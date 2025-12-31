@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
       label: 'Ứng dụng',
       collapsed: false,
       items: [
+        'apps/local-server',
         'apps/web-admin',
         'apps/web-dashboard',
         'apps/ccb',
@@ -73,7 +74,7 @@ const sidebars: SidebarsConfig = {
     'api/overview',
     {
       type: 'category',
-      label: 'REST API',
+      label: 'REST API (Cloud)',
       items: [
         'api/rest/authentication',
         'api/rest/stores',
@@ -86,7 +87,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Local API (CCB)',
+      label: 'Local API (Server)',
       items: [
         'api/local/endpoints',
         'api/local/websocket-events',

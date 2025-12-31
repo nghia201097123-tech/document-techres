@@ -4,157 +4,291 @@ sidebar_position: 2
 
 # Mô hình kinh doanh
 
-Hệ thống hỗ trợ 2 mô hình kinh doanh khác nhau, phù hợp với quy mô của từng quán.
+Hệ thống FNB POS hỗ trợ **3 mô hình kinh doanh** phù hợp với các quy mô quán khác nhau.
 
-## Mô hình 1: Quán nhỏ
+## Tổng quan 3 mô hình
+
+| Tiêu chí | Order Only | CCB Only | Full System |
+|----------|------------|----------|-------------|
+| **Quy mô** | 1 người | 1-3 người | 4+ người |
+| **Thiết bị** | 1 điện thoại | 1 máy POS | Server + nhiều thiết bị |
+| **Database** | SQLite trên điện thoại | SQLite trên POS | SQLite/SQL Server trên Server |
+| **Kết nối** | Không cần LAN | Không cần LAN | Cần LAN/WiFi |
+| **In ấn** | Bluetooth | USB/Bluetooth/LAN | Tập trung qua Server |
+| **Chi phí** | Thấp | Trung bình | Cao |
+| **Mở rộng** | Không | Hạn chế | Linh hoạt |
+
+---
+
+## Mô hình 1: Order Only (Quán rất nhỏ)
+
+### Kiến trúc
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLOUD SERVER                            │
+│                    (Sync khi có internet)                       │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      CỬA HÀNG                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │              ORDER APP (Standalone Mode)                 │   │
+│   │                   Kotlin / Android                       │   │
+│   ├─────────────────────────────────────────────────────────┤   │
+│   │  • SQLite Local (tự quản lý dữ liệu)                    │   │
+│   │  • Tạo order, thanh toán ngay trên app                  │   │
+│   │  • In bill qua Bluetooth (máy in mini)                  │   │
+│   │  • Chốt ca, báo cáo                                     │   │
+│   │  • Sync lên Cloud khi có mạng                           │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌──────────────┐                             │
+│                    │ Máy in mini  │                             │
+│                    │ (Bluetooth)  │                             │
+│                    └──────────────┘                             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Đặc điểm
-- 1-2 nhân viên
-- Quán cafe, trà sữa, xe đẩy
-- Không gian nhỏ, không cần nhiều thiết bị
 
-### Thiết bị sử dụng
-- **Chỉ 1 điện thoại** chạy Order App ở chế độ **Standalone**
-- Máy in Bluetooth mini (tùy chọn)
+- 1 người vừa order vừa thu ngân
+- Không cần mạng LAN
+- In qua Bluetooth
+- **Phù hợp**: xe đẩy, quán vỉa hè, 1 người bán
 
-### Luồng hoạt động
+### Tính năng Order App (Standalone)
 
-```
-Khách đến quán
-      │
-      ▼
-Nhân viên mở Order App (Standalone Mode)
-      │
-      ▼
-Chọn món, thêm vào order
-      │
-      ▼
-Thanh toán ngay trên app
-      │
-      ▼
-In bill (Bluetooth) hoặc không in
-      │
-      ▼
-Tự làm món và phục vụ
-```
-
-### Tính năng Standalone Mode
-
-| Tính năng | Có/Không |
-|-----------|----------|
-| Xem/quản lý menu | ✅ Local DB |
-| Tạo order | ✅ Lưu local |
-| Thanh toán | ✅ Trên app |
-| In bill | ✅ Bluetooth |
-| In bếp | ✅ Bluetooth |
-| Báo cáo | ✅ Trên app |
-| Chốt ca | ✅ Trên app |
-| Quản lý menu | ✅ Trên app |
-| Sync Cloud | ✅ Trực tiếp |
+| Tính năng | Có/Không | Mô tả |
+|-----------|----------|-------|
+| Xem/quản lý menu | ✅ | Local DB |
+| Tạo order | ✅ | Lưu local |
+| Thanh toán | ✅ | Trên app |
+| In bill | ✅ | Bluetooth |
+| In bếp | ✅ | Bluetooth |
+| Báo cáo | ✅ | Trên app |
+| Chốt ca | ✅ | Trên app |
+| Sync Cloud | ✅ | Trực tiếp |
 
 ---
 
-## Mô hình 2: Quán lớn
+## Mô hình 2: CCB Only (Quán nhỏ có quầy)
+
+### Kiến trúc
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLOUD SERVER                            │
+│                    (Sync khi có internet)                       │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      CỬA HÀNG                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │                   CCB APP (Standalone)                   │   │
+│   │           Kotlin/Android hoặc .NET/Windows               │   │
+│   ├─────────────────────────────────────────────────────────┤   │
+│   │  • SQLite Local (tự quản lý dữ liệu)                    │   │
+│   │  • Thu ngân tự order và thanh toán                      │   │
+│   │  • In bill qua USB/Bluetooth/LAN                        │   │
+│   │  • Chốt ca, báo cáo                                     │   │
+│   │  • Sync lên Cloud khi có mạng                           │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                            │                                    │
+│              ┌─────────────┼─────────────┐                      │
+│              ▼             ▼             ▼                      │
+│      ┌────────────┐ ┌────────────┐ ┌────────────┐               │
+│      │ Máy in Bill│ │ Máy in Bếp│ │ Máy in Bar │               │
+│      └────────────┘ └────────────┘ └────────────┘               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Đặc điểm
-- Nhiều nhân viên (3+)
-- Nhà hàng, quán ăn, cafe lớn
-- Có khu bếp/bar riêng
 
-### Thiết bị sử dụng
-- **POS Thu ngân (CCB Master)**: Windows hoặc Android tablet
-- **Màn hình Bếp/Bar (CCB Client)**: Hiển thị món cần làm
-- **Order App (Client Mode)**: Điện thoại cho nhân viên phục vụ
-- Máy in bill (USB/LAN)
-- Máy in tem bếp/bar (USB/LAN)
+- Thu ngân ngồi 1 chỗ, khách đến quầy order
+- Không cần app Order riêng
+- Có thể có nhiều máy in (bếp, bar, bill)
+- **Phù hợp**: quán cafe, trà sữa, fast food nhỏ
 
-### Luồng hoạt động
+### Tính năng CCB App (Standalone)
 
-```
-Khách đến quán
-      │
-      ▼
-Nhân viên A dùng Order App → Gọi món cho Bàn 5
-      │
-      ▼
-Order gửi về CCB (POS Thu ngân) qua WebSocket
-      │
-      ▼
-CCB lưu vào SQLite + broadcast đến tất cả clients
-      │
-      ├───────────────────────────────────┐
-      ▼                                   ▼
-Màn hình Bếp hiển thị món           Các Order App khác
-+ In tem bếp tự động                thấy Bàn 5 đang sử dụng
-      │
-      ▼
-Bếp làm xong → Bấm "Hoàn thành"
-      │
-      ▼
-Order App của NV A hiện thông báo "Món X sẵn sàng"
-      │
-      ▼
-NV A mang món ra → Khách dùng xong
-      │
-      ▼
-Khách thanh toán tại quầy thu ngân (CCB)
-```
-
-### Tính năng Client Mode (Order App)
-
-| Tính năng | Có/Không |
-|-----------|----------|
-| Xem menu | ✅ Từ POS |
-| Tạo order | ✅ Gửi POS |
-| Thanh toán | ❌ Trên POS |
-| In bill | ❌ POS in |
-| In bếp | ❌ POS in |
-| Báo cáo | ❌ Trên POS |
-| Chốt ca | ❌ Trên POS |
-| Quản lý menu | ❌ Trên Web Dashboard |
-| Sync Cloud | ❌ Qua POS |
+| Tính năng | Có/Không | Mô tả |
+|-----------|----------|-------|
+| Xem/quản lý menu | ✅ | Local DB |
+| Tạo order | ✅ | Trực tiếp |
+| Thanh toán | ✅ | Trên app |
+| In bill | ✅ | USB/Bluetooth/LAN |
+| In bếp/bar | ✅ | USB/Bluetooth/LAN |
+| Báo cáo | ✅ | Trên app |
+| Chốt ca | ✅ | Trên app |
+| Sync Cloud | ✅ | Trực tiếp |
 
 ---
 
-## So sánh 2 mô hình
+## Mô hình 3: Full System (Quán lớn)
 
-| Tiêu chí | Quán nhỏ | Quán lớn |
-|----------|----------|----------|
-| Thiết bị | 1 điện thoại | Nhiều thiết bị |
-| Order App mode | Standalone | Client |
-| Database | Trên điện thoại | Trên POS |
-| Thanh toán | Trên điện thoại | Tại quầy thu ngân |
-| Màn hình bếp | Không có | Có |
-| Chi phí setup | Thấp | Cao hơn |
-| Khả năng mở rộng | Hạn chế | Linh hoạt |
+### Kiến trúc
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLOUD SERVER                            │
+│                    (Sync khi có internet)                       │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      CỬA HÀNG (LAN/WIFI)                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │              LOCAL SERVER (Trung tâm)                    │   │
+│   │              .NET / ASP.NET Core / Windows               │   │
+│   ├─────────────────────────────────────────────────────────┤   │
+│   │  • SQLite hoặc SQL Server Local                         │   │
+│   │  • REST API + WebSocket Server (SignalR)                │   │
+│   │  • Print Queue (quản lý lệnh in)                        │   │
+│   │  • UDP Broadcast (Discovery)                            │   │
+│   │  • Sync lên Cloud khi có mạng                           │   │
+│   └────────────────────────┬────────────────────────────────┘   │
+│                            │                                    │
+│              WebSocket + HTTP (Realtime trong LAN)              │
+│                            │                                    │
+│   ┌────────────────────────┼────────────────────────────────┐   │
+│   │                        │                                │   │
+│   ▼                        ▼                                ▼   │
+│ ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
+│ │  CCB App     │    │  CCB App     │    │    Order App     │   │
+│ │  (Thu ngân)  │    │  (Bếp/Bar)   │    │    (Nhân viên)   │   │
+│ │  .NET/Win    │    │  Kotlin/And  │    │    Kotlin/And    │   │
+│ │  hoặc Kotlin │    │  hoặc .NET   │    │                  │   │
+│ ├──────────────┤    ├──────────────┤    ├──────────────────┤   │
+│ │ • Thanh toán │    │ • Xem món    │    │ • Xem bàn        │   │
+│ │ • In bill    │    │ • In tem     │    │ • Gọi món        │   │
+│ │ • Chốt ca    │    │ • Đánh dấu   │    │ • Chuyển bàn     │   │
+│ │ • Báo cáo    │    │   hoàn thành │    │ • Gọi thanh toán │   │
+│ └──────────────┘    └──────────────┘    └──────────────────┘   │
+│                                                                 │
+│          Tất cả kết nối vào LOCAL SERVER qua LAN                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Đặc điểm
+
+- Local Server chạy trên máy Windows là trung tâm
+- CCB và Order App đều là client, kết nối vào Server
+- Không phụ thuộc internet
+- **Phù hợp**: nhà hàng, quán lớn, nhiều nhân viên
+
+### Vai trò Local Server
+
+| Chức năng | Mô tả |
+|-----------|-------|
+| REST API | Cung cấp API cho tất cả client |
+| WebSocket Server | SignalR cho realtime communication |
+| Database | SQLite hoặc SQL Server LocalDB |
+| Print Queue | Quản lý lệnh in tập trung |
+| UDP Broadcast | Discovery cho các client |
+| Cloud Sync | Đồng bộ dữ liệu lên cloud |
+
+### Chế độ hoạt động của các App
+
+| App | Chế độ | Database | Kết nối |
+|-----|--------|----------|---------|
+| CCB Thu ngân | Client | Không có DB | Kết nối Local Server |
+| CCB Bếp/Bar | Client | Không có DB | Kết nối Local Server |
+| Order App | Client | Không có DB | Kết nối Local Server |
+
+### Tính năng Order App (Client Mode)
+
+| Tính năng | Có/Không | Mô tả |
+|-----------|----------|-------|
+| Xem menu | ✅ | Từ Server |
+| Tạo order | ✅ | Gửi Server |
+| Thanh toán | ❌ | Trên CCB |
+| In bill | ❌ | Server in |
+| In bếp | ❌ | Server in |
+| Báo cáo | ❌ | Trên CCB/Web |
+| Chốt ca | ❌ | Trên CCB |
+| Sync Cloud | ❌ | Qua Server |
 
 ---
 
-## Chuyển đổi giữa 2 mô hình
+## Chọn mô hình phù hợp
 
-Khi quán nhỏ phát triển và cần nâng cấp:
+### Khi nào chọn Order Only?
+
+- Quán 1 người (chủ tự bán)
+- Không có quầy thu ngân cố định
+- Di động nhiều (xe đẩy, food truck)
+- Ngân sách hạn chế
+
+### Khi nào chọn CCB Only?
+
+- Quán có quầy thu ngân
+- 1-3 nhân viên
+- Khách đến quầy order
+- Không cần nhân viên phục vụ bàn
+
+### Khi nào chọn Full System?
+
+- Quán lớn, nhiều bàn
+- 4+ nhân viên
+- Có nhân viên phục vụ bàn
+- Cần bếp/bar riêng
+- Cần quản lý tập trung
+
+---
+
+## Chuyển đổi giữa các mô hình
+
+### Order Only → CCB Only
 
 ```
-Quán nhỏ dùng Standalone
+Quán phát triển, cần quầy thu ngân
         │
         ▼
-Quán phát triển, mua POS
+Mua máy POS, cài CCB App (Standalone)
         │
         ▼
-Vào Settings → "Chuyển sang chế độ Client"
+Order App sync lên Cloud → CCB tải về
         │
         ▼
-App tìm POS → Kết nối → Hoạt động như Client
+Ngừng dùng Order App Standalone
+```
+
+### CCB Only → Full System
+
+```
+Quán phát triển, cần nhiều nhân viên
         │
         ▼
-Data cũ trên Standalone → Sync lên Cloud → POS tải về
+Cài Local Server trên Windows
+        │
+        ▼
+CCB App chuyển sang Client Mode
+        │
+        ▼
+Thêm Order App cho nhân viên
+        │
+        ▼
+Thêm CCB App Bếp/Bar nếu cần
 ```
 
 ### Lưu ý khi chuyển đổi
 
 1. **Backup dữ liệu** trước khi chuyển
-2. **Sync đầy đủ** lên cloud từ Standalone
-3. **POS tải về** dữ liệu từ cloud
+2. **Sync đầy đủ** lên cloud
+3. **Import dữ liệu** vào hệ thống mới
 4. **Kiểm tra** menu, bàn, nhân viên đầy đủ
 5. **Training** nhân viên sử dụng hệ thống mới
 
@@ -162,8 +296,8 @@ Data cũ trên Standalone → Sync lên Cloud → POS tải về
 
 ## Gói dịch vụ
 
-| Gói | Số thiết bị | Tính năng | Giá |
-|-----|-------------|-----------|-----|
-| **Basic** | 1 | Standalone mode | Miễn phí |
-| **Pro** | 5 | Full features | 299k/tháng |
-| **Enterprise** | Không giới hạn | Full + API access | Liên hệ |
+| Gói | Mô hình | Số thiết bị | Tính năng | Giá |
+|-----|---------|-------------|-----------|-----|
+| **Basic** | Order Only | 1 | Standalone mode | Miễn phí |
+| **Pro** | CCB Only | 1 POS + 3 máy in | Full features | 299k/tháng |
+| **Enterprise** | Full System | Không giới hạn | Full + API access | Liên hệ |

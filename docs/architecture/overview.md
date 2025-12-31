@@ -4,99 +4,111 @@ sidebar_position: 1
 
 # Tổng quan kiến trúc
 
-Hệ thống FNB POS được thiết kế theo kiến trúc **Offline-First** với CCB App đóng vai trò là **Local Server** trong cửa hàng.
+Hệ thống FNB POS được thiết kế theo kiến trúc **Offline-First** với 3 mô hình triển khai phù hợp với các quy mô quán khác nhau.
 
-## Mô hình quán lớn (Có POS)
+## Kiến trúc tổng quan
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         CLOUD/SERVER                            │
+│                      WEB ADMIN (Super Admin)                    │
+│                    Quản lý toàn bộ hệ thống                     │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   ┌─────────────────┐         ┌─────────────────────────────┐   │
-│   │   Web Dashboard │         │        REST API +           │   │
-│   │   (Quản lý)     │────────►│        PostgreSQL           │   │
-│   └─────────────────┘         └──────────────┬──────────────┘   │
-│                                              │                  │
-│   Chức năng:                                 │ Sync cuối ngày   │
-│   • Tạo menu, giá                            │ hoặc có mạng     │
-│   • Quản lý bàn, khu vực                     │                  │
-│   • Báo cáo tổng hợp                         │                  │
-│   • Quản lý nhân viên                        │                  │
-│                                              │                  │
-└──────────────────────────────────────────────┼──────────────────┘
-                                               │
-                                               ▼
+│  • Tạo nhà hàng/quán mới                                        │
+│  • Tạo tài khoản Owner cho từng quán                            │
+│  • Quản lý gói dịch vụ, billing, thanh toán                     │
+│  • Xem thống kê toàn hệ thống (tất cả quán)                     │
+│  • Hỗ trợ khách hàng, xử lý sự cố                               │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ Tạo quán + cấp tài khoản
+                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      CỬA HÀNG (LAN/WIFI)                        │
+│                   WEB DASHBOARD (Chủ quán/Owner)                │
+│                     Quản lý 1 quán cụ thể                       │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐   │
-│   │              POS THU NGÂN (CCB Master)                   │   │
-│   │                 Windows + Android                        │   │
-│   ├─────────────────────────────────────────────────────────┤   │
-│   │  • SQLite (Local DB) - Source of Truth trong cửa hàng   │   │
-│   │  • Socket Server (WebSocket cho tất cả clients)         │   │
-│   │  • UDP Broadcast (Discovery)                            │   │
-│   │  • Print Queue (Quản lý lệnh in)                        │   │
-│   │  • Thanh toán, in bill khách                            │   │
-│   │  • Sync dữ liệu lên Cloud Server                        │   │
-│   └────────────────────────┬────────────────────────────────┘   │
-│                            │                                    │
-│              WebSocket (Realtime trong LAN)                     │
-│                            │                                    │
-│   ┌────────────────────────┼────────────────────────────────┐   │
-│   │                        │                                │   │
-│   ▼                        ▼                                ▼   │
-│ ┌──────────────┐    ┌────────────┐    ┌────────────────────┐   │
-│ │ POS BẾP/BAR  │    │ Order App  │    │    Order App       │   │
-│ │ (CCB Client) │    │ (NV 1)     │    │    (NV 2, 3...)    │   │
-│ ├──────────────┤    │ Client Mode│    │    Client Mode     │   │
-│ │ • Hiển thị   │    └────────────┘    └────────────────────┘   │
-│ │   món chờ    │                                                │
-│ │ • In tem bếp │                                                │
-│ │ • Đánh dấu   │                                                │
-│ │   hoàn thành │                                                │
-│ └──────────────┘                                                │
-│                                                                 │
+│  • Đăng nhập bằng tài khoản được Web Admin cấp                  │
+│  • Xây dựng menu, giá, danh mục                                 │
+│  • Quản lý bàn, khu vực                                         │
+│  • Tạo tài khoản nhân viên (thu ngân, phục vụ)                  │
+│  • Xem báo cáo doanh thu, thống kê                              │
+│  • Cấu hình quán (máy in, thiết bị, thanh toán)                 │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ Sync data xuống thiết bị
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   CỬA HÀNG (Offline-First)                      │
+│         Chọn 1 trong 3 mô hình phù hợp quy mô                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Mô hình quán nhỏ (Không có POS)
+## 3 Mô hình triển khai
+
+### Mô hình 1: Order Only (Quán rất nhỏ)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         CLOUD/SERVER                            │
-├─────────────────────────────────────────────────────────────────┤
-│   ┌─────────────────┐         ┌─────────────────────────────┐   │
-│   │   Web Dashboard │         │        REST API +           │   │
-│   │   (Quản lý)     │────────►│        PostgreSQL           │   │
-│   └─────────────────┘         └──────────────┬──────────────┘   │
-│                                              │ Sync khi có mạng │
-└──────────────────────────────────────────────┼──────────────────┘
-                                               │
-                                               ▼
-┌─────────────────────────────────────────────────────────────────┐
 │                      CỬA HÀNG                                   │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │           ORDER APP (Standalone Mode)                    │   │
-│   │              Android / iOS                               │   │
+│   │              ORDER APP (Standalone Mode)                 │   │
+│   │                   Kotlin / Android                       │   │
 │   ├─────────────────────────────────────────────────────────┤   │
 │   │  • SQLite Local (tự quản lý dữ liệu)                    │   │
 │   │  • Tạo order, thanh toán ngay trên app                  │   │
 │   │  • In bill qua Bluetooth (máy in mini)                  │   │
-│   │  • Chốt ca, báo cáo                                     │   │
+│   │  • Sync lên Cloud khi có mạng                           │   │
+│   └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Mô hình 2: CCB Only (Quán nhỏ có quầy)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      CỬA HÀNG                                   │
+├─────────────────────────────────────────────────────────────────┤
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │                   CCB APP (Standalone)                   │   │
+│   │           Kotlin/Android hoặc .NET/Windows               │   │
+│   ├─────────────────────────────────────────────────────────┤   │
+│   │  • SQLite Local (tự quản lý dữ liệu)                    │   │
+│   │  • Thu ngân tự order và thanh toán                      │   │
+│   │  • In bill qua USB/Bluetooth/LAN                        │   │
 │   │  • Sync lên Cloud khi có mạng                           │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │                            │                                    │
-│                            ▼                                    │
-│                    ┌──────────────┐                             │
-│                    │ Máy in mini  │                             │
-│                    │ (Bluetooth)  │                             │
-│                    └──────────────┘                             │
-│                                                                 │
+│              ┌─────────────┼─────────────┐                      │
+│              ▼             ▼             ▼                      │
+│      ┌────────────┐ ┌────────────┐ ┌────────────┐               │
+│      │ Máy in Bill│ │ Máy in Bếp│ │ Máy in Bar │               │
+│      └────────────┘ └────────────┘ └────────────┘               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Mô hình 3: Full System (Quán lớn)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      CỬA HÀNG (LAN/WIFI)                        │
+├─────────────────────────────────────────────────────────────────┤
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │              LOCAL SERVER (Trung tâm)                    │   │
+│   │              .NET / ASP.NET Core / Windows               │   │
+│   ├─────────────────────────────────────────────────────────┤   │
+│   │  • SQLite hoặc SQL Server Local                         │   │
+│   │  • REST API + WebSocket Server (SignalR)                │   │
+│   │  • Print Queue (quản lý lệnh in)                        │   │
+│   │  • UDP Broadcast (Discovery)                            │   │
+│   │  • Sync lên Cloud khi có mạng                           │   │
+│   └────────────────────────┬────────────────────────────────┘   │
+│                            │                                    │
+│   ┌────────────────────────┼────────────────────────────────┐   │
+│   │                        │                                │   │
+│   ▼                        ▼                                ▼   │
+│ ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
+│ │  CCB App     │    │  CCB App     │    │    Order App     │   │
+│ │  (Thu ngân)  │    │  (Bếp/Bar)   │    │    (Nhân viên)   │   │
+│ └──────────────┘    └──────────────┘    └──────────────────┘   │
+│          Tất cả kết nối vào LOCAL SERVER qua LAN                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -104,13 +116,16 @@ Hệ thống FNB POS được thiết kế theo kiến trúc **Offline-First** v
 
 ### 1. Offline-First
 - Mọi tính năng core phải hoạt động không cần internet
-- CCB là **Source of Truth** trong cửa hàng
+- Database local (SQLite) là **Source of Truth** trong cửa hàng
 - Sync dữ liệu lên cloud khi có mạng
 
 ### 2. Single Source of Truth
-- CCB giữ SQLite database làm nguồn dữ liệu chính
-- Order App (Client Mode) không có database, chỉ lấy data từ CCB
-- Tránh conflict bằng cách chỉ có 1 nơi ghi data
+
+| Mô hình | Source of Truth | Ghi chú |
+|---------|-----------------|---------|
+| Order Only | SQLite trên Order App | App tự quản lý |
+| CCB Only | SQLite trên CCB App | App tự quản lý |
+| Full System | SQLite trên Local Server | Tất cả client kết nối vào |
 
 ### 3. Graceful Degradation
 - Tính năng online bị disable khi offline, không crash
@@ -142,6 +157,7 @@ Super Admin đăng nhập Web Admin
 Tạo nhà hàng mới:
 ├── Nhập: Tên quán, địa chỉ, SĐT, email owner
 ├── Chọn gói dịch vụ (Basic, Pro, Enterprise)
+├── Chọn mô hình sử dụng (Order Only / CCB Only / Full System)
 ├── Hệ thống tự động:
 │   ├── Tạo store_id (UUID)
 │   ├── Tạo tài khoản Owner (email + password tạm)
@@ -168,11 +184,25 @@ Nhân viên đăng nhập CCB/Order App:
 
 ## Yêu cầu kỹ thuật
 
-### Hardware tối thiểu cho CCB
-- **RAM 4GB**: Cho ~30 connections đồng thời
-- **RAM 2GB**: Chỉ nên dùng cho 10-15 connections
-- **Storage**: Tối thiểu 1GB trống cho database
+### Hardware tối thiểu
+
+| Thành phần | Yêu cầu tối thiểu | Khuyến nghị |
+|------------|-------------------|-------------|
+| Local Server | RAM 4GB, SSD 128GB | RAM 8GB, SSD 256GB |
+| CCB App (Windows) | RAM 4GB | RAM 8GB |
+| CCB App (Android) | RAM 2GB | RAM 4GB |
+| Order App | RAM 2GB | RAM 3GB |
 
 ### Network
-- WiFi/LAN cho kết nối nội bộ
+
+- WiFi/LAN cho kết nối nội bộ (Mô hình 3)
 - Internet cho sync lên cloud (không bắt buộc realtime)
+- Khuyến nghị: Router WiFi riêng cho hệ thống POS
+
+### Cấu hình máy cho Local Server
+
+| Số connection | RAM tối thiểu | Khuyến nghị |
+|---------------|---------------|-------------|
+| 10-15 | 2GB | 4GB |
+| 15-30 | 4GB | 8GB |
+| 30+ | 8GB | 16GB |

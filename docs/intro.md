@@ -9,12 +9,13 @@ Chào mừng bạn đến với tài liệu kỹ thuật của **Hệ thống PO
 
 ## Tổng quan
 
-FNB POS System là hệ thống bán hàng được thiết kế với cơ chế **Offline-First**, hỗ trợ 2 mô hình kinh doanh:
+FNB POS System là hệ thống bán hàng được thiết kế với cơ chế **Offline-First**, hỗ trợ **3 mô hình kinh doanh**:
 
-| Mô hình | Đối tượng | Thiết bị sử dụng |
-|---------|-----------|------------------|
-| **Quán nhỏ** | 1-2 nhân viên, quán cafe, trà sữa nhỏ | Chỉ dùng điện thoại (Order App chế độ Standalone) |
-| **Quán lớn** | Nhiều nhân viên, nhà hàng, quán lớn | Điện thoại (Order App) + Máy POS (CCB) + Màn hình bếp |
+| Mô hình | Đối tượng | Thiết bị | Mô tả |
+|---------|-----------|----------|-------|
+| **Mô hình 1: Order Only** | Quán rất nhỏ, 1 người | Chỉ điện thoại (Order App) | App Order chạy độc lập, có SQLite, tự thanh toán, in Bluetooth |
+| **Mô hình 2: CCB Only** | Quán nhỏ, có quầy thu ngân | Chỉ máy POS (CCB App) | App CCB chạy độc lập, có SQLite, thu ngân tự order và thanh toán |
+| **Mô hình 3: Full System** | Quán lớn, nhiều nhân viên | Order + CCB + Local Server | Server chạy trên Windows làm trung tâm, CCB và Order kết nối vào |
 
 ## Các thành phần hệ thống
 
@@ -22,10 +23,11 @@ FNB POS System là hệ thống bán hàng được thiết kế với cơ chế
 |------------|----------|---------|
 | **Web Admin** | React/Next.js | Super Admin - Tạo quán mới, quản lý tài khoản owner, billing |
 | **Web Dashboard** | React/Next.js | Chủ quán - Xây dựng menu, bàn, nhân viên, xem báo cáo |
-| **CCB App (Thu ngân)** | React Native | Thu ngân, thanh toán, in bill, đóng vai trò Local API Server |
-| **CCB App (Bếp/Bar)** | React Native | Hiển thị món cần làm, in tem bếp, đánh dấu hoàn thành |
-| **Order App** | React Native | Nhân viên order món - 2 chế độ: Standalone và Client |
-| **Customer App** | React Native/Web | Khách hàng xem điểm, lịch sử (Online only) |
+| **Local Server** | .NET trên Windows | API Server local cho mô hình Full System |
+| **CCB App (Thu ngân)** | Kotlin/Android hoặc .NET/Windows | Thu ngân, thanh toán, in bill |
+| **CCB App (Bếp/Bar)** | Kotlin/Android hoặc .NET/Windows | Hiển thị món, in tem, đánh dấu hoàn thành |
+| **Order App** | Kotlin/Android | Nhân viên order món |
+| **Customer App** | Kotlin hoặc Web | Khách hàng xem điểm, lịch sử |
 
 ## Kiến trúc tổng quan
 
@@ -33,20 +35,42 @@ FNB POS System là hệ thống bán hàng được thiết kế với cơ chế
 ┌─────────────────────────────────────────────────────────────────┐
 │                      WEB ADMIN (Super Admin)                    │
 │                    Quản lý toàn bộ hệ thống                     │
+├─────────────────────────────────────────────────────────────────┤
+│  • Tạo nhà hàng/quán mới                                        │
+│  • Tạo tài khoản Owner cho từng quán                            │
+│  • Quản lý gói dịch vụ, billing, thanh toán                     │
+│  • Xem thống kê toàn hệ thống (tất cả quán)                     │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ Tạo quán + cấp tài khoản
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   WEB DASHBOARD (Chủ quán/Owner)                │
 │                     Quản lý 1 quán cụ thể                       │
+├─────────────────────────────────────────────────────────────────┤
+│  • Đăng nhập bằng tài khoản được Web Admin cấp                  │
+│  • Xây dựng menu, giá, danh mục                                 │
+│  • Quản lý bàn, khu vực                                         │
+│  • Tạo tài khoản nhân viên (thu ngân, phục vụ)                  │
+│  • Xem báo cáo doanh thu, thống kê                              │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ Sync data xuống thiết bị
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              CỬA HÀNG (CCB + Order App + Bếp/Bar)               │
-│                     Hoạt động Offline-First                     │
+│                   CỬA HÀNG (Offline-First)                      │
+│         Chọn 1 trong 3 mô hình phù hợp quy mô                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## Phân quyền hệ thống
+
+| Hệ thống | Role | Quyền |
+|----------|------|-------|
+| **Web Admin** | Super Admin | Tạo quán, quản lý billing, xem tất cả quán |
+| **Web Admin** | Support | Hỗ trợ khách hàng, xem thông tin quán (không sửa) |
+| **Web Dashboard** | Owner | Toàn quyền với quán của mình |
+| **Web Dashboard** | Manager | Quản lý menu, nhân viên, xem báo cáo (không xóa quán) |
+| **CCB App** | Cashier | Thu ngân, thanh toán, chốt ca |
+| **Order App** | Staff | Order món, phục vụ, xem trạng thái |
 
 ## Tính năng chính
 
@@ -56,9 +80,9 @@ FNB POS System là hệ thống bán hàng được thiết kế với cơ chế
 - Xử lý conflict thông minh
 
 ### Đa thiết bị
-- Hỗ trợ Android, iOS, Windows
+- Hỗ trợ Android và Windows
 - Kết nối qua mạng LAN/WiFi
-- Auto-discovery thiết bị
+- Auto-discovery thiết bị (UDP Broadcast)
 
 ### Hệ thống in ấn
 - In bill, tem bếp/bar
@@ -73,18 +97,22 @@ FNB POS System là hệ thống bán hàng được thiết kế với cơ chế
 ## Bắt đầu nhanh
 
 1. **[Tổng quan kiến trúc](/docs/architecture/overview)** - Hiểu cách hệ thống hoạt động
-2. **[Hướng dẫn cài đặt](/docs/guides/getting-started)** - Thiết lập môi trường phát triển
-3. **[API Reference](/docs/api/overview)** - Tài liệu API chi tiết
+2. **[3 Mô hình kinh doanh](/docs/architecture/business-models)** - Chọn mô hình phù hợp
+3. **[Hướng dẫn cài đặt](/docs/guides/getting-started)** - Thiết lập môi trường phát triển
+4. **[API Reference](/docs/api/overview)** - Tài liệu API chi tiết
 
 ## Công nghệ sử dụng
 
-| Layer | Công nghệ |
-|-------|-----------|
-| Web Dashboard | React/Next.js + TypeScript |
-| Server API | Node.js + Express/Fastify |
-| Database Server | PostgreSQL + Prisma |
-| Mobile Apps | React Native |
-| Local DB | SQLite |
-| State Management | Zustand |
-| WebSocket | Socket.io |
-| Print | ESC/POS Protocol |
+| Thành phần | Công nghệ | Nền tảng |
+|------------|-----------|----------|
+| **Order App** | Kotlin (Native Android) | Android |
+| **CCB App (Android)** | Kotlin (Native Android) | Android |
+| **CCB App (Windows)** | .NET (WPF/WinForms) | Windows |
+| **Local Server** | .NET (ASP.NET Core) | Windows |
+| **Web Admin** | React/Next.js | Web |
+| **Web Dashboard** | React/Next.js | Web |
+| **Cloud Server** | .NET (ASP.NET Core) | Cloud |
+| **Database Server** | PostgreSQL | Cloud |
+| **Local Database** | SQLite | Local |
+| **WebSocket** | SignalR | All |
+| **Print** | ESC/POS Protocol | All |
