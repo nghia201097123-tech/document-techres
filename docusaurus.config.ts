@@ -3,8 +3,8 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'TechRes Documentation',
-  tagline: 'Tài liệu kỹ thuật dự án TechRes',
+  title: 'FNB POS System',
+  tagline: 'Hệ thống POS F&B Offline-First - Tài liệu kỹ thuật',
   favicon: 'img/favicon.ico',
 
   url: 'https://nghia201097123-tech.github.io',
@@ -45,19 +45,25 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/fnb-pos-social-card.jpg',
     navbar: {
-      title: 'TechRes Docs',
+      title: 'FNB POS',
       logo: {
-        alt: 'TechRes Logo',
+        alt: 'FNB POS Logo',
         src: 'img/logo.svg',
       },
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'docsSidebar',
           position: 'left',
           label: 'Tài liệu',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'apiSidebar',
+          position: 'left',
+          label: 'API',
         },
         {to: '/blog', label: 'Blog', position: 'left'},
         {
@@ -74,17 +80,33 @@ const config: Config = {
           title: 'Tài liệu',
           items: [
             {
+              label: 'Giới thiệu',
+              to: '/docs/',
+            },
+            {
+              label: 'Kiến trúc',
+              to: '/docs/architecture/overview',
+            },
+            {
               label: 'Hướng dẫn',
-              to: '/docs/intro',
+              to: '/docs/guides/getting-started',
             },
           ],
         },
         {
-          title: 'Cộng đồng',
+          title: 'Ứng dụng',
           items: [
             {
-              label: 'GitHub',
-              href: 'https://github.com/nghia201097123-tech/document-techres',
+              label: 'CCB App',
+              to: '/docs/apps/ccb',
+            },
+            {
+              label: 'Order App',
+              to: '/docs/apps/order',
+            },
+            {
+              label: 'Web Dashboard',
+              to: '/docs/apps/web-dashboard',
             },
           ],
         },
@@ -95,14 +117,23 @@ const config: Config = {
               label: 'Blog',
               to: '/blog',
             },
+            {
+              label: 'GitHub',
+              href: 'https://github.com/nghia201097123-tech/document-techres',
+            },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} TechRes. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} FNB POS System. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ['sql', 'bash', 'json', 'typescript'],
+    },
+    tableOfContents: {
+      minHeadingLevel: 2,
+      maxHeadingLevel: 4,
     },
   } satisfies Preset.ThemeConfig,
 };

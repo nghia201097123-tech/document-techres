@@ -19,8 +19,14 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/intro">
-            Bắt đầu ngay - 5 phút ⏱️
+            to="/docs/">
+            Xem tài liệu
+          </Link>
+          <Link
+            className="button button--outline button--secondary button--lg"
+            style={{marginLeft: '1rem'}}
+            to="/docs/guides/getting-started">
+            Bắt đầu nhanh
           </Link>
         </div>
       </div>
@@ -33,7 +39,7 @@ export default function Home(): JSX.Element {
   return (
     <Layout
       title={`Trang chủ`}
-      description="Tài liệu kỹ thuật dự án TechRes">
+      description="Tài liệu kỹ thuật hệ thống POS F&B Offline-First">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

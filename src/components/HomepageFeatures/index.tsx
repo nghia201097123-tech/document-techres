@@ -10,22 +10,22 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Dễ sử dụng',
+    title: 'Offline-First',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Tài liệu được thiết kế để dễ dàng tìm kiếm và sử dụng.
-        Bạn có thể nhanh chóng tìm thấy những gì bạn cần.
+        Mọi tính năng core hoạt động không cần internet.
+        CCB đóng vai trò Local Server, đảm bảo cửa hàng luôn vận hành.
       </>
     ),
   },
   {
-    title: 'Tập trung vào nội dung',
+    title: 'Đa nền tảng',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        Tập trung vào tài liệu của bạn, chúng tôi sẽ lo phần còn lại.
-        Chỉ cần viết Markdown và để Docusaurus xử lý.
+        Hỗ trợ Android, iOS, Windows. Order App có 2 chế độ:
+        Standalone cho quán nhỏ, Client cho quán lớn.
       </>
     ),
   },
@@ -34,8 +34,8 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        Mở rộng hoặc tùy chỉnh layout website bằng cách sử dụng React.
-        Docusaurus có thể được mở rộng trong khi vẫn sử dụng cùng header và footer.
+        Sử dụng React Native cho mobile apps và React/Next.js cho web.
+        Monorepo giúp chia sẻ 70-80% code giữa các ứng dụng.
       </>
     ),
   },

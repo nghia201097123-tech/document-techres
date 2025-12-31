@@ -1,24 +1,96 @@
 import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
-  tutorialSidebar: [
+  docsSidebar: [
     'intro',
     {
       type: 'category',
-      label: 'Hướng dẫn',
+      label: 'Kiến trúc hệ thống',
+      collapsed: false,
       items: [
-        'tutorial/getting-started',
-        'tutorial/installation',
-        'tutorial/configuration',
+        'architecture/overview',
+        'architecture/business-models',
+        'architecture/system-components',
+        'architecture/data-flow',
+        'architecture/monorepo-structure',
       ],
     },
     {
       type: 'category',
-      label: 'API Reference',
+      label: 'Ứng dụng',
+      collapsed: false,
       items: [
-        'api/overview',
-        'api/endpoints',
-        'api/authentication',
+        'apps/web-admin',
+        'apps/web-dashboard',
+        'apps/ccb',
+        'apps/order',
+        'apps/customer',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Database',
+      items: [
+        'database/overview',
+        'database/sqlite-local',
+        'database/postgresql-server',
+        'database/storage-strategy',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Đồng bộ dữ liệu',
+      items: [
+        'sync/overview',
+        'sync/ccb-order-sync',
+        'sync/cloud-sync',
+        'sync/conflict-resolution',
+        'sync/offline-handling',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Hệ thống in ấn',
+      items: [
+        'printing/overview',
+        'printing/print-queue',
+        'printing/printer-types',
+        'printing/esc-pos',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Hướng dẫn',
+      items: [
+        'guides/getting-started',
+        'guides/setup-development',
+        'guides/deployment',
+        'guides/troubleshooting',
+      ],
+    },
+  ],
+  apiSidebar: [
+    'api/overview',
+    {
+      type: 'category',
+      label: 'REST API',
+      items: [
+        'api/rest/authentication',
+        'api/rest/stores',
+        'api/rest/menu',
+        'api/rest/tables',
+        'api/rest/orders',
+        'api/rest/staff',
+        'api/rest/sync',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Local API (CCB)',
+      items: [
+        'api/local/endpoints',
+        'api/local/websocket-events',
+        'api/local/discovery',
       ],
     },
   ],
