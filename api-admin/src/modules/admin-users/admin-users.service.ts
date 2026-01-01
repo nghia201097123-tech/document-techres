@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { AdminUser, PermissionGroup } from '../../database/entities';
+import { AdminUser, PermissionGroup, AdminRole } from '../../database/entities';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -17,7 +17,7 @@ export class AdminUsersService {
     private readonly permissionGroupRepository: Repository<PermissionGroup>,
   ) {}
 
-  async create(dto: CreateAdminUserDto): Promise<AdminUser> {
+  async create(dto: CreateAdminUserDto): Promise<Omit<AdminUser, 'passwordHash'>> {
     const existing = await this.adminUserRepository.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email đã tồn tại');
 
@@ -25,10 +25,10 @@ export class AdminUsersService {
 
     const adminUser = this.adminUserRepository.create({
       email: dto.email,
-      password: hashedPassword,
-      fullName: dto.fullName,
+      passwordHash: hashedPassword,
+      name: dto.fullName,
       phone: dto.phone,
-      role: dto.role,
+      role: dto.role as AdminRole,
     });
 
     if (dto.permissionGroupId) {
@@ -39,8 +39,8 @@ export class AdminUsersService {
     }
 
     const saved = await this.adminUserRepository.save(adminUser);
-    delete saved.password;
-    return saved;
+    const { passwordHash, ...result } = saved;
+    return result as Omit<AdminUser, 'passwordHash'>;
   }
 
   async findAll(paginationDto: PaginationDto) {
@@ -50,12 +50,12 @@ export class AdminUsersService {
     const queryBuilder = this.adminUserRepository.createQueryBuilder('user');
     queryBuilder.leftJoinAndSelect('user.permissionGroup', 'permissionGroup');
     queryBuilder.select([
-      'user.id', 'user.email', 'user.fullName', 'user.phone', 'user.role', 'user.isActive', 'user.createdAt', 'user.lastLoginAt',
+      'user.id', 'user.email', 'user.name', 'user.phone', 'user.role', 'user.isActive', 'user.createdAt', 'user.lastLogin',
       'permissionGroup.id', 'permissionGroup.name', 'permissionGroup.code',
     ]);
 
     if (search) {
-      queryBuilder.andWhere('(user.email ILIKE :search OR user.fullName ILIKE :search)', { search: `%${search}%` });
+      queryBuilder.andWhere('(user.email ILIKE :search OR user.name ILIKE :search)', { search: `%${search}%` });
     }
 
     queryBuilder.orderBy('user.createdAt', 'DESC').skip(skip).take(limit);
@@ -68,7 +68,7 @@ export class AdminUsersService {
     const user = await this.adminUserRepository.findOne({
       where: { id },
       relations: ['permissionGroup', 'permissionGroup.permissions'],
-      select: ['id', 'email', 'fullName', 'phone', 'role', 'isActive', 'createdAt', 'lastLoginAt'],
+      select: ['id', 'email', 'name', 'phone', 'role', 'isActive', 'createdAt', 'lastLogin'],
     });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     return user;
@@ -81,11 +81,12 @@ export class AdminUsersService {
     });
   }
 
-  async update(id: string, dto: UpdateAdminUserDto): Promise<AdminUser> {
-    const user = await this.findOne(id);
+  async update(id: string, dto: UpdateAdminUserDto): Promise<Omit<AdminUser, 'passwordHash'>> {
+    const user = await this.adminUserRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
 
     if (dto.password) {
-      dto.password = await bcrypt.hash(dto.password, 10);
+      user.passwordHash = await bcrypt.hash(dto.password, 10);
     }
 
     if (dto.permissionGroupId) {
@@ -95,20 +96,24 @@ export class AdminUsersService {
       }
     }
 
-    Object.assign(user, dto);
+    if (dto.fullName) user.name = dto.fullName;
+    if (dto.phone !== undefined) user.phone = dto.phone;
+    if (dto.role) user.role = dto.role as AdminRole;
+    if (dto.isActive !== undefined) user.isActive = dto.isActive;
+
     const saved = await this.adminUserRepository.save(user);
-    delete saved.password;
-    return saved;
+    const { passwordHash, ...result } = saved;
+    return result as Omit<AdminUser, 'passwordHash'>;
   }
 
   async changePassword(id: string, dto: ChangePasswordDto): Promise<void> {
     const user = await this.adminUserRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
 
-    const isValid = await bcrypt.compare(dto.currentPassword, user.password);
+    const isValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
     if (!isValid) throw new BadRequestException('Mật khẩu hiện tại không đúng');
 
-    user.password = await bcrypt.hash(dto.newPassword, 10);
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
     await this.adminUserRepository.save(user);
   }
 
@@ -117,15 +122,16 @@ export class AdminUsersService {
     await this.adminUserRepository.remove(user);
   }
 
-  async toggleStatus(id: string): Promise<AdminUser> {
-    const user = await this.findOne(id);
+  async toggleStatus(id: string): Promise<Omit<AdminUser, 'passwordHash'>> {
+    const user = await this.adminUserRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     user.isActive = !user.isActive;
     const saved = await this.adminUserRepository.save(user);
-    delete saved.password;
-    return saved;
+    const { passwordHash, ...result } = saved;
+    return result as Omit<AdminUser, 'passwordHash'>;
   }
 
   async updateLastLogin(id: string): Promise<void> {
-    await this.adminUserRepository.update(id, { lastLoginAt: new Date() });
+    await this.adminUserRepository.update(id, { lastLogin: new Date() });
   }
 }

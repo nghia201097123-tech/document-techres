@@ -32,13 +32,13 @@ export class PermissionsService {
     if (search) {
       queryBuilder.andWhere('(permission.name ILIKE :search OR permission.code ILIKE :search)', { search: `%${search}%` });
     }
-    queryBuilder.orderBy('permission.module', 'ASC').addOrderBy('permission.createdAt', 'DESC').skip(skip).take(limit);
+    queryBuilder.orderBy('permission.module', 'ASC').addOrderBy('permission.code', 'ASC').skip(skip).take(limit);
     const [data, total] = await queryBuilder.getManyAndCount();
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findPermissionsByModule(module: string): Promise<Permission[]> {
-    return this.permissionRepository.find({ where: { module, isActive: true }, order: { createdAt: 'ASC' } });
+    return this.permissionRepository.find({ where: { module }, order: { code: 'ASC' } });
   }
 
   async findOnePermission(id: string): Promise<Permission> {

@@ -1,11 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, IsEmail, IsEnum, IsUUID, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export enum AdminRole {
-  SUPER_ADMIN = 'super_admin',
-  ADMIN = 'admin',
-  SUPPORT = 'support',
-}
+import { AdminRole } from '../../../database/entities';
 
 export class CreateAdminUserDto {
   @ApiProperty({ example: 'admin@techres.vn' })
@@ -32,7 +27,7 @@ export class CreateAdminUserDto {
   @MaxLength(20)
   phone?: string;
 
-  @ApiProperty({ enum: AdminRole, example: AdminRole.ADMIN })
+  @ApiProperty({ enum: AdminRole, example: AdminRole.SUPPORT })
   @IsEnum(AdminRole)
   role: AdminRole;
 
