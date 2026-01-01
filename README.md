@@ -1,71 +1,69 @@
-# TechRes Documentation
+# TechRes FNB System
 
-Website tài liệu kỹ thuật được xây dựng bằng [Docusaurus](https://docusaurus.io/) và React.
+Hệ thống quản lý F&B (Food & Beverage) đa chi nhánh, hỗ trợ offline-first.
 
-## Yêu cầu
+## Cấu trúc Repository
 
-- Node.js >= 18.0
-- npm hoặc yarn
+```
+├── document-techres/    # Documentation website (Docusaurus)
+└── web-admin/           # Web Admin dashboard (Next.js)
+```
 
-## Cài đặt
+## Services
 
+### 1. Document TechRes
+
+Website tài liệu hệ thống, bao gồm:
+- Kiến trúc hệ thống
+- Database schema
+- API documentation
+- Hướng dẫn sử dụng
+
+**Khởi chạy:**
 ```bash
+cd document-techres
 npm install
+npm run start
 ```
 
-## Phát triển
+### 2. Web Admin
 
-Chạy development server:
+Dashboard quản trị hệ thống, bao gồm:
+- Quản lý Công ty
+- Quản lý Thương hiệu
+- Quản lý Chi nhánh
+- Quản lý Gói App Food
+- Danh mục Thu/Chi
+- Phân quyền
+- Quản trị viên
 
+**Khởi chạy:**
 ```bash
-npm start
+cd web-admin
+npm install
+npm run dev
 ```
 
-Website sẽ chạy tại `http://localhost:3000`.
+## Mô hình kinh doanh
 
-## Build
+| Mô hình | Ứng dụng | Mô tả |
+|---------|----------|-------|
+| Order Only | POS Order | Chỉ gọi món, không tính tiền |
+| CCB Only | POS Thu Ngân | Chỉ thu ngân, không quản lý bếp |
+| Full System | POS Order + CCB + Dashboard | Đầy đủ tính năng |
 
-Tạo bản production:
+## Gói App Food
 
-```bash
-npm run build
-```
+| Gói | Chi nhánh | Mô tả |
+|-----|-----------|-------|
+| Basic | 3 | Cơ bản |
+| Standard | 10 | Tiêu chuẩn |
+| Premium | 30 | Cao cấp |
+| Enterprise | Unlimited | Doanh nghiệp |
 
-Output sẽ được tạo trong thư mục `build/`.
+## Tech Stack
 
-## Preview
-
-Preview bản build:
-
-```bash
-npm run serve
-```
-
-## Cấu trúc thư mục
-
-```
-document-techres/
-├── blog/                    # Blog posts
-├── docs/                    # Documentation files
-│   ├── intro.md
-│   ├── tutorial/
-│   └── api/
-├── src/
-│   ├── components/          # React components
-│   ├── css/                 # Custom styles
-│   └── pages/               # Custom pages
-├── static/                  # Static files
-├── docusaurus.config.ts     # Docusaurus configuration
-├── sidebars.ts              # Sidebar configuration
-└── package.json
-```
-
-## Thêm tài liệu mới
-
-1. Tạo file `.md` trong thư mục `docs/`
-2. Thêm frontmatter với `sidebar_position`
-3. Cập nhật `sidebars.ts` nếu cần
-
-## License
-
-MIT
+- **Document**: Docusaurus 3.x
+- **Web Admin**: Next.js 16, TypeScript, Tailwind CSS, shadcn/ui
+- **State Management**: Zustand
+- **API Client**: Axios, React Query
