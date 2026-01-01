@@ -294,10 +294,13 @@ Thêm CCB App Bếp/Bar nếu cần
 
 ---
 
-## Gói dịch vụ
+## Gói App Food
 
-| Gói | Mô hình | Số thiết bị | Tính năng | Giá |
-|-----|---------|-------------|-----------|-----|
-| **Basic** | Order Only | 1 | Standalone mode | Miễn phí |
-| **Pro** | CCB Only | 1 POS + 3 máy in | Full features | 299k/tháng |
-| **Enterprise** | Full System | Không giới hạn | Full + API access | Liên hệ |
+| Gói | Số cổng kết nối | Mô tả |
+|-----|-----------------|-------|
+| **Basic** | 3 | 1 CCB + 2 Order App |
+| **Standard** | 10 | 2 CCB + 8 Order App |
+| **Premium** | 30 | 5 CCB + 25 Order App |
+| **Enterprise** | Unlimited | Không giới hạn |
+
+> **Lưu ý:** Cấu hình máy cho Local Server: RAM tối thiểu 4GB, khuyến nghị 8GB cho 30+ connections

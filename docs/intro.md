@@ -95,12 +95,41 @@ CÔNG TY (Company)
 
 | Hệ thống | Role | Quyền |
 |----------|------|-------|
-| **Web Admin** | Super Admin | Tạo Công ty, quản lý Gói dịch vụ, Hạng mục thu/chi |
+| **Web Admin** | Super Admin | Toàn quyền quản lý hệ thống |
 | **Web Admin** | Support | Hỗ trợ khách hàng, xem thông tin (không sửa) |
-| **Web Dashboard** | Owner | Toàn quyền với Công ty/Thương hiệu/Chi nhánh của mình |
-| **Web Dashboard** | Manager | Quản lý menu, nhân viên, xem báo cáo |
+| **Web Dashboard** | Owner | Toàn quyền với chi nhánh của mình |
+| **Web Dashboard** | Manager | Quản lý theo quyền được gán |
 | **CCB App** | Cashier | Thu ngân, thanh toán, chốt ca |
 | **Order App** | Staff | Order món, phục vụ, xem trạng thái |
+
+## Phạm vi quản lý dữ liệu
+
+| Cấp | Dữ liệu quản lý |
+|-----|-----------------|
+| **Công ty** | Bộ phận (có cấp bậc cha-con), Thiết lập công ty |
+| **Thương hiệu** | Món ăn, Danh mục, Đơn vị, Ghi chú món, Lý do hủy, Coupon |
+| **Chi nhánh** | Nhân viên, Khu vực, Bàn, Bếp, Gán món-bếp, Món tăng giá, Ca, Đơn hàng, HĐĐT |
+
+## Tổng hợp tính năng hệ thống
+
+| Module | Web Admin | Web Dashboard | CCB App | Order App |
+|--------|-----------|---------------|---------|-----------|
+| Quản lý Công ty | ✅ | ❌ | ❌ | ❌ |
+| Quản lý Thương hiệu | ✅ | Thiết lập | ❌ | ❌ |
+| Quản lý Chi nhánh | ✅ | Thiết lập | ❌ | ❌ |
+| Quản lý Quyền | ✅ | Gán quyền | ❌ | ❌ |
+| Quản lý Gói | ✅ | ❌ | ❌ | ❌ |
+| Quản lý Nhân viên | ❌ | ✅ | ❌ | ❌ |
+| Quản lý Menu | ❌ | ✅ | Xem | Xem |
+| Quản lý Bàn | ❌ | ✅ | Xem | Xem |
+| Quản lý Bếp | ❌ | ✅ | Xem | ❌ |
+| Quản lý Ca | ❌ | Xem | ✅ | ❌ |
+| Quản lý HĐĐT | ❌ | ✅ | Xuất | ❌ |
+| Order | ❌ | ❌ | ✅ | ✅ |
+| Thanh toán | ❌ | ❌ | ✅ | ✅* |
+| Báo cáo | Hệ thống | Chi nhánh | Ca | ❌ |
+
+> *Thanh toán trên Order App chỉ có ở Mô hình 1 (Order Only)
 
 ## Tính năng chính
 
