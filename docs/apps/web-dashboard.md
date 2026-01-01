@@ -19,15 +19,46 @@ Web Dashboard là ứng dụng dành cho **Chủ quán (Owner)** để quản l�
 Owner đăng nhập bằng tài khoản được Web Admin cấp:
 
 ```
-1. Nhận email từ Web Admin chứa:
-   - Link đăng nhập
-   - Email/Username
-   - Password tạm
-
-2. Đăng nhập lần đầu → Bắt buộc đổi password
-
-3. Bắt đầu thiết lập Thương hiệu và Chi nhánh
+┌─────────────────────────────────────────────────────────────────┐
+│                        ĐĂNG NHẬP                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Mã công ty:    [annhonquan              ]                     │
+│                                                                  │
+│   Tên đăng nhập: [tr000001                ]                     │
+│                                                                  │
+│   Mật khẩu:      [••••••••••              ]                     │
+│                                                                  │
+│                      [  ĐĂNG NHẬP  ]                            │
+│                                                                  │
+│   Quên mật khẩu?                                                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+### Thông tin đăng nhập
+
+| Trường | Mô tả |
+|--------|-------|
+| **Mã công ty** | Mã định danh công ty (VD: `annhonquan`, `phobien`) |
+| **Tên đăng nhập** | Username được cấp (VD: `tr000001`) |
+| **Mật khẩu** | Password được cấp |
+
+### Quy trình đăng nhập
+
+1. **Nhận thông tin từ Web Admin:**
+   - Mã công ty
+   - Tên đăng nhập (username)
+   - Mật khẩu tạm
+
+2. **Đăng nhập lần đầu:**
+   - Nhập đầy đủ 3 thông tin
+   - Bắt buộc đổi mật khẩu mới
+
+3. **Bắt đầu thiết lập:**
+   - Tạo Thương hiệu
+   - Tạo Chi nhánh
+   - Cấu hình menu, bàn, nhân viên
 
 ---
 
@@ -47,9 +78,11 @@ Owner đăng nhập bằng tài khoản được Web Admin cấp:
 
 | Chức năng | Mô tả |
 |-----------|-------|
-| Thêm nhân viên | Tạo mới với tên, SĐT, PIN code, bộ phận |
+| Thêm nhân viên | Tạo mới với đầy đủ thông tin |
 | Sửa thông tin | Cập nhật thông tin nhân viên |
 | Tắt/Bật | Vô hiệu hóa hoặc kích hoạt nhân viên |
+| Reset mật khẩu | Đặt lại mật khẩu về mặc định |
+| Gán quyền chi nhánh | Cho phép làm việc trên nhiều chi nhánh |
 | Import Excel | Import danh sách từ file Excel |
 | Export Excel | Xuất danh sách ra file Excel |
 
@@ -59,16 +92,199 @@ Owner đăng nhập bằng tài khoản được Web Admin cấp:
 ├─────────────────────────────────────────────────────────────────┤
 │  🔍 Tìm kiếm...                         [Bộ phận: Tất cả ▼]     │
 ├─────────────────────────────────────────────────────────────────┤
-│  │ Tên          │ SĐT         │ PIN  │ Bộ phận   │ Trạng thái │ │
-│  ├──────────────┼─────────────┼──────┼───────────┼────────────┤ │
-│  │ Nguyễn Văn A │ 0901234567  │ 1234 │ Thu ngân  │ ● Hoạt động│ │
-│  │ Trần Thị B   │ 0909876543  │ 5678 │ Phục vụ   │ ● Hoạt động│ │
-│  │ Lê Văn C     │ 0912345678  │ 9012 │ Bếp chính │ ○ Tạm khóa │ │
-│  └──────────────┴─────────────┴──────┴───────────┴────────────┘ │
+│  │ Mã NV    │ Tên          │ SĐT         │ Bộ phận   │ Trạng thái │
+│  ├──────────┼──────────────┼─────────────┼───────────┼────────────┤
+│  │ tr000001 │ Nguyễn Văn A │ 0901234567  │ Thu ngân  │ ● Hoạt động│
+│  │ tr000002 │ Trần Thị B   │ 0909876543  │ Phục vụ   │ ● Hoạt động│
+│  │ tr000003 │ Lê Văn C     │ 0912345678  │ Bếp chính │ ○ Tạm khóa │
+│  └──────────┴──────────────┴─────────────┴───────────┴────────────┘
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Danh sách Bộ phận (Công ty)
+### 1.2 Thông tin Nhân viên Chi tiết
+
+Khi thêm/sửa nhân viên, cần nhập các thông tin theo nhóm:
+
+#### Thông tin cá nhân
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| **Tên nhân viên** | ✅ | Họ và tên đầy đủ |
+| **Số điện thoại** | ✅ | SĐT liên hệ |
+| **Ngày sinh** | ❌ | Ngày tháng năm sinh |
+| **Giới tính** | ❌ | Nam / Nữ / Khác |
+| **CMND/CCCD** | ❌ | Số chứng minh nhân dân hoặc căn cước |
+| **Email** | ❌ | Email cá nhân |
+| **Nơi sinh** | ❌ | Tỉnh/thành phố sinh |
+
+#### Địa chỉ
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| **Tỉnh/Thành phố** | ❌ | Chọn từ danh sách |
+| **Quận/Huyện** | ❌ | Chọn theo Tỉnh/Thành |
+| **Phường/Xã** | ❌ | Chọn theo Quận/Huyện |
+| **Số nhà, tên đường** | ❌ | Địa chỉ chi tiết |
+
+#### Phân loại
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| **Loại nhân viên** | ✅ | Fulltime / Part-time / Thử việc |
+| **Bậc lương** | ❌ | Bậc 1 / Bậc 2 / Bậc 3... |
+| **Khối bộ phận** | ✅ | Bếp / Phục vụ / Thu ngân / Quản lý |
+| **Bộ phận** | ✅ | Bộ phận cụ thể trong khối |
+
+#### Làm việc
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| **Thương hiệu** | ✅ | Thương hiệu làm việc |
+| **Chi nhánh chính** | ✅ | Chi nhánh làm việc chính |
+| **Quyền hoạt động** | ❌ | Multi-select: Các chi nhánh được phép làm việc |
+| **Khu vực** | ❌ | Khu vực phụ trách (Tầng 1, Sân vườn...) |
+| **Quản lý khu vực** | ❌ | Có/Không - Nếu có sẽ hưởng doanh số khu vực |
+
+#### Hệ thống
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| **Ngày bắt đầu làm việc** | ✅ | Ngày vào làm |
+| **Username** | Tự động | Tự sinh: `tr000001`, `tr000002`... |
+| **Password** | ✅ | Mật khẩu đăng nhập (có thể reset) |
+| **PIN Code** | ❌ | Mã PIN đăng nhập nhanh trên app |
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  THÊM NHÂN VIÊN                                           [X]   │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ THÔNG TIN CÁ NHÂN                                       │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │  Tên nhân viên*: [Nguyễn Văn A              ]           │    │
+│  │  Số điện thoại*: [0901234567                ]           │    │
+│  │  Ngày sinh:      [15/03/1995                ]           │    │
+│  │  Giới tính:      [● Nam  ○ Nữ  ○ Khác       ]           │    │
+│  │  CMND/CCCD:      [079123456789              ]           │    │
+│  │  Email:          [nguyenvana@gmail.com      ]           │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ PHÂN LOẠI                                               │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │  Loại nhân viên*: [Fulltime           ▼]                │    │
+│  │  Bậc lương:       [Bậc 2              ▼]                │    │
+│  │  Khối bộ phận*:   [Thu ngân           ▼]                │    │
+│  │  Bộ phận*:        [Thu ngân chính     ▼]                │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ LÀM VIỆC                                                │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │  Thương hiệu*:    [Phở Việt           ▼]                │    │
+│  │  Chi nhánh*:      [Quận 1             ▼]                │    │
+│  │  Quyền hoạt động: [☑ Quận 1  ☑ Quận 3  ☐ Quận 7]        │    │
+│  │  Khu vực:         [Tầng 1             ▼]                │    │
+│  │  Quản lý khu vực: [☑ Có]                                │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ HỆ THỐNG                                                │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │  Ngày bắt đầu*:   [01/01/2024                ]          │    │
+│  │  Username:        [tr000001] (Tự động sinh)             │    │
+│  │  Password*:       [••••••••                  ]          │    │
+│  │  PIN Code:        [1234                      ]          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│                                      [Hủy] [Lưu]                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 1.3 Quản lý quyền Chi nhánh
+
+Nhân viên có thể được cấp quyền làm việc trên nhiều chi nhánh:
+
+| Chức năng | Mô tả |
+|-----------|-------|
+| Gán chi nhánh | Cho phép NV làm việc tại chi nhánh khác |
+| Gỡ chi nhánh | Thu hồi quyền làm việc tại chi nhánh |
+| Xem chi nhánh | Xem danh sách chi nhánh NV được phép làm việc |
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  QUYỀN CHI NHÁNH - Nguyễn Văn A (tr000001)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Chi nhánh chính: Quận 1                                        │
+│                                                                  │
+│  Quyền hoạt động tại các chi nhánh khác:                        │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ ☑ Quận 1 (Chi nhánh chính)                              │    │
+│  │ ☑ Quận 3                                                │    │
+│  │ ☐ Quận 7                                                │    │
+│  │ ☐ Bình Thạnh                                            │    │
+│  │ ☐ Gò Vấp                                                │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│                                      [Hủy] [Lưu]                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 1.4 Quản lý Khu vực & Doanh số
+
+| Khái niệm | Mô tả |
+|-----------|-------|
+| **Khu vực** | Khu vực phục vụ trong chi nhánh (Tầng 1, Tầng 2, Sân vườn...) |
+| **Quản lý khu vực** | Nhân viên được gán làm quản lý khu vực |
+| **Doanh số khu vực** | Quản lý khu vực được tính doanh số từ đơn hàng trong khu vực |
+
+```
+Nhân viên A (Quản lý khu vực: Tầng 1)
+        │
+        ▼
+Đơn hàng tại Bàn 1-10 (thuộc Tầng 1)
+        │
+        ▼
+Doanh số được tính cho Nhân viên A
+```
+
+### 1.5 Danh sách Loại nhân viên (Công ty)
+
+| Chức năng | Mô tả |
+|-----------|-------|
+| Thêm loại | Tạo loại nhân viên mới |
+| Sửa loại | Cập nhật tên, mô tả |
+| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
+
+**Danh sách mặc định:**
+
+| Mã | Tên | Mô tả |
+|----|-----|-------|
+| `fulltime` | Fulltime | Nhân viên toàn thời gian |
+| `parttime` | Part-time | Nhân viên bán thời gian |
+| `probation` | Thử việc | Nhân viên thử việc |
+| `intern` | Thực tập | Sinh viên thực tập |
+
+### 1.6 Danh sách Bậc lương (Công ty)
+
+| Chức năng | Mô tả |
+|-----------|-------|
+| Thêm bậc | Tạo bậc lương mới |
+| Sửa bậc | Cập nhật tên, mô tả, hệ số |
+| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
+
+**Danh sách mặc định:**
+
+| Bậc | Tên | Mô tả |
+|-----|-----|-------|
+| 1 | Bậc 1 | Nhân viên mới |
+| 2 | Bậc 2 | Nhân viên có kinh nghiệm |
+| 3 | Bậc 3 | Nhân viên lành nghề |
+| 4 | Bậc 4 | Nhân viên kỹ năng cao |
+| 5 | Bậc 5 | Chuyên gia |
+
+### 1.8 Danh sách Bộ phận (Công ty)
 
 Bộ phận có cấu trúc **cha-con** (hierarchical):
 
@@ -90,7 +306,7 @@ Bộ phận Phục vụ
 | Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
 | Sắp xếp | Thay đổi thứ tự hiển thị |
 
-### 1.3 Gán quyền (Chi nhánh)
+### 1.9 Gán quyền (Chi nhánh)
 
 Gán quyền cho nhân viên theo 2 cách:
 

@@ -8,6 +8,73 @@ Schema các bảng liên quan đến chức năng Web Dashboard.
 
 ## 1. Quản lý Nhân sự
 
+### Companies Code (Mã công ty cho đăng nhập)
+
+Thêm trường `code` vào bảng `companies` để đăng nhập:
+
+```sql
+ALTER TABLE companies ADD COLUMN code VARCHAR(50) UNIQUE;
+
+-- Ví dụ: annhonquan, phobien, cafenha...
+-- Dùng trong đăng nhập: Mã công ty + Username + Password
+```
+
+### Staff Types (Loại nhân viên - Cấp Công ty)
+
+```sql
+CREATE TABLE staff_types (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    code VARCHAR(50) NOT NULL,          -- fulltime, parttime, probation, intern
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(company_id, code)
+);
+
+CREATE INDEX idx_staff_types_company ON staff_types(company_id);
+
+-- Default staff types
+INSERT INTO staff_types (company_id, code, name, description) VALUES
+(NULL, 'fulltime', 'Fulltime', 'Nhân viên toàn thời gian'),
+(NULL, 'parttime', 'Part-time', 'Nhân viên bán thời gian'),
+(NULL, 'probation', 'Thử việc', 'Nhân viên thử việc'),
+(NULL, 'intern', 'Thực tập', 'Sinh viên thực tập');
+```
+
+### Salary Grades (Bậc lương - Cấp Công ty)
+
+```sql
+CREATE TABLE salary_grades (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    level INTEGER NOT NULL,             -- 1, 2, 3, 4, 5
+    name VARCHAR(255) NOT NULL,         -- Bậc 1, Bậc 2...
+    description TEXT,
+    coefficient DECIMAL(5,2) DEFAULT 1.0,  -- Hệ số lương
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(company_id, level)
+);
+
+CREATE INDEX idx_salary_grades_company ON salary_grades(company_id);
+
+-- Default salary grades
+INSERT INTO salary_grades (company_id, level, name, coefficient) VALUES
+(NULL, 1, 'Bậc 1', 1.0),
+(NULL, 2, 'Bậc 2', 1.2),
+(NULL, 3, 'Bậc 3', 1.5),
+(NULL, 4, 'Bậc 4', 1.8),
+(NULL, 5, 'Bậc 5', 2.0);
+```
+
 ### Departments (Bộ phận - Cấp Công ty)
 
 ```sql
@@ -42,10 +109,36 @@ CREATE TABLE staff (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id UUID NOT NULL REFERENCES branches(id),
     department_id UUID REFERENCES departments(id),
+    staff_type_id UUID REFERENCES staff_types(id),
+    salary_grade_id UUID REFERENCES salary_grades(id),
+
+    -- Mã nhân viên (tự động sinh)
+    username VARCHAR(50) UNIQUE NOT NULL,  -- tr000001, tr000002...
+    password_hash TEXT NOT NULL,
+    pin_code VARCHAR(10),                  -- Mã PIN đăng nhập nhanh
+
+    -- Thông tin cá nhân
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
-    pin_code VARCHAR(10),              -- Mã PIN đăng nhập nhanh
-    role VARCHAR(50) DEFAULT 'staff',  -- cashier, staff, kitchen
+    email VARCHAR(255),
+    birth_date DATE,
+    gender VARCHAR(10),                    -- male, female, other
+    id_number VARCHAR(20),                 -- CMND/CCCD
+    birth_place VARCHAR(255),              -- Nơi sinh
+
+    -- Địa chỉ
+    province_id INTEGER,                   -- Tỉnh/Thành phố
+    district_id INTEGER,                   -- Quận/Huyện
+    ward_id INTEGER,                       -- Phường/Xã
+    street_address TEXT,                   -- Số nhà, tên đường
+
+    -- Làm việc
+    area_id UUID REFERENCES areas(id),     -- Khu vực phụ trách
+    is_area_manager BOOLEAN DEFAULT false, -- Quản lý khu vực (hưởng doanh số)
+    start_date DATE NOT NULL,              -- Ngày bắt đầu làm việc
+
+    -- Trạng thái
+    role VARCHAR(50) DEFAULT 'staff',      -- cashier, staff, kitchen, manager
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -55,6 +148,63 @@ CREATE TABLE staff (
 
 CREATE INDEX idx_staff_branch ON staff(branch_id);
 CREATE INDEX idx_staff_department ON staff(department_id);
+CREATE INDEX idx_staff_username ON staff(username);
+CREATE INDEX idx_staff_area ON staff(area_id);
+```
+
+**Giải thích các trường:**
+
+| Nhóm | Trường | Mô tả |
+|------|--------|-------|
+| Hệ thống | `username` | Mã nhân viên tự sinh (tr000001) |
+| Hệ thống | `password_hash` | Mật khẩu đã mã hóa |
+| Hệ thống | `pin_code` | Mã PIN đăng nhập nhanh trên app |
+| Cá nhân | `name`, `phone`, `email` | Thông tin liên hệ |
+| Cá nhân | `birth_date`, `gender` | Ngày sinh, giới tính |
+| Cá nhân | `id_number`, `birth_place` | CMND/CCCD, nơi sinh |
+| Địa chỉ | `province_id`, `district_id`, `ward_id` | Tỉnh/Quận/Phường |
+| Địa chỉ | `street_address` | Số nhà, tên đường |
+| Phân loại | `staff_type_id` | Loại NV (Fulltime/Part-time...) |
+| Phân loại | `salary_grade_id` | Bậc lương |
+| Phân loại | `department_id` | Bộ phận |
+| Làm việc | `area_id` | Khu vực phụ trách |
+| Làm việc | `is_area_manager` | Có phải quản lý khu vực |
+| Làm việc | `start_date` | Ngày bắt đầu làm việc |
+
+### Staff Branch Access (Quyền làm việc trên chi nhánh khác)
+
+```sql
+CREATE TABLE staff_branch_access (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id),
+    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    granted_by UUID REFERENCES staff(id),
+    is_active BOOLEAN DEFAULT true,
+
+    UNIQUE(staff_id, branch_id)
+);
+
+CREATE INDEX idx_staff_branch_access_staff ON staff_branch_access(staff_id);
+CREATE INDEX idx_staff_branch_access_branch ON staff_branch_access(branch_id);
+```
+
+**Flow hoạt động:**
+
+```
+Nhân viên A (branch_id = Chi nhánh Quận 1)
+    │
+    ├── Mặc định làm việc tại: Chi nhánh Quận 1
+    │
+    └── staff_branch_access:
+            ├── branch_id = Chi nhánh Quận 3 (được cấp)
+            └── branch_id = Chi nhánh Quận 7 (được cấp)
+    │
+    ▼
+Nhân viên A có thể đăng nhập làm việc tại:
+    • Chi nhánh Quận 1 (chi nhánh chính)
+    • Chi nhánh Quận 3 (được cấp quyền)
+    • Chi nhánh Quận 7 (được cấp quyền)
 ```
 
 ### Permission Groups (Nhóm quyền)
@@ -566,6 +716,12 @@ CREATE INDEX idx_order_items_kitchen ON order_items(kitchen_station_id, status);
 ```
 companies
     │
+    ├── code (Mã đăng nhập)
+    │
+    ├── staff_types (Loại nhân viên)
+    │
+    ├── salary_grades (Bậc lương)
+    │
     ├── brands
     │       ├── categories
     │       ├── products
@@ -581,7 +737,13 @@ companies
     │
     └── branches
             ├── staff
-            │       └── staff_permissions → permissions
+            │       ├── staff_type_id → staff_types
+            │       ├── salary_grade_id → salary_grades
+            │       ├── department_id → departments
+            │       ├── area_id → areas
+            │       ├── is_area_manager (doanh số khu vực)
+            │       ├── staff_permissions → permissions
+            │       └── staff_branch_access (quyền chi nhánh khác)
             ├── areas → tables
             ├── kitchen_stations
             │       └── product_kitchen_mapping
@@ -590,4 +752,56 @@ companies
             ├── orders → order_items
             ├── branch_e_invoice_config → e_invoice_providers
             └── e_invoices
+```
+
+## Tổng quan nhân sự
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              COMPANIES                                       │
+│  • code (Mã đăng nhập: annhonquan, phobien...)                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                    │                                         │
+│    ┌───────────────────────────────┼───────────────────────────────┐        │
+│    ▼                               ▼                               ▼        │
+│ STAFF_TYPES                 SALARY_GRADES                    DEPARTMENTS    │
+│ (Loại NV)                   (Bậc lương)                      (Bộ phận)      │
+│ • fulltime                  • Bậc 1 (1.0)                    • Bếp          │
+│ • parttime                  • Bậc 2 (1.2)                      ├── Bếp chính│
+│ • probation                 • Bậc 3 (1.5)                      └── Bếp phụ  │
+│ • intern                    • Bậc 4 (1.8)                    • Phục vụ      │
+│                             • Bậc 5 (2.0)                    • Thu ngân     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                               BRANCHES                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                    │                                         │
+│                                    ▼                                         │
+│                                 STAFF                                        │
+│                    ┌────────────────────────────────┐                        │
+│                    │ • username: tr000001           │                        │
+│                    │ • password_hash                │                        │
+│                    │ • name, phone, email           │                        │
+│                    │ • birth_date, gender           │                        │
+│                    │ • id_number, birth_place       │                        │
+│                    │ • province/district/ward       │                        │
+│                    │ • staff_type_id → STAFF_TYPES  │                        │
+│                    │ • salary_grade_id → SALARY     │                        │
+│                    │ • department_id → DEPARTMENTS  │                        │
+│                    │ • area_id → AREAS              │                        │
+│                    │ • is_area_manager              │                        │
+│                    │ • start_date                   │                        │
+│                    └───────────────┬────────────────┘                        │
+│                                    │                                         │
+│                                    ▼                                         │
+│                         STAFF_BRANCH_ACCESS                                  │
+│                    ┌────────────────────────────────┐                        │
+│                    │ Nhân viên có thể làm việc      │                        │
+│                    │ tại nhiều chi nhánh            │                        │
+│                    │                                 │                        │
+│                    │ staff_id → branch_id (khác)    │                        │
+│                    └────────────────────────────────┘                        │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
