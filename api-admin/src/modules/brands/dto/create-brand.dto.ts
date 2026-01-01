@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, IsEnum, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BusinessModel } from '../../../database/entities/brand.entity';
+import { BusinessModel } from '../../../database/entities';
 
 export class CreateBrandDto {
   @ApiProperty({ description: 'ID của công ty' })

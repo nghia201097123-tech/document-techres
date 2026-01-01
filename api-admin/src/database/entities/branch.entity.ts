@@ -8,8 +8,9 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { Brand, BusinessModel } from './brand.entity';
+import { Brand } from './brand.entity';
 import { Package } from './package.entity';
+import { BusinessModel } from './enums';
 
 @Entity('branches')
 @Index('idx_branches_tenant', ['tenantId'])
