@@ -1,20 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import * as cors from 'cors';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  // Use cors middleware directly for better control
-  app.use(
-    cors({
-      origin: '*',
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
-      allowedHeaders: '*',
-      credentials: false,
-    }),
-  );
+  const app = await NestFactory.create(AppModule, { cors: true });
 
   // Global prefix
   app.setGlobalPrefix('api');
