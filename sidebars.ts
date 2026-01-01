@@ -33,6 +33,7 @@ const sidebars: SidebarsConfig = {
       label: 'Database',
       items: [
         'database/overview',
+        'database/web-dashboard-schema',
         'database/sqlite-local',
         'database/postgresql-server',
         'database/storage-strategy',
