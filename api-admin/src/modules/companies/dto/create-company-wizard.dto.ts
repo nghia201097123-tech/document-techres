@@ -12,8 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionPlan } from '../../../database/entities/company.entity';
-import { BusinessModel } from '../../../database/entities/brand.entity';
+import { SubscriptionPlan, BusinessModel } from '../../../database/entities';
 
 /**
  * Bước 1: Thông tin Công ty

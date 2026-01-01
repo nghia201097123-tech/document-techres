@@ -7,13 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Brand } from './brand.entity';
-
-export enum SubscriptionPlan {
-  BASIC = 'basic',
-  STANDARD = 'standard',
-  PREMIUM = 'premium',
-  ENTERPRISE = 'enterprise',
-}
+import { SubscriptionPlan } from './enums';
 
 @Entity('companies')
 export class Company {

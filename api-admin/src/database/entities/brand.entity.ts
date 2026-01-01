@@ -11,12 +11,7 @@ import {
 } from 'typeorm';
 import { Company } from './company.entity';
 import { Branch } from './branch.entity';
-
-export enum BusinessModel {
-  ORDER_ONLY = 'order_only',
-  CCB_ONLY = 'ccb_only',
-  FULL_SYSTEM = 'full_system',
-}
+import { BusinessModel } from './enums';
 
 @Entity('brands')
 @Index('idx_brands_tenant', ['tenantId'])
