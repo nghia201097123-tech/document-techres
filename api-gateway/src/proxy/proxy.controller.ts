@@ -18,6 +18,14 @@ export class ProxyController {
   @ApiOperation({ summary: 'Proxy all requests to backend services' })
   @ApiBearerAuth()
   async proxyRequest(@Req() req: Request, @Res() res: Response) {
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+      return res.status(204).send();
+    }
+
     try {
       // Extract path after /api prefix
       const path = req.originalUrl.replace(/^\/api/, '');
