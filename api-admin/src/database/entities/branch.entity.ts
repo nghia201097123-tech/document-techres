@@ -6,14 +6,20 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
-import { Brand } from './brand.entity';
+import { Brand, BusinessModel } from './brand.entity';
 import { Package } from './package.entity';
 
 @Entity('branches')
+@Index('idx_branches_tenant', ['tenantId'])
 export class Branch {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  // tenant_id = company.code, dùng để phân biệt dữ liệu giữa các tenant
+  @Column({ name: 'tenant_id', length: 50 })
+  tenantId: string;
 
   @Column({ name: 'brand_id' })
   brandId: string;
@@ -35,6 +41,10 @@ export class Branch {
   @Column({ length: 50, unique: true })
   code: string;
 
+  // Logo chi nhánh (nếu khác logo thương hiệu)
+  @Column({ name: 'logo_url', type: 'text', nullable: true })
+  logoUrl: string;
+
   @Column({ type: 'text', nullable: true })
   address: string;
 
@@ -47,11 +57,24 @@ export class Branch {
   @Column({ length: 255, nullable: true })
   manager: string;
 
+  // Mô hình sử dụng (mặc định kế thừa từ brand)
+  @Column({
+    name: 'business_model',
+    type: 'enum',
+    enum: BusinessModel,
+    default: BusinessModel.CCB_ONLY,
+  })
+  businessModel: BusinessModel;
+
   @Column({ name: 'open_time', type: 'time', nullable: true })
   openTime: string;
 
   @Column({ name: 'close_time', type: 'time', nullable: true })
   closeTime: string;
+
+  // Số cổng kết nối tối đa
+  @Column({ name: 'max_connections', type: 'int', default: 3 })
+  maxConnections: number;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

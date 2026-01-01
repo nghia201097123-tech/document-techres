@@ -8,6 +8,13 @@ import {
 } from 'typeorm';
 import { Brand } from './brand.entity';
 
+export enum SubscriptionPlan {
+  BASIC = 'basic',
+  STANDARD = 'standard',
+  PREMIUM = 'premium',
+  ENTERPRISE = 'enterprise',
+}
+
 @Entity('companies')
 export class Company {
   @PrimaryGeneratedColumn('uuid')
@@ -16,8 +23,12 @@ export class Company {
   @Column({ length: 255 })
   name: string;
 
+  // Code đóng vai trò là tenant_id, dùng để login và phân biệt dữ liệu
   @Column({ length: 50, unique: true })
   code: string;
+
+  @Column({ name: 'logo_url', type: 'text', nullable: true })
+  logoUrl: string;
 
   @Column({ name: 'tax_code', length: 50, nullable: true })
   taxCode: string;
@@ -33,6 +44,24 @@ export class Company {
 
   @Column({ length: 255, nullable: true })
   representative: string;
+
+  // SaaS Subscription fields
+  @Column({
+    name: 'subscription_plan',
+    type: 'enum',
+    enum: SubscriptionPlan,
+    default: SubscriptionPlan.BASIC,
+  })
+  subscriptionPlan: SubscriptionPlan;
+
+  @Column({ name: 'subscription_expires_at', type: 'timestamp', nullable: true })
+  subscriptionExpiresAt: Date;
+
+  @Column({ name: 'max_branches', type: 'int', default: 1 })
+  maxBranches: number;
+
+  @Column({ name: 'max_users', type: 'int', default: 10 })
+  maxUsers: number;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

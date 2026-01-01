@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BusinessModel } from '../../../database/entities/brand.entity';
 
 export class CreateBrandDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'ID của công ty' })
   @IsNotEmpty()
   @IsUUID()
   companyId: string;
@@ -25,10 +25,10 @@ export class CreateBrandDto {
   @IsEnum(BusinessModel)
   businessModel?: BusinessModel;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'https://example.com/logo.png' })
   @IsOptional()
   @IsString()
-  logo?: string;
+  logoUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

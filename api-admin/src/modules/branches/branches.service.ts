@@ -30,7 +30,11 @@ export class BranchesService {
       throw new ConflictException('Mã chi nhánh đã tồn tại');
     }
 
-    const branch = this.branchRepository.create(createBranchDto);
+    // Tự động set tenant_id từ brand
+    const branch = this.branchRepository.create({
+      ...createBranchDto,
+      tenantId: brand.tenantId,
+    });
     return this.branchRepository.save(branch);
   }
 

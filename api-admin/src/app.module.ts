@@ -14,6 +14,7 @@ import {
   Permission,
   PermissionGroup,
   AdminUser,
+  Staff,
 } from './database/entities';
 
 // Modules
@@ -53,6 +54,7 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
           Permission,
           PermissionGroup,
           AdminUser,
+          Staff,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',

@@ -6,3 +6,4 @@ export * from './transaction-category.entity';
 export * from './permission.entity';
 export * from './permission-group.entity';
 export * from './admin-user.entity';
+export * from './staff.entity';
