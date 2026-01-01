@@ -346,13 +346,18 @@ Gán quyền cho nhân viên theo 2 cách:
 
 #### 5 loại món ăn
 
-| Loại | Mô tả | Hiển thị order | In |
-|------|-------|----------------|-----|
-| **Đồ ăn** | Món ăn chính | ✅ Có | In món + In stamp |
-| **Đồ uống** | Nước, trà, cafe... | ✅ Có | In món + In stamp |
-| **Khác** | Món khác | ✅ Có | In món + In stamp |
-| **Topping** | Món thêm | ❌ Không (chỉ hiện trong topping) | Theo món chính |
-| **Combo** | Gói combo | ✅ Có | In món + In stamp |
+| Loại | Mô tả | Hiển thị order | In | Gán vào Combo |
+|------|-------|----------------|-----|---------------|
+| **Đồ ăn** | Món ăn chính | ✅ Có | In món + In stamp | ✅ Có thể |
+| **Đồ uống** | Nước, trà, cafe... | ✅ Có | In món + In stamp | ✅ Có thể |
+| **Khác** | Món khác | ✅ Có | In món + In stamp | ✅ Có thể |
+| **Topping** | Món thêm | ❌ Không (chỉ hiện trong topping) | Theo món chính | ❌ Không |
+| **Combo** | Gói combo | ✅ Có | In món + In stamp | ❌ Không |
+
+> **Quy tắc Combo:**
+> - Combo có thể chứa: **Đồ ăn**, **Đồ uống**, **Khác**
+> - Combo **KHÔNG** được chứa: **Topping**, **Combo** (không cho phép lồng combo)
+> - Mỗi món trong combo chỉ gán món, **không gán topping** cho món đó
 
 #### Chức năng
 
@@ -365,10 +370,19 @@ Gán quyền cho nhân viên theo 2 cách:
 | Export Excel | Xuất danh sách ra file Excel |
 | Cài đặt in | Chọn in ra bếp / in tem dán |
 
-#### Cài đặt in cho món
+#### Cài đặt món ăn
 
-- **In món (in ra bếp/bar)**: Có/Không
-- **In stamp (in tem dán)**: Có/Không
+| Cài đặt | Mô tả | Giá trị |
+|---------|-------|---------|
+| **In món** | In ra bếp/bar | Có/Không |
+| **In stamp** | In tem dán | Có/Không |
+| **% VAT** | Thuế giá trị gia tăng | 0%, 5%, 8%, 10% |
+| **Gán nhiều bếp** | 1 món có thể in ra nhiều bếp khác nhau | Chọn bếp |
+
+> **Lưu ý VAT:**
+> - Mỗi món ăn có % VAT riêng
+> - **Giá món hiển thị đã bao gồm VAT**
+> - Khi in bill sẽ tách riêng tiền thuế để hiển thị
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

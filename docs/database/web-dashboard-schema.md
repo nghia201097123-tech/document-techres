@@ -361,6 +361,10 @@ CREATE TABLE products (
     print_to_kitchen BOOLEAN DEFAULT true, -- In ra bếp
     print_stamp BOOLEAN DEFAULT false,     -- In tem dán
 
+    -- VAT
+    vat_rate DECIMAL(5,2) DEFAULT 0,       -- % VAT (0, 5, 8, 10...)
+    -- Giá hiển thị (price) đã bao gồm VAT
+
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -449,10 +453,15 @@ CREATE INDEX idx_product_toppings_product ON product_toppings(product_id);
 
 ### Combo Items (Món trong Combo)
 
+> **Quy tắc Combo:**
+> - Combo có thể chứa: `food`, `drink`, `other`
+> - Combo **KHÔNG** chứa: `topping`, `combo` (không lồng combo)
+> - Chỉ gán món, **không gán topping** cho món trong combo
+
 ```sql
 CREATE TABLE combo_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    combo_id UUID NOT NULL REFERENCES products(id),      -- Combo
+    combo_id UUID NOT NULL REFERENCES products(id),      -- Combo (product_type = 'combo')
     product_id UUID NOT NULL REFERENCES products(id),    -- Món trong combo
     quantity INTEGER DEFAULT 1,
     sort_order INTEGER DEFAULT 0,
@@ -462,6 +471,10 @@ CREATE TABLE combo_items (
 );
 
 CREATE INDEX idx_combo_items_combo ON combo_items(combo_id);
+
+-- Business rule validation (application level):
+-- product_id phải có product_type IN ('food', 'drink', 'other')
+-- product_id KHÔNG được là 'topping' hoặc 'combo'
 ```
 
 ### Product Price Adjustments (Món tăng giá - Cấp Chi nhánh)
