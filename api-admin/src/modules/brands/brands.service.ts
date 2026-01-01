@@ -30,7 +30,11 @@ export class BrandsService {
       throw new ConflictException('Mã thương hiệu đã tồn tại');
     }
 
-    const brand = this.brandRepository.create(createBrandDto);
+    // Tự động set tenant_id = company.code
+    const brand = this.brandRepository.create({
+      ...createBrandDto,
+      tenantId: company.code,
+    });
     return this.brandRepository.save(brand);
   }
 

@@ -9,10 +9,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import {
+  CreateCompanyWizardDto,
+  CreateCompanyWizardResponseDto,
+} from './dto/create-company-wizard.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
@@ -24,15 +28,42 @@ export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new company' })
+  @ApiOperation({ summary: 'Create a new company (simple)' })
   create(@Body() createCompanyDto: CreateCompanyDto) {
     return this.companiesService.create(createCompanyDto);
+  }
+
+  @Post('wizard')
+  @ApiOperation({
+    summary: 'Create company with wizard (Company + Brand + Branch)',
+    description:
+      'Tạo công ty mới với wizard 3 bước bắt buộc: Công ty → Thương hiệu → Chi nhánh. ' +
+      'Tất cả phải hoàn thành trong cùng một request. ' +
+      'Có thể tùy chọn tạo Owner với thông tin đăng nhập tạm thời.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo thành công công ty, thương hiệu và chi nhánh',
+    type: CreateCompanyWizardResponseDto,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Mã công ty/thương hiệu/chi nhánh đã tồn tại',
+  })
+  createWithWizard(@Body() wizardDto: CreateCompanyWizardDto) {
+    return this.companiesService.createWithWizard(wizardDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all companies with pagination' })
   findAll(@Query() paginationDto: PaginationDto) {
     return this.companiesService.findAll(paginationDto);
+  }
+
+  @Get('by-code/:code')
+  @ApiOperation({ summary: 'Get company by code (tenant_id)' })
+  findByCode(@Param('code') code: string) {
+    return this.companiesService.findByCode(code);
   }
 
   @Get(':id')

@@ -1,8 +1,19 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsEmail } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BusinessModel } from '../../../database/entities/brand.entity';
 
 export class CreateBranchDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'ID của thương hiệu' })
   @IsNotEmpty()
   @IsUUID()
   brandId: string;
@@ -18,6 +29,11 @@ export class CreateBranchDto {
   @IsString()
   @MaxLength(50)
   code: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/branch-logo.png' })
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -40,6 +56,11 @@ export class CreateBranchDto {
   @IsString()
   manager?: string;
 
+  @ApiPropertyOptional({ enum: BusinessModel, default: BusinessModel.CCB_ONLY })
+  @IsOptional()
+  @IsEnum(BusinessModel)
+  businessModel?: BusinessModel;
+
   @ApiPropertyOptional({ example: '08:00' })
   @IsOptional()
   @IsString()
@@ -49,6 +70,12 @@ export class CreateBranchDto {
   @IsOptional()
   @IsString()
   closeTime?: string;
+
+  @ApiPropertyOptional({ example: 3, default: 3, description: 'Số cổng kết nối tối đa' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxConnections?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
