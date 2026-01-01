@@ -130,7 +130,86 @@ Quản lý các gói dịch vụ và giới hạn kết nối:
 - Khóa/mở khóa tài khoản
 - Phân quyền theo company
 
-### 7. Analytics & Reports
+### 7. Quản lý Quyền (Permissions)
+
+Web Admin quản lý hệ thống quyền theo cấu trúc **Nhóm quyền → Quyền chi tiết**:
+
+#### Cấu trúc phân quyền
+
+```
+NHÓM QUYỀN (Permission Group)
+    │
+    ├── Quyền 1 (Permission)
+    ├── Quyền 2 (Permission)
+    └── Quyền 3 (Permission)
+```
+
+#### Danh sách nhóm quyền mẫu
+
+| Nhóm quyền | Mã | Các quyền trong nhóm |
+|------------|----|----------------------|
+| **Quản lý Menu** | `menu_management` | Xem menu, Thêm món, Sửa món, Xóa món, Sửa giá |
+| **Quản lý Bàn** | `table_management` | Xem bàn, Thêm bàn, Sửa bàn, Xóa bàn, Chuyển bàn, Gộp bàn |
+| **Quản lý Order** | `order_management` | Tạo order, Sửa order, Hủy order, Xem order |
+| **Thanh toán** | `payment` | Thanh toán tiền mặt, Thanh toán chuyển khoản, Áp dụng giảm giá, Hủy thanh toán |
+| **Quản lý Ca** | `shift_management` | Mở ca, Đóng ca, Xem báo cáo ca |
+| **Báo cáo** | `reports` | Xem doanh thu, Xem best seller, Xuất báo cáo |
+| **Quản lý Nhân viên** | `staff_management` | Xem nhân viên, Thêm nhân viên, Sửa nhân viên, Xóa nhân viên |
+| **Quản lý Khách hàng** | `customer_management` | Xem khách hàng, Thêm khách, Sửa điểm, Xem lịch sử |
+| **Thu/Chi** | `transaction` | Tạo phiếu thu, Tạo phiếu chi, Xem thu chi |
+| **Cài đặt** | `settings` | Cài đặt máy in, Cài đặt thanh toán, Cài đặt chung |
+
+#### Ví dụ quyền trong nhóm `order_management`
+
+| Mã quyền | Tên quyền | Mô tả |
+|----------|-----------|-------|
+| `order.view` | Xem order | Xem danh sách và chi tiết order |
+| `order.create` | Tạo order | Tạo order mới |
+| `order.edit` | Sửa order | Sửa thông tin order |
+| `order.cancel` | Hủy order | Hủy order đang chờ |
+
+#### Chức năng quản lý
+
+| Chức năng | Mô tả |
+|-----------|-------|
+| **Quản lý Nhóm quyền** | Thêm/sửa/xóa/tắt-bật nhóm quyền |
+| **Quản lý Quyền chi tiết** | Thêm/sửa/xóa quyền, gán vào nhóm |
+| **Gán mặc định** | Đặt quyền mặc định cho từng role |
+
+#### Gán quyền
+
+Quyền có thể được gán theo 2 cách:
+
+| Cách gán | Mô tả | Thực hiện tại |
+|----------|-------|---------------|
+| **Theo cá nhân** | Gán quyền trực tiếp cho từng nhân viên | Web Dashboard |
+| **Theo bộ phận** | Gán quyền cho cả bộ phận | Web Dashboard |
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  QUẢN LÝ QUYỀN                                [+ Tạo nhóm mới]  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [NHÓM QUYỀN]  [QUYỀN CHI TIẾT]                                 │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ Mã            │ Tên nhóm         │ Số quyền │ Trạng thái │  │
+│  ├───────────────┼──────────────────┼──────────┼────────────┤  │
+│  │ menu_mgmt     │ Quản lý Menu     │    5     │  ● Active  │  │
+│  │ order_mgmt    │ Quản lý Order    │    4     │  ● Active  │  │
+│  │ payment       │ Thanh toán       │    4     │  ● Active  │  │
+│  │ shift_mgmt    │ Quản lý Ca       │    3     │  ● Active  │  │
+│  │ reports       │ Báo cáo          │    3     │  ● Active  │  │
+│  │ staff_mgmt    │ Quản lý NV       │    4     │  ● Active  │  │
+│  │ customer_mgmt │ Quản lý KH       │    4     │  ● Active  │  │
+│  │ transaction   │ Thu/Chi          │    3     │  ● Active  │  │
+│  │ settings      │ Cài đặt          │    3     │  ● Active  │  │
+│  └───────────────┴──────────────────┴──────────┴────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 8. Analytics & Reports
 
 - Thống kê số lượng công ty, thương hiệu, chi nhánh
 - Doanh thu theo thời gian (theo company/brand/branch)
@@ -329,17 +408,21 @@ Hệ thống tự động:
 
 ```sql
 CREATE TABLE companies (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,      -- Mã viết tắt công ty (dùng để login: annhonquan)
     tax_code VARCHAR(50),
     address TEXT,
     email VARCHAR(255),
     phone VARCHAR(20),
+    representative VARCHAR(255),           -- Người đại diện
     owner_id UUID REFERENCES users(id),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_companies_code ON companies(code);
 ```
 
 ### Brands
@@ -411,14 +494,65 @@ CREATE TABLE package_purchases (
 
 ```sql
 CREATE TABLE transaction_categories (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID REFERENCES companies(id),
     code VARCHAR(20) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    type VARCHAR(10) NOT NULL,  -- 'income' or 'expense'
-    is_default BOOLEAN DEFAULT false,
+    type VARCHAR(20) NOT NULL,             -- 'income' or 'expense'
+    description TEXT,
+    is_system BOOLEAN DEFAULT false,       -- Hạng mục hệ thống (không xóa được)
     is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Permission Groups (Nhóm quyền)
+
+```sql
+CREATE TABLE permission_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(100) UNIQUE NOT NULL,     -- menu_management, order_management...
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Permissions (Quyền chi tiết)
+
+```sql
+CREATE TABLE permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES permission_groups(id),
+    code VARCHAR(100) UNIQUE NOT NULL,     -- menu.view, menu.create, order.edit...
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_permissions_group ON permissions(group_id);
+```
+
+### Admin Users
+
+```sql
+CREATE TABLE admin_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    role VARCHAR(50) DEFAULT 'support',    -- super_admin, support
+    is_active BOOLEAN DEFAULT true,
+    last_login_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -480,12 +614,28 @@ CREATE TABLE transaction_categories (
 | POST | `/admin/transaction-categories/import` | Import từ Excel |
 | GET | `/admin/transaction-categories/export` | Export ra Excel |
 
+### Permissions
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/admin/permission-groups` | Danh sách nhóm quyền |
+| POST | `/admin/permission-groups` | Tạo nhóm quyền |
+| PUT | `/admin/permission-groups/:id` | Cập nhật nhóm quyền |
+| DELETE | `/admin/permission-groups/:id` | Xóa nhóm quyền |
+| GET | `/admin/permissions` | Danh sách quyền |
+| POST | `/admin/permissions` | Tạo quyền mới |
+| PUT | `/admin/permissions/:id` | Cập nhật quyền |
+| DELETE | `/admin/permissions/:id` | Xóa quyền |
+
 ### Owners & Analytics
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
 | GET | `/admin/owners` | Danh sách owners |
 | POST | `/admin/owners` | Tạo owner |
+| POST | `/admin/owners/:id/reset-password` | Reset mật khẩu owner |
+| POST | `/admin/owners/:id/suspend` | Khóa tài khoản owner |
+| POST | `/admin/owners/:id/activate` | Mở khóa tài khoản owner |
 | GET | `/admin/analytics` | Thống kê tổng quan |
 | GET | `/admin/analytics/companies` | Thống kê theo công ty |
 | GET | `/admin/analytics/packages` | Thống kê theo gói |
