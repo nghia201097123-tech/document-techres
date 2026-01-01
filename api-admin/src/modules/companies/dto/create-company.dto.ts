@@ -10,7 +10,7 @@ import {
   IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionPlan } from '../../../database/entities/company.entity';
+import { SubscriptionPlan } from '../../../database/entities';
 
 export class CreateCompanyDto {
   @ApiProperty({ example: 'Công ty TNHH ABC' })

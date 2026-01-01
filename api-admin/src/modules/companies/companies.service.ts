@@ -2,8 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Company, Brand, Branch, Staff, StaffRole } from '../../database/entities';
-import { BusinessModel } from '../../database/entities/brand.entity';
+import { Company, Brand, Branch, Staff, StaffRole, BusinessModel } from '../../database/entities';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import {

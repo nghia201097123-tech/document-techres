@@ -11,19 +11,7 @@ import {
 import { Company } from './company.entity';
 import { Brand } from './brand.entity';
 import { Branch } from './branch.entity';
-
-export enum StaffRole {
-  OWNER = 'owner',
-  MANAGER = 'manager',
-  CASHIER = 'cashier',
-  STAFF = 'staff',
-  KITCHEN = 'kitchen',
-}
-
-export enum Gender {
-  MALE = 'male',
-  FEMALE = 'female',
-}
+import { StaffRole, Gender } from './enums';
 
 @Entity('staff')
 @Index('idx_staff_tenant', ['tenantId'])

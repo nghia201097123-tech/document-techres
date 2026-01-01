@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BusinessModel } from '../../../database/entities/brand.entity';
+import { BusinessModel } from '../../../database/entities';
 
 export class CreateBranchDto {
   @ApiProperty({ description: 'ID của thương hiệu' })
