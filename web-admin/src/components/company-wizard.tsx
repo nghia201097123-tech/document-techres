@@ -99,20 +99,16 @@ function removeVietnameseDiacritics(str: string): string {
 }
 
 // Helper: Generate alias from company name (first letter of each word, no diacritics)
+// Example: "Công ty điền quan" → "CTDQ"
 function generateAlias(name: string): string {
   if (!name) return "";
   // Remove diacritics first
   const cleanName = removeVietnameseDiacritics(name);
-  const skipWords = ["cong", "ty", "tnhh", "co", "phan", "cp", "and", "va", "&"];
+  // Take first letter of EVERY word (including "Công", "ty", etc.)
   const words = cleanName
     .split(/\s+/)
-    .filter(w => !skipWords.includes(w.toLowerCase()))
-    .map(w => {
-      const firstChar = w.charAt(0).toUpperCase();
-      // Keep numbers as-is, only take first letter for text
-      if (/^\d+$/.test(w)) return w;
-      return firstChar;
-    })
+    .filter(w => w.length > 0)
+    .map(w => w.charAt(0).toUpperCase())
     .join("");
   return words || cleanName.substring(0, 3).toUpperCase();
 }
