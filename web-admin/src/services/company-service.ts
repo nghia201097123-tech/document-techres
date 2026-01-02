@@ -30,6 +30,64 @@ interface UpdateCompanyData extends Partial<CreateCompanyData> {
   isActive?: boolean;
 }
 
+// Wizard types
+interface WizardCompanyData {
+  name: string;
+  code: string;
+  taxCode?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  representative?: string;
+}
+
+interface WizardBrandData {
+  name: string;
+  code: string;
+  description?: string;
+  businessModel?: "order_only" | "ccb_only" | "full_system";
+}
+
+interface WizardBranchData {
+  name: string;
+  code: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  manager?: string;
+  openTime?: string;
+  closeTime?: string;
+}
+
+interface WizardDepartmentData {
+  name: string;
+  code: string;
+  description?: string;
+}
+
+interface WizardStaffData {
+  name: string;
+  phone?: string;
+  email?: string;
+  role?: string;
+}
+
+export interface CreateCompanyWizardData {
+  company: WizardCompanyData;
+  brand: WizardBrandData;
+  branch: WizardBranchData;
+  department: WizardDepartmentData;
+  staff: WizardStaffData;
+}
+
+export interface WizardResponse {
+  company: { id: string; name: string; code: string };
+  brand: { id: string; name: string; code: string };
+  branch: { id: string; name: string; code: string };
+  department: { id: string; name: string; code: string };
+  staff: { id: string; name: string; username: string; temporaryPassword: string };
+}
+
 export const companyService = {
   async getList(params?: CompanyListParams): Promise<CompanyListResponse> {
     // Filter out empty/undefined params
@@ -67,6 +125,11 @@ export const companyService = {
 
   async toggleStatus(id: string): Promise<Company> {
     const response = await api.patch<Company>(`/companies/${id}/toggle-status`);
+    return response.data;
+  },
+
+  async createWithWizard(data: CreateCompanyWizardData): Promise<WizardResponse> {
+    const response = await api.post<WizardResponse>("/companies/wizard", data);
     return response.data;
   },
 };
