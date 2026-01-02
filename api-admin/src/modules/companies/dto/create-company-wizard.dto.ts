@@ -189,31 +189,59 @@ export class WizardBranchDto {
 }
 
 /**
- * Thông tin Owner (tự động tạo khi hoàn thành wizard)
+ * Bước 4: Bộ phận đầu tiên (Bắt buộc)
  */
-export class WizardOwnerDto {
-  @ApiPropertyOptional({ example: 'Nguyễn Văn A' })
-  @IsOptional()
+export class WizardDepartmentDto {
+  @ApiProperty({ example: 'Bộ phận Phục vụ' })
+  @IsNotEmpty({ message: 'Tên bộ phận không được để trống' })
   @IsString()
   @MaxLength(255)
-  name?: string;
+  name: string;
 
-  @ApiPropertyOptional({ example: 'owner@abc.vn', description: 'Email dùng để gửi thông tin đăng nhập' })
+  @ApiProperty({ example: 'PHUCVU', description: 'Mã bộ phận' })
+  @IsNotEmpty({ message: 'Mã bộ phận không được để trống' })
+  @IsString()
+  @MaxLength(50)
+  code: string;
+
+  @ApiPropertyOptional({ example: 'Bộ phận phục vụ khách hàng' })
   @IsOptional()
-  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @IsString()
+  description?: string;
+}
+
+/**
+ * Bước 5: Nhân viên đầu tiên (Bắt buộc - thường là quản lý)
+ */
+export class WizardStaffDto {
+  @ApiProperty({ example: 'Nguyễn Văn A' })
+  @IsNotEmpty({ message: 'Tên nhân viên không được để trống' })
+  @IsString()
   @MaxLength(255)
-  email?: string;
+  name: string;
 
   @ApiPropertyOptional({ example: '0901234567' })
   @IsOptional()
   @IsString()
   @MaxLength(20)
   phone?: string;
+
+  @ApiPropertyOptional({ example: 'nva@abc.vn' })
+  @IsOptional()
+  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @MaxLength(255)
+  email?: string;
+
+  @ApiPropertyOptional({ example: 'owner', description: 'Vai trò: owner, manager, staff' })
+  @IsOptional()
+  @IsString()
+  role?: string;
 }
 
 /**
- * DTO cho Wizard tạo công ty 3 bước (Company + Brand + Branch)
- * Bắt buộc phải hoàn thành cả 3 bước mới lưu được
+ * DTO cho Wizard tạo công ty 5 bước
+ * (Company + Brand + Branch + Department + Staff)
+ * Bắt buộc phải hoàn thành cả 5 bước mới lưu được
  */
 export class CreateCompanyWizardDto {
   @ApiProperty({ description: 'Bước 1: Thông tin công ty' })
@@ -231,11 +259,15 @@ export class CreateCompanyWizardDto {
   @Type(() => WizardBranchDto)
   branch: WizardBranchDto;
 
-  @ApiPropertyOptional({ description: 'Thông tin Owner (tùy chọn, sẽ tự động tạo)' })
-  @IsOptional()
+  @ApiProperty({ description: 'Bước 4: Bộ phận đầu tiên (bắt buộc)' })
   @ValidateNested()
-  @Type(() => WizardOwnerDto)
-  owner?: WizardOwnerDto;
+  @Type(() => WizardDepartmentDto)
+  department: WizardDepartmentDto;
+
+  @ApiProperty({ description: 'Bước 5: Nhân viên đầu tiên (bắt buộc)' })
+  @ValidateNested()
+  @Type(() => WizardStaffDto)
+  staff: WizardStaffDto;
 }
 
 /**
@@ -257,8 +289,14 @@ export class CreateCompanyWizardResponseDto {
     name: string;
     code: string;
   };
-  owner?: {
+  department: {
     id: string;
+    name: string;
+    code: string;
+  };
+  staff: {
+    id: string;
+    name: string;
     username: string;
     temporaryPassword: string;
   };

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Company, Brand, Branch, Staff, StaffRole, BusinessModel } from '../../database/entities';
+import { Company, Brand, Branch, Department, Staff, StaffRole, BusinessModel } from '../../database/entities';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import {
@@ -20,6 +20,8 @@ export class CompaniesService {
     private readonly brandRepository: Repository<Brand>,
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
+    @InjectRepository(Department)
+    private readonly departmentRepository: Repository<Department>,
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
     private readonly dataSource: DataSource,
@@ -39,13 +41,19 @@ export class CompaniesService {
   }
 
   /**
-   * Wizard tạo công ty 3 bước: Company + Brand + Branch
+   * Wizard tạo công ty 5 bước: Company + Brand + Branch + Department + Staff
    * Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
    */
   async createWithWizard(
     wizardDto: CreateCompanyWizardDto,
   ): Promise<CreateCompanyWizardResponseDto> {
-    const { company: companyDto, brand: brandDto, branch: branchDto, owner: ownerDto } = wizardDto;
+    const {
+      company: companyDto,
+      brand: brandDto,
+      branch: branchDto,
+      department: departmentDto,
+      staff: staffDto,
+    } = wizardDto;
 
     // Validate unique codes trước khi tạo
     const existingCompany = await this.companyRepository.findOne({
@@ -116,7 +124,7 @@ export class CompaniesService {
         brandId: savedBrand.id,
         name: branchDto.name,
         code: branchDto.code,
-        logoUrl: branchDto.logoUrl || brandDto.logoUrl, // Mặc định dùng logo thương hiệu
+        logoUrl: branchDto.logoUrl || brandDto.logoUrl,
         address: branchDto.address,
         phone: branchDto.phone,
         email: branchDto.email,
@@ -128,30 +136,42 @@ export class CompaniesService {
       });
       const savedBranch = await queryRunner.manager.save(branch);
 
-      // Bước 4: Tạo Owner (tùy chọn)
-      let savedOwner: Staff | null = null;
-      let temporaryPassword: string | null = null;
+      // Bước 4: Tạo Department (Bộ phận đầu tiên)
+      const department = queryRunner.manager.create(Department, {
+        tenantId,
+        companyId: savedCompany.id,
+        branchId: savedBranch.id,
+        name: departmentDto.name,
+        code: departmentDto.code,
+        description: departmentDto.description,
+      });
+      const savedDepartment = await queryRunner.manager.save(department);
 
-      if (ownerDto) {
-        // Tạo username mặc định: owner hoặc lấy từ email
-        const username = ownerDto.email?.split('@')[0] || 'owner';
-        temporaryPassword = this.generateTemporaryPassword();
-        const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+      // Bước 5: Tạo Staff (Nhân viên đầu tiên - thường là quản lý)
+      const username = staffDto.email?.split('@')[0] || `${companyDto.code}_001`;
+      const temporaryPassword = this.generateTemporaryPassword();
+      const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
-        const owner = queryRunner.manager.create(Staff, {
-          tenantId,
-          companyId: savedCompany.id,
-          brandId: savedBrand.id,
-          branchId: savedBranch.id,
-          name: ownerDto.name || companyDto.representative || 'Owner',
-          email: ownerDto.email || companyDto.email,
-          phone: ownerDto.phone || companyDto.phone,
-          username,
-          passwordHash,
-          role: StaffRole.OWNER,
-        });
-        savedOwner = await queryRunner.manager.save(owner);
-      }
+      const staffRole = staffDto.role === 'owner'
+        ? StaffRole.OWNER
+        : staffDto.role === 'manager'
+        ? StaffRole.MANAGER
+        : StaffRole.STAFF;
+
+      const staff = queryRunner.manager.create(Staff, {
+        tenantId,
+        companyId: savedCompany.id,
+        brandId: savedBrand.id,
+        branchId: savedBranch.id,
+        departmentId: savedDepartment.id,
+        name: staffDto.name,
+        email: staffDto.email,
+        phone: staffDto.phone,
+        username,
+        passwordHash,
+        role: staffRole,
+      });
+      const savedStaff = await queryRunner.manager.save(staff);
 
       await queryRunner.commitTransaction();
 
@@ -171,13 +191,17 @@ export class CompaniesService {
           name: savedBranch.name,
           code: savedBranch.code,
         },
-        owner: savedOwner
-          ? {
-              id: savedOwner.id,
-              username: savedOwner.username,
-              temporaryPassword: temporaryPassword!,
-            }
-          : undefined,
+        department: {
+          id: savedDepartment.id,
+          name: savedDepartment.name,
+          code: savedDepartment.code,
+        },
+        staff: {
+          id: savedStaff.id,
+          name: savedStaff.name,
+          username: savedStaff.username,
+          temporaryPassword,
+        },
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();

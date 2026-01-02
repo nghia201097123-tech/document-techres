@@ -2,6 +2,7 @@ export * from './enums';
 export * from './company.entity';
 export * from './brand.entity';
 export * from './branch.entity';
+export * from './department.entity';
 export * from './package.entity';
 export * from './transaction-category.entity';
 export * from './permission.entity';
