@@ -1,5 +1,14 @@
+import axios from "axios";
 import api from "./api";
 import type { AdminUser } from "@/types";
+
+// Separate axios instance for login (without auth interceptors)
+const authApi = axios.create({
+  baseURL: "http://localhost:3000/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 interface LoginRequest {
   email: string;
@@ -13,7 +22,7 @@ interface LoginResponse {
 
 export const authService = {
   async login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await api.post<LoginResponse>("/auth/login", data);
+    const response = await authApi.post<LoginResponse>("/auth/login", data);
     return response.data;
   },
 
