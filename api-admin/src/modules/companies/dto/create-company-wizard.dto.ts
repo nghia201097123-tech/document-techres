@@ -11,6 +11,7 @@ import {
   ValidateNested,
   IsBoolean,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -223,6 +224,7 @@ export class WizardStaffDto {
 
   @ApiPropertyOptional({ example: 'nva@abc.vn', description: 'Email nhân viên (không bắt buộc)' })
   @IsOptional()
+  @ValidateIf((o) => o.email && o.email.length > 0)
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @MaxLength(255)
   email?: string;
