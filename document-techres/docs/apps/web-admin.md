@@ -73,26 +73,6 @@ TENANT (tenant_id = company.code) ← Định danh duy nhất
 | **tenant_id = company.code** | Mã công ty là định danh tenant |
 | **Data Isolation** | Dữ liệu hoàn toàn tách biệt theo tenant |
 
-### Ví dụ thực tế
-
-```
-Tenant: abcfood (tenant_id = "abcfood")
-    │
-    └── Công ty TNHH ABC Food (code = "abcfood")
-            │
-            ├── Thương hiệu "Phở Việt"
-            │       ├── Chi nhánh Quận 1 (logoUrl: brand logo)
-            │       ├── Chi nhánh Quận 7
-            │       └── Chi nhánh Thủ Đức
-            │
-            ├── Thương hiệu "Cà phê ABC"
-            │       ├── Chi nhánh Nguyễn Huệ
-            │       └── Chi nhánh Lê Lợi
-            │
-            └── Thương hiệu "Trà sữa XYZ"
-                    └── Chi nhánh Landmark
-```
-
 ---
 
 ## Chức năng chính
@@ -273,21 +253,6 @@ NHÓM QUYỀN (Permission Group)
     └── Quyền 3 (Permission)
 ```
 
-#### Danh sách nhóm quyền mẫu
-
-| Nhóm quyền | Mã | Các quyền trong nhóm |
-|------------|----|----------------------|
-| **Quản lý Menu** | `menu_management` | Xem menu, Thêm món, Sửa món, Xóa món, Sửa giá |
-| **Quản lý Bàn** | `table_management` | Xem bàn, Thêm bàn, Sửa bàn, Xóa bàn, Chuyển bàn, Gộp bàn |
-| **Quản lý Order** | `order_management` | Tạo order, Sửa order, Hủy order, Xem order |
-| **Thanh toán** | `payment` | Thanh toán tiền mặt, Thanh toán chuyển khoản, Áp dụng giảm giá, Hủy thanh toán |
-| **Quản lý Ca** | `shift_management` | Mở ca, Đóng ca, Xem báo cáo ca |
-| **Báo cáo** | `reports` | Xem doanh thu, Xem best seller, Xuất báo cáo |
-| **Quản lý Nhân viên** | `staff_management` | Xem nhân viên, Thêm nhân viên, Sửa nhân viên, Xóa nhân viên |
-| **Quản lý Khách hàng** | `customer_management` | Xem khách hàng, Thêm khách, Sửa điểm, Xem lịch sử |
-| **Thu/Chi** | `transaction` | Tạo phiếu thu, Tạo phiếu chi, Xem thu chi |
-| **Cài đặt** | `settings` | Cài đặt máy in, Cài đặt thanh toán, Cài đặt chung |
-
 #### Chức năng quản lý
 
 | Chức năng | Mô tả |
@@ -399,10 +364,10 @@ Hệ thống thực hiện trong 1 TRANSACTION:
         │
         ▼
 Hiển thị kết quả:
-├── Company: ABC Food (abcfood)
-├── Brand: Phở 24 (pho24)
-├── Branch: Phở 24 - Q1 (pho24-q1)
-└── Owner: owner@abcfood.com (password: xxxxxxxx)
+├── Company: [Tên công ty] ([mã tenant])
+├── Brand: [Tên thương hiệu] ([mã thương hiệu])
+├── Branch: [Tên chi nhánh] ([mã chi nhánh])
+└── Owner: [email đăng nhập] (password: [mật khẩu tạm])
         │
         ▼
 Owner đăng nhập Web Dashboard → Sẵn sàng sử dụng
@@ -421,19 +386,17 @@ Owner đăng nhập Web Dashboard → Sẵn sàng sử dụng
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │
 │  │ Công ty     │  │ Thương hiệu │  │ Chi nhánh   │  │ Doanh   │ │
-│  │    45       │  │    120      │  │    350      │  │ thu     │ │
-│  │   +8%       │  │   +12%      │  │   +15%      │  │ 5.2 tỷ  │ │
+│  │  [count]    │  │   [count]   │  │   [count]   │  │ thu     │ │
+│  │  [% tăng]   │  │  [% tăng]   │  │  [% tăng]   │  │ [total] │ │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────┘ │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  Biểu đồ tăng trưởng chi nhánh                            │  │
-│  │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓           │  │
+│  │  [Dữ liệu thực từ database]                               │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  Tenant đăng ký gần đây:                                        │
-│  • abcfood - ABC Food - 2 giờ trước                            │
-│  • xyzresto - XYZ Restaurant - 5 giờ trước                     │
-│  • 123cafe - 123 Cafe - 1 ngày trước                           │
+│  [Danh sách tenant thực từ database]                           │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -448,12 +411,12 @@ Owner đăng nhập Web Dashboard → Sẵn sàng sử dụng
 ├─────────────────────────────────────────────────────────────────┤
 │  │Logo│ Tenant ID    │ Tên công ty      │Brands│Branches│Status││
 │  ├────┼──────────────┼──────────────────┼──────┼────────┼──────┤│
-│  │ 🏢 │ abcfood      │ Công ty ABC Food │   3  │   12   │●Active│
-│  │ 🏢 │ xyzresto     │ Công ty XYZ      │   1  │    5   │●Active│
-│  │ 🏢 │ 123cafe      │ Cá nhân Nguyễn A │   1  │    1   │○Expired│
+│  │    │              │                  │      │        │      ││
+│  │        [Dữ liệu thực từ database qua API]                   ││
+│  │                                                              ││
 │  └────┴──────────────┴──────────────────┴──────┴────────┴──────┘│
 │                                                                 │
-│  Hiển thị 1-10 của 45 công ty                  [< 1 2 3 ... >]  │
+│  Hiển thị [x]-[y] của [total] công ty          [< 1 2 3 ... >]  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
