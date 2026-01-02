@@ -33,11 +33,11 @@ interface UpdateCompanyData extends Partial<CreateCompanyData> {
 /**
  * Wizard types - Cập nhật theo địa chỉ hành chính Việt Nam sau sáp nhập 07/2025
  * Cấu trúc 2 cấp: Tỉnh/Thành phố → Xã/Phường (không còn cấp Quận/Huyện)
+ * Mã (code) sẽ được tự động sinh trên backend
  */
 interface WizardCompanyData {
   name: string;
-  code: string;
-  alias: string; // Tiên định danh - viết tắt tên công ty
+  alias: string; // Tiên định danh - viết tắt tên công ty, dùng làm code
   email: string; // Required
   isTrial: boolean; // Dùng thử hay chính thức
   taxCode?: string;
@@ -50,14 +50,12 @@ interface WizardCompanyData {
 
 interface WizardBrandData {
   name: string;
-  code: string;
   description?: string;
   businessModel?: "order_only" | "ccb_only" | "full_system";
 }
 
 interface WizardBranchData {
   name: string;
-  code: string;
   addressDetail?: string; // Địa chỉ chi tiết (số nhà, đường)
   provinceCode?: string; // Mã tỉnh/thành
   wardCode?: string; // Mã phường/xã
