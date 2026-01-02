@@ -41,7 +41,8 @@ export class CompaniesService {
   }
 
   /**
-   * Wizard tạo công ty 5 bước: Company + Brand + Branch + Department + Staff
+   * Wizard tạo công ty 4 bước: Company + Brand + Branch + Staff
+   * Bộ phận "Chủ nhà hàng" sẽ được tự động tạo ngầm
    * Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
    */
   async createWithWizard(
@@ -51,7 +52,6 @@ export class CompaniesService {
       company: companyDto,
       brand: brandDto,
       branch: branchDto,
-      department: departmentDto,
       staff: staffDto,
     } = wizardDto;
 
@@ -136,18 +136,18 @@ export class CompaniesService {
       });
       const savedBranch = await queryRunner.manager.save(branch);
 
-      // Bước 4: Tạo Department (Bộ phận đầu tiên)
+      // Bước 4: Tự động tạo Department "Chủ nhà hàng"
       const department = queryRunner.manager.create(Department, {
         tenantId,
         companyId: savedCompany.id,
         branchId: savedBranch.id,
-        name: departmentDto.name,
-        code: departmentDto.code,
-        description: departmentDto.description,
+        name: 'Chủ nhà hàng',
+        code: 'CHUNHAHANG',
+        description: 'Bộ phận chủ nhà hàng - tự động tạo khi khởi tạo công ty',
       });
       const savedDepartment = await queryRunner.manager.save(department);
 
-      // Bước 5: Tạo Staff (Nhân viên đầu tiên - thường là quản lý)
+      // Bước 5: Tạo Staff (Nhân viên đầu tiên - thuộc bộ phận Chủ nhà hàng)
       const username = staffDto.email?.split('@')[0] || `${companyDto.code}_001`;
       const temporaryPassword = this.generateTemporaryPassword();
       const passwordHash = await bcrypt.hash(temporaryPassword, 10);

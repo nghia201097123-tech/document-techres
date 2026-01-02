@@ -52,11 +52,11 @@ export class WizardCompanyDto {
   @MaxLength(50)
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'contact@abc.vn' })
-  @IsOptional()
+  @ApiProperty({ example: 'contact@abc.vn' })
+  @IsNotEmpty({ message: 'Email công ty không được để trống' })
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @MaxLength(255)
-  email?: string;
+  email: string;
 
   @ApiPropertyOptional({ example: 'Nguyễn Văn A' })
   @IsOptional()
@@ -189,29 +189,7 @@ export class WizardBranchDto {
 }
 
 /**
- * Bước 4: Bộ phận đầu tiên (Bắt buộc)
- */
-export class WizardDepartmentDto {
-  @ApiProperty({ example: 'Bộ phận Phục vụ' })
-  @IsNotEmpty({ message: 'Tên bộ phận không được để trống' })
-  @IsString()
-  @MaxLength(255)
-  name: string;
-
-  @ApiProperty({ example: 'PHUCVU', description: 'Mã bộ phận' })
-  @IsNotEmpty({ message: 'Mã bộ phận không được để trống' })
-  @IsString()
-  @MaxLength(50)
-  code: string;
-
-  @ApiPropertyOptional({ example: 'Bộ phận phục vụ khách hàng' })
-  @IsOptional()
-  @IsString()
-  description?: string;
-}
-
-/**
- * Bước 5: Nhân viên đầu tiên (Bắt buộc - thường là quản lý)
+ * Bước 4: Nhân viên đầu tiên (Bắt buộc - thường là chủ nhà hàng)
  */
 export class WizardStaffDto {
   @ApiProperty({ example: 'Nguyễn Văn A' })
@@ -239,9 +217,10 @@ export class WizardStaffDto {
 }
 
 /**
- * DTO cho Wizard tạo công ty 5 bước
- * (Company + Brand + Branch + Department + Staff)
- * Bắt buộc phải hoàn thành cả 5 bước mới lưu được
+ * DTO cho Wizard tạo công ty 4 bước
+ * (Company + Brand + Branch + Staff)
+ * Bộ phận "Chủ nhà hàng" sẽ được tự động tạo ngầm
+ * Bắt buộc phải hoàn thành cả 4 bước mới lưu được
  */
 export class CreateCompanyWizardDto {
   @ApiProperty({ description: 'Bước 1: Thông tin công ty' })
@@ -259,12 +238,7 @@ export class CreateCompanyWizardDto {
   @Type(() => WizardBranchDto)
   branch: WizardBranchDto;
 
-  @ApiProperty({ description: 'Bước 4: Bộ phận đầu tiên (bắt buộc)' })
-  @ValidateNested()
-  @Type(() => WizardDepartmentDto)
-  department: WizardDepartmentDto;
-
-  @ApiProperty({ description: 'Bước 5: Nhân viên đầu tiên (bắt buộc)' })
+  @ApiProperty({ description: 'Bước 4: Nhân viên đầu tiên (bắt buộc)' })
   @ValidateNested()
   @Type(() => WizardStaffDto)
   staff: WizardStaffDto;

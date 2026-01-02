@@ -34,10 +34,10 @@ interface UpdateCompanyData extends Partial<CreateCompanyData> {
 interface WizardCompanyData {
   name: string;
   code: string;
+  email: string; // Required
   taxCode?: string;
   address?: string;
   phone?: string;
-  email?: string;
   representative?: string;
 }
 
@@ -59,12 +59,6 @@ interface WizardBranchData {
   closeTime?: string;
 }
 
-interface WizardDepartmentData {
-  name: string;
-  code: string;
-  description?: string;
-}
-
 interface WizardStaffData {
   name: string;
   phone?: string;
@@ -76,7 +70,6 @@ export interface CreateCompanyWizardData {
   company: WizardCompanyData;
   brand: WizardBrandData;
   branch: WizardBranchData;
-  department: WizardDepartmentData;
   staff: WizardStaffData;
 }
 

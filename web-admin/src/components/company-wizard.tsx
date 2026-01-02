@@ -33,15 +33,13 @@ const STEPS = [
   { id: 1, title: "Công ty", description: "Thông tin công ty" },
   { id: 2, title: "Thương hiệu", description: "Thương hiệu đầu tiên" },
   { id: 3, title: "Chi nhánh", description: "Chi nhánh đầu tiên" },
-  { id: 4, title: "Bộ phận", description: "Bộ phận đầu tiên" },
-  { id: 5, title: "Nhân viên", description: "Nhân viên đầu tiên" },
+  { id: 4, title: "Nhân viên", description: "Chủ nhà hàng" },
 ];
 
 const initialWizardData: CreateCompanyWizardData = {
-  company: { name: "", code: "", taxCode: "", address: "", phone: "", email: "", representative: "" },
+  company: { name: "", code: "", email: "", taxCode: "", address: "", phone: "", representative: "" },
   brand: { name: "", code: "", description: "", businessModel: "full_system" },
   branch: { name: "", code: "", address: "", phone: "", email: "", manager: "", openTime: "08:00", closeTime: "22:00" },
-  department: { name: "", code: "", description: "" },
   staff: { name: "", phone: "", email: "", role: "owner" },
 };
 
@@ -64,14 +62,12 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(wizardData.company.name && wizardData.company.code);
+        return !!(wizardData.company.name && wizardData.company.code && wizardData.company.email);
       case 2:
         return !!(wizardData.brand.name && wizardData.brand.code);
       case 3:
         return !!(wizardData.branch.name && wizardData.branch.code && wizardData.branch.address);
       case 4:
-        return !!(wizardData.department.name && wizardData.department.code);
-      case 5:
         return !!(wizardData.staff.name);
       default:
         return false;
@@ -87,7 +83,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
       });
       return;
     }
-    if (currentStep < 5) {
+    if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -99,7 +95,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(5)) {
+    if (!validateStep(4)) {
       toast({
         variant: "destructive",
         title: "Lỗi",
@@ -144,7 +140,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
         <DialogHeader>
           <DialogTitle>Tạo công ty mới</DialogTitle>
           <DialogDescription>
-            Hoàn thành 5 bước để tạo công ty với đầy đủ thương hiệu, chi nhánh, bộ phận và nhân viên
+            Hoàn thành 4 bước để tạo công ty với thương hiệu, chi nhánh và chủ nhà hàng
           </DialogDescription>
         </DialogHeader>
 
@@ -198,6 +194,15 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Email công ty *</Label>
+                <Input
+                  type="email"
+                  value={wizardData.company.email}
+                  onChange={(e) => handleChange("company", "email", e.target.value)}
+                  placeholder="contact@company.vn"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Mã số thuế</Label>
@@ -221,22 +226,12 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   onChange={(e) => handleChange("company", "address", e.target.value)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Số điện thoại</Label>
-                  <Input
-                    value={wizardData.company.phone}
-                    onChange={(e) => handleChange("company", "phone", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={wizardData.company.email}
-                    onChange={(e) => handleChange("company", "email", e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Số điện thoại</Label>
+                <Input
+                  value={wizardData.company.phone}
+                  onChange={(e) => handleChange("company", "phone", e.target.value)}
+                />
               </div>
             </>
           )}
@@ -364,65 +359,21 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
             </>
           )}
 
-          {/* Step 4: Department */}
+          {/* Step 4: Staff (Chủ nhà hàng) */}
           {currentStep === 4 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tên bộ phận *</Label>
-                  <Input
-                    value={wizardData.department.name}
-                    onChange={(e) => handleChange("department", "name", e.target.value)}
-                    placeholder="Bộ phận Phục vụ"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mã bộ phận *</Label>
-                  <Input
-                    value={wizardData.department.code}
-                    onChange={(e) => handleChange("department", "code", e.target.value.toUpperCase())}
-                    placeholder="PHUCVU"
-                  />
-                </div>
+              <div className="p-3 bg-muted rounded-md mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Bộ phận &quot;Chủ nhà hàng&quot; sẽ được tự động tạo. Nhân viên đầu tiên là chủ sở hữu hệ thống.
+                </p>
               </div>
               <div className="space-y-2">
-                <Label>Mô tả</Label>
+                <Label>Tên chủ nhà hàng *</Label>
                 <Input
-                  value={wizardData.department.description}
-                  onChange={(e) => handleChange("department", "description", e.target.value)}
+                  value={wizardData.staff.name}
+                  onChange={(e) => handleChange("staff", "name", e.target.value)}
+                  placeholder="Nguyễn Văn A"
                 />
-              </div>
-            </>
-          )}
-
-          {/* Step 5: Staff */}
-          {currentStep === 5 && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tên nhân viên *</Label>
-                  <Input
-                    value={wizardData.staff.name}
-                    onChange={(e) => handleChange("staff", "name", e.target.value)}
-                    placeholder="Nguyễn Văn A"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Vai trò</Label>
-                  <Select
-                    value={wizardData.staff.role}
-                    onValueChange={(value) => handleChange("staff", "role", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="owner">Chủ sở hữu</SelectItem>
-                      <SelectItem value="manager">Quản lý</SelectItem>
-                      <SelectItem value="staff">Nhân viên</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -443,7 +394,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                * Tài khoản đăng nhập sẽ được tự động tạo dựa trên email hoặc mã công ty
+                * Nhân viên này sẽ thuộc bộ phận &quot;Chủ nhà hàng&quot; (tự động tạo). Tài khoản đăng nhập sẽ được tạo dựa trên email công ty.
               </p>
             </>
           )}
@@ -462,7 +413,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
             <Button type="button" variant="outline" onClick={handleClose}>
               Hủy
             </Button>
-            {currentStep < 5 ? (
+            {currentStep < 4 ? (
               <Button type="button" onClick={handleNext}>
                 Tiếp theo
                 <ChevronRight className="w-4 h-4 ml-1" />
