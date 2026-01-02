@@ -21,14 +21,31 @@ export class Company {
   @Column({ length: 50, unique: true })
   code: string;
 
+  // Tiên định danh - viết tắt tên công ty để đăng nhập (tự động gợi ý từ tên)
+  @Column({ length: 20, unique: true })
+  alias: string;
+
   @Column({ name: 'logo_url', type: 'text', nullable: true })
   logoUrl: string;
 
   @Column({ name: 'tax_code', length: 50, nullable: true })
   taxCode: string;
 
-  @Column({ type: 'text', nullable: true })
-  address: string;
+  // Địa chỉ chi tiết (số nhà, đường)
+  @Column({ name: 'address_detail', type: 'text', nullable: true })
+  addressDetail: string;
+
+  // Mã tỉnh/thành phố
+  @Column({ name: 'province_code', length: 10, nullable: true })
+  provinceCode: string;
+
+  // Mã quận/huyện
+  @Column({ name: 'district_code', length: 10, nullable: true })
+  districtCode: string;
+
+  // Mã phường/xã
+  @Column({ name: 'ward_code', length: 10, nullable: true })
+  wardCode: string;
 
   @Column({ length: 50, nullable: true })
   phone: string;
@@ -38,6 +55,14 @@ export class Company {
 
   @Column({ length: 255, nullable: true })
   representative: string;
+
+  // Dùng thử hay chính thức
+  @Column({ name: 'is_trial', default: false })
+  isTrial: boolean;
+
+  // Ngày hết hạn dùng thử (15 ngày từ khi tạo)
+  @Column({ name: 'trial_expires_at', type: 'timestamp', nullable: true })
+  trialExpiresAt: Date;
 
   // SaaS Subscription fields
   @Column({

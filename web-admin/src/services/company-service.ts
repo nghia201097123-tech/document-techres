@@ -34,9 +34,14 @@ interface UpdateCompanyData extends Partial<CreateCompanyData> {
 interface WizardCompanyData {
   name: string;
   code: string;
+  alias: string; // Tiên định danh - viết tắt tên công ty
   email: string; // Required
+  isTrial: boolean; // Dùng thử hay chính thức
   taxCode?: string;
-  address?: string;
+  addressDetail?: string; // Địa chỉ chi tiết (số nhà, đường)
+  provinceCode?: string; // Mã tỉnh/thành
+  districtCode?: string; // Mã quận/huyện
+  wardCode?: string; // Mã phường/xã
   phone?: string;
   representative?: string;
 }

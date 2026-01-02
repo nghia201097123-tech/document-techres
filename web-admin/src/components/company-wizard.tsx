@@ -5,6 +5,7 @@ import { Loader2, ChevronRight, ChevronLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { companyService, type CreateCompanyWizardData, type WizardResponse } from "@/services/company-service";
+import { locationService, type Province, type District, type Ward } from "@/services/location-service";
 import { useToast } from "@/hooks/use-toast";
 
 interface CompanyWizardProps {
@@ -37,11 +39,37 @@ const STEPS = [
 ];
 
 const initialWizardData: CreateCompanyWizardData = {
-  company: { name: "", code: "", email: "", taxCode: "", address: "", phone: "", representative: "" },
+  company: {
+    name: "",
+    code: "",
+    alias: "",
+    email: "",
+    isTrial: false,
+    taxCode: "",
+    addressDetail: "",
+    provinceCode: "",
+    districtCode: "",
+    wardCode: "",
+    phone: "",
+    representative: ""
+  },
   brand: { name: "", code: "", description: "", businessModel: "full_system" },
   branch: { name: "", code: "", address: "", phone: "", manager: "", openTime: "08:00", closeTime: "22:00" },
   staff: { name: "", phone: "", email: "", role: "owner" },
 };
+
+// Helper: Generate alias from company name
+function generateAlias(name: string): string {
+  if (!name) return "";
+  // Lấy chữ cái đầu của mỗi từ, loại bỏ các từ phổ biến
+  const skipWords = ["công", "ty", "tnhh", "cổ", "phần", "cp", "and", "và", "&"];
+  const words = name
+    .split(/\s+/)
+    .filter(w => !skipWords.includes(w.toLowerCase()))
+    .map(w => w.charAt(0).toUpperCase())
+    .join("");
+  return words || name.substring(0, 3).toUpperCase();
+}
 
 export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardProps) {
   const [currentStep, setCurrentStep] = React.useState(1);
@@ -49,7 +77,57 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
 
-  const handleChange = (section: keyof CreateCompanyWizardData, field: string, value: string) => {
+  // Location states
+  const [provinces, setProvinces] = React.useState<Province[]>([]);
+  const [districts, setDistricts] = React.useState<District[]>([]);
+  const [wards, setWards] = React.useState<Ward[]>([]);
+  const [loadingLocations, setLoadingLocations] = React.useState(false);
+
+  // Load provinces when dialog opens
+  React.useEffect(() => {
+    if (open && provinces.length === 0) {
+      loadProvinces();
+    }
+  }, [open]);
+
+  const loadProvinces = async () => {
+    try {
+      setLoadingLocations(true);
+      const data = await locationService.getProvinces();
+      setProvinces(data);
+    } catch (error) {
+      console.error("Error loading provinces:", error);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const loadDistricts = async (provinceCode: string) => {
+    try {
+      setLoadingLocations(true);
+      const data = await locationService.getDistricts(provinceCode);
+      setDistricts(data);
+      setWards([]); // Reset wards
+    } catch (error) {
+      console.error("Error loading districts:", error);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const loadWards = async (districtCode: string) => {
+    try {
+      setLoadingLocations(true);
+      const data = await locationService.getWards(districtCode);
+      setWards(data);
+    } catch (error) {
+      console.error("Error loading wards:", error);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const handleChange = (section: keyof CreateCompanyWizardData, field: string, value: string | boolean) => {
     setWizardData((prev) => ({
       ...prev,
       [section]: {
@@ -59,10 +137,42 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
     }));
   };
 
+  // Auto-generate alias when company name changes
+  const handleCompanyNameChange = (name: string) => {
+    handleChange("company", "name", name);
+    // Auto-generate alias if not manually edited
+    const suggestedAlias = generateAlias(name);
+    if (!wizardData.company.alias || wizardData.company.alias === generateAlias(wizardData.company.name)) {
+      handleChange("company", "alias", suggestedAlias);
+    }
+  };
+
+  const handleProvinceChange = (provinceCode: string) => {
+    handleChange("company", "provinceCode", provinceCode);
+    handleChange("company", "districtCode", "");
+    handleChange("company", "wardCode", "");
+    if (provinceCode) {
+      loadDistricts(provinceCode);
+    } else {
+      setDistricts([]);
+      setWards([]);
+    }
+  };
+
+  const handleDistrictChange = (districtCode: string) => {
+    handleChange("company", "districtCode", districtCode);
+    handleChange("company", "wardCode", "");
+    if (districtCode) {
+      loadWards(districtCode);
+    } else {
+      setWards([]);
+    }
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(wizardData.company.name && wizardData.company.code && wizardData.company.email);
+        return !!(wizardData.company.name && wizardData.company.code && wizardData.company.alias && wizardData.company.email);
       case 2:
         return !!(wizardData.brand.name && wizardData.brand.code);
       case 3:
@@ -107,15 +217,18 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
     setIsSubmitting(true);
     try {
       const result = await companyService.createWithWizard(wizardData);
+      const trialMsg = wizardData.company.isTrial ? " (Dùng thử 15 ngày)" : "";
       toast({
         title: "Thành công",
-        description: `Đã tạo công ty ${result.company.name}. Tài khoản đăng nhập: ${result.staff.username} / ${result.staff.temporaryPassword}`,
+        description: `Đã tạo công ty ${result.company.name}${trialMsg}. Tài khoản: ${result.staff.username} / ${result.staff.temporaryPassword}`,
       });
       onSuccess(result);
       onOpenChange(false);
       // Reset form
       setCurrentStep(1);
       setWizardData(initialWizardData);
+      setDistricts([]);
+      setWards([]);
     } catch (error: any) {
       console.error("Error creating company:", error);
       toast({
@@ -132,6 +245,8 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
     onOpenChange(false);
     setCurrentStep(1);
     setWizardData(initialWizardData);
+    setDistricts([]);
+    setWards([]);
   };
 
   return (
@@ -181,7 +296,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   <Label>Tên công ty *</Label>
                   <Input
                     value={wizardData.company.name}
-                    onChange={(e) => handleChange("company", "name", e.target.value)}
+                    onChange={(e) => handleCompanyNameChange(e.target.value)}
                     placeholder="Công ty TNHH ABC"
                   />
                 </div>
@@ -194,13 +309,102 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tiên định danh *</Label>
+                  <Input
+                    value={wizardData.company.alias}
+                    onChange={(e) => handleChange("company", "alias", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                    placeholder="CTAF"
+                    maxLength={20}
+                  />
+                  <p className="text-xs text-muted-foreground">Viết tắt để đăng nhập (tự động gợi ý từ tên)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Email công ty *</Label>
+                  <Input
+                    type="email"
+                    value={wizardData.company.email}
+                    onChange={(e) => handleChange("company", "email", e.target.value)}
+                    placeholder="contact@company.vn"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 p-3 bg-muted rounded-md">
+                <Checkbox
+                  id="isTrial"
+                  checked={wizardData.company.isTrial}
+                  onCheckedChange={(checked) => handleChange("company", "isTrial", checked as boolean)}
+                />
+                <Label htmlFor="isTrial" className="text-sm font-normal cursor-pointer">
+                  Dùng thử (15 ngày, sau đó tự động tạm ngưng nếu không nâng cấp)
+                </Label>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Tỉnh/Thành phố</Label>
+                  <Select
+                    value={wizardData.company.provinceCode || ""}
+                    onValueChange={handleProvinceChange}
+                    disabled={loadingLocations}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn tỉnh/thành" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {provinces.map((p) => (
+                        <SelectItem key={p.code} value={p.code}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Quận/Huyện</Label>
+                  <Select
+                    value={wizardData.company.districtCode || ""}
+                    onValueChange={handleDistrictChange}
+                    disabled={loadingLocations || !wizardData.company.provinceCode}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn quận/huyện" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {districts.map((d) => (
+                        <SelectItem key={d.code} value={d.code}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Phường/Xã</Label>
+                  <Select
+                    value={wizardData.company.wardCode || ""}
+                    onValueChange={(v) => handleChange("company", "wardCode", v)}
+                    disabled={loadingLocations || !wizardData.company.districtCode}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn phường/xã" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wards.map((w) => (
+                        <SelectItem key={w.code} value={w.code}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label>Email công ty *</Label>
+                <Label>Địa chỉ chi tiết (số nhà, đường)</Label>
                 <Input
-                  type="email"
-                  value={wizardData.company.email}
-                  onChange={(e) => handleChange("company", "email", e.target.value)}
-                  placeholder="contact@company.vn"
+                  value={wizardData.company.addressDetail}
+                  onChange={(e) => handleChange("company", "addressDetail", e.target.value)}
+                  placeholder="123 Nguyễn Văn Linh"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -212,25 +416,18 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Người đại diện</Label>
+                  <Label>Số điện thoại</Label>
                   <Input
-                    value={wizardData.company.representative}
-                    onChange={(e) => handleChange("company", "representative", e.target.value)}
+                    value={wizardData.company.phone}
+                    onChange={(e) => handleChange("company", "phone", e.target.value)}
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Địa chỉ</Label>
+                <Label>Người đại diện</Label>
                 <Input
-                  value={wizardData.company.address}
-                  onChange={(e) => handleChange("company", "address", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Số điện thoại</Label>
-                <Input
-                  value={wizardData.company.phone}
-                  onChange={(e) => handleChange("company", "phone", e.target.value)}
+                  value={wizardData.company.representative}
+                  onChange={(e) => handleChange("company", "representative", e.target.value)}
                 />
               </div>
             </>

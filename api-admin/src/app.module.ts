@@ -16,6 +16,9 @@ import {
   PermissionGroup,
   AdminUser,
   Staff,
+  Province,
+  District,
+  Ward,
 } from './database/entities';
 
 // Modules
@@ -27,6 +30,7 @@ import { PackagesModule } from './modules/packages/packages.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
+import { LocationsModule } from './modules/locations/locations.module';
 
 @Module({
   imports: [
@@ -57,6 +61,9 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
           PermissionGroup,
           AdminUser,
           Staff,
+          Province,
+          District,
+          Ward,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',
@@ -73,6 +80,7 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
     CategoriesModule,
     PermissionsModule,
     AdminUsersModule,
+    LocationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

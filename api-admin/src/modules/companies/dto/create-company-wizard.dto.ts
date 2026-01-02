@@ -9,6 +9,8 @@ import {
   Min,
   IsDateString,
   ValidateNested,
+  IsBoolean,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -30,6 +32,17 @@ export class WizardCompanyDto {
   @MaxLength(50)
   code: string;
 
+  @ApiProperty({ example: 'CTAF', description: 'Tiên định danh - viết tắt tên công ty để đăng nhập' })
+  @IsNotEmpty({ message: 'Tiên định danh không được để trống' })
+  @IsString()
+  @MaxLength(20)
+  @Matches(/^[A-Z0-9]+$/, { message: 'Tiên định danh chỉ chứa chữ in hoa và số' })
+  alias: string;
+
+  @ApiProperty({ example: false, description: 'true = dùng thử 15 ngày, false = chính thức' })
+  @IsBoolean()
+  isTrial: boolean;
+
   @ApiPropertyOptional({ example: 'https://example.com/logo.png' })
   @IsOptional()
   @IsString()
@@ -41,10 +54,32 @@ export class WizardCompanyDto {
   @MaxLength(50)
   taxCode?: string;
 
-  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh, Q7, TP.HCM' })
+  // Địa chỉ chi tiết (số nhà, đường)
+  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh' })
   @IsOptional()
   @IsString()
-  address?: string;
+  addressDetail?: string;
+
+  // Mã tỉnh/thành phố
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  provinceCode?: string;
+
+  // Mã quận/huyện
+  @ApiPropertyOptional({ example: '760', description: 'Mã quận/huyện' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  districtCode?: string;
+
+  // Mã phường/xã
+  @ApiPropertyOptional({ example: '26734', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  wardCode?: string;
 
   @ApiPropertyOptional({ example: '028 1234 5678' })
   @IsOptional()

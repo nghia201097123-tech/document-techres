@@ -63,6 +63,14 @@ export class CompaniesService {
       throw new ConflictException('Mã công ty đã tồn tại');
     }
 
+    // Kiểm tra alias đã tồn tại chưa
+    const existingAlias = await this.companyRepository.findOne({
+      where: { alias: companyDto.alias },
+    });
+    if (existingAlias) {
+      throw new ConflictException('Tiên định danh đã tồn tại');
+    }
+
     const existingBrand = await this.brandRepository.findOne({
       where: { code: brandDto.code },
     });
@@ -87,16 +95,27 @@ export class CompaniesService {
       const companyData: Partial<Company> = {
         name: companyDto.name,
         code: companyDto.code,
+        alias: companyDto.alias,
         logoUrl: companyDto.logoUrl,
         taxCode: companyDto.taxCode,
-        address: companyDto.address,
+        addressDetail: companyDto.addressDetail,
+        provinceCode: companyDto.provinceCode,
+        districtCode: companyDto.districtCode,
+        wardCode: companyDto.wardCode,
         phone: companyDto.phone,
         email: companyDto.email,
         representative: companyDto.representative,
+        isTrial: companyDto.isTrial,
         subscriptionPlan: companyDto.subscriptionPlan,
         maxBranches: companyDto.maxBranches,
         maxUsers: companyDto.maxUsers,
       };
+      // Nếu dùng thử, set ngày hết hạn 15 ngày
+      if (companyDto.isTrial) {
+        const trialExpires = new Date();
+        trialExpires.setDate(trialExpires.getDate() + 15);
+        companyData.trialExpiresAt = trialExpires;
+      }
       if (companyDto.subscriptionExpiresAt) {
         companyData.subscriptionExpiresAt = new Date(companyDto.subscriptionExpiresAt);
       }
