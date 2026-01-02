@@ -37,7 +37,17 @@ interface UpdateBranchData extends Partial<CreateBranchData> {
 
 export const branchService = {
   async getList(params?: BranchListParams): Promise<BranchListResponse> {
-    const response = await api.get<BranchListResponse>("/branches", { params });
+    // Filter out empty/undefined params
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) => value !== undefined && value !== ""
+          )
+        )
+      : undefined;
+    const response = await api.get<BranchListResponse>("/branches", {
+      params: cleanParams,
+    });
     return response.data;
   },
 

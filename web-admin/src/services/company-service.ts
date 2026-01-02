@@ -32,7 +32,17 @@ interface UpdateCompanyData extends Partial<CreateCompanyData> {
 
 export const companyService = {
   async getList(params?: CompanyListParams): Promise<CompanyListResponse> {
-    const response = await api.get<CompanyListResponse>("/companies", { params });
+    // Filter out empty/undefined params
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) => value !== undefined && value !== ""
+          )
+        )
+      : undefined;
+    const response = await api.get<CompanyListResponse>("/companies", {
+      params: cleanParams,
+    });
     return response.data;
   },
 

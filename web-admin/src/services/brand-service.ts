@@ -32,7 +32,17 @@ interface UpdateBrandData extends Partial<CreateBrandData> {
 
 export const brandService = {
   async getList(params?: BrandListParams): Promise<BrandListResponse> {
-    const response = await api.get<BrandListResponse>("/brands", { params });
+    // Filter out empty/undefined params
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) => value !== undefined && value !== ""
+          )
+        )
+      : undefined;
+    const response = await api.get<BrandListResponse>("/brands", {
+      params: cleanParams,
+    });
     return response.data;
   },
 
