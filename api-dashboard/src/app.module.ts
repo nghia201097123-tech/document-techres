@@ -7,6 +7,20 @@ import { ProductsModule } from './modules/products/products.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
+import {
+  Company,
+  Brand,
+  Branch,
+  Department,
+  Staff,
+  Package,
+  Province,
+  Ward,
+  AdminUser,
+  Permission,
+  PermissionGroup,
+  TransactionCategory,
+} from './database/entities';
 
 @Module({
   imports: [
@@ -22,8 +36,21 @@ import { DepartmentsModule } from './modules/departments/departments.module';
         username: configService.get('DB_USERNAME', 'postgres'),
         password: configService.get('DB_PASSWORD', 'postgres'),
         database: configService.get('DB_DATABASE', 'techres'),
-        autoLoadEntities: true,
-        synchronize: configService.get('NODE_ENV') !== 'production',
+        entities: [
+          Company,
+          Brand,
+          Branch,
+          Department,
+          Staff,
+          Package,
+          Province,
+          Ward,
+          AdminUser,
+          Permission,
+          PermissionGroup,
+          TransactionCategory,
+        ],
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),
