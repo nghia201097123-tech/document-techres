@@ -4,7 +4,7 @@ import type { AdminUser } from "@/types";
 
 // Separate axios instance for login (without auth interceptors)
 const authApi = axios.create({
-  baseURL: "http://localhost:3002/api",
+  baseURL: "http://localhost:4001/api",
   headers: {
     "Content-Type": "application/json",
   },

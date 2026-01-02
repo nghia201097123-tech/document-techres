@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// API Dashboard URL - port 3003
-const API_BASE_URL = "http://localhost:3003/api";
+// API Dashboard URL - port 4002
+const API_BASE_URL = "http://localhost:4002/api";
 
 console.log("[Dashboard API] Base URL:", API_BASE_URL);
 

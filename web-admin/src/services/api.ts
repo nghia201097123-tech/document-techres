@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // API Gateway URL - hardcoded to ensure correct routing
-const API_BASE_URL = "http://localhost:3002/api";
+const API_BASE_URL = "http://localhost:4001/api";
 
 console.log("[API] Base URL:", API_BASE_URL);
 
