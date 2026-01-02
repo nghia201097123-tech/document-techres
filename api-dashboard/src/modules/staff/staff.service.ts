@@ -35,14 +35,17 @@ export class StaffService {
   }
 
   async create(tenantId: string, companyId: string, branchId: string, createDto: CreateStaffDto) {
-    // Generate username from name
-    const username = this.generateUsername(createDto.name);
+    // Generate username with pattern: prefix (2 chars) + auto-increment (6 digits)
+    // Example: tr000001, tr000002, ...
+    const prefix = createDto.usernamePrefix?.toLowerCase().substring(0, 2) || 'tr';
+    const username = await this.generateUsername(tenantId, prefix);
+
     // Generate temporary password
     const tempPassword = this.generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-    // Exclude role from DTO spread (role is enum in entity, string in DTO)
-    const { role, ...restDto } = createDto;
+    // Exclude role and usernamePrefix from DTO spread
+    const { role, usernamePrefix, ...restDto } = createDto;
     const staff = this.staffRepository.create({
       ...restDto,
       tenantId,
@@ -80,15 +83,13 @@ export class StaffService {
     return { temporaryPassword: tempPassword };
   }
 
-  private generateUsername(name: string): string {
-    const normalized = name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd')
-      .replace(/[^a-z0-9]/g, '');
-    const random = Math.random().toString(36).substring(2, 6);
-    return `${normalized}${random}`;
+  private async generateUsername(tenantId: string, prefix: string): Promise<string> {
+    // Count existing staff in this tenant to get next number
+    const count = await this.staffRepository.count({ where: { tenantId } });
+    const nextNumber = count + 1;
+    // Format: prefix (2 chars) + 6-digit padded number
+    // Example: tr000001, tr000002, ...
+    return `${prefix}${String(nextNumber).padStart(6, '0')}`;
   }
 
   private generateTempPassword(): string {

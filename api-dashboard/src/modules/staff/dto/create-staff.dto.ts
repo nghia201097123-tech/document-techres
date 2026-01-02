@@ -30,4 +30,13 @@ export class CreateStaffDto {
   @IsOptional()
   @IsString()
   departmentId?: string;
+
+  @ApiPropertyOptional({
+    example: 'tr',
+    description: 'Prefix cho username (2 ký tự), mặc định là "tr". VD: tr000001'
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  usernamePrefix?: string;
 }

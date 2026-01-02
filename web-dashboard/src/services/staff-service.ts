@@ -17,6 +17,7 @@ export interface CreateStaffDto {
   email?: string;
   phone?: string;
   departmentId?: string;
+  usernamePrefix?: string; // 2 ký tự prefix, mặc định "tr". VD: tr000001
 }
 
 export interface UpdateStaffDto {

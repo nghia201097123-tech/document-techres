@@ -35,6 +35,7 @@ export default function StaffPage() {
     name: "",
     email: "",
     phone: "",
+    usernamePrefix: "tr",
   });
   const [tempPassword, setTempPassword] = React.useState<string | null>(null);
 
@@ -65,7 +66,7 @@ export default function StaffPage() {
       const result = await staffService.create(formData);
       setTempPassword(result.temporaryPassword);
       setStaffList((prev) => [...prev, result]);
-      setFormData({ name: "", email: "", phone: "" });
+      setFormData({ name: "", email: "", phone: "", usernamePrefix: "tr" });
     } catch (error) {
       console.error("Error creating staff:", error);
       alert("Có lỗi xảy ra khi tạo nhân viên");
@@ -88,7 +89,7 @@ export default function StaffPage() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setTempPassword(null);
-    setFormData({ name: "", email: "", phone: "" });
+    setFormData({ name: "", email: "", phone: "", usernamePrefix: "tr" });
   };
 
   // Filter staff by search
@@ -211,6 +212,24 @@ export default function StaffPage() {
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="usernamePrefix">Mã đăng nhập</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      id="usernamePrefix"
+                      placeholder="tr"
+                      maxLength={2}
+                      className="w-20 text-center font-mono uppercase"
+                      value={formData.usernamePrefix}
+                      onChange={(e) => setFormData({ ...formData, usernamePrefix: e.target.value.toLowerCase().substring(0, 2) })}
+                    />
+                    <span className="text-muted-foreground font-mono">000001</span>
+                    <span className="text-xs text-muted-foreground">(tự động tăng)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    2 ký tự đầu của mã đăng nhập. VD: tr000001, ab000001
+                  </p>
+                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="name">Tên nhân viên *</Label>
                   <Input
