@@ -22,7 +22,7 @@ export class Company {
   code: string;
 
   // Tiên định danh - viết tắt tên công ty để đăng nhập (tự động gợi ý từ tên)
-  @Column({ length: 20, unique: true })
+  @Column({ length: 20, unique: true, nullable: true })
   alias: string;
 
   @Column({ name: 'logo_url', type: 'text', nullable: true })
