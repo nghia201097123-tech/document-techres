@@ -8,7 +8,7 @@ async function bootstrap() {
 
   // CORS - allow web-dashboard (port 3002)
   app.enableCors({
-    origin: ['http://localhost:3002', 'http://localhost:3000'],
+    origin: ['http://localhost:3001'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
