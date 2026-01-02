@@ -127,7 +127,6 @@ export class CompaniesService {
         logoUrl: branchDto.logoUrl || brandDto.logoUrl,
         address: branchDto.address,
         phone: branchDto.phone,
-        email: branchDto.email,
         manager: branchDto.manager,
         businessModel: branchDto.businessModel || BusinessModel.CCB_ONLY,
         openTime: branchDto.openTime,

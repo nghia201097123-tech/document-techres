@@ -53,7 +53,6 @@ interface WizardBranchData {
   code: string;
   address: string;
   phone?: string;
-  email?: string;
   manager?: string;
   openTime?: string;
   closeTime?: string;

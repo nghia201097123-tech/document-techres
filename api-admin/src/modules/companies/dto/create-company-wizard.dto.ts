@@ -154,12 +154,6 @@ export class WizardBranchDto {
   @MaxLength(50)
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'pho24q1@abc.vn' })
-  @IsOptional()
-  @IsEmail({}, { message: 'Email không hợp lệ' })
-  @MaxLength(255)
-  email?: string;
-
   @ApiPropertyOptional({ example: 'Nguyễn Văn B' })
   @IsOptional()
   @IsString()

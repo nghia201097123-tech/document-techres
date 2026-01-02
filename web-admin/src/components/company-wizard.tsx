@@ -39,7 +39,7 @@ const STEPS = [
 const initialWizardData: CreateCompanyWizardData = {
   company: { name: "", code: "", email: "", taxCode: "", address: "", phone: "", representative: "" },
   brand: { name: "", code: "", description: "", businessModel: "full_system" },
-  branch: { name: "", code: "", address: "", phone: "", email: "", manager: "", openTime: "08:00", closeTime: "22:00" },
+  branch: { name: "", code: "", address: "", phone: "", manager: "", openTime: "08:00", closeTime: "22:00" },
   staff: { name: "", phone: "", email: "", role: "owner" },
 };
 
@@ -321,22 +321,14 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={wizardData.branch.email}
-                    onChange={(e) => handleChange("branch", "email", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
                   <Label>Quản lý</Label>
                   <Input
                     value={wizardData.branch.manager}
                     onChange={(e) => handleChange("branch", "manager", e.target.value)}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-2">
                     <Label>Giờ mở cửa</Label>
