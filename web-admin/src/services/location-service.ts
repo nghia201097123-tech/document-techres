@@ -1,41 +1,53 @@
 import api from "./api";
 
+/**
+ * Dữ liệu địa chỉ hành chính Việt Nam sau sáp nhập 07/2025
+ * Theo QĐ 19/2025/QĐ-TTg: 34 tỉnh/thành phố → xã/phường
+ * (Không còn cấp quận/huyện)
+ */
+
 export interface Province {
   code: string;
   name: string;
   fullName: string;
-}
-
-export interface District {
-  code: string;
-  name: string;
-  fullName: string;
-  provinceCode: string;
+  divisionType?: string; // "thành phố trung ương" | "tỉnh"
+  phoneCode?: number;
 }
 
 export interface Ward {
   code: string;
   name: string;
   fullName: string;
-  districtCode: string;
+  provinceCode: string; // Liên kết trực tiếp với tỉnh
+  divisionType?: string; // "phường" | "xã" | "thị trấn"
 }
 
 export const locationService = {
+  /**
+   * Lấy danh sách 34 tỉnh/thành phố (sau sáp nhập 07/2025)
+   */
   async getProvinces(): Promise<Province[]> {
     const response = await api.get<Province[]>("/locations/provinces");
     return response.data;
   },
 
-  async getDistricts(provinceCode: string): Promise<District[]> {
-    const response = await api.get<District[]>(
-      `/locations/provinces/${provinceCode}/districts`
+  /**
+   * Lấy danh sách xã/phường theo tỉnh
+   * Sau sáp nhập 07/2025, xã/phường thuộc trực tiếp tỉnh/thành phố
+   */
+  async getWards(provinceCode: string): Promise<Ward[]> {
+    const response = await api.get<Ward[]>(
+      `/locations/provinces/${provinceCode}/wards`
     );
     return response.data;
   },
 
-  async getWards(districtCode: string): Promise<Ward[]> {
-    const response = await api.get<Ward[]>(
-      `/locations/districts/${districtCode}/wards`
+  /**
+   * Seed dữ liệu địa chỉ từ API (admin only)
+   */
+  async seedLocations(): Promise<{ provinces: number; wards: number }> {
+    const response = await api.post<{ provinces: number; wards: number }>(
+      "/locations/seed"
     );
     return response.data;
   },

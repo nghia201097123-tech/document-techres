@@ -35,15 +35,11 @@ export class Company {
   @Column({ name: 'address_detail', type: 'text', nullable: true })
   addressDetail: string;
 
-  // Mã tỉnh/thành phố
+  // Mã tỉnh/thành phố (theo QĐ 19/2025/QĐ-TTg - 34 tỉnh sau sáp nhập 07/2025)
   @Column({ name: 'province_code', length: 10, nullable: true })
   provinceCode: string;
 
-  // Mã quận/huyện
-  @Column({ name: 'district_code', length: 10, nullable: true })
-  districtCode: string;
-
-  // Mã phường/xã
+  // Mã phường/xã (liên kết trực tiếp với tỉnh, không qua quận/huyện)
   @Column({ name: 'ward_code', length: 10, nullable: true })
   wardCode: string;
 

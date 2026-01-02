@@ -91,7 +91,7 @@ export class CompaniesService {
     await queryRunner.startTransaction();
 
     try {
-      // Bước 1: Tạo Company
+      // Bước 1: Tạo Company (địa chỉ 2 cấp: Tỉnh → Xã/Phường, không còn Quận/Huyện)
       const companyData: Partial<Company> = {
         name: companyDto.name,
         code: companyDto.code,
@@ -100,7 +100,6 @@ export class CompaniesService {
         taxCode: companyDto.taxCode,
         addressDetail: companyDto.addressDetail,
         provinceCode: companyDto.provinceCode,
-        districtCode: companyDto.districtCode,
         wardCode: companyDto.wardCode,
         phone: companyDto.phone,
         email: companyDto.email,
@@ -137,14 +136,16 @@ export class CompaniesService {
       });
       const savedBrand = await queryRunner.manager.save(brand);
 
-      // Bước 3: Tạo Branch (Chi nhánh đầu tiên)
+      // Bước 3: Tạo Branch (Chi nhánh đầu tiên - địa chỉ 2 cấp)
       const branch = queryRunner.manager.create(Branch, {
         tenantId,
         brandId: savedBrand.id,
         name: branchDto.name,
         code: branchDto.code,
         logoUrl: branchDto.logoUrl || brandDto.logoUrl,
-        address: branchDto.address,
+        addressDetail: branchDto.addressDetail,
+        provinceCode: branchDto.provinceCode,
+        wardCode: branchDto.wardCode,
         phone: branchDto.phone,
         manager: branchDto.manager,
         businessModel: branchDto.businessModel || BusinessModel.CCB_ONLY,

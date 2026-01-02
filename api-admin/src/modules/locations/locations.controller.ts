@@ -11,26 +11,26 @@ export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}
 
   @Post('seed')
-  @ApiOperation({ summary: 'Import dữ liệu địa chỉ hành chính Việt Nam từ API' })
+  @ApiOperation({
+    summary: 'Import dữ liệu địa chỉ hành chính Việt Nam sau sáp nhập 07/2025',
+    description: 'Nguồn: QĐ 19/2025/QĐ-TTg. Cấu trúc 2 cấp: 34 tỉnh/thành → xã/phường (bỏ cấp quận/huyện)'
+  })
   async seedLocations() {
     return this.locationsService.seedFromAPI();
   }
 
   @Get('provinces')
-  @ApiOperation({ summary: 'Lấy danh sách tỉnh/thành phố' })
+  @ApiOperation({ summary: 'Lấy danh sách 34 tỉnh/thành phố (sau sáp nhập 07/2025)' })
   async getProvinces() {
     return this.locationsService.getProvinces();
   }
 
-  @Get('provinces/:provinceCode/districts')
-  @ApiOperation({ summary: 'Lấy danh sách quận/huyện theo tỉnh' })
-  async getDistricts(@Param('provinceCode') provinceCode: string) {
-    return this.locationsService.getDistricts(provinceCode);
-  }
-
-  @Get('districts/:districtCode/wards')
-  @ApiOperation({ summary: 'Lấy danh sách phường/xã theo quận' })
-  async getWards(@Param('districtCode') districtCode: string) {
-    return this.locationsService.getWards(districtCode);
+  @Get('provinces/:provinceCode/wards')
+  @ApiOperation({
+    summary: 'Lấy danh sách xã/phường theo tỉnh',
+    description: 'Xã/phường thuộc trực tiếp tỉnh/thành phố (không còn cấp quận/huyện)'
+  })
+  async getWards(@Param('provinceCode') provinceCode: string) {
+    return this.locationsService.getWards(provinceCode);
   }
 }

@@ -30,7 +30,10 @@ interface UpdateCompanyData extends Partial<CreateCompanyData> {
   isActive?: boolean;
 }
 
-// Wizard types
+/**
+ * Wizard types - Cập nhật theo địa chỉ hành chính Việt Nam sau sáp nhập 07/2025
+ * Cấu trúc 2 cấp: Tỉnh/Thành phố → Xã/Phường (không còn cấp Quận/Huyện)
+ */
 interface WizardCompanyData {
   name: string;
   code: string;
@@ -39,9 +42,8 @@ interface WizardCompanyData {
   isTrial: boolean; // Dùng thử hay chính thức
   taxCode?: string;
   addressDetail?: string; // Địa chỉ chi tiết (số nhà, đường)
-  provinceCode?: string; // Mã tỉnh/thành
-  districtCode?: string; // Mã quận/huyện
-  wardCode?: string; // Mã phường/xã
+  provinceCode?: string; // Mã tỉnh/thành (34 tỉnh sau sáp nhập)
+  wardCode?: string; // Mã phường/xã (liên kết trực tiếp với tỉnh)
   phone?: string;
   representative?: string;
 }
@@ -56,7 +58,9 @@ interface WizardBrandData {
 interface WizardBranchData {
   name: string;
   code: string;
-  address: string;
+  addressDetail?: string; // Địa chỉ chi tiết (số nhà, đường)
+  provinceCode?: string; // Mã tỉnh/thành
+  wardCode?: string; // Mã phường/xã
   phone?: string;
   manager?: string;
   openTime?: string;

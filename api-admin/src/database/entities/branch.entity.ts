@@ -46,8 +46,17 @@ export class Branch {
   @Column({ name: 'logo_url', type: 'text', nullable: true })
   logoUrl: string;
 
-  @Column({ type: 'text', nullable: true })
-  address: string;
+  // Địa chỉ chi tiết (số nhà, đường)
+  @Column({ name: 'address_detail', type: 'text', nullable: true })
+  addressDetail: string;
+
+  // Mã tỉnh/thành phố (theo QĐ 19/2025/QĐ-TTg - 34 tỉnh sau sáp nhập 07/2025)
+  @Column({ name: 'province_code', length: 10, nullable: true })
+  provinceCode: string;
+
+  // Mã phường/xã (liên kết trực tiếp với tỉnh, không qua quận/huyện)
+  @Column({ name: 'ward_code', length: 10, nullable: true })
+  wardCode: string;
 
   @Column({ length: 50, nullable: true })
   phone: string;

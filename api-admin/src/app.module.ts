@@ -17,7 +17,6 @@ import {
   AdminUser,
   Staff,
   Province,
-  District,
   Ward,
 } from './database/entities';
 
@@ -62,7 +61,6 @@ import { LocationsModule } from './modules/locations/locations.module';
           AdminUser,
           Staff,
           Province,
-          District,
           Ward,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',

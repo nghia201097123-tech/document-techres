@@ -60,21 +60,14 @@ export class WizardCompanyDto {
   @IsString()
   addressDetail?: string;
 
-  // Mã tỉnh/thành phố
-  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố' })
+  // Mã tỉnh/thành phố (theo QĐ 19/2025/QĐ-TTg - 34 tỉnh sau sáp nhập 07/2025)
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố (34 tỉnh sau sáp nhập)' })
   @IsOptional()
   @IsString()
   @MaxLength(10)
   provinceCode?: string;
 
-  // Mã quận/huyện
-  @ApiPropertyOptional({ example: '760', description: 'Mã quận/huyện' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  districtCode?: string;
-
-  // Mã phường/xã
+  // Mã phường/xã (liên kết trực tiếp với tỉnh, không qua quận/huyện)
   @ApiPropertyOptional({ example: '26734', description: 'Mã phường/xã' })
   @IsOptional()
   @IsString()
@@ -156,6 +149,7 @@ export class WizardBrandDto {
 
 /**
  * Bước 3: Chi nhánh đầu tiên (Bắt buộc)
+ * Địa chỉ theo cấu trúc 2 cấp: Tỉnh → Xã/Phường (sau sáp nhập 07/2025)
  */
 export class WizardBranchDto {
   @ApiProperty({ example: 'Phở 24 - Quận 1' })
@@ -178,10 +172,22 @@ export class WizardBranchDto {
   @IsString()
   logoUrl?: string;
 
-  @ApiProperty({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
-  @IsNotEmpty({ message: 'Địa chỉ chi nhánh không được để trống' })
+  @ApiPropertyOptional({ example: '123 Nguyễn Huệ', description: 'Địa chỉ chi tiết (số nhà, đường)' })
+  @IsOptional()
   @IsString()
-  address: string;
+  addressDetail?: string;
+
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '26734', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  wardCode?: string;
 
   @ApiPropertyOptional({ example: '028 1234 5678' })
   @IsOptional()

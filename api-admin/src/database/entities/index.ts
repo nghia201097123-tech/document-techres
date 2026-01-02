@@ -10,5 +10,4 @@ export * from './permission-group.entity';
 export * from './admin-user.entity';
 export * from './staff.entity';
 export * from './province.entity';
-export * from './district.entity';
 export * from './ward.entity';
