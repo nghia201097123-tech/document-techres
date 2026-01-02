@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Department } from '../../database/entities';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto';
 
@@ -15,24 +15,20 @@ export class DepartmentsService {
     return this.departmentRepository.find({
       where: { tenantId },
       order: { name: 'ASC' },
-      relations: ['parent', 'children'],
     });
   }
 
   async findTree(tenantId: string) {
-    // Get root departments (no parent)
-    const roots = await this.departmentRepository.find({
-      where: { tenantId, parentId: IsNull() },
+    // Return all departments (entity doesn't support parent-child yet)
+    return this.departmentRepository.find({
+      where: { tenantId },
       order: { name: 'ASC' },
-      relations: ['children'],
     });
-    return roots;
   }
 
   async findOne(tenantId: string, id: string) {
     const department = await this.departmentRepository.findOne({
       where: { tenantId, id },
-      relations: ['parent', 'children'],
     });
     if (!department) {
       throw new NotFoundException('Không tìm thấy bộ phận');

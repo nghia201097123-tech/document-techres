@@ -20,14 +20,13 @@ export class StaffService {
     return this.staffRepository.find({
       where,
       order: { name: 'ASC' },
-      relations: ['department'],
     });
   }
 
   async findOne(tenantId: string, id: string) {
     const staff = await this.staffRepository.findOne({
       where: { tenantId, id },
-      relations: ['department', 'branch'],
+      relations: ['branch'],
     });
     if (!staff) {
       throw new NotFoundException('Không tìm thấy nhân viên');
@@ -42,8 +41,10 @@ export class StaffService {
     const tempPassword = this.generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
+    // Exclude role from DTO spread (role is enum in entity, string in DTO)
+    const { role, ...restDto } = createDto;
     const staff = this.staffRepository.create({
-      ...createDto,
+      ...restDto,
       tenantId,
       companyId,
       branchId,
