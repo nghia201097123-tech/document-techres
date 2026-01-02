@@ -42,6 +42,7 @@ import type { Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 import { companyService } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
+import { CompanyWizard } from "@/components/company-wizard";
 
 interface CompanyFormData {
   name: string;
@@ -66,6 +67,7 @@ const initialFormData: CompanyFormData = {
 export default function CompaniesPage() {
   const [companies, setCompanies] = React.useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [isWizardOpen, setIsWizardOpen] = React.useState(false);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
@@ -101,10 +103,11 @@ export default function CompaniesPage() {
   const filteredCompanies = companies;
 
   const handleOpenCreate = () => {
-    setSelectedCompany(null);
-    setFormData(initialFormData);
-    setIsViewMode(false);
-    setIsDialogOpen(true);
+    setIsWizardOpen(true);
+  };
+
+  const handleWizardSuccess = () => {
+    fetchCompanies();
   };
 
   const handleOpenEdit = (company: Company) => {
@@ -503,6 +506,13 @@ export default function CompaniesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Company Wizard */}
+      <CompanyWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        onSuccess={handleWizardSuccess}
+      />
     </div>
   );
 }
