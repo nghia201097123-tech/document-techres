@@ -24,7 +24,7 @@ FNB POS System là hệ thống bán hàng được thiết kế với cơ chế
 │   │  (Công ty A)│   │  (Công ty B)│   │  (Công ty C)│             │
 │   │             │   │             │   │             │             │
 │   │ tenant_id:  │   │ tenant_id:  │   │ tenant_id:  │             │
-│   │ abc-food    │   │ xyz-resto   │   │ 123-cafe    │             │
+│   │ [mã cty A]  │   │ [mã cty B]  │   │ [mã cty C]  │             │
 │   └─────────────┘   └─────────────┘   └─────────────┘             │
 │                                                                     │
 │   Đặc điểm:                                                        │
@@ -58,22 +58,6 @@ TENANT (tenant_id) ← Cấp cao nhất, đại diện cho 1 khách hàng SaaS
 - `tenant_id` = `company.code` (mã viết tắt công ty)
 - Tất cả dữ liệu đều có `tenant_id` để phân biệt
 
-**Ví dụ thực tế:**
-```
-Tenant: abcfood (tenant_id = "abcfood")
-    │
-    └── Công ty ABC Food (company.code = "abcfood")
-            │
-            ├── Thương hiệu "Phở 24"
-            │       ├── Phở 24 - Quận 1
-            │       ├── Phở 24 - Quận 3
-            │       └── Phở 24 - Quận 7
-            │
-            └── Thương hiệu "Cơm Tấm Sài Gòn"
-                    ├── Cơm Tấm - Bình Thạnh
-                    └── Cơm Tấm - Gò Vấp
-```
-
 ## Cơ chế Tenant ID
 
 | Nguyên tắc | Mô tả |
@@ -85,12 +69,12 @@ Tenant: abcfood (tenant_id = "abcfood")
 
 ### Cách xác định Tenant
 
-| Nguồn | Cách lấy tenant_id | Ví dụ |
+| Nguồn | Cách lấy tenant_id | Mô tả |
 |-------|-------------------|-------|
-| **Web Dashboard Login** | Input từ user | Nhập "abcfood" ở màn hình login |
-| **API Request** | Header `X-Tenant-ID` | `X-Tenant-ID: abcfood` |
+| **Web Dashboard Login** | Input từ user | Nhập mã công ty ở màn hình login |
+| **API Request** | Header `X-Tenant-ID` | `X-Tenant-ID: [mã công ty]` |
 | **POS/Order App** | Lưu local sau khi login | Stored trong SQLite |
-| **Subdomain** (tùy chọn) | Parse từ URL | `abcfood.pos.vn` → `abcfood` |
+| **Subdomain** (tùy chọn) | Parse từ URL | `[tenant].pos.vn` → `[tenant]` |
 
 ## 3 Mô hình kinh doanh
 
@@ -244,24 +228,24 @@ Super Admin đăng nhập Web Admin
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │   BƯỚC 1: THÔNG TIN CÔNG TY                                        │
-│   ├── Tên công ty: ABC Food                                        │
-│   ├── Tenant ID (Mã công ty): abcfood                              │
+│   ├── Tên công ty: [Nhập tên công ty]                              │
+│   ├── Tenant ID (Mã công ty): [Nhập mã công ty]                    │
 │   ├── Logo công ty: [Upload]                                       │
 │   ├── MST, địa chỉ, SĐT, email...                                  │
-│   └── Gói dịch vụ: Standard                                        │
+│   └── Gói dịch vụ: [Chọn gói]                                      │
 │                        │                                            │
 │                        ▼                                            │
 │   BƯỚC 2: THƯƠNG HIỆU ĐẦU TIÊN (Bắt buộc)                         │
-│   ├── Tên thương hiệu: Phở 24                                      │
+│   ├── Tên thương hiệu: [Nhập tên thương hiệu]                      │
 │   ├── Logo thương hiệu: [Upload]                                   │
-│   └── Mô tả: Chuỗi phở Việt Nam                                    │
+│   └── Mô tả: [Nhập mô tả]                                          │
 │                        │                                            │
 │                        ▼                                            │
 │   BƯỚC 3: CHI NHÁNH ĐẦU TIÊN (Bắt buộc)                           │
-│   ├── Tên chi nhánh: Phở 24 - Quận 1                               │
+│   ├── Tên chi nhánh: [Nhập tên chi nhánh]                          │
 │   ├── Logo chi nhánh: [Mặc định logo thương hiệu]                  │
-│   ├── Địa chỉ: 123 Nguyễn Huệ, Q.1                                 │
-│   ├── Mô hình: CCB Only                                            │
+│   ├── Địa chỉ: [Nhập địa chỉ]                                      │
+│   ├── Mô hình: [Chọn mô hình]                                      │
 │   └── Tài khoản Owner tự động tạo                                  │
 │                                                                     │
 │   [Quay lại]                              [Hoàn tất & Tạo Tenant]  │
@@ -269,15 +253,15 @@ Super Admin đăng nhập Web Admin
         │
         ▼
 Hệ thống tự động:
-├── Tạo company với code = tenant_id = "abcfood"
-├── Tạo brand "Phở 24" với tenant_id = "abcfood"
-├── Tạo branch "Phở 24 - Quận 1" với tenant_id = "abcfood"
+├── Tạo company với code = tenant_id
+├── Tạo brand với tenant_id
+├── Tạo branch với tenant_id
 ├── Tạo tài khoản Owner (username + password tạm)
 └── Gửi email thông tin đăng nhập cho Owner
         │
         ▼
 Owner nhận email → Đăng nhập Web Dashboard
-├── Nhập: Tenant ID (abcfood) + Username + Password
+├── Nhập: Tenant ID + Username + Password
 ├── Tenant context được set cho toàn bộ session
 └── Sẵn sàng quản lý quán
 ```

@@ -19,7 +19,7 @@ Hệ thống FNB POS được thiết kế theo mô hình **SaaS Multi-Tenant** 
 │   │  (Công ty A)│   │  (Công ty B)│   │  (Công ty C)│             │
 │   │             │   │             │   │             │             │
 │   │ tenant_id:  │   │ tenant_id:  │   │ tenant_id:  │             │
-│   │ abc-food    │   │ xyz-resto   │   │ 123-cafe    │             │
+│   │ [mã cty A]  │   │ [mã cty B]  │   │ [mã cty C]  │             │
 │   └─────────────┘   └─────────────┘   └─────────────┘             │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -71,12 +71,12 @@ TENANT (tenant_id) ← Cấp cao nhất, đại diện cho 1 khách hàng SaaS
 
 ### Cách xác định Tenant
 
-| Nguồn | Cách lấy tenant_id | Ví dụ |
+| Nguồn | Cách lấy tenant_id | Mô tả |
 |-------|-------------------|-------|
-| **Web Dashboard Login** | Input từ user | Nhập "abcfood" ở màn hình login |
-| **API Request** | Header `X-Tenant-ID` | `X-Tenant-ID: abcfood` |
+| **Web Dashboard Login** | Input từ user | Nhập mã công ty ở màn hình login |
+| **API Request** | Header `X-Tenant-ID` | `X-Tenant-ID: [mã công ty]` |
 | **POS/Order App** | Lưu local sau khi login | Stored trong SQLite |
-| **Subdomain** (tùy chọn) | Parse từ URL | `abcfood.pos.vn` → `abcfood` |
+| **Subdomain** (tùy chọn) | Parse từ URL | `[tenant].pos.vn` → `[tenant]` |
 
 ## Tenant trong Database
 
@@ -345,7 +345,7 @@ Khi tạo công ty mới, **bắt buộc phải hoàn thành 3 bước liên ti�
 | Trường | Bắt buộc | Mô tả |
 |--------|----------|-------|
 | Tên công ty | ✅ | Tên đầy đủ |
-| Mã công ty (Tenant ID) | ✅ | Mã viết tắt, dùng để login (vd: abcfood) |
+| Mã công ty (Tenant ID) | ✅ | Mã viết tắt, dùng để login |
 | Logo | | Logo công ty |
 | Mã số thuế | | MST doanh nghiệp |
 | Địa chỉ | | Địa chỉ trụ sở |
