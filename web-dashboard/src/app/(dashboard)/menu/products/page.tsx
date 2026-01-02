@@ -1,25 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, MoreHorizontal, UtensilsCrossed, Filter } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -28,37 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Mock data
-const products = [
-  { id: "1", name: "Phở bò tái", code: "PHO001", category: "Đồ ăn", price: 55000, vatRate: 10, type: "food", isActive: true },
-  { id: "2", name: "Phở bò chín", code: "PHO002", category: "Đồ ăn", price: 55000, vatRate: 10, type: "food", isActive: true },
-  { id: "3", name: "Cà phê sữa đá", code: "CAFE001", category: "Đồ uống", price: 25000, vatRate: 10, type: "drink", isActive: true },
-  { id: "4", name: "Trà đào", code: "TRA001", category: "Đồ uống", price: 30000, vatRate: 10, type: "drink", isActive: true },
-  { id: "5", name: "Trứng thêm", code: "TOP001", category: "Topping", price: 10000, vatRate: 10, type: "topping", isActive: true },
-  { id: "6", name: "Combo trưa", code: "CMB001", category: "Combo", price: 89000, vatRate: 10, type: "combo", isActive: true },
-];
-
-const typeLabels: Record<string, { label: string; color: string }> = {
-  food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
-  drink: { label: "Đồ uống", color: "bg-blue-100 text-blue-800" },
-  other: { label: "Khác", color: "bg-gray-100 text-gray-800" },
-  topping: { label: "Topping", color: "bg-purple-100 text-purple-800" },
-  combo: { label: "Combo", color: "bg-green-100 text-green-800" },
-};
-
 export default function ProductsPage() {
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("all");
-
-  const filteredProducts = products.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === "all" || p.type === typeFilter;
-    return matchSearch && matchType;
-  });
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN").format(price) + "đ";
-  };
+  const products: any[] = []; // Empty - will fetch from API
 
   return (
     <div className="space-y-6">
@@ -108,58 +73,33 @@ export default function ProductsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mã</TableHead>
-                <TableHead>Tên món</TableHead>
-                <TableHead>Danh mục</TableHead>
-                <TableHead>Loại</TableHead>
-                <TableHead className="text-right">Giá</TableHead>
-                <TableHead className="text-right">VAT</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-mono text-sm">{product.code}</TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${typeLabels[product.type]?.color}`}>
-                      {typeLabels[product.type]?.label}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">{formatPrice(product.price)}</TableCell>
-                  <TableCell className="text-right">{product.vatRate}%</TableCell>
-                  <TableCell>
-                    <Badge variant={product.isActive ? "default" : "secondary"}>
-                      {product.isActive ? "Đang bán" : "Tạm ngưng"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Xem chi tiết</DropdownMenuItem>
-                        <DropdownMenuItem>Sửa thông tin</DropdownMenuItem>
-                        <DropdownMenuItem>Gán bếp in</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          {product.isActive ? "Tạm ngưng bán" : "Kích hoạt"}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Chưa có món ăn nào</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Nhấn &quot;Thêm món ăn&quot; để bắt đầu
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mã</TableHead>
+                  <TableHead>Tên món</TableHead>
+                  <TableHead>Danh mục</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead className="text-right">Giá</TableHead>
+                  <TableHead className="text-right">VAT</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {/* Data will be rendered here */}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

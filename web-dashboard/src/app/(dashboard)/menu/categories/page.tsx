@@ -1,28 +1,8 @@
 "use client";
 
-import * as React from "react";
-import { Plus, MoreHorizontal, FolderOpen, GripVertical } from "lucide-react";
+import { Plus, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-// Mock data
-const categories = [
-  { id: "1", name: "Phở", productType: "food", productCount: 8, isActive: true },
-  { id: "2", name: "Bún", productType: "food", productCount: 6, isActive: true },
-  { id: "3", name: "Cơm", productType: "food", productCount: 12, isActive: true },
-  { id: "4", name: "Cà phê", productType: "drink", productCount: 5, isActive: true },
-  { id: "5", name: "Trà", productType: "drink", productCount: 7, isActive: true },
-  { id: "6", name: "Sinh tố", productType: "drink", productCount: 4, isActive: false },
-  { id: "7", name: "Topping", productType: "topping", productCount: 10, isActive: true },
-  { id: "8", name: "Combo", productType: "combo", productCount: 3, isActive: true },
-];
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -33,6 +13,8 @@ const typeLabels: Record<string, { label: string; color: string }> = {
 };
 
 export default function CategoriesPage() {
+  const categories: any[] = []; // Empty - will fetch from API
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -57,9 +39,7 @@ export default function CategoriesPage() {
                 </div>
                 <div>
                   <p className="font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {categories.filter((c) => c.productType === key).length} danh mục
-                  </p>
+                  <p className="text-xs text-muted-foreground">0 danh mục</p>
                 </div>
               </div>
             </CardContent>
@@ -73,49 +53,19 @@ export default function CategoriesPage() {
           <CardDescription>Kéo thả để thay đổi thứ tự hiển thị</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center gap-4 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow"
-              >
-                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <FolderOpen className="h-5 w-5 text-muted-foreground" />
-                </div>
-
-                <div className="flex-1">
-                  <div className="font-medium">{category.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {category.productCount} món ăn
-                  </div>
-                </div>
-
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeLabels[category.productType]?.color}`}>
-                  {typeLabels[category.productType]?.label}
-                </span>
-
-                <Badge variant={category.isActive ? "default" : "secondary"}>
-                  {category.isActive ? "Hoạt động" : "Tạm ngưng"}
-                </Badge>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Sửa danh mục</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">
-                      {category.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
+          {categories.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <FolderOpen className="h-10 w-10 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Chưa có danh mục nào</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Nhấn &quot;Thêm danh mục&quot; để bắt đầu
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Data will be rendered here */}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

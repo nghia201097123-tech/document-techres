@@ -7,47 +7,12 @@ import {
   Users,
   ShoppingCart,
   DollarSign,
-  TrendingUp,
   Clock,
+  AlertCircle,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const { staff, company } = useAuthStore();
-
-  const stats = [
-    {
-      title: "Doanh thu hôm nay",
-      value: "2,450,000đ",
-      change: "+12%",
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-    },
-    {
-      title: "Số đơn hàng",
-      value: "45",
-      change: "+8%",
-      icon: ShoppingCart,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-    },
-    {
-      title: "Món bán chạy",
-      value: "Phở bò đặc biệt",
-      change: "32 phần",
-      icon: UtensilsCrossed,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100",
-    },
-    {
-      title: "Nhân viên đang làm",
-      value: "8",
-      change: "2 ca",
-      icon: Users,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
-    },
-  ];
 
   return (
     <div className="space-y-6">
@@ -70,30 +35,70 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Empty State */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
-              <div className={`rounded-lg p-2 ${stat.bgColor}`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <TrendingUp className="h-3 w-3 text-green-500" />
-                {stat.change}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Doanh thu hôm nay
+            </CardTitle>
+            <div className="rounded-lg p-2 bg-green-100">
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">Chưa có dữ liệu</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Số đơn hàng
+            </CardTitle>
+            <div className="rounded-lg p-2 bg-blue-100">
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">Chưa có dữ liệu</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Món bán chạy
+            </CardTitle>
+            <div className="rounded-lg p-2 bg-orange-100">
+              <UtensilsCrossed className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">Chưa có dữ liệu</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Nhân viên đang làm
+            </CardTitle>
+            <div className="rounded-lg p-2 bg-purple-100">
+              <Users className="h-4 w-4 text-purple-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">Chưa có dữ liệu</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Quick Actions */}
+      {/* Empty State */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -101,23 +106,12 @@ export default function DashboardPage() {
             <CardDescription>Các đơn hàng và hoạt động mới nhất</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                    <ShoppingCart className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Đơn hàng #{100 + i}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Bàn {i} - {i * 2} món - {i * 150000}đ
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {i * 5} phút trước
-                  </span>
-                </div>
-              ))}
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Chưa có hoạt động nào</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Các đơn hàng sẽ xuất hiện ở đây
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -128,32 +122,12 @@ export default function DashboardPage() {
             <CardDescription>Tổng quan hoạt động trong ngày</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Đơn hoàn thành</span>
-                <span className="font-medium">42/45 (93%)</span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full w-[93%] bg-green-500 rounded-full"></div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Đơn đang làm</span>
-                <span className="font-medium">3</span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full w-[7%] bg-yellow-500 rounded-full"></div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Thanh toán tiền mặt</span>
-                <span className="font-medium">1,200,000đ</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Thanh toán chuyển khoản</span>
-                <span className="font-medium">1,250,000đ</span>
-              </div>
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Chưa có dữ liệu thống kê</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Bắt đầu bán hàng để xem thống kê
+              </p>
             </div>
           </CardContent>
         </Card>
