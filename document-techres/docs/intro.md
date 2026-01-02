@@ -5,30 +5,94 @@ slug: /
 
 # Giới thiệu FNB POS System
 
-Chào mừng bạn đến với tài liệu kỹ thuật của **Hệ thống POS F&B Offline-First** - giải pháp quản lý bán hàng toàn diện cho ngành F&B.
+Chào mừng bạn đến với tài liệu kỹ thuật của **Hệ thống POS F&B Offline-First** - giải pháp quản lý bán hàng toàn diện cho ngành F&B theo mô hình **SaaS Multi-Tenant**.
 
 ## Tổng quan
 
-FNB POS System là hệ thống bán hàng được thiết kế với cơ chế **Offline-First**, hỗ trợ **3 mô hình kinh doanh** và cấu trúc phân cấp **Công ty → Thương hiệu → Chi nhánh**.
+FNB POS System là hệ thống bán hàng được thiết kế với cơ chế **Offline-First**, hỗ trợ **3 mô hình kinh doanh** và cấu trúc phân cấp **Tenant → Công ty → Thương hiệu → Chi nhánh**.
+
+## Mô hình SaaS Multi-Tenant
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        SAAS PLATFORM                                │
+│                    (Single Database Instance)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐             │
+│   │  TENANT A   │   │  TENANT B   │   │  TENANT C   │   ...       │
+│   │  (Công ty A)│   │  (Công ty B)│   │  (Công ty C)│             │
+│   │             │   │             │   │             │             │
+│   │ tenant_id:  │   │ tenant_id:  │   │ tenant_id:  │             │
+│   │ abc-food    │   │ xyz-resto   │   │ 123-cafe    │             │
+│   └─────────────┘   └─────────────┘   └─────────────┘             │
+│                                                                     │
+│   Đặc điểm:                                                        │
+│   • Shared Database (cùng database, phân biệt bằng tenant_id)      │
+│   • Shared Application (cùng codebase, cùng infrastructure)        │
+│   • Data Isolation (dữ liệu được cô lập theo tenant)              │
+│   • Scalable (dễ mở rộng khi thêm tenant mới)                     │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ### Cấu trúc phân cấp
 
 ```
-CÔNG TY (Company)
+TENANT (tenant_id) ← Cấp cao nhất, đại diện cho 1 khách hàng SaaS
     │
-    ├── THƯƠNG HIỆU 1 (Brand)
-    │       │
-    │       ├── Chi nhánh 1.1 (Branch)
-    │       ├── Chi nhánh 1.2 (Branch)
-    │       └── Chi nhánh 1.3 (Branch)
-    │
-    └── THƯƠNG HIỆU 2 (Brand)
+    └── CÔNG TY (Company)
             │
-            ├── Chi nhánh 2.1 (Branch)
-            └── Chi nhánh 2.2 (Branch)
+            ├── THƯƠNG HIỆU 1 (Brand)
+            │       ├── Chi nhánh A (Branch)
+            │       ├── Chi nhánh B
+            │       └── Chi nhánh C
+            │
+            └── THƯƠNG HIỆU 2 (Brand)
+                    ├── Chi nhánh D
+                    └── Chi nhánh E
 ```
 
-### 3 Mô hình kinh doanh
+**Lưu ý quan trọng:**
+- Mỗi Tenant = 1 Công ty (quan hệ 1:1)
+- `tenant_id` = `company.code` (mã viết tắt công ty)
+- Tất cả dữ liệu đều có `tenant_id` để phân biệt
+
+**Ví dụ thực tế:**
+```
+Tenant: abcfood (tenant_id = "abcfood")
+    │
+    └── Công ty ABC Food (company.code = "abcfood")
+            │
+            ├── Thương hiệu "Phở 24"
+            │       ├── Phở 24 - Quận 1
+            │       ├── Phở 24 - Quận 3
+            │       └── Phở 24 - Quận 7
+            │
+            └── Thương hiệu "Cơm Tấm Sài Gòn"
+                    ├── Cơm Tấm - Bình Thạnh
+                    └── Cơm Tấm - Gò Vấp
+```
+
+## Cơ chế Tenant ID
+
+| Nguyên tắc | Mô tả |
+|------------|-------|
+| **Tenant = Company** | Mỗi tenant là 1 công ty, `tenant_id` = `company.code` |
+| **Data Isolation** | Mọi query đều có điều kiện `WHERE tenant_id = ?` |
+| **Row-Level Security** | PostgreSQL RLS đảm bảo không truy cập chéo tenant |
+| **Tenant Context** | Mọi request đều phải xác định tenant từ đầu |
+
+### Cách xác định Tenant
+
+| Nguồn | Cách lấy tenant_id | Ví dụ |
+|-------|-------------------|-------|
+| **Web Dashboard Login** | Input từ user | Nhập "abcfood" ở màn hình login |
+| **API Request** | Header `X-Tenant-ID` | `X-Tenant-ID: abcfood` |
+| **POS/Order App** | Lưu local sau khi login | Stored trong SQLite |
+| **Subdomain** (tùy chọn) | Parse từ URL | `abcfood.pos.vn` → `abcfood` |
+
+## 3 Mô hình kinh doanh
 
 | Mô hình | Đối tượng | Thiết bị | Mô tả |
 |---------|-----------|----------|-------|
@@ -36,100 +100,192 @@ CÔNG TY (Company)
 | **Mô hình 2: CCB Only** | Quán nhỏ, có quầy thu ngân | Chỉ máy POS (CCB App) | App CCB chạy độc lập, có SQLite, thu ngân tự order và thanh toán |
 | **Mô hình 3: Full System** | Quán lớn, nhiều nhân viên | Order + CCB + Local Server | Server chạy trên Windows làm trung tâm, CCB và Order kết nối vào |
 
-### Gói dịch vụ (Packages)
+## Gói dịch vụ (SaaS Subscription)
 
-| Gói | Kết nối tối đa | Phù hợp |
-|-----|----------------|---------|
-| **Basic** | 3 connections | Quán nhỏ, 1-2 người |
-| **Standard** | 10 connections | Quán vừa, 3-5 người |
-| **Premium** | 30 connections | Quán lớn, nhiều nhân viên |
-| **Enterprise** | Unlimited | Chuỗi, franchise |
+| Gói | Số cổng kết nối | Giá/tháng | Mô tả |
+|-----|-----------------|-----------|-------|
+| Basic | 3 | X VNĐ | 1 CCB + 2 Order App |
+| Standard | 10 | Y VNĐ | 2 CCB + 8 Order App |
+| Premium | 30 | Z VNĐ | 5 CCB + 25 Order App |
+| Enterprise | Unlimited | Thỏa thuận | Không giới hạn |
 
 ## Các thành phần hệ thống
 
 | Thành phần | Nền tảng | Vai trò |
 |------------|----------|---------|
-| **Web Admin** | React/Next.js | Super Admin - Quản lý Công ty, Thương hiệu, Gói dịch vụ, Hạng mục thu/chi |
-| **Web Dashboard** | React/Next.js | Chủ quán - Quản lý Chi nhánh, menu, bàn, nhân viên, xem báo cáo |
+| **Web Admin** | React/Next.js | Super Admin - Quản lý tenant, công ty, gói dịch vụ, quyền |
+| **Web Dashboard** | React/Next.js | Chủ quán - Quản lý nhân sự, menu, bàn, bếp, ca, HĐĐT |
+| **API Admin** | NestJS | Backend API kết nối database PostgreSQL |
+| **API Gateway** | NestJS | Proxy/routing, không kết nối database |
 | **Local Server** | .NET trên Windows | API Server local cho mô hình Full System |
 | **CCB App (Thu ngân)** | Kotlin/Android hoặc .NET/Windows | Thu ngân, thanh toán, in bill |
 | **CCB App (Bếp/Bar)** | Kotlin/Android hoặc .NET/Windows | Hiển thị món, in tem, đánh dấu hoàn thành |
 | **Order App** | Kotlin/Android | Nhân viên order món |
 | **Customer App** | Kotlin hoặc Web | Khách hàng xem điểm, lịch sử |
 
-## Kiến trúc tổng quan
+## Kiến trúc hệ thống
+
+### Kết nối Database
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         KIẾN TRÚC KẾT NỐI                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   ┌─────────────┐                                                  │
+│   │  Web Admin  │────────┐                                         │
+│   │  (Next.js)  │        │                                         │
+│   │ NO DATABASE │        │                                         │
+│   └─────────────┘        │                                         │
+│                          │ HTTP API                                │
+│   ┌─────────────┐        │     ┌─────────────┐   ┌───────────────┐│
+│   │ API Gateway │────────┼────▶│  API Admin  │──▶│  PostgreSQL   ││
+│   │  (NestJS)   │        │     │  (NestJS)   │   │   Database    ││
+│   │ NO DATABASE │        │     │  DATABASE   │   │               ││
+│   └─────────────┘        │     └─────────────┘   └───────────────┘│
+│                          │                                         │
+│   ┌─────────────┐        │                                         │
+│   │Web Dashboard│────────┘                                         │
+│   │  (Next.js)  │                                                  │
+│   │ NO DATABASE │                                                  │
+│   └─────────────┘                                                  │
+│                                                                     │
+│   LƯU Ý: Chỉ API Admin mới kết nối trực tiếp đến database          │
+│          Web Admin và API Gateway gọi API, không kết nối database   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Phân tầng hệ thống (Multi-Tenant)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      WEB ADMIN (Super Admin)                    │
-│                    Quản lý toàn bộ hệ thống                     │
+│                 Quản lý toàn bộ SaaS Platform                   │
 ├─────────────────────────────────────────────────────────────────┤
-│  • Quản lý Công ty (Companies)                                  │
-│  • Quản lý Thương hiệu (Brands)                                 │
-│  • Quản lý Gói App Food (Packages)                              │
-│  • Quản lý Hạng mục Thu/Chi (Transaction Categories)            │
-│  • Tạo tài khoản Owner                                          │
+│  • Quản lý Tenant/Công ty (tạo tenant mới = tạo công ty mới)   │
+│  • Quản lý Thương hiệu (thêm, sửa, tắt/bật)                    │
+│  • Quản lý Chi nhánh (thêm, sửa, tắt/bật)                      │
+│  • Quản lý Hạng mục Thu/Chi                                     │
+│  • Quản lý Gói App Food (số cổng kết nối, giá)                 │
+│  • Quản lý Quyền (nhóm quyền, danh sách quyền)                 │
 └──────────────────────────┬──────────────────────────────────────┘
-                           │ Tạo công ty + cấp tài khoản
+                           │ Tạo tenant/công ty/thương hiệu/chi nhánh
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   WEB DASHBOARD (Chủ quán/Owner)                │
-│                     Quản lý Công ty của mình                    │
+│              Quản lý trong phạm vi Tenant của mình              │
 ├─────────────────────────────────────────────────────────────────┤
-│  • Tạo/quản lý Thương hiệu                                      │
-│  • Tạo/quản lý Chi nhánh                                        │
-│  • Xây dựng menu, giá, danh mục                                 │
-│  • Quản lý bàn, khu vực                                         │
-│  • Tạo tài khoản nhân viên (thu ngân, phục vụ)                  │
-│  • Xem báo cáo doanh thu, thống kê                              │
+│  • Đăng nhập: Tenant ID (mã công ty) + Username + Password     │
+│  • Chỉ xem/sửa dữ liệu thuộc tenant của mình                   │
+│  • Quản lý Nhân sự (nhân viên, bộ phận, gán quyền)             │
+│  • Xây dựng dữ liệu bán hàng (món, danh mục, bàn, coupon...)   │
+│  • Xây dựng dữ liệu bếp (bếp, gán món vào bếp)                 │
+│  • Quản lý Ca thu ngân, Đơn hàng                                │
+│  • Quản lý Hóa đơn điện tử (7 đối tác)                         │
+│  • Thiết lập Công ty/Thương hiệu/Chi nhánh                     │
 └──────────────────────────┬──────────────────────────────────────┘
-                           │ Sync data xuống thiết bị
+                           │ Sync data xuống thiết bị (cùng tenant)
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   CHI NHÁNH (Offline-First)                     │
+│                   CỬA HÀNG (Offline-First)                      │
 │         Chọn 1 trong 3 mô hình phù hợp quy mô                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Phân quyền hệ thống
+## Phân quyền hệ thống (Multi-Tenant)
 
-| Hệ thống | Role | Quyền |
-|----------|------|-------|
-| **Web Admin** | Super Admin | Toàn quyền quản lý hệ thống |
-| **Web Admin** | Support | Hỗ trợ khách hàng, xem thông tin (không sửa) |
-| **Web Dashboard** | Owner | Toàn quyền với chi nhánh của mình |
-| **Web Dashboard** | Manager | Quản lý theo quyền được gán |
-| **CCB App** | Cashier | Thu ngân, thanh toán, chốt ca |
-| **Order App** | Staff | Order món, phục vụ, xem trạng thái |
+| Hệ thống | Role | Phạm vi | Quyền |
+|----------|------|---------|-------|
+| **Web Admin** | Super Admin | Toàn platform | Quản lý tất cả tenant, công ty, gói dịch vụ |
+| **Web Admin** | Support | Toàn platform | Hỗ trợ khách hàng, xem thông tin (không sửa) |
+| **Web Dashboard** | Owner | Trong tenant | Toàn quyền với tenant của mình |
+| **Web Dashboard** | Manager | Trong tenant | Quản lý theo quyền được gán |
+| **CCB App** | Cashier | Trong tenant | Thu ngân, thanh toán, chốt ca |
+| **Order App** | Staff | Trong tenant | Order món, phục vụ, xem trạng thái |
 
-## Phạm vi quản lý dữ liệu
+## Phạm vi quản lý dữ liệu (theo Tenant)
 
-| Cấp | Dữ liệu quản lý |
-|-----|-----------------|
-| **Công ty** | Bộ phận (có cấp bậc cha-con), Thiết lập công ty |
-| **Thương hiệu** | Món ăn, Danh mục, Đơn vị, Ghi chú món, Lý do hủy, Coupon |
-| **Chi nhánh** | Nhân viên, Khu vực, Bàn, Bếp, Gán món-bếp, Món tăng giá, Ca, Đơn hàng, HĐĐT |
+| Cấp | Dữ liệu quản lý | Tenant Scope |
+|-----|-----------------|--------------|
+| **Tenant/Công ty** | Bộ phận (có cấp bậc cha-con), Thiết lập công ty | Có tenant_id |
+| **Thương hiệu** | Món ăn, Danh mục, Đơn vị, Ghi chú món, Lý do hủy, Coupon | Có tenant_id |
+| **Chi nhánh** | Nhân viên, Khu vực, Bàn, Bếp, Gán món-bếp, Món tăng giá, Ca, Đơn hàng, HĐĐT | Có tenant_id |
 
 ## Tổng hợp tính năng hệ thống
 
 | Module | Web Admin | Web Dashboard | CCB App | Order App |
 |--------|-----------|---------------|---------|-----------|
-| Quản lý Công ty | ✅ | ❌ | ❌ | ❌ |
-| Quản lý Thương hiệu | ✅ | Thiết lập | ❌ | ❌ |
-| Quản lý Chi nhánh | ✅ | Thiết lập | ❌ | ❌ |
-| Quản lý Quyền | ✅ | Gán quyền | ❌ | ❌ |
-| Quản lý Gói | ✅ | ❌ | ❌ | ❌ |
-| Quản lý Nhân viên | ❌ | ✅ | ❌ | ❌ |
-| Quản lý Menu | ❌ | ✅ | Xem | Xem |
-| Quản lý Bàn | ❌ | ✅ | Xem | Xem |
-| Quản lý Bếp | ❌ | ✅ | Xem | ❌ |
-| Quản lý Ca | ❌ | Xem | ✅ | ❌ |
-| Quản lý HĐĐT | ❌ | ✅ | Xuất | ❌ |
-| Order | ❌ | ❌ | ✅ | ✅ |
-| Thanh toán | ❌ | ❌ | ✅ | ✅* |
-| Báo cáo | Hệ thống | Chi nhánh | Ca | ❌ |
+| Quản lý Công ty | Wizard 3 bước | - | - | - |
+| Quản lý Thương hiệu | CRUD | Thiết lập | - | - |
+| Quản lý Chi nhánh | CRUD | Thiết lập | - | - |
+| Quản lý Quyền | CRUD | Gán quyền | - | - |
+| Quản lý Gói | CRUD | - | - | - |
+| Quản lý Nhân viên | - | CRUD | - | - |
+| Quản lý Menu | - | CRUD | Xem | Xem |
+| Quản lý Bàn | - | CRUD | Xem | Xem |
+| Quản lý Bếp | - | CRUD | Xem | - |
+| Quản lý Ca | - | Xem | CRUD | - |
+| Quản lý HĐĐT | - | CRUD | Xuất | - |
+| Order | - | - | CRUD | CRUD |
+| Thanh toán | - | - | CRUD | CRUD* |
+| Báo cáo | Hệ thống | Chi nhánh | Ca | - |
 
 > *Thanh toán trên Order App chỉ có ở Mô hình 1 (Order Only)
+
+## Flow tạo Tenant mới (Wizard 3 bước bắt buộc)
+
+```
+Super Admin đăng nhập Web Admin
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              TẠO CÔNG TY MỚI - WIZARD 3 BƯỚC BẮT BUỘC              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   BƯỚC 1: THÔNG TIN CÔNG TY                                        │
+│   ├── Tên công ty: ABC Food                                        │
+│   ├── Tenant ID (Mã công ty): abcfood                              │
+│   ├── Logo công ty: [Upload]                                       │
+│   ├── MST, địa chỉ, SĐT, email...                                  │
+│   └── Gói dịch vụ: Standard                                        │
+│                        │                                            │
+│                        ▼                                            │
+│   BƯỚC 2: THƯƠNG HIỆU ĐẦU TIÊN (Bắt buộc)                         │
+│   ├── Tên thương hiệu: Phở 24                                      │
+│   ├── Logo thương hiệu: [Upload]                                   │
+│   └── Mô tả: Chuỗi phở Việt Nam                                    │
+│                        │                                            │
+│                        ▼                                            │
+│   BƯỚC 3: CHI NHÁNH ĐẦU TIÊN (Bắt buộc)                           │
+│   ├── Tên chi nhánh: Phở 24 - Quận 1                               │
+│   ├── Logo chi nhánh: [Mặc định logo thương hiệu]                  │
+│   ├── Địa chỉ: 123 Nguyễn Huệ, Q.1                                 │
+│   ├── Mô hình: CCB Only                                            │
+│   └── Tài khoản Owner tự động tạo                                  │
+│                                                                     │
+│   [Quay lại]                              [Hoàn tất & Tạo Tenant]  │
+└─────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+Hệ thống tự động:
+├── Tạo company với code = tenant_id = "abcfood"
+├── Tạo brand "Phở 24" với tenant_id = "abcfood"
+├── Tạo branch "Phở 24 - Quận 1" với tenant_id = "abcfood"
+├── Tạo tài khoản Owner (username + password tạm)
+└── Gửi email thông tin đăng nhập cho Owner
+        │
+        ▼
+Owner nhận email → Đăng nhập Web Dashboard
+├── Nhập: Tenant ID (abcfood) + Username + Password
+├── Tenant context được set cho toàn bộ session
+└── Sẵn sàng quản lý quán
+```
+
+**Lưu ý quan trọng:**
+- **Không thể tạo công ty mà không có thương hiệu và chi nhánh**
+- Wizard phải hoàn thành cả 3 bước mới lưu được
+- Sau khi tạo xong, có thể thêm thương hiệu/chi nhánh khác từ menu riêng
 
 ## Tính năng chính
 
@@ -138,10 +294,16 @@ CÔNG TY (Company)
 - Tự động đồng bộ khi có mạng
 - Xử lý conflict thông minh
 
-### Cấu trúc phân cấp
-- Công ty có thể có nhiều Thương hiệu
-- Mỗi Thương hiệu có thể có nhiều Chi nhánh
-- Quản lý tập trung, báo cáo theo cấp
+### Multi-Tenant SaaS
+- Dữ liệu được phân tách hoàn toàn theo tenant
+- Tenant context xác định từ đầu mọi request
+- Row-Level Security bảo vệ dữ liệu
+
+### Logo cho mọi cấp
+- Công ty có logo riêng
+- Thương hiệu có logo riêng
+- Chi nhánh có logo (mặc định dùng logo thương hiệu)
+- Nhân viên có avatar
 
 ### Gói dịch vụ linh hoạt
 - Giới hạn kết nối theo gói
@@ -158,17 +320,13 @@ CÔNG TY (Company)
 - Hỗ trợ Bluetooth, USB, WiFi/LAN
 - Print Queue đảm bảo không miss lệnh in
 
-### Quản lý tập trung
-- Web Admin quản lý tất cả Công ty
-- Web Dashboard cho từng chủ quán
-- Báo cáo doanh thu realtime
-
 ## Bắt đầu nhanh
 
 1. **[Tổng quan kiến trúc](/docs/architecture/overview)** - Hiểu cách hệ thống hoạt động
 2. **[3 Mô hình kinh doanh](/docs/architecture/business-models)** - Chọn mô hình phù hợp
-3. **[Hướng dẫn cài đặt](/docs/guides/getting-started)** - Thiết lập môi trường phát triển
-4. **[API Reference](/docs/api/overview)** - Tài liệu API chi tiết
+3. **[Multi-Tenant Architecture](/docs/architecture/multi-tenant)** - Hiểu cơ chế tenant
+4. **[Hướng dẫn cài đặt](/docs/guides/getting-started)** - Thiết lập môi trường phát triển
+5. **[API Reference](/docs/api/overview)** - Tài liệu API chi tiết
 
 ## Công nghệ sử dụng
 
@@ -180,6 +338,8 @@ CÔNG TY (Company)
 | **Local Server** | .NET (ASP.NET Core) | Windows |
 | **Web Admin** | React/Next.js | Web |
 | **Web Dashboard** | React/Next.js | Web |
+| **API Admin** | NestJS + TypeORM | Cloud |
+| **API Gateway** | NestJS | Cloud |
 | **Cloud Server** | .NET (ASP.NET Core) | Cloud |
 | **Database Server** | PostgreSQL | Cloud |
 | **Local Database** | SQLite | Local |

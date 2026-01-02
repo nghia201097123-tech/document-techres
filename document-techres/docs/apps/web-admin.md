@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Web Admin
 
-Web Admin là ứng dụng dành cho **Super Admin** để quản lý toàn bộ hệ thống FNB POS.
+Web Admin là ứng dụng dành cho **Super Admin** để quản lý toàn bộ hệ thống FNB POS theo mô hình **SaaS Multi-Tenant**.
 
 ## Tổng quan
 
@@ -12,57 +12,180 @@ Web Admin là ứng dụng dành cho **Super Admin** để quản lý toàn bộ
 |-----------|----------|
 | **Nền tảng** | React/Next.js |
 | **Users** | Super Admin, Support |
-| **Mục đích** | Quản lý tất cả Công ty, Thương hiệu, Chi nhánh, Gói dịch vụ |
+| **Mục đích** | Quản lý tất cả Tenant/Công ty, Thương hiệu, Chi nhánh, Gói dịch vụ |
+| **Database** | **KHÔNG kết nối trực tiếp** - gọi API Admin |
 
-## Cấu trúc phân cấp
-
-Web Admin quản lý hệ thống theo cấu trúc 3 cấp:
+## Kiến trúc kết nối
 
 ```
-CÔNG TY (Company)
+┌─────────────────────────────────────────────────────────────────────┐
+│                         KIẾN TRÚC WEB ADMIN                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   ┌─────────────────┐         ┌─────────────────┐                  │
+│   │    Web Admin    │  HTTP   │    API Admin    │                  │
+│   │    (Next.js)    │────────▶│    (NestJS)     │                  │
+│   │                 │         │                 │                  │
+│   │  • UI/Forms     │         │  • Business     │                  │
+│   │  • State Mgmt   │         │  • Database     │                  │
+│   │  • API Calls    │         │  • TypeORM      │                  │
+│   │                 │         │        │        │                  │
+│   │  ❌ NO DATABASE │         │        ▼        │                  │
+│   └─────────────────┘         │ ┌─────────────┐ │                  │
+│                               │ │ PostgreSQL  │ │                  │
+│                               │ │  Database   │ │                  │
+│                               │ └─────────────┘ │                  │
+│                               └─────────────────┘                  │
+│                                                                     │
+│   ⚠️ LƯU Ý QUAN TRỌNG:                                              │
+│   • Web Admin KHÔNG kết nối trực tiếp đến database                 │
+│   • Tất cả dữ liệu được lấy từ API Admin                           │
+│   • Dữ liệu hiển thị là DỮ LIỆU THẬT từ PostgreSQL                 │
+│   • Mọi thay đổi đều được lưu vào database qua API                 │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Mô hình SaaS Multi-Tenant
+
+Web Admin quản lý hệ thống theo mô hình **Multi-Tenant**:
+
+```
+TENANT (tenant_id = company.code) ← Định danh duy nhất
     │
-    ├── THƯƠNG HIỆU 1 (Brand)
-    │       │
-    │       ├── Chi nhánh 1.1 (Branch)
-    │       ├── Chi nhánh 1.2 (Branch)
-    │       └── Chi nhánh 1.3 (Branch)
-    │
-    └── THƯƠNG HIỆU 2 (Brand)
+    └── CÔNG TY (Company)
             │
-            ├── Chi nhánh 2.1 (Branch)
-            └── Chi nhánh 2.2 (Branch)
+            ├── THƯƠNG HIỆU 1 (Brand)
+            │       ├── Chi nhánh A (Branch)
+            │       ├── Chi nhánh B
+            │       └── Chi nhánh C
+            │
+            └── THƯƠNG HIỆU 2 (Brand)
+                    ├── Chi nhánh D
+                    └── Chi nhánh E
 ```
+
+### Quy tắc Tenant
+
+| Quy tắc | Mô tả |
+|---------|-------|
+| **Tenant = Company** | Mỗi tenant là 1 công ty (1:1) |
+| **tenant_id = company.code** | Mã công ty là định danh tenant |
+| **Data Isolation** | Dữ liệu hoàn toàn tách biệt theo tenant |
 
 ### Ví dụ thực tế
 
 ```
-Công ty TNHH ABC Food
+Tenant: abcfood (tenant_id = "abcfood")
     │
-    ├── Thương hiệu "Phở Việt"
-    │       ├── Chi nhánh Quận 1
-    │       ├── Chi nhánh Quận 7
-    │       └── Chi nhánh Thủ Đức
-    │
-    ├── Thương hiệu "Cà phê ABC"
-    │       ├── Chi nhánh Nguyễn Huệ
-    │       └── Chi nhánh Lê Lợi
-    │
-    └── Thương hiệu "Trà sữa XYZ"
-            └── Chi nhánh Landmark
+    └── Công ty TNHH ABC Food (code = "abcfood")
+            │
+            ├── Thương hiệu "Phở Việt"
+            │       ├── Chi nhánh Quận 1 (logoUrl: brand logo)
+            │       ├── Chi nhánh Quận 7
+            │       └── Chi nhánh Thủ Đức
+            │
+            ├── Thương hiệu "Cà phê ABC"
+            │       ├── Chi nhánh Nguyễn Huệ
+            │       └── Chi nhánh Lê Lợi
+            │
+            └── Thương hiệu "Trà sữa XYZ"
+                    └── Chi nhánh Landmark
 ```
 
 ---
 
 ## Chức năng chính
 
-### 1. Quản lý Công ty (Companies)
+### 1. Quản lý Công ty (Companies) - Wizard 3 bước bắt buộc
 
-Quản lý các công ty/doanh nghiệp sử dụng hệ thống:
+Khi tạo công ty mới, **bắt buộc phải hoàn thành 3 bước liên tiếp**:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              TẠO CÔNG TY MỚI - WIZARD 3 BƯỚC BẮT BUỘC              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   [●] Bước 1        [ ] Bước 2        [ ] Bước 3                   │
+│   Thông tin         Thương hiệu       Chi nhánh                    │
+│   công ty           đầu tiên          đầu tiên                     │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Bước 1: Thông tin Công ty
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| Tên công ty | ✅ | Tên đầy đủ |
+| Mã công ty (Tenant ID) | ✅ | Mã viết tắt, dùng để login (vd: abcfood) |
+| **Logo công ty** | | Upload logo |
+| Mã số thuế | | MST doanh nghiệp |
+| Địa chỉ | | Địa chỉ trụ sở |
+| Số điện thoại | | SĐT liên hệ |
+| Email | | Email công ty |
+| Người đại diện | | Họ tên người đại diện |
+| Gói dịch vụ | ✅ | Basic / Standard / Premium / Enterprise |
+| Số chi nhánh tối đa | | Mặc định theo gói |
+| Số users tối đa | | Mặc định theo gói |
+
+#### Bước 2: Thương hiệu đầu tiên (BẮT BUỘC)
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| Tên thương hiệu | ✅ | Tên thương hiệu đầu tiên |
+| Mã thương hiệu | ✅ | Mã viết tắt (unique) |
+| **Logo thương hiệu** | | Upload logo |
+| Mô tả | | Mô tả ngắn |
+| Mô hình kinh doanh | ✅ | Order Only / CCB Only / Full System |
+
+#### Bước 3: Chi nhánh đầu tiên (BẮT BUỘC)
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| Tên chi nhánh | ✅ | Tên chi nhánh đầu tiên |
+| Mã chi nhánh | ✅ | Mã viết tắt (unique) |
+| **Logo chi nhánh** | | Mặc định dùng logo thương hiệu |
+| Địa chỉ | ✅ | Địa chỉ chi nhánh |
+| Số điện thoại | | SĐT chi nhánh |
+| Email | | Email chi nhánh |
+| Mô hình sử dụng | ✅ | Order Only / CCB Only / Full System |
+| Số cổng kết nối | | Mặc định: 3 |
+| Giờ mở cửa | | HH:mm |
+| Giờ đóng cửa | | HH:mm |
+
+#### Tùy chọn: Thông tin Owner
+
+| Trường | Bắt buộc | Mô tả |
+|--------|----------|-------|
+| Tên owner | | Mặc định lấy từ người đại diện công ty |
+| Email | | Email để đăng nhập |
+| Số điện thoại | | SĐT liên hệ |
+
+#### Sau khi hoàn thành Wizard
+
+```
+Hệ thống tự động:
+├── Tạo company với code = tenant_id
+├── Tạo brand với tenant_id = company.code
+├── Tạo branch với tenant_id = company.code
+├── Tạo tài khoản Owner (username + password tạm)
+└── Gửi email thông tin đăng nhập cho Owner
+```
+
+**Lưu ý quan trọng:**
+- **Không thể lưu công ty nếu chưa hoàn thành cả 3 bước**
+- Tất cả thực hiện trong 1 transaction để đảm bảo tính toàn vẹn
+- Nút "Quay lại" cho phép sửa bước trước
+- Nút "Hủy" sẽ không lưu gì cả
+- Sau khi tạo xong, có thể thêm thương hiệu/chi nhánh khác từ menu riêng
+
+#### Quản lý công ty đã tạo
 
 | Chức năng | Mô tả |
 |-----------|-------|
-| Tạo công ty mới | Tạo company + tài khoản Owner |
-| Xem danh sách | Danh sách tất cả công ty |
+| Xem danh sách | Danh sách tất cả công ty (filter, search) |
+| Xem chi tiết | Thông tin công ty + brands + branches |
 | Chỉnh sửa | Cập nhật thông tin công ty |
 | Khóa/mở khóa | Suspend hoặc activate công ty |
 | Xóa | Soft delete công ty |
@@ -73,10 +196,11 @@ Quản lý các thương hiệu thuộc công ty:
 
 | Chức năng | Mô tả |
 |-----------|-------|
-| Tạo thương hiệu | Tạo brand mới cho company |
+| Tạo thương hiệu | Tạo brand mới cho company (có tenant_id) |
 | Danh sách | Xem brands theo company |
 | Chỉnh sửa | Cập nhật thông tin brand |
-| Logo & branding | Upload logo, màu sắc thương hiệu |
+| **Logo & branding** | Upload logo thương hiệu |
+| Tắt/Bật | Toggle isActive |
 
 ### 3. Quản lý Chi nhánh (Branches)
 
@@ -84,11 +208,13 @@ Quản lý các chi nhánh/cửa hàng:
 
 | Chức năng | Mô tả |
 |-----------|-------|
-| Tạo chi nhánh | Tạo branch mới cho brand |
+| Tạo chi nhánh | Tạo branch mới cho brand (có tenant_id) |
 | Danh sách | Xem branches theo brand/company |
 | Chỉnh sửa | Cập nhật thông tin chi nhánh |
+| **Logo chi nhánh** | Upload logo (mặc định dùng logo brand) |
 | Cấu hình | Thiết lập máy in, thiết bị |
 | Gán gói | Gán gói App Food cho chi nhánh |
+| Tắt/Bật | Toggle isActive |
 
 ### 4. Quản lý Hạng mục Thu/Chi (Transaction Categories)
 
@@ -102,33 +228,36 @@ Quản lý các hạng mục thu chi cho báo cáo tài chính:
 **Chức năng:**
 - Tạo/sửa/xóa hạng mục
 - Phân loại: Thu nhập / Chi phí
-- Gán hạng mục mặc định cho company/brand
+- Đánh dấu hạng mục hệ thống (không xóa được)
+- Tắt/Bật hạng mục
 - Import/export danh sách hạng mục
 
 ### 5. Quản lý Gói App Food (Packages)
 
 Quản lý các gói dịch vụ và giới hạn kết nối:
 
-| Gói | Kết nối tối đa | Mô tả |
-|-----|----------------|-------|
-| **Basic** | 3 connections | Quán nhỏ, 1-2 người |
-| **Standard** | 10 connections | Quán vừa, 3-5 người |
-| **Premium** | 30 connections | Quán lớn, nhiều nhân viên |
-| **Enterprise** | Unlimited | Chuỗi, franchise |
+| Gói | Kết nối tối đa | Giá/tháng | Mô tả |
+|-----|----------------|-----------|-------|
+| **Basic** | 3 | X VNĐ | 1 CCB + 2 Order App |
+| **Standard** | 10 | Y VNĐ | 2 CCB + 8 Order App |
+| **Premium** | 30 | Z VNĐ | 5 CCB + 25 Order App |
+| **Enterprise** | Unlimited | Thỏa thuận | Không giới hạn |
 
 **Chức năng:**
 - Tạo/sửa/xóa gói dịch vụ
 - Thiết lập giới hạn kết nối
-- Thiết lập giá và thời hạn
+- Thiết lập giá theo tháng/năm
+- Quản lý features (JSONB)
 - Xem lịch sử mua gói
 - Gia hạn/nâng cấp gói
 
-### 6. Quản lý Owners
+### 6. Quản lý Admin Users
 
-- Tạo tài khoản Owner cho từng công ty
+- Tạo tài khoản Super Admin / Support
+- Gán nhóm quyền
 - Reset password
 - Khóa/mở khóa tài khoản
-- Phân quyền theo company
+- Xem last login
 
 ### 7. Quản lý Quyền (Permissions)
 
@@ -159,15 +288,6 @@ NHÓM QUYỀN (Permission Group)
 | **Thu/Chi** | `transaction` | Tạo phiếu thu, Tạo phiếu chi, Xem thu chi |
 | **Cài đặt** | `settings` | Cài đặt máy in, Cài đặt thanh toán, Cài đặt chung |
 
-#### Ví dụ quyền trong nhóm `order_management`
-
-| Mã quyền | Tên quyền | Mô tả |
-|----------|-----------|-------|
-| `order.view` | Xem order | Xem danh sách và chi tiết order |
-| `order.create` | Tạo order | Tạo order mới |
-| `order.edit` | Sửa order | Sửa thông tin order |
-| `order.cancel` | Hủy order | Hủy order đang chờ |
-
 #### Chức năng quản lý
 
 | Chức năng | Mô tả |
@@ -176,38 +296,7 @@ NHÓM QUYỀN (Permission Group)
 | **Quản lý Quyền chi tiết** | Thêm/sửa/xóa quyền, gán vào nhóm |
 | **Gán mặc định** | Đặt quyền mặc định cho từng role |
 
-#### Gán quyền
-
-Quyền có thể được gán theo 2 cách:
-
-| Cách gán | Mô tả | Thực hiện tại |
-|----------|-------|---------------|
-| **Theo cá nhân** | Gán quyền trực tiếp cho từng nhân viên | Web Dashboard |
-| **Theo bộ phận** | Gán quyền cho cả bộ phận | Web Dashboard |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  QUẢN LÝ QUYỀN                                [+ Tạo nhóm mới]  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [NHÓM QUYỀN]  [QUYỀN CHI TIẾT]                                 │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Mã            │ Tên nhóm         │ Số quyền │ Trạng thái │  │
-│  ├───────────────┼──────────────────┼──────────┼────────────┤  │
-│  │ menu_mgmt     │ Quản lý Menu     │    5     │  ● Active  │  │
-│  │ order_mgmt    │ Quản lý Order    │    4     │  ● Active  │  │
-│  │ payment       │ Thanh toán       │    4     │  ● Active  │  │
-│  │ shift_mgmt    │ Quản lý Ca       │    3     │  ● Active  │  │
-│  │ reports       │ Báo cáo          │    3     │  ● Active  │  │
-│  │ staff_mgmt    │ Quản lý NV       │    4     │  ● Active  │  │
-│  │ customer_mgmt │ Quản lý KH       │    4     │  ● Active  │  │
-│  │ transaction   │ Thu/Chi          │    3     │  ● Active  │  │
-│  │ settings      │ Cài đặt          │    3     │  ● Active  │  │
-│  └───────────────┴──────────────────┴──────────┴────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Lưu ý:** Permissions là dữ liệu **dùng chung** cho tất cả tenant (không có tenant_id)
 
 ### 8. Analytics & Reports
 
@@ -219,85 +308,104 @@ Quyền có thể được gán theo 2 cách:
 
 ---
 
+## Logo cho mọi cấp
+
+Hệ thống hỗ trợ upload logo/avatar cho tất cả các cấp:
+
+| Entity | Field | Mô tả | Kích thước khuyến nghị |
+|--------|-------|-------|------------------------|
+| **Company** | `logoUrl` | Logo công ty | 200x200px |
+| **Brand** | `logoUrl` | Logo thương hiệu | 200x200px |
+| **Branch** | `logoUrl` | Logo chi nhánh | 200x200px (mặc định dùng brand logo) |
+| **Staff** | `avatarUrl` | Ảnh đại diện nhân viên | 150x150px |
+
+---
+
 ## Phân quyền
 
 | Role | Quyền |
 |------|-------|
-| **Super Admin** | Toàn quyền: quản lý company/brand/branch, gói dịch vụ, hạng mục thu chi |
+| **Super Admin** | Toàn quyền: quản lý company/brand/branch, gói dịch vụ, hạng mục thu chi, permissions |
 | **Support** | Chỉ xem thông tin, xử lý tickets (không sửa dữ liệu) |
 
 ---
 
-## Flow tạo Công ty mới
+## Flow tạo Công ty mới (Wizard 3 bước)
 
 ```
-Super Admin đăng nhập
+Super Admin đăng nhập Web Admin
         │
         ▼
 Vào menu "Companies" → "Tạo mới"
         │
         ▼
-Nhập thông tin công ty:
-├── Tên công ty
-├── Mã số thuế
-├── Địa chỉ
-├── Email đại diện
-├── SĐT liên hệ
+┌─────────────────────────────────────────┐
+│            WIZARD BƯỚC 1                │
+│         Thông tin Công ty               │
+├─────────────────────────────────────────┤
+│  Tên công ty: [__________________]      │
+│  Mã công ty (Tenant ID): [________]     │
+│  Logo: [Upload]                         │
+│  MST: [______________]                  │
+│  Địa chỉ: [_____________________]       │
+│  Email: [___________________]           │
+│  SĐT: [____________]                    │
+│  Người đại diện: [_______________]      │
+│  Gói dịch vụ: [Standard ▼]              │
+│                                         │
+│  [Hủy]                      [Tiếp tục]  │
+└─────────────────────────────────────────┘
         │
         ▼
-Tạo tài khoản Owner:
-├── Email owner
-├── Họ tên
-├── SĐT
+┌─────────────────────────────────────────┐
+│            WIZARD BƯỚC 2                │
+│     Thương hiệu đầu tiên (BẮT BUỘC)     │
+├─────────────────────────────────────────┤
+│  Tên thương hiệu: [_______________]     │
+│  Mã thương hiệu: [________]             │
+│  Logo: [Upload]                         │
+│  Mô tả: [____________________]          │
+│  Mô hình: [CCB Only ▼]                  │
+│                                         │
+│  [Quay lại]                 [Tiếp tục]  │
+└─────────────────────────────────────────┘
         │
         ▼
-Chọn gói dịch vụ ban đầu (hoặc trial)
+┌─────────────────────────────────────────┐
+│            WIZARD BƯỚC 3                │
+│      Chi nhánh đầu tiên (BẮT BUỘC)      │
+├─────────────────────────────────────────┤
+│  Tên chi nhánh: [_______________]       │
+│  Mã chi nhánh: [________]               │
+│  Logo: [Dùng logo thương hiệu]          │
+│  Địa chỉ: [_____________________]       │
+│  SĐT: [____________]                    │
+│  Mô hình: [CCB Only ▼]                  │
+│  Số cổng kết nối: [3]                   │
+│                                         │
+│  ☑ Tạo tài khoản Owner                  │
+│    Email: [___________________]         │
+│                                         │
+│  [Quay lại]          [Hoàn tất & Tạo]   │
+└─────────────────────────────────────────┘
         │
         ▼
-Bấm "Tạo công ty"
-        │
-        ▼
-Hệ thống tự động:
-├── Tạo company_id (UUID)
+Hệ thống thực hiện trong 1 TRANSACTION:
+├── Tạo company với code = tenant_id
+├── Tạo brand với tenant_id
+├── Tạo branch với tenant_id
 ├── Tạo tài khoản Owner
-├── Gửi email thông tin đăng nhập
+└── Gửi email thông tin đăng nhập
         │
         ▼
-Owner đăng nhập Web Dashboard → Tạo Brand → Tạo Branch
-```
-
----
-
-## Flow tạo Chi nhánh
-
-```
-Owner đăng nhập Web Dashboard
+Hiển thị kết quả:
+├── Company: ABC Food (abcfood)
+├── Brand: Phở 24 (pho24)
+├── Branch: Phở 24 - Q1 (pho24-q1)
+└── Owner: owner@abcfood.com (password: xxxxxxxx)
         │
         ▼
-Chọn Thương hiệu (hoặc tạo mới)
-        │
-        ▼
-Vào "Chi nhánh" → "Tạo mới"
-        │
-        ▼
-Nhập thông tin chi nhánh:
-├── Tên chi nhánh
-├── Địa chỉ
-├── SĐT
-├── Giờ mở cửa
-├── Chọn mô hình (Order Only / CCB Only / Full System)
-        │
-        ▼
-Gán gói App Food (nếu cần)
-        │
-        ▼
-Bấm "Tạo chi nhánh"
-        │
-        ▼
-Hệ thống tự động:
-├── Tạo branch_id (UUID)
-├── Tạo store_code cho chi nhánh
-├── Sync data cấu trúc lên thiết bị
+Owner đăng nhập Web Dashboard → Sẵn sàng sử dụng
 ```
 
 ---
@@ -322,10 +430,10 @@ Hệ thống tự động:
 │  │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓           │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
-│  Công ty đăng ký gần đây:                                       │
-│  • Công ty A - 2 giờ trước                                      │
-│  • Công ty B - 5 giờ trước                                      │
-│  • Công ty C - 1 ngày trước                                     │
+│  Tenant đăng ký gần đây:                                        │
+│  • abcfood - ABC Food - 2 giờ trước                            │
+│  • xyzresto - XYZ Restaurant - 5 giờ trước                     │
+│  • 123cafe - 123 Cafe - 1 ngày trước                           │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -334,223 +442,135 @@ Hệ thống tự động:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  COMPANIES                                 [+ Tạo công ty mới]  │
+│  COMPANIES                              [+ Tạo công ty mới]     │
 ├─────────────────────────────────────────────────────────────────┤
 │  🔍 Tìm kiếm...                    [Lọc: Tất cả ▼]              │
 ├─────────────────────────────────────────────────────────────────┤
-│  │ Tên công ty      │ Brands │ Branches │ Gói      │ Status │  │
-│  ├──────────────────┼────────┼──────────┼──────────┼────────┼──┤
-│  │ Công ty ABC Food │   3    │    12    │ Premium  │●Active │⋮ │
-│  │ Công ty XYZ      │   1    │    5     │ Standard │●Active │⋮ │
-│  │ Cá nhân Nguyễn A │   1    │    1     │ Basic    │○Expired│⋮ │
-│  └──────────────────┴────────┴──────────┴──────────┴────────┴──┘
+│  │Logo│ Tenant ID    │ Tên công ty      │Brands│Branches│Status││
+│  ├────┼──────────────┼──────────────────┼──────┼────────┼──────┤│
+│  │ 🏢 │ abcfood      │ Công ty ABC Food │   3  │   12   │●Active│
+│  │ 🏢 │ xyzresto     │ Công ty XYZ      │   1  │    5   │●Active│
+│  │ 🏢 │ 123cafe      │ Cá nhân Nguyễn A │   1  │    1   │○Expired│
+│  └────┴──────────────┴──────────────────┴──────┴────────┴──────┘│
 │                                                                 │
 │  Hiển thị 1-10 của 45 công ty                  [< 1 2 3 ... >]  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Quản lý Gói App Food
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  GÓI APP FOOD                                    [+ Tạo gói]    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │
-│  │   BASIC     │  │  STANDARD   │  │   PREMIUM   │  │ENTERPRISE│ │
-│  │             │  │             │  │             │  │         │ │
-│  │  3 kết nối  │  │ 10 kết nối  │  │ 30 kết nối  │  │Unlimited│ │
-│  │             │  │             │  │             │  │         │ │
-│  │ 500k/tháng  │  │ 1.5tr/tháng │  │ 3tr/tháng   │  │ Liên hệ │ │
-│  │             │  │             │  │             │  │         │ │
-│  │  120 users  │  │   85 users  │  │  45 users   │  │ 10 users│ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────┘ │
-│                                                                 │
-│  Lịch sử mua gói gần đây:                                       │
-│  • Công ty A - Premium - 2 giờ trước                            │
-│  • Công ty B - Standard → Premium - 5 giờ trước (nâng cấp)      │
-│  • Công ty C - Basic - 1 ngày trước                             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Quản lý Hạng mục Thu/Chi
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  HẠNG MỤC THU/CHI                              [+ Tạo hạng mục] │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [THU NHẬP]  [CHI PHÍ]                                          │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Mã      │ Tên hạng mục            │ Loại     │ Mặc định  │  │
-│  ├─────────┼─────────────────────────┼──────────┼───────────┤  │
-│  │ INC001  │ Doanh thu bán hàng      │ Thu nhập │    ✓      │  │
-│  │ INC002  │ Tiền tip                │ Thu nhập │    ✓      │  │
-│  │ INC003  │ Thu nhập khác           │ Thu nhập │    ✓      │  │
-│  │ EXP001  │ Mua nguyên liệu         │ Chi phí  │    ✓      │  │
-│  │ EXP002  │ Tiền điện nước          │ Chi phí  │    ✓      │  │
-│  │ EXP003  │ Lương nhân viên         │ Chi phí  │    ✓      │  │
-│  │ EXP004  │ Chi phí khác            │ Chi phí  │    ✓      │  │
-│  └─────────┴─────────────────────────┴──────────┴───────────┘  │
-│                                                                 │
-│  [Import Excel]  [Export Excel]                                 │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ---
 
-## Database Schema
+## Database Schema (PostgreSQL)
 
-### Companies
+### Companies (Tenant)
 
 ```sql
 CREATE TABLE companies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) UNIQUE NOT NULL,      -- Mã viết tắt công ty (dùng để login: annhonquan)
+    code VARCHAR(50) UNIQUE NOT NULL,      -- Tenant ID
+    logo_url TEXT,                         -- Logo công ty
     tax_code VARCHAR(50),
     address TEXT,
+    phone VARCHAR(50),
     email VARCHAR(255),
-    phone VARCHAR(20),
-    representative VARCHAR(255),           -- Người đại diện
-    owner_id UUID REFERENCES users(id),
+    representative VARCHAR(255),
+
+    -- SaaS Subscription
+    subscription_plan VARCHAR(50) DEFAULT 'basic',
+    subscription_expires_at TIMESTAMP,
+    max_branches INTEGER DEFAULT 1,
+    max_users INTEGER DEFAULT 10,
+
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_companies_code ON companies(code);
 ```
 
 ### Brands
 
 ```sql
 CREATE TABLE brands (
-    id UUID PRIMARY KEY,
-    company_id UUID REFERENCES companies(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(50) NOT NULL REFERENCES companies(code),
+    company_id UUID NOT NULL REFERENCES companies(id),
     name VARCHAR(255) NOT NULL,
-    logo_url TEXT,
-    primary_color VARCHAR(7),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    code VARCHAR(50) UNIQUE NOT NULL,
+    logo_url TEXT,                         -- Logo thương hiệu
+    business_model VARCHAR(50) DEFAULT 'full_system',
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_brands_tenant ON brands(tenant_id);
 ```
 
 ### Branches
 
 ```sql
 CREATE TABLE branches (
-    id UUID PRIMARY KEY,
-    brand_id UUID REFERENCES brands(id),
-    name VARCHAR(255) NOT NULL,
-    store_code VARCHAR(20) UNIQUE,
-    address TEXT,
-    phone VARCHAR(20),
-    opening_hours JSONB,
-    model_type VARCHAR(20),  -- 'order_only', 'ccb_only', 'full_system'
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(50) NOT NULL REFERENCES companies(code),
+    brand_id UUID NOT NULL REFERENCES brands(id),
     package_id UUID REFERENCES packages(id),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    logo_url TEXT,                         -- Logo chi nhánh
+    address TEXT,
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    manager VARCHAR(255),
+    business_model VARCHAR(50) DEFAULT 'ccb_only',
+    open_time TIME,
+    close_time TIME,
+    max_connections INTEGER DEFAULT 3,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_branches_tenant ON branches(tenant_id);
+```
+
+### Staff
+
+```sql
+CREATE TABLE staff (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(50) NOT NULL REFERENCES companies(code),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    brand_id UUID REFERENCES brands(id),
+    branch_id UUID NOT NULL REFERENCES branches(id),
+    name VARCHAR(255) NOT NULL,
+    avatar_url TEXT,                       -- Ảnh đại diện nhân viên
+    phone VARCHAR(20),
+    email VARCHAR(255),
+    username VARCHAR(50),
+    password_hash VARCHAR(255),
+    pin_code VARCHAR(10),
+    role VARCHAR(50) DEFAULT 'staff',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_staff_tenant ON staff(tenant_id);
 ```
 
 ### Packages
 
 ```sql
 CREATE TABLE packages (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
-    max_connections INTEGER,  -- NULL = unlimited
-    price_monthly DECIMAL(12,2),
-    price_yearly DECIMAL(12,2),
-    features JSONB,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    max_branches INTEGER,
+    monthly_price DECIMAL(12,2),
+    yearly_price DECIMAL(12,2),
+    features JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### Package Purchases
-
-```sql
-CREATE TABLE package_purchases (
-    id UUID PRIMARY KEY,
-    branch_id UUID REFERENCES branches(id),
-    package_id UUID REFERENCES packages(id),
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    price_paid DECIMAL(12,2),
-    payment_method VARCHAR(50),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### Transaction Categories
-
-```sql
-CREATE TABLE transaction_categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id UUID REFERENCES companies(id),
-    code VARCHAR(20) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    type VARCHAR(20) NOT NULL,             -- 'income' or 'expense'
-    description TEXT,
-    is_system BOOLEAN DEFAULT false,       -- Hạng mục hệ thống (không xóa được)
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### Permission Groups (Nhóm quyền)
-
-```sql
-CREATE TABLE permission_groups (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(100) UNIQUE NOT NULL,     -- menu_management, order_management...
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### Permissions (Quyền chi tiết)
-
-```sql
-CREATE TABLE permissions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    group_id UUID NOT NULL REFERENCES permission_groups(id),
-    code VARCHAR(100) UNIQUE NOT NULL,     -- menu.view, menu.create, order.edit...
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_permissions_group ON permissions(group_id);
-```
-
-### Admin Users
-
-```sql
-CREATE TABLE admin_users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(255),
-    role VARCHAR(50) DEFAULT 'support',    -- super_admin, support
-    is_active BOOLEAN DEFAULT true,
-    last_login_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -560,85 +580,142 @@ CREATE TABLE admin_users (
 
 ## API Endpoints
 
-### Companies
+### Companies (với Wizard)
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/companies` | Danh sách công ty |
-| POST | `/admin/companies` | Tạo công ty mới |
-| GET | `/admin/companies/:id` | Chi tiết công ty |
-| PUT | `/admin/companies/:id` | Cập nhật công ty |
-| DELETE | `/admin/companies/:id` | Xóa công ty |
-| POST | `/admin/companies/:id/suspend` | Khóa công ty |
-| POST | `/admin/companies/:id/activate` | Mở khóa công ty |
+| GET | `/companies` | Danh sách công ty |
+| **POST** | **`/companies/wizard`** | **Wizard tạo công ty 3 bước** |
+| POST | `/companies` | Tạo công ty đơn (không bắt buộc brand/branch) |
+| GET | `/companies/:id` | Chi tiết công ty |
+| GET | `/companies/by-code/:code` | Tìm theo tenant code |
+| PATCH | `/companies/:id` | Cập nhật công ty |
+| DELETE | `/companies/:id` | Xóa công ty |
+| PATCH | `/companies/:id/toggle-status` | Tắt/Bật công ty |
+
+### Wizard API
+
+```typescript
+// POST /companies/wizard
+interface CreateCompanyWizardDto {
+  company: {
+    name: string;
+    code: string;           // Tenant ID
+    logoUrl?: string;       // Logo công ty
+    taxCode?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    representative?: string;
+    subscriptionPlan: 'BASIC' | 'STANDARD' | 'PREMIUM' | 'ENTERPRISE';
+    maxBranches?: number;
+    maxUsers?: number;
+    subscriptionExpiresAt?: string;
+  };
+  brand: {
+    name: string;
+    code: string;
+    logoUrl?: string;       // Logo thương hiệu
+    description?: string;
+    businessModel: 'ORDER_ONLY' | 'CCB_ONLY' | 'FULL_SYSTEM';
+  };
+  branch: {
+    name: string;
+    code: string;
+    logoUrl?: string;       // Logo chi nhánh (mặc định dùng brand logo)
+    address: string;
+    phone?: string;
+    email?: string;
+    manager?: string;
+    businessModel?: 'ORDER_ONLY' | 'CCB_ONLY' | 'FULL_SYSTEM';
+    openTime?: string;
+    closeTime?: string;
+    maxConnections?: number;
+  };
+  owner?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+}
+
+// Response
+interface CreateCompanyWizardResponseDto {
+  company: { id: string; name: string; code: string; };
+  brand: { id: string; name: string; code: string; };
+  branch: { id: string; name: string; code: string; };
+  owner?: {
+    id: string;
+    username: string;
+    temporaryPassword: string;
+  };
+}
+```
 
 ### Brands
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/brands` | Danh sách thương hiệu |
-| POST | `/admin/brands` | Tạo thương hiệu |
-| GET | `/admin/brands/:id` | Chi tiết thương hiệu |
-| PUT | `/admin/brands/:id` | Cập nhật thương hiệu |
-| DELETE | `/admin/brands/:id` | Xóa thương hiệu |
+| GET | `/brands` | Danh sách thương hiệu |
+| POST | `/brands` | Tạo thương hiệu |
+| GET | `/brands/:id` | Chi tiết thương hiệu |
+| PATCH | `/brands/:id` | Cập nhật thương hiệu |
+| DELETE | `/brands/:id` | Xóa thương hiệu |
+| PATCH | `/brands/:id/toggle-status` | Tắt/Bật thương hiệu |
 
 ### Branches
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/branches` | Danh sách chi nhánh |
-| POST | `/admin/branches` | Tạo chi nhánh |
-| GET | `/admin/branches/:id` | Chi tiết chi nhánh |
-| PUT | `/admin/branches/:id` | Cập nhật chi nhánh |
-| DELETE | `/admin/branches/:id` | Xóa chi nhánh |
-| POST | `/admin/branches/:id/assign-package` | Gán gói cho chi nhánh |
+| GET | `/branches` | Danh sách chi nhánh |
+| POST | `/branches` | Tạo chi nhánh |
+| GET | `/branches/:id` | Chi tiết chi nhánh |
+| PATCH | `/branches/:id` | Cập nhật chi nhánh |
+| DELETE | `/branches/:id` | Xóa chi nhánh |
+| PATCH | `/branches/:id/toggle-status` | Tắt/Bật chi nhánh |
 
 ### Packages
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/packages` | Danh sách gói |
-| POST | `/admin/packages` | Tạo gói mới |
-| PUT | `/admin/packages/:id` | Cập nhật gói |
-| DELETE | `/admin/packages/:id` | Xóa gói |
-| GET | `/admin/packages/purchases` | Lịch sử mua gói |
+| GET | `/packages` | Danh sách gói |
+| POST | `/packages` | Tạo gói mới |
+| PATCH | `/packages/:id` | Cập nhật gói |
+| DELETE | `/packages/:id` | Xóa gói |
+| PATCH | `/packages/:id/toggle-status` | Tắt/Bật gói |
 
 ### Transaction Categories
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/transaction-categories` | Danh sách hạng mục |
-| POST | `/admin/transaction-categories` | Tạo hạng mục |
-| PUT | `/admin/transaction-categories/:id` | Cập nhật hạng mục |
-| DELETE | `/admin/transaction-categories/:id` | Xóa hạng mục |
-| POST | `/admin/transaction-categories/import` | Import từ Excel |
-| GET | `/admin/transaction-categories/export` | Export ra Excel |
+| GET | `/categories` | Danh sách hạng mục |
+| POST | `/categories` | Tạo hạng mục |
+| PATCH | `/categories/:id` | Cập nhật hạng mục |
+| DELETE | `/categories/:id` | Xóa hạng mục |
+| PATCH | `/categories/:id/toggle-status` | Tắt/Bật hạng mục |
 
 ### Permissions
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/permission-groups` | Danh sách nhóm quyền |
-| POST | `/admin/permission-groups` | Tạo nhóm quyền |
-| PUT | `/admin/permission-groups/:id` | Cập nhật nhóm quyền |
-| DELETE | `/admin/permission-groups/:id` | Xóa nhóm quyền |
-| GET | `/admin/permissions` | Danh sách quyền |
-| POST | `/admin/permissions` | Tạo quyền mới |
-| PUT | `/admin/permissions/:id` | Cập nhật quyền |
-| DELETE | `/admin/permissions/:id` | Xóa quyền |
+| GET | `/permissions/groups` | Danh sách nhóm quyền |
+| POST | `/permissions/groups` | Tạo nhóm quyền |
+| PATCH | `/permissions/groups/:id` | Cập nhật nhóm quyền |
+| DELETE | `/permissions/groups/:id` | Xóa nhóm quyền |
+| GET | `/permissions` | Danh sách quyền |
+| POST | `/permissions` | Tạo quyền mới |
+| PATCH | `/permissions/:id` | Cập nhật quyền |
+| DELETE | `/permissions/:id` | Xóa quyền |
 
-### Owners & Analytics
+### Admin Users
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/admin/owners` | Danh sách owners |
-| POST | `/admin/owners` | Tạo owner |
-| POST | `/admin/owners/:id/reset-password` | Reset mật khẩu owner |
-| POST | `/admin/owners/:id/suspend` | Khóa tài khoản owner |
-| POST | `/admin/owners/:id/activate` | Mở khóa tài khoản owner |
-| GET | `/admin/analytics` | Thống kê tổng quan |
-| GET | `/admin/analytics/companies` | Thống kê theo công ty |
-| GET | `/admin/analytics/packages` | Thống kê theo gói |
+| GET | `/admin-users` | Danh sách admin |
+| POST | `/admin-users` | Tạo admin |
+| PATCH | `/admin-users/:id` | Cập nhật admin |
+| DELETE | `/admin-users/:id` | Xóa admin |
+| POST | `/admin-users/:id/change-password` | Đổi mật khẩu |
 
 ---
 
@@ -646,7 +723,8 @@ CREATE TABLE admin_users (
 
 - Xác thực bằng JWT token
 - Session timeout sau 30 phút không hoạt động
-- 2FA cho Super Admin
+- 2FA cho Super Admin (tùy chọn)
 - Audit log cho mọi thao tác quan trọng
 - Rate limiting cho API endpoints
 - RBAC (Role-Based Access Control)
+- Mã hóa password với bcrypt
