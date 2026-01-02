@@ -7,9 +7,9 @@ import {
   Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
   Eye,
   Loader2,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,6 @@ export default function CompaniesPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isWizardOpen, setIsWizardOpen] = React.useState(false);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
   const [formData, setFormData] = React.useState<CompanyFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
@@ -140,11 +139,6 @@ export default function CompaniesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleOpenDelete = (company: Company) => {
-    setSelectedCompany(company);
-    setIsDeleteDialogOpen(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -175,28 +169,6 @@ export default function CompaniesPage() {
       });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (selectedCompany) {
-      try {
-        await companyService.delete(selectedCompany.id);
-        toast({
-          title: "Thành công",
-          description: "Xóa công ty thành công",
-        });
-        setIsDeleteDialogOpen(false);
-        setSelectedCompany(null);
-        fetchCompanies(); // Refresh list
-      } catch (error: any) {
-        console.error("Error deleting company:", error);
-        toast({
-          variant: "destructive",
-          title: "Lỗi",
-          description: error.response?.data?.message || "Không thể xóa công ty",
-        });
-      }
     }
   };
 
@@ -322,12 +294,9 @@ export default function CompaniesPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(company)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
+                        <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {company.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -479,31 +448,6 @@ export default function CompaniesPage() {
               )}
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn xóa công ty{" "}
-              <span className="font-medium">{selectedCompany?.name}</span>? Hành
-              động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Xóa
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

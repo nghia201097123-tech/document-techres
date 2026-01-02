@@ -7,10 +7,10 @@ import {
   Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
   Eye,
   Building2,
   Loader2,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +86,6 @@ export default function BrandsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterCompany, setFilterCompany] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedBrand, setSelectedBrand] = React.useState<Brand | null>(null);
   const [formData, setFormData] = React.useState<BrandFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
@@ -168,11 +167,6 @@ export default function BrandsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleOpenDelete = (brand: Brand) => {
-    setSelectedBrand(brand);
-    setIsDeleteDialogOpen(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -201,28 +195,6 @@ export default function BrandsPage() {
       });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (selectedBrand) {
-      try {
-        await brandService.delete(selectedBrand.id);
-        toast({
-          title: "Thành công",
-          description: "Xóa thương hiệu thành công",
-        });
-        setIsDeleteDialogOpen(false);
-        setSelectedBrand(null);
-        fetchBrands();
-      } catch (error: any) {
-        console.error("Error deleting brand:", error);
-        toast({
-          variant: "destructive",
-          title: "Lỗi",
-          description: error.response?.data?.message || "Không thể xóa thương hiệu",
-        });
-      }
     }
   };
 
@@ -369,12 +341,9 @@ export default function BrandsPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(brand)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
+                        <DropdownMenuItem onClick={() => handleToggleStatus(brand)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {brand.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -524,30 +493,6 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn xóa thương hiệu{" "}
-              <span className="font-medium">{selectedBrand?.name}</span>? Hành
-              động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Xóa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

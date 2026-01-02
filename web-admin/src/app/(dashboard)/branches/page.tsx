@@ -7,12 +7,12 @@ import {
   Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
   Eye,
   Store,
   Clock,
   Phone,
   Loader2,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +86,6 @@ export default function BranchesPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterBrand, setFilterBrand] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedBranch, setSelectedBranch] = React.useState<Branch | null>(null);
   const [formData, setFormData] = React.useState<BranchFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
@@ -178,11 +177,6 @@ export default function BranchesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleOpenDelete = (branch: Branch) => {
-    setSelectedBranch(branch);
-    setIsDeleteDialogOpen(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -211,28 +205,6 @@ export default function BranchesPage() {
       });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (selectedBranch) {
-      try {
-        await branchService.delete(selectedBranch.id);
-        toast({
-          title: "Thành công",
-          description: "Xóa chi nhánh thành công",
-        });
-        setIsDeleteDialogOpen(false);
-        setSelectedBranch(null);
-        fetchBranches();
-      } catch (error: any) {
-        console.error("Error deleting branch:", error);
-        toast({
-          variant: "destructive",
-          title: "Lỗi",
-          description: error.response?.data?.message || "Không thể xóa chi nhánh",
-        });
-      }
     }
   };
 
@@ -393,12 +365,9 @@ export default function BranchesPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(branch)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
+                        <DropdownMenuItem onClick={() => handleToggleStatus(branch)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {branch.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -586,30 +555,6 @@ export default function BranchesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn xóa chi nhánh{" "}
-              <span className="font-medium">{selectedBranch?.name}</span>? Hành
-              động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Xóa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
