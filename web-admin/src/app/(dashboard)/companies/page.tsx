@@ -9,6 +9,7 @@ import {
   Pencil,
   Trash2,
   Eye,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,49 +40,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
-
-// Mock data - replace with API call
-const mockCompanies: Company[] = [
-  {
-    id: "1",
-    name: "Công ty TNHH ABC Food",
-    code: "ABC001",
-    taxCode: "0123456789",
-    address: "123 Nguyễn Văn Linh, Quận 7, TP.HCM",
-    phone: "028 1234 5678",
-    email: "contact@abcfood.vn",
-    representative: "Nguyễn Văn A",
-    isActive: true,
-    createdAt: "2024-01-15T10:30:00Z",
-    updatedAt: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "2",
-    name: "Công ty Cổ phần XYZ Restaurant",
-    code: "XYZ002",
-    taxCode: "0987654321",
-    address: "456 Lê Lợi, Quận 1, TP.HCM",
-    phone: "028 8765 4321",
-    email: "info@xyzrestaurant.vn",
-    representative: "Trần Thị B",
-    isActive: true,
-    createdAt: "2024-02-20T14:45:00Z",
-    updatedAt: "2024-02-20T14:45:00Z",
-  },
-  {
-    id: "3",
-    name: "Công ty TNHH DEF Beverages",
-    code: "DEF003",
-    taxCode: "1122334455",
-    address: "789 Trần Hưng Đạo, Quận 5, TP.HCM",
-    phone: "028 1122 3344",
-    email: "hello@defbeverages.vn",
-    representative: "Lê Văn C",
-    isActive: false,
-    createdAt: "2024-03-10T09:15:00Z",
-    updatedAt: "2024-03-10T09:15:00Z",
-  },
-];
+import { companyService } from "@/services/company-service";
+import { useToast } from "@/hooks/use-toast";
 
 interface CompanyFormData {
   name: string;
@@ -104,19 +64,41 @@ const initialFormData: CompanyFormData = {
 };
 
 export default function CompaniesPage() {
-  const [companies, setCompanies] = React.useState<Company[]>(mockCompanies);
+  const [companies, setCompanies] = React.useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
   const [formData, setFormData] = React.useState<CompanyFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { toast } = useToast();
 
-  const filteredCompanies = companies.filter(
-    (company) =>
-      company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      company.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Fetch companies from API
+  const fetchCompanies = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await companyService.getList({ search: searchQuery });
+      setCompanies(response.data);
+    } catch (error: any) {
+      console.error("Error fetching companies:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách công ty",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, toast]);
+
+  // Initial fetch
+  React.useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
+
+  const filteredCompanies = companies;
 
   const handleOpenCreate = () => {
     setSelectedCompany(null);
@@ -160,45 +142,77 @@ export default function CompaniesPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedCompany) {
-      // Update
-      setCompanies((prev) =>
-        prev.map((c) =>
-          c.id === selectedCompany.id
-            ? { ...c, ...formData, updatedAt: new Date().toISOString() }
-            : c
-        )
-      );
-    } else {
-      // Create
-      const newCompany: Company = {
-        id: String(Date.now()),
-        ...formData,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setCompanies((prev) => [newCompany, ...prev]);
+    setIsSubmitting(true);
+    try {
+      if (selectedCompany) {
+        // Update
+        await companyService.update(selectedCompany.id, formData);
+        toast({
+          title: "Thành công",
+          description: "Cập nhật công ty thành công",
+        });
+      } else {
+        // Create
+        await companyService.create(formData);
+        toast({
+          title: "Thành công",
+          description: "Tạo công ty mới thành công",
+        });
+      }
+      setIsDialogOpen(false);
+      fetchCompanies(); // Refresh list
+    } catch (error: any) {
+      console.error("Error saving company:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể lưu công ty",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedCompany) {
-      setCompanies((prev) => prev.filter((c) => c.id !== selectedCompany.id));
-      setIsDeleteDialogOpen(false);
-      setSelectedCompany(null);
+      try {
+        await companyService.delete(selectedCompany.id);
+        toast({
+          title: "Thành công",
+          description: "Xóa công ty thành công",
+        });
+        setIsDeleteDialogOpen(false);
+        setSelectedCompany(null);
+        fetchCompanies(); // Refresh list
+      } catch (error: any) {
+        console.error("Error deleting company:", error);
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: error.response?.data?.message || "Không thể xóa công ty",
+        });
+      }
     }
   };
 
-  const handleToggleStatus = (company: Company) => {
-    setCompanies((prev) =>
-      prev.map((c) =>
-        c.id === company.id ? { ...c, isActive: !c.isActive } : c
-      )
-    );
+  const handleToggleStatus = async (company: Company) => {
+    try {
+      await companyService.toggleStatus(company.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${company.isActive ? "tạm dừng" : "kích hoạt"} công ty`,
+      });
+      fetchCompanies(); // Refresh list
+    } catch (error: any) {
+      console.error("Error toggling status:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể thay đổi trạng thái",
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,7 +268,7 @@ export default function CompaniesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCompanies.map((company) => (
+              {!isLoading && filteredCompanies.map((company) => (
                 <TableRow key={company.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -317,7 +331,17 @@ export default function CompaniesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredCompanies.length === 0 && (
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      Đang tải...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && filteredCompanies.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
                     Không tìm thấy công ty nào
@@ -444,7 +468,8 @@ export default function CompaniesPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedCompany ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
