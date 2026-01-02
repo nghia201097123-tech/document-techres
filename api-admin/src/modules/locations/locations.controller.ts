@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { LocationsService } from './locations.service';
@@ -9,6 +9,12 @@ import { LocationsService } from './locations.service';
 @ApiBearerAuth()
 export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}
+
+  @Post('seed')
+  @ApiOperation({ summary: 'Import dữ liệu địa chỉ hành chính Việt Nam từ API' })
+  async seedLocations() {
+    return this.locationsService.seedFromAPI();
+  }
 
   @Get('provinces')
   @ApiOperation({ summary: 'Lấy danh sách tỉnh/thành phố' })
