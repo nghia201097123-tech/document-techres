@@ -11,3 +11,6 @@ export * from './admin-user.entity';
 export * from './staff.entity';
 export * from './province.entity';
 export * from './ward.entity';
+export * from './product.entity';
+export * from './category.entity';
+export * from './kitchen.entity';

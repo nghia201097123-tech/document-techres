@@ -20,7 +20,11 @@ import {
   Permission,
   PermissionGroup,
   TransactionCategory,
+  Product,
+  Category,
+  Kitchen,
 } from './database/entities';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -49,6 +53,9 @@ import {
           Permission,
           PermissionGroup,
           TransactionCategory,
+          Product,
+          Category,
+          Kitchen,
         ],
         synchronize: false,
       }),
@@ -60,6 +67,7 @@ import {
     CategoriesModule,
     KitchenModule,
     DepartmentsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// API Dashboard URL - port 4002
-const API_BASE_URL = "http://localhost:4002/api";
+// API Gateway URL - port 4000, using /tenant prefix for dashboard routes
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/tenant";
 
 console.log("[Dashboard API] Base URL:", API_BASE_URL);
 

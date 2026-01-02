@@ -1,0 +1,77 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
+import { Brand } from './brand.entity';
+
+export enum ProductType {
+  FOOD = 'food',
+  DRINK = 'drink',
+  OTHER = 'other',
+  TOPPING = 'topping',
+  COMBO = 'combo',
+}
+
+@Entity('products')
+@Index(['tenantId', 'brandId'])
+export class Product {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'tenant_id' })
+  @Index()
+  tenantId: string;
+
+  @Column({ name: 'brand_id' })
+  brandId: string;
+
+  @ManyToOne(() => Brand)
+  @JoinColumn({ name: 'brand_id' })
+  brand: Brand;
+
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  price: number;
+
+  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 10 })
+  vatRate: number;
+
+  @Column({
+    type: 'enum',
+    enum: ProductType,
+    default: ProductType.FOOD,
+  })
+  type: ProductType;
+
+  @Column({ name: 'category_id', nullable: true })
+  categoryId: string;
+
+  @Column({ name: 'image_url', nullable: true })
+  imageUrl: string;
+
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
+  @Column({ name: 'sort_order', default: 0 })
+  sortOrder: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
