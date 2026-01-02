@@ -27,8 +27,9 @@ export class ProxyController {
     }
 
     try {
-      // Extract path after /api prefix
-      const path = req.originalUrl.replace(/^\/api/, '');
+      // Extract path after /api prefix (without query string)
+      const fullPath = req.originalUrl.replace(/^\/api/, '');
+      const path = fullPath.split('?')[0]; // Remove query string from path
 
       // Forward authorization header if present
       const headers: Record<string, string> = {};
