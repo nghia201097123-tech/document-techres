@@ -13,7 +13,7 @@ export class DepartmentsService {
   async findAll(tenantId: string) {
     return this.departmentRepository.find({
       where: { tenantId },
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { name: 'ASC' },
     });
   }
 }
