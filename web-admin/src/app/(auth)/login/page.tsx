@@ -20,13 +20,20 @@ import { authService } from "@/services/auth-service";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, isHydrated } = useAuthStore();
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [formData, setFormData] = React.useState({
     email: "",
     password: "",
   });
+
+  // Redirect if already authenticated
+  React.useEffect(() => {
+    if (isHydrated && isAuthenticated) {
+      router.push("/companies");
+    }
+  }, [isHydrated, isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +43,7 @@ export default function LoginPage() {
     try {
       const response = await authService.login(formData);
       login(response.user, response.token);
-      router.push("/dashboard");
+      router.push("/companies");
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(
@@ -107,11 +114,14 @@ export default function LoginPage() {
             />
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex-col gap-4">
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Đăng nhập
           </Button>
+          <div className="text-center text-sm text-muted-foreground">
+            <p>Demo: admin@techres.vn / Admin@123</p>
+          </div>
         </CardFooter>
       </form>
     </Card>
