@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
@@ -36,6 +37,16 @@ export class Department {
   @ManyToOne(() => Branch, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'branch_id' })
   branch: Branch;
+
+  @Column({ name: 'parent_id', nullable: true })
+  parentId: string;
+
+  @ManyToOne(() => Department, (department) => department.children, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parent_id' })
+  parent: Department;
+
+  @OneToMany(() => Department, (department) => department.parent)
+  children: Department[];
 
   @Column({ length: 255 })
   name: string;

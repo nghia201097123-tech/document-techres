@@ -400,6 +400,26 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('paper_size column converted to varchar');
       }
 
+      // 20. Add parent_id column to departments table for hierarchy support
+      const hasParentId = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'departments' AND column_name = 'parent_id'
+        );
+      `);
+
+      if (!hasParentId[0].exists) {
+        this.logger.log('Adding parent_id column to departments table...');
+        await queryRunner.query(`
+          ALTER TABLE departments
+          ADD COLUMN parent_id UUID NULL REFERENCES departments(id) ON DELETE SET NULL
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS idx_department_parent ON departments(parent_id)
+        `);
+        this.logger.log('parent_id column added to departments table');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

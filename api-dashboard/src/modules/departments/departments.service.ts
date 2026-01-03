@@ -51,7 +51,18 @@ export class DepartmentsService {
 
   async update(tenantId: string, id: string, updateDto: UpdateDepartmentDto) {
     const department = await this.findOne(tenantId, id);
-    Object.assign(department, updateDto);
+
+    // Handle parentId update (including clearing parent)
+    if ('parentId' in updateDto) {
+      department.parentId = updateDto.parentId || null;
+    }
+    if ('name' in updateDto) {
+      department.name = updateDto.name;
+    }
+    if ('description' in updateDto) {
+      department.description = updateDto.description;
+    }
+
     return this.departmentRepository.save(department);
   }
 
