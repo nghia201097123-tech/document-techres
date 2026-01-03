@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Product, ProductType, ProductTopping, ToppingGroup } from '../../database/entities';
-import { CreateProductDto, UpdateProductDto, CreateToppingGroupDto, UpdateToppingGroupDto, AddToppingItemDto, UpdateToppingItemDto } from './dto';
+import { Product, ProductType, ProductTopping, ToppingGroup, ProductNote, ProductNoteAssignment } from '../../database/entities';
+import { CreateProductDto, UpdateProductDto, CreateToppingGroupDto, UpdateToppingGroupDto, AddToppingItemDto, UpdateToppingItemDto, CreateProductNoteDto, UpdateProductNoteDto, AssignNotesToProductDto } from './dto';
 
 @Injectable()
 export class ProductsService {
@@ -13,6 +13,10 @@ export class ProductsService {
     private readonly toppingGroupRepository: Repository<ToppingGroup>,
     @InjectRepository(ProductTopping)
     private readonly productToppingRepository: Repository<ProductTopping>,
+    @InjectRepository(ProductNote)
+    private readonly productNoteRepository: Repository<ProductNote>,
+    @InjectRepository(ProductNoteAssignment)
+    private readonly productNoteAssignmentRepository: Repository<ProductNoteAssignment>,
   ) {}
 
   async findAll(tenantId: string, brandId?: string, type?: ProductType) {
@@ -274,5 +278,155 @@ export class ProductsService {
     }
 
     return this.getToppingGroups(tenantId, productId);
+  }
+
+  // === Product Notes Management ===
+
+  async getAllNotes(tenantId: string) {
+    return this.productNoteRepository.find({
+      where: { tenantId },
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
+  }
+
+  async createNote(tenantId: string, dto: CreateProductNoteDto) {
+    // Get max sort order
+    const maxOrder = await this.productNoteRepository
+      .createQueryBuilder('pn')
+      .where('pn.tenant_id = :tenantId', { tenantId })
+      .select('MAX(pn.sort_order)', 'max')
+      .getRawOne();
+
+    const note = this.productNoteRepository.create({
+      tenantId,
+      name: dto.name,
+      description: dto.description,
+      sortOrder: dto.sortOrder ?? (maxOrder?.max ?? -1) + 1,
+      isActive: true,
+    });
+
+    return this.productNoteRepository.save(note);
+  }
+
+  async updateNote(tenantId: string, noteId: string, dto: UpdateProductNoteDto) {
+    const note = await this.productNoteRepository.findOne({
+      where: { tenantId, id: noteId },
+    });
+
+    if (!note) {
+      throw new NotFoundException('Không tìm thấy ghi chú');
+    }
+
+    Object.assign(note, dto);
+    return this.productNoteRepository.save(note);
+  }
+
+  async deleteNote(tenantId: string, noteId: string) {
+    const result = await this.productNoteRepository.delete({
+      tenantId,
+      id: noteId,
+    });
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Không tìm thấy ghi chú');
+    }
+
+    return { success: true };
+  }
+
+  async getProductNotes(tenantId: string, productId: string) {
+    await this.findOne(tenantId, productId);
+
+    const assignments = await this.productNoteAssignmentRepository.find({
+      where: { tenantId, productId },
+      relations: ['note'],
+      order: { sortOrder: 'ASC' },
+    });
+
+    return assignments.map(a => ({
+      id: a.id,
+      noteId: a.noteId,
+      note: a.note,
+      sortOrder: a.sortOrder,
+    }));
+  }
+
+  async assignNotesToProduct(tenantId: string, productId: string, dto: AssignNotesToProductDto) {
+    await this.findOne(tenantId, productId);
+
+    // Remove all existing assignments
+    await this.productNoteAssignmentRepository.delete({
+      tenantId,
+      productId,
+    });
+
+    // Create new assignments
+    const assignments = dto.noteIds.map((noteId, index) =>
+      this.productNoteAssignmentRepository.create({
+        tenantId,
+        productId,
+        noteId,
+        sortOrder: index,
+      }),
+    );
+
+    if (assignments.length > 0) {
+      await this.productNoteAssignmentRepository.save(assignments);
+    }
+
+    return this.getProductNotes(tenantId, productId);
+  }
+
+  async addNoteToProduct(tenantId: string, productId: string, noteId: string) {
+    await this.findOne(tenantId, productId);
+
+    // Verify note exists
+    const note = await this.productNoteRepository.findOne({
+      where: { tenantId, id: noteId },
+    });
+    if (!note) {
+      throw new BadRequestException('Ghi chú không tồn tại');
+    }
+
+    // Check if already assigned
+    const existing = await this.productNoteAssignmentRepository.findOne({
+      where: { productId, noteId },
+    });
+    if (existing) {
+      throw new BadRequestException('Ghi chú đã được gán cho món này');
+    }
+
+    // Get max sort order
+    const maxOrder = await this.productNoteAssignmentRepository
+      .createQueryBuilder('pna')
+      .where('pna.product_id = :productId', { productId })
+      .select('MAX(pna.sort_order)', 'max')
+      .getRawOne();
+
+    const assignment = this.productNoteAssignmentRepository.create({
+      tenantId,
+      productId,
+      noteId,
+      sortOrder: (maxOrder?.max ?? -1) + 1,
+    });
+
+    await this.productNoteAssignmentRepository.save(assignment);
+    return this.getProductNotes(tenantId, productId);
+  }
+
+  async removeNoteFromProduct(tenantId: string, productId: string, noteId: string) {
+    await this.findOne(tenantId, productId);
+
+    const result = await this.productNoteAssignmentRepository.delete({
+      tenantId,
+      productId,
+      noteId,
+    });
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Không tìm thấy ghi chú trong món này');
+    }
+
+    return this.getProductNotes(tenantId, productId);
   }
 }

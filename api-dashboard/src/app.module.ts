@@ -33,6 +33,8 @@ import {
   Table,
   ToppingGroup,
   ProductTopping,
+  ProductNote,
+  ProductNoteAssignment,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -70,6 +72,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           Table,
           ToppingGroup,
           ProductTopping,
+          ProductNote,
+          ProductNoteAssignment,
         ],
         synchronize: false,
       }),

@@ -8,6 +8,11 @@ export enum ProductType {
   COMBO = "combo",
 }
 
+export enum SellingType {
+  PORTION = "portion",
+  WEIGHT = "weight",
+}
+
 export interface Product {
   id: string;
   code: string;
@@ -21,6 +26,12 @@ export interface Product {
   unit?: string;
   description?: string;
   imageUrl?: string;
+  preparationTime: number;
+  costPrice: number;
+  sellingType: SellingType;
+  printDish: boolean;
+  printLabel: boolean;
+  printSeafood: boolean;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
@@ -37,6 +48,13 @@ export interface CreateProductDto {
   description?: string;
   imageUrl?: string;
   sortOrder?: number;
+  preparationTime?: number;
+  costPrice?: number;
+  sellingType?: SellingType;
+  printDish?: boolean;
+  printLabel?: boolean;
+  printSeafood?: boolean;
+  noteIds?: string[];
 }
 
 export interface UpdateProductDto {
@@ -49,6 +67,43 @@ export interface UpdateProductDto {
   unit?: string;
   description?: string;
   imageUrl?: string;
+  sortOrder?: number;
+  preparationTime?: number;
+  costPrice?: number;
+  sellingType?: SellingType;
+  printDish?: boolean;
+  printLabel?: boolean;
+  printSeafood?: boolean;
+  noteIds?: string[];
+}
+
+// Product Note interfaces
+export interface ProductNote {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface ProductNoteAssignment {
+  id: string;
+  noteId: string;
+  note: ProductNote;
+  sortOrder: number;
+}
+
+export interface CreateProductNoteDto {
+  name: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateProductNoteDto {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
   sortOrder?: number;
 }
 
@@ -172,6 +227,46 @@ export const productService = {
 
   removeToppingItem: async (productId: string, groupId: string, itemId: string): Promise<ToppingGroup[]> => {
     const response = await api.delete<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}/items/${itemId}`);
+    return response.data;
+  },
+
+  // Product Notes Management
+  getAllNotes: async (): Promise<ProductNote[]> => {
+    const response = await api.get<ProductNote[]>("/products/notes/all");
+    return response.data;
+  },
+
+  createNote: async (data: CreateProductNoteDto): Promise<ProductNote> => {
+    const response = await api.post<ProductNote>("/products/notes", data);
+    return response.data;
+  },
+
+  updateNote: async (noteId: string, data: UpdateProductNoteDto): Promise<ProductNote> => {
+    const response = await api.put<ProductNote>(`/products/notes/${noteId}`, data);
+    return response.data;
+  },
+
+  deleteNote: async (noteId: string): Promise<void> => {
+    await api.delete(`/products/notes/${noteId}`);
+  },
+
+  getProductNotes: async (productId: string): Promise<ProductNoteAssignment[]> => {
+    const response = await api.get<ProductNoteAssignment[]>(`/products/${productId}/notes`);
+    return response.data;
+  },
+
+  assignNotesToProduct: async (productId: string, noteIds: string[]): Promise<ProductNoteAssignment[]> => {
+    const response = await api.post<ProductNoteAssignment[]>(`/products/${productId}/notes`, { noteIds });
+    return response.data;
+  },
+
+  addNoteToProduct: async (productId: string, noteId: string): Promise<ProductNoteAssignment[]> => {
+    const response = await api.post<ProductNoteAssignment[]>(`/products/${productId}/notes/${noteId}`);
+    return response.data;
+  },
+
+  removeNoteFromProduct: async (productId: string, noteId: string): Promise<ProductNoteAssignment[]> => {
+    const response = await api.delete<ProductNoteAssignment[]>(`/products/${productId}/notes/${noteId}`);
     return response.data;
   },
 };

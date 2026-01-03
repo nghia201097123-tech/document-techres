@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuard
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateProductDto, UpdateProductDto, CreateToppingGroupDto, UpdateToppingGroupDto, AddToppingItemDto, UpdateToppingItemDto } from './dto';
+import { CreateProductDto, UpdateProductDto, CreateToppingGroupDto, UpdateToppingGroupDto, AddToppingItemDto, UpdateToppingItemDto, CreateProductNoteDto, UpdateProductNoteDto, AssignNotesToProductDto } from './dto';
 import { ProductType } from '../../database/entities';
 
 @ApiTags('Products')
@@ -129,5 +129,71 @@ export class ProductsController {
     @Param('itemId') itemId: string,
   ) {
     return this.productsService.removeToppingItem(req.user.tenantId, id, groupId, itemId);
+  }
+
+  // === Product Notes Management ===
+
+  @Get('notes/all')
+  @ApiOperation({ summary: 'Lấy danh sách tất cả ghi chú' })
+  getAllNotes(@Request() req) {
+    return this.productsService.getAllNotes(req.user.tenantId);
+  }
+
+  @Post('notes')
+  @ApiOperation({ summary: 'Tạo ghi chú mới' })
+  createNote(@Request() req, @Body() dto: CreateProductNoteDto) {
+    return this.productsService.createNote(req.user.tenantId, dto);
+  }
+
+  @Put('notes/:noteId')
+  @ApiOperation({ summary: 'Cập nhật ghi chú' })
+  updateNote(
+    @Request() req,
+    @Param('noteId') noteId: string,
+    @Body() dto: UpdateProductNoteDto,
+  ) {
+    return this.productsService.updateNote(req.user.tenantId, noteId, dto);
+  }
+
+  @Delete('notes/:noteId')
+  @ApiOperation({ summary: 'Xóa ghi chú' })
+  deleteNote(@Request() req, @Param('noteId') noteId: string) {
+    return this.productsService.deleteNote(req.user.tenantId, noteId);
+  }
+
+  @Get(':id/notes')
+  @ApiOperation({ summary: 'Lấy danh sách ghi chú của món' })
+  getProductNotes(@Request() req, @Param('id') id: string) {
+    return this.productsService.getProductNotes(req.user.tenantId, id);
+  }
+
+  @Post(':id/notes')
+  @ApiOperation({ summary: 'Gán nhiều ghi chú cho món' })
+  assignNotesToProduct(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: AssignNotesToProductDto,
+  ) {
+    return this.productsService.assignNotesToProduct(req.user.tenantId, id, dto);
+  }
+
+  @Post(':id/notes/:noteId')
+  @ApiOperation({ summary: 'Thêm một ghi chú vào món' })
+  addNoteToProduct(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+  ) {
+    return this.productsService.addNoteToProduct(req.user.tenantId, id, noteId);
+  }
+
+  @Delete(':id/notes/:noteId')
+  @ApiOperation({ summary: 'Xóa ghi chú khỏi món' })
+  removeNoteFromProduct(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+  ) {
+    return this.productsService.removeNoteFromProduct(req.user.tenantId, id, noteId);
   }
 }

@@ -40,7 +40,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, type ToppingGroup } from "@/services/product-service";
+import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup } from "@/services/product-service";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -62,6 +63,13 @@ const initialFormData: CreateProductDto = {
   categoryId: "",
   description: "",
   imageUrl: "",
+  preparationTime: 0,
+  costPrice: 0,
+  sellingType: SellingType.PORTION,
+  unit: "",
+  printDish: true,
+  printLabel: false,
+  printSeafood: false,
 };
 
 type DialogMode = "create" | "edit" | "view" | "toppings" | null;
@@ -151,6 +159,13 @@ export default function ProductsPage() {
       categoryId: product.categoryId || "",
       description: product.description || "",
       imageUrl: product.imageUrl || "",
+      preparationTime: product.preparationTime || 0,
+      costPrice: product.costPrice || 0,
+      sellingType: product.sellingType || SellingType.PORTION,
+      unit: product.unit || "",
+      printDish: product.printDish ?? true,
+      printLabel: product.printLabel ?? false,
+      printSeafood: product.printSeafood ?? false,
     });
     setDialogMode("edit");
   };
@@ -737,6 +752,92 @@ export default function ProductsPage() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
+              </div>
+
+              {/* Thời gian chế biến và Giá vốn */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="preparationTime">Thời gian chế biến (phút)</Label>
+                  <Input
+                    id="preparationTime"
+                    type="number"
+                    min="0"
+                    placeholder="15"
+                    value={formData.preparationTime || ""}
+                    onChange={(e) => setFormData({ ...formData, preparationTime: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="costPrice">Giá vốn (VNĐ)</Label>
+                  <Input
+                    id="costPrice"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    placeholder="30000"
+                    value={formData.costPrice || ""}
+                    onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              {/* Loại bán và Đơn vị */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="sellingType">Loại bán</Label>
+                  <Select
+                    value={formData.sellingType || SellingType.PORTION}
+                    onValueChange={(value) => setFormData({ ...formData, sellingType: value as SellingType })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn loại bán" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="portion">Bán theo phần</SelectItem>
+                      <SelectItem value="weight">Bán theo ký</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="unit">Đơn vị tính</Label>
+                  <Input
+                    id="unit"
+                    placeholder={formData.sellingType === SellingType.WEIGHT ? "kg, gram" : "phần, ly, tô"}
+                    value={formData.unit || ""}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Setup in ấn */}
+              <div className="grid gap-2">
+                <Label>Cài đặt in ấn</Label>
+                <div className="flex flex-wrap gap-6 p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="printDish"
+                      checked={formData.printDish ?? true}
+                      onCheckedChange={(checked) => setFormData({ ...formData, printDish: !!checked })}
+                    />
+                    <Label htmlFor="printDish" className="cursor-pointer">In món</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="printLabel"
+                      checked={formData.printLabel ?? false}
+                      onCheckedChange={(checked) => setFormData({ ...formData, printLabel: !!checked })}
+                    />
+                    <Label htmlFor="printLabel" className="cursor-pointer">In tem</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="printSeafood"
+                      checked={formData.printSeafood ?? false}
+                      onCheckedChange={(checked) => setFormData({ ...formData, printSeafood: !!checked })}
+                    />
+                    <Label htmlFor="printSeafood" className="cursor-pointer">In hồ hải sản</Label>
+                  </div>
+                </div>
               </div>
             </div>
             <DialogFooter>

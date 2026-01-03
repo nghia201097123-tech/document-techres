@@ -18,6 +18,11 @@ export enum ProductType {
   COMBO = 'combo',
 }
 
+export enum SellingType {
+  PORTION = 'portion', // Bán theo phần
+  WEIGHT = 'weight',   // Bán theo ký
+}
+
 @Entity('products')
 @Index(['tenantId', 'brandId'])
 export class Product {
@@ -62,6 +67,37 @@ export class Product {
 
   @Column({ name: 'image_url', nullable: true })
   imageUrl: string;
+
+  // Thời gian chế biến (phút)
+  @Column({ name: 'preparation_time', type: 'int', default: 0 })
+  preparationTime: number;
+
+  // Giá vốn
+  @Column({ name: 'cost_price', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  costPrice: number;
+
+  // Loại bán (theo phần hoặc theo ký)
+  @Column({
+    name: 'selling_type',
+    type: 'enum',
+    enum: SellingType,
+    default: SellingType.PORTION,
+  })
+  sellingType: SellingType;
+
+  // Đơn vị tính
+  @Column({ nullable: true })
+  unit: string;
+
+  // Setup in ấn
+  @Column({ name: 'print_dish', default: true })
+  printDish: boolean;
+
+  @Column({ name: 'print_label', default: false })
+  printLabel: boolean;
+
+  @Column({ name: 'print_seafood', default: false })
+  printSeafood: boolean;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

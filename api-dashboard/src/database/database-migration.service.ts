@@ -92,7 +92,91 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Tables table created successfully');
       }
 
-      // 5. Check if topping_groups table exists
+      // 5. Create selling_type enum if not exists
+      this.logger.log('Creating selling_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE selling_type AS ENUM ('portion', 'weight');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 6. Add new columns to products table
+      const hasPreparationTime = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'products' AND column_name = 'preparation_time'
+        );
+      `);
+
+      if (!hasPreparationTime[0].exists) {
+        this.logger.log('Adding new columns to products table...');
+        await queryRunner.query(`
+          ALTER TABLE products
+          ADD COLUMN IF NOT EXISTS preparation_time INTEGER DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS cost_price DECIMAL(15,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS selling_type selling_type DEFAULT 'portion',
+          ADD COLUMN IF NOT EXISTS unit VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS print_dish BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS print_label BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS print_seafood BOOLEAN DEFAULT FALSE
+        `);
+        this.logger.log('New columns added to products table');
+      }
+
+      // 7. Check if product_notes table exists
+      const productNotesExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'product_notes'
+        );
+      `);
+
+      if (!productNotesExists[0].exists) {
+        this.logger.log('Creating product_notes table...');
+        await queryRunner.query(`
+          CREATE TABLE product_notes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_product_notes_tenant ON product_notes(tenant_id);
+        `);
+        this.logger.log('Product notes table created successfully');
+      }
+
+      // 8. Check if product_note_assignments table exists
+      const noteAssignmentsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'product_note_assignments'
+        );
+      `);
+
+      if (!noteAssignmentsExists[0].exists) {
+        this.logger.log('Creating product_note_assignments table...');
+        await queryRunner.query(`
+          CREATE TABLE product_note_assignments (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            note_id UUID NOT NULL REFERENCES product_notes(id) ON DELETE CASCADE,
+            sort_order INTEGER DEFAULT 0,
+            UNIQUE(product_id, note_id)
+          );
+          CREATE INDEX idx_product_note_assignments_tenant ON product_note_assignments(tenant_id);
+          CREATE INDEX idx_product_note_assignments_product ON product_note_assignments(tenant_id, product_id);
+        `);
+        this.logger.log('Product note assignments table created successfully');
+      }
+
+      // 9. Check if topping_groups table exists
       const toppingGroupsExists = await queryRunner.query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables

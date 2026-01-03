@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsNumber, IsEnum, MaxLength, Min } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsNumber, IsEnum, MaxLength, Min, IsBoolean, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum ProductType {
@@ -7,6 +7,11 @@ export enum ProductType {
   OTHER = 'other',
   TOPPING = 'topping',
   COMBO = 'combo',
+}
+
+export enum SellingType {
+  PORTION = 'portion',
+  WEIGHT = 'weight',
 }
 
 export class CreateProductDto {
@@ -47,4 +52,47 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @ApiPropertyOptional({ example: 15, description: 'Thời gian chế biến (phút)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  preparationTime?: number;
+
+  @ApiPropertyOptional({ example: 30000, description: 'Giá vốn' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costPrice?: number;
+
+  @ApiPropertyOptional({ enum: SellingType, default: SellingType.PORTION, description: 'Loại bán (theo phần/theo ký)' })
+  @IsOptional()
+  @IsEnum(SellingType)
+  sellingType?: SellingType;
+
+  @ApiPropertyOptional({ example: 'phần', description: 'Đơn vị tính' })
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @ApiPropertyOptional({ default: true, description: 'Cho phép in món' })
+  @IsOptional()
+  @IsBoolean()
+  printDish?: boolean;
+
+  @ApiPropertyOptional({ default: false, description: 'Cho phép in tem' })
+  @IsOptional()
+  @IsBoolean()
+  printLabel?: boolean;
+
+  @ApiPropertyOptional({ default: false, description: 'Cho phép in hồ hải sản' })
+  @IsOptional()
+  @IsBoolean()
+  printSeafood?: boolean;
+
+  @ApiPropertyOptional({ description: 'Danh sách ID ghi chú được gán' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  noteIds?: string[];
 }
