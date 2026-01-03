@@ -7,6 +7,8 @@ import { ProductsModule } from './modules/products/products.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
+import { BrandsModule } from './modules/brands/brands.module';
+import { BranchesModule } from './modules/branches/branches.module';
 import {
   Company,
   Brand,
@@ -68,6 +70,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     KitchenModule,
     DepartmentsModule,
     DashboardModule,
+    BrandsModule,
+    BranchesModule,
   ],
 })
 export class AppModule {}
