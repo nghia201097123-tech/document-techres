@@ -1,18 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, Loader2, Cherry, X, Trash2, ChevronDown, ChevronRight, UtensilsCrossed, Pencil } from "lucide-react";
+import { Plus, Search, Loader2, Cherry, X, Trash2, ChevronDown, ChevronRight, UtensilsCrossed, Pencil, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, ProductType, type ToppingGroup } from "@/services/product-service";
 
@@ -30,17 +25,15 @@ export default function ToppingOptionsPage() {
   const { toast } = useToast();
 
   // State
-  const [products, setProducts] = React.useState<Product[]>([]);
+  const [toppingGroups, setToppingGroups] = React.useState<ToppingGroup[]>([]);
   const [availableToppings, setAvailableToppings] = React.useState<Product[]>([]);
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
-  const [typeFilter, setTypeFilter] = React.useState("all");
 
-  // Selected product for management
-  const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
-  const [toppingGroups, setToppingGroups] = React.useState<ToppingGroup[]>([]);
-  const [loadingGroups, setLoadingGroups] = React.useState(false);
-  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
+  // Selected group for management
+  const [selectedGroup, setSelectedGroup] = React.useState<ToppingGroup | null>(null);
+  const [expandedItems, setExpandedItems] = React.useState(true);
   const [savingGroups, setSavingGroups] = React.useState(false);
 
   // New group form
@@ -51,7 +44,7 @@ export default function ToppingOptionsPage() {
   const [newGroupMaxSelection, setNewGroupMaxSelection] = React.useState(1);
 
   // Adding topping to group
-  const [addingToGroupId, setAddingToGroupId] = React.useState<string | null>(null);
+  const [showAddToppingDialog, setShowAddToppingDialog] = React.useState(false);
 
   // Edit group dialog
   const [editingGroup, setEditingGroup] = React.useState<ToppingGroup | null>(null);
@@ -60,73 +53,62 @@ export default function ToppingOptionsPage() {
   const [editGroupMinSelection, setEditGroupMinSelection] = React.useState(0);
   const [editGroupMaxSelection, setEditGroupMaxSelection] = React.useState(1);
 
-  // Load products
-  const loadProducts = React.useCallback(async () => {
+  // Assign to product dialog
+  const [showAssignDialog, setShowAssignDialog] = React.useState(false);
+  const [selectedProductForAssign, setSelectedProductForAssign] = React.useState<Product | null>(null);
+  const [assignedGroupIds, setAssignedGroupIds] = React.useState<string[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = React.useState(false);
+
+  // Load data
+  const loadData = React.useCallback(async () => {
     try {
       setLoading(true);
-      const [allProducts, toppings] = await Promise.all([
-        productService.getAll(),
+      const [groups, toppings, allProducts] = await Promise.all([
+        productService.getAllToppingGroups(),
         productService.getAvailableToppings(),
+        productService.getAll(),
       ]);
-      // Filter out topping type products for the main list
-      setProducts(allProducts.filter(p => p.type !== ProductType.TOPPING));
+      setToppingGroups(groups);
       setAvailableToppings(toppings);
+      // Filter out topping type products
+      setProducts(allProducts.filter(p => p.type !== ProductType.TOPPING));
     } catch (error) {
-      console.error("Error loading products:", error);
-      toast({ title: "Lỗi", description: "Không thể tải danh sách món", variant: "destructive" });
+      console.error("Error loading data:", error);
+      toast({ title: "Lỗi", description: "Không thể tải dữ liệu", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   React.useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+    loadData();
+  }, [loadData]);
 
-  // Load topping groups for selected product
-  const loadToppingGroups = async (productId: string) => {
-    setLoadingGroups(true);
-    try {
-      const groups = await productService.getToppingGroups(productId);
-      setToppingGroups(groups);
-      setExpandedGroups(new Set(groups.map(g => g.id)));
-    } catch (error) {
-      console.error("Error loading topping groups:", error);
-      toast({ title: "Lỗi", description: "Không thể tải nhóm topping", variant: "destructive" });
-    } finally {
-      setLoadingGroups(false);
-    }
-  };
-
-  // Select a product
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
-    loadToppingGroups(product.id);
+  // Select a group
+  const handleSelectGroup = (group: ToppingGroup) => {
+    setSelectedGroup(group);
     setShowNewGroupForm(false);
-    setAddingToGroupId(null);
   };
 
   // Create topping group
   const handleCreateGroup = async () => {
-    if (!newGroupName.trim() || !selectedProduct) return;
+    if (!newGroupName.trim()) return;
     setSavingGroups(true);
     try {
-      const result = await productService.createToppingGroup(selectedProduct.id, {
+      const newGroup = await productService.createToppingGroup({
         name: newGroupName.trim(),
         isRequired: newGroupRequired,
         minSelection: newGroupMinSelection,
         maxSelection: newGroupMaxSelection,
       });
-      setToppingGroups(result);
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(newGroup);
       setNewGroupName("");
       setNewGroupRequired(false);
       setNewGroupMinSelection(0);
       setNewGroupMaxSelection(1);
       setShowNewGroupForm(false);
-      const newGroup = result.find(g => g.name === newGroupName.trim());
-      if (newGroup) {
-        setExpandedGroups(prev => new Set([...prev, newGroup.id]));
-      }
       toast({ title: "Thành công", description: `Đã tạo nhóm "${newGroupName}"` });
     } catch (error: any) {
       console.error("Error creating group:", error);
@@ -137,27 +119,30 @@ export default function ToppingOptionsPage() {
   };
 
   // Open edit group dialog
-  const handleOpenEditGroup = (group: ToppingGroup, e: React.MouseEvent) => {
+  const handleOpenEditGroup = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingGroup(group);
-    setEditGroupName(group.name);
-    setEditGroupRequired(group.isRequired);
-    setEditGroupMinSelection(group.minSelection);
-    setEditGroupMaxSelection(group.maxSelection);
+    if (!selectedGroup) return;
+    setEditingGroup(selectedGroup);
+    setEditGroupName(selectedGroup.name);
+    setEditGroupRequired(selectedGroup.isRequired);
+    setEditGroupMinSelection(selectedGroup.minSelection);
+    setEditGroupMaxSelection(selectedGroup.maxSelection);
   };
 
   // Update topping group
   const handleUpdateGroup = async () => {
-    if (!editingGroup || !selectedProduct) return;
+    if (!editingGroup) return;
     setSavingGroups(true);
     try {
-      const result = await productService.updateToppingGroup(selectedProduct.id, editingGroup.id, {
+      const updated = await productService.updateToppingGroup(editingGroup.id, {
         name: editGroupName.trim(),
         isRequired: editGroupRequired,
         minSelection: editGroupMinSelection,
         maxSelection: editGroupMaxSelection,
       });
-      setToppingGroups(result);
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(updated);
       setEditingGroup(null);
       toast({ title: "Thành công", description: "Đã cập nhật nhóm topping" });
     } catch (error: any) {
@@ -169,14 +154,15 @@ export default function ToppingOptionsPage() {
   };
 
   // Delete topping group
-  const handleDeleteGroup = async (groupId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!selectedProduct) return;
-    if (!confirm("Bạn có chắc muốn xóa nhóm này?")) return;
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup) return;
+    if (!confirm("Bạn có chắc muốn xóa nhóm này? Nhóm sẽ bị xóa khỏi tất cả các món đã gán.")) return;
     setSavingGroups(true);
     try {
-      const result = await productService.deleteToppingGroup(selectedProduct.id, groupId);
-      setToppingGroups(result);
+      await productService.deleteToppingGroup(selectedGroup.id);
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(null);
       toast({ title: "Thành công", description: "Đã xóa nhóm topping" });
     } catch (error: any) {
       console.error("Error deleting group:", error);
@@ -186,18 +172,38 @@ export default function ToppingOptionsPage() {
     }
   };
 
-  // Add topping to group
-  const handleAddToppingToGroup = async (groupId: string, toppingId: string) => {
-    if (!selectedProduct) return;
+  // Toggle group active
+  const handleToggleActive = async () => {
+    if (!selectedGroup) return;
     setSavingGroups(true);
     try {
-      const result = await productService.addToppingItem(selectedProduct.id, groupId, {
+      const updated = await productService.toggleToppingGroupActive(selectedGroup.id);
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(updated);
+      toast({ title: "Thành công", description: updated.isActive ? "Đã kích hoạt nhóm" : "Đã tạm ngưng nhóm" });
+    } catch (error: any) {
+      console.error("Error toggling group:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  // Add topping to group
+  const handleAddToppingToGroup = async (toppingId: string) => {
+    if (!selectedGroup) return;
+    setSavingGroups(true);
+    try {
+      const updated = await productService.addToppingItem(selectedGroup.id, {
         toppingId,
         priceAdjustment: 0,
         maxQuantity: 5,
       });
-      setToppingGroups(result);
-      setAddingToGroupId(null);
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(updated);
+      setShowAddToppingDialog(false);
       const topping = availableToppings.find(t => t.id === toppingId);
       toast({ title: "Thành công", description: `Đã thêm "${topping?.name}" vào nhóm` });
     } catch (error: any) {
@@ -209,12 +215,14 @@ export default function ToppingOptionsPage() {
   };
 
   // Remove topping from group
-  const handleRemoveToppingFromGroup = async (groupId: string, itemId: string) => {
-    if (!selectedProduct) return;
+  const handleRemoveToppingFromGroup = async (itemId: string) => {
+    if (!selectedGroup) return;
     setSavingGroups(true);
     try {
-      const result = await productService.removeToppingItem(selectedProduct.id, groupId, itemId);
-      setToppingGroups(result);
+      const updated = await productService.removeToppingItem(selectedGroup.id, itemId);
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(updated);
       toast({ title: "Thành công", description: "Đã xóa topping khỏi nhóm" });
     } catch (error: any) {
       console.error("Error removing topping:", error);
@@ -224,24 +232,43 @@ export default function ToppingOptionsPage() {
     }
   };
 
-  // Toggle group expansion
-  const toggleGroupExpanded = (groupId: string) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
-      }
-      return next;
-    });
+  // Open assign to product dialog
+  const handleOpenAssignDialog = async (product: Product) => {
+    setSelectedProductForAssign(product);
+    setLoadingAssignments(true);
+    try {
+      const groups = await productService.getProductToppingGroups(product.id);
+      setAssignedGroupIds(groups.map(g => g.id));
+    } catch (error) {
+      console.error("Error loading assignments:", error);
+      setAssignedGroupIds([]);
+    } finally {
+      setLoadingAssignments(false);
+    }
+    setShowAssignDialog(true);
   };
 
-  // Get toppings not in a specific group
-  const getAvailableToppingsForGroup = (groupId: string) => {
-    const group = toppingGroups.find(g => g.id === groupId);
-    if (!group) return availableToppings;
-    const usedIds = new Set(group.items.map(i => i.toppingId));
+  // Save assignments
+  const handleSaveAssignments = async () => {
+    if (!selectedProductForAssign) return;
+    setSavingGroups(true);
+    try {
+      await productService.assignToppingGroupsToProduct(selectedProductForAssign.id, assignedGroupIds);
+      setShowAssignDialog(false);
+      setSelectedProductForAssign(null);
+      toast({ title: "Thành công", description: "Đã cập nhật nhóm topping cho món" });
+    } catch (error: any) {
+      console.error("Error saving assignments:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  // Get toppings not in selected group
+  const getAvailableToppingsForGroup = () => {
+    if (!selectedGroup) return availableToppings;
+    const usedIds = new Set(selectedGroup.items.map(i => i.toppingId));
     return availableToppings.filter(t => !usedIds.has(t.id));
   };
 
@@ -253,344 +280,351 @@ export default function ToppingOptionsPage() {
     }).format(value);
   };
 
-  // Filter products
-  const filteredProducts = products.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.code?.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === "all" || p.type === typeFilter;
-    return matchSearch && matchType;
-  });
+  // Filter groups
+  const filteredGroups = toppingGroups.filter(g =>
+    g.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Quản lý Topping Options</h1>
-        <p className="text-muted-foreground">Gán nhóm topping và các lựa chọn cho món ăn</p>
+        <p className="text-muted-foreground">Tạo nhóm topping dùng chung và gán vào các món ăn</p>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left panel - Product list */}
-        <div className="col-span-5">
-          <Card className="h-[calc(100vh-200px)]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Danh sách món</CardTitle>
-              <CardDescription>Chọn món để quản lý topping</CardDescription>
-              <div className="flex gap-2 mt-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm kiếm..."
-                    className="pl-10"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Loại" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="food">Đồ ăn</SelectItem>
-                    <SelectItem value="drink">Đồ uống</SelectItem>
-                    <SelectItem value="other">Khác</SelectItem>
-                    <SelectItem value="combo">Combo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+      <Tabs defaultValue="groups" className="w-full">
+        <TabsList>
+          <TabsTrigger value="groups">Nhóm Topping</TabsTrigger>
+          <TabsTrigger value="assign">Gán vào món</TabsTrigger>
+        </TabsList>
+
+        {/* Tab: Topping Groups */}
+        <TabsContent value="groups" className="mt-4">
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left panel - Group list */}
+            <div className="col-span-4">
+              <Card className="h-[calc(100vh-280px)]">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Nhóm Topping</CardTitle>
+                    <Button size="sm" onClick={() => setShowNewGroupForm(true)} disabled={showNewGroupForm}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="relative mt-2">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Tìm kiếm..."
+                      className="pl-10"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="overflow-y-auto h-[calc(100%-140px)]">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {/* New group form */}
+                      {showNewGroupForm && (
+                        <div className="p-3 border rounded-lg bg-muted/50 mb-3">
+                          <div className="space-y-3">
+                            <Input
+                              placeholder="Tên nhóm (VD: Size, Topping)"
+                              value={newGroupName}
+                              onChange={(e) => setNewGroupName(e.target.value)}
+                              autoFocus
+                            />
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={newGroupRequired}
+                                onCheckedChange={setNewGroupRequired}
+                              />
+                              <Label className="text-sm">Bắt buộc</Label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs">Min</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={newGroupMinSelection}
+                                  onChange={(e) => setNewGroupMinSelection(Number(e.target.value))}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Max</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={newGroupMaxSelection}
+                                  onChange={(e) => setNewGroupMaxSelection(Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={handleCreateGroup}
+                                disabled={!newGroupName.trim() || savingGroups}
+                              >
+                                {savingGroups ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tạo"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setShowNewGroupForm(false);
+                                  setNewGroupName("");
+                                }}
+                              >
+                                Hủy
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {filteredGroups.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <Cherry className="h-10 w-10 text-muted-foreground mb-4" />
+                          <p className="text-muted-foreground">Chưa có nhóm topping</p>
+                        </div>
+                      ) : (
+                        filteredGroups.map((group) => (
+                          <div
+                            key={group.id}
+                            className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                              selectedGroup?.id === group.id
+                                ? "bg-primary text-primary-foreground"
+                                : "hover:bg-muted"
+                            }`}
+                            onClick={() => handleSelectGroup(group)}
+                          >
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {group.name}
+                                {!group.isActive && (
+                                  <Badge variant="secondary" className="text-xs">Tạm ngưng</Badge>
+                                )}
+                              </div>
+                              <div className={`text-xs ${selectedGroup?.id === group.id ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                                {group.items.length} topping • {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right panel - Group details */}
+            <div className="col-span-8">
+              <Card className="h-[calc(100vh-280px)]">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">
+                        {selectedGroup ? selectedGroup.name : "Chi tiết nhóm"}
+                      </CardTitle>
+                      <CardDescription>
+                        {selectedGroup
+                          ? `${selectedGroup.isRequired ? "Bắt buộc" : "Tùy chọn"} • Chọn ${selectedGroup.minSelection}-${selectedGroup.maxSelection}`
+                          : "Chọn một nhóm từ danh sách bên trái"}
+                      </CardDescription>
+                    </div>
+                    {selectedGroup && (
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={handleToggleActive} disabled={savingGroups}>
+                          {selectedGroup.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleOpenEditGroup} disabled={savingGroups}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleDeleteGroup} disabled={savingGroups}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="overflow-y-auto h-[calc(100%-100px)]">
+                  {!selectedGroup ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <Cherry className="h-16 w-16 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">Chọn một nhóm để xem chi tiết</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Topping items */}
+                      <div className="border rounded-lg">
+                        <div
+                          className="flex items-center justify-between p-3 bg-muted/30 cursor-pointer"
+                          onClick={() => setExpandedItems(!expandedItems)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {expandedItems ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <span className="font-medium">Danh sách Topping</span>
+                            <Badge variant="secondary">{selectedGroup.items.length}</Badge>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowAddToppingDialog(true);
+                            }}
+                            disabled={getAvailableToppingsForGroup().length === 0}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Thêm
+                          </Button>
+                        </div>
+
+                        {expandedItems && (
+                          <div className="p-3 space-y-2 border-t">
+                            {selectedGroup.items.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                Chưa có topping nào trong nhóm
+                              </p>
+                            ) : (
+                              selectedGroup.items.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center justify-between p-3 rounded bg-muted/20"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Cherry className="h-5 w-5 text-purple-500" />
+                                    <div>
+                                      <div className="font-medium">{item.topping.name}</div>
+                                      <div className="text-xs text-muted-foreground">{item.topping.code}</div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                      <div className="text-sm font-medium text-green-600">
+                                        {item.priceAdjustment > 0 ? "+" : ""}{formatCurrency(item.priceAdjustment || item.topping.price)}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Tối đa: {item.maxQuantity}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => handleRemoveToppingFromGroup(item.id)}
+                                      disabled={savingGroups}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {availableToppings.length === 0 && (
+                        <div className="p-4 border rounded-lg bg-yellow-50 text-yellow-800 text-sm">
+                          Chưa có sản phẩm loại "Topping". Hãy tạo sản phẩm loại Topping trong mục Món ăn.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Tab: Assign to Products */}
+        <TabsContent value="assign" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gán nhóm Topping vào món</CardTitle>
+              <CardDescription>Chọn món để gán các nhóm topping</CardDescription>
             </CardHeader>
-            <CardContent className="overflow-y-auto h-[calc(100%-140px)]">
+            <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center py-10">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : products.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Không tìm thấy món ăn</p>
+                  <p className="text-muted-foreground">Chưa có món ăn nào</p>
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {filteredProducts.map((product) => (
+                <div className="grid grid-cols-3 gap-4">
+                  {products.map((product) => (
                     <div
                       key={product.id}
-                      className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                        selectedProduct?.id === product.id
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-muted"
-                      }`}
-                      onClick={() => handleSelectProduct(product)}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                      onClick={() => handleOpenAssignDialog(product)}
                     >
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className={`text-xs ${selectedProduct?.id === product.id ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                          {product.code}
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <UtensilsCrossed className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-xs text-muted-foreground">{product.code}</div>
                         </div>
                       </div>
-                      <Badge variant={selectedProduct?.id === product.id ? "secondary" : "outline"} className="text-xs">
-                        {product.type === "food" ? "Đồ ăn" :
-                         product.type === "drink" ? "Đồ uống" :
-                         product.type === "combo" ? "Combo" : "Khác"}
-                      </Badge>
+                      <Button variant="ghost" size="sm">
+                        <Package className="h-4 w-4 mr-1" />
+                        Gán
+                      </Button>
                     </div>
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
-        </div>
+        </TabsContent>
+      </Tabs>
 
-        {/* Right panel - Topping groups */}
-        <div className="col-span-7">
-          <Card className="h-[calc(100vh-200px)]">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">
-                    {selectedProduct ? `Topping - ${selectedProduct.name}` : "Chọn món để quản lý"}
-                  </CardTitle>
-                  <CardDescription>
-                    {selectedProduct ? "Quản lý nhóm topping và lựa chọn" : "Chọn một món ăn từ danh sách bên trái"}
-                  </CardDescription>
+      {/* Add Topping Dialog */}
+      <Dialog open={showAddToppingDialog} onOpenChange={setShowAddToppingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Thêm Topping vào nhóm</DialogTitle>
+            <DialogDescription>
+              Chọn topping để thêm vào nhóm "{selectedGroup?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto space-y-2 py-4">
+            {getAvailableToppingsForGroup().map((topping) => (
+              <div
+                key={topping.id}
+                className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-muted"
+                onClick={() => handleAddToppingToGroup(topping.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <Cherry className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <div className="font-medium">{topping.name}</div>
+                    <div className="text-xs text-muted-foreground">{topping.code}</div>
+                  </div>
                 </div>
-                {selectedProduct && (
-                  <Button onClick={() => setShowNewGroupForm(true)} disabled={showNewGroupForm}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Thêm nhóm
-                  </Button>
-                )}
+                <span className="text-sm text-green-600">{formatCurrency(topping.price)}</span>
               </div>
-            </CardHeader>
-            <CardContent className="overflow-y-auto h-[calc(100%-100px)]">
-              {!selectedProduct ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <Cherry className="h-16 w-16 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Chọn một món ăn để bắt đầu quản lý topping</p>
-                </div>
-              ) : loadingGroups ? (
-                <div className="flex items-center justify-center py-10">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* New group form */}
-                  {showNewGroupForm && (
-                    <div className="p-4 border rounded-lg bg-muted/50">
-                      <Label className="text-sm font-medium">Tạo nhóm mới</Label>
-                      <div className="space-y-3 mt-2">
-                        <Input
-                          placeholder="Tên nhóm (VD: Size, Topping, Độ ngọt)"
-                          value={newGroupName}
-                          onChange={(e) => setNewGroupName(e.target.value)}
-                        />
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={newGroupRequired}
-                              onCheckedChange={setNewGroupRequired}
-                            />
-                            <Label className="text-sm">Bắt buộc</Label>
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Tối thiểu</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={newGroupMinSelection}
-                              onChange={(e) => setNewGroupMinSelection(Number(e.target.value))}
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Tối đa</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={newGroupMaxSelection}
-                              onChange={(e) => setNewGroupMaxSelection(Number(e.target.value))}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleCreateGroup}
-                            disabled={!newGroupName.trim() || savingGroups}
-                          >
-                            {savingGroups ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                            Tạo nhóm
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setShowNewGroupForm(false);
-                              setNewGroupName("");
-                              setNewGroupRequired(false);
-                              setNewGroupMinSelection(0);
-                              setNewGroupMaxSelection(1);
-                            }}
-                          >
-                            Hủy
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Existing groups */}
-                  {toppingGroups.length === 0 && !showNewGroupForm ? (
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <Cherry className="h-10 w-10 text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">Chưa có nhóm topping nào</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Nhấn "Thêm nhóm" để bắt đầu
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {toppingGroups.map((group) => (
-                        <div key={group.id} className="border rounded-lg overflow-hidden">
-                          {/* Group header */}
-                          <div
-                            className="flex items-center justify-between p-3 bg-muted/30 cursor-pointer hover:bg-muted/50"
-                            onClick={() => toggleGroupExpanded(group.id)}
-                          >
-                            <div className="flex items-center gap-2">
-                              {expandedGroups.has(group.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                              <span className="font-medium">{group.name}</span>
-                              <Badge variant={group.isRequired ? "default" : "secondary"} className="text-xs">
-                                {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                Chọn: {group.minSelection} - {group.maxSelection}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                • {group.items.length} item
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => handleOpenEditGroup(group, e)}
-                                disabled={savingGroups}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => handleDeleteGroup(group.id, e)}
-                                disabled={savingGroups}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Group items */}
-                          {expandedGroups.has(group.id) && (
-                            <div className="p-3 space-y-2 border-t">
-                              {group.items.length === 0 ? (
-                                <p className="text-sm text-muted-foreground text-center py-2">
-                                  Chưa có topping nào trong nhóm
-                                </p>
-                              ) : (
-                                group.items.map((item) => (
-                                  <div
-                                    key={item.id}
-                                    className="flex items-center justify-between p-2 rounded bg-muted/20"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Cherry className="h-4 w-4 text-purple-500" />
-                                      <span>{item.topping.name}</span>
-                                      <span className="text-xs font-mono text-muted-foreground">
-                                        {item.topping.code}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm text-green-600">
-                                        {item.priceAdjustment > 0 && "+"}
-                                        {formatCurrency(item.priceAdjustment > 0 ? item.priceAdjustment : item.topping.price)}
-                                      </span>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => handleRemoveToppingFromGroup(group.id, item.id)}
-                                        disabled={savingGroups}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-
-                              {/* Add topping to group */}
-                              {addingToGroupId === group.id ? (
-                                <div className="p-2 border rounded bg-background">
-                                  <Label className="text-xs">Chọn topping để thêm</Label>
-                                  <div className="grid gap-1 mt-1 max-h-40 overflow-y-auto">
-                                    {getAvailableToppingsForGroup(group.id).map((topping) => (
-                                      <div
-                                        key={topping.id}
-                                        className="flex items-center justify-between p-2 rounded cursor-pointer hover:bg-muted"
-                                        onClick={() => handleAddToppingToGroup(group.id, topping.id)}
-                                      >
-                                        <span className="text-sm">{topping.name}</span>
-                                        <span className="text-sm text-green-600">{formatCurrency(topping.price)}</span>
-                                      </div>
-                                    ))}
-                                    {getAvailableToppingsForGroup(group.id).length === 0 && (
-                                      <p className="text-xs text-muted-foreground p-2">
-                                        Không còn topping nào để thêm
-                                      </p>
-                                    )}
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full mt-2"
-                                    onClick={() => setAddingToGroupId(null)}
-                                  >
-                                    Hủy
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full"
-                                  onClick={() => setAddingToGroupId(group.id)}
-                                  disabled={availableToppings.length === 0}
-                                >
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Thêm topping
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {availableToppings.length === 0 && (
-                    <div className="p-4 border rounded-lg bg-yellow-50 text-yellow-800 text-sm">
-                      Chưa có sản phẩm loại "Topping" nào. Hãy tạo sản phẩm loại Topping trước trong mục Món ăn.
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            ))}
+            {getAvailableToppingsForGroup().length === 0 && (
+              <p className="text-center text-muted-foreground py-4">
+                Không còn topping nào để thêm
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Group Dialog */}
       <Dialog open={!!editingGroup} onOpenChange={() => setEditingGroup(null)}>
@@ -644,6 +678,67 @@ export default function ToppingOptionsPage() {
             <Button onClick={handleUpdateGroup} disabled={savingGroups || !editGroupName.trim()}>
               {savingGroups && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign to Product Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Gán nhóm Topping</DialogTitle>
+            <DialogDescription>
+              Chọn các nhóm topping để gán cho "{selectedProductForAssign?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {loadingAssignments ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : toppingGroups.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                Chưa có nhóm topping nào. Hãy tạo nhóm trong tab "Nhóm Topping".
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {toppingGroups.filter(g => g.isActive).map((group) => (
+                  <div
+                    key={group.id}
+                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50"
+                  >
+                    <Checkbox
+                      checked={assignedGroupIds.includes(group.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setAssignedGroupIds([...assignedGroupIds, group.id]);
+                        } else {
+                          setAssignedGroupIds(assignedGroupIds.filter(id => id !== group.id));
+                        }
+                      }}
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{group.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {group.items.length} topping • {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
+                      </div>
+                    </div>
+                    {assignedGroupIds.includes(group.id) && (
+                      <Check className="h-4 w-4 text-green-600" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleSaveAssignments} disabled={savingGroups}>
+              {savingGroups && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Lưu ({assignedGroupIds.length} nhóm)
             </Button>
           </DialogFooter>
         </DialogContent>

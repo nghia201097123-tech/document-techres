@@ -17,6 +17,8 @@ export * from './kitchen.entity';
 export * from './area.entity';
 export * from './table.entity';
 export * from './topping-group.entity';
+export * from './topping-group-item.entity';
+export * from './product-topping-group.entity';
 export * from './product-topping.entity';
 export * from './product-note.entity';
 export * from './product-note-assignment.entity';

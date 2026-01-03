@@ -100,3 +100,11 @@ export class UpdateToppingItemDto {
   @IsOptional()
   sortOrder?: number;
 }
+
+// DTO for assigning topping groups to a product
+export class AssignToppingGroupsDto {
+  @ApiProperty({ description: 'Danh sách ID nhóm topping cần gán', type: [String] })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  groupIds: string[];
+}

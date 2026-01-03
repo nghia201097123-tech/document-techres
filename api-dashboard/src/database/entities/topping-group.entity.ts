@@ -4,15 +4,12 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
-  OneToMany,
 } from 'typeorm';
-import { Product } from './product.entity';
 
+// Shared Topping Group - can be assigned to multiple products
 @Entity('topping_groups')
-@Index(['tenantId', 'productId'])
+@Index(['tenantId'])
 export class ToppingGroup {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -21,15 +18,11 @@ export class ToppingGroup {
   @Index()
   tenantId: string;
 
-  @Column({ name: 'product_id' })
-  productId: string;
-
-  @ManyToOne(() => Product, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'product_id' })
-  product: Product;
-
   @Column()
   name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
 
   @Column({ name: 'is_required', default: false })
   isRequired: boolean;
@@ -39,6 +32,9 @@ export class ToppingGroup {
 
   @Column({ name: 'max_selection', default: 10 })
   maxSelection: number;
+
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
 
   @Column({ name: 'sort_order', default: 0 })
   sortOrder: number;

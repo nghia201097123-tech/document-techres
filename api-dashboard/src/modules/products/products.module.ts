@@ -1,11 +1,27 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Product, ToppingGroup, ProductTopping, ProductNote, ProductNoteAssignment } from '../../database/entities';
+import {
+  Product,
+  ToppingGroup,
+  ToppingGroupItem,
+  ProductToppingGroup,
+  ProductNote,
+  ProductNoteAssignment,
+} from '../../database/entities';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, ToppingGroup, ProductTopping, ProductNote, ProductNoteAssignment])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Product,
+      ToppingGroup,
+      ToppingGroupItem,
+      ProductToppingGroup,
+      ProductNote,
+      ProductNoteAssignment,
+    ]),
+  ],
   controllers: [ProductsController],
   providers: [ProductsService],
   exports: [ProductsService],
