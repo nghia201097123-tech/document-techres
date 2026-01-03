@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,9 +39,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup } from "@/services/product-service";
+import { categoryService } from "@/services/category-service";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -103,6 +118,10 @@ export default function ProductsPage() {
   const [newGroupMaxSelection, setNewGroupMaxSelection] = React.useState(1);
   const [addingToGroupId, setAddingToGroupId] = React.useState<string | null>(null);
 
+  // Category combobox state
+  const [categoryComboboxOpen, setCategoryComboboxOpen] = React.useState(false);
+  const [categorySearchValue, setCategorySearchValue] = React.useState("");
+
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
     if (!formData.type) return categories.filter(c => c.isActive);
@@ -139,6 +158,7 @@ export default function ProductsPage() {
   const handleOpenCreate = () => {
     setSelectedProduct(null);
     setFormData(initialFormData);
+    setCategorySearchValue("");
     setDialogMode("create");
   };
 
@@ -167,6 +187,9 @@ export default function ProductsPage() {
       printLabel: product.printLabel ?? false,
       printSeafood: product.printSeafood ?? false,
     });
+    // Set category search value
+    const category = categories.find(c => c.id === product.categoryId);
+    setCategorySearchValue(category?.name || "");
     setDialogMode("edit");
   };
 
@@ -304,6 +327,36 @@ export default function ProductsPage() {
     return availableToppings.filter(t => !usedIds.has(t.id));
   };
 
+  // Get or create category by name
+  const getOrCreateCategory = async (categoryName: string, productType: ProductType): Promise<string> => {
+    // Check if category already exists (case-insensitive)
+    const existingCategory = categories.find(
+      c => c.name.toLowerCase() === categoryName.toLowerCase() && c.productType === productType
+    );
+    if (existingCategory) {
+      return existingCategory.id;
+    }
+
+    // Create new category
+    const newCategory = await categoryService.create({
+      name: categoryName,
+      productType: productType,
+    });
+    // Refresh categories
+    dispatch(fetchCategories());
+    toast({ title: "Thành công", description: `Đã tạo danh mục "${categoryName}"` });
+    return newCategory.id;
+  };
+
+  // Filter categories for combobox
+  const filteredCategories = availableCategories.filter(cat =>
+    cat.name.toLowerCase().includes(categorySearchValue.toLowerCase())
+  );
+
+  // Check if search value is a new category
+  const isNewCategory = categorySearchValue.trim() &&
+    !availableCategories.some(c => c.name.toLowerCase() === categorySearchValue.toLowerCase());
+
   // Handle form submit (create or update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,50 +366,49 @@ export default function ProductsPage() {
       return;
     }
 
-    // Prepare data with proper number types
-    const preparedData = {
-      name: formData.name,
-      type: formData.type,
-      price: Number(formData.price) || 0,
-      vatRate: parseFloat(String(formData.vatRate)) || 0,
-      categoryId: formData.categoryId || undefined,
-      description: formData.description || undefined,
-      imageUrl: formData.imageUrl || undefined,
-      preparationTime: Number(formData.preparationTime) || 0,
-      costPrice: Number(formData.costPrice) || 0,
-      sellingType: formData.sellingType,
-      unit: formData.unit || undefined,
-      printDish: formData.printDish ?? true,
-      printLabel: formData.printLabel ?? false,
-      printSeafood: formData.printSeafood ?? false,
-    };
+    try {
+      setSaving(true);
 
-    if (dialogMode === "create") {
-      try {
-        setSaving(true);
+      // Get or create category if needed
+      let categoryId = formData.categoryId;
+      if (!categoryId && categorySearchValue.trim()) {
+        categoryId = await getOrCreateCategory(categorySearchValue.trim(), formData.type);
+      }
+
+      // Prepare data with proper number types
+      const preparedData = {
+        name: formData.name,
+        type: formData.type,
+        price: Number(formData.price) || 0,
+        vatRate: parseFloat(String(formData.vatRate)) || 0,
+        categoryId: categoryId || undefined,
+        description: formData.description || undefined,
+        imageUrl: formData.imageUrl || undefined,
+        preparationTime: Number(formData.preparationTime) || 0,
+        costPrice: Number(formData.costPrice) || 0,
+        sellingType: formData.sellingType,
+        unit: formData.unit || undefined,
+        printDish: formData.printDish ?? true,
+        printLabel: formData.printLabel ?? false,
+        printSeafood: formData.printSeafood ?? false,
+      };
+
+      if (dialogMode === "create") {
         const result = await productService.create(preparedData);
         setProducts((prev) => [...prev, result]);
         toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });
         handleCloseDialog();
-      } catch (error: any) {
-        console.error("Error creating product:", error);
-        toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi tạo món ăn", variant: "destructive" });
-      } finally {
-        setSaving(false);
-      }
-    } else if (dialogMode === "edit" && selectedProduct) {
-      try {
-        setSaving(true);
+      } else if (dialogMode === "edit" && selectedProduct) {
         const result = await productService.update(selectedProduct.id, preparedData);
         setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? result : p)));
         toast({ title: "Thành công", description: "Đã cập nhật thông tin món ăn" });
         handleCloseDialog();
-      } catch (error: any) {
-        console.error("Error updating product:", error);
-        toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi cập nhật món ăn", variant: "destructive" });
-      } finally {
-        setSaving(false);
       }
+    } catch (error: any) {
+      console.error("Error saving product:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -380,6 +432,7 @@ export default function ProductsPage() {
     setDialogMode(null);
     setSelectedProduct(null);
     setFormData(initialFormData);
+    setCategorySearchValue("");
     setAvailableToppings([]);
     setToppingGroups([]);
     setExpandedGroups(new Set());
@@ -684,23 +737,90 @@ export default function ProductsPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="categoryId">Danh mục</Label>
-                  <Select
-                    value={formData.categoryId || ""}
-                    onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                    disabled={loadingCategories || availableCategories.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={availableCategories.length === 0 ? "Không có danh mục" : "Chọn danh mục"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Danh mục</Label>
+                  <Popover open={categoryComboboxOpen} onOpenChange={setCategoryComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={categoryComboboxOpen}
+                        className="w-full justify-between font-normal"
+                        disabled={loadingCategories}
+                      >
+                        {categorySearchValue || "Chọn hoặc nhập danh mục..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Tìm hoặc tạo danh mục..."
+                          value={categorySearchValue}
+                          onValueChange={(value) => {
+                            setCategorySearchValue(value);
+                            // Clear categoryId if user is typing a new value
+                            if (!availableCategories.some(c => c.name.toLowerCase() === value.toLowerCase())) {
+                              setFormData(prev => ({ ...prev, categoryId: "" }));
+                            }
+                          }}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            {categorySearchValue.trim() ? (
+                              <div className="py-2 px-4 text-sm">
+                                <span className="text-muted-foreground">Nhấn để tạo: </span>
+                                <span className="font-medium">&quot;{categorySearchValue}&quot;</span>
+                              </div>
+                            ) : (
+                              <div className="py-2 px-4 text-sm text-muted-foreground">
+                                Nhập tên danh mục để tìm hoặc tạo mới
+                              </div>
+                            )}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {/* Option to create new category if not exists */}
+                            {isNewCategory && (
+                              <CommandItem
+                                value={`create-${categorySearchValue}`}
+                                onSelect={() => {
+                                  setFormData(prev => ({ ...prev, categoryId: "" }));
+                                  setCategoryComboboxOpen(false);
+                                }}
+                                className="text-primary"
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Tạo mới: &quot;{categorySearchValue}&quot;
+                              </CommandItem>
+                            )}
+                            {filteredCategories.map((category) => (
+                              <CommandItem
+                                key={category.id}
+                                value={category.name}
+                                onSelect={() => {
+                                  setFormData(prev => ({ ...prev, categoryId: category.id }));
+                                  setCategorySearchValue(category.name);
+                                  setCategoryComboboxOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.categoryId === category.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {category.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {isNewCategory && (
+                    <p className="text-xs text-muted-foreground">
+                      Danh mục &quot;{categorySearchValue}&quot; sẽ được tạo tự động khi lưu
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -858,7 +978,7 @@ export default function ProductsPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={saving || !formData.name.trim() || formData.price <= 0}
+                disabled={saving || !formData.name.trim() || formData.price < 0}
               >
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {dialogMode === "create" ? "Tạo món ăn" : "Cập nhật"}
