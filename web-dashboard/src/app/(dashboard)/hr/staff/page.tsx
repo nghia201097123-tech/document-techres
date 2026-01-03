@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2 } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -30,7 +37,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { staffService, type Staff, type CreateStaffDto, type Gender } from "@/services/staff-service";
+import { useToast } from "@/hooks/use-toast";
+import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender } from "@/services/staff-service";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -55,8 +63,11 @@ const initialFormData: CreateStaffDto = {
   usernamePrefix: "tr",
 };
 
+type DialogMode = "create" | "edit" | "view" | null;
+
 export default function StaffPage() {
   const dispatch = useAppDispatch();
+  const { toast } = useToast();
 
   // Redux selectors
   const { items: brands, loading: loadingBrands } = useAppSelector((state) => state.brands);
@@ -68,9 +79,10 @@ export default function StaffPage() {
   const [search, setSearch] = React.useState("");
   const [staffList, setStaffList] = React.useState<Staff[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [formData, setFormData] = React.useState<CreateStaffDto>(initialFormData);
+  const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [createdStaff, setCreatedStaff] = React.useState<(Staff & { temporaryPassword: string }) | null>(null);
 
   // Derived state from Redux
@@ -86,10 +98,11 @@ export default function StaffPage() {
       setStaffList(data);
     } catch (error) {
       console.error("Error loading staff:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách nhân viên", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   React.useEffect(() => {
     loadStaff();
@@ -111,53 +124,122 @@ export default function StaffPage() {
 
   // Load dropdowns when dialog opens (using Redux - cached data)
   React.useEffect(() => {
-    if (dialogOpen) {
+    if (dialogMode === "create" || dialogMode === "edit") {
       dispatch(fetchDepartments());
       dispatch(fetchBrands());
       dispatch(fetchProvinces());
     }
-  }, [dialogOpen, dispatch]);
+  }, [dialogMode, dispatch]);
 
-  // Handle form submit
+  // Open create dialog
+  const handleOpenCreate = () => {
+    setSelectedStaff(null);
+    setFormData(initialFormData);
+    setCreatedStaff(null);
+    setDialogMode("create");
+  };
+
+  // Open view dialog
+  const handleOpenView = (staff: Staff) => {
+    setSelectedStaff(staff);
+    setDialogMode("view");
+  };
+
+  // Open edit dialog
+  const handleOpenEdit = (staff: Staff) => {
+    setSelectedStaff(staff);
+    setFormData({
+      name: staff.name,
+      email: staff.email || "",
+      phone: staff.phone || "",
+      birthDate: staff.birthDate || "",
+      gender: staff.gender || "male",
+      idNumber: staff.idNumber || "",
+      address: staff.address || "",
+      provinceCode: staff.provinceCode || "",
+      wardCode: staff.wardCode || "",
+      departmentId: staff.departmentId || "",
+      brandId: staff.brandId || "",
+      branchId: staff.branchId || "",
+      usernamePrefix: "tr",
+    });
+    setDialogMode("edit");
+  };
+
+  // Handle form submit (create or update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
-    if (!formData.name.trim() || !formData.birthDate || !formData.gender ||
-        !formData.address.trim() || !formData.departmentId ||
-        !formData.brandId || !formData.branchId) {
-      alert("Vui lòng điền đầy đủ các trường bắt buộc");
-      return;
-    }
+    if (dialogMode === "create") {
+      // Validate required fields for create
+      if (!formData.name.trim() || !formData.birthDate || !formData.gender ||
+          !formData.address.trim() || !formData.departmentId ||
+          !formData.brandId || !formData.branchId) {
+        toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ các trường bắt buộc", variant: "destructive" });
+        return;
+      }
 
-    try {
-      setSaving(true);
-      const result = await staffService.create(formData);
-      setCreatedStaff(result);
-      setStaffList((prev) => [...prev, result]);
-      setFormData(initialFormData);
-    } catch (error) {
-      console.error("Error creating staff:", error);
-      alert("Có lỗi xảy ra khi tạo nhân viên");
-    } finally {
-      setSaving(false);
+      try {
+        setSaving(true);
+        const result = await staffService.create(formData);
+        setCreatedStaff(result);
+        setStaffList((prev) => [...prev, result]);
+        toast({ title: "Thành công", description: "Đã tạo nhân viên mới" });
+      } catch (error: any) {
+        console.error("Error creating staff:", error);
+        toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi tạo nhân viên", variant: "destructive" });
+      } finally {
+        setSaving(false);
+      }
+    } else if (dialogMode === "edit" && selectedStaff) {
+      const updateData: UpdateStaffDto = {
+        name: formData.name,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        birthDate: formData.birthDate || undefined,
+        gender: formData.gender,
+        idNumber: formData.idNumber || undefined,
+        address: formData.address || undefined,
+        provinceCode: formData.provinceCode || undefined,
+        wardCode: formData.wardCode || undefined,
+        departmentId: formData.departmentId || undefined,
+      };
+
+      try {
+        setSaving(true);
+        const result = await staffService.update(selectedStaff.id, updateData);
+        setStaffList((prev) => prev.map((s) => (s.id === selectedStaff.id ? result : s)));
+        toast({ title: "Thành công", description: "Đã cập nhật thông tin nhân viên" });
+        handleCloseDialog();
+      } catch (error: any) {
+        console.error("Error updating staff:", error);
+        toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi cập nhật nhân viên", variant: "destructive" });
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
   // Handle toggle active
-  const handleToggleActive = async (id: string) => {
+  const handleToggleActive = async (staff: Staff) => {
     try {
-      const updated = await staffService.toggleActive(id);
-      setStaffList((prev) => prev.map((s) => (s.id === id ? updated : s)));
-    } catch (error) {
+      const updated = await staffService.toggleActive(staff.id);
+      setStaffList((prev) => prev.map((s) => (s.id === staff.id ? updated : s)));
+      toast({
+        title: "Thành công",
+        description: `Đã ${updated.isActive ? "kích hoạt" : "tạm ngưng"} nhân viên ${staff.name}`,
+      });
+    } catch (error: any) {
       console.error("Error toggling staff:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
     }
   };
 
   // Close dialog and reset
   const handleCloseDialog = () => {
-    setDialogOpen(false);
+    setDialogMode(null);
     setCreatedStaff(null);
+    setSelectedStaff(null);
     setFormData(initialFormData);
   };
 
@@ -169,6 +251,26 @@ export default function StaffPage() {
   // Handle brand change
   const handleBrandChange = (brandId: string) => {
     setFormData({ ...formData, brandId, branchId: "" });
+  };
+
+  // Format date for display
+  const formatDate = (date?: string) => {
+    if (!date) return "-";
+    return new Date(date).toLocaleDateString("vi-VN");
+  };
+
+  // Get gender label
+  const getGenderLabel = (gender?: string) => {
+    if (gender === "male") return "Nam";
+    if (gender === "female") return "Nữ";
+    return "-";
+  };
+
+  // Get department name from ID
+  const getDepartmentName = (departmentId?: string) => {
+    if (!departmentId) return "-";
+    const dept = departments.find(d => d.id === departmentId);
+    return dept?.name || "-";
   };
 
   // Filter staff by search
@@ -186,7 +288,7 @@ export default function StaffPage() {
           <h1 className="text-2xl font-bold">Quản lý nhân viên</h1>
           <p className="text-muted-foreground">Thêm, sửa và quản lý nhân viên trong chi nhánh</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={handleOpenCreate}>
           <UserPlus className="mr-2 h-4 w-4" />
           Thêm nhân viên
         </Button>
@@ -232,14 +334,14 @@ export default function StaffPage() {
                   <TableHead>Số điện thoại</TableHead>
                   <TableHead>Chi nhánh</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="w-[100px]">Thao tác</TableHead>
+                  <TableHead className="w-[80px]">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredStaff.map((staff) => (
                   <TableRow key={staff.id}>
                     <TableCell className="font-medium">{staff.name}</TableCell>
-                    <TableCell>{staff.username}</TableCell>
+                    <TableCell className="font-mono text-sm">{staff.username}</TableCell>
                     <TableCell>{staff.phone || "-"}</TableCell>
                     <TableCell>{staff.branchName || "-"}</TableCell>
                     <TableCell>
@@ -248,13 +350,28 @@ export default function StaffPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleActive(staff.id)}
-                      >
-                        {staff.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenView(staff)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Xem chi tiết
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenEdit(staff)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Chỉnh sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleToggleActive(staff)}>
+                            <Power className="mr-2 h-4 w-4" />
+                            {staff.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -264,13 +381,98 @@ export default function StaffPage() {
         </CardContent>
       </Card>
 
-      {/* Add Staff Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
+      {/* View Staff Dialog */}
+      <Dialog open={dialogMode === "view"} onOpenChange={() => handleCloseDialog()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Chi tiết nhân viên</DialogTitle>
+            <DialogDescription>Thông tin chi tiết của nhân viên</DialogDescription>
+          </DialogHeader>
+          {selectedStaff && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Tên nhân viên</Label>
+                  <p className="font-medium">{selectedStaff.name}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Username</Label>
+                  <p className="font-mono">{selectedStaff.username}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Ngày sinh</Label>
+                  <p>{formatDate(selectedStaff.birthDate)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Giới tính</Label>
+                  <p>{getGenderLabel(selectedStaff.gender)}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Số điện thoại</Label>
+                  <p>{selectedStaff.phone || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Email</Label>
+                  <p>{selectedStaff.email || "-"}</p>
+                </div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">CCCD</Label>
+                <p>{selectedStaff.idNumber || "-"}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Địa chỉ</Label>
+                <p>{selectedStaff.address || "-"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Chi nhánh</Label>
+                  <p>{selectedStaff.branchName || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Bộ phận</Label>
+                  <p>{selectedStaff.departmentName || getDepartmentName(selectedStaff.departmentId)}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Trạng thái</Label>
+                  <Badge variant={selectedStaff.isActive ? "default" : "secondary"}>
+                    {selectedStaff.isActive ? "Hoạt động" : "Tạm ngưng"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Ngày tạo</Label>
+                  <p>{formatDate(selectedStaff.createdAt)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleCloseDialog()}>
+              Đóng
+            </Button>
+            <Button onClick={() => selectedStaff && handleOpenEdit(selectedStaff)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Chỉnh sửa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Staff Dialog */}
+      <Dialog open={dialogMode === "create" || dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Thêm nhân viên mới</DialogTitle>
+            <DialogTitle>{dialogMode === "create" ? "Thêm nhân viên mới" : "Chỉnh sửa nhân viên"}</DialogTitle>
             <DialogDescription>
-              Nhập thông tin nhân viên. Hệ thống sẽ tự động tạo tài khoản và mật khẩu tạm thời.
+              {dialogMode === "create"
+                ? "Nhập thông tin nhân viên. Hệ thống sẽ tự động tạo tài khoản và mật khẩu tạm thời."
+                : "Cập nhật thông tin nhân viên"}
             </DialogDescription>
           </DialogHeader>
           {createdStaff ? (
@@ -311,21 +513,29 @@ export default function StaffPage() {
                       required
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="usernamePrefix">Mã đăng nhập</Label>
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        id="usernamePrefix"
-                        placeholder="tr"
-                        maxLength={2}
-                        className="w-20 text-center font-mono uppercase"
-                        value={formData.usernamePrefix}
-                        onChange={(e) => setFormData({ ...formData, usernamePrefix: e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2) })}
-                      />
-                      <span className="text-muted-foreground font-mono">000001</span>
-                      <span className="text-xs text-muted-foreground">(tự động)</span>
+                  {dialogMode === "create" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="usernamePrefix">Mã đăng nhập</Label>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          id="usernamePrefix"
+                          placeholder="tr"
+                          maxLength={2}
+                          className="w-20 text-center font-mono uppercase"
+                          value={formData.usernamePrefix}
+                          onChange={(e) => setFormData({ ...formData, usernamePrefix: e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2) })}
+                        />
+                        <span className="text-muted-foreground font-mono">000001</span>
+                        <span className="text-xs text-muted-foreground">(tự động)</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  {dialogMode === "edit" && selectedStaff && (
+                    <div className="grid gap-2">
+                      <Label>Username</Label>
+                      <Input value={selectedStaff.username} disabled className="font-mono" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 2: Birth Date and Gender */}
@@ -337,7 +547,7 @@ export default function StaffPage() {
                       type="date"
                       value={formData.birthDate}
                       onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                      required
+                      required={dialogMode === "create"}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -407,55 +617,57 @@ export default function StaffPage() {
                     placeholder="123 Nguyễn Văn Linh"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    required
+                    required={dialogMode === "create"}
                   />
                 </div>
 
-                {/* Row 5: Brand and Branch */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="brandId">Thương hiệu *</Label>
-                    <Select
-                      value={formData.brandId}
-                      onValueChange={handleBrandChange}
-                      disabled={loadingBrands}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn thương hiệu" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brands.map((brand) => (
-                          <SelectItem key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                {/* Row 5: Brand and Branch - only for create mode */}
+                {dialogMode === "create" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="brandId">Thương hiệu *</Label>
+                      <Select
+                        value={formData.brandId}
+                        onValueChange={handleBrandChange}
+                        disabled={loadingBrands}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn thương hiệu" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {brands.map((brand) => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              {brand.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="branchId">Chi nhánh *</Label>
+                      <Select
+                        value={formData.branchId}
+                        onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                        disabled={!formData.brandId || loadingBranches || branches.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn chi nhánh" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {branches.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="branchId">Chi nhánh *</Label>
-                    <Select
-                      value={formData.branchId}
-                      onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                      disabled={!formData.brandId || loadingBranches || branches.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn chi nhánh" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                )}
 
                 {/* Row 6: Department */}
                 <div className="grid gap-2">
-                  <Label htmlFor="departmentId">Bộ phận *</Label>
+                  <Label htmlFor="departmentId">Bộ phận {dialogMode === "create" ? "*" : ""}</Label>
                   <Select
                     value={formData.departmentId}
                     onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
@@ -514,10 +726,10 @@ export default function StaffPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={saving || !formData.name.trim() || !formData.birthDate || !formData.address.trim() || !formData.departmentId || !formData.brandId || !formData.branchId}
+                  disabled={saving || (dialogMode === "create" && (!formData.name.trim() || !formData.birthDate || !formData.address.trim() || !formData.departmentId || !formData.brandId || !formData.branchId))}
                 >
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Tạo nhân viên
+                  {dialogMode === "create" ? "Tạo nhân viên" : "Cập nhật"}
                 </Button>
               </DialogFooter>
             </form>
