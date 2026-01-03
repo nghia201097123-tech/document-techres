@@ -274,7 +274,37 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Product topping groups junction table created successfully');
       }
 
-      // 13. Check if units table exists
+      // 13. Check if kitchens table exists
+      const kitchensExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'kitchens'
+        );
+      `);
+
+      if (!kitchensExists[0].exists) {
+        this.logger.log('Creating kitchens table...');
+        await queryRunner.query(`
+          CREATE TABLE kitchens (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            printer_name VARCHAR(100),
+            printer_ip VARCHAR(50),
+            description TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_kitchens_tenant ON kitchens(tenant_id);
+          CREATE INDEX idx_kitchens_tenant_branch ON kitchens(tenant_id, branch_id);
+        `);
+        this.logger.log('Kitchens table created successfully');
+      }
+
+      // 15. Check if units table exists
       const unitsExists = await queryRunner.query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables
@@ -302,7 +332,7 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Units table created successfully');
       }
 
-      // 14. Check if product_kitchens table exists
+      // 16. Check if product_kitchens table exists
       const productKitchensExists = await queryRunner.query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables
