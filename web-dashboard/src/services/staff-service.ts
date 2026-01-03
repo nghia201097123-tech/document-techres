@@ -13,10 +13,13 @@ export interface Staff {
   idNumber?: string; // CCCD
   address?: string;
   provinceCode?: string;
+  provinceName?: string;
   wardCode?: string;
+  wardName?: string;
   departmentId?: string;
   departmentName?: string;
   brandId?: string;
+  brandName?: string;
   branchId?: string;
   branchName?: string;
   isActive: boolean;

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Staff } from '../../database/entities';
+import { Repository, In } from 'typeorm';
+import { Staff, Province, Ward, Department } from '../../database/entities';
 import { CreateStaffDto, UpdateStaffDto, BulkImportStaffDto, BulkImportResultDto, BulkStaffItemDto } from './dto';
 import * as bcrypt from 'bcrypt';
 
@@ -10,17 +10,57 @@ export class StaffService {
   constructor(
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
+    @InjectRepository(Province)
+    private readonly provinceRepository: Repository<Province>,
+    @InjectRepository(Ward)
+    private readonly wardRepository: Repository<Ward>,
+    @InjectRepository(Department)
+    private readonly departmentRepository: Repository<Department>,
   ) {}
 
   async findAll(tenantId: string, branchId?: string) {
-    const where: any = { tenantId };
+    const query = this.staffRepository
+      .createQueryBuilder('staff')
+      .leftJoinAndSelect('staff.branch', 'branch')
+      .leftJoinAndSelect('staff.brand', 'brand')
+      .where('staff.tenantId = :tenantId', { tenantId });
+
     if (branchId) {
-      where.branchId = branchId;
+      query.andWhere('staff.branchId = :branchId', { branchId });
     }
-    return this.staffRepository.find({
-      where,
-      order: { name: 'ASC' },
-    });
+
+    const staffList = await query.orderBy('staff.name', 'ASC').getMany();
+
+    // Get province/ward/department names
+    const provinceCodes = [...new Set(staffList.map(s => s.provinceCode).filter(Boolean))] as string[];
+    const wardCodes = [...new Set(staffList.map(s => s.wardCode).filter(Boolean))] as string[];
+    const departmentIds = [...new Set(staffList.map(s => s.departmentId).filter(Boolean))] as string[];
+
+    const [provinces, wards, departments] = await Promise.all([
+      provinceCodes.length > 0
+        ? this.provinceRepository.find({ where: { code: In(provinceCodes) } })
+        : [],
+      wardCodes.length > 0
+        ? this.wardRepository.find({ where: { code: In(wardCodes) } })
+        : [],
+      departmentIds.length > 0
+        ? this.departmentRepository.find({ where: { id: In(departmentIds) } })
+        : [],
+    ]);
+
+    const provinceMap = new Map(provinces.map(p => [p.code, p.fullName]));
+    const wardMap = new Map(wards.map(w => [w.code, w.fullName]));
+    const departmentMap = new Map(departments.map(d => [d.id, d.name]));
+
+    // Transform to include names
+    return staffList.map(staff => ({
+      ...staff,
+      branchName: staff.branch?.name || null,
+      brandName: staff.brand?.name || null,
+      provinceName: staff.provinceCode ? provinceMap.get(staff.provinceCode) || null : null,
+      wardName: staff.wardCode ? wardMap.get(staff.wardCode) || null : null,
+      departmentName: staff.departmentId ? departmentMap.get(staff.departmentId) || null : null,
+    }));
   }
 
   async findOne(tenantId: string, id: string) {

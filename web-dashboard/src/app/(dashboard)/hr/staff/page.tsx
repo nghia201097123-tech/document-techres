@@ -74,9 +74,12 @@ const excelColumns = [
   { key: "birthDate" as keyof Staff, header: "Ngày sinh", width: 12 },
   { key: "gender" as keyof Staff, header: "Giới tính", width: 10 },
   { key: "idNumber" as keyof Staff, header: "CCCD", width: 15 },
+  { key: "provinceName" as keyof Staff, header: "Tỉnh/Thành phố", width: 20 },
+  { key: "wardName" as keyof Staff, header: "Phường/Xã", width: 20 },
   { key: "address" as keyof Staff, header: "Địa chỉ", width: 30 },
-  { key: "departmentId" as keyof Staff, header: "ID Bộ phận", width: 40 },
+  { key: "brandName" as keyof Staff, header: "Thương hiệu", width: 20 },
   { key: "branchName" as keyof Staff, header: "Chi nhánh", width: 20 },
+  { key: "departmentName" as keyof Staff, header: "Bộ phận", width: 20 },
   { key: "isActive" as keyof Staff, header: "Hoạt động", width: 10 },
 ];
 
