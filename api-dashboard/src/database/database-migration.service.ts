@@ -473,6 +473,33 @@ export class DatabaseMigrationService implements OnModuleInit {
       // 23. Seed F&B permissions
       await this.seedFnBPermissions(queryRunner);
 
+      // 24. Create combo_items table for combo products
+      const comboItemsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'combo_items'
+        );
+      `);
+
+      if (!comboItemsExists[0].exists) {
+        this.logger.log('Creating combo_items table...');
+        await queryRunner.query(`
+          CREATE TABLE combo_items (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            combo_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            quantity INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(combo_id, product_id)
+          );
+          CREATE INDEX idx_combo_items_tenant ON combo_items(tenant_id);
+          CREATE INDEX idx_combo_items_combo ON combo_items(combo_id);
+        `);
+        this.logger.log('Combo items table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

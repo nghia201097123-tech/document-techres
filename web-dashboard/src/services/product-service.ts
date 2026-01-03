@@ -107,6 +107,15 @@ export interface UpdateProductNoteDto {
   sortOrder?: number;
 }
 
+// Combo Item interfaces
+export interface ComboItem {
+  id: string;
+  productId: string;
+  product: Product;
+  quantity: number;
+  sortOrder: number;
+}
+
 // Topping Group interfaces
 export interface ToppingItem {
   id: string;
@@ -315,6 +324,35 @@ export const productService = {
 
   assignNoteToProducts: async (noteId: string, productIds: string[]): Promise<{ noteId: string; productCount: number; products: Product[] }> => {
     const response = await api.post<{ noteId: string; productCount: number; products: Product[] }>(`/products/notes/${noteId}/products`, { productIds });
+    return response.data;
+  },
+
+  // === Combo Items Management ===
+
+  getAvailableProductsForCombo: async (brandId?: string): Promise<Product[]> => {
+    const params: Record<string, any> = {};
+    if (brandId) params.brandId = brandId;
+    const response = await api.get<Product[]>("/products/combo/available-products", { params });
+    return response.data;
+  },
+
+  getComboItems: async (comboId: string): Promise<ComboItem[]> => {
+    const response = await api.get<ComboItem[]>(`/products/${comboId}/combo-items`);
+    return response.data;
+  },
+
+  assignComboItems: async (comboId: string, items: { productId: string; quantity?: number }[]): Promise<ComboItem[]> => {
+    const response = await api.post<ComboItem[]>(`/products/${comboId}/combo-items`, { items });
+    return response.data;
+  },
+
+  addItemToCombo: async (comboId: string, productId: string, quantity?: number): Promise<ComboItem[]> => {
+    const response = await api.post<ComboItem[]>(`/products/${comboId}/combo-items/${productId}`, { quantity });
+    return response.data;
+  },
+
+  removeItemFromCombo: async (comboId: string, productId: string): Promise<ComboItem[]> => {
+    const response = await api.delete<ComboItem[]>(`/products/${comboId}/combo-items/${productId}`);
     return response.data;
   },
 };

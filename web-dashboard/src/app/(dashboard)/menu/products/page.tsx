@@ -53,7 +53,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup } from "@/services/product-service";
+import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem } from "@/services/product-service";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
 import { unitService, type Unit } from "@/services/unit-service";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -88,7 +89,7 @@ const initialFormData: CreateProductDto = {
   printSeafood: false,
 };
 
-type DialogMode = "create" | "edit" | "view" | "toppings" | null;
+type DialogMode = "create" | "edit" | "view" | "toppings" | "combo" | null;
 
 export default function ProductsPage() {
   const dispatch = useAppDispatch();
@@ -131,6 +132,14 @@ export default function ProductsPage() {
 
   // Continue creating state
   const [continueCreating, setContinueCreating] = React.useState(false);
+
+  // Combo items management state
+  const [availableComboProducts, setAvailableComboProducts] = React.useState<Product[]>([]);
+  const [comboItems, setComboItems] = React.useState<ComboItem[]>([]);
+  const [selectedComboProductIds, setSelectedComboProductIds] = React.useState<Map<string, number>>(new Map());
+  const [loadingComboItems, setLoadingComboItems] = React.useState(false);
+  const [savingComboItems, setSavingComboItems] = React.useState(false);
+  const [comboProductSearch, setComboProductSearch] = React.useState("");
 
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
@@ -248,6 +257,90 @@ export default function ProductsPage() {
       setLoadingToppings(false);
     }
   };
+
+  // Open combo items management dialog
+  const handleOpenCombo = async (product: Product) => {
+    if (product.type !== ProductType.COMBO) {
+      toast({ title: "Lỗi", description: "Chỉ có thể quản lý món cho combo", variant: "destructive" });
+      return;
+    }
+    setSelectedProduct(product);
+    setDialogMode("combo");
+    setLoadingComboItems(true);
+    setComboProductSearch("");
+    try {
+      const [availableProducts, existingItems] = await Promise.all([
+        productService.getAvailableProductsForCombo(),
+        productService.getComboItems(product.id),
+      ]);
+      setAvailableComboProducts(availableProducts);
+      setComboItems(existingItems);
+      // Initialize selected products map with existing items
+      const selectedMap = new Map<string, number>();
+      existingItems.forEach(item => {
+        selectedMap.set(item.productId, item.quantity);
+      });
+      setSelectedComboProductIds(selectedMap);
+    } catch (error) {
+      console.error("Error loading combo items:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách món", variant: "destructive" });
+    } finally {
+      setLoadingComboItems(false);
+    }
+  };
+
+  // Toggle product in combo
+  const toggleComboProduct = (productId: string) => {
+    setSelectedComboProductIds(prev => {
+      const newMap = new Map(prev);
+      if (newMap.has(productId)) {
+        newMap.delete(productId);
+      } else {
+        newMap.set(productId, 1);
+      }
+      return newMap;
+    });
+  };
+
+  // Update combo product quantity
+  const updateComboProductQuantity = (productId: string, quantity: number) => {
+    if (quantity < 1) return;
+    setSelectedComboProductIds(prev => {
+      const newMap = new Map(prev);
+      newMap.set(productId, quantity);
+      return newMap;
+    });
+  };
+
+  // Save combo items
+  const handleSaveComboItems = async () => {
+    if (!selectedProduct) return;
+    setSavingComboItems(true);
+    try {
+      const items = Array.from(selectedComboProductIds.entries()).map(([productId, quantity]) => ({
+        productId,
+        quantity,
+      }));
+      const result = await productService.assignComboItems(selectedProduct.id, items);
+      setComboItems(result);
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật combo với ${items.length} món`,
+      });
+      handleCloseDialog();
+    } catch (error: any) {
+      console.error("Error saving combo items:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSavingComboItems(false);
+    }
+  };
+
+  // Filter combo products by search
+  const filteredComboProducts = availableComboProducts.filter(p =>
+    p.name.toLowerCase().includes(comboProductSearch.toLowerCase()) ||
+    p.code.toLowerCase().includes(comboProductSearch.toLowerCase())
+  );
 
   // Create topping group (shared - then assign to product)
   const handleCreateGroup = async () => {
@@ -652,6 +745,12 @@ export default function ProductsPage() {
                             <DropdownMenuItem onClick={() => handleOpenToppings(product)}>
                               <Cherry className="mr-2 h-4 w-4" />
                               Quản lý Topping
+                            </DropdownMenuItem>
+                          )}
+                          {product.type === ProductType.COMBO && (
+                            <DropdownMenuItem onClick={() => handleOpenCombo(product)}>
+                              <UtensilsCrossed className="mr-2 h-4 w-4" />
+                              Quản lý món Combo
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -1353,6 +1452,123 @@ export default function ProductsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => handleCloseDialog()}>
               Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Combo Items Management Dialog */}
+      <Dialog open={dialogMode === "combo"} onOpenChange={() => handleCloseDialog()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Quản lý món trong Combo</DialogTitle>
+            <DialogDescription>
+              Chọn các món ăn cho combo &quot;{selectedProduct?.name}&quot;. Không thể thêm combo hoặc topping vào combo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm món ăn..."
+                className="pl-10"
+                value={comboProductSearch}
+                onChange={(e) => setComboProductSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Selected count */}
+            <div className="text-sm text-muted-foreground">
+              Đã chọn: <span className="font-medium text-foreground">{selectedComboProductIds.size}</span> món
+            </div>
+
+            {/* Products list */}
+            {loadingComboItems ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] border rounded-md">
+                <div className="p-4 space-y-2">
+                  {filteredComboProducts.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">Không tìm thấy món ăn</p>
+                  ) : (
+                    filteredComboProducts.map((product) => {
+                      const isSelected = selectedComboProductIds.has(product.id);
+                      const quantity = selectedComboProductIds.get(product.id) || 1;
+                      return (
+                        <div
+                          key={product.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                            isSelected
+                              ? "bg-primary/10 border-primary"
+                              : "hover:bg-muted"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleComboProduct(product.id)}
+                          />
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() => toggleComboProduct(product.id)}
+                          >
+                            <p className="font-medium truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.code} • {new Intl.NumberFormat("vi-VN").format(product.price)}đ
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="shrink-0">
+                            {typeLabels[product.type]?.label || product.type}
+                          </Badge>
+                          {isSelected && (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => updateComboProductQuantity(product.id, quantity - 1)}
+                                disabled={quantity <= 1}
+                              >
+                                -
+                              </Button>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={quantity}
+                                onChange={(e) => updateComboProductQuantity(product.id, parseInt(e.target.value) || 1)}
+                                className="w-14 h-7 text-center"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => updateComboProductQuantity(product.id, quantity + 1)}
+                              >
+                                +
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleCloseDialog()}>
+              Hủy
+            </Button>
+            <Button onClick={handleSaveComboItems} disabled={savingComboItems}>
+              {savingComboItems && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu ({selectedComboProductIds.size} món)
             </Button>
           </DialogFooter>
         </DialogContent>

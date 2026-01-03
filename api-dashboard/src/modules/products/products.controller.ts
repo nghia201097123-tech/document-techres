@@ -14,6 +14,7 @@ import {
   AssignNotesToProductDto,
   AssignNoteToProductsDto,
   AssignToppingGroupsDto,
+  AssignComboItemsDto,
 } from './dto';
 import { ProductType } from '../../database/entities';
 
@@ -265,5 +266,51 @@ export class ProductsController {
     @Body() dto: AssignNoteToProductsDto,
   ) {
     return this.productsService.assignNoteToProducts(req.user.tenantId, noteId, dto);
+  }
+
+  // === Combo Items Management ===
+
+  @Get('combo/available-products')
+  @ApiOperation({ summary: 'Lấy danh sách món có thể thêm vào combo (trừ combo và topping)' })
+  @ApiQuery({ name: 'brandId', required: false })
+  getAvailableProductsForCombo(@Request() req, @Query('brandId') brandId?: string) {
+    return this.productsService.getAvailableProductsForCombo(req.user.tenantId, brandId);
+  }
+
+  @Get(':id/combo-items')
+  @ApiOperation({ summary: 'Lấy danh sách món trong combo' })
+  getComboItems(@Request() req, @Param('id') id: string) {
+    return this.productsService.getComboItems(req.user.tenantId, id);
+  }
+
+  @Post(':id/combo-items')
+  @ApiOperation({ summary: 'Gán danh sách món vào combo' })
+  assignComboItems(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: AssignComboItemsDto,
+  ) {
+    return this.productsService.assignComboItems(req.user.tenantId, id, dto);
+  }
+
+  @Post(':id/combo-items/:productId')
+  @ApiOperation({ summary: 'Thêm một món vào combo' })
+  addItemToCombo(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('productId') productId: string,
+    @Body('quantity') quantity?: number,
+  ) {
+    return this.productsService.addItemToCombo(req.user.tenantId, id, productId, quantity || 1);
+  }
+
+  @Delete(':id/combo-items/:productId')
+  @ApiOperation({ summary: 'Xóa món khỏi combo' })
+  removeItemFromCombo(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('productId') productId: string,
+  ) {
+    return this.productsService.removeItemFromCombo(req.user.tenantId, id, productId);
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, Not } from 'typeorm';
 import {
   Product,
   ProductType,
@@ -9,6 +9,7 @@ import {
   ProductToppingGroup,
   ProductNote,
   ProductNoteAssignment,
+  ComboItem,
 } from '../../database/entities';
 import {
   CreateProductDto,
@@ -22,6 +23,7 @@ import {
   AssignNotesToProductDto,
   AssignNoteToProductsDto,
   AssignToppingGroupsDto,
+  AssignComboItemsDto,
 } from './dto';
 
 @Injectable()
@@ -39,6 +41,8 @@ export class ProductsService {
     private readonly productNoteRepository: Repository<ProductNote>,
     @InjectRepository(ProductNoteAssignment)
     private readonly productNoteAssignmentRepository: Repository<ProductNoteAssignment>,
+    @InjectRepository(ComboItem)
+    private readonly comboItemRepository: Repository<ComboItem>,
   ) {}
 
   async findAll(tenantId: string, brandId?: string, type?: ProductType) {
@@ -669,5 +673,172 @@ export class ProductsService {
       productCount: assignments.length,
       products: await this.getProductsByNote(tenantId, noteId),
     };
+  }
+
+  // === Combo Items Management ===
+
+  // Get all products that can be added to a combo (exclude combos and toppings)
+  async getAvailableProductsForCombo(tenantId: string, brandId?: string) {
+    const where: any = {
+      tenantId,
+      type: Not(In([ProductType.COMBO, ProductType.TOPPING])),
+      isActive: true,
+    };
+    if (brandId) {
+      where.brandId = brandId;
+    }
+    return this.productRepository.find({
+      where,
+      order: { name: 'ASC' },
+    });
+  }
+
+  // Get items in a combo
+  async getComboItems(tenantId: string, comboId: string) {
+    // Verify combo exists and is actually a combo
+    const combo = await this.productRepository.findOne({
+      where: { tenantId, id: comboId },
+    });
+    if (!combo) {
+      throw new NotFoundException('Không tìm thấy combo');
+    }
+    if (combo.type !== ProductType.COMBO) {
+      throw new BadRequestException('Sản phẩm này không phải là combo');
+    }
+
+    const items = await this.comboItemRepository.find({
+      where: { tenantId, comboId },
+      relations: ['product'],
+      order: { sortOrder: 'ASC' },
+    });
+
+    return items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      product: item.product,
+      quantity: item.quantity,
+      sortOrder: item.sortOrder,
+    }));
+  }
+
+  // Assign items to a combo
+  async assignComboItems(tenantId: string, comboId: string, dto: AssignComboItemsDto) {
+    // Verify combo exists and is actually a combo
+    const combo = await this.productRepository.findOne({
+      where: { tenantId, id: comboId },
+    });
+    if (!combo) {
+      throw new NotFoundException('Không tìm thấy combo');
+    }
+    if (combo.type !== ProductType.COMBO) {
+      throw new BadRequestException('Sản phẩm này không phải là combo');
+    }
+
+    // Validate all products
+    for (const item of dto.items) {
+      const product = await this.productRepository.findOne({
+        where: { tenantId, id: item.productId },
+      });
+      if (!product) {
+        throw new NotFoundException(`Không tìm thấy món: ${item.productId}`);
+      }
+      if (product.type === ProductType.COMBO) {
+        throw new BadRequestException(`Không thể thêm combo "${product.name}" vào combo khác`);
+      }
+      if (product.type === ProductType.TOPPING) {
+        throw new BadRequestException(`Không thể thêm topping "${product.name}" vào combo`);
+      }
+    }
+
+    // Remove all existing items
+    await this.comboItemRepository.delete({ tenantId, comboId });
+
+    // Create new items
+    const items = dto.items.map((item, index) =>
+      this.comboItemRepository.create({
+        tenantId,
+        comboId,
+        productId: item.productId,
+        quantity: item.quantity || 1,
+        sortOrder: index,
+      }),
+    );
+
+    if (items.length > 0) {
+      await this.comboItemRepository.save(items);
+    }
+
+    return this.getComboItems(tenantId, comboId);
+  }
+
+  // Add a single item to combo
+  async addItemToCombo(tenantId: string, comboId: string, productId: string, quantity: number = 1) {
+    // Verify combo
+    const combo = await this.productRepository.findOne({
+      where: { tenantId, id: comboId },
+    });
+    if (!combo) {
+      throw new NotFoundException('Không tìm thấy combo');
+    }
+    if (combo.type !== ProductType.COMBO) {
+      throw new BadRequestException('Sản phẩm này không phải là combo');
+    }
+
+    // Verify product
+    const product = await this.productRepository.findOne({
+      where: { tenantId, id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException('Không tìm thấy món');
+    }
+    if (product.type === ProductType.COMBO) {
+      throw new BadRequestException('Không thể thêm combo vào combo khác');
+    }
+    if (product.type === ProductType.TOPPING) {
+      throw new BadRequestException('Không thể thêm topping vào combo');
+    }
+
+    // Check if already exists
+    const existing = await this.comboItemRepository.findOne({
+      where: { tenantId, comboId, productId },
+    });
+    if (existing) {
+      // Update quantity
+      existing.quantity = quantity;
+      await this.comboItemRepository.save(existing);
+    } else {
+      // Get max sort order
+      const maxSortOrder = await this.comboItemRepository
+        .createQueryBuilder('item')
+        .where('item.comboId = :comboId', { comboId })
+        .select('MAX(item.sortOrder)', 'max')
+        .getRawOne();
+
+      const item = this.comboItemRepository.create({
+        tenantId,
+        comboId,
+        productId,
+        quantity,
+        sortOrder: (maxSortOrder?.max || 0) + 1,
+      });
+      await this.comboItemRepository.save(item);
+    }
+
+    return this.getComboItems(tenantId, comboId);
+  }
+
+  // Remove item from combo
+  async removeItemFromCombo(tenantId: string, comboId: string, productId: string) {
+    const result = await this.comboItemRepository.delete({
+      tenantId,
+      comboId,
+      productId,
+    });
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Không tìm thấy món trong combo');
+    }
+
+    return this.getComboItems(tenantId, comboId);
   }
 }
