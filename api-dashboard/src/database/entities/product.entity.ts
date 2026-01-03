@@ -24,7 +24,7 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tenant_id' })
+  @Column({ name: 'tenant_id', nullable: true })
   @Index()
   tenantId: string;
 
