@@ -310,7 +310,7 @@ export default function ProductsPage() {
                   <TableHead>Tên món</TableHead>
                   <TableHead>Loại</TableHead>
                   <TableHead>Danh mục</TableHead>
-                  <TableHead className="text-right">Giá</TableHead>
+                  <TableHead className="text-right">Giá (đã VAT)</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead className="w-[80px]">Thao tác</TableHead>
                 </TableRow>
@@ -391,12 +391,26 @@ export default function ProductsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground text-xs">Giá bán</Label>
+                  <Label className="text-muted-foreground text-xs">Giá bán (đã bao gồm VAT)</Label>
                   <p className="font-medium text-lg text-green-600">{formatCurrency(selectedProduct.price)}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground text-xs">VAT</Label>
                   <p>{selectedProduct.vatRate || 10}%</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Giá chưa bao gồm VAT</Label>
+                  <p className="font-medium text-lg text-muted-foreground">
+                    {formatCurrency(Math.round(selectedProduct.price / (1 + (selectedProduct.vatRate || 10) / 100)))}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Thuế VAT</Label>
+                  <p className="font-medium text-muted-foreground">
+                    {formatCurrency(Math.round(selectedProduct.price - selectedProduct.price / (1 + (selectedProduct.vatRate || 10) / 100)))}
+                  </p>
                 </div>
               </div>
               <div>
@@ -514,7 +528,7 @@ export default function ProductsPage() {
               {/* Row 3: Price and VAT */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="price">Giá bán (VNĐ) *</Label>
+                  <Label htmlFor="price">Giá đã bao gồm VAT (VNĐ) *</Label>
                   <Input
                     id="price"
                     type="number"
@@ -539,6 +553,19 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
+
+              {/* Row 3.5: Pre-VAT Price (calculated) */}
+              {formData.price > 0 && (
+                <div className="grid gap-2">
+                  <Label className="text-muted-foreground">Giá chưa bao gồm VAT</Label>
+                  <div className="flex items-center h-10 px-3 rounded-md border bg-muted text-muted-foreground">
+                    {formatCurrency(Math.round(formData.price / (1 + (formData.vatRate || 10) / 100)))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tính từ giá bán ÷ (1 + {formData.vatRate || 10}%)
+                  </p>
+                </div>
+              )}
 
               {/* Row 4: Image URL */}
               <div className="grid gap-2">
