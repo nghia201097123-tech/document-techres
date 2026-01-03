@@ -318,7 +318,7 @@ export default function ProductsPage() {
       name: formData.name,
       type: formData.type,
       price: Number(formData.price) || 0,
-      vatRate: Number(formData.vatRate) || 0,
+      vatRate: parseFloat(String(formData.vatRate)) || 0,
       categoryId: formData.categoryId || undefined,
       description: formData.description || undefined,
       imageUrl: formData.imageUrl || undefined,
@@ -725,9 +725,10 @@ export default function ProductsPage() {
                     type="number"
                     min="0"
                     max="100"
+                    step="0.01"
                     placeholder="10"
-                    value={formData.vatRate || ""}
-                    onChange={(e) => setFormData({ ...formData, vatRate: Number(e.target.value) })}
+                    value={formData.vatRate ?? ""}
+                    onChange={(e) => setFormData({ ...formData, vatRate: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
               </div>
