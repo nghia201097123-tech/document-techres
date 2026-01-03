@@ -62,7 +62,7 @@ const initialWizardData: CreateCompanyWizardData = {
     openTime: "08:00",
     closeTime: "22:00"
   },
-  staff: { name: "", phone: "", email: "", role: "owner" },
+  staff: { name: "", phone: "", email: "", role: "owner", usernamePrefix: "tr" },
 };
 
 // Helper: Remove Vietnamese diacritics
@@ -700,13 +700,29 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   Bộ phận &quot;Chủ nhà hàng&quot; sẽ được tự động tạo. Nhân viên đầu tiên là chủ sở hữu hệ thống.
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label>Tên chủ nhà hàng *</Label>
-                <Input
-                  value={wizardData.staff.name}
-                  onChange={(e) => handleChange("staff", "name", e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tên chủ nhà hàng *</Label>
+                  <Input
+                    value={wizardData.staff.name}
+                    onChange={(e) => handleChange("staff", "name", e.target.value)}
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mã đăng nhập</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      value={wizardData.staff.usernamePrefix || "tr"}
+                      onChange={(e) => handleChange("staff", "usernamePrefix", e.target.value.toLowerCase().substring(0, 2))}
+                      placeholder="tr"
+                      maxLength={2}
+                      className="w-20 text-center font-mono uppercase"
+                    />
+                    <span className="text-muted-foreground font-mono">000001</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Tối đa 2 ký tự, số tự động tăng</p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -727,7 +743,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                Tài khoản đăng nhập sẽ được tự động tạo. Sau khi hoàn thành, thông tin đăng nhập sẽ hiển thị để gửi cho khách hàng.
+                Tài khoản đăng nhập sẽ được tự động tạo theo mã đăng nhập đã chọn. Ví dụ: tr000001
               </p>
             </>
           )}

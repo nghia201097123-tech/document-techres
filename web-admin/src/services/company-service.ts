@@ -70,6 +70,7 @@ interface WizardStaffData {
   phone?: string;
   email?: string;
   role?: string;
+  usernamePrefix?: string; // Mã đăng nhập (2 ký tự), mặc định "tr" → tr000001
 }
 
 export interface CreateCompanyWizardData {

@@ -233,6 +233,15 @@ export class WizardStaffDto {
   @IsOptional()
   @IsString()
   role?: string;
+
+  @ApiPropertyOptional({
+    example: 'tr',
+    description: 'Mã đăng nhập (2 ký tự), mặc định "tr". Username sẽ là: tr000001'
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  usernamePrefix?: string;
 }
 
 /**

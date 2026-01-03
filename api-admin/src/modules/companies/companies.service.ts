@@ -204,8 +204,10 @@ export class CompaniesService {
       const savedDepartment = await queryRunner.manager.save(department);
 
       // Bước 5: Tạo Staff (Nhân viên đầu tiên - thuộc bộ phận Chủ nhà hàng)
-      // Username: lấy từ email hoặc tự sinh từ companyCode
-      const username = staffDto.email?.split('@')[0] || `${companyCode.toLowerCase()}_001`;
+      // Username: prefix (2 ký tự, mặc định "tr") + số tự động tăng 6 chữ số
+      // Ví dụ: tr000001, ab000001
+      const prefix = (staffDto.usernamePrefix || 'tr').toLowerCase().substring(0, 2);
+      const username = await this.generateUsername(queryRunner, tenantId, prefix);
       const temporaryPassword = this.generateTemporaryPassword();
       const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
@@ -278,6 +280,24 @@ export class CompaniesService {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return password;
+  }
+
+  /**
+   * Tạo username theo pattern: prefix (2 ký tự) + số tự động tăng 6 chữ số
+   * Ví dụ: tr000001, tr000002, ab000001
+   */
+  private async generateUsername(
+    queryRunner: any,
+    tenantId: string,
+    prefix: string,
+  ): Promise<string> {
+    // Đếm số nhân viên hiện có trong tenant để lấy số tiếp theo
+    const count = await queryRunner.manager.count(Staff, {
+      where: { tenantId },
+    });
+    const nextNumber = count + 1;
+    // Format: prefix (2 chars) + 6-digit padded number
+    return `${prefix}${String(nextNumber).padStart(6, '0')}`;
   }
 
   async findAll(paginationDto: PaginationDto) {
