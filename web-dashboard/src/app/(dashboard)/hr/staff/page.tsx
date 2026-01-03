@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender } from "@/services/staff-service";
+import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem } from "@/services/staff-service";
+import { exportToExcel, readExcelFile, downloadTemplate } from "@/lib/excel-utils";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -63,11 +64,58 @@ const initialFormData: CreateStaffDto = {
   usernamePrefix: "tr",
 };
 
-type DialogMode = "create" | "edit" | "view" | null;
+// Excel column configuration for export
+const excelColumns = [
+  { key: "id" as keyof Staff, header: "ID", width: 40 },
+  { key: "name" as keyof Staff, header: "Tên nhân viên", width: 25 },
+  { key: "username" as keyof Staff, header: "Username", width: 15 },
+  { key: "phone" as keyof Staff, header: "Số điện thoại", width: 15 },
+  { key: "email" as keyof Staff, header: "Email", width: 25 },
+  { key: "birthDate" as keyof Staff, header: "Ngày sinh", width: 12 },
+  { key: "gender" as keyof Staff, header: "Giới tính", width: 10 },
+  { key: "idNumber" as keyof Staff, header: "CCCD", width: 15 },
+  { key: "address" as keyof Staff, header: "Địa chỉ", width: 30 },
+  { key: "departmentId" as keyof Staff, header: "ID Bộ phận", width: 40 },
+  { key: "branchName" as keyof Staff, header: "Chi nhánh", width: 20 },
+  { key: "isActive" as keyof Staff, header: "Hoạt động", width: 10 },
+];
+
+// Excel column mapping for import
+const importColumnMapping = [
+  { excelHeader: "ID", key: "id" as keyof BulkStaffItem },
+  { excelHeader: "Tên nhân viên", key: "name" as keyof BulkStaffItem },
+  { excelHeader: "Số điện thoại", key: "phone" as keyof BulkStaffItem },
+  { excelHeader: "Email", key: "email" as keyof BulkStaffItem },
+  { excelHeader: "Ngày sinh", key: "birthDate" as keyof BulkStaffItem },
+  { excelHeader: "Giới tính", key: "gender" as keyof BulkStaffItem },
+  { excelHeader: "CCCD", key: "idNumber" as keyof BulkStaffItem },
+  { excelHeader: "Địa chỉ", key: "address" as keyof BulkStaffItem },
+  { excelHeader: "ID Bộ phận", key: "departmentId" as keyof BulkStaffItem },
+  { excelHeader: "ID Thương hiệu", key: "brandId" as keyof BulkStaffItem },
+  { excelHeader: "ID Chi nhánh", key: "branchId" as keyof BulkStaffItem },
+];
+
+// Template columns
+const templateColumns = [
+  { header: "ID", example: "(để trống nếu tạo mới)", required: false },
+  { header: "Tên nhân viên", example: "Nguyễn Văn A", required: true },
+  { header: "Số điện thoại", example: "0901234567", required: false },
+  { header: "Email", example: "email@example.com", required: false },
+  { header: "Ngày sinh", example: "1990-01-15", required: true },
+  { header: "Giới tính", example: "male hoặc female", required: true },
+  { header: "CCCD", example: "001234567890", required: false },
+  { header: "Địa chỉ", example: "123 Nguyễn Văn Linh, Q.7, TP.HCM", required: true },
+  { header: "ID Bộ phận", example: "(UUID của bộ phận)", required: true },
+  { header: "ID Thương hiệu", example: "(UUID - chỉ khi tạo mới)", required: false },
+  { header: "ID Chi nhánh", example: "(UUID - chỉ khi tạo mới)", required: false },
+];
+
+type DialogMode = "create" | "edit" | "view" | "import" | null;
 
 export default function StaffPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Redux selectors
   const { items: brands, loading: loadingBrands } = useAppSelector((state) => state.brands);
@@ -84,6 +132,11 @@ export default function StaffPage() {
   const [formData, setFormData] = React.useState<CreateStaffDto>(initialFormData);
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [createdStaff, setCreatedStaff] = React.useState<(Staff & { temporaryPassword: string }) | null>(null);
+
+  // Import state
+  const [importData, setImportData] = React.useState<Partial<BulkStaffItem>[]>([]);
+  const [importErrors, setImportErrors] = React.useState<string[]>([]);
+  const [importing, setImporting] = React.useState(false);
 
   // Derived state from Redux
   const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
@@ -241,6 +294,8 @@ export default function StaffPage() {
     setCreatedStaff(null);
     setSelectedStaff(null);
     setFormData(initialFormData);
+    setImportData([]);
+    setImportErrors([]);
   };
 
   // Handle province change
@@ -251,6 +306,94 @@ export default function StaffPage() {
   // Handle brand change
   const handleBrandChange = (brandId: string) => {
     setFormData({ ...formData, brandId, branchId: "" });
+  };
+
+  // Export to Excel
+  const handleExport = () => {
+    if (staffList.length === 0) {
+      toast({ title: "Thông báo", description: "Không có dữ liệu để xuất", variant: "destructive" });
+      return;
+    }
+
+    // Transform data for export
+    const exportData = staffList.map((staff) => ({
+      ...staff,
+      birthDate: staff.birthDate ? new Date(staff.birthDate).toISOString().split("T")[0] : "",
+      gender: staff.gender === "male" ? "Nam" : staff.gender === "female" ? "Nữ" : "",
+      isActive: staff.isActive ? "Có" : "Không",
+    }));
+
+    exportToExcel(exportData, excelColumns, `danh_sach_nhan_vien_${new Date().toISOString().split("T")[0]}`);
+    toast({ title: "Thành công", description: "Đã xuất file Excel" });
+  };
+
+  // Download template
+  const handleDownloadTemplate = () => {
+    downloadTemplate(templateColumns, "mau_import_nhan_vien");
+    toast({ title: "Thành công", description: "Đã tải file mẫu" });
+  };
+
+  // Handle file input change
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const result = await readExcelFile<BulkStaffItem>(file, importColumnMapping);
+
+      // Transform gender values
+      const transformedData = result.data.map((item) => ({
+        ...item,
+        gender: item.gender === "Nam" || item.gender === "male" ? "male" as Gender :
+                item.gender === "Nữ" || item.gender === "female" ? "female" as Gender :
+                item.gender as Gender,
+      }));
+
+      setImportData(transformedData);
+      setImportErrors(result.errors);
+      setDialogMode("import");
+    } catch (error: any) {
+      toast({ title: "Lỗi", description: error.message || "Không thể đọc file Excel", variant: "destructive" });
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Handle import
+  const handleImport = async () => {
+    if (importData.length === 0) {
+      toast({ title: "Lỗi", description: "Không có dữ liệu để import", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const result = await staffService.bulkImport(importData as BulkStaffItem[]);
+
+      if (result.errors.length > 0) {
+        toast({
+          title: "Hoàn thành với lỗi",
+          description: `Tạo mới: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`,
+          variant: "destructive",
+        });
+        setImportErrors(result.errors.map((e) => `Dòng ${e.row}: ${e.message}`));
+      } else {
+        toast({
+          title: "Thành công",
+          description: `Đã tạo mới ${result.created} và cập nhật ${result.updated} nhân viên`,
+        });
+        handleCloseDialog();
+        loadStaff();
+      }
+    } catch (error: any) {
+      console.error("Error importing:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi import", variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
   };
 
   // Format date for display
@@ -288,11 +431,45 @@ export default function StaffPage() {
           <h1 className="text-2xl font-bold">Quản lý nhân viên</h1>
           <p className="text-muted-foreground">Thêm, sửa và quản lý nhân viên trong chi nhánh</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Thêm nhân viên
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Excel
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Xuất Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadTemplate}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Tải file mẫu
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import từ Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={handleOpenCreate}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Thêm nhân viên
+          </Button>
+        </div>
       </div>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
       <Card>
         <CardHeader>
@@ -459,6 +636,100 @@ export default function StaffPage() {
             <Button onClick={() => selectedStaff && handleOpenEdit(selectedStaff)}>
               <Pencil className="mr-2 h-4 w-4" />
               Chỉnh sửa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={dialogMode === "import"} onOpenChange={() => handleCloseDialog()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import nhân viên từ Excel</DialogTitle>
+            <DialogDescription>
+              Xem lại dữ liệu trước khi import. Các dòng có ID sẽ được cập nhật, còn lại sẽ tạo mới.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="flex gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="default">{importData.filter((d) => !d.id).length}</Badge>
+                <span>Tạo mới</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{importData.filter((d) => d.id).length}</Badge>
+                <span>Cập nhật</span>
+              </div>
+              {importErrors.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive">{importErrors.length}</Badge>
+                  <span>Lỗi</span>
+                </div>
+              )}
+            </div>
+
+            {/* Errors */}
+            {importErrors.length > 0 && (
+              <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+                <p className="text-sm font-medium text-red-800 mb-2">Lỗi:</p>
+                <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                  {importErrors.slice(0, 5).map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                  {importErrors.length > 5 && (
+                    <li>... và {importErrors.length - 5} lỗi khác</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {/* Preview table */}
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">STT</TableHead>
+                    <TableHead>Tên</TableHead>
+                    <TableHead>SĐT</TableHead>
+                    <TableHead>Giới tính</TableHead>
+                    <TableHead>Loại</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importData.slice(0, 10).map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell>{item.phone || "-"}</TableCell>
+                      <TableCell>{item.gender === "male" ? "Nam" : item.gender === "female" ? "Nữ" : "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.id ? "secondary" : "default"}>
+                          {item.id ? "Cập nhật" : "Tạo mới"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {importData.length > 10 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        ... và {importData.length - 10} dòng khác
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseDialog}>
+              Hủy
+            </Button>
+            <Button onClick={handleImport} disabled={importing || importData.length === 0}>
+              {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Import {importData.length} dòng
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -83,4 +83,37 @@ export const staffService = {
     const response = await api.post<{ temporaryPassword: string }>(`/staff/${id}/reset-password`);
     return response.data;
   },
+
+  bulkImport: async (
+    items: BulkStaffItem[],
+    usernamePrefix?: string
+  ): Promise<BulkImportResult> => {
+    const response = await api.post<BulkImportResult>("/staff/bulk-import", {
+      items,
+      usernamePrefix,
+    });
+    return response.data;
+  },
 };
+
+export interface BulkStaffItem {
+  id?: string; // Có ID = update, không có = create
+  name: string;
+  email?: string;
+  phone?: string;
+  birthDate?: string;
+  gender?: Gender;
+  idNumber?: string;
+  address?: string;
+  provinceCode?: string;
+  wardCode?: string;
+  departmentId?: string;
+  brandId?: string;
+  branchId?: string;
+}
+
+export interface BulkImportResult {
+  created: number;
+  updated: number;
+  errors: { row: number; message: string }[];
+}

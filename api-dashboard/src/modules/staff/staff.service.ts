@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Staff } from '../../database/entities';
-import { CreateStaffDto, UpdateStaffDto } from './dto';
+import { CreateStaffDto, UpdateStaffDto, BulkImportStaffDto, BulkImportResultDto, BulkStaffItemDto } from './dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -95,5 +95,120 @@ export class StaffService {
 
   private generateTempPassword(): string {
     return Math.random().toString(36).substring(2, 10);
+  }
+
+  async bulkImport(
+    tenantId: string,
+    companyId: string,
+    bulkDto: BulkImportStaffDto,
+  ): Promise<BulkImportResultDto> {
+    const result: BulkImportResultDto = {
+      created: 0,
+      updated: 0,
+      errors: [],
+    };
+
+    const prefix = bulkDto.usernamePrefix?.toLowerCase().substring(0, 2) || 'tr';
+
+    for (let i = 0; i < bulkDto.items.length; i++) {
+      const item = bulkDto.items[i];
+      const rowNumber = i + 2; // Excel row (1-indexed + header)
+
+      try {
+        if (item.id) {
+          // Update existing staff
+          const staff = await this.staffRepository.findOne({
+            where: { tenantId, id: item.id },
+          });
+
+          if (!staff) {
+            result.errors.push({
+              row: rowNumber,
+              message: `Không tìm thấy nhân viên với ID: ${item.id}`,
+            });
+            continue;
+          }
+
+          // Update fields
+          if (item.name) staff.name = item.name;
+          if (item.phone) staff.phone = item.phone;
+          if (item.email) staff.email = item.email;
+          if (item.birthDate) staff.birthDate = new Date(item.birthDate);
+          if (item.gender) staff.gender = item.gender;
+          if (item.idNumber) staff.idNumber = item.idNumber;
+          if (item.address) staff.address = item.address;
+          if (item.provinceCode) staff.provinceCode = item.provinceCode;
+          if (item.wardCode) staff.wardCode = item.wardCode;
+          if (item.departmentId) staff.departmentId = item.departmentId;
+
+          await this.staffRepository.save(staff);
+          result.updated++;
+        } else {
+          // Create new staff - validate required fields
+          if (!item.name) {
+            result.errors.push({ row: rowNumber, message: 'Tên nhân viên là bắt buộc' });
+            continue;
+          }
+          if (!item.birthDate) {
+            result.errors.push({ row: rowNumber, message: 'Ngày sinh là bắt buộc' });
+            continue;
+          }
+          if (!item.gender) {
+            result.errors.push({ row: rowNumber, message: 'Giới tính là bắt buộc' });
+            continue;
+          }
+          if (!item.address) {
+            result.errors.push({ row: rowNumber, message: 'Địa chỉ là bắt buộc' });
+            continue;
+          }
+          if (!item.departmentId) {
+            result.errors.push({ row: rowNumber, message: 'Bộ phận là bắt buộc' });
+            continue;
+          }
+          if (!item.brandId) {
+            result.errors.push({ row: rowNumber, message: 'Thương hiệu là bắt buộc' });
+            continue;
+          }
+          if (!item.branchId) {
+            result.errors.push({ row: rowNumber, message: 'Chi nhánh là bắt buộc' });
+            continue;
+          }
+
+          const username = await this.generateUsername(tenantId, prefix);
+          const tempPassword = this.generateTempPassword();
+          const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+          const staff = this.staffRepository.create({
+            tenantId,
+            companyId,
+            name: item.name,
+            birthDate: new Date(item.birthDate),
+            gender: item.gender,
+            address: item.address,
+            provinceCode: item.provinceCode,
+            wardCode: item.wardCode,
+            departmentId: item.departmentId,
+            brandId: item.brandId,
+            branchId: item.branchId,
+            phone: item.phone,
+            email: item.email,
+            idNumber: item.idNumber,
+            username,
+            passwordHash,
+            isActive: true,
+          });
+
+          await this.staffRepository.save(staff);
+          result.created++;
+        }
+      } catch (error) {
+        result.errors.push({
+          row: rowNumber,
+          message: error.message || 'Lỗi không xác định',
+        });
+      }
+    }
+
+    return result;
   }
 }

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Param, Body, Query, UseGuards, Reque
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateStaffDto, UpdateStaffDto } from './dto';
+import { CreateStaffDto, UpdateStaffDto, BulkImportStaffDto } from './dto';
 
 @ApiTags('Staff')
 @Controller('staff')
@@ -51,5 +51,15 @@ export class StaffController {
   @ApiOperation({ summary: 'Reset mật khẩu nhân viên' })
   resetPassword(@Request() req, @Param('id') id: string) {
     return this.staffService.resetPassword(req.user.tenantId, id);
+  }
+
+  @Post('bulk-import')
+  @ApiOperation({ summary: 'Import/cập nhật nhân viên hàng loạt' })
+  bulkImport(@Request() req, @Body() bulkDto: BulkImportStaffDto) {
+    return this.staffService.bulkImport(
+      req.user.tenantId,
+      req.user.companyId,
+      bulkDto,
+    );
   }
 }
