@@ -62,6 +62,7 @@ export class AuthService {
       sub: staff.id,
       tenantId: staff.tenantId,
       companyId: staff.companyId,
+      brandId: staff.brandId,
       branchId: staff.branchId,
       username: staff.username,
       role: staff.role,

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, FolderOpen, Loader2 } from "lucide-react";
+import { Plus, FolderOpen, Loader2, MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { categoryService, type Category, type CreateCategoryDto } from "@/services/category-service";
+import { useToast } from "@/hooks/use-toast";
+import { categoryService, type Category, type CreateCategoryDto, type UpdateCategoryDto } from "@/services/category-service";
 import { ProductType } from "@/services/product-service";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
@@ -34,15 +52,21 @@ const typeLabels: Record<string, { label: string; color: string }> = {
   combo: { label: "Combo", color: "bg-green-100 text-green-800" },
 };
 
+type DialogMode = "create" | "edit" | null;
+
 export default function CategoriesPage() {
+  const { toast } = useToast();
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
+  const [selectedCategory, setSelectedCategory] = React.useState<Category | null>(null);
+  const [deleteCategory, setDeleteCategory] = React.useState<Category | null>(null);
   const [formData, setFormData] = React.useState<CreateCategoryDto>({
     name: "",
     productType: ProductType.FOOD,
     description: "",
+    sortOrder: 0,
   });
 
   // Load categories
@@ -53,41 +77,115 @@ export default function CategoriesPage() {
       setCategories(data);
     } catch (error) {
       console.error("Error loading categories:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách danh mục", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   React.useEffect(() => {
     loadCategories();
   }, [loadCategories]);
 
-  // Handle form submit
+  // Open create dialog
+  const handleOpenCreate = () => {
+    setSelectedCategory(null);
+    setFormData({ name: "", productType: ProductType.FOOD, description: "", sortOrder: 0 });
+    setDialogMode("create");
+  };
+
+  // Open edit dialog
+  const handleOpenEdit = (category: Category) => {
+    setSelectedCategory(category);
+    setFormData({
+      name: category.name,
+      productType: category.productType,
+      description: category.description || "",
+      sortOrder: category.sortOrder,
+    });
+    setDialogMode("edit");
+  };
+
+  // Close dialog
+  const handleCloseDialog = () => {
+    setDialogMode(null);
+    setSelectedCategory(null);
+    setFormData({ name: "", productType: ProductType.FOOD, description: "", sortOrder: 0 });
+  };
+
+  // Handle form submit (create or update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
     try {
       setSaving(true);
-      const result = await categoryService.create(formData);
-      setCategories((prev) => [...prev, result]);
-      setDialogOpen(false);
-      setFormData({ name: "", productType: ProductType.FOOD, description: "" });
-    } catch (error) {
-      console.error("Error creating category:", error);
-      alert("Có lỗi xảy ra khi tạo danh mục");
+
+      if (dialogMode === "create") {
+        const result = await categoryService.create(formData);
+        setCategories((prev) => [...prev, result]);
+        toast({ title: "Thành công", description: "Đã tạo danh mục mới" });
+      } else if (dialogMode === "edit" && selectedCategory) {
+        const updateData: UpdateCategoryDto = {
+          name: formData.name,
+          description: formData.description,
+          productType: formData.productType,
+          sortOrder: formData.sortOrder,
+        };
+        const result = await categoryService.update(selectedCategory.id, updateData);
+        setCategories((prev) => prev.map((c) => (c.id === selectedCategory.id ? result : c)));
+        toast({ title: "Thành công", description: "Đã cập nhật danh mục" });
+      }
+
+      handleCloseDialog();
+    } catch (error: any) {
+      console.error("Error saving category:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi lưu danh mục",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
   };
 
   // Handle toggle active
-  const handleToggleActive = async (id: string) => {
+  const handleToggleActive = async (category: Category) => {
     try {
-      const updated = await categoryService.toggleActive(id);
-      setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)));
-    } catch (error) {
+      const updated = await categoryService.toggleActive(category.id);
+      setCategories((prev) => prev.map((c) => (c.id === category.id ? updated : c)));
+      toast({
+        title: "Thành công",
+        description: `Đã ${updated.isActive ? "kích hoạt" : "tạm ngưng"} danh mục ${category.name}`,
+      });
+    } catch (error: any) {
       console.error("Error toggling category:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    if (!deleteCategory) return;
+
+    try {
+      await categoryService.delete(deleteCategory.id);
+      setCategories((prev) => prev.filter((c) => c.id !== deleteCategory.id));
+      toast({ title: "Thành công", description: `Đã xóa danh mục ${deleteCategory.name}` });
+    } catch (error: any) {
+      console.error("Error deleting category:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi xóa",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteCategory(null);
     }
   };
 
@@ -103,7 +201,7 @@ export default function CategoriesPage() {
           <h1 className="text-2xl font-bold">Quản lý danh mục</h1>
           <p className="text-muted-foreground">Phân loại món ăn theo danh mục (thuộc 5 loại món)</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={handleOpenCreate}>
           <Plus className="mr-2 h-4 w-4" />
           Thêm danh mục
         </Button>
@@ -159,22 +257,46 @@ export default function CategoriesPage() {
                     </div>
                     <div>
                       <p className="font-medium">{category.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {typeLabels[category.productType]?.label || category.productType}
-                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{typeLabels[category.productType]?.label || category.productType}</span>
+                        {category.description && (
+                          <>
+                            <span>•</span>
+                            <span className="max-w-[200px] truncate">{category.description}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={category.isActive ? "default" : "secondary"}>
                       {category.isActive ? "Hoạt động" : "Tạm ngưng"}
                     </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleActive(category.id)}
-                    >
-                      {category.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenEdit(category)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Chỉnh sửa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleActive(category)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {category.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleteCategory(category)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Xóa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               ))}
@@ -183,13 +305,15 @@ export default function CategoriesPage() {
         </CardContent>
       </Card>
 
-      {/* Add Category Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Create/Edit Category Dialog */}
+      <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Thêm danh mục mới</DialogTitle>
+            <DialogTitle>{dialogMode === "create" ? "Thêm danh mục mới" : "Chỉnh sửa danh mục"}</DialogTitle>
             <DialogDescription>
-              Nhập thông tin danh mục. Mỗi danh mục thuộc một loại món.
+              {dialogMode === "create"
+                ? "Nhập thông tin danh mục. Mỗi danh mục thuộc một loại món."
+                : "Cập nhật thông tin danh mục."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -198,7 +322,7 @@ export default function CategoriesPage() {
                 <Label htmlFor="name">Tên danh mục *</Label>
                 <Input
                   id="name"
-                  placeholder="Phở"
+                  placeholder="Phở, Cơm chiên, Trà sữa..."
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
@@ -231,19 +355,48 @@ export default function CategoriesPage() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="sortOrder">Thứ tự hiển thị</Label>
+                <Input
+                  id="sortOrder"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={formData.sortOrder || 0}
+                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                />
+              </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={handleCloseDialog}>
                 Hủy
               </Button>
               <Button type="submit" disabled={saving || !formData.name.trim()}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Tạo danh mục
+                {dialogMode === "create" ? "Tạo danh mục" : "Cập nhật"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteCategory !== null} onOpenChange={() => setDeleteCategory(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa danh mục &quot;{deleteCategory?.name}&quot;? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
