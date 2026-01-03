@@ -9,10 +9,16 @@ export interface Area {
   createdAt: string;
 }
 
+export interface QuickTableDto {
+  name: string;
+  capacity?: number;
+}
+
 export interface CreateAreaDto {
   name: string;
   description?: string;
   sortOrder?: number;
+  tables?: QuickTableDto[];
 }
 
 export interface UpdateAreaDto {

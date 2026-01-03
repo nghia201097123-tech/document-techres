@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, MapPin, Loader2, MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, MapPin, Loader2, MoreHorizontal, Pencil, Power, Trash2, X, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,10 +34,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto } from "@/services/area-service";
+import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto, type QuickTableDto } from "@/services/area-service";
 
 type DialogMode = "create" | "edit" | null;
+
+interface QuickTable {
+  id: string; // temporary id for UI
+  name: string;
+  capacity: number;
+}
 
 export default function AreasPage() {
   const { toast } = useToast();
@@ -53,6 +60,11 @@ export default function AreasPage() {
     sortOrder: 0,
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
+
+  // Quick table creation state
+  const [quickTables, setQuickTables] = React.useState<QuickTable[]>([]);
+  const [newTableName, setNewTableName] = React.useState("");
+  const [newTableCapacity, setNewTableCapacity] = React.useState(4);
 
   // Load areas
   const loadAreas = React.useCallback(async () => {
@@ -76,6 +88,9 @@ export default function AreasPage() {
   const handleOpenCreate = () => {
     setSelectedArea(null);
     setFormData({ name: "", description: "", sortOrder: 0 });
+    setQuickTables([]);
+    setNewTableName("");
+    setNewTableCapacity(4);
     setDialogMode("create");
   };
 
@@ -87,6 +102,7 @@ export default function AreasPage() {
       description: area.description || "",
       sortOrder: area.sortOrder,
     });
+    setQuickTables([]);
     setDialogMode("edit");
   };
 
@@ -95,6 +111,54 @@ export default function AreasPage() {
     setDialogMode(null);
     setSelectedArea(null);
     setFormData({ name: "", description: "", sortOrder: 0 });
+    setQuickTables([]);
+    setNewTableName("");
+    setNewTableCapacity(4);
+  };
+
+  // Add quick table
+  const handleAddQuickTable = () => {
+    if (!newTableName.trim()) return;
+
+    const newTable: QuickTable = {
+      id: `temp-${Date.now()}`,
+      name: newTableName.trim(),
+      capacity: newTableCapacity,
+    };
+    setQuickTables([...quickTables, newTable]);
+    setNewTableName("");
+    setNewTableCapacity(4);
+  };
+
+  // Add multiple tables with pattern
+  const handleAddMultipleTables = () => {
+    const baseName = formData.name || "Bàn";
+    const startNum = quickTables.length + 1;
+    const count = 5; // Add 5 tables at a time
+
+    const newTables: QuickTable[] = [];
+    for (let i = 0; i < count; i++) {
+      newTables.push({
+        id: `temp-${Date.now()}-${i}`,
+        name: `${baseName} ${startNum + i}`,
+        capacity: 4,
+      });
+    }
+    setQuickTables([...quickTables, ...newTables]);
+  };
+
+  // Remove quick table
+  const handleRemoveQuickTable = (id: string) => {
+    setQuickTables(quickTables.filter((t) => t.id !== id));
+  };
+
+  // Update quick table
+  const handleUpdateQuickTable = (id: string, field: "name" | "capacity", value: string | number) => {
+    setQuickTables(
+      quickTables.map((t) =>
+        t.id === id ? { ...t, [field]: field === "capacity" ? Number(value) : value } : t
+      )
+    );
   };
 
   // Handle form submit (create or update)
@@ -106,11 +170,24 @@ export default function AreasPage() {
       setSaving(true);
 
       if (dialogMode === "create") {
-        const result = await areaService.create(formData);
+        const createData: CreateAreaDto = {
+          ...formData,
+          tables: quickTables.length > 0
+            ? quickTables.map((t) => ({ name: t.name, capacity: t.capacity }))
+            : undefined,
+        };
+        const result = await areaService.create(createData);
         setAreas((prev) => [...prev, result]);
-        toast({ title: "Thành công", description: "Đã tạo khu vực mới" });
+        const tableCount = quickTables.length;
+        toast({
+          title: "Thành công",
+          description: tableCount > 0
+            ? `Đã tạo khu vực mới với ${tableCount} bàn`
+            : "Đã tạo khu vực mới",
+        });
         if (continueCreating) {
           setFormData({ name: "", description: "", sortOrder: (formData.sortOrder || 0) + 1 });
+          setQuickTables([]);
           return;
         }
       } else if (dialogMode === "edit" && selectedArea) {
@@ -270,47 +347,146 @@ export default function AreasPage() {
 
       {/* Create/Edit Area Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{dialogMode === "create" ? "Thêm khu vực mới" : "Chỉnh sửa khu vực"}</DialogTitle>
             <DialogDescription>
               {dialogMode === "create"
-                ? "Nhập thông tin khu vực. Khu vực giúp phân chia không gian nhà hàng."
+                ? "Nhập thông tin khu vực và tạo bàn nhanh cho khu vực này."
                 : "Cập nhật thông tin khu vực."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Tên khu vực *</Label>
-                <Input
-                  id="name"
-                  placeholder="Tầng 1, Sân vườn, Phòng VIP..."
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Tên khu vực *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Tầng 1, Sân vườn, Phòng VIP..."
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="sortOrder">Thứ tự hiển thị</Label>
+                  <Input
+                    id="sortOrder"
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={formData.sortOrder || 0}
+                    onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="description">Mô tả</Label>
                 <Textarea
                   id="description"
                   placeholder="Mô tả khu vực..."
+                  rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sortOrder">Thứ tự hiển thị</Label>
-                <Input
-                  id="sortOrder"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                />
-              </div>
+
+              {/* Quick Table Creation - Only show for create mode */}
+              {dialogMode === "create" && (
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Table2 className="h-4 w-4" />
+                      Tạo bàn nhanh
+                      {quickTables.length > 0 && (
+                        <Badge variant="secondary">{quickTables.length} bàn</Badge>
+                      )}
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddMultipleTables}
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      Thêm 5 bàn
+                    </Button>
+                  </div>
+
+                  {/* Add new table form */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Tên bàn (VD: Bàn 1)"
+                      value={newTableName}
+                      onChange={(e) => setNewTableName(e.target.value)}
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddQuickTable();
+                        }
+                      }}
+                    />
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Sức chứa"
+                      value={newTableCapacity}
+                      onChange={(e) => setNewTableCapacity(parseInt(e.target.value) || 4)}
+                      className="w-24"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleAddQuickTable}
+                      disabled={!newTableName.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Quick tables list */}
+                  {quickTables.length > 0 && (
+                    <ScrollArea className="h-[200px] border rounded-md">
+                      <div className="p-3 space-y-2">
+                        {quickTables.map((table, index) => (
+                          <div
+                            key={table.id}
+                            className="flex items-center gap-2 p-2 bg-muted/50 rounded-md"
+                          >
+                            <span className="text-xs text-muted-foreground w-6">
+                              {index + 1}.
+                            </span>
+                            <Input
+                              value={table.name}
+                              onChange={(e) => handleUpdateQuickTable(table.id, "name", e.target.value)}
+                              className="flex-1 h-8"
+                            />
+                            <Input
+                              type="number"
+                              min="1"
+                              value={table.capacity}
+                              onChange={(e) => handleUpdateQuickTable(table.id, "capacity", e.target.value)}
+                              className="w-20 h-8"
+                            />
+                            <span className="text-xs text-muted-foreground">người</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => handleRemoveQuickTable(table.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              )}
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-4">
               {dialogMode === "create" && (
@@ -331,7 +507,11 @@ export default function AreasPage() {
                 </Button>
                 <Button type="submit" disabled={saving || !formData.name.trim()}>
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {dialogMode === "create" ? "Tạo khu vực" : "Cập nhật"}
+                  {dialogMode === "create"
+                    ? quickTables.length > 0
+                      ? `Tạo khu vực + ${quickTables.length} bàn`
+                      : "Tạo khu vực"
+                    : "Cập nhật"}
                 </Button>
               </div>
             </DialogFooter>

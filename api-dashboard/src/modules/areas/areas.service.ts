@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Area } from '../../database/entities';
+import { Area, Table, TableStatus } from '../../database/entities';
 import { CreateAreaDto, UpdateAreaDto } from './dto';
 
 @Injectable()
@@ -9,6 +9,8 @@ export class AreasService {
   constructor(
     @InjectRepository(Area)
     private readonly areaRepository: Repository<Area>,
+    @InjectRepository(Table)
+    private readonly tableRepository: Repository<Table>,
   ) {}
 
   async findAll(tenantId: string, branchId: string) {
@@ -29,13 +31,35 @@ export class AreasService {
   }
 
   async create(tenantId: string, branchId: string, createDto: CreateAreaDto) {
+    const { tables, ...areaData } = createDto;
+
+    // Create the area
     const area = this.areaRepository.create({
-      ...createDto,
+      ...areaData,
       tenantId,
       branchId,
       isActive: true,
     });
-    return this.areaRepository.save(area);
+    const savedArea = await this.areaRepository.save(area);
+
+    // Create quick tables if provided
+    if (tables && tables.length > 0) {
+      const tableEntities = tables.map((table, index) =>
+        this.tableRepository.create({
+          tenantId,
+          branchId,
+          areaId: savedArea.id,
+          name: table.name,
+          capacity: table.capacity || 4,
+          status: TableStatus.AVAILABLE,
+          sortOrder: index,
+          isActive: true,
+        }),
+      );
+      await this.tableRepository.save(tableEntities);
+    }
+
+    return savedArea;
   }
 
   async update(tenantId: string, id: string, updateDto: UpdateAreaDto) {
