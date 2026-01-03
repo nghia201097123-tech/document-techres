@@ -12,6 +12,7 @@ import {
   CreateProductNoteDto,
   UpdateProductNoteDto,
   AssignNotesToProductDto,
+  AssignNoteToProductsDto,
   AssignToppingGroupsDto,
 } from './dto';
 import { ProductType } from '../../database/entities';
@@ -246,5 +247,23 @@ export class ProductsController {
     @Param('noteId') noteId: string,
   ) {
     return this.productsService.removeNoteFromProduct(req.user.tenantId, id, noteId);
+  }
+
+  // === Note to Multiple Products Assignment ===
+
+  @Get('notes/:noteId/products')
+  @ApiOperation({ summary: 'Lấy danh sách món đã gán ghi chú' })
+  getProductsByNote(@Request() req, @Param('noteId') noteId: string) {
+    return this.productsService.getProductsByNote(req.user.tenantId, noteId);
+  }
+
+  @Post('notes/:noteId/products')
+  @ApiOperation({ summary: 'Gán ghi chú cho nhiều món cùng lúc' })
+  assignNoteToProducts(
+    @Request() req,
+    @Param('noteId') noteId: string,
+    @Body() dto: AssignNoteToProductsDto,
+  ) {
+    return this.productsService.assignNoteToProducts(req.user.tenantId, noteId, dto);
   }
 }

@@ -46,3 +46,10 @@ export class AssignNotesToProductDto {
   @IsString({ each: true })
   noteIds: string[];
 }
+
+export class AssignNoteToProductsDto {
+  @ApiProperty({ description: 'Danh sách ID món' })
+  @IsArray()
+  @IsString({ each: true })
+  productIds: string[];
+}

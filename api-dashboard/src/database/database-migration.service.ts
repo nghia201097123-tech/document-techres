@@ -470,11 +470,112 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Staff permissions table created successfully');
       }
 
+      // 23. Seed F&B permissions
+      await this.seedFnBPermissions(queryRunner);
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private async seedFnBPermissions(queryRunner: any) {
+    this.logger.log('Seeding F&B permissions...');
+
+    const permissions = [
+      // Dashboard
+      { code: 'dashboard.view', name: 'Xem tổng quan', module: 'Dashboard', description: 'Xem báo cáo tổng quan doanh thu' },
+
+      // Đơn hàng (Orders)
+      { code: 'orders.view', name: 'Xem đơn hàng', module: 'Đơn hàng', description: 'Xem danh sách đơn hàng' },
+      { code: 'orders.create', name: 'Tạo đơn hàng', module: 'Đơn hàng', description: 'Tạo đơn hàng mới' },
+      { code: 'orders.edit', name: 'Sửa đơn hàng', module: 'Đơn hàng', description: 'Chỉnh sửa đơn hàng' },
+      { code: 'orders.cancel', name: 'Hủy đơn hàng', module: 'Đơn hàng', description: 'Hủy đơn hàng' },
+      { code: 'orders.discount', name: 'Giảm giá đơn hàng', module: 'Đơn hàng', description: 'Áp dụng giảm giá cho đơn hàng' },
+      { code: 'orders.void', name: 'Void món', module: 'Đơn hàng', description: 'Void/xóa món trong đơn hàng' },
+      { code: 'orders.transfer', name: 'Chuyển bàn', module: 'Đơn hàng', description: 'Chuyển đơn sang bàn khác' },
+      { code: 'orders.merge', name: 'Gộp bàn', module: 'Đơn hàng', description: 'Gộp nhiều bàn thành một' },
+      { code: 'orders.split', name: 'Tách hóa đơn', module: 'Đơn hàng', description: 'Tách một hóa đơn thành nhiều' },
+
+      // Thanh toán (Payments)
+      { code: 'payments.process', name: 'Thanh toán', module: 'Thanh toán', description: 'Xử lý thanh toán' },
+      { code: 'payments.refund', name: 'Hoàn tiền', module: 'Thanh toán', description: 'Thực hiện hoàn tiền' },
+      { code: 'payments.view_history', name: 'Xem lịch sử thanh toán', module: 'Thanh toán', description: 'Xem lịch sử thanh toán' },
+
+      // Bàn (Tables)
+      { code: 'tables.view', name: 'Xem bàn', module: 'Bàn', description: 'Xem sơ đồ bàn' },
+      { code: 'tables.manage', name: 'Quản lý bàn', module: 'Bàn', description: 'Thêm, sửa, xóa bàn' },
+      { code: 'tables.manage_areas', name: 'Quản lý khu vực', module: 'Bàn', description: 'Thêm, sửa, xóa khu vực' },
+
+      // Thực đơn (Menu)
+      { code: 'menu.view', name: 'Xem thực đơn', module: 'Thực đơn', description: 'Xem danh sách món' },
+      { code: 'menu.manage_products', name: 'Quản lý món', module: 'Thực đơn', description: 'Thêm, sửa, xóa món' },
+      { code: 'menu.manage_categories', name: 'Quản lý danh mục', module: 'Thực đơn', description: 'Thêm, sửa, xóa danh mục' },
+      { code: 'menu.manage_toppings', name: 'Quản lý topping', module: 'Thực đơn', description: 'Quản lý nhóm topping' },
+      { code: 'menu.manage_notes', name: 'Quản lý ghi chú', module: 'Thực đơn', description: 'Quản lý ghi chú món ăn' },
+      { code: 'menu.change_price', name: 'Thay đổi giá', module: 'Thực đơn', description: 'Thay đổi giá bán món' },
+      { code: 'menu.toggle_availability', name: 'Bật/tắt món', module: 'Thực đơn', description: 'Bật hoặc tắt trạng thái món' },
+
+      // Bếp (Kitchen)
+      { code: 'kitchen.view', name: 'Xem bếp', module: 'Bếp', description: 'Xem màn hình bếp' },
+      { code: 'kitchen.manage', name: 'Quản lý bếp', module: 'Bếp', description: 'Thêm, sửa, xóa bếp/trạm' },
+      { code: 'kitchen.complete_order', name: 'Hoàn thành món', module: 'Bếp', description: 'Đánh dấu món đã làm xong' },
+
+      // Kho hàng (Inventory)
+      { code: 'inventory.view', name: 'Xem tồn kho', module: 'Kho hàng', description: 'Xem số lượng tồn kho' },
+      { code: 'inventory.import', name: 'Nhập kho', module: 'Kho hàng', description: 'Tạo phiếu nhập kho' },
+      { code: 'inventory.export', name: 'Xuất kho', module: 'Kho hàng', description: 'Tạo phiếu xuất kho' },
+      { code: 'inventory.transfer', name: 'Chuyển kho', module: 'Kho hàng', description: 'Chuyển hàng giữa các kho' },
+      { code: 'inventory.stocktake', name: 'Kiểm kê', module: 'Kho hàng', description: 'Thực hiện kiểm kê' },
+
+      // Nhân sự (HR)
+      { code: 'hr.view_staff', name: 'Xem nhân viên', module: 'Nhân sự', description: 'Xem danh sách nhân viên' },
+      { code: 'hr.manage_staff', name: 'Quản lý nhân viên', module: 'Nhân sự', description: 'Thêm, sửa, xóa nhân viên' },
+      { code: 'hr.manage_departments', name: 'Quản lý bộ phận', module: 'Nhân sự', description: 'Thêm, sửa, xóa bộ phận' },
+      { code: 'hr.assign_permissions', name: 'Phân quyền', module: 'Nhân sự', description: 'Phân quyền cho nhân viên và bộ phận' },
+      { code: 'hr.view_attendance', name: 'Xem chấm công', module: 'Nhân sự', description: 'Xem bảng chấm công' },
+      { code: 'hr.manage_attendance', name: 'Quản lý chấm công', module: 'Nhân sự', description: 'Chỉnh sửa chấm công' },
+      { code: 'hr.view_salary', name: 'Xem lương', module: 'Nhân sự', description: 'Xem bảng lương' },
+
+      // Khách hàng (Customers)
+      { code: 'customers.view', name: 'Xem khách hàng', module: 'Khách hàng', description: 'Xem danh sách khách hàng' },
+      { code: 'customers.manage', name: 'Quản lý khách hàng', module: 'Khách hàng', description: 'Thêm, sửa, xóa khách hàng' },
+      { code: 'customers.view_points', name: 'Xem điểm thưởng', module: 'Khách hàng', description: 'Xem điểm tích lũy' },
+      { code: 'customers.manage_points', name: 'Điều chỉnh điểm', module: 'Khách hàng', description: 'Cộng/trừ điểm khách hàng' },
+
+      // Báo cáo (Reports)
+      { code: 'reports.revenue', name: 'Báo cáo doanh thu', module: 'Báo cáo', description: 'Xem báo cáo doanh thu' },
+      { code: 'reports.products', name: 'Báo cáo món bán', module: 'Báo cáo', description: 'Xem báo cáo món bán chạy' },
+      { code: 'reports.staff', name: 'Báo cáo nhân viên', module: 'Báo cáo', description: 'Xem báo cáo nhân viên' },
+      { code: 'reports.inventory', name: 'Báo cáo kho', module: 'Báo cáo', description: 'Xem báo cáo tồn kho' },
+      { code: 'reports.export', name: 'Xuất báo cáo', module: 'Báo cáo', description: 'Xuất báo cáo ra file' },
+
+      // Cài đặt (Settings)
+      { code: 'settings.view', name: 'Xem cài đặt', module: 'Cài đặt', description: 'Xem cài đặt hệ thống' },
+      { code: 'settings.general', name: 'Cài đặt chung', module: 'Cài đặt', description: 'Thay đổi cài đặt chung' },
+      { code: 'settings.payment', name: 'Cài đặt thanh toán', module: 'Cài đặt', description: 'Cấu hình phương thức thanh toán' },
+      { code: 'settings.printer', name: 'Cài đặt in', module: 'Cài đặt', description: 'Cấu hình máy in' },
+      { code: 'settings.units', name: 'Quản lý đơn vị', module: 'Cài đặt', description: 'Quản lý đơn vị tính' },
+
+      // Ca làm việc (Shifts)
+      { code: 'shifts.view', name: 'Xem ca làm', module: 'Ca làm việc', description: 'Xem thông tin ca làm việc' },
+      { code: 'shifts.open', name: 'Mở ca', module: 'Ca làm việc', description: 'Mở ca làm việc mới' },
+      { code: 'shifts.close', name: 'Đóng ca', module: 'Ca làm việc', description: 'Đóng ca và kiểm tiền' },
+      { code: 'shifts.cash_in', name: 'Nạp tiền quỹ', module: 'Ca làm việc', description: 'Nạp tiền vào quỹ ca' },
+      { code: 'shifts.cash_out', name: 'Rút tiền quỹ', module: 'Ca làm việc', description: 'Rút tiền từ quỹ ca' },
+    ];
+
+    for (const perm of permissions) {
+      await queryRunner.query(
+        `INSERT INTO permissions (code, name, module, description)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (code) DO UPDATE SET name = $2, module = $3, description = $4`,
+        [perm.code, perm.name, perm.module, perm.description],
+      );
+    }
+
+    this.logger.log(`Seeded ${permissions.length} F&B permissions`);
   }
 }

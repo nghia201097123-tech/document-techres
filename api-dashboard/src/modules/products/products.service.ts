@@ -20,6 +20,7 @@ import {
   CreateProductNoteDto,
   UpdateProductNoteDto,
   AssignNotesToProductDto,
+  AssignNoteToProductsDto,
   AssignToppingGroupsDto,
 } from './dto';
 
@@ -613,5 +614,60 @@ export class ProductsService {
     }
 
     return this.getProductNotes(tenantId, productId);
+  }
+
+  // Get products that have a specific note assigned
+  async getProductsByNote(tenantId: string, noteId: string) {
+    const assignments = await this.productNoteAssignmentRepository.find({
+      where: { tenantId, noteId },
+      relations: ['product'],
+    });
+
+    return assignments.map(a => a.product);
+  }
+
+  // Assign a note to multiple products at once
+  async assignNoteToProducts(tenantId: string, noteId: string, dto: AssignNoteToProductsDto) {
+    // Verify note exists
+    const note = await this.productNoteRepository.findOne({
+      where: { tenantId, id: noteId },
+    });
+    if (!note) {
+      throw new NotFoundException('Không tìm thấy ghi chú');
+    }
+
+    // Remove all existing assignments for this note
+    await this.productNoteAssignmentRepository.delete({
+      tenantId,
+      noteId,
+    });
+
+    // Create new assignments
+    const assignments: ProductNoteAssignment[] = [];
+    for (const productId of dto.productIds) {
+      // Verify product exists
+      const product = await this.productRepository.findOne({
+        where: { tenantId, id: productId },
+      });
+      if (product) {
+        const assignment = this.productNoteAssignmentRepository.create({
+          tenantId,
+          productId,
+          noteId,
+          sortOrder: 0,
+        });
+        assignments.push(assignment);
+      }
+    }
+
+    if (assignments.length > 0) {
+      await this.productNoteAssignmentRepository.save(assignments);
+    }
+
+    return {
+      noteId,
+      productCount: assignments.length,
+      products: await this.getProductsByNote(tenantId, noteId),
+    };
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, Loader2, Pencil, Trash2, StickyNote, Power } from "lucide-react";
+import { Plus, Search, Loader2, Pencil, Trash2, StickyNote, Power, LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,8 +25,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type ProductNote, type CreateProductNoteDto, type UpdateProductNoteDto } from "@/services/product-service";
+import { productService, type ProductNote, type Product, ProductType } from "@/services/product-service";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -45,6 +46,15 @@ export default function ProductNotesPage() {
   const [formName, setFormName] = React.useState("");
   const [formDescription, setFormDescription] = React.useState("");
   const [continueCreating, setContinueCreating] = React.useState(false);
+
+  // Assign products state
+  const [assignDialogOpen, setAssignDialogOpen] = React.useState(false);
+  const [assigningNote, setAssigningNote] = React.useState<ProductNote | null>(null);
+  const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
+  const [loadingProducts, setLoadingProducts] = React.useState(false);
+  const [savingAssign, setSavingAssign] = React.useState(false);
+  const [productSearch, setProductSearch] = React.useState("");
 
   // Load notes
   const loadNotes = React.useCallback(async () => {
@@ -158,6 +168,89 @@ export default function ProductNotesPage() {
     }
   };
 
+  // Open assign products dialog
+  const handleOpenAssignProducts = async (note: ProductNote) => {
+    setAssigningNote(note);
+    setProductSearch("");
+    setAssignDialogOpen(true);
+    setLoadingProducts(true);
+
+    try {
+      // Load all products (excluding toppings)
+      const products = await productService.getAll();
+      const filteredProducts = products.filter(p => p.type !== ProductType.TOPPING);
+      setAllProducts(filteredProducts);
+
+      // Load products that already have this note
+      const assignedProducts = await productService.getProductsByNote(note.id);
+      setSelectedProductIds(assignedProducts.map(p => p.id));
+    } catch (error) {
+      console.error("Error loading products:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách món", variant: "destructive" });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // Close assign dialog
+  const handleCloseAssignDialog = () => {
+    setAssignDialogOpen(false);
+    setAssigningNote(null);
+    setAllProducts([]);
+    setSelectedProductIds([]);
+    setProductSearch("");
+  };
+
+  // Toggle product selection
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds(prev =>
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  // Select all filtered products
+  const selectAllFiltered = () => {
+    const filteredIds = filteredProducts.map(p => p.id);
+    setSelectedProductIds(prev => {
+      const newSet = new Set([...prev, ...filteredIds]);
+      return Array.from(newSet);
+    });
+  };
+
+  // Deselect all filtered products
+  const deselectAllFiltered = () => {
+    const filteredIds = new Set(filteredProducts.map(p => p.id));
+    setSelectedProductIds(prev => prev.filter(id => !filteredIds.has(id)));
+  };
+
+  // Save product assignments
+  const handleSaveAssignments = async () => {
+    if (!assigningNote) return;
+
+    setSavingAssign(true);
+    try {
+      await productService.assignNoteToProducts(assigningNote.id, selectedProductIds);
+      toast({
+        title: "Thành công",
+        description: `Đã gán ghi chú "${assigningNote.name}" cho ${selectedProductIds.length} món`,
+      });
+      handleCloseAssignDialog();
+    } catch (error: any) {
+      console.error("Error assigning note to products:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSavingAssign(false);
+    }
+  };
+
+  // Filter products by search
+  const filteredProducts = allProducts.filter(p =>
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    p.code.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
   // Filter notes
   const filteredNotes = notes.filter(
     (n) => n.name.toLowerCase().includes(search.toLowerCase())
@@ -234,7 +327,16 @@ export default function ProductNotesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => handleOpenAssignProducts(note)}
+                          title="Gán món"
+                        >
+                          <LinkIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleOpenEdit(note)}
+                          title="Sửa"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -242,6 +344,7 @@ export default function ProductNotesPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleToggleActive(note)}
+                          title={note.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         >
                           <Power className="h-4 w-4" />
                         </Button>
@@ -249,6 +352,7 @@ export default function ProductNotesPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(note)}
+                          title="Xóa"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -322,6 +426,99 @@ export default function ProductNotesPage() {
               </div>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Products Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={() => handleCloseAssignDialog()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Gán ghi chú cho món ăn</DialogTitle>
+            <DialogDescription>
+              Chọn các món ăn sẽ sử dụng ghi chú &quot;{assigningNote?.name}&quot;
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Search and select all buttons */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm món ăn..."
+                  className="pl-10"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={selectAllFiltered}>
+                Chọn tất cả
+              </Button>
+              <Button variant="outline" size="sm" onClick={deselectAllFiltered}>
+                Bỏ chọn tất cả
+              </Button>
+            </div>
+
+            {/* Selected count */}
+            <div className="text-sm text-muted-foreground">
+              Đã chọn: <span className="font-medium text-foreground">{selectedProductIds.length}</span> món
+              {productSearch && ` (Hiển thị ${filteredProducts.length}/${allProducts.length} món)`}
+            </div>
+
+            {/* Products list */}
+            {loadingProducts ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] border rounded-md">
+                <div className="p-4 space-y-2">
+                  {filteredProducts.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">Không tìm thấy món ăn</p>
+                  ) : (
+                    filteredProducts.map((product) => (
+                      <div
+                        key={product.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedProductIds.includes(product.id)
+                            ? "bg-primary/10 border-primary"
+                            : "hover:bg-muted"
+                        }`}
+                        onClick={() => toggleProductSelection(product.id)}
+                      >
+                        <Checkbox
+                          checked={selectedProductIds.includes(product.id)}
+                          onCheckedChange={() => toggleProductSelection(product.id)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {product.code} • {new Intl.NumberFormat("vi-VN").format(product.price)}đ
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0">
+                          {product.type === ProductType.FOOD && "Món ăn"}
+                          {product.type === ProductType.DRINK && "Đồ uống"}
+                          {product.type === ProductType.OTHER && "Khác"}
+                          {product.type === ProductType.COMBO && "Combo"}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseAssignDialog}>
+              Hủy
+            </Button>
+            <Button onClick={handleSaveAssignments} disabled={savingAssign}>
+              {savingAssign && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu ({selectedProductIds.length} món)
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

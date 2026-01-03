@@ -305,4 +305,16 @@ export const productService = {
     const response = await api.delete<ProductNoteAssignment[]>(`/products/${productId}/notes/${noteId}`);
     return response.data;
   },
+
+  // === Note to Multiple Products Assignment ===
+
+  getProductsByNote: async (noteId: string): Promise<Product[]> => {
+    const response = await api.get<Product[]>(`/products/notes/${noteId}/products`);
+    return response.data;
+  },
+
+  assignNoteToProducts: async (noteId: string, productIds: string[]): Promise<{ noteId: string; productCount: number; products: Product[] }> => {
+    const response = await api.post<{ noteId: string; productCount: number; products: Product[] }>(`/products/notes/${noteId}/products`, { productIds });
+    return response.data;
+  },
 };
