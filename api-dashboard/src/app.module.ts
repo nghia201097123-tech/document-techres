@@ -9,6 +9,7 @@ import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { BranchesModule } from './modules/branches/branches.module';
+import { LocationsModule } from './modules/locations/locations.module';
 import {
   Company,
   Brand,
@@ -72,6 +73,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     DashboardModule,
     BrandsModule,
     BranchesModule,
+    LocationsModule,
   ],
 })
 export class AppModule {}

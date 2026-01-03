@@ -34,6 +34,7 @@ import { staffService, type Staff, type CreateStaffDto, type Gender } from "@/se
 import { departmentService, type Department } from "@/services/department-service";
 import { brandService, type Brand } from "@/services/brand-service";
 import { branchService, type Branch } from "@/services/branch-service";
+import { locationService, type Province, type Ward } from "@/services/location-service";
 
 const initialFormData: CreateStaffDto = {
   name: "",
@@ -43,6 +44,8 @@ const initialFormData: CreateStaffDto = {
   gender: "male",
   idNumber: "",
   address: "",
+  provinceCode: "",
+  wardCode: "",
   departmentId: "",
   brandId: "",
   branchId: "",
@@ -62,6 +65,8 @@ export default function StaffPage() {
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [branches, setBranches] = React.useState<Branch[]>([]);
+  const [provinces, setProvinces] = React.useState<Province[]>([]);
+  const [wards, setWards] = React.useState<Ward[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = React.useState(false);
 
   // Load staff list
@@ -81,12 +86,14 @@ export default function StaffPage() {
   const loadDropdowns = React.useCallback(async () => {
     try {
       setLoadingDropdowns(true);
-      const [deptData, brandData] = await Promise.all([
+      const [deptData, brandData, provinceData] = await Promise.all([
         departmentService.getAll(),
         brandService.getAll(),
+        locationService.getProvinces(),
       ]);
       setDepartments(deptData);
       setBrands(brandData);
+      setProvinces(provinceData);
     } catch (error) {
       console.error("Error loading dropdowns:", error);
     } finally {
@@ -106,6 +113,15 @@ export default function StaffPage() {
       setBranches([]);
     }
   }, [formData.brandId]);
+
+  // Load wards when province changes
+  React.useEffect(() => {
+    if (formData.provinceCode) {
+      locationService.getWards(formData.provinceCode).then(setWards).catch(console.error);
+    } else {
+      setWards([]);
+    }
+  }, [formData.provinceCode]);
 
   // Load dropdowns when dialog opens
   React.useEffect(() => {
@@ -156,6 +172,12 @@ export default function StaffPage() {
     setTempPassword(null);
     setFormData(initialFormData);
     setBranches([]);
+    setWards([]);
+  };
+
+  // Handle province change
+  const handleProvinceChange = (provinceCode: string) => {
+    setFormData({ ...formData, provinceCode, wardCode: "" });
   };
 
   // Handle brand change
@@ -341,19 +363,61 @@ export default function StaffPage() {
                   </div>
                 </div>
 
-                {/* Row 3: Address */}
+                {/* Row 3: Province and Ward */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="provinceCode">Tỉnh/Thành phố</Label>
+                    <Select
+                      value={formData.provinceCode || ""}
+                      onValueChange={handleProvinceChange}
+                      disabled={loadingDropdowns}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn tỉnh/thành phố" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {provinces.map((province) => (
+                          <SelectItem key={province.code} value={province.code}>
+                            {province.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="wardCode">Phường/Xã</Label>
+                    <Select
+                      value={formData.wardCode || ""}
+                      onValueChange={(value) => setFormData({ ...formData, wardCode: value })}
+                      disabled={!formData.provinceCode || wards.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn phường/xã" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wards.map((ward) => (
+                          <SelectItem key={ward.code} value={ward.code}>
+                            {ward.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 4: Address */}
                 <div className="grid gap-2">
-                  <Label htmlFor="address">Địa chỉ hành chính *</Label>
+                  <Label htmlFor="address">Địa chỉ chi tiết *</Label>
                   <Input
                     id="address"
-                    placeholder="123 Nguyễn Văn Linh, Phường 1, Quận 7, TP.HCM"
+                    placeholder="123 Nguyễn Văn Linh"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
                   />
                 </div>
 
-                {/* Row 4: Brand and Branch */}
+                {/* Row 5: Brand and Branch */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="brandId">Thương hiệu *</Label>
@@ -395,7 +459,7 @@ export default function StaffPage() {
                   </div>
                 </div>
 
-                {/* Row 5: Department */}
+                {/* Row 6: Department */}
                 <div className="grid gap-2">
                   <Label htmlFor="departmentId">Bộ phận *</Label>
                   <Select
@@ -416,7 +480,7 @@ export default function StaffPage() {
                   </Select>
                 </div>
 
-                {/* Row 6: ID Number and Email */}
+                {/* Row 7: ID Number and Email */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="idNumber">Căn cước công dân</Label>
@@ -439,7 +503,7 @@ export default function StaffPage() {
                   </div>
                 </div>
 
-                {/* Row 7: Phone */}
+                {/* Row 8: Phone */}
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Số điện thoại</Label>
                   <Input

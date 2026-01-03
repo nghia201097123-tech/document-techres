@@ -24,6 +24,16 @@ export class CreateStaffDto {
   @IsString()
   address: string;
 
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '001', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  wardCode?: string;
+
   @ApiProperty({ description: 'ID bộ phận' })
   @IsNotEmpty({ message: 'Bộ phận không được để trống' })
   @IsString()
