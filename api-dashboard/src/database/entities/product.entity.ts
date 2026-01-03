@@ -28,17 +28,17 @@ export class Product {
   @Index()
   tenantId: string;
 
-  @Column({ name: 'brand_id' })
+  @Column({ name: 'brand_id', nullable: true })
   brandId: string;
 
   @ManyToOne(() => Brand)
   @JoinColumn({ name: 'brand_id' })
   brand: Brand;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   code: string;
 
-  @Column()
+  @Column({ nullable: true })
   name: string;
 
   @Column({ type: 'text', nullable: true })
