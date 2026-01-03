@@ -31,10 +31,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { staffService, type Staff, type CreateStaffDto, type Gender } from "@/services/staff-service";
-import { departmentService, type Department } from "@/services/department-service";
-import { brandService, type Brand } from "@/services/brand-service";
-import { branchService, type Branch } from "@/services/branch-service";
-import { locationService, type Province, type Ward } from "@/services/location-service";
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchBrands } from "@/store/slices/brandsSlice";
+import { fetchBranchesByBrand } from "@/store/slices/branchesSlice";
+import { fetchDepartments } from "@/store/slices/departmentsSlice";
+import { fetchProvinces, fetchWardsByProvince } from "@/store/slices/locationsSlice";
 
 const initialFormData: CreateStaffDto = {
   name: "",
@@ -53,6 +56,15 @@ const initialFormData: CreateStaffDto = {
 };
 
 export default function StaffPage() {
+  const dispatch = useAppDispatch();
+
+  // Redux selectors
+  const { items: brands, loading: loadingBrands } = useAppSelector((state) => state.brands);
+  const { byBrandId: branchesByBrand, loading: loadingBranches } = useAppSelector((state) => state.branches);
+  const { items: departments, loading: loadingDepartments } = useAppSelector((state) => state.departments);
+  const { provinces, wardsByProvince, loadingProvinces, loadingWards } = useAppSelector((state) => state.locations);
+
+  // Local state
   const [search, setSearch] = React.useState("");
   const [staffList, setStaffList] = React.useState<Staff[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -61,13 +73,10 @@ export default function StaffPage() {
   const [formData, setFormData] = React.useState<CreateStaffDto>(initialFormData);
   const [createdStaff, setCreatedStaff] = React.useState<(Staff & { temporaryPassword: string }) | null>(null);
 
-  // Dropdown data
-  const [departments, setDepartments] = React.useState<Department[]>([]);
-  const [brands, setBrands] = React.useState<Brand[]>([]);
-  const [branches, setBranches] = React.useState<Branch[]>([]);
-  const [provinces, setProvinces] = React.useState<Province[]>([]);
-  const [wards, setWards] = React.useState<Ward[]>([]);
-  const [loadingDropdowns, setLoadingDropdowns] = React.useState(false);
+  // Derived state from Redux
+  const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
+  const wards = formData.provinceCode ? wardsByProvince[formData.provinceCode] || [] : [];
+  const loadingDropdowns = loadingBrands || loadingDepartments || loadingProvinces;
 
   // Load staff list
   const loadStaff = React.useCallback(async () => {
@@ -82,53 +91,32 @@ export default function StaffPage() {
     }
   }, []);
 
-  // Load dropdown data
-  const loadDropdowns = React.useCallback(async () => {
-    try {
-      setLoadingDropdowns(true);
-      const [deptData, brandData, provinceData] = await Promise.all([
-        departmentService.getAll(),
-        brandService.getAll(),
-        locationService.getProvinces(),
-      ]);
-      setDepartments(deptData);
-      setBrands(brandData);
-      setProvinces(provinceData);
-    } catch (error) {
-      console.error("Error loading dropdowns:", error);
-    } finally {
-      setLoadingDropdowns(false);
-    }
-  }, []);
-
   React.useEffect(() => {
     loadStaff();
   }, [loadStaff]);
 
-  // Load branches when brand changes
+  // Load branches when brand changes (using Redux)
   React.useEffect(() => {
     if (formData.brandId) {
-      branchService.getAll(formData.brandId).then(setBranches).catch(console.error);
-    } else {
-      setBranches([]);
+      dispatch(fetchBranchesByBrand(formData.brandId));
     }
-  }, [formData.brandId]);
+  }, [formData.brandId, dispatch]);
 
-  // Load wards when province changes
+  // Load wards when province changes (using Redux)
   React.useEffect(() => {
     if (formData.provinceCode) {
-      locationService.getWards(formData.provinceCode).then(setWards).catch(console.error);
-    } else {
-      setWards([]);
+      dispatch(fetchWardsByProvince(formData.provinceCode));
     }
-  }, [formData.provinceCode]);
+  }, [formData.provinceCode, dispatch]);
 
-  // Load dropdowns when dialog opens
+  // Load dropdowns when dialog opens (using Redux - cached data)
   React.useEffect(() => {
     if (dialogOpen) {
-      loadDropdowns();
+      dispatch(fetchDepartments());
+      dispatch(fetchBrands());
+      dispatch(fetchProvinces());
     }
-  }, [dialogOpen, loadDropdowns]);
+  }, [dialogOpen, dispatch]);
 
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,8 +159,6 @@ export default function StaffPage() {
     setDialogOpen(false);
     setCreatedStaff(null);
     setFormData(initialFormData);
-    setBranches([]);
-    setWards([]);
   };
 
   // Handle province change
@@ -378,7 +364,7 @@ export default function StaffPage() {
                     <Select
                       value={formData.provinceCode || ""}
                       onValueChange={handleProvinceChange}
-                      disabled={loadingDropdowns}
+                      disabled={loadingProvinces}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Chọn tỉnh/thành phố" />
@@ -397,7 +383,7 @@ export default function StaffPage() {
                     <Select
                       value={formData.wardCode || ""}
                       onValueChange={(value) => setFormData({ ...formData, wardCode: value })}
-                      disabled={!formData.provinceCode || wards.length === 0}
+                      disabled={!formData.provinceCode || loadingWards || wards.length === 0}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Chọn phường/xã" />
@@ -432,7 +418,7 @@ export default function StaffPage() {
                     <Select
                       value={formData.brandId}
                       onValueChange={handleBrandChange}
-                      disabled={loadingDropdowns}
+                      disabled={loadingBrands}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Chọn thương hiệu" />
@@ -451,7 +437,7 @@ export default function StaffPage() {
                     <Select
                       value={formData.branchId}
                       onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                      disabled={!formData.brandId || branches.length === 0}
+                      disabled={!formData.brandId || loadingBranches || branches.length === 0}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Chọn chi nhánh" />
@@ -473,7 +459,7 @@ export default function StaffPage() {
                   <Select
                     value={formData.departmentId}
                     onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
-                    disabled={loadingDropdowns}
+                    disabled={loadingDepartments}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn bộ phận" />

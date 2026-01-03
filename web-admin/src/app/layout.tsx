@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { ReduxProvider } from "@/store/provider";
 
 export const metadata: Metadata = {
   title: "TechRes Admin",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className="font-sans antialiased">
-        {children}
+        <ReduxProvider>
+          {children}
+        </ReduxProvider>
         <Toaster />
       </body>
     </html>

@@ -22,8 +22,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { companyService, type CreateCompanyWizardData, type WizardResponse } from "@/services/company-service";
-import { locationService, type Province, type Ward } from "@/services/location-service";
 import { useToast } from "@/hooks/use-toast";
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchProvinces, fetchWardsByProvince } from "@/store/slices/locationsSlice";
 
 interface CompanyWizardProps {
   open: boolean;
@@ -114,6 +117,7 @@ function generateAlias(name: string): string {
 }
 
 export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardProps) {
+  const dispatch = useAppDispatch();
   const [currentStep, setCurrentStep] = React.useState(1);
   const [wizardData, setWizardData] = React.useState<CreateCompanyWizardData>(initialWizardData);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -122,53 +126,34 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
   const { toast } = useToast();
 
-  // Location states
-  const [provinces, setProvinces] = React.useState<Province[]>([]);
-  const [companyWards, setCompanyWards] = React.useState<Ward[]>([]);
-  const [branchWards, setBranchWards] = React.useState<Ward[]>([]);
-  const [loadingLocations, setLoadingLocations] = React.useState(false);
+  // Redux selectors for locations
+  const { provinces, wardsByProvince, loadingProvinces, loadingWards } = useAppSelector((state) => state.locations);
 
+  // Derived state from Redux
+  const companyWards = wizardData.company.provinceCode ? wardsByProvince[wizardData.company.provinceCode] || [] : [];
+  const branchWards = wizardData.branch.provinceCode ? wardsByProvince[wizardData.branch.provinceCode] || [] : [];
+  const loadingLocations = loadingProvinces || loadingWards;
+
+  // Load provinces when dialog opens
   React.useEffect(() => {
-    if (open && provinces.length === 0) {
-      loadProvinces();
+    if (open) {
+      dispatch(fetchProvinces());
     }
-  }, [open]);
+  }, [open, dispatch]);
 
-  const loadProvinces = async () => {
-    try {
-      setLoadingLocations(true);
-      const data = await locationService.getProvinces();
-      setProvinces(data);
-    } catch (error) {
-      console.error("Error loading provinces:", error);
-    } finally {
-      setLoadingLocations(false);
+  // Load company wards when province changes
+  React.useEffect(() => {
+    if (wizardData.company.provinceCode) {
+      dispatch(fetchWardsByProvince(wizardData.company.provinceCode));
     }
-  };
+  }, [wizardData.company.provinceCode, dispatch]);
 
-  const loadCompanyWards = async (provinceCode: string) => {
-    try {
-      setLoadingLocations(true);
-      const data = await locationService.getWards(provinceCode);
-      setCompanyWards(data);
-    } catch (error) {
-      console.error("Error loading wards:", error);
-    } finally {
-      setLoadingLocations(false);
+  // Load branch wards when province changes
+  React.useEffect(() => {
+    if (wizardData.branch.provinceCode) {
+      dispatch(fetchWardsByProvince(wizardData.branch.provinceCode));
     }
-  };
-
-  const loadBranchWards = async (provinceCode: string) => {
-    try {
-      setLoadingLocations(true);
-      const data = await locationService.getWards(provinceCode);
-      setBranchWards(data);
-    } catch (error) {
-      console.error("Error loading wards:", error);
-    } finally {
-      setLoadingLocations(false);
-    }
-  };
+  }, [wizardData.branch.provinceCode, dispatch]);
 
   const handleChange = (section: keyof CreateCompanyWizardData, field: string, value: string | boolean) => {
     setWizardData((prev) => ({
@@ -191,21 +176,11 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   const handleCompanyProvinceChange = (provinceCode: string) => {
     handleChange("company", "provinceCode", provinceCode);
     handleChange("company", "wardCode", "");
-    if (provinceCode) {
-      loadCompanyWards(provinceCode);
-    } else {
-      setCompanyWards([]);
-    }
   };
 
   const handleBranchProvinceChange = (provinceCode: string) => {
     handleChange("branch", "provinceCode", provinceCode);
     handleChange("branch", "wardCode", "");
-    if (provinceCode) {
-      loadBranchWards(provinceCode);
-    } else {
-      setBranchWards([]);
-    }
   };
 
   const validateStep = (step: number): boolean => {
@@ -276,8 +251,6 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
     onOpenChange(false);
     setCurrentStep(1);
     setWizardData(initialWizardData);
-    setCompanyWards([]);
-    setBranchWards([]);
   };
 
   const handleCloseSuccess = () => {
