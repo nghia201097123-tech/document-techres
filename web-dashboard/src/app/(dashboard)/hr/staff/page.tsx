@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -160,6 +160,9 @@ export default function StaffPage() {
 
   // Continue creating state
   const [continueCreating, setContinueCreating] = React.useState(false);
+
+  // Reset password state
+  const [resetPasswordResult, setResetPasswordResult] = React.useState<{ staff: Staff; temporaryPassword: string } | null>(null);
 
   // Derived state from Redux - for create/edit form
   const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
@@ -343,6 +346,17 @@ export default function StaffPage() {
     } catch (error: any) {
       console.error("Error toggling staff:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    }
+  };
+
+  // Handle reset password
+  const handleResetPassword = async (staff: Staff) => {
+    try {
+      const result = await staffService.resetPassword(staff.id);
+      setResetPasswordResult({ staff, temporaryPassword: result.temporaryPassword });
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi reset mật khẩu", variant: "destructive" });
     }
   };
 
@@ -810,6 +824,10 @@ export default function StaffPage() {
                           <DropdownMenuItem onClick={() => handleOpenEdit(staff)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             Chỉnh sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleResetPassword(staff)}>
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Reset mật khẩu
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleToggleActive(staff)}>
@@ -1456,6 +1474,41 @@ export default function StaffPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Result Dialog */}
+      <Dialog open={resetPasswordResult !== null} onOpenChange={() => setResetPasswordResult(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset mật khẩu thành công</DialogTitle>
+            <DialogDescription>
+              Mật khẩu mới đã được tạo cho nhân viên
+            </DialogDescription>
+          </DialogHeader>
+          {resetPasswordResult && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-green-50 p-4 border border-green-200">
+                <div className="space-y-2">
+                  <p className="text-sm text-green-700">
+                    Nhân viên: <strong>{resetPasswordResult.staff.name}</strong>
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Username: <strong className="font-mono">{resetPasswordResult.staff.username}</strong>
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Mật khẩu mới: <strong className="font-mono text-lg">{resetPasswordResult.temporaryPassword}</strong>
+                  </p>
+                </div>
+                <p className="text-xs text-green-600 mt-3">
+                  Vui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setResetPasswordResult(null)}>Đóng</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

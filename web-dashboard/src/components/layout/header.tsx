@@ -1,8 +1,11 @@
 "use client";
 
+import * as React from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Settings, Bell } from "lucide-react";
+import { LogOut, User, KeyRound, Bell, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,16 +14,67 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/auth-store";
+import { authService } from "@/services/auth-service";
+import { useToast } from "@/hooks/use-toast";
 
 export function Header() {
   const router = useRouter();
+  const { toast } = useToast();
   const { staff, logout } = useAuthStore();
+
+  // Change password state
+  const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
+  const [changingPassword, setChangingPassword] = React.useState(false);
+  const [passwordForm, setPasswordForm] = React.useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const handleLogout = () => {
     logout();
     router.push("/login");
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({ title: "Lỗi", description: "Mật khẩu xác nhận không khớp", variant: "destructive" });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast({ title: "Lỗi", description: "Mật khẩu mới phải có ít nhất 6 ký tự", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      await authService.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+      toast({ title: "Thành công", description: "Đổi mật khẩu thành công" });
+      setChangePasswordOpen(false);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi đổi mật khẩu",
+        variant: "destructive"
+      });
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -83,8 +137,8 @@ export function Header() {
               <User className="mr-2 h-4 w-4" />
               Thông tin cá nhân
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
+            <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
+              <KeyRound className="mr-2 h-4 w-4" />
               Đổi mật khẩu
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -95,6 +149,65 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Change Password Dialog */}
+      <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Đổi mật khẩu</DialogTitle>
+            <DialogDescription>
+              Nhập mật khẩu hiện tại và mật khẩu mới để thay đổi
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="currentPassword">Mật khẩu hiện tại</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  placeholder="Nhập mật khẩu hiện tại"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="newPassword">Mật khẩu mới</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirmPassword">Xác nhận mật khẩu mới</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Nhập lại mật khẩu mới"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setChangePasswordOpen(false)}>
+                Hủy
+              </Button>
+              <Button type="submit" disabled={changingPassword}>
+                {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Đổi mật khẩu
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }
