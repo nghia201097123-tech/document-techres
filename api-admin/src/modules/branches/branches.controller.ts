@@ -1,11 +1,11 @@
 import {
   Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { BranchListDto } from './dto/branch-list.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Branches')
@@ -23,9 +23,8 @@ export class BranchesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all branches' })
-  @ApiQuery({ name: 'brandId', required: false })
-  findAll(@Query() paginationDto: PaginationDto, @Query('brandId') brandId?: string) {
-    return this.branchesService.findAll({ ...paginationDto, brandId });
+  findAll(@Query() query: BranchListDto) {
+    return this.branchesService.findAll(query);
   }
 
   @Get(':id')
