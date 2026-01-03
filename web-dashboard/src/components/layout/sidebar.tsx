@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Table2,
   MapPin,
+  Cherry,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -48,6 +49,7 @@ const menuItems: MenuItem[] = [
     children: [
       { title: "Món ăn", href: "/menu/products", icon: UtensilsCrossed },
       { title: "Danh mục", href: "/menu/categories", icon: FolderOpen },
+      { title: "Topping Options", href: "/menu/topping-options", icon: Cherry },
     ],
   },
   {

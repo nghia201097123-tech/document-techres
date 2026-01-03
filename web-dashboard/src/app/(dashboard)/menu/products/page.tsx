@@ -91,6 +91,7 @@ export default function ProductsPage() {
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
   const [newGroupName, setNewGroupName] = React.useState("");
   const [newGroupRequired, setNewGroupRequired] = React.useState(false);
+  const [newGroupMinSelection, setNewGroupMinSelection] = React.useState(0);
   const [newGroupMaxSelection, setNewGroupMaxSelection] = React.useState(1);
   const [addingToGroupId, setAddingToGroupId] = React.useState<string | null>(null);
 
@@ -184,12 +185,13 @@ export default function ProductsPage() {
       const result = await productService.createToppingGroup(selectedProduct.id, {
         name: newGroupName.trim(),
         isRequired: newGroupRequired,
+        minSelection: newGroupMinSelection,
         maxSelection: newGroupMaxSelection,
-        minSelection: newGroupRequired ? 1 : 0,
       });
       setToppingGroups(result);
       setNewGroupName("");
       setNewGroupRequired(false);
+      setNewGroupMinSelection(0);
       setNewGroupMaxSelection(1);
       // Expand the new group
       const newGroup = result.find(g => g.name === newGroupName.trim());
@@ -356,6 +358,7 @@ export default function ProductsPage() {
     setExpandedGroups(new Set());
     setNewGroupName("");
     setNewGroupRequired(false);
+    setNewGroupMinSelection(0);
     setNewGroupMaxSelection(1);
     setAddingToGroupId(null);
   };
@@ -776,23 +779,33 @@ export default function ProductsPage() {
                       placeholder="Tên nhóm (VD: Size, Topping)"
                       value={newGroupName}
                       onChange={(e) => setNewGroupName(e.target.value)}
-                      className="col-span-5"
+                      className="col-span-4"
                     />
-                    <div className="col-span-3 flex items-center gap-2">
+                    <div className="col-span-2 flex items-center gap-2">
                       <Switch
                         checked={newGroupRequired}
                         onCheckedChange={setNewGroupRequired}
                       />
                       <Label className="text-xs">Bắt buộc</Label>
                     </div>
-                    <Input
-                      type="number"
-                      min="1"
-                      placeholder="Max"
-                      value={newGroupMaxSelection}
-                      onChange={(e) => setNewGroupMaxSelection(Number(e.target.value))}
-                      className="col-span-2"
-                    />
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="Min"
+                        value={newGroupMinSelection}
+                        onChange={(e) => setNewGroupMinSelection(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Max"
+                        value={newGroupMaxSelection}
+                        onChange={(e) => setNewGroupMaxSelection(Number(e.target.value))}
+                      />
+                    </div>
                     <Button
                       onClick={handleCreateGroup}
                       disabled={!newGroupName.trim() || savingToppings}
@@ -802,7 +815,7 @@ export default function ProductsPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Max = số lượng tối đa có thể chọn trong nhóm
+                    Min = số lượng tối thiểu phải chọn, Max = số lượng tối đa được chọn
                   </p>
                 </div>
 
@@ -835,7 +848,7 @@ export default function ProductsPage() {
                               {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              (chọn tối đa {group.maxSelection})
+                              (chọn {group.minSelection}-{group.maxSelection})
                             </span>
                             <span className="text-xs text-muted-foreground">
                               • {group.items.length} item
