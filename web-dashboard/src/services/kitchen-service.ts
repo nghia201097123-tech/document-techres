@@ -1,4 +1,5 @@
 import api from "./api";
+import { Product } from "./product-service";
 
 export interface Kitchen {
   id: string;
@@ -8,6 +9,7 @@ export interface Kitchen {
   description?: string;
   isActive: boolean;
   sortOrder: number;
+  productCount?: number;
   createdAt: string;
 }
 
@@ -54,5 +56,36 @@ export const kitchenService = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/kitchen/${id}`);
+  },
+
+  // Product assignment APIs
+  getKitchenProducts: async (kitchenId: string): Promise<Product[]> => {
+    const response = await api.get<Product[]>(`/kitchen/${kitchenId}/products`);
+    return response.data;
+  },
+
+  setKitchenProducts: async (kitchenId: string, productIds: string[]): Promise<Product[]> => {
+    const response = await api.put<Product[]>(`/kitchen/${kitchenId}/products`, { productIds });
+    return response.data;
+  },
+
+  addProductToKitchen: async (kitchenId: string, productId: string): Promise<Product[]> => {
+    const response = await api.post<Product[]>(`/kitchen/${kitchenId}/products/${productId}`);
+    return response.data;
+  },
+
+  removeProductFromKitchen: async (kitchenId: string, productId: string): Promise<Product[]> => {
+    const response = await api.delete<Product[]>(`/kitchen/${kitchenId}/products/${productId}`);
+    return response.data;
+  },
+
+  getProductKitchens: async (productId: string): Promise<Kitchen[]> => {
+    const response = await api.get<Kitchen[]>(`/kitchen/product/${productId}/kitchens`);
+    return response.data;
+  },
+
+  setProductKitchens: async (productId: string, kitchenIds: string[]): Promise<Kitchen[]> => {
+    const response = await api.put<Kitchen[]>(`/kitchen/product/${productId}/kitchens`, { kitchenIds });
+    return response.data;
   },
 };

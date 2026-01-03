@@ -39,6 +39,7 @@ import {
   ProductNote,
   ProductNoteAssignment,
   Unit,
+  ProductKitchen,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -81,6 +82,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           ProductNote,
           ProductNoteAssignment,
           Unit,
+          ProductKitchen,
         ],
         synchronize: false,
       }),
