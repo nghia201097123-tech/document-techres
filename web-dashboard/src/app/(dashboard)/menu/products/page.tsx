@@ -170,20 +170,23 @@ export default function ProductsPage() {
     setDialogMode("edit");
   };
 
-  // Open toppings management dialog
+  // Open toppings management dialog (show assigned groups)
   const handleOpenToppings = async (product: Product) => {
     setSelectedProduct(product);
     setDialogMode("toppings");
     setLoadingToppings(true);
     try {
-      const [toppings, groups] = await Promise.all([
+      const [toppings, assignedGroups, allGroups] = await Promise.all([
         productService.getAvailableToppings(),
-        productService.getToppingGroups(product.id),
+        productService.getProductToppingGroups(product.id),
+        productService.getAllToppingGroups(),
       ]);
       setAvailableToppings(toppings);
-      setToppingGroups(groups);
+      setToppingGroups(assignedGroups);
+      // Store all groups for assignment dialog
+      (window as any).__allToppingGroups = allGroups;
       // Expand all groups by default
-      setExpandedGroups(new Set(groups.map(g => g.id)));
+      setExpandedGroups(new Set(assignedGroups.map(g => g.id)));
     } catch (error) {
       console.error("Error loading toppings:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách topping", variant: "destructive" });
@@ -192,28 +195,28 @@ export default function ProductsPage() {
     }
   };
 
-  // Create topping group
+  // Create topping group (shared - then assign to product)
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || !selectedProduct) return;
     setSavingToppings(true);
     try {
-      const result = await productService.createToppingGroup(selectedProduct.id, {
+      // Create shared group
+      const newGroup = await productService.createToppingGroup({
         name: newGroupName.trim(),
         isRequired: newGroupRequired,
         minSelection: newGroupMinSelection,
         maxSelection: newGroupMaxSelection,
       });
+      // Assign to current product
+      const result = await productService.addToppingGroupToProduct(selectedProduct.id, newGroup.id);
       setToppingGroups(result);
       setNewGroupName("");
       setNewGroupRequired(false);
       setNewGroupMinSelection(0);
       setNewGroupMaxSelection(1);
       // Expand the new group
-      const newGroup = result.find(g => g.name === newGroupName.trim());
-      if (newGroup) {
-        setExpandedGroups(prev => new Set([...prev, newGroup.id]));
-      }
-      toast({ title: "Thành công", description: `Đã tạo nhóm "${newGroupName}"` });
+      setExpandedGroups(prev => new Set([...prev, newGroup.id]));
+      toast({ title: "Thành công", description: `Đã tạo và gán nhóm "${newGroupName}"` });
     } catch (error: any) {
       console.error("Error creating group:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
@@ -222,32 +225,34 @@ export default function ProductsPage() {
     }
   };
 
-  // Delete topping group
+  // Remove topping group from product (unassign)
   const handleDeleteGroup = async (groupId: string) => {
     if (!selectedProduct) return;
     setSavingToppings(true);
     try {
-      const result = await productService.deleteToppingGroup(selectedProduct.id, groupId);
+      const result = await productService.removeToppingGroupFromProduct(selectedProduct.id, groupId);
       setToppingGroups(result);
-      toast({ title: "Thành công", description: "Đã xóa nhóm topping" });
+      toast({ title: "Thành công", description: "Đã gỡ nhóm topping khỏi món" });
     } catch (error: any) {
-      console.error("Error deleting group:", error);
+      console.error("Error removing group:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
     } finally {
       setSavingToppings(false);
     }
   };
 
-  // Add topping to group
+  // Add topping to group (shared group item)
   const handleAddToppingToGroup = async (groupId: string, toppingId: string) => {
     if (!selectedProduct) return;
     setSavingToppings(true);
     try {
-      const result = await productService.addToppingItem(selectedProduct.id, groupId, {
+      await productService.addToppingItem(groupId, {
         toppingId,
         priceAdjustment: 0,
         maxQuantity: 5,
       });
+      // Refresh assigned groups
+      const result = await productService.getProductToppingGroups(selectedProduct.id);
       setToppingGroups(result);
       setAddingToGroupId(null);
       const topping = availableToppings.find(t => t.id === toppingId);
@@ -260,12 +265,14 @@ export default function ProductsPage() {
     }
   };
 
-  // Remove topping from group
+  // Remove topping from group (shared group item)
   const handleRemoveToppingFromGroup = async (groupId: string, itemId: string) => {
     if (!selectedProduct) return;
     setSavingToppings(true);
     try {
-      const result = await productService.removeToppingItem(selectedProduct.id, groupId, itemId);
+      await productService.removeToppingItem(groupId, itemId);
+      // Refresh assigned groups
+      const result = await productService.getProductToppingGroups(selectedProduct.id);
       setToppingGroups(result);
       toast({ title: "Thành công", description: "Đã xóa topping khỏi nhóm" });
     } catch (error: any) {
@@ -301,18 +308,33 @@ export default function ProductsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || formData.price <= 0) {
-      toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ tên món và giá", variant: "destructive" });
+    if (!formData.name.trim() || formData.price < 0) {
+      toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ tên món và giá hợp lệ", variant: "destructive" });
       return;
     }
+
+    // Prepare data with proper number types
+    const preparedData = {
+      name: formData.name,
+      type: formData.type,
+      price: Number(formData.price) || 0,
+      vatRate: Number(formData.vatRate) || 0,
+      categoryId: formData.categoryId || undefined,
+      description: formData.description || undefined,
+      imageUrl: formData.imageUrl || undefined,
+      preparationTime: Number(formData.preparationTime) || 0,
+      costPrice: Number(formData.costPrice) || 0,
+      sellingType: formData.sellingType,
+      unit: formData.unit || undefined,
+      printDish: formData.printDish ?? true,
+      printLabel: formData.printLabel ?? false,
+      printSeafood: formData.printSeafood ?? false,
+    };
 
     if (dialogMode === "create") {
       try {
         setSaving(true);
-        const result = await productService.create({
-          ...formData,
-          categoryId: formData.categoryId || undefined,
-        });
+        const result = await productService.create(preparedData);
         setProducts((prev) => [...prev, result]);
         toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });
         handleCloseDialog();
@@ -323,19 +345,9 @@ export default function ProductsPage() {
         setSaving(false);
       }
     } else if (dialogMode === "edit" && selectedProduct) {
-      const updateData: UpdateProductDto = {
-        name: formData.name,
-        type: formData.type,
-        price: formData.price,
-        vatRate: formData.vatRate,
-        categoryId: formData.categoryId || undefined,
-        description: formData.description || undefined,
-        imageUrl: formData.imageUrl || undefined,
-      };
-
       try {
         setSaving(true);
-        const result = await productService.update(selectedProduct.id, updateData);
+        const result = await productService.update(selectedProduct.id, preparedData);
         setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? result : p)));
         toast({ title: "Thành công", description: "Đã cập nhật thông tin món ăn" });
         handleCloseDialog();

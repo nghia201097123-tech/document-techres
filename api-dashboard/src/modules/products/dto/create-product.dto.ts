@@ -1,5 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, IsNumber, IsEnum, MaxLength, Min, IsBoolean, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
 
 export enum ProductType {
   FOOD = 'food',
@@ -28,14 +29,16 @@ export class CreateProductDto {
 
   @ApiProperty({ example: 55000 })
   @IsNotEmpty({ message: 'Giá không được để trống' })
+  @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(0, { message: 'Giá phải >= 0' })
   price: number;
 
   @ApiPropertyOptional({ example: 10, default: 10 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(0, { message: 'VAT phải >= 0' })
   vatRate?: number;
 
   @ApiProperty({ enum: ProductType, example: ProductType.FOOD })
@@ -55,14 +58,16 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({ example: 15, description: 'Thời gian chế biến (phút)' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(0, { message: 'Thời gian chế biến phải >= 0' })
   preparationTime?: number;
 
-  @ApiPropertyOptional({ example: 30000, description: 'Giá vốn' })
+  @ApiPropertyOptional({ example: 30000, description: 'Giá vốn (cho phép = 0)' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(0, { message: 'Giá vốn phải >= 0' })
   costPrice?: number;
 
   @ApiPropertyOptional({ enum: SellingType, default: SellingType.PORTION, description: 'Loại bán (theo phần/theo ký)' })
@@ -77,16 +82,19 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({ default: true, description: 'Cho phép in món' })
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   printDish?: boolean;
 
   @ApiPropertyOptional({ default: false, description: 'Cho phép in tem' })
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   printLabel?: boolean;
 
   @ApiPropertyOptional({ default: false, description: 'Cho phép in hồ hải sản' })
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   printSeafood?: boolean;
 
