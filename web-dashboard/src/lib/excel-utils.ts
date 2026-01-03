@@ -12,7 +12,7 @@ export function exportToExcel<T extends Record<string, any>>(
   const headers = columns.map((col) => col.header);
   const rows = data.map((item) =>
     columns.map((col) => {
-      const value = item[col.key];
+      const value = item[col.key] as unknown;
       // Format dates
       if (value instanceof Date) {
         return value.toLocaleDateString("vi-VN");
@@ -21,7 +21,7 @@ export function exportToExcel<T extends Record<string, any>>(
       if (typeof value === "boolean") {
         return value ? "Có" : "Không";
       }
-      return value ?? "";
+      return (value as string) ?? "";
     })
   );
 
@@ -153,7 +153,8 @@ export function validateImportData<T>(
 
     // Run custom validators
     if (validators) {
-      Object.entries(validators).forEach(([field, validator]) => {
+      Object.entries(validators).forEach(([field, validatorFn]) => {
+        const validator = validatorFn as ((value: any) => string | null) | undefined;
         if (validator && row[field as keyof T]) {
           const error = validator(row[field as keyof T]);
           if (error) {
