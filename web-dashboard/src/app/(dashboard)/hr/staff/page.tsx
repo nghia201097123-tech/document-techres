@@ -5,6 +5,7 @@ import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -157,6 +158,9 @@ export default function StaffPage() {
   const [importing, setImporting] = React.useState(false);
   const [importSettings, setImportSettings] = React.useState<ImportSettings>(initialImportSettings);
 
+  // Continue creating state
+  const [continueCreating, setContinueCreating] = React.useState(false);
+
   // Derived state from Redux - for create/edit form
   const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
   const wards = formData.provinceCode ? wardsByProvince[formData.provinceCode] || [] : [];
@@ -272,9 +276,26 @@ export default function StaffPage() {
       try {
         setSaving(true);
         const result = await staffService.create(formData);
-        setCreatedStaff(result);
         setStaffList((prev) => [...prev, result]);
-        toast({ title: "Thành công", description: "Đã tạo nhân viên mới" });
+
+        if (continueCreating) {
+          // Reset form but keep brand, branch, department for continuous creation
+          setFormData({
+            ...initialFormData,
+            brandId: formData.brandId,
+            branchId: formData.branchId,
+            departmentId: formData.departmentId,
+            provinceCode: formData.provinceCode,
+            wardCode: formData.wardCode,
+          });
+          toast({
+            title: "Thành công",
+            description: `Đã tạo ${result.name} (${result.username}). Mật khẩu: ${result.temporaryPassword}`,
+          });
+        } else {
+          setCreatedStaff(result);
+          toast({ title: "Thành công", description: "Đã tạo nhân viên mới" });
+        }
       } catch (error: any) {
         console.error("Error creating staff:", error);
         toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi tạo nhân viên", variant: "destructive" });
@@ -1407,17 +1428,31 @@ export default function StaffPage() {
                   />
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={saving || (dialogMode === "create" && (!formData.name.trim() || !formData.birthDate || !formData.address.trim() || !formData.departmentId || !formData.brandId || !formData.branchId))}
-                >
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {dialogMode === "create" ? "Tạo nhân viên" : "Cập nhật"}
-                </Button>
+              <DialogFooter className="flex-col sm:flex-row gap-4">
+                {dialogMode === "create" && (
+                  <div className="flex items-center space-x-2 mr-auto">
+                    <Checkbox
+                      id="continueCreating"
+                      checked={continueCreating}
+                      onCheckedChange={(checked) => setContinueCreating(checked === true)}
+                    />
+                    <Label htmlFor="continueCreating" className="text-sm font-normal cursor-pointer">
+                      Tiếp tục tạo sau khi lưu
+                    </Label>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                    Hủy
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving || (dialogMode === "create" && (!formData.name.trim() || !formData.birthDate || !formData.address.trim() || !formData.departmentId || !formData.brandId || !formData.branchId))}
+                  >
+                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {dialogMode === "create" ? "Tạo nhân viên" : "Cập nhật"}
+                  </Button>
+                </div>
               </DialogFooter>
             </form>
           )}
