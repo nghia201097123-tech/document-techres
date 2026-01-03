@@ -357,15 +357,8 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Product kitchens table created successfully');
       }
 
-      // 17. Create paper_size and print_mode enums if not exists
-      this.logger.log('Creating paper_size and print_mode enums...');
-      await queryRunner.query(`
-        DO $$ BEGIN
-          CREATE TYPE paper_size AS ENUM ('58mm', '80mm');
-        EXCEPTION
-          WHEN duplicate_object THEN null;
-        END $$;
-      `);
+      // 17. Create print_mode enum if not exists
+      this.logger.log('Creating print_mode enum...');
       await queryRunner.query(`
         DO $$ BEGIN
           CREATE TYPE print_mode AS ENUM ('individual', 'list');
@@ -387,10 +380,24 @@ export class DatabaseMigrationService implements OnModuleInit {
         await queryRunner.query(`
           ALTER TABLE kitchens
           ADD COLUMN IF NOT EXISTS printer_port INTEGER DEFAULT 9100,
-          ADD COLUMN IF NOT EXISTS paper_size paper_size DEFAULT '80mm',
+          ADD COLUMN IF NOT EXISTS paper_size VARCHAR(50) DEFAULT '80mm',
           ADD COLUMN IF NOT EXISTS print_mode print_mode DEFAULT 'list'
         `);
         this.logger.log('Printer config columns added to kitchens table');
+      }
+
+      // 19. Convert paper_size from enum to varchar if needed
+      const paperSizeType = await queryRunner.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'kitchens' AND column_name = 'paper_size'
+      `);
+      if (paperSizeType.length > 0 && paperSizeType[0].data_type === 'USER-DEFINED') {
+        this.logger.log('Converting paper_size from enum to varchar...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ALTER COLUMN paper_size TYPE VARCHAR(50) USING paper_size::text
+        `);
+        this.logger.log('paper_size column converted to varchar');
       }
 
       this.logger.log('Database migration completed successfully');

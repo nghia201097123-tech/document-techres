@@ -35,9 +35,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type PaperSize, type PrintMode } from "@/services/kitchen-service";
+import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type PrintMode } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Common paper sizes for thermal printers
+const PAPER_SIZE_SUGGESTIONS = ["58mm", "80mm", "76mm", "110mm", "A4"];
 
 type DialogMode = "create" | "edit" | "products" | null;
 
@@ -458,18 +461,18 @@ export default function KitchenPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="paperSize">Kích thước giấy</Label>
-                  <Select
-                    value={formData.paperSize}
-                    onValueChange={(value: PaperSize) => setFormData({ ...formData, paperSize: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn kích thước" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="58mm">58mm</SelectItem>
-                      <SelectItem value="80mm">80mm</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="paperSize"
+                    list="paperSizeList"
+                    placeholder="58mm, 80mm..."
+                    value={formData.paperSize || ""}
+                    onChange={(e) => setFormData({ ...formData, paperSize: e.target.value })}
+                  />
+                  <datalist id="paperSizeList">
+                    {PAPER_SIZE_SUGGESTIONS.map((size) => (
+                      <option key={size} value={size} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="printMode">Chế độ in</Label>

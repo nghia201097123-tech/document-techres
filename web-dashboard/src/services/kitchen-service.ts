@@ -1,7 +1,6 @@
 import api from "./api";
 import { Product } from "./product-service";
 
-export type PaperSize = "58mm" | "80mm";
 export type PrintMode = "individual" | "list";
 
 export interface Kitchen {
@@ -10,7 +9,7 @@ export interface Kitchen {
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
-  paperSize?: PaperSize;
+  paperSize?: string;
   printMode?: PrintMode;
   description?: string;
   isActive: boolean;
@@ -24,7 +23,7 @@ export interface CreateKitchenDto {
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
-  paperSize?: PaperSize;
+  paperSize?: string;
   printMode?: PrintMode;
   description?: string;
 }
@@ -34,7 +33,7 @@ export interface UpdateKitchenDto {
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
-  paperSize?: PaperSize;
+  paperSize?: string;
   printMode?: PrintMode;
   description?: string;
 }

@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsEnum, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaperSize, PrintMode } from '../../../database/entities/kitchen.entity';
+import { PrintMode } from '../../../database/entities/kitchen.entity';
 
 export class CreateKitchenDto {
   @ApiProperty({ example: 'Bếp chính' })
@@ -27,10 +27,11 @@ export class CreateKitchenDto {
   @Max(65535)
   printerPort?: number;
 
-  @ApiPropertyOptional({ example: '80mm', enum: PaperSize, description: 'Kích thước giấy in' })
+  @ApiPropertyOptional({ example: '80mm', description: 'Kích thước giấy in (VD: 58mm, 80mm, A4...)' })
   @IsOptional()
-  @IsEnum(PaperSize)
-  paperSize?: PaperSize;
+  @IsString()
+  @MaxLength(50)
+  paperSize?: string;
 
   @ApiPropertyOptional({ example: 'list', enum: PrintMode, description: 'Chế độ in: individual (từng món) hoặc list (danh sách)' })
   @IsOptional()

@@ -45,6 +45,10 @@ export default function ToppingOptionsPage() {
 
   // Adding topping to group
   const [showAddToppingDialog, setShowAddToppingDialog] = React.useState(false);
+  const [showQuickCreateForm, setShowQuickCreateForm] = React.useState(false);
+  const [quickCreateName, setQuickCreateName] = React.useState("");
+  const [quickCreatePrice, setQuickCreatePrice] = React.useState<number>(0);
+  const [creatingTopping, setCreatingTopping] = React.useState(false);
 
   // Edit group dialog
   const [editingGroup, setEditingGroup] = React.useState<ToppingGroup | null>(null);
@@ -270,6 +274,53 @@ export default function ToppingOptionsPage() {
     if (!selectedGroup) return availableToppings;
     const usedIds = new Set(selectedGroup.items.map(i => i.toppingId));
     return availableToppings.filter(t => !usedIds.has(t.id));
+  };
+
+  // Quick create topping and add to group
+  const handleQuickCreateTopping = async () => {
+    if (!quickCreateName.trim() || !selectedGroup) return;
+    setCreatingTopping(true);
+    try {
+      // Create topping product
+      const newTopping = await productService.create({
+        name: quickCreateName.trim(),
+        type: ProductType.TOPPING,
+        price: quickCreatePrice || 0,
+      });
+
+      // Refresh available toppings
+      const toppings = await productService.getAvailableToppings();
+      setAvailableToppings(toppings);
+
+      // Add to group
+      const updated = await productService.addToppingItem(selectedGroup.id, {
+        toppingId: newTopping.id,
+        priceAdjustment: quickCreatePrice || 0,
+        maxQuantity: 5,
+      });
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      setSelectedGroup(updated);
+
+      // Reset form
+      setQuickCreateName("");
+      setQuickCreatePrice(0);
+      setShowQuickCreateForm(false);
+      toast({ title: "Thành công", description: `Đã tạo và thêm "${newTopping.name}" vào nhóm` });
+    } catch (error: any) {
+      console.error("Error creating topping:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setCreatingTopping(false);
+    }
+  };
+
+  // Reset quick create form when dialog closes
+  const handleCloseAddToppingDialog = () => {
+    setShowAddToppingDialog(false);
+    setShowQuickCreateForm(false);
+    setQuickCreateName("");
+    setQuickCreatePrice(0);
   };
 
   // Format currency
@@ -592,36 +643,99 @@ export default function ToppingOptionsPage() {
       </Tabs>
 
       {/* Add Topping Dialog */}
-      <Dialog open={showAddToppingDialog} onOpenChange={setShowAddToppingDialog}>
+      <Dialog open={showAddToppingDialog} onOpenChange={handleCloseAddToppingDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Thêm Topping vào nhóm</DialogTitle>
             <DialogDescription>
-              Chọn topping để thêm vào nhóm "{selectedGroup?.name}"
+              Chọn topping để thêm vào nhóm &quot;{selectedGroup?.name}&quot;
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[400px] overflow-y-auto space-y-2 py-4">
-            {getAvailableToppingsForGroup().map((topping) => (
-              <div
-                key={topping.id}
-                className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-muted"
-                onClick={() => handleAddToppingToGroup(topping.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <Cherry className="h-5 w-5 text-purple-500" />
-                  <div>
-                    <div className="font-medium">{topping.name}</div>
-                    <div className="text-xs text-muted-foreground">{topping.code}</div>
+          <div className="py-4">
+            {/* Quick create form */}
+            {showQuickCreateForm ? (
+              <div className="border rounded-lg p-4 mb-4 bg-muted/30">
+                <h4 className="font-medium mb-3">Tạo topping mới</h4>
+                <div className="space-y-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="quickCreateName">Tên topping *</Label>
+                    <Input
+                      id="quickCreateName"
+                      placeholder="VD: Trân châu đen, Size L..."
+                      value={quickCreateName}
+                      onChange={(e) => setQuickCreateName(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="quickCreatePrice">Giá (VND)</Label>
+                    <Input
+                      id="quickCreatePrice"
+                      type="number"
+                      placeholder="0"
+                      value={quickCreatePrice || ""}
+                      onChange={(e) => setQuickCreatePrice(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleQuickCreateTopping}
+                      disabled={!quickCreateName.trim() || creatingTopping}
+                    >
+                      {creatingTopping && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      Tạo & thêm vào nhóm
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowQuickCreateForm(false);
+                        setQuickCreateName("");
+                        setQuickCreatePrice(0);
+                      }}
+                    >
+                      Hủy
+                    </Button>
                   </div>
                 </div>
-                <span className="text-sm text-green-600">{formatCurrency(topping.price)}</span>
               </div>
-            ))}
-            {getAvailableToppingsForGroup().length === 0 && (
-              <p className="text-center text-muted-foreground py-4">
-                Không còn topping nào để thêm
-              </p>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full mb-4"
+                onClick={() => setShowQuickCreateForm(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Tạo topping mới
+              </Button>
             )}
+
+            {/* Available toppings list */}
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {getAvailableToppingsForGroup().length > 0 && (
+                <p className="text-sm text-muted-foreground mb-2">Hoặc chọn từ danh sách:</p>
+              )}
+              {getAvailableToppingsForGroup().map((topping) => (
+                <div
+                  key={topping.id}
+                  className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-muted"
+                  onClick={() => handleAddToppingToGroup(topping.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Cherry className="h-5 w-5 text-purple-500" />
+                    <div>
+                      <div className="font-medium">{topping.name}</div>
+                      <div className="text-xs text-muted-foreground">{topping.code}</div>
+                    </div>
+                  </div>
+                  <span className="text-sm text-green-600">{formatCurrency(topping.price)}</span>
+                </div>
+              ))}
+              {getAvailableToppingsForGroup().length === 0 && !showQuickCreateForm && (
+                <p className="text-center text-muted-foreground py-4">
+                  Không còn topping nào. Hãy tạo mới bằng nút phía trên.
+                </p>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

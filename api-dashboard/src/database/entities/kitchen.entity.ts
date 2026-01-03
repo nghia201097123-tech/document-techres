@@ -10,11 +10,6 @@ import {
 } from 'typeorm';
 import { Branch } from './branch.entity';
 
-export enum PaperSize {
-  MM_58 = '58mm',
-  MM_80 = '80mm',
-}
-
 export enum PrintMode {
   INDIVIDUAL = 'individual', // In từng món riêng lẻ
   LIST = 'list', // In danh sách món
@@ -49,13 +44,8 @@ export class Kitchen {
   @Column({ name: 'printer_port', type: 'int', nullable: true, default: 9100 })
   printerPort: number;
 
-  @Column({
-    name: 'paper_size',
-    type: 'enum',
-    enum: PaperSize,
-    default: PaperSize.MM_80,
-  })
-  paperSize: PaperSize;
+  @Column({ name: 'paper_size', type: 'varchar', length: 50, nullable: true, default: '80mm' })
+  paperSize: string;
 
   @Column({
     name: 'print_mode',
