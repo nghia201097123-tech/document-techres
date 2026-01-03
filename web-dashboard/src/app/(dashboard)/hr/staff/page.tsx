@@ -59,7 +59,7 @@ export default function StaffPage() {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [formData, setFormData] = React.useState<CreateStaffDto>(initialFormData);
-  const [tempPassword, setTempPassword] = React.useState<string | null>(null);
+  const [createdStaff, setCreatedStaff] = React.useState<(Staff & { temporaryPassword: string }) | null>(null);
 
   // Dropdown data
   const [departments, setDepartments] = React.useState<Department[]>([]);
@@ -145,7 +145,7 @@ export default function StaffPage() {
     try {
       setSaving(true);
       const result = await staffService.create(formData);
-      setTempPassword(result.temporaryPassword);
+      setCreatedStaff(result);
       setStaffList((prev) => [...prev, result]);
       setFormData(initialFormData);
     } catch (error) {
@@ -169,7 +169,7 @@ export default function StaffPage() {
   // Close dialog and reset
   const handleCloseDialog = () => {
     setDialogOpen(false);
-    setTempPassword(null);
+    setCreatedStaff(null);
     setFormData(initialFormData);
     setBranches([]);
     setWards([]);
@@ -287,15 +287,23 @@ export default function StaffPage() {
               Nhập thông tin nhân viên. Hệ thống sẽ tự động tạo tài khoản và mật khẩu tạm thời.
             </DialogDescription>
           </DialogHeader>
-          {tempPassword ? (
+          {createdStaff ? (
             <div className="space-y-4">
               <div className="rounded-lg bg-green-50 p-4 border border-green-200">
-                <p className="text-sm font-medium text-green-800">Tạo nhân viên thành công!</p>
-                <p className="text-sm text-green-700 mt-2">
-                  Mật khẩu tạm thời: <strong className="font-mono">{tempPassword}</strong>
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  Vui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập lần đầu.
+                <p className="text-sm font-medium text-green-800 mb-3">Tạo nhân viên thành công!</p>
+                <div className="space-y-2">
+                  <p className="text-sm text-green-700">
+                    Tên nhân viên: <strong>{createdStaff.name}</strong>
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Tên đăng nhập: <strong className="font-mono">{createdStaff.username}</strong>
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Mật khẩu tạm thời: <strong className="font-mono">{createdStaff.temporaryPassword}</strong>
+                  </p>
+                </div>
+                <p className="text-xs text-green-600 mt-3">
+                  Vui lòng ghi lại thông tin này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập lần đầu.
                 </p>
               </div>
               <DialogFooter>
