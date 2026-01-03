@@ -12,6 +12,7 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { AreasModule } from './modules/areas/areas.module';
 import { TablesModule } from './modules/tables/tables.module';
+import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
   Brand,
@@ -83,5 +84,6 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AreasModule,
     TablesModule,
   ],
+  providers: [DatabaseMigrationService],
 })
 export class AppModule {}
