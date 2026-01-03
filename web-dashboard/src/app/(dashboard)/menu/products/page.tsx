@@ -129,6 +129,9 @@ export default function ProductsPage() {
   const [unitComboboxOpen, setUnitComboboxOpen] = React.useState(false);
   const [unitSearchValue, setUnitSearchValue] = React.useState("");
 
+  // Continue creating state
+  const [continueCreating, setContinueCreating] = React.useState(false);
+
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
     if (!formData.type) return categories.filter(c => c.isActive);
@@ -458,7 +461,14 @@ export default function ProductsPage() {
         const result = await productService.create(preparedData);
         setProducts((prev) => [...prev, result]);
         toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });
-        handleCloseDialog();
+        if (continueCreating) {
+          // Reset form for next creation
+          setFormData(initialFormData);
+          setCategorySearchValue("");
+          setUnitSearchValue("");
+        } else {
+          handleCloseDialog();
+        }
       } else if (dialogMode === "edit" && selectedProduct) {
         const result = await productService.update(selectedProduct.id, preparedData);
         setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? result : p)));
@@ -1108,17 +1118,31 @@ export default function ProductsPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving || !formData.name.trim() || formData.price < 0}
-              >
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo món ăn" : "Cập nhật"}
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-4">
+              {dialogMode === "create" && (
+                <div className="flex items-center gap-2 mr-auto">
+                  <Checkbox
+                    id="continueCreating"
+                    checked={continueCreating}
+                    onCheckedChange={(checked) => setContinueCreating(!!checked)}
+                  />
+                  <Label htmlFor="continueCreating" className="text-sm cursor-pointer">
+                    Tiếp tục tạo
+                  </Label>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Hủy
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saving || !formData.name.trim() || formData.price < 0}
+                >
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {dialogMode === "create" ? "Tạo món ăn" : "Cập nhật"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

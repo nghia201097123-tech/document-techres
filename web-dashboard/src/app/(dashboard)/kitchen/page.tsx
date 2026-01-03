@@ -57,10 +57,11 @@ export default function KitchenPage() {
     printerName: "",
     printerIp: "",
     printerPort: 9100,
-    paperSize: "80mm" as PaperSize,
+    paperSize: "80mm",
     printMode: "list" as PrintMode,
     description: "",
   });
+  const [continueCreating, setContinueCreating] = React.useState(false);
 
   // Product assignment state
   const [allProducts, setAllProducts] = React.useState<Product[]>([]);
@@ -171,6 +172,18 @@ export default function KitchenPage() {
         const result = await kitchenService.create(formData);
         setKitchens((prev) => [...prev, { ...result, productCount: 0 }]);
         toast({ title: "Thành công", description: "Đã tạo bếp mới" });
+        if (continueCreating) {
+          setFormData({
+            name: "",
+            printerName: formData.printerName,
+            printerIp: formData.printerIp,
+            printerPort: formData.printerPort,
+            paperSize: formData.paperSize,
+            printMode: formData.printMode,
+            description: "",
+          });
+          return;
+        }
       } else if (dialogMode === "edit" && selectedKitchen) {
         const updateData: UpdateKitchenDto = {
           name: formData.name,
@@ -500,14 +513,28 @@ export default function KitchenPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving || !formData.name.trim()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo bếp" : "Cập nhật"}
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-4">
+              {dialogMode === "create" && (
+                <div className="flex items-center gap-2 mr-auto">
+                  <Checkbox
+                    id="continueCreatingKitchen"
+                    checked={continueCreating}
+                    onCheckedChange={(checked) => setContinueCreating(!!checked)}
+                  />
+                  <Label htmlFor="continueCreatingKitchen" className="text-sm cursor-pointer">
+                    Tiếp tục tạo
+                  </Label>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Hủy
+                </Button>
+                <Button type="submit" disabled={saving || !formData.name.trim()}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {dialogMode === "create" ? "Tạo bếp" : "Cập nhật"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

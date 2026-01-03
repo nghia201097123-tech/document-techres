@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type ProductNote, type CreateProductNoteDto, type UpdateProductNoteDto } from "@/services/product-service";
 
@@ -43,6 +44,7 @@ export default function ProductNotesPage() {
   // Form data
   const [formName, setFormName] = React.useState("");
   const [formDescription, setFormDescription] = React.useState("");
+  const [continueCreating, setContinueCreating] = React.useState(false);
 
   // Load notes
   const loadNotes = React.useCallback(async () => {
@@ -103,6 +105,11 @@ export default function ProductNotesPage() {
         });
         setNotes((prev) => [...prev, newNote]);
         toast({ title: "Thành công", description: `Đã tạo ghi chú "${newNote.name}"` });
+        if (continueCreating) {
+          setFormName("");
+          setFormDescription("");
+          return;
+        }
       } else if (dialogMode === "edit" && selectedNote) {
         const updatedNote = await productService.updateNote(selectedNote.id, {
           name: formName.trim(),
@@ -291,14 +298,28 @@ export default function ProductNotesPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving || !formName.trim()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo ghi chú" : "Cập nhật"}
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-4">
+              {dialogMode === "create" && (
+                <div className="flex items-center gap-2 mr-auto">
+                  <Checkbox
+                    id="continueCreating"
+                    checked={continueCreating}
+                    onCheckedChange={(checked) => setContinueCreating(!!checked)}
+                  />
+                  <Label htmlFor="continueCreating" className="text-sm cursor-pointer">
+                    Tiếp tục tạo
+                  </Label>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Hủy
+                </Button>
+                <Button type="submit" disabled={saving || !formName.trim()}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {dialogMode === "create" ? "Tạo ghi chú" : "Cập nhật"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

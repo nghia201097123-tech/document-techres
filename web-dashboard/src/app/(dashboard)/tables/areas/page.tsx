@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto } from "@/services/area-service";
 
@@ -51,6 +52,7 @@ export default function AreasPage() {
     description: "",
     sortOrder: 0,
   });
+  const [continueCreating, setContinueCreating] = React.useState(false);
 
   // Load areas
   const loadAreas = React.useCallback(async () => {
@@ -107,6 +109,10 @@ export default function AreasPage() {
         const result = await areaService.create(formData);
         setAreas((prev) => [...prev, result]);
         toast({ title: "Thành công", description: "Đã tạo khu vực mới" });
+        if (continueCreating) {
+          setFormData({ name: "", description: "", sortOrder: (formData.sortOrder || 0) + 1 });
+          return;
+        }
       } else if (dialogMode === "edit" && selectedArea) {
         const updateData: UpdateAreaDto = {
           name: formData.name,
@@ -306,14 +312,28 @@ export default function AreasPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving || !formData.name.trim()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo khu vực" : "Cập nhật"}
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-4">
+              {dialogMode === "create" && (
+                <div className="flex items-center gap-2 mr-auto">
+                  <Checkbox
+                    id="continueCreating"
+                    checked={continueCreating}
+                    onCheckedChange={(checked) => setContinueCreating(!!checked)}
+                  />
+                  <Label htmlFor="continueCreating" className="text-sm cursor-pointer">
+                    Tiếp tục tạo
+                  </Label>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Hủy
+                </Button>
+                <Button type="submit" disabled={saving || !formData.name.trim()}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {dialogMode === "create" ? "Tạo khu vực" : "Cập nhật"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
