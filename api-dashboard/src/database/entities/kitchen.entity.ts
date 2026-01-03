@@ -10,6 +10,16 @@ import {
 } from 'typeorm';
 import { Branch } from './branch.entity';
 
+export enum PaperSize {
+  MM_58 = '58mm',
+  MM_80 = '80mm',
+}
+
+export enum PrintMode {
+  INDIVIDUAL = 'individual', // In từng món riêng lẻ
+  LIST = 'list', // In danh sách món
+}
+
 @Entity('kitchens')
 @Index(['tenantId', 'branchId'])
 export class Kitchen {
@@ -35,6 +45,25 @@ export class Kitchen {
 
   @Column({ name: 'printer_ip', nullable: true })
   printerIp: string;
+
+  @Column({ name: 'printer_port', type: 'int', nullable: true, default: 9100 })
+  printerPort: number;
+
+  @Column({
+    name: 'paper_size',
+    type: 'enum',
+    enum: PaperSize,
+    default: PaperSize.MM_80,
+  })
+  paperSize: PaperSize;
+
+  @Column({
+    name: 'print_mode',
+    type: 'enum',
+    enum: PrintMode,
+    default: PrintMode.LIST,
+  })
+  printMode: PrintMode;
 
   @Column({ type: 'text', nullable: true })
   description: string;

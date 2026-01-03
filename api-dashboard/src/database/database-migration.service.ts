@@ -357,6 +357,42 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Product kitchens table created successfully');
       }
 
+      // 17. Create paper_size and print_mode enums if not exists
+      this.logger.log('Creating paper_size and print_mode enums...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE paper_size AS ENUM ('58mm', '80mm');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE print_mode AS ENUM ('individual', 'list');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 18. Add new columns to kitchens table
+      const hasPrinterPort = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'printer_port'
+        );
+      `);
+
+      if (!hasPrinterPort[0].exists) {
+        this.logger.log('Adding printer config columns to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN IF NOT EXISTS printer_port INTEGER DEFAULT 9100,
+          ADD COLUMN IF NOT EXISTS paper_size paper_size DEFAULT '80mm',
+          ADD COLUMN IF NOT EXISTS print_mode print_mode DEFAULT 'list'
+        `);
+        this.logger.log('Printer config columns added to kitchens table');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

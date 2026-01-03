@@ -35,8 +35,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto } from "@/services/kitchen-service";
+import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type PaperSize, type PrintMode } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type DialogMode = "create" | "edit" | "products" | null;
 
@@ -52,6 +53,9 @@ export default function KitchenPage() {
     name: "",
     printerName: "",
     printerIp: "",
+    printerPort: 9100,
+    paperSize: "80mm" as PaperSize,
+    printMode: "list" as PrintMode,
     description: "",
   });
 
@@ -83,7 +87,15 @@ export default function KitchenPage() {
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedKitchen(null);
-    setFormData({ name: "", printerName: "", printerIp: "", description: "" });
+    setFormData({
+      name: "",
+      printerName: "",
+      printerIp: "",
+      printerPort: 9100,
+      paperSize: "80mm",
+      printMode: "list",
+      description: "",
+    });
     setDialogMode("create");
   };
 
@@ -94,6 +106,9 @@ export default function KitchenPage() {
       name: kitchen.name,
       printerName: kitchen.printerName || "",
       printerIp: kitchen.printerIp || "",
+      printerPort: kitchen.printerPort || 9100,
+      paperSize: kitchen.paperSize || "80mm",
+      printMode: kitchen.printMode || "list",
       description: kitchen.description || "",
     });
     setDialogMode("edit");
@@ -126,7 +141,15 @@ export default function KitchenPage() {
   const handleCloseDialog = () => {
     setDialogMode(null);
     setSelectedKitchen(null);
-    setFormData({ name: "", printerName: "", printerIp: "", description: "" });
+    setFormData({
+      name: "",
+      printerName: "",
+      printerIp: "",
+      printerPort: 9100,
+      paperSize: "80mm",
+      printMode: "list",
+      description: "",
+    });
     setAllProducts([]);
     setKitchenProducts([]);
     setSelectedProductIds(new Set());
@@ -150,6 +173,9 @@ export default function KitchenPage() {
           name: formData.name,
           printerName: formData.printerName,
           printerIp: formData.printerIp,
+          printerPort: formData.printerPort,
+          paperSize: formData.paperSize,
+          printMode: formData.printMode,
           description: formData.description,
         };
         const result = await kitchenService.update(selectedKitchen.id, updateData);
@@ -323,7 +349,12 @@ export default function KitchenPage() {
                           <p className="font-medium">{kitchen.name}</p>
                           <div className="text-xs text-muted-foreground space-y-0.5">
                             {kitchen.printerName && <p>Máy in: {kitchen.printerName}</p>}
-                            {kitchen.printerIp && <p>IP: {kitchen.printerIp}</p>}
+                            {kitchen.printerIp && (
+                              <p>IP: {kitchen.printerIp}{kitchen.printerPort ? `:${kitchen.printerPort}` : ""}</p>
+                            )}
+                            {kitchen.paperSize && (
+                              <p>Giấy: {kitchen.paperSize} | {kitchen.printMode === "individual" ? "In từng món" : "In danh sách"}</p>
+                            )}
                             <p>{kitchen.productCount || 0} món được gán</p>
                           </div>
                         </div>
@@ -412,6 +443,48 @@ export default function KitchenPage() {
                     value={formData.printerIp}
                     onChange={(e) => setFormData({ ...formData, printerIp: e.target.value })}
                   />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="printerPort">Cổng máy in</Label>
+                  <Input
+                    id="printerPort"
+                    type="number"
+                    placeholder="9100"
+                    value={formData.printerPort || ""}
+                    onChange={(e) => setFormData({ ...formData, printerPort: e.target.value ? parseInt(e.target.value) : undefined })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="paperSize">Kích thước giấy</Label>
+                  <Select
+                    value={formData.paperSize}
+                    onValueChange={(value: PaperSize) => setFormData({ ...formData, paperSize: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn kích thước" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="58mm">58mm</SelectItem>
+                      <SelectItem value="80mm">80mm</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="printMode">Chế độ in</Label>
+                  <Select
+                    value={formData.printMode}
+                    onValueChange={(value: PrintMode) => setFormData({ ...formData, printMode: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn chế độ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="list">In danh sách món</SelectItem>
+                      <SelectItem value="individual">In từng món</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="grid gap-2">
