@@ -52,6 +52,32 @@ export interface UpdateProductDto {
   sortOrder?: number;
 }
 
+export interface ProductTopping {
+  id: string;
+  toppingId: string;
+  topping: Product;
+  isRequired: boolean;
+  maxQuantity: number;
+  sortOrder: number;
+}
+
+export interface ToppingItem {
+  toppingId: string;
+  isRequired?: boolean;
+  maxQuantity?: number;
+  sortOrder?: number;
+}
+
+export interface SetToppingsDto {
+  toppings: ToppingItem[];
+}
+
+export interface AddToppingDto {
+  toppingId: string;
+  isRequired?: boolean;
+  maxQuantity?: number;
+}
+
 export const productService = {
   getAll: async (brandId?: string, type?: ProductType): Promise<Product[]> => {
     const params: Record<string, any> = {};
@@ -78,6 +104,34 @@ export const productService = {
 
   toggleActive: async (id: string): Promise<Product> => {
     const response = await api.patch<Product>(`/products/${id}/toggle-active`);
+    return response.data;
+  },
+
+  // Topping Management
+  getAvailableToppings: async (brandId?: string): Promise<Product[]> => {
+    const params: Record<string, any> = {};
+    if (brandId) params.brandId = brandId;
+    const response = await api.get<Product[]>("/products/toppings/available", { params });
+    return response.data;
+  },
+
+  getToppings: async (productId: string): Promise<ProductTopping[]> => {
+    const response = await api.get<ProductTopping[]>(`/products/${productId}/toppings`);
+    return response.data;
+  },
+
+  setToppings: async (productId: string, data: SetToppingsDto): Promise<ProductTopping[]> => {
+    const response = await api.put<ProductTopping[]>(`/products/${productId}/toppings`, data);
+    return response.data;
+  },
+
+  addTopping: async (productId: string, data: AddToppingDto): Promise<ProductTopping[]> => {
+    const response = await api.post<ProductTopping[]>(`/products/${productId}/toppings`, data);
+    return response.data;
+  },
+
+  removeTopping: async (productId: string, toppingId: string): Promise<ProductTopping[]> => {
+    const response = await api.delete<ProductTopping[]>(`/products/${productId}/toppings/${toppingId}`);
     return response.data;
   },
 };

@@ -92,6 +92,34 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Tables table created successfully');
       }
 
+      // 5. Check if product_toppings table exists
+      const productToppingsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'product_toppings'
+        );
+      `);
+
+      if (!productToppingsExists[0].exists) {
+        this.logger.log('Creating product_toppings table...');
+        await queryRunner.query(`
+          CREATE TABLE product_toppings (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            topping_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            is_required BOOLEAN DEFAULT FALSE,
+            max_quantity INTEGER DEFAULT 5,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(product_id, topping_id)
+          );
+          CREATE INDEX idx_product_toppings_tenant ON product_toppings(tenant_id);
+          CREATE INDEX idx_product_toppings_product ON product_toppings(tenant_id, product_id);
+        `);
+        this.logger.log('Product toppings table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

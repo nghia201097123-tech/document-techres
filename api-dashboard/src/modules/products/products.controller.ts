@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Put, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateProductDto, UpdateProductDto, ProductType } from './dto';
+import { CreateProductDto, UpdateProductDto, ProductType, SetToppingsDto, AddToppingDto } from './dto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -47,5 +47,42 @@ export class ProductsController {
   @ApiOperation({ summary: 'Kích hoạt/Tạm ngưng món' })
   toggleActive(@Request() req, @Param('id') id: string) {
     return this.productsService.toggleActive(req.user.tenantId, id);
+  }
+
+  // === Topping Management ===
+
+  @Get('toppings/available')
+  @ApiOperation({ summary: 'Lấy danh sách topping có thể gán' })
+  @ApiQuery({ name: 'brandId', required: false })
+  getAvailableToppings(@Request() req, @Query('brandId') brandId?: string) {
+    return this.productsService.getAvailableToppings(req.user.tenantId, brandId);
+  }
+
+  @Get(':id/toppings')
+  @ApiOperation({ summary: 'Lấy danh sách topping của món' })
+  getToppings(@Request() req, @Param('id') id: string) {
+    return this.productsService.getToppings(req.user.tenantId, id);
+  }
+
+  @Put(':id/toppings')
+  @ApiOperation({ summary: 'Cập nhật toàn bộ danh sách topping của món' })
+  setToppings(@Request() req, @Param('id') id: string, @Body() dto: SetToppingsDto) {
+    return this.productsService.setToppings(req.user.tenantId, id, dto);
+  }
+
+  @Post(':id/toppings')
+  @ApiOperation({ summary: 'Thêm topping vào món' })
+  addTopping(@Request() req, @Param('id') id: string, @Body() dto: AddToppingDto) {
+    return this.productsService.addTopping(req.user.tenantId, id, dto);
+  }
+
+  @Delete(':id/toppings/:toppingId')
+  @ApiOperation({ summary: 'Xóa topping khỏi món' })
+  removeTopping(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('toppingId') toppingId: string,
+  ) {
+    return this.productsService.removeTopping(req.user.tenantId, id, toppingId);
   }
 }

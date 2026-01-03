@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +39,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType } from "@/services/product-service";
+import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, type ProductTopping } from "@/services/product-service";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -63,7 +64,7 @@ const initialFormData: CreateProductDto = {
   imageUrl: "",
 };
 
-type DialogMode = "create" | "edit" | "view" | null;
+type DialogMode = "create" | "edit" | "view" | "toppings" | null;
 
 export default function ProductsPage() {
   const dispatch = useAppDispatch();
@@ -81,6 +82,12 @@ export default function ProductsPage() {
   const [saving, setSaving] = React.useState(false);
   const [formData, setFormData] = React.useState<CreateProductDto>(initialFormData);
   const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
+
+  // Topping management state
+  const [availableToppings, setAvailableToppings] = React.useState<Product[]>([]);
+  const [currentToppings, setCurrentToppings] = React.useState<ProductTopping[]>([]);
+  const [loadingToppings, setLoadingToppings] = React.useState(false);
+  const [savingToppings, setSavingToppings] = React.useState(false);
 
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
@@ -140,6 +147,48 @@ export default function ProductsPage() {
       imageUrl: product.imageUrl || "",
     });
     setDialogMode("edit");
+  };
+
+  // Open toppings management dialog
+  const handleOpenToppings = async (product: Product) => {
+    setSelectedProduct(product);
+    setDialogMode("toppings");
+    setLoadingToppings(true);
+    try {
+      const [toppings, productToppings] = await Promise.all([
+        productService.getAvailableToppings(),
+        productService.getToppings(product.id),
+      ]);
+      setAvailableToppings(toppings);
+      setCurrentToppings(productToppings);
+    } catch (error) {
+      console.error("Error loading toppings:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách topping", variant: "destructive" });
+    } finally {
+      setLoadingToppings(false);
+    }
+  };
+
+  // Toggle topping selection
+  const handleToggleTopping = async (topping: Product) => {
+    const isSelected = currentToppings.some(t => t.toppingId === topping.id);
+    setSavingToppings(true);
+    try {
+      if (isSelected) {
+        const result = await productService.removeTopping(selectedProduct!.id, topping.id);
+        setCurrentToppings(result);
+        toast({ title: "Thành công", description: `Đã xóa "${topping.name}" khỏi danh sách topping` });
+      } else {
+        const result = await productService.addTopping(selectedProduct!.id, { toppingId: topping.id });
+        setCurrentToppings(result);
+        toast({ title: "Thành công", description: `Đã thêm "${topping.name}" vào danh sách topping` });
+      }
+    } catch (error: any) {
+      console.error("Error toggling topping:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSavingToppings(false);
+    }
   };
 
   // Handle form submit (create or update)
@@ -213,6 +262,8 @@ export default function ProductsPage() {
     setDialogMode(null);
     setSelectedProduct(null);
     setFormData(initialFormData);
+    setAvailableToppings([]);
+    setCurrentToppings([]);
   };
 
   // Handle product type change - reset category when type changes
@@ -348,6 +399,12 @@ export default function ProductsPage() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Chỉnh sửa
                           </DropdownMenuItem>
+                          {product.type !== ProductType.TOPPING && (
+                            <DropdownMenuItem onClick={() => handleOpenToppings(product)}>
+                              <Cherry className="mr-2 h-4 w-4" />
+                              Quản lý Topping
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleToggleActive(product)}>
                             <Power className="mr-2 h-4 w-4" />
@@ -612,6 +669,81 @@ export default function ProductsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toppings Management Dialog */}
+      <Dialog open={dialogMode === "toppings"} onOpenChange={() => handleCloseDialog()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quản lý Topping</DialogTitle>
+            <DialogDescription>
+              Chọn các topping có thể thêm vào món "{selectedProduct?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {loadingToppings ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : availableToppings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Cherry className="h-10 w-10 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Chưa có topping nào</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Hãy tạo sản phẩm loại "Topping" trước
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Đã chọn: {currentToppings.length} / {availableToppings.length} topping</span>
+                  {savingToppings && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                <div className="grid gap-2">
+                  {availableToppings.map((topping) => {
+                    const isSelected = currentToppings.some(t => t.toppingId === topping.id);
+                    return (
+                      <div
+                        key={topping.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                          isSelected
+                            ? "bg-primary/5 border-primary"
+                            : "hover:bg-muted/50"
+                        }`}
+                        onClick={() => !savingToppings && handleToggleTopping(topping)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`flex items-center justify-center w-5 h-5 rounded border ${
+                            isSelected
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-muted-foreground"
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3" />}
+                          </div>
+                          <div>
+                            <p className="font-medium">{topping.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{topping.code}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-green-600">{formatCurrency(topping.price)}</p>
+                          <Badge variant="secondary" className="text-xs">
+                            {topping.isActive ? "Hoạt động" : "Tạm ngưng"}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleCloseDialog()}>
+              Đóng
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
