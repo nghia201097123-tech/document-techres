@@ -130,8 +130,8 @@ export default function TablesPage() {
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedTable(null);
-    setFormData({ areaId: areas[0]?.id || "", name: "", capacity: 4, sortOrder: 0 });
-    setAreaSearchValue(areas[0]?.name || "");
+    setFormData({ areaId: "", name: "", capacity: 4, sortOrder: 0 });
+    setAreaSearchValue("");
     setDialogMode("create");
   };
 
