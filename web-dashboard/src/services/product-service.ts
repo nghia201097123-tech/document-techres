@@ -52,30 +52,53 @@ export interface UpdateProductDto {
   sortOrder?: number;
 }
 
-export interface ProductTopping {
+// Topping Group interfaces
+export interface ToppingItem {
   id: string;
   toppingId: string;
   topping: Product;
-  isRequired: boolean;
+  priceAdjustment: number;
   maxQuantity: number;
   sortOrder: number;
 }
 
-export interface ToppingItem {
-  toppingId: string;
+export interface ToppingGroup {
+  id: string;
+  name: string;
+  isRequired: boolean;
+  minSelection: number;
+  maxSelection: number;
+  sortOrder: number;
+  items: ToppingItem[];
+}
+
+export interface CreateToppingGroupDto {
+  name: string;
   isRequired?: boolean;
+  minSelection?: number;
+  maxSelection?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateToppingGroupDto {
+  name?: string;
+  isRequired?: boolean;
+  minSelection?: number;
+  maxSelection?: number;
+  sortOrder?: number;
+}
+
+export interface AddToppingItemDto {
+  toppingId: string;
+  priceAdjustment?: number;
   maxQuantity?: number;
   sortOrder?: number;
 }
 
-export interface SetToppingsDto {
-  toppings: ToppingItem[];
-}
-
-export interface AddToppingDto {
-  toppingId: string;
-  isRequired?: boolean;
+export interface UpdateToppingItemDto {
+  priceAdjustment?: number;
   maxQuantity?: number;
+  sortOrder?: number;
 }
 
 export const productService = {
@@ -107,7 +130,7 @@ export const productService = {
     return response.data;
   },
 
-  // Topping Management
+  // Available Toppings
   getAvailableToppings: async (brandId?: string): Promise<Product[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
@@ -115,23 +138,40 @@ export const productService = {
     return response.data;
   },
 
-  getToppings: async (productId: string): Promise<ProductTopping[]> => {
-    const response = await api.get<ProductTopping[]>(`/products/${productId}/toppings`);
+  // Topping Group Management
+  getToppingGroups: async (productId: string): Promise<ToppingGroup[]> => {
+    const response = await api.get<ToppingGroup[]>(`/products/${productId}/topping-groups`);
     return response.data;
   },
 
-  setToppings: async (productId: string, data: SetToppingsDto): Promise<ProductTopping[]> => {
-    const response = await api.put<ProductTopping[]>(`/products/${productId}/toppings`, data);
+  createToppingGroup: async (productId: string, data: CreateToppingGroupDto): Promise<ToppingGroup[]> => {
+    const response = await api.post<ToppingGroup[]>(`/products/${productId}/topping-groups`, data);
     return response.data;
   },
 
-  addTopping: async (productId: string, data: AddToppingDto): Promise<ProductTopping[]> => {
-    const response = await api.post<ProductTopping[]>(`/products/${productId}/toppings`, data);
+  updateToppingGroup: async (productId: string, groupId: string, data: UpdateToppingGroupDto): Promise<ToppingGroup[]> => {
+    const response = await api.put<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}`, data);
     return response.data;
   },
 
-  removeTopping: async (productId: string, toppingId: string): Promise<ProductTopping[]> => {
-    const response = await api.delete<ProductTopping[]>(`/products/${productId}/toppings/${toppingId}`);
+  deleteToppingGroup: async (productId: string, groupId: string): Promise<ToppingGroup[]> => {
+    const response = await api.delete<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}`);
+    return response.data;
+  },
+
+  // Topping Item Management
+  addToppingItem: async (productId: string, groupId: string, data: AddToppingItemDto): Promise<ToppingGroup[]> => {
+    const response = await api.post<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}/items`, data);
+    return response.data;
+  },
+
+  updateToppingItem: async (productId: string, groupId: string, itemId: string, data: UpdateToppingItemDto): Promise<ToppingGroup[]> => {
+    const response = await api.put<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}/items/${itemId}`, data);
+    return response.data;
+  },
+
+  removeToppingItem: async (productId: string, groupId: string, itemId: string): Promise<ToppingGroup[]> => {
+    const response = await api.delete<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}/items/${itemId}`);
     return response.data;
   },
 };

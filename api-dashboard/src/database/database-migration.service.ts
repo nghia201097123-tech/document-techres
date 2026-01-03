@@ -92,32 +92,66 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Tables table created successfully');
       }
 
-      // 5. Check if product_toppings table exists
-      const productToppingsExists = await queryRunner.query(`
+      // 5. Check if topping_groups table exists
+      const toppingGroupsExists = await queryRunner.query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables
-          WHERE table_name = 'product_toppings'
+          WHERE table_name = 'topping_groups'
         );
       `);
 
-      if (!productToppingsExists[0].exists) {
-        this.logger.log('Creating product_toppings table...');
+      if (!toppingGroupsExists[0].exists) {
+        this.logger.log('Creating topping_groups table...');
+        await queryRunner.query(`
+          CREATE TABLE topping_groups (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            is_required BOOLEAN DEFAULT FALSE,
+            min_selection INTEGER DEFAULT 0,
+            max_selection INTEGER DEFAULT 10,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_topping_groups_tenant ON topping_groups(tenant_id);
+          CREATE INDEX idx_topping_groups_product ON topping_groups(tenant_id, product_id);
+        `);
+        this.logger.log('Topping groups table created successfully');
+      }
+
+      // 6. Check if product_toppings has group_id column (new structure)
+      const hasGroupId = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'product_toppings' AND column_name = 'group_id'
+        );
+      `);
+
+      if (!hasGroupId[0].exists) {
+        this.logger.log('Recreating product_toppings table with new structure...');
+        // Drop old table if exists
+        await queryRunner.query(`DROP TABLE IF EXISTS product_toppings CASCADE`);
+
         await queryRunner.query(`
           CREATE TABLE product_toppings (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
             product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            group_id UUID NOT NULL REFERENCES topping_groups(id) ON DELETE CASCADE,
             topping_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-            is_required BOOLEAN DEFAULT FALSE,
+            price_adjustment DECIMAL(15,2) DEFAULT 0,
             max_quantity INTEGER DEFAULT 5,
             sort_order INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(product_id, topping_id)
+            UNIQUE(group_id, topping_id)
           );
           CREATE INDEX idx_product_toppings_tenant ON product_toppings(tenant_id);
           CREATE INDEX idx_product_toppings_product ON product_toppings(tenant_id, product_id);
+          CREATE INDEX idx_product_toppings_group ON product_toppings(tenant_id, group_id);
         `);
-        this.logger.log('Product toppings table created successfully');
+        this.logger.log('Product toppings table recreated successfully');
       }
 
       this.logger.log('Database migration completed successfully');

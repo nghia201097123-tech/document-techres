@@ -31,6 +31,7 @@ import {
   Kitchen,
   Area,
   Table,
+  ToppingGroup,
   ProductTopping,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -67,6 +68,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           Kitchen,
           Area,
           Table,
+          ToppingGroup,
           ProductTopping,
         ],
         synchronize: false,

@@ -9,10 +9,12 @@ import {
   Unique,
 } from 'typeorm';
 import { Product } from './product.entity';
+import { ToppingGroup } from './topping-group.entity';
 
 @Entity('product_toppings')
 @Index(['tenantId', 'productId'])
-@Unique(['productId', 'toppingId'])
+@Index(['tenantId', 'groupId'])
+@Unique(['groupId', 'toppingId'])
 export class ProductTopping {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -28,6 +30,13 @@ export class ProductTopping {
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
+  @Column({ name: 'group_id' })
+  groupId: string;
+
+  @ManyToOne(() => ToppingGroup, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'group_id' })
+  group: ToppingGroup;
+
   @Column({ name: 'topping_id' })
   toppingId: string;
 
@@ -35,8 +44,8 @@ export class ProductTopping {
   @JoinColumn({ name: 'topping_id' })
   topping: Product;
 
-  @Column({ name: 'is_required', default: false })
-  isRequired: boolean;
+  @Column({ name: 'price_adjustment', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  priceAdjustment: number;
 
   @Column({ name: 'max_quantity', default: 5 })
   maxQuantity: number;

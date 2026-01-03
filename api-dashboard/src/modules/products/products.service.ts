@@ -1,14 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Product, ProductType, ProductTopping } from '../../database/entities';
-import { CreateProductDto, UpdateProductDto, SetToppingsDto, AddToppingDto } from './dto';
+import { Product, ProductType, ProductTopping, ToppingGroup } from '../../database/entities';
+import { CreateProductDto, UpdateProductDto, CreateToppingGroupDto, UpdateToppingGroupDto, AddToppingItemDto, UpdateToppingItemDto } from './dto';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(ToppingGroup)
+    private readonly toppingGroupRepository: Repository<ToppingGroup>,
     @InjectRepository(ProductTopping)
     private readonly productToppingRepository: Repository<ProductTopping>,
   ) {}
@@ -76,120 +78,6 @@ export class ProductsService {
 
   // === Topping Management ===
 
-  async getToppings(tenantId: string, productId: string) {
-    // Verify product exists
-    await this.findOne(tenantId, productId);
-
-    const productToppings = await this.productToppingRepository.find({
-      where: { tenantId, productId },
-      relations: ['topping'],
-      order: { sortOrder: 'ASC' },
-    });
-
-    return productToppings.map((pt) => ({
-      id: pt.id,
-      toppingId: pt.toppingId,
-      topping: pt.topping,
-      isRequired: pt.isRequired,
-      maxQuantity: pt.maxQuantity,
-      sortOrder: pt.sortOrder,
-    }));
-  }
-
-  async setToppings(tenantId: string, productId: string, dto: SetToppingsDto) {
-    // Verify product exists
-    const product = await this.findOne(tenantId, productId);
-
-    // Verify all toppings exist and are of type TOPPING
-    if (dto.toppings.length > 0) {
-      const toppingIds = dto.toppings.map((t) => t.toppingId);
-      const toppings = await this.productRepository.find({
-        where: { tenantId, id: In(toppingIds), type: ProductType.TOPPING },
-      });
-
-      if (toppings.length !== toppingIds.length) {
-        throw new BadRequestException('Một số topping không tồn tại hoặc không phải loại topping');
-      }
-    }
-
-    // Delete existing toppings
-    await this.productToppingRepository.delete({ tenantId, productId });
-
-    // Insert new toppings
-    if (dto.toppings.length > 0) {
-      const productToppings = dto.toppings.map((t, index) =>
-        this.productToppingRepository.create({
-          tenantId,
-          productId,
-          toppingId: t.toppingId,
-          isRequired: t.isRequired ?? false,
-          maxQuantity: t.maxQuantity ?? 5,
-          sortOrder: t.sortOrder ?? index,
-        }),
-      );
-      await this.productToppingRepository.save(productToppings);
-    }
-
-    return this.getToppings(tenantId, productId);
-  }
-
-  async addTopping(tenantId: string, productId: string, dto: AddToppingDto) {
-    // Verify product exists
-    await this.findOne(tenantId, productId);
-
-    // Verify topping exists and is of type TOPPING
-    const topping = await this.productRepository.findOne({
-      where: { tenantId, id: dto.toppingId, type: ProductType.TOPPING },
-    });
-    if (!topping) {
-      throw new BadRequestException('Topping không tồn tại hoặc không phải loại topping');
-    }
-
-    // Check if already exists
-    const existing = await this.productToppingRepository.findOne({
-      where: { productId, toppingId: dto.toppingId },
-    });
-    if (existing) {
-      throw new BadRequestException('Topping này đã được gán cho món ăn');
-    }
-
-    // Get max sort order
-    const maxOrder = await this.productToppingRepository
-      .createQueryBuilder('pt')
-      .where('pt.product_id = :productId', { productId })
-      .select('MAX(pt.sort_order)', 'max')
-      .getRawOne();
-
-    const productTopping = this.productToppingRepository.create({
-      tenantId,
-      productId,
-      toppingId: dto.toppingId,
-      isRequired: dto.isRequired ?? false,
-      maxQuantity: dto.maxQuantity ?? 5,
-      sortOrder: (maxOrder?.max ?? -1) + 1,
-    });
-
-    await this.productToppingRepository.save(productTopping);
-    return this.getToppings(tenantId, productId);
-  }
-
-  async removeTopping(tenantId: string, productId: string, toppingId: string) {
-    // Verify product exists
-    await this.findOne(tenantId, productId);
-
-    const result = await this.productToppingRepository.delete({
-      tenantId,
-      productId,
-      toppingId,
-    });
-
-    if (result.affected === 0) {
-      throw new NotFoundException('Không tìm thấy topping này trong món ăn');
-    }
-
-    return this.getToppings(tenantId, productId);
-  }
-
   async getAvailableToppings(tenantId: string, brandId?: string) {
     const where: any = { tenantId, type: ProductType.TOPPING, isActive: true };
     if (brandId) {
@@ -199,5 +87,192 @@ export class ProductsService {
       where,
       order: { name: 'ASC' },
     });
+  }
+
+  // === Topping Group Management ===
+
+  async getToppingGroups(tenantId: string, productId: string) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    const groups = await this.toppingGroupRepository.find({
+      where: { tenantId, productId },
+      order: { sortOrder: 'ASC' },
+    });
+
+    // Get items for each group
+    const result = await Promise.all(
+      groups.map(async (group) => {
+        const items = await this.productToppingRepository.find({
+          where: { tenantId, groupId: group.id },
+          relations: ['topping'],
+          order: { sortOrder: 'ASC' },
+        });
+
+        return {
+          id: group.id,
+          name: group.name,
+          isRequired: group.isRequired,
+          minSelection: group.minSelection,
+          maxSelection: group.maxSelection,
+          sortOrder: group.sortOrder,
+          items: items.map((item) => ({
+            id: item.id,
+            toppingId: item.toppingId,
+            topping: item.topping,
+            priceAdjustment: Number(item.priceAdjustment),
+            maxQuantity: item.maxQuantity,
+            sortOrder: item.sortOrder,
+          })),
+        };
+      }),
+    );
+
+    return result;
+  }
+
+  async createToppingGroup(tenantId: string, productId: string, dto: CreateToppingGroupDto) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    // Get max sort order
+    const maxOrder = await this.toppingGroupRepository
+      .createQueryBuilder('tg')
+      .where('tg.product_id = :productId', { productId })
+      .select('MAX(tg.sort_order)', 'max')
+      .getRawOne();
+
+    const group = this.toppingGroupRepository.create({
+      tenantId,
+      productId,
+      name: dto.name,
+      isRequired: dto.isRequired ?? false,
+      minSelection: dto.minSelection ?? 0,
+      maxSelection: dto.maxSelection ?? 10,
+      sortOrder: dto.sortOrder ?? (maxOrder?.max ?? -1) + 1,
+    });
+
+    await this.toppingGroupRepository.save(group);
+    return this.getToppingGroups(tenantId, productId);
+  }
+
+  async updateToppingGroup(tenantId: string, productId: string, groupId: string, dto: UpdateToppingGroupDto) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    const group = await this.toppingGroupRepository.findOne({
+      where: { tenantId, productId, id: groupId },
+    });
+
+    if (!group) {
+      throw new NotFoundException('Không tìm thấy nhóm topping');
+    }
+
+    Object.assign(group, dto);
+    await this.toppingGroupRepository.save(group);
+    return this.getToppingGroups(tenantId, productId);
+  }
+
+  async deleteToppingGroup(tenantId: string, productId: string, groupId: string) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    const result = await this.toppingGroupRepository.delete({
+      tenantId,
+      productId,
+      id: groupId,
+    });
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Không tìm thấy nhóm topping');
+    }
+
+    return this.getToppingGroups(tenantId, productId);
+  }
+
+  // === Topping Item Management ===
+
+  async addToppingItem(tenantId: string, productId: string, groupId: string, dto: AddToppingItemDto) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    // Verify group exists
+    const group = await this.toppingGroupRepository.findOne({
+      where: { tenantId, productId, id: groupId },
+    });
+    if (!group) {
+      throw new NotFoundException('Không tìm thấy nhóm topping');
+    }
+
+    // Verify topping exists and is of type TOPPING
+    const topping = await this.productRepository.findOne({
+      where: { tenantId, id: dto.toppingId, type: ProductType.TOPPING },
+    });
+    if (!topping) {
+      throw new BadRequestException('Topping không tồn tại hoặc không phải loại topping');
+    }
+
+    // Check if already exists in this group
+    const existing = await this.productToppingRepository.findOne({
+      where: { groupId, toppingId: dto.toppingId },
+    });
+    if (existing) {
+      throw new BadRequestException('Topping này đã có trong nhóm');
+    }
+
+    // Get max sort order
+    const maxOrder = await this.productToppingRepository
+      .createQueryBuilder('pt')
+      .where('pt.group_id = :groupId', { groupId })
+      .select('MAX(pt.sort_order)', 'max')
+      .getRawOne();
+
+    const item = this.productToppingRepository.create({
+      tenantId,
+      productId,
+      groupId,
+      toppingId: dto.toppingId,
+      priceAdjustment: dto.priceAdjustment ?? 0,
+      maxQuantity: dto.maxQuantity ?? 5,
+      sortOrder: dto.sortOrder ?? (maxOrder?.max ?? -1) + 1,
+    });
+
+    await this.productToppingRepository.save(item);
+    return this.getToppingGroups(tenantId, productId);
+  }
+
+  async updateToppingItem(tenantId: string, productId: string, groupId: string, itemId: string, dto: UpdateToppingItemDto) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    const item = await this.productToppingRepository.findOne({
+      where: { tenantId, productId, groupId, id: itemId },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Không tìm thấy topping trong nhóm');
+    }
+
+    Object.assign(item, dto);
+    await this.productToppingRepository.save(item);
+    return this.getToppingGroups(tenantId, productId);
+  }
+
+  async removeToppingItem(tenantId: string, productId: string, groupId: string, itemId: string) {
+    // Verify product exists
+    await this.findOne(tenantId, productId);
+
+    const result = await this.productToppingRepository.delete({
+      tenantId,
+      productId,
+      groupId,
+      id: itemId,
+    });
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Không tìm thấy topping trong nhóm');
+    }
+
+    return this.getToppingGroups(tenantId, productId);
   }
 }
