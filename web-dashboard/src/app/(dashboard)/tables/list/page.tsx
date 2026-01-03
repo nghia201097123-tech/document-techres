@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Table2, Loader2, MoreHorizontal, Pencil, Power, Trash2, Users } from "lucide-react";
+import { Plus, Table2, Loader2, MoreHorizontal, Pencil, Power, Trash2, Users, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,10 +38,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { tableService, type Table, type CreateTableDto, type UpdateTableDto, TableStatus, tableStatusLabels } from "@/services/table-service";
 import { areaService, type Area } from "@/services/area-service";
+import { cn } from "@/lib/utils";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -55,12 +70,21 @@ export default function TablesPage() {
   const [selectedTable, setSelectedTable] = React.useState<Table | null>(null);
   const [deleteTable, setDeleteTable] = React.useState<Table | null>(null);
   const [filterAreaId, setFilterAreaId] = React.useState<string>("all");
+
+  // Form data
   const [formData, setFormData] = React.useState<CreateTableDto>({
     areaId: "",
     name: "",
     capacity: 4,
     sortOrder: 0,
   });
+
+  // Continue creating checkbox
+  const [continueCreating, setContinueCreating] = React.useState(false);
+
+  // Area combobox state
+  const [areaComboboxOpen, setAreaComboboxOpen] = React.useState(false);
+  const [areaSearchValue, setAreaSearchValue] = React.useState("");
 
   // Load data
   const loadData = React.useCallback(async () => {
@@ -107,6 +131,7 @@ export default function TablesPage() {
   const handleOpenCreate = () => {
     setSelectedTable(null);
     setFormData({ areaId: areas[0]?.id || "", name: "", capacity: 4, sortOrder: 0 });
+    setAreaSearchValue(areas[0]?.name || "");
     setDialogMode("create");
   };
 
@@ -119,6 +144,8 @@ export default function TablesPage() {
       capacity: table.capacity,
       sortOrder: table.sortOrder,
     });
+    const area = areas.find(a => a.id === table.areaId);
+    setAreaSearchValue(area?.name || "");
     setDialogMode("edit");
   };
 
@@ -127,23 +154,77 @@ export default function TablesPage() {
     setDialogMode(null);
     setSelectedTable(null);
     setFormData({ areaId: "", name: "", capacity: 4, sortOrder: 0 });
+    setAreaSearchValue("");
+    setContinueCreating(false);
+  };
+
+  // Reset form for continue creating
+  const resetFormForContinue = () => {
+    // Keep the same areaId and search value, just reset name
+    setFormData(prev => ({
+      ...prev,
+      name: "",
+      sortOrder: (prev.sortOrder || 0) + 1,
+    }));
+  };
+
+  // Get or create area by name
+  const getOrCreateArea = async (areaName: string): Promise<string> => {
+    // Check if area already exists
+    const existingArea = areas.find(a => a.name.toLowerCase() === areaName.toLowerCase());
+    if (existingArea) {
+      return existingArea.id;
+    }
+
+    // Create new area
+    const newArea = await areaService.create({ name: areaName });
+    setAreas(prev => [...prev, newArea]);
+    toast({ title: "Thành công", description: `Đã tạo khu vực "${areaName}"` });
+    return newArea.id;
   };
 
   // Handle form submit (create or update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.areaId) return;
+    if (!formData.name.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập tên bàn", variant: "destructive" });
+      return;
+    }
+
+    // Check if we have an area selected or need to create one
+    if (!formData.areaId && !areaSearchValue.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập tên khu vực", variant: "destructive" });
+      return;
+    }
 
     try {
       setSaving(true);
 
+      // Get or create area if needed
+      let areaId = formData.areaId;
+      if (!areaId && areaSearchValue.trim()) {
+        areaId = await getOrCreateArea(areaSearchValue.trim());
+      }
+
       if (dialogMode === "create") {
-        const result = await tableService.create(formData);
+        const result = await tableService.create({ ...formData, areaId });
         setTables((prev) => [...prev, result]);
-        toast({ title: "Thành công", description: "Đã tạo bàn mới" });
+        toast({ title: "Thành công", description: `Đã tạo bàn "${result.name}"` });
+
+        // If continue creating is checked, reset form but keep dialog open
+        if (continueCreating) {
+          setFormData(prev => ({
+            areaId: areaId,
+            name: "",
+            capacity: prev.capacity,
+            sortOrder: (prev.sortOrder || 0) + 1,
+          }));
+        } else {
+          handleCloseDialog();
+        }
       } else if (dialogMode === "edit" && selectedTable) {
         const updateData: UpdateTableDto = {
-          areaId: formData.areaId,
+          areaId: areaId,
           name: formData.name,
           capacity: formData.capacity,
           sortOrder: formData.sortOrder,
@@ -151,9 +232,8 @@ export default function TablesPage() {
         const result = await tableService.update(selectedTable.id, updateData);
         setTables((prev) => prev.map((t) => (t.id === selectedTable.id ? result : t)));
         toast({ title: "Thành công", description: "Đã cập nhật bàn" });
+        handleCloseDialog();
       }
-
-      handleCloseDialog();
     } catch (error: any) {
       console.error("Error saving table:", error);
       toast({
@@ -228,6 +308,15 @@ export default function TablesPage() {
     return areas.find((a) => a.id === areaId)?.name || "Không xác định";
   };
 
+  // Filter areas for combobox
+  const filteredAreas = areas.filter(area =>
+    area.name.toLowerCase().includes(areaSearchValue.toLowerCase())
+  );
+
+  // Check if search value is a new area
+  const isNewArea = areaSearchValue.trim() &&
+    !areas.some(a => a.name.toLowerCase() === areaSearchValue.toLowerCase());
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -249,27 +338,27 @@ export default function TablesPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleOpenCreate} disabled={areas.length === 0}>
+          <Button onClick={handleOpenCreate}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm bàn
           </Button>
         </div>
       </div>
 
-      {areas.length === 0 && !loading ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-            <Table2 className="h-10 w-10 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Chưa có khu vực nào</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Vui lòng tạo khu vực trước khi thêm bàn
-            </p>
-          </CardContent>
-        </Card>
-      ) : loading ? (
+      {loading ? (
         <Card>
           <CardContent className="flex items-center justify-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      ) : filteredTables.length === 0 && areas.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+            <Table2 className="h-10 w-10 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Chưa có bàn nào</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Nhấn &quot;Thêm bàn&quot; để bắt đầu. Hệ thống sẽ tự động tạo khu vực nếu chưa có.
+            </p>
           </CardContent>
         </Card>
       ) : filteredTables.length === 0 ? (
@@ -374,29 +463,96 @@ export default function TablesPage() {
             <DialogTitle>{dialogMode === "create" ? "Thêm bàn mới" : "Chỉnh sửa bàn"}</DialogTitle>
             <DialogDescription>
               {dialogMode === "create"
-                ? "Nhập thông tin bàn. Mỗi bàn thuộc một khu vực."
+                ? "Nhập thông tin bàn. Nếu khu vực chưa tồn tại, hệ thống sẽ tự động tạo mới."
                 : "Cập nhật thông tin bàn."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="areaId">Khu vực *</Label>
-                <Select
-                  value={formData.areaId}
-                  onValueChange={(value) => setFormData({ ...formData, areaId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn khu vực" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map((area) => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Khu vực *</Label>
+                <Popover open={areaComboboxOpen} onOpenChange={setAreaComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={areaComboboxOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      {areaSearchValue || "Chọn hoặc nhập tên khu vực..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Tìm hoặc tạo khu vực..."
+                        value={areaSearchValue}
+                        onValueChange={(value) => {
+                          setAreaSearchValue(value);
+                          // Clear areaId if user is typing a new value
+                          if (!areas.some(a => a.name.toLowerCase() === value.toLowerCase())) {
+                            setFormData(prev => ({ ...prev, areaId: "" }));
+                          }
+                        }}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {areaSearchValue.trim() ? (
+                            <div className="py-2 px-4 text-sm">
+                              <span className="text-muted-foreground">Nhấn Enter hoặc chọn để tạo: </span>
+                              <span className="font-medium">&quot;{areaSearchValue}&quot;</span>
+                            </div>
+                          ) : (
+                            <div className="py-2 px-4 text-sm text-muted-foreground">
+                              Nhập tên khu vực để tìm hoặc tạo mới
+                            </div>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {/* Option to create new area if not exists */}
+                          {isNewArea && (
+                            <CommandItem
+                              value={`create-${areaSearchValue}`}
+                              onSelect={() => {
+                                setFormData(prev => ({ ...prev, areaId: "" }));
+                                setAreaComboboxOpen(false);
+                              }}
+                              className="text-primary"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Tạo mới: &quot;{areaSearchValue}&quot;
+                            </CommandItem>
+                          )}
+                          {filteredAreas.map((area) => (
+                            <CommandItem
+                              key={area.id}
+                              value={area.name}
+                              onSelect={() => {
+                                setFormData(prev => ({ ...prev, areaId: area.id }));
+                                setAreaSearchValue(area.name);
+                                setAreaComboboxOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  formData.areaId === area.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {area.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {isNewArea && (
+                  <p className="text-xs text-muted-foreground">
+                    Khu vực &quot;{areaSearchValue}&quot; sẽ được tạo tự động khi lưu
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="name">Tên bàn *</Label>
@@ -406,6 +562,7 @@ export default function TablesPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  autoFocus={dialogMode === "create" && continueCreating}
                 />
               </div>
               <div className="grid gap-2">
@@ -430,12 +587,32 @@ export default function TablesPage() {
                   onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
                 />
               </div>
+
+              {/* Continue creating checkbox - only show in create mode */}
+              {dialogMode === "create" && (
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="continueCreating"
+                    checked={continueCreating}
+                    onCheckedChange={(checked) => setContinueCreating(checked === true)}
+                  />
+                  <Label
+                    htmlFor="continueCreating"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Tiếp tục tạo bàn sau khi lưu
+                  </Label>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCloseDialog}>
                 Hủy
               </Button>
-              <Button type="submit" disabled={saving || !formData.name.trim() || !formData.areaId}>
+              <Button
+                type="submit"
+                disabled={saving || !formData.name.trim() || (!formData.areaId && !areaSearchValue.trim())}
+              >
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {dialogMode === "create" ? "Tạo bàn" : "Cập nhật"}
               </Button>
