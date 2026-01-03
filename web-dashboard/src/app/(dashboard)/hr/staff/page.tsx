@@ -39,7 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem } from "@/services/staff-service";
-import { exportToExcel, readExcelFile, downloadTemplate } from "@/lib/excel-utils";
+import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -110,22 +110,6 @@ const importColumnMapping: { excelHeader: string; key: keyof ImportDataWithNames
   { excelHeader: "Bộ phận", key: "departmentName" },
 ];
 
-// Template columns - same as export for easy re-import
-const templateColumns = [
-  { header: "ID", example: "(để trống nếu tạo mới)", required: false },
-  { header: "Tên nhân viên", example: "Nguyễn Văn A", required: true },
-  { header: "Số điện thoại", example: "0901234567", required: false },
-  { header: "Email", example: "email@example.com", required: false },
-  { header: "Ngày sinh", example: "1990-01-15", required: true },
-  { header: "Giới tính", example: "Nam hoặc Nữ", required: true },
-  { header: "CCCD", example: "001234567890", required: false },
-  { header: "Tỉnh/Thành phố", example: "Thành phố Hồ Chí Minh", required: false },
-  { header: "Phường/Xã", example: "Phường Bến Nghé", required: false },
-  { header: "Địa chỉ", example: "123 Nguyễn Văn Linh", required: true },
-  { header: "Thương hiệu", example: "The Coffee House", required: true },
-  { header: "Chi nhánh", example: "Chi nhánh Quận 1", required: true },
-  { header: "Bộ phận", example: "Phục vụ", required: true },
-];
 
 // Import settings for new staff
 interface ImportSettings {
@@ -390,10 +374,64 @@ export default function StaffPage() {
     toast({ title: "Thành công", description: "Đã xuất file Excel" });
   };
 
-  // Download template
-  const handleDownloadTemplate = () => {
-    downloadTemplate(templateColumns, "mau_import_nhan_vien");
-    toast({ title: "Thành công", description: "Đã tải file mẫu" });
+  // Download template with dropdowns
+  const handleDownloadTemplate = async () => {
+    // Load data for dropdowns if not loaded
+    await Promise.all([
+      dispatch(fetchDepartments()),
+      dispatch(fetchBrands()),
+      dispatch(fetchProvinces()),
+    ]);
+
+    // Wait for Redux state to update
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Build columns with dropdown options
+    const columnsWithDropdowns: TemplateColumnWithDropdown[] = [
+      { header: "ID", example: "(để trống nếu tạo mới)", required: false },
+      { header: "Tên nhân viên", example: "Nguyễn Văn A", required: true },
+      { header: "Số điện thoại", example: "0901234567", required: false },
+      { header: "Email", example: "email@example.com", required: false },
+      { header: "Ngày sinh", example: "1990-01-15", required: true },
+      {
+        header: "Giới tính",
+        example: "Nam",
+        required: true,
+        dropdown: [
+          { value: "male", label: "Nam" },
+          { value: "female", label: "Nữ" },
+        ],
+        dropdownSheetName: "GioiTinh",
+      },
+      { header: "CCCD", example: "001234567890", required: false },
+      {
+        header: "Tỉnh/Thành phố",
+        example: provinces[0]?.fullName || "Thành phố Hồ Chí Minh",
+        required: false,
+        dropdown: provinces.map((p) => ({ value: p.code, label: p.fullName || p.name })),
+        dropdownSheetName: "TinhTP",
+      },
+      { header: "Phường/Xã", example: "Phường Bến Nghé", required: false },
+      { header: "Địa chỉ", example: "123 Nguyễn Văn Linh", required: true },
+      {
+        header: "Thương hiệu",
+        example: brands[0]?.name || "The Coffee House",
+        required: true,
+        dropdown: brands.map((b) => ({ value: b.id, label: b.name })),
+        dropdownSheetName: "ThuongHieu",
+      },
+      { header: "Chi nhánh", example: "Chi nhánh Quận 1", required: true },
+      {
+        header: "Bộ phận",
+        example: departments[0]?.name || "Phục vụ",
+        required: true,
+        dropdown: departments.map((d) => ({ value: d.id, label: d.name })),
+        dropdownSheetName: "BoPhan",
+      },
+    ];
+
+    downloadTemplateWithDropdowns(columnsWithDropdowns, "mau_import_nhan_vien", 50);
+    toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown chọn sẵn" });
   };
 
   // Handle file input change - auto lookup IDs from names
@@ -875,15 +913,31 @@ export default function StaffPage() {
                 <Badge variant="secondary">{importData.filter((d) => d.id).length}</Badge>
                 <span>Cập nhật</span>
               </div>
-              {/* Show how many have complete data from Excel */}
-              {importData.filter((d) => !d.id && d.brandId && d.branchId && d.departmentId).length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    {importData.filter((d) => !d.id && d.brandId && d.branchId && d.departmentId).length}
-                  </Badge>
-                  <span className="text-green-700">Đầy đủ từ Excel</span>
-                </div>
-              )}
+              {/* Show how many NEW staff have complete data from Excel */}
+              {(() => {
+                const newStaffComplete = importData.filter((d) => !d.id && d.brandId && d.branchId && d.departmentId).length;
+                const newStaffMissing = importData.filter((d) => !d.id && (!d.brandId || !d.branchId || !d.departmentId)).length;
+                return (
+                  <>
+                    {newStaffComplete > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          {newStaffComplete}
+                        </Badge>
+                        <span className="text-green-700">Đầy đủ thông tin</span>
+                      </div>
+                    )}
+                    {newStaffMissing > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          {newStaffMissing}
+                        </Badge>
+                        <span className="text-yellow-700">Thiếu thông tin</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {importErrors.length > 0 && (
                 <div className="flex items-center gap-2">
                   <Badge variant="destructive">{importErrors.length}</Badge>
@@ -1034,11 +1088,13 @@ export default function StaffPage() {
                 </TableHeader>
                 <TableBody>
                   {importData.slice(0, 10).map((item, index) => {
+                    const isUpdate = !!item.id;
                     const brand = item.brandId ? brands.find((b) => b.id === item.brandId) : null;
                     const allBranches = item.brandId ? branchesByBrand[item.brandId] || [] : [];
                     const branch = item.branchId ? allBranches.find((b) => b.id === item.branchId) : null;
                     const department = item.departmentId ? departments.find((d) => d.id === item.departmentId) : null;
-                    const hasAllRequired = item.id || (item.brandId && item.branchId && item.departmentId);
+                    // For updates, we don't need brand/branch/department (they keep current values)
+                    const hasAllRequired = isUpdate || (item.brandId && item.branchId && item.departmentId);
 
                     return (
                       <TableRow key={index} className={!hasAllRequired ? "bg-yellow-50" : ""}>
@@ -1046,16 +1102,26 @@ export default function StaffPage() {
                         <TableCell>{item.name}</TableCell>
                         <TableCell>{item.phone || "-"}</TableCell>
                         <TableCell className="text-xs">
-                          {brand?.name || <span className="text-yellow-600">Chưa có</span>}
-                          {" / "}
-                          {branch?.name || <span className="text-yellow-600">Chưa có</span>}
+                          {isUpdate ? (
+                            <span className="text-muted-foreground">Giữ nguyên</span>
+                          ) : (
+                            <>
+                              {brand?.name || <span className="text-yellow-600">Chưa có</span>}
+                              {" / "}
+                              {branch?.name || <span className="text-yellow-600">Chưa có</span>}
+                            </>
+                          )}
                         </TableCell>
                         <TableCell className="text-xs">
-                          {department?.name || <span className="text-yellow-600">Chưa có</span>}
+                          {isUpdate ? (
+                            <span className="text-muted-foreground">Giữ nguyên</span>
+                          ) : (
+                            department?.name || <span className="text-yellow-600">Chưa có</span>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={item.id ? "secondary" : hasAllRequired ? "default" : "outline"}>
-                            {item.id ? "Cập nhật" : hasAllRequired ? "Tạo mới" : "Thiếu TT"}
+                          <Badge variant={isUpdate ? "secondary" : hasAllRequired ? "default" : "outline"}>
+                            {isUpdate ? "Cập nhật" : hasAllRequired ? "Tạo mới" : "Thiếu TT"}
                           </Badge>
                         </TableCell>
                       </TableRow>

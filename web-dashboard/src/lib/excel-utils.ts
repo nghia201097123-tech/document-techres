@@ -72,7 +72,12 @@ export async function readExcelFile<T>(
           const parsedRow: Partial<T> = {};
 
           columnMapping.forEach(({ excelHeader, key }) => {
-            const value = row[excelHeader];
+            // Try exact match first, then try without asterisk (required marker)
+            let value = row[excelHeader];
+            if (value === undefined) {
+              // Try with asterisk suffix (required field marker)
+              value = row[`${excelHeader} *`];
+            }
             if (value !== undefined && value !== "") {
               (parsedRow as any)[key] = value;
             }
@@ -99,7 +104,7 @@ export async function readExcelFile<T>(
 }
 
 /**
- * Create a template Excel file for importing
+ * Create a template Excel file for importing (simple version)
  */
 export function downloadTemplate(
   columns: { header: string; example?: string; required?: boolean }[],
@@ -122,6 +127,97 @@ export function downloadTemplate(
 
   // Generate file and trigger download
   XLSX.writeFile(wb, `${filename}_template.xlsx`);
+}
+
+/**
+ * Dropdown option for Excel data validation
+ */
+export interface DropdownOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Column with dropdown configuration
+ */
+export interface TemplateColumnWithDropdown {
+  header: string;
+  example?: string;
+  required?: boolean;
+  dropdown?: DropdownOption[];
+  dropdownSheetName?: string;
+}
+
+/**
+ * Create a template Excel file with reference sheets for dropdown values
+ * Users can see available values in reference sheets and copy/paste
+ */
+export function downloadTemplateWithDropdowns(
+  columns: TemplateColumnWithDropdown[],
+  filename: string,
+  rowCount: number = 50
+) {
+  const wb = XLSX.utils.book_new();
+
+  // Create headers with required markers
+  const headers = columns.map((col) =>
+    col.required ? `${col.header} *` : col.header
+  );
+
+  // Create main sheet with headers and empty rows
+  const mainData: (string | undefined)[][] = [headers];
+
+  // Add example row
+  const exampleRow = columns.map((col) => col.example || "");
+  mainData.push(exampleRow);
+
+  // Add empty rows for data entry
+  for (let i = 0; i < rowCount - 1; i++) {
+    mainData.push(columns.map(() => ""));
+  }
+
+  const mainWs = XLSX.utils.aoa_to_sheet(mainData);
+
+  // Set column widths
+  mainWs["!cols"] = columns.map((col) => ({ wch: col.dropdown ? 30 : 20 }));
+
+  // Add main sheet first
+  XLSX.utils.book_append_sheet(wb, mainWs, "NhapDuLieu");
+
+  // Create reference sheets for each dropdown
+  const dropdownColumns = columns.filter((col) => col.dropdown && col.dropdown.length > 0);
+
+  if (dropdownColumns.length > 0) {
+    // Create a combined reference sheet with all dropdown options
+    const maxLength = Math.max(...dropdownColumns.map((col) => col.dropdown!.length));
+    const refHeaders = dropdownColumns.map((col) => col.header);
+    const refData: string[][] = [refHeaders];
+
+    for (let i = 0; i < maxLength; i++) {
+      const row = dropdownColumns.map((col) => col.dropdown![i]?.label || "");
+      refData.push(row);
+    }
+
+    const refWs = XLSX.utils.aoa_to_sheet(refData);
+    refWs["!cols"] = dropdownColumns.map(() => ({ wch: 30 }));
+    XLSX.utils.book_append_sheet(wb, refWs, "DanhSachChon");
+  }
+
+  // Generate file and trigger download
+  XLSX.writeFile(wb, `${filename}_template.xlsx`);
+}
+
+/**
+ * Get Excel column letter from index (0 = A, 1 = B, etc.)
+ */
+function getColumnLetter(index: number): string {
+  let letter = "";
+  let temp = index;
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
 }
 
 /**
