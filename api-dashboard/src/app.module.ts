@@ -66,7 +66,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           Area,
           Table,
         ],
-        synchronize: false,
+        synchronize: true,
       }),
       inject: [ConfigService],
     }),
