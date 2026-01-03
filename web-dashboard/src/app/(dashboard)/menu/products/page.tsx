@@ -712,10 +712,9 @@ export default function ProductsPage() {
                     type="number"
                     min="0"
                     step="1000"
-                    placeholder="50000"
-                    value={formData.price || ""}
-                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                    required
+                    placeholder="0"
+                    value={formData.price ?? ""}
+                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) || 0 })}
                   />
                 </div>
                 <div className="grid gap-2">
