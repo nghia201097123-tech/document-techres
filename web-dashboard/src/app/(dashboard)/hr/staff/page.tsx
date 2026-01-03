@@ -83,7 +83,7 @@ const excelColumns = [
   { key: "isActive" as keyof Staff, header: "Hoạt động", width: 10 },
 ];
 
-// Excel column mapping for import
+// Excel column mapping for import (simplified - no ID columns for Brand/Branch/Department)
 const importColumnMapping = [
   { excelHeader: "ID", key: "id" as keyof BulkStaffItem },
   { excelHeader: "Tên nhân viên", key: "name" as keyof BulkStaffItem },
@@ -93,25 +93,36 @@ const importColumnMapping = [
   { excelHeader: "Giới tính", key: "gender" as keyof BulkStaffItem },
   { excelHeader: "CCCD", key: "idNumber" as keyof BulkStaffItem },
   { excelHeader: "Địa chỉ", key: "address" as keyof BulkStaffItem },
-  { excelHeader: "ID Bộ phận", key: "departmentId" as keyof BulkStaffItem },
-  { excelHeader: "ID Thương hiệu", key: "brandId" as keyof BulkStaffItem },
-  { excelHeader: "ID Chi nhánh", key: "branchId" as keyof BulkStaffItem },
 ];
 
-// Template columns
+// Template columns (simplified - no ID columns)
 const templateColumns = [
   { header: "ID", example: "(để trống nếu tạo mới)", required: false },
   { header: "Tên nhân viên", example: "Nguyễn Văn A", required: true },
   { header: "Số điện thoại", example: "0901234567", required: false },
   { header: "Email", example: "email@example.com", required: false },
   { header: "Ngày sinh", example: "1990-01-15", required: true },
-  { header: "Giới tính", example: "male hoặc female", required: true },
+  { header: "Giới tính", example: "Nam hoặc Nữ", required: true },
   { header: "CCCD", example: "001234567890", required: false },
   { header: "Địa chỉ", example: "123 Nguyễn Văn Linh, Q.7, TP.HCM", required: true },
-  { header: "ID Bộ phận", example: "(UUID của bộ phận)", required: true },
-  { header: "ID Thương hiệu", example: "(UUID - chỉ khi tạo mới)", required: false },
-  { header: "ID Chi nhánh", example: "(UUID - chỉ khi tạo mới)", required: false },
 ];
+
+// Import settings for new staff
+interface ImportSettings {
+  brandId: string;
+  branchId: string;
+  departmentId: string;
+  provinceCode: string;
+  wardCode: string;
+}
+
+const initialImportSettings: ImportSettings = {
+  brandId: "",
+  branchId: "",
+  departmentId: "",
+  provinceCode: "",
+  wardCode: "",
+};
 
 type DialogMode = "create" | "edit" | "view" | "import" | null;
 
@@ -140,11 +151,16 @@ export default function StaffPage() {
   const [importData, setImportData] = React.useState<Partial<BulkStaffItem>[]>([]);
   const [importErrors, setImportErrors] = React.useState<string[]>([]);
   const [importing, setImporting] = React.useState(false);
+  const [importSettings, setImportSettings] = React.useState<ImportSettings>(initialImportSettings);
 
-  // Derived state from Redux
+  // Derived state from Redux - for create/edit form
   const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
   const wards = formData.provinceCode ? wardsByProvince[formData.provinceCode] || [] : [];
   const loadingDropdowns = loadingBrands || loadingDepartments || loadingProvinces;
+
+  // Derived state for import settings
+  const importBranches = importSettings.brandId ? branchesByBrand[importSettings.brandId] || [] : [];
+  const importWards = importSettings.provinceCode ? wardsByProvince[importSettings.provinceCode] || [] : [];
 
   // Load staff list
   const loadStaff = React.useCallback(async () => {
@@ -180,12 +196,26 @@ export default function StaffPage() {
 
   // Load dropdowns when dialog opens (using Redux - cached data)
   React.useEffect(() => {
-    if (dialogMode === "create" || dialogMode === "edit") {
+    if (dialogMode === "create" || dialogMode === "edit" || dialogMode === "import") {
       dispatch(fetchDepartments());
       dispatch(fetchBrands());
       dispatch(fetchProvinces());
     }
   }, [dialogMode, dispatch]);
+
+  // Load branches for import settings
+  React.useEffect(() => {
+    if (importSettings.brandId) {
+      dispatch(fetchBranchesByBrand(importSettings.brandId));
+    }
+  }, [importSettings.brandId, dispatch]);
+
+  // Load wards for import settings
+  React.useEffect(() => {
+    if (importSettings.provinceCode) {
+      dispatch(fetchWardsByProvince(importSettings.provinceCode));
+    }
+  }, [importSettings.provinceCode, dispatch]);
 
   // Open create dialog
   const handleOpenCreate = () => {
@@ -299,6 +329,16 @@ export default function StaffPage() {
     setFormData(initialFormData);
     setImportData([]);
     setImportErrors([]);
+    setImportSettings(initialImportSettings);
+  };
+
+  // Handle import settings change
+  const handleImportBrandChange = (brandId: string) => {
+    setImportSettings({ ...importSettings, brandId, branchId: "" });
+  };
+
+  const handleImportProvinceChange = (provinceCode: string) => {
+    setImportSettings({ ...importSettings, provinceCode, wardCode: "" });
   };
 
   // Handle province change
@@ -372,9 +412,33 @@ export default function StaffPage() {
       return;
     }
 
+    // Check if we have new staff that need settings
+    const hasNewStaff = importData.some((d) => !d.id);
+    if (hasNewStaff) {
+      if (!importSettings.brandId || !importSettings.branchId || !importSettings.departmentId) {
+        toast({ title: "Lỗi", description: "Vui lòng chọn Thương hiệu, Chi nhánh và Bộ phận cho nhân viên mới", variant: "destructive" });
+        return;
+      }
+    }
+
+    // Apply import settings to new staff (those without ID)
+    const dataWithSettings = importData.map((item) => {
+      if (!item.id) {
+        return {
+          ...item,
+          brandId: importSettings.brandId,
+          branchId: importSettings.branchId,
+          departmentId: importSettings.departmentId,
+          provinceCode: importSettings.provinceCode || undefined,
+          wardCode: importSettings.wardCode || undefined,
+        };
+      }
+      return item;
+    });
+
     try {
       setImporting(true);
-      const result = await staffService.bulkImport(importData as BulkStaffItem[]);
+      const result = await staffService.bulkImport(dataWithSettings as BulkStaffItem[]);
 
       if (result.errors.length > 0) {
         toast({
@@ -646,11 +710,11 @@ export default function StaffPage() {
 
       {/* Import Dialog */}
       <Dialog open={dialogMode === "import"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import nhân viên từ Excel</DialogTitle>
             <DialogDescription>
-              Xem lại dữ liệu trước khi import. Các dòng có ID sẽ được cập nhật, còn lại sẽ tạo mới.
+              Chọn thông tin chung cho nhân viên mới, sau đó xem lại dữ liệu và import.
             </DialogDescription>
           </DialogHeader>
 
@@ -672,6 +736,118 @@ export default function StaffPage() {
                 </div>
               )}
             </div>
+
+            {/* Settings for new staff */}
+            {importData.some((d) => !d.id) && (
+              <div className="rounded-lg bg-blue-50 p-4 border border-blue-200 space-y-4">
+                <p className="text-sm font-medium text-blue-800">Cài đặt cho nhân viên mới:</p>
+
+                {/* Brand and Branch */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-sm">Thương hiệu *</Label>
+                    <Select
+                      value={importSettings.brandId}
+                      onValueChange={handleImportBrandChange}
+                      disabled={loadingBrands}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Chọn thương hiệu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.id}>
+                            {brand.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-sm">Chi nhánh *</Label>
+                    <Select
+                      value={importSettings.branchId}
+                      onValueChange={(value) => setImportSettings({ ...importSettings, branchId: value })}
+                      disabled={!importSettings.brandId || loadingBranches || importBranches.length === 0}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Chọn chi nhánh" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {importBranches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Department */}
+                <div className="grid gap-2">
+                  <Label className="text-sm">Bộ phận *</Label>
+                  <Select
+                    value={importSettings.departmentId}
+                    onValueChange={(value) => setImportSettings({ ...importSettings, departmentId: value })}
+                    disabled={loadingDepartments}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Chọn bộ phận" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Province and Ward */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-sm">Tỉnh/Thành phố</Label>
+                    <Select
+                      value={importSettings.provinceCode}
+                      onValueChange={handleImportProvinceChange}
+                      disabled={loadingProvinces}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Chọn tỉnh/thành phố" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {provinces.map((province) => (
+                          <SelectItem key={province.code} value={province.code}>
+                            {province.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-sm">Phường/Xã</Label>
+                    <Select
+                      value={importSettings.wardCode}
+                      onValueChange={(value) => setImportSettings({ ...importSettings, wardCode: value })}
+                      disabled={!importSettings.provinceCode || loadingWards || importWards.length === 0}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Chọn phường/xã" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {importWards.map((ward) => (
+                          <SelectItem key={ward.code} value={ward.code}>
+                            {ward.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Errors */}
             {importErrors.length > 0 && (
