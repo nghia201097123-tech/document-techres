@@ -13,6 +13,7 @@ import { LocationsModule } from './modules/locations/locations.module';
 import { AreasModule } from './modules/areas/areas.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { UnitsModule } from './modules/units/units.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
 import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
@@ -40,6 +41,8 @@ import {
   ProductNoteAssignment,
   Unit,
   ProductKitchen,
+  DepartmentPermission,
+  StaffPermission,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -83,6 +86,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           ProductNoteAssignment,
           Unit,
           ProductKitchen,
+          DepartmentPermission,
+          StaffPermission,
         ],
         synchronize: false,
       }),
@@ -101,6 +106,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AreasModule,
     TablesModule,
     UnitsModule,
+    PermissionsModule,
   ],
   providers: [DatabaseMigrationService],
 })

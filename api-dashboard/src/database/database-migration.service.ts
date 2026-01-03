@@ -420,6 +420,56 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('parent_id column added to departments table');
       }
 
+      // 21. Check if department_permissions table exists
+      const deptPermissionsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'department_permissions'
+        );
+      `);
+
+      if (!deptPermissionsExists[0].exists) {
+        this.logger.log('Creating department_permissions table...');
+        await queryRunner.query(`
+          CREATE TABLE department_permissions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+            permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(department_id, permission_id)
+          );
+          CREATE INDEX idx_dept_perm_tenant ON department_permissions(tenant_id);
+          CREATE INDEX idx_dept_perm_department ON department_permissions(department_id);
+        `);
+        this.logger.log('Department permissions table created successfully');
+      }
+
+      // 22. Check if staff_permissions table exists
+      const staffPermissionsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'staff_permissions'
+        );
+      `);
+
+      if (!staffPermissionsExists[0].exists) {
+        this.logger.log('Creating staff_permissions table...');
+        await queryRunner.query(`
+          CREATE TABLE staff_permissions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+            permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(staff_id, permission_id)
+          );
+          CREATE INDEX idx_staff_perm_tenant ON staff_permissions(tenant_id);
+          CREATE INDEX idx_staff_perm_staff ON staff_permissions(staff_id);
+        `);
+        this.logger.log('Staff permissions table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

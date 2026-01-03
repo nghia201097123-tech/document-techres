@@ -24,3 +24,5 @@ export * from './product-note.entity';
 export * from './product-note-assignment.entity';
 export * from './unit.entity';
 export * from './product-kitchen.entity';
+export * from './department-permission.entity';
+export * from './staff-permission.entity';

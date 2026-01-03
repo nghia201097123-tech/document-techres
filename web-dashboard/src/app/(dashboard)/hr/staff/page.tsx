@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +40,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem } from "@/services/staff-service";
+import { permissionService, type Permission } from "@/services/permission-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -163,6 +165,15 @@ export default function StaffPage() {
 
   // Reset password state
   const [resetPasswordResult, setResetPasswordResult] = React.useState<{ staff: Staff; temporaryPassword: string } | null>(null);
+
+  // Permission states
+  const [permissionDialogOpen, setPermissionDialogOpen] = React.useState(false);
+  const [permissionStaff, setPermissionStaff] = React.useState<Staff | null>(null);
+  const [allPermissions, setAllPermissions] = React.useState<Record<string, Permission[]>>({});
+  const [selectedPermissionIds, setSelectedPermissionIds] = React.useState<Set<string>>(new Set());
+  const [departmentPermissionIds, setDepartmentPermissionIds] = React.useState<Set<string>>(new Set());
+  const [loadingPermissions, setLoadingPermissions] = React.useState(false);
+  const [savingPermissions, setSavingPermissions] = React.useState(false);
 
   // Derived state from Redux - for create/edit form
   const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
@@ -358,6 +369,88 @@ export default function StaffPage() {
       console.error("Error resetting password:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi reset mật khẩu", variant: "destructive" });
     }
+  };
+
+  // Open permission dialog
+  const handleOpenPermissions = async (staff: Staff) => {
+    setPermissionStaff(staff);
+    setPermissionDialogOpen(true);
+    setLoadingPermissions(true);
+
+    try {
+      // Load all permissions grouped by module
+      const grouped = await permissionService.getGrouped();
+      setAllPermissions(grouped);
+
+      // Load staff's permissions (including department inherited)
+      const staffPerms = await permissionService.getStaffPermissions(staff.id);
+      setSelectedPermissionIds(new Set(staffPerms.ownPermissions.map(p => p.id)));
+      setDepartmentPermissionIds(new Set(staffPerms.departmentPermissions.map(p => p.id)));
+    } catch (error) {
+      console.error("Error loading permissions:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách quyền", variant: "destructive" });
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  // Save staff permissions
+  const handleSavePermissions = async () => {
+    if (!permissionStaff) return;
+
+    try {
+      setSavingPermissions(true);
+      await permissionService.assignStaffPermissions({
+        staffId: permissionStaff.id,
+        permissionIds: Array.from(selectedPermissionIds),
+      });
+      toast({ title: "Thành công", description: `Đã cập nhật quyền cho nhân viên "${permissionStaff.name}"` });
+      setPermissionDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error saving permissions:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi lưu quyền",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  // Toggle permission selection
+  const togglePermission = (permissionId: string) => {
+    // Don't allow toggling department-inherited permissions
+    if (departmentPermissionIds.has(permissionId)) return;
+
+    setSelectedPermissionIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(permissionId)) {
+        newSet.delete(permissionId);
+      } else {
+        newSet.add(permissionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle all permissions in a module (excluding department inherited)
+  const toggleModule = (modulePermissions: Permission[]) => {
+    const nonInheritedPerms = modulePermissions.filter(p => !departmentPermissionIds.has(p.id));
+    if (nonInheritedPerms.length === 0) return;
+
+    const allSelected = nonInheritedPerms.every(p => selectedPermissionIds.has(p.id));
+    setSelectedPermissionIds(prev => {
+      const newSet = new Set(prev);
+      nonInheritedPerms.forEach(p => {
+        if (allSelected) {
+          newSet.delete(p.id);
+        } else {
+          newSet.add(p.id);
+        }
+      });
+      return newSet;
+    });
   };
 
   // Close dialog and reset
@@ -828,6 +921,10 @@ export default function StaffPage() {
                           <DropdownMenuItem onClick={() => handleResetPassword(staff)}>
                             <KeyRound className="mr-2 h-4 w-4" />
                             Reset mật khẩu
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenPermissions(staff)}>
+                            <Shield className="mr-2 h-4 w-4" />
+                            Phân quyền
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleToggleActive(staff)}>
@@ -1508,6 +1605,142 @@ export default function StaffPage() {
           )}
           <DialogFooter>
             <Button onClick={() => setResetPasswordResult(null)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permission Assignment Dialog */}
+      <Dialog open={permissionDialogOpen} onOpenChange={setPermissionDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Phân quyền cho nhân viên
+            </DialogTitle>
+            <DialogDescription>
+              Gán quyền riêng cho nhân viên &quot;{permissionStaff?.name}&quot;.
+              {permissionStaff?.departmentName && (
+                <span className="block mt-1">
+                  Nhân viên thuộc bộ phận <strong>{permissionStaff.departmentName}</strong> và đã thừa hưởng các quyền của bộ phận đó.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingPermissions ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : Object.keys(allPermissions).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Shield className="h-10 w-10 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Chưa có quyền nào được định nghĩa trong hệ thống</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-4">
+                {/* Legend */}
+                {departmentPermissionIds.size > 0 && (
+                  <div className="flex items-center gap-4 text-sm p-2 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-blue-500" />
+                      <span>Quyền riêng</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-green-500" />
+                      <span>Thừa hưởng từ bộ phận</span>
+                    </div>
+                  </div>
+                )}
+
+                {Object.entries(allPermissions).map(([module, permissions]) => {
+                  const nonInheritedPerms = permissions.filter(p => !departmentPermissionIds.has(p.id));
+                  const allNonInheritedSelected = nonInheritedPerms.length > 0 && nonInheritedPerms.every(p => selectedPermissionIds.has(p.id));
+                  const someSelected = permissions.some(p => selectedPermissionIds.has(p.id) || departmentPermissionIds.has(p.id));
+
+                  return (
+                    <div key={module} className="border rounded-lg p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Checkbox
+                          id={`module-${module}`}
+                          checked={allNonInheritedSelected}
+                          disabled={nonInheritedPerms.length === 0}
+                          className={someSelected && !allNonInheritedSelected ? "data-[state=checked]:bg-primary/50" : ""}
+                          onCheckedChange={() => toggleModule(permissions)}
+                        />
+                        <Label
+                          htmlFor={`module-${module}`}
+                          className="text-base font-semibold cursor-pointer"
+                        >
+                          {module}
+                        </Label>
+                        <Badge variant="outline" className="ml-auto">
+                          {permissions.filter(p => selectedPermissionIds.has(p.id) || departmentPermissionIds.has(p.id)).length}/{permissions.length}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-6">
+                        {permissions.map((perm) => {
+                          const isInherited = departmentPermissionIds.has(perm.id);
+                          const isOwn = selectedPermissionIds.has(perm.id);
+
+                          return (
+                            <div key={perm.id} className="flex items-start gap-2">
+                              <Checkbox
+                                id={perm.id}
+                                checked={isOwn || isInherited}
+                                disabled={isInherited}
+                                onCheckedChange={() => togglePermission(perm.id)}
+                                className={isInherited ? "data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600" : ""}
+                              />
+                              <div className="grid gap-0.5">
+                                <div className="flex items-center gap-2">
+                                  <Label
+                                    htmlFor={perm.id}
+                                    className={`text-sm font-medium ${isInherited ? "cursor-default" : "cursor-pointer"}`}
+                                  >
+                                    {perm.name}
+                                  </Label>
+                                  {isInherited && (
+                                    <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">
+                                      Bộ phận
+                                    </Badge>
+                                  )}
+                                </div>
+                                {perm.description && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {perm.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
+
+          <DialogFooter className="mt-4">
+            <div className="flex items-center gap-4 mr-auto text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Shield className="h-4 w-4 text-blue-500" />
+                <span>Quyền riêng: {selectedPermissionIds.size}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Shield className="h-4 w-4 text-green-500" />
+                <span>Thừa hưởng: {departmentPermissionIds.size}</span>
+              </div>
+            </div>
+            <Button variant="outline" onClick={() => setPermissionDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleSavePermissions} disabled={savingPermissions}>
+              {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu quyền
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
