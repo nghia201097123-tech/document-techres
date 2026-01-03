@@ -10,6 +10,8 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { LocationsModule } from './modules/locations/locations.module';
+import { AreasModule } from './modules/areas/areas.module';
+import { TablesModule } from './modules/tables/tables.module';
 import {
   Company,
   Brand,
@@ -26,6 +28,8 @@ import {
   Product,
   Category,
   Kitchen,
+  Area,
+  Table,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -59,6 +63,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           Product,
           Category,
           Kitchen,
+          Area,
+          Table,
         ],
         synchronize: false,
       }),
@@ -74,6 +80,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     BrandsModule,
     BranchesModule,
     LocationsModule,
+    AreasModule,
+    TablesModule,
   ],
 })
 export class AppModule {}

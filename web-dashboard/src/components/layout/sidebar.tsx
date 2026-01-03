@@ -14,6 +14,8 @@ import {
   Store,
   ChevronDown,
   ChevronRight,
+  Table2,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -49,6 +51,14 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    title: "Quản lý bàn",
+    icon: Table2,
+    children: [
+      { title: "Khu vực", href: "/tables/areas", icon: MapPin },
+      { title: "Danh sách bàn", href: "/tables/list", icon: Table2 },
+    ],
+  },
+  {
     title: "Bếp",
     href: "/kitchen",
     icon: ChefHat,
@@ -68,7 +78,7 @@ const menuItems: MenuItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { company } = useAuthStore();
-  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu"]);
+  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn"]);
 
   const toggleExpand = (title: string) => {
     setExpandedItems((prev) =>
