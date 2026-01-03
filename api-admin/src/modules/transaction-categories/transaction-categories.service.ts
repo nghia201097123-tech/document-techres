@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, FindOptionsWhere } from 'typeorm';
-import { TransactionCategory } from '../../database/entities/transaction-category.entity';
+import { TransactionCategory, TransactionType } from '../../database/entities/transaction-category.entity';
 import { CreateTransactionCategoryDto } from './dto/create-transaction-category.dto';
 import { UpdateTransactionCategoryDto } from './dto/update-transaction-category.dto';
 import { FilterTransactionCategoryDto } from './dto/filter-transaction-category.dto';
@@ -123,18 +123,18 @@ export class TransactionCategoriesService {
 
   // Seed default categories
   async seedDefaults(): Promise<void> {
-    const defaultCategories = [
+    const defaultCategories: Array<{ name: string; code: string; type: TransactionType; isSystem: boolean }> = [
       // Income categories
-      { name: 'Doanh thu bán hàng', code: 'DT_BH', type: 'income' as const, isSystem: true },
-      { name: 'Doanh thu dịch vụ', code: 'DT_DV', type: 'income' as const, isSystem: true },
-      { name: 'Thu khác', code: 'THU_KHAC', type: 'income' as const, isSystem: true },
+      { name: 'Doanh thu bán hàng', code: 'DT_BH', type: TransactionType.INCOME, isSystem: true },
+      { name: 'Doanh thu dịch vụ', code: 'DT_DV', type: TransactionType.INCOME, isSystem: true },
+      { name: 'Thu khác', code: 'THU_KHAC', type: TransactionType.INCOME, isSystem: true },
       // Expense categories
-      { name: 'Chi phí nguyên vật liệu', code: 'CP_NVL', type: 'expense' as const, isSystem: true },
-      { name: 'Chi phí nhân công', code: 'CP_NC', type: 'expense' as const, isSystem: true },
-      { name: 'Chi phí điện nước', code: 'CP_DN', type: 'expense' as const, isSystem: true },
-      { name: 'Chi phí thuê mặt bằng', code: 'CP_TMB', type: 'expense' as const, isSystem: true },
-      { name: 'Chi phí marketing', code: 'CP_MKT', type: 'expense' as const, isSystem: true },
-      { name: 'Chi khác', code: 'CHI_KHAC', type: 'expense' as const, isSystem: true },
+      { name: 'Chi phí nguyên vật liệu', code: 'CP_NVL', type: TransactionType.EXPENSE, isSystem: true },
+      { name: 'Chi phí nhân công', code: 'CP_NC', type: TransactionType.EXPENSE, isSystem: true },
+      { name: 'Chi phí điện nước', code: 'CP_DN', type: TransactionType.EXPENSE, isSystem: true },
+      { name: 'Chi phí thuê mặt bằng', code: 'CP_TMB', type: TransactionType.EXPENSE, isSystem: true },
+      { name: 'Chi phí marketing', code: 'CP_MKT', type: TransactionType.EXPENSE, isSystem: true },
+      { name: 'Chi khác', code: 'CHI_KHAC', type: TransactionType.EXPENSE, isSystem: true },
     ];
 
     for (const cat of defaultCategories) {

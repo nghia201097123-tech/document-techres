@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
+import { IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { TransactionType } from '../../../database/entities/transaction-category.entity';
@@ -9,11 +9,6 @@ export class FilterTransactionCategoryDto extends PaginationDto {
   @IsOptional()
   @IsEnum(TransactionType)
   type?: TransactionType;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  search?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
