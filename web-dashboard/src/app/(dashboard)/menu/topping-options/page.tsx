@@ -48,6 +48,7 @@ export default function ToppingOptionsPage() {
   const [showQuickCreateForm, setShowQuickCreateForm] = React.useState(false);
   const [quickCreateName, setQuickCreateName] = React.useState("");
   const [quickCreatePrice, setQuickCreatePrice] = React.useState<number>(0);
+  const [quickCreateVat, setQuickCreateVat] = React.useState<number>(0);
   const [creatingTopping, setCreatingTopping] = React.useState(false);
 
   // Edit group dialog
@@ -286,6 +287,7 @@ export default function ToppingOptionsPage() {
         name: quickCreateName.trim(),
         type: ProductType.TOPPING,
         price: quickCreatePrice || 0,
+        vatRate: quickCreateVat || 0,
       });
 
       // Refresh available toppings
@@ -305,6 +307,7 @@ export default function ToppingOptionsPage() {
       // Reset form
       setQuickCreateName("");
       setQuickCreatePrice(0);
+      setQuickCreateVat(0);
       setShowQuickCreateForm(false);
       toast({ title: "Thành công", description: `Đã tạo và thêm "${newTopping.name}" vào nhóm` });
     } catch (error: any) {
@@ -321,6 +324,7 @@ export default function ToppingOptionsPage() {
     setShowQuickCreateForm(false);
     setQuickCreateName("");
     setQuickCreatePrice(0);
+    setQuickCreateVat(0);
   };
 
   // Format currency
@@ -666,15 +670,29 @@ export default function ToppingOptionsPage() {
                       autoFocus
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="quickCreatePrice">Giá (VND)</Label>
-                    <Input
-                      id="quickCreatePrice"
-                      type="number"
-                      placeholder="0"
-                      value={quickCreatePrice || ""}
-                      onChange={(e) => setQuickCreatePrice(Number(e.target.value))}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="quickCreatePrice">Giá (VND)</Label>
+                      <Input
+                        id="quickCreatePrice"
+                        type="number"
+                        placeholder="0"
+                        value={quickCreatePrice || ""}
+                        onChange={(e) => setQuickCreatePrice(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="quickCreateVat">VAT (%)</Label>
+                      <Input
+                        id="quickCreateVat"
+                        type="number"
+                        placeholder="0"
+                        min="0"
+                        max="100"
+                        value={quickCreateVat || ""}
+                        onChange={(e) => setQuickCreateVat(Number(e.target.value))}
+                      />
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -690,6 +708,7 @@ export default function ToppingOptionsPage() {
                         setShowQuickCreateForm(false);
                         setQuickCreateName("");
                         setQuickCreatePrice(0);
+                        setQuickCreateVat(0);
                       }}
                     >
                       Hủy
