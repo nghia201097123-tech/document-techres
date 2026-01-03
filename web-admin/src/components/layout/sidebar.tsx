@@ -47,7 +47,7 @@ const navItems: NavItem[] = [
   },
   {
     title: "Danh mục Thu/Chi",
-    href: "/categories",
+    href: "/transaction-categories",
     icon: Wallet,
   },
   {

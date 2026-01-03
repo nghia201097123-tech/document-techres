@@ -30,6 +30,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
 import { LocationsModule } from './modules/locations/locations.module';
+import { TransactionCategoriesModule } from './modules/transaction-categories/transaction-categories.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { LocationsModule } from './modules/locations/locations.module';
     PermissionsModule,
     AdminUsersModule,
     LocationsModule,
+    TransactionCategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -4,6 +4,7 @@ import companiesReducer from "./slices/companiesSlice";
 import brandsReducer from "./slices/brandsSlice";
 import branchesReducer from "./slices/branchesSlice";
 import locationsReducer from "./slices/locationsSlice";
+import transactionCategoriesReducer from "./slices/transactionCategoriesSlice";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     brands: brandsReducer,
     branches: branchesReducer,
     locations: locationsReducer,
+    transactionCategories: transactionCategoriesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
