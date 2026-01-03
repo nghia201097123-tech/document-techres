@@ -530,7 +530,6 @@ export default function ToppingOptionsPage() {
                               e.stopPropagation();
                               setShowAddToppingDialog(true);
                             }}
-                            disabled={getAvailableToppingsForGroup().length === 0}
                           >
                             <Plus className="h-4 w-4 mr-1" />
                             Thêm
