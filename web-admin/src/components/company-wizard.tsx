@@ -217,7 +217,8 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
       case 3:
         return !!(wizardData.branch.name);
       case 4:
-        return !!(wizardData.staff.name);
+        // Bắt buộc tên và mã đăng nhập phải đủ 2 ký tự
+        return !!(wizardData.staff.name && wizardData.staff.usernamePrefix?.length === 2);
       default:
         return false;
     }
@@ -710,18 +711,32 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Mã đăng nhập</Label>
+                  <Label>Mã đăng nhập *</Label>
                   <div className="flex gap-2 items-center">
                     <Input
-                      value={wizardData.staff.usernamePrefix || "tr"}
-                      onChange={(e) => handleChange("staff", "usernamePrefix", e.target.value.toLowerCase().substring(0, 2))}
+                      value={wizardData.staff.usernamePrefix ?? ""}
+                      onChange={(e) => {
+                        // Chỉ cho phép chữ cái, chuyển thành chữ thường, tối đa 2 ký tự
+                        const value = e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2);
+                        handleChange("staff", "usernamePrefix", value);
+                      }}
                       placeholder="tr"
                       maxLength={2}
-                      className="w-20 text-center font-mono uppercase"
+                      className={`w-20 text-center font-mono uppercase ${
+                        wizardData.staff.usernamePrefix && wizardData.staff.usernamePrefix.length !== 2
+                          ? 'border-red-500 focus-visible:ring-red-500'
+                          : ''
+                      }`}
                     />
                     <span className="text-muted-foreground font-mono">000001</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Tối đa 2 ký tự, số tự động tăng</p>
+                  <p className={`text-xs ${
+                    wizardData.staff.usernamePrefix && wizardData.staff.usernamePrefix.length !== 2
+                      ? 'text-red-500'
+                      : 'text-muted-foreground'
+                  }`}>
+                    Bắt buộc 2 ký tự (a-z)
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
