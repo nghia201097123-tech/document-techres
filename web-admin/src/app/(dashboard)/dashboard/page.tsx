@@ -1,8 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Building2, Store, MapPin, Package, Users, TrendingUp } from "lucide-react";
+import { Building2, Store, MapPin, Package, TrendingUp, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { dashboardService, type RecentCompany, type RecentBranch } from "@/services/dashboard-service";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface StatCardProps {
   title: string;
@@ -13,9 +16,10 @@ interface StatCardProps {
     value: number;
     isPositive: boolean;
   };
+  loading?: boolean;
 }
 
-function StatCard({ title, value, description, icon: Icon, trend }: StatCardProps) {
+function StatCard({ title, value, description, icon: Icon, trend, loading }: StatCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -25,22 +29,28 @@ function StatCard({ title, value, description, icon: Icon, trend }: StatCardProp
         <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && (
-          <p className="text-xs text-muted-foreground">{description}</p>
-        )}
-        {trend && (
-          <div className="mt-2 flex items-center text-xs">
-            <TrendingUp
-              className={`mr-1 h-3 w-3 ${
-                trend.isPositive ? "text-green-500" : "text-red-500 rotate-180"
-              }`}
-            />
-            <span className={trend.isPositive ? "text-green-500" : "text-red-500"}>
-              {trend.isPositive ? "+" : "-"}{trend.value}%
-            </span>
-            <span className="ml-1 text-muted-foreground">so với tháng trước</span>
-          </div>
+        {loading ? (
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        ) : (
+          <>
+            <div className="text-2xl font-bold">{value}</div>
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+            {trend && (
+              <div className="mt-2 flex items-center text-xs">
+                <TrendingUp
+                  className={`mr-1 h-3 w-3 ${
+                    trend.isPositive ? "text-green-500" : "text-red-500 rotate-180"
+                  }`}
+                />
+                <span className={trend.isPositive ? "text-green-500" : "text-red-500"}>
+                  {trend.isPositive ? "+" : "-"}{trend.value}%
+                </span>
+                <span className="ml-1 text-muted-foreground">so với tháng trước</span>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
@@ -48,14 +58,42 @@ function StatCard({ title, value, description, icon: Icon, trend }: StatCardProp
 }
 
 export default function DashboardPage() {
-  // TODO: Fetch real data from API
-  const stats = {
-    companies: 25,
-    brands: 48,
-    branches: 156,
-    packages: 4,
-    activeUsers: 1250,
-  };
+  const { toast } = useToast();
+  const [loading, setLoading] = React.useState(true);
+  const [stats, setStats] = React.useState({
+    companies: 0,
+    brands: 0,
+    branches: 0,
+    packages: 0,
+  });
+  const [recentCompanies, setRecentCompanies] = React.useState<RecentCompany[]>([]);
+  const [recentBranches, setRecentBranches] = React.useState<RecentBranch[]>([]);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [statsData, companies, branches] = await Promise.all([
+          dashboardService.getStats(),
+          dashboardService.getRecentCompanies(3),
+          dashboardService.getRecentBranches(3),
+        ]);
+        setStats(statsData);
+        setRecentCompanies(companies);
+        setRecentBranches(branches);
+      } catch (error) {
+        toast({
+          title: "Lỗi",
+          description: "Không thể tải dữ liệu dashboard",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
 
   return (
     <div className="space-y-6">
@@ -73,27 +111,28 @@ export default function DashboardPage() {
           value={stats.companies}
           description="Đang hoạt động"
           icon={Building2}
-          trend={{ value: 12, isPositive: true }}
+          loading={loading}
         />
         <StatCard
           title="Thương hiệu"
           value={stats.brands}
           description="Trên toàn hệ thống"
           icon={Store}
-          trend={{ value: 8, isPositive: true }}
+          loading={loading}
         />
         <StatCard
           title="Chi nhánh"
           value={stats.branches}
           description="Đang vận hành"
           icon={MapPin}
-          trend={{ value: 15, isPositive: true }}
+          loading={loading}
         />
         <StatCard
           title="Gói App Food"
           value={stats.packages}
-          description="Basic, Standard, Premium, Enterprise"
+          description="Đang hoạt động"
           icon={Package}
+          loading={loading}
         />
       </div>
 
@@ -104,25 +143,33 @@ export default function DashboardPage() {
             <CardTitle>Công ty mới đăng ký</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { name: "Công ty TNHH ABC", date: "2 giờ trước" },
-                { name: "Công ty Cổ phần XYZ", date: "5 giờ trước" },
-                { name: "Công ty TNHH DEF", date: "1 ngày trước" },
-              ].map((company, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                      <Building2 className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{company.name}</p>
-                      <p className="text-xs text-muted-foreground">{company.date}</p>
+            {loading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : recentCompanies.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Chưa có công ty nào
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {recentCompanies.map((company) => (
+                  <div key={company.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                        <Building2 className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{company.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatRelativeTime(company.createdAt)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -131,27 +178,33 @@ export default function DashboardPage() {
             <CardTitle>Chi nhánh mới</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { name: "Chi nhánh Quận 1", brand: "Thương hiệu A", date: "3 giờ trước" },
-                { name: "Chi nhánh Quận 7", brand: "Thương hiệu B", date: "6 giờ trước" },
-                { name: "Chi nhánh Thủ Đức", brand: "Thương hiệu A", date: "1 ngày trước" },
-              ].map((branch, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-                      <MapPin className="h-4 w-4 text-green-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{branch.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {branch.brand} • {branch.date}
-                      </p>
+            {loading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : recentBranches.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Chưa có chi nhánh nào
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {recentBranches.map((branch) => (
+                  <div key={branch.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+                        <MapPin className="h-4 w-4 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{branch.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {branch.brandName} • {formatRelativeTime(branch.createdAt)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

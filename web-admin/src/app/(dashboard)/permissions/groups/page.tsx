@@ -10,6 +10,7 @@ import {
   Trash2,
   Eye,
   Users,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,108 +40,86 @@ import {
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import type { PermissionGroup, Permission } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import {
+  permissionService,
+  type Permission,
+  type PermissionGroup,
+} from "@/services/permission-service";
 import { formatDateTime } from "@/lib/utils";
-
-// Mock permissions
-const mockPermissions: Permission[] = [
-  { id: "1", code: "company.view", name: "Xem công ty", module: "company", description: "Xem danh sách công ty" },
-  { id: "2", code: "company.create", name: "Tạo công ty", module: "company", description: "Thêm công ty mới" },
-  { id: "3", code: "company.edit", name: "Sửa công ty", module: "company", description: "Chỉnh sửa công ty" },
-  { id: "4", code: "company.delete", name: "Xóa công ty", module: "company", description: "Xóa công ty" },
-  { id: "5", code: "brand.view", name: "Xem thương hiệu", module: "brand", description: "Xem danh sách thương hiệu" },
-  { id: "6", code: "brand.create", name: "Tạo thương hiệu", module: "brand", description: "Thêm thương hiệu mới" },
-  { id: "7", code: "brand.edit", name: "Sửa thương hiệu", module: "brand", description: "Chỉnh sửa thương hiệu" },
-  { id: "8", code: "brand.delete", name: "Xóa thương hiệu", module: "brand", description: "Xóa thương hiệu" },
-  { id: "9", code: "branch.view", name: "Xem chi nhánh", module: "branch", description: "Xem danh sách chi nhánh" },
-  { id: "10", code: "branch.create", name: "Tạo chi nhánh", module: "branch", description: "Thêm chi nhánh mới" },
-  { id: "11", code: "branch.edit", name: "Sửa chi nhánh", module: "branch", description: "Chỉnh sửa chi nhánh" },
-  { id: "12", code: "branch.delete", name: "Xóa chi nhánh", module: "branch", description: "Xóa chi nhánh" },
-];
-
-// Mock data
-const mockGroups: PermissionGroup[] = [
-  {
-    id: "1",
-    name: "Super Admin",
-    code: "super_admin",
-    description: "Toàn quyền quản trị hệ thống",
-    permissions: mockPermissions.map((p) => p.id),
-    userCount: 2,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "2",
-    name: "Support",
-    code: "support",
-    description: "Nhân viên hỗ trợ khách hàng",
-    permissions: ["1", "5", "9"],
-    userCount: 5,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "3",
-    name: "Viewer",
-    code: "viewer",
-    description: "Chỉ xem, không chỉnh sửa",
-    permissions: ["1", "5", "9"],
-    userCount: 10,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-];
 
 const moduleLabels: Record<string, string> = {
   company: "Công ty",
   brand: "Thương hiệu",
   branch: "Chi nhánh",
+  package: "Gói App Food",
+  category: "Danh mục",
+  permission: "Phân quyền",
+  admin: "Quản trị viên",
+  report: "Báo cáo",
 };
 
 interface GroupFormData {
   name: string;
   code: string;
   description: string;
-  permissions: string[];
+  permissionIds: string[];
 }
 
 const initialFormData: GroupFormData = {
   name: "",
   code: "",
   description: "",
-  permissions: [],
+  permissionIds: [],
 };
 
 export default function PermissionGroupsPage() {
-  const [groups, setGroups] = React.useState<PermissionGroup[]>(mockGroups);
+  const { toast } = useToast();
+  const [groups, setGroups] = React.useState<PermissionGroup[]>([]);
+  const [permissions, setPermissions] = React.useState<Permission[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedGroup, setSelectedGroup] = React.useState<PermissionGroup | null>(null);
   const [formData, setFormData] = React.useState<GroupFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const filteredGroups = groups.filter(
-    (group) =>
-      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const fetchData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const [groupsRes, permissionsRes] = await Promise.all([
+        permissionService.getAllGroups({ search: searchQuery || undefined, limit: 100 }),
+        permissionService.getAllPermissions({ limit: 100 }),
+      ]);
+      setGroups(groupsRes.data);
+      setPermissions(permissionsRes.data);
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải dữ liệu",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, toast]);
 
-  // Group permissions by module
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const permissionsByModule = React.useMemo(() => {
     const grouped: Record<string, Permission[]> = {};
-    mockPermissions.forEach((p) => {
+    permissions.forEach((p) => {
       if (!grouped[p.module]) {
         grouped[p.module] = [];
       }
       grouped[p.module].push(p);
     });
     return grouped;
-  }, []);
+  }, [permissions]);
 
   const handleOpenCreate = () => {
     setSelectedGroup(null);
@@ -155,7 +134,7 @@ export default function PermissionGroupsPage() {
       name: group.name,
       code: group.code,
       description: group.description || "",
-      permissions: [...group.permissions],
+      permissionIds: group.permissions.map((p) => p.id),
     });
     setIsViewMode(false);
     setIsDialogOpen(true);
@@ -167,7 +146,7 @@ export default function PermissionGroupsPage() {
       name: group.name,
       code: group.code,
       description: group.description || "",
-      permissions: [...group.permissions],
+      permissionIds: group.permissions.map((p) => p.id),
     });
     setIsViewMode(true);
     setIsDialogOpen(true);
@@ -178,42 +157,74 @@ export default function PermissionGroupsPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedGroup) {
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === selectedGroup.id
-            ? { ...g, ...formData, updatedAt: new Date().toISOString() }
-            : g
-        )
-      );
-    } else {
-      const newGroup: PermissionGroup = {
-        id: String(Date.now()),
-        ...formData,
-        userCount: 0,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setGroups((prev) => [newGroup, ...prev]);
+    setIsSubmitting(true);
+    try {
+      if (selectedGroup) {
+        await permissionService.updateGroup(selectedGroup.id, {
+          name: formData.name,
+          description: formData.description || undefined,
+          permissionIds: formData.permissionIds,
+        });
+        toast({ title: "Thành công", description: "Đã cập nhật nhóm quyền" });
+      } else {
+        await permissionService.createGroup({
+          name: formData.name,
+          code: formData.code,
+          description: formData.description || undefined,
+          permissionIds: formData.permissionIds,
+        });
+        toast({ title: "Thành công", description: "Đã thêm nhóm quyền mới" });
+      }
+      setIsDialogOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
-    if (selectedGroup) {
-      setGroups((prev) => prev.filter((g) => g.id !== selectedGroup.id));
+  const handleDelete = async () => {
+    if (!selectedGroup) return;
+    setIsSubmitting(true);
+    try {
+      await permissionService.deleteGroup(selectedGroup.id);
+      toast({ title: "Thành công", description: "Đã xóa nhóm quyền" });
       setIsDeleteDialogOpen(false);
       setSelectedGroup(null);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể xóa nhóm quyền",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (group: PermissionGroup) => {
-    setGroups((prev) =>
-      prev.map((g) => (g.id === group.id ? { ...g, isActive: !g.isActive } : g))
-    );
+  const handleToggleStatus = async (group: PermissionGroup) => {
+    try {
+      await permissionService.toggleGroupStatus(group.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${group.isActive ? "tạm dừng" : "kích hoạt"} nhóm quyền`,
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,26 +237,34 @@ export default function PermissionGroupsPage() {
   const handlePermissionToggle = (permissionId: string, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
-      permissions: checked
-        ? [...prev.permissions, permissionId]
-        : prev.permissions.filter((id) => id !== permissionId),
+      permissionIds: checked
+        ? [...prev.permissionIds, permissionId]
+        : prev.permissionIds.filter((id) => id !== permissionId),
     }));
   };
 
   const handleModuleToggleAll = (module: string, checked: boolean) => {
-    const modulePermissionIds = permissionsByModule[module].map((p) => p.id);
+    const modulePermissionIds = permissionsByModule[module]?.map((p) => p.id) || [];
     setFormData((prev) => ({
       ...prev,
-      permissions: checked
-        ? [...new Set([...prev.permissions, ...modulePermissionIds])]
-        : prev.permissions.filter((id) => !modulePermissionIds.includes(id)),
+      permissionIds: checked
+        ? [...new Set([...prev.permissionIds, ...modulePermissionIds])]
+        : prev.permissionIds.filter((id) => !modulePermissionIds.includes(id)),
     }));
   };
 
   const isModuleAllSelected = (module: string) => {
-    const modulePermissionIds = permissionsByModule[module].map((p) => p.id);
-    return modulePermissionIds.every((id) => formData.permissions.includes(id));
+    const modulePermissionIds = permissionsByModule[module]?.map((p) => p.id) || [];
+    return modulePermissionIds.length > 0 && modulePermissionIds.every((id) => formData.permissionIds.includes(id));
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -266,7 +285,7 @@ export default function PermissionGroupsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              Danh sách nhóm quyền ({filteredGroups.length})
+              Danh sách nhóm quyền ({groups.length})
             </CardTitle>
             <div className="relative w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -286,14 +305,13 @@ export default function PermissionGroupsPage() {
                 <TableHead>Nhóm quyền</TableHead>
                 <TableHead>Mô tả</TableHead>
                 <TableHead>Số quyền</TableHead>
-                <TableHead>Người dùng</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Ngày tạo</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredGroups.map((group) => (
+              {groups.map((group) => (
                 <TableRow key={group.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -315,12 +333,6 @@ export default function PermissionGroupsPage() {
                     <Badge variant="outline">
                       {group.permissions.length} quyền
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span>{group.userCount}</span>
-                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -362,9 +374,9 @@ export default function PermissionGroupsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredGroups.length === 0 && (
+              {groups.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     Không tìm thấy nhóm quyền nào
                   </TableCell>
                 </TableRow>
@@ -432,10 +444,10 @@ export default function PermissionGroupsPage() {
               <div className="space-y-3">
                 <Label>Danh sách quyền</Label>
                 <div className="space-y-4">
-                  {Object.entries(permissionsByModule).map(([module, permissions]) => (
+                  {Object.entries(permissionsByModule).map(([module, perms]) => (
                     <div key={module} className="rounded-lg border p-4">
                       <div className="mb-3 flex items-center justify-between">
-                        <h4 className="font-medium">{moduleLabels[module]}</h4>
+                        <h4 className="font-medium">{moduleLabels[module] || module}</h4>
                         {!isViewMode && (
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">
@@ -451,7 +463,7 @@ export default function PermissionGroupsPage() {
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        {permissions.map((permission) => (
+                        {perms.map((permission) => (
                           <div
                             key={permission.id}
                             className="flex items-center justify-between rounded border p-2"
@@ -465,14 +477,14 @@ export default function PermissionGroupsPage() {
                               </p>
                             </div>
                             {isViewMode ? (
-                              formData.permissions.includes(permission.id) ? (
+                              formData.permissionIds.includes(permission.id) ? (
                                 <Badge variant="success">Có</Badge>
                               ) : (
                                 <Badge variant="secondary">Không</Badge>
                               )
                             ) : (
                               <Switch
-                                checked={formData.permissions.includes(permission.id)}
+                                checked={formData.permissionIds.includes(permission.id)}
                                 onCheckedChange={(checked) =>
                                   handlePermissionToggle(permission.id, checked)
                                 }
@@ -500,7 +512,8 @@ export default function PermissionGroupsPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedGroup ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
@@ -528,7 +541,8 @@ export default function PermissionGroupsPage() {
             >
               Hủy
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Xóa
             </Button>
           </DialogFooter>
