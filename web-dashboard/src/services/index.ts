@@ -6,3 +6,4 @@ export * from "./product-service";
 export * from "./category-service";
 export * from "./kitchen-service";
 export * from "./dashboard-service";
+export * from "./unit-service";

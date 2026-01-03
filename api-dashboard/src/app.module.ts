@@ -12,6 +12,7 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { AreasModule } from './modules/areas/areas.module';
 import { TablesModule } from './modules/tables/tables.module';
+import { UnitsModule } from './modules/units/units.module';
 import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
@@ -37,6 +38,7 @@ import {
   ProductTopping,
   ProductNote,
   ProductNoteAssignment,
+  Unit,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -78,6 +80,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           ProductTopping,
           ProductNote,
           ProductNoteAssignment,
+          Unit,
         ],
         synchronize: false,
       }),
@@ -95,6 +98,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     LocationsModule,
     AreasModule,
     TablesModule,
+    UnitsModule,
   ],
   providers: [DatabaseMigrationService],
 })

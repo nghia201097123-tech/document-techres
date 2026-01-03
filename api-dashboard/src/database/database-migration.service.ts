@@ -274,6 +274,34 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Product topping groups junction table created successfully');
       }
 
+      // 13. Check if units table exists
+      const unitsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'units'
+        );
+      `);
+
+      if (!unitsExists[0].exists) {
+        this.logger.log('Creating units table...');
+        await queryRunner.query(`
+          CREATE TABLE units (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_units_tenant ON units(tenant_id);
+          CREATE INDEX idx_units_tenant_brand ON units(tenant_id, brand_id);
+        `);
+        this.logger.log('Units table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

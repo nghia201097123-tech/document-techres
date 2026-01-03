@@ -55,6 +55,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup } from "@/services/product-service";
 import { categoryService } from "@/services/category-service";
+import { unitService, type Unit } from "@/services/unit-service";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +123,12 @@ export default function ProductsPage() {
   const [categoryComboboxOpen, setCategoryComboboxOpen] = React.useState(false);
   const [categorySearchValue, setCategorySearchValue] = React.useState("");
 
+  // Unit combobox state
+  const [units, setUnits] = React.useState<Unit[]>([]);
+  const [loadingUnits, setLoadingUnits] = React.useState(false);
+  const [unitComboboxOpen, setUnitComboboxOpen] = React.useState(false);
+  const [unitSearchValue, setUnitSearchValue] = React.useState("");
+
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
     if (!formData.type) return categories.filter(c => c.isActive);
@@ -154,11 +161,30 @@ export default function ProductsPage() {
     }
   }, [dialogMode, dispatch]);
 
+  // Load units when dialog opens
+  React.useEffect(() => {
+    const loadUnits = async () => {
+      if (dialogMode === "create" || dialogMode === "edit") {
+        setLoadingUnits(true);
+        try {
+          const data = await unitService.getAll();
+          setUnits(data.filter(u => u.isActive));
+        } catch (error) {
+          console.error("Error loading units:", error);
+        } finally {
+          setLoadingUnits(false);
+        }
+      }
+    };
+    loadUnits();
+  }, [dialogMode]);
+
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedProduct(null);
     setFormData(initialFormData);
     setCategorySearchValue("");
+    setUnitSearchValue("");
     setDialogMode("create");
   };
 
@@ -190,6 +216,8 @@ export default function ProductsPage() {
     // Set category search value
     const category = categories.find(c => c.id === product.categoryId);
     setCategorySearchValue(category?.name || "");
+    // Set unit search value
+    setUnitSearchValue(product.unit || "");
     setDialogMode("edit");
   };
 
@@ -357,6 +385,33 @@ export default function ProductsPage() {
   const isNewCategory = categorySearchValue.trim() &&
     !availableCategories.some(c => c.name.toLowerCase() === categorySearchValue.toLowerCase());
 
+  // Filter units for combobox
+  const filteredUnits = units.filter(unit =>
+    unit.name.toLowerCase().includes(unitSearchValue.toLowerCase())
+  );
+
+  // Check if search value is a new unit
+  const isNewUnit = unitSearchValue.trim() &&
+    !units.some(u => u.name.toLowerCase() === unitSearchValue.toLowerCase());
+
+  // Get or create unit by name
+  const getOrCreateUnit = async (unitName: string): Promise<string> => {
+    // Check if unit already exists (case-insensitive)
+    const existingUnit = units.find(
+      u => u.name.toLowerCase() === unitName.toLowerCase()
+    );
+    if (existingUnit) {
+      return existingUnit.name;
+    }
+
+    // Create new unit
+    const newUnit = await unitService.create({ name: unitName });
+    // Add to local units list
+    setUnits(prev => [...prev, newUnit]);
+    toast({ title: "Thành công", description: `Đã tạo đơn vị "${unitName}"` });
+    return newUnit.name;
+  };
+
   // Handle form submit (create or update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -375,6 +430,12 @@ export default function ProductsPage() {
         categoryId = await getOrCreateCategory(categorySearchValue.trim(), formData.type);
       }
 
+      // Get or create unit if needed
+      let unitName = formData.unit;
+      if (unitSearchValue.trim()) {
+        unitName = await getOrCreateUnit(unitSearchValue.trim());
+      }
+
       // Prepare data with proper number types
       const preparedData = {
         name: formData.name,
@@ -387,7 +448,7 @@ export default function ProductsPage() {
         preparationTime: Number(formData.preparationTime) || 0,
         costPrice: Number(formData.costPrice) || 0,
         sellingType: formData.sellingType,
-        unit: formData.unit || undefined,
+        unit: unitName || undefined,
         printDish: formData.printDish ?? true,
         printLabel: formData.printLabel ?? false,
         printSeafood: formData.printSeafood ?? false,
@@ -433,6 +494,7 @@ export default function ProductsPage() {
     setSelectedProduct(null);
     setFormData(initialFormData);
     setCategorySearchValue("");
+    setUnitSearchValue("");
     setAvailableToppings([]);
     setToppingGroups([]);
     setExpandedGroups(new Set());
@@ -931,13 +993,87 @@ export default function ProductsPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="unit">Đơn vị tính</Label>
-                  <Input
-                    id="unit"
-                    placeholder={formData.sellingType === SellingType.WEIGHT ? "kg, gram" : "phần, ly, tô"}
-                    value={formData.unit || ""}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  />
+                  <Label>Đơn vị tính</Label>
+                  <Popover open={unitComboboxOpen} onOpenChange={setUnitComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={unitComboboxOpen}
+                        className="w-full justify-between font-normal"
+                        disabled={loadingUnits}
+                      >
+                        {unitSearchValue || (formData.sellingType === SellingType.WEIGHT ? "kg, gram..." : "phần, ly, tô...")}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Tìm hoặc tạo đơn vị..."
+                          value={unitSearchValue}
+                          onValueChange={(value) => {
+                            setUnitSearchValue(value);
+                            setFormData(prev => ({ ...prev, unit: value }));
+                          }}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            {unitSearchValue.trim() ? (
+                              <div className="py-2 px-4 text-sm">
+                                <span className="text-muted-foreground">Nhấn để tạo: </span>
+                                <span className="font-medium">&quot;{unitSearchValue}&quot;</span>
+                              </div>
+                            ) : (
+                              <div className="py-2 px-4 text-sm text-muted-foreground">
+                                Nhập tên đơn vị để tìm hoặc tạo mới
+                              </div>
+                            )}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {/* Option to create new unit if not exists */}
+                            {isNewUnit && (
+                              <CommandItem
+                                value={`create-${unitSearchValue}`}
+                                onSelect={() => {
+                                  setFormData(prev => ({ ...prev, unit: unitSearchValue }));
+                                  setUnitComboboxOpen(false);
+                                }}
+                                className="text-primary"
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Tạo mới: &quot;{unitSearchValue}&quot;
+                              </CommandItem>
+                            )}
+                            {filteredUnits.map((unit) => (
+                              <CommandItem
+                                key={unit.id}
+                                value={unit.name}
+                                onSelect={() => {
+                                  setFormData(prev => ({ ...prev, unit: unit.name }));
+                                  setUnitSearchValue(unit.name);
+                                  setUnitComboboxOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.unit === unit.name ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {unit.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {isNewUnit && (
+                    <p className="text-xs text-muted-foreground">
+                      Đơn vị &quot;{unitSearchValue}&quot; sẽ được tạo tự động khi lưu
+                    </p>
+                  )}
                 </div>
               </div>
 

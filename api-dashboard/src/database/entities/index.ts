@@ -22,3 +22,4 @@ export * from './product-topping-group.entity';
 export * from './product-topping.entity';
 export * from './product-note.entity';
 export * from './product-note-assignment.entity';
+export * from './unit.entity';

@@ -18,6 +18,7 @@ import {
   MapPin,
   Cherry,
   StickyNote,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -50,6 +51,7 @@ const menuItems: MenuItem[] = [
     children: [
       { title: "Món ăn", href: "/menu/products", icon: UtensilsCrossed },
       { title: "Danh mục", href: "/menu/categories", icon: FolderOpen },
+      { title: "Đơn vị tính", href: "/menu/units", icon: Scale },
       { title: "Topping Options", href: "/menu/topping-options", icon: Cherry },
       { title: "Ghi chú", href: "/menu/product-notes", icon: StickyNote },
     ],
