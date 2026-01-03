@@ -22,8 +22,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { staffService, type Staff, type CreateStaffDto } from "@/services/staff-service";
+import { staffService, type Staff, type CreateStaffDto, type Gender } from "@/services/staff-service";
+import { departmentService, type Department } from "@/services/department-service";
+import { brandService, type Brand } from "@/services/brand-service";
+import { branchService, type Branch } from "@/services/branch-service";
+
+const initialFormData: CreateStaffDto = {
+  name: "",
+  email: "",
+  phone: "",
+  birthDate: "",
+  gender: "male",
+  idNumber: "",
+  address: "",
+  departmentId: "",
+  brandId: "",
+  branchId: "",
+  usernamePrefix: "tr",
+};
 
 export default function StaffPage() {
   const [search, setSearch] = React.useState("");
@@ -31,13 +55,14 @@ export default function StaffPage() {
   const [loading, setLoading] = React.useState(true);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
-  const [formData, setFormData] = React.useState<CreateStaffDto>({
-    name: "",
-    email: "",
-    phone: "",
-    usernamePrefix: "tr",
-  });
+  const [formData, setFormData] = React.useState<CreateStaffDto>(initialFormData);
   const [tempPassword, setTempPassword] = React.useState<string | null>(null);
+
+  // Dropdown data
+  const [departments, setDepartments] = React.useState<Department[]>([]);
+  const [brands, setBrands] = React.useState<Brand[]>([]);
+  const [branches, setBranches] = React.useState<Branch[]>([]);
+  const [loadingDropdowns, setLoadingDropdowns] = React.useState(false);
 
   // Load staff list
   const loadStaff = React.useCallback(async () => {
@@ -52,21 +77,61 @@ export default function StaffPage() {
     }
   }, []);
 
+  // Load dropdown data
+  const loadDropdowns = React.useCallback(async () => {
+    try {
+      setLoadingDropdowns(true);
+      const [deptData, brandData] = await Promise.all([
+        departmentService.getAll(),
+        brandService.getAll(),
+      ]);
+      setDepartments(deptData);
+      setBrands(brandData);
+    } catch (error) {
+      console.error("Error loading dropdowns:", error);
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     loadStaff();
   }, [loadStaff]);
 
+  // Load branches when brand changes
+  React.useEffect(() => {
+    if (formData.brandId) {
+      branchService.getAll(formData.brandId).then(setBranches).catch(console.error);
+    } else {
+      setBranches([]);
+    }
+  }, [formData.brandId]);
+
+  // Load dropdowns when dialog opens
+  React.useEffect(() => {
+    if (dialogOpen) {
+      loadDropdowns();
+    }
+  }, [dialogOpen, loadDropdowns]);
+
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+
+    // Validate required fields
+    if (!formData.name.trim() || !formData.birthDate || !formData.gender ||
+        !formData.address.trim() || !formData.departmentId ||
+        !formData.brandId || !formData.branchId) {
+      alert("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
 
     try {
       setSaving(true);
       const result = await staffService.create(formData);
       setTempPassword(result.temporaryPassword);
       setStaffList((prev) => [...prev, result]);
-      setFormData({ name: "", email: "", phone: "", usernamePrefix: "tr" });
+      setFormData(initialFormData);
     } catch (error) {
       console.error("Error creating staff:", error);
       alert("Có lỗi xảy ra khi tạo nhân viên");
@@ -89,7 +154,13 @@ export default function StaffPage() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setTempPassword(null);
-    setFormData({ name: "", email: "", phone: "", usernamePrefix: "tr" });
+    setFormData(initialFormData);
+    setBranches([]);
+  };
+
+  // Handle brand change
+  const handleBrandChange = (brandId: string) => {
+    setFormData({ ...formData, brandId, branchId: "" });
   };
 
   // Filter staff by search
@@ -151,7 +222,7 @@ export default function StaffPage() {
                   <TableHead>Tên nhân viên</TableHead>
                   <TableHead>Username</TableHead>
                   <TableHead>Số điện thoại</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Chi nhánh</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead className="w-[100px]">Thao tác</TableHead>
                 </TableRow>
@@ -162,7 +233,7 @@ export default function StaffPage() {
                     <TableCell className="font-medium">{staff.name}</TableCell>
                     <TableCell>{staff.username}</TableCell>
                     <TableCell>{staff.phone || "-"}</TableCell>
-                    <TableCell>{staff.email || "-"}</TableCell>
+                    <TableCell>{staff.branchName || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={staff.isActive ? "default" : "secondary"}>
                         {staff.isActive ? "Hoạt động" : "Tạm ngưng"}
@@ -187,7 +258,7 @@ export default function StaffPage() {
 
       {/* Add Staff Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Thêm nhân viên mới</DialogTitle>
             <DialogDescription>
@@ -212,34 +283,163 @@ export default function StaffPage() {
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="usernamePrefix">Mã đăng nhập</Label>
-                  <div className="flex gap-2 items-center">
+                {/* Row 1: Name and Username Prefix */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Tên nhân viên *</Label>
                     <Input
-                      id="usernamePrefix"
-                      placeholder="tr"
-                      maxLength={2}
-                      className="w-20 text-center font-mono uppercase"
-                      value={formData.usernamePrefix}
-                      onChange={(e) => setFormData({ ...formData, usernamePrefix: e.target.value.toLowerCase().substring(0, 2) })}
+                      id="name"
+                      placeholder="Nguyễn Văn A"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
                     />
-                    <span className="text-muted-foreground font-mono">000001</span>
-                    <span className="text-xs text-muted-foreground">(tự động tăng)</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    2 ký tự đầu của mã đăng nhập. VD: tr000001, ab000001
-                  </p>
+                  <div className="grid gap-2">
+                    <Label htmlFor="usernamePrefix">Mã đăng nhập</Label>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        id="usernamePrefix"
+                        placeholder="tr"
+                        maxLength={2}
+                        className="w-20 text-center font-mono uppercase"
+                        value={formData.usernamePrefix}
+                        onChange={(e) => setFormData({ ...formData, usernamePrefix: e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2) })}
+                      />
+                      <span className="text-muted-foreground font-mono">000001</span>
+                      <span className="text-xs text-muted-foreground">(tự động)</span>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Row 2: Birth Date and Gender */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="birthDate">Ngày sinh *</Label>
+                    <Input
+                      id="birthDate"
+                      type="date"
+                      value={formData.birthDate}
+                      onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="gender">Giới tính *</Label>
+                    <Select
+                      value={formData.gender}
+                      onValueChange={(value: Gender) => setFormData({ ...formData, gender: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn giới tính" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Nam</SelectItem>
+                        <SelectItem value="female">Nữ</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 3: Address */}
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Tên nhân viên *</Label>
+                  <Label htmlFor="address">Địa chỉ hành chính *</Label>
                   <Input
-                    id="name"
-                    placeholder="Nguyễn Văn A"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    id="address"
+                    placeholder="123 Nguyễn Văn Linh, Phường 1, Quận 7, TP.HCM"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
                   />
                 </div>
+
+                {/* Row 4: Brand and Branch */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="brandId">Thương hiệu *</Label>
+                    <Select
+                      value={formData.brandId}
+                      onValueChange={handleBrandChange}
+                      disabled={loadingDropdowns}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn thương hiệu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.id}>
+                            {brand.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="branchId">Chi nhánh *</Label>
+                    <Select
+                      value={formData.branchId}
+                      onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                      disabled={!formData.brandId || branches.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn chi nhánh" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 5: Department */}
+                <div className="grid gap-2">
+                  <Label htmlFor="departmentId">Bộ phận *</Label>
+                  <Select
+                    value={formData.departmentId}
+                    onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
+                    disabled={loadingDropdowns}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn bộ phận" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Row 6: ID Number and Email */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="idNumber">Căn cước công dân</Label>
+                    <Input
+                      id="idNumber"
+                      placeholder="001234567890"
+                      value={formData.idNumber}
+                      onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="email@example.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 7: Phone */}
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Số điện thoại</Label>
                   <Input
@@ -249,22 +449,15 @@ export default function StaffPage() {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={handleCloseDialog}>
                   Hủy
                 </Button>
-                <Button type="submit" disabled={saving || !formData.name.trim()}>
+                <Button
+                  type="submit"
+                  disabled={saving || !formData.name.trim() || !formData.birthDate || !formData.address.trim() || !formData.departmentId || !formData.brandId || !formData.branchId}
+                >
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Tạo nhân viên
                 </Button>

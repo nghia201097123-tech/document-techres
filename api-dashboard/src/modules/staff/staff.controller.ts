@@ -27,10 +27,10 @@ export class StaffController {
   @Post()
   @ApiOperation({ summary: 'Tạo nhân viên mới' })
   create(@Request() req, @Body() createDto: CreateStaffDto) {
+    // Sử dụng branchId và brandId từ DTO thay vì từ user context
     return this.staffService.create(
       req.user.tenantId,
       req.user.companyId,
-      req.user.branchId,
       createDto,
     );
   }

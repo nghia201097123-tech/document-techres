@@ -34,7 +34,7 @@ export class StaffService {
     return staff;
   }
 
-  async create(tenantId: string, companyId: string, branchId: string, createDto: CreateStaffDto) {
+  async create(tenantId: string, companyId: string, createDto: CreateStaffDto) {
     // Generate username with pattern: prefix (2 chars) + auto-increment (6 digits)
     // Example: tr000001, tr000002, ...
     const prefix = createDto.usernamePrefix?.toLowerCase().substring(0, 2) || 'tr';
@@ -45,12 +45,13 @@ export class StaffService {
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
     // Exclude role and usernamePrefix from DTO spread
-    const { role, usernamePrefix, ...restDto } = createDto;
+    // brandId, branchId, departmentId now come from DTO
+    const { role, usernamePrefix, birthDate, ...restDto } = createDto;
     const staff = this.staffRepository.create({
       ...restDto,
       tenantId,
       companyId,
-      branchId,
+      birthDate: birthDate ? new Date(birthDate) : undefined,
       username,
       passwordHash,
       isActive: true,
