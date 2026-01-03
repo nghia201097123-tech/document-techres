@@ -48,9 +48,9 @@ export class StaffService {
         : [],
     ]);
 
-    const provinceMap = new Map(provinces.map(p => [p.code, p.fullName]));
-    const wardMap = new Map(wards.map(w => [w.code, w.fullName]));
-    const departmentMap = new Map(departments.map(d => [d.id, d.name]));
+    const provinceMap = new Map<string, string>(provinces.map(p => [p.code, p.fullName] as [string, string]));
+    const wardMap = new Map<string, string>(wards.map(w => [w.code, w.fullName] as [string, string]));
+    const departmentMap = new Map<string, string>(departments.map(d => [d.id, d.name] as [string, string]));
 
     // Transform to include names
     return staffList.map(staff => ({
