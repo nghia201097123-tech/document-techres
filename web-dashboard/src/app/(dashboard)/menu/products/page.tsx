@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +53,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem } from "@/services/product-service";
+import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem } from "@/services/product-service";
+import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
 import { unitService, type Unit } from "@/services/unit-service";
@@ -86,6 +87,48 @@ const defaultProductColumns: ColumnConfig[] = [
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchCategories } from "@/store/slices/categoriesSlice";
 
+// Excel column configuration for export
+const excelColumns = [
+  { key: "id" as keyof Product, header: "ID", width: 40 },
+  { key: "code" as keyof Product, header: "Mã món", width: 15 },
+  { key: "name" as keyof Product, header: "Tên món", width: 30 },
+  { key: "type" as keyof Product, header: "Loại", width: 12 },
+  { key: "categoryName" as keyof Product, header: "Danh mục", width: 20 },
+  { key: "price" as keyof Product, header: "Giá (VNĐ)", width: 15 },
+  { key: "vatRate" as keyof Product, header: "VAT (%)", width: 10 },
+  { key: "costPrice" as keyof Product, header: "Giá vốn", width: 15 },
+  { key: "unit" as keyof Product, header: "Đơn vị", width: 12 },
+  { key: "description" as keyof Product, header: "Mô tả", width: 30 },
+  { key: "preparationTime" as keyof Product, header: "Thời gian CB (phút)", width: 18 },
+  { key: "sellingType" as keyof Product, header: "Loại bán", width: 12 },
+  { key: "printDish" as keyof Product, header: "In món", width: 10 },
+  { key: "printLabel" as keyof Product, header: "In tem", width: 10 },
+  { key: "printSeafood" as keyof Product, header: "In hải sản", width: 12 },
+  { key: "isActive" as keyof Product, header: "Hoạt động", width: 10 },
+];
+
+// Extended import data with name fields for lookup
+interface ImportDataWithNames extends Partial<BulkProductItem> {
+  typeName?: string; // For converting "Đồ ăn" -> "food"
+}
+
+// Excel column mapping for import
+const importColumnMapping: { excelHeader: string; key: keyof ImportDataWithNames }[] = [
+  { excelHeader: "ID", key: "id" },
+  { excelHeader: "Mã món", key: "code" },
+  { excelHeader: "Tên món", key: "name" },
+  { excelHeader: "Loại", key: "typeName" },
+  { excelHeader: "Danh mục", key: "categoryName" },
+  { excelHeader: "Giá (VNĐ)", key: "price" },
+  { excelHeader: "VAT (%)", key: "vatRate" },
+  { excelHeader: "Giá vốn", key: "costPrice" },
+  { excelHeader: "Đơn vị", key: "unit" },
+  { excelHeader: "Mô tả", key: "description" },
+  { excelHeader: "Thời gian CB (phút)", key: "preparationTime" },
+  { excelHeader: "Loại bán", key: "sellingType" },
+  { excelHeader: "URL Hình ảnh", key: "imageUrl" },
+];
+
 const typeLabels: Record<ProductType, { label: string; color: string }> = {
   [ProductType.FOOD]: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
   [ProductType.DRINK]: { label: "Đồ uống", color: "bg-blue-100 text-blue-800" },
@@ -111,11 +154,12 @@ const initialFormData: CreateProductDto = {
   printSeafood: false,
 };
 
-type DialogMode = "create" | "edit" | "view" | "toppings" | "combo" | null;
+type DialogMode = "create" | "edit" | "view" | "toppings" | "combo" | "import" | null;
 
 export default function ProductsPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Column configuration hook
   const {
@@ -177,6 +221,11 @@ export default function ProductsPage() {
   const [loadingComboItems, setLoadingComboItems] = React.useState(false);
   const [savingComboItems, setSavingComboItems] = React.useState(false);
   const [comboProductSearch, setComboProductSearch] = React.useState("");
+
+  // Import state
+  const [importData, setImportData] = React.useState<Partial<BulkProductItem>[]>([]);
+  const [importErrors, setImportErrors] = React.useState<string[]>([]);
+  const [importing, setImporting] = React.useState(false);
 
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
@@ -648,6 +697,222 @@ export default function ProductsPage() {
     setNewGroupMinSelection(0);
     setNewGroupMaxSelection(1);
     setAddingToGroupId(null);
+    // Reset import state
+    setImportData([]);
+    setImportErrors([]);
+  };
+
+  // Export to Excel
+  const handleExport = () => {
+    if (products.length === 0) {
+      toast({ title: "Thông báo", description: "Không có dữ liệu để xuất", variant: "destructive" });
+      return;
+    }
+
+    // Transform data for export
+    const exportData = products.map((product) => ({
+      ...product,
+      type: typeLabels[product.type]?.label || product.type,
+      sellingType: product.sellingType === "weight" ? "Theo cân" : "Theo phần",
+      printDish: product.printDish ? "Có" : "Không",
+      printLabel: product.printLabel ? "Có" : "Không",
+      printSeafood: product.printSeafood ? "Có" : "Không",
+      isActive: product.isActive ? "Có" : "Không",
+    }));
+
+    exportToExcel(exportData, excelColumns, `danh_sach_mon_an_${new Date().toISOString().split("T")[0]}`);
+    toast({ title: "Thành công", description: "Đã xuất file Excel" });
+  };
+
+  // Download template with dropdowns
+  const handleDownloadTemplate = async () => {
+    // Load categories if not loaded
+    await dispatch(fetchCategories());
+
+    // Wait for Redux state to update
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Build columns with dropdown options
+    const columnsWithDropdowns: TemplateColumnWithDropdown[] = [
+      { header: "ID", example: "(để trống nếu tạo mới)", required: false },
+      { header: "Mã món", example: "(tự động tạo nếu mới)", required: false },
+      { header: "Tên món", example: "Phở bò tái", required: true },
+      {
+        header: "Loại",
+        example: "Đồ ăn",
+        required: true,
+        dropdown: [
+          { value: "food", label: "Đồ ăn" },
+          { value: "drink", label: "Đồ uống" },
+          { value: "other", label: "Khác" },
+          { value: "topping", label: "Topping" },
+          { value: "combo", label: "Combo" },
+        ],
+        dropdownSheetName: "LoaiMon",
+      },
+      {
+        header: "Danh mục",
+        example: categories[0]?.name || "Món chính",
+        required: false,
+        dropdown: categories.map((c) => ({ value: c.id, label: c.name })),
+        dropdownSheetName: "DanhMuc",
+      },
+      { header: "Giá (VNĐ)", example: "50000", required: true },
+      { header: "VAT (%)", example: "10", required: false },
+      { header: "Giá vốn", example: "30000", required: false },
+      { header: "Đơn vị", example: "phần", required: false },
+      { header: "Mô tả", example: "Phở bò tái thơm ngon", required: false },
+      { header: "Thời gian CB (phút)", example: "15", required: false },
+      {
+        header: "Loại bán",
+        example: "Theo phần",
+        required: false,
+        dropdown: [
+          { value: "portion", label: "Theo phần" },
+          { value: "weight", label: "Theo cân" },
+        ],
+        dropdownSheetName: "LoaiBan",
+      },
+      { header: "URL Hình ảnh", example: "https://example.com/image.jpg", required: false },
+    ];
+
+    downloadTemplateWithDropdowns(columnsWithDropdowns, "mau_import_mon_an", 50);
+    toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown chọn sẵn" });
+  };
+
+  // Handle file input change
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const result = await readExcelFile<ImportDataWithNames>(file, importColumnMapping);
+
+      // Load categories if not available
+      await dispatch(fetchCategories());
+
+      // Wait for Redux state to update
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Transform data: convert names to IDs
+      const transformedData: Partial<BulkProductItem>[] = [];
+      const lookupErrors: string[] = [...result.errors];
+
+      for (let i = 0; i < result.data.length; i++) {
+        const item = result.data[i];
+        const rowNumber = i + 2; // Excel row (1-indexed + header)
+
+        // Convert type string from Excel
+        const typeStr = String(item.typeName || "").toLowerCase();
+        let productType: ProductType | undefined;
+        if (typeStr === "đồ ăn" || typeStr === "food") productType = ProductType.FOOD;
+        else if (typeStr === "đồ uống" || typeStr === "drink") productType = ProductType.DRINK;
+        else if (typeStr === "khác" || typeStr === "other") productType = ProductType.OTHER;
+        else if (typeStr === "topping") productType = ProductType.TOPPING;
+        else if (typeStr === "combo") productType = ProductType.COMBO;
+        else if (typeStr) {
+          lookupErrors.push(`Dòng ${rowNumber}: Loại món không hợp lệ "${item.typeName}"`);
+        }
+
+        // Convert selling type string
+        const sellingTypeStr = String(item.sellingType || "").toLowerCase();
+        let sellingType: SellingType | undefined;
+        if (sellingTypeStr === "theo phần" || sellingTypeStr === "portion") sellingType = SellingType.PORTION;
+        else if (sellingTypeStr === "theo cân" || sellingTypeStr === "weight") sellingType = SellingType.WEIGHT;
+
+        const transformedItem: Partial<BulkProductItem> = {
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          type: productType,
+          price: item.price ? Number(item.price) : undefined,
+          vatRate: item.vatRate ? Number(item.vatRate) : undefined,
+          costPrice: item.costPrice ? Number(item.costPrice) : undefined,
+          unit: item.unit,
+          description: item.description,
+          imageUrl: item.imageUrl,
+          preparationTime: item.preparationTime ? Number(item.preparationTime) : undefined,
+          sellingType,
+        };
+
+        // Lookup category ID from name
+        if (item.categoryName) {
+          const category = categories.find(
+            (c) => c.name?.toLowerCase() === item.categoryName?.toLowerCase()
+          );
+          if (category) {
+            transformedItem.categoryId = category.id;
+          } else {
+            // Will create new category if doesn't exist
+            transformedItem.categoryName = item.categoryName;
+          }
+        }
+
+        transformedData.push(transformedItem);
+      }
+
+      setImportData(transformedData);
+      setImportErrors(lookupErrors);
+      setDialogMode("import");
+    } catch (error: any) {
+      toast({ title: "Lỗi", description: error.message || "Không thể đọc file Excel", variant: "destructive" });
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Handle import
+  const handleImport = async () => {
+    if (importData.length === 0) {
+      toast({ title: "Lỗi", description: "Không có dữ liệu để import", variant: "destructive" });
+      return;
+    }
+
+    if (!filterBrandId) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn thương hiệu trước khi import", variant: "destructive" });
+      return;
+    }
+
+    // Validate required fields for new products
+    const newProducts = importData.filter((d) => !d.id);
+    const invalidProducts = newProducts.filter((d) => !d.name || !d.type || d.price === undefined);
+    if (invalidProducts.length > 0) {
+      toast({
+        title: "Lỗi",
+        description: `Có ${invalidProducts.length} sản phẩm mới thiếu thông tin bắt buộc (tên, loại, giá)`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const result = await productService.bulkImport(importData as BulkProductItem[], filterBrandId);
+
+      if (result.errors.length > 0) {
+        toast({
+          title: "Hoàn thành với lỗi",
+          description: `Tạo mới: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`,
+          variant: "destructive",
+        });
+        setImportErrors(result.errors.map((e) => `Dòng ${e.row}: ${e.message}`));
+      } else {
+        toast({
+          title: "Thành công",
+          description: `Đã tạo mới ${result.created} và cập nhật ${result.updated} món ăn`,
+        });
+        handleCloseDialog();
+        loadProducts(filterBrandId);
+      }
+    } catch (error: any) {
+      console.error("Error importing:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi import", variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
   };
 
   // Handle product type change - reset category when type changes
@@ -686,11 +951,46 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold">Quản lý món ăn</h1>
           <p className="text-muted-foreground">Thêm, sửa và quản lý menu món ăn theo thương hiệu</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm món ăn
-        </Button>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Excel
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Xuất Excel
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleDownloadTemplate}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Tải file mẫu
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import từ Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm món ăn
+          </Button>
+        </div>
       </div>
+
+      {/* Hidden file input for Excel import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".xlsx,.xls"
+        className="hidden"
+      />
 
       <Card>
         <CardHeader>
@@ -1651,6 +1951,108 @@ export default function ProductsPage() {
             <Button onClick={handleSaveComboItems} disabled={savingComboItems}>
               {savingComboItems && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu ({selectedComboProductIds.size} món)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import dialog */}
+      <Dialog open={dialogMode === "import"} onOpenChange={(open) => !open && handleCloseDialog()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Import món ăn từ Excel</DialogTitle>
+            <DialogDescription>
+              Xem lại dữ liệu trước khi import. Các dòng có lỗi sẽ được đánh dấu màu đỏ.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden">
+            {importErrors.length > 0 && (
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm font-medium text-destructive mb-2">Cảnh báo:</p>
+                <ul className="text-xs text-destructive space-y-1 max-h-24 overflow-y-auto">
+                  {importErrors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <ScrollArea className="h-[400px] border rounded-lg">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableRow>
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Tên món</TableHead>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Danh mục</TableHead>
+                    <TableHead className="text-right">Giá</TableHead>
+                    <TableHead className="text-right">VAT (%)</TableHead>
+                    <TableHead>Đơn vị</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importData.map((item, index) => {
+                    const hasError = !item.name || !item.type || item.price === undefined;
+                    return (
+                      <TableRow key={index} className={hasError ? "bg-destructive/5" : ""}>
+                        <TableCell className="font-mono text-xs">{index + 2}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {item.id ? (
+                            <Badge variant="outline" className="font-mono">Cập nhật</Badge>
+                          ) : (
+                            <Badge variant="secondary">Tạo mới</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className={!item.name ? "text-destructive" : ""}>
+                          {item.name || <span className="italic text-muted-foreground">Thiếu</span>}
+                        </TableCell>
+                        <TableCell className={!item.type ? "text-destructive" : ""}>
+                          {item.type ? (
+                            <Badge className={typeLabels[item.type]?.color}>
+                              {typeLabels[item.type]?.label || item.type}
+                            </Badge>
+                          ) : (
+                            <span className="italic text-muted-foreground">Thiếu</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.categoryName || categories.find(c => c.id === item.categoryId)?.name || "-"}
+                        </TableCell>
+                        <TableCell className={item.price === undefined ? "text-right text-destructive" : "text-right"}>
+                          {item.price !== undefined ? new Intl.NumberFormat("vi-VN").format(item.price) + "đ" : <span className="italic text-muted-foreground">Thiếu</span>}
+                        </TableCell>
+                        <TableCell className="text-right">{item.vatRate ?? 10}%</TableCell>
+                        <TableCell>{item.unit || "-"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+
+            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+              <div>
+                Tổng: {importData.length} dòng |
+                Tạo mới: {importData.filter(d => !d.id).length} |
+                Cập nhật: {importData.filter(d => d.id).length}
+              </div>
+              {importData.filter(d => !d.name || !d.type || d.price === undefined).length > 0 && (
+                <div className="text-destructive">
+                  {importData.filter(d => !d.name || !d.type || d.price === undefined).length} dòng lỗi (thiếu dữ liệu bắt buộc)
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseDialog}>
+              Hủy
+            </Button>
+            <Button onClick={handleImport} disabled={importing || importData.length === 0}>
+              {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Import {importData.length} dòng
             </Button>
           </DialogFooter>
         </DialogContent>

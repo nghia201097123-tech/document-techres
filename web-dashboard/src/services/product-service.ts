@@ -170,6 +170,35 @@ export interface UpdateToppingItemDto {
   sortOrder?: number;
 }
 
+// Bulk import interfaces
+export interface BulkProductItem {
+  id?: string; // If provided, will update existing product
+  code?: string; // Product code (only for update)
+  name: string;
+  type: ProductType;
+  categoryId?: string;
+  categoryName?: string; // For lookup
+  price: number;
+  discountPrice?: number;
+  vatRate?: number;
+  unit?: string;
+  description?: string;
+  imageUrl?: string;
+  preparationTime?: number;
+  costPrice?: number;
+  sellingType?: SellingType;
+  printDish?: boolean;
+  printLabel?: boolean;
+  printSeafood?: boolean;
+}
+
+export interface ProductBulkImportResult {
+  created: number;
+  updated: number;
+  errors: { row: number; message: string }[];
+  products: Product[];
+}
+
 export const productService = {
   getAll: async (brandId?: string, type?: ProductType): Promise<Product[]> => {
     const params: Record<string, any> = {};
@@ -358,6 +387,13 @@ export const productService = {
 
   removeItemFromCombo: async (comboId: string, productId: string): Promise<ComboItem[]> => {
     const response = await api.delete<ComboItem[]>(`/products/${comboId}/combo-items/${productId}`);
+    return response.data;
+  },
+
+  // === Bulk Import ===
+
+  bulkImport: async (items: BulkProductItem[], brandId: string): Promise<ProductBulkImportResult> => {
+    const response = await api.post<ProductBulkImportResult>("/products/bulk-import", { items, brandId });
     return response.data;
   },
 };
