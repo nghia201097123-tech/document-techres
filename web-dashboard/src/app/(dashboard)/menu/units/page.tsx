@@ -35,6 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { unitService, type Unit, type CreateUnitDto, type UpdateUnitDto } from "@/services/unit-service";
+import { BrandFilter } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -42,6 +43,7 @@ export default function UnitsPage() {
   const { toast } = useToast();
   const [units, setUnits] = React.useState<Unit[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [selectedUnit, setSelectedUnit] = React.useState<Unit | null>(null);
@@ -170,6 +172,11 @@ export default function UnitsPage() {
     }
   };
 
+  // Filter units by brand
+  const filteredUnits = units.filter((u) => {
+    return filterBrandId === "all" || u.brandId === filterBrandId;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -177,23 +184,30 @@ export default function UnitsPage() {
           <h1 className="text-2xl font-bold">Quản lý đơn vị tính</h1>
           <p className="text-muted-foreground">Thêm, sửa và quản lý đơn vị tính cho món ăn</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm đơn vị
-        </Button>
+        <div className="flex items-center gap-2">
+          <BrandFilter
+            selectedBrandId={filterBrandId}
+            onBrandChange={setFilterBrandId}
+            className="w-[180px]"
+          />
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm đơn vị
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Danh sách đơn vị tính</CardTitle>
-          <CardDescription>Tổng cộng {units.length} đơn vị</CardDescription>
+          <CardDescription>Tổng cộng {filteredUnits.length} đơn vị</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : units.length === 0 ? (
+          ) : filteredUnits.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <Scale className="h-10 w-10 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Chưa có đơn vị tính nào</p>
@@ -203,7 +217,7 @@ export default function UnitsPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {units.map((unit) => (
+              {filteredUnits.map((unit) => (
                 <div
                   key={unit.id}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"

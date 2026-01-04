@@ -15,6 +15,8 @@ export interface Kitchen {
   isActive: boolean;
   sortOrder: number;
   productCount?: number;
+  brandId?: string;
+  branchId?: string;
   createdAt: string;
 }
 

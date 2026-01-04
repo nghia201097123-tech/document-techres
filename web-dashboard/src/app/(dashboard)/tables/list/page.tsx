@@ -57,11 +57,17 @@ import { useToast } from "@/hooks/use-toast";
 import { tableService, type Table, type CreateTableDto, type UpdateTableDto, TableStatus, tableStatusLabels } from "@/services/table-service";
 import { areaService, type Area } from "@/services/area-service";
 import { cn } from "@/lib/utils";
+import { BrandBranchFilter } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
 export default function TablesPage() {
   const { toast } = useToast();
+
+  // Filter state
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBranchId, setFilterBranchId] = React.useState("all");
+
   const [tables, setTables] = React.useState<Table[]>([]);
   const [areas, setAreas] = React.useState<Area[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -108,11 +114,15 @@ export default function TablesPage() {
     loadData();
   }, [loadData]);
 
-  // Filter tables by area
+  // Filter tables by area, brand and branch
   const filteredTables = React.useMemo(() => {
-    if (filterAreaId === "all") return tables;
-    return tables.filter((t) => t.areaId === filterAreaId);
-  }, [tables, filterAreaId]);
+    return tables.filter((t) => {
+      const matchesArea = filterAreaId === "all" || t.areaId === filterAreaId;
+      const matchesBrand = filterBrandId === "all" || t.brandId === filterBrandId;
+      const matchesBranch = filterBranchId === "all" || t.branchId === filterBranchId;
+      return matchesArea && matchesBrand && matchesBranch;
+    });
+  }, [tables, filterAreaId, filterBrandId, filterBranchId]);
 
   // Group tables by area
   const tablesByArea = React.useMemo(() => {
@@ -324,10 +334,18 @@ export default function TablesPage() {
           <h1 className="text-2xl font-bold">Quản lý bàn</h1>
           <p className="text-muted-foreground">Quản lý danh sách bàn trong nhà hàng</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <BrandBranchFilter
+            selectedBrandId={filterBrandId}
+            selectedBranchId={filterBranchId}
+            onBrandChange={setFilterBrandId}
+            onBranchChange={setFilterBranchId}
+            brandClassName="w-[150px]"
+            branchClassName="w-[150px]"
+          />
           <Select value={filterAreaId} onValueChange={setFilterAreaId}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Lọc theo khu vực" />
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Khu vực" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tất cả khu vực</SelectItem>

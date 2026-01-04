@@ -26,6 +26,8 @@ export interface Table {
   status: TableStatus;
   sortOrder: number;
   isActive: boolean;
+  brandId?: string;
+  branchId?: string;
   createdAt: string;
 }
 

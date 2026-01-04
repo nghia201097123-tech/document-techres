@@ -34,6 +34,7 @@ export interface Product {
   printSeafood: boolean;
   isActive: boolean;
   sortOrder: number;
+  brandId?: string;
   createdAt: string;
 }
 
@@ -84,6 +85,7 @@ export interface ProductNote {
   description?: string;
   isActive: boolean;
   sortOrder: number;
+  brandId?: string;
   createdAt: string;
 }
 
@@ -135,6 +137,7 @@ export interface ToppingGroup {
   maxSelection: number;
   isActive: boolean;
   sortOrder: number;
+  brandId?: string;
   items: ToppingItem[];
 }
 

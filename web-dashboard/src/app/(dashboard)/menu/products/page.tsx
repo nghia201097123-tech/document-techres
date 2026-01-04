@@ -61,6 +61,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+import { BrandFilter } from "@/components/ui/brand-filter";
 
 // Default column configuration for products table
 const defaultProductColumns: ColumnConfig[] = [
@@ -134,6 +135,7 @@ export default function ProductsPage() {
   // Local state
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
   const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
@@ -661,12 +663,14 @@ export default function ProductsPage() {
     return category?.name || "-";
   };
 
-  // Filter products by search
-  const filteredProducts = products.filter(
-    (p) =>
+  // Filter products by search and brand
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.code?.toLowerCase().includes(search.toLowerCase())
-  );
+      p.code?.toLowerCase().includes(search.toLowerCase());
+    const matchesBrand = filterBrandId === "all" || p.brandId === filterBrandId;
+    return matchesSearch && matchesBrand;
+  });
 
   return (
     <div className="space-y-6">
@@ -689,8 +693,13 @@ export default function ProductsPage() {
               <CardDescription>Tổng cộng {products.length} món</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <BrandFilter
+                selectedBrandId={filterBrandId}
+                onBrandChange={setFilterBrandId}
+                className="w-[160px]"
+              />
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[130px]">
                   <Filter className="mr-2 h-4 w-4" />
                   <SelectValue placeholder="Loại món" />
                 </SelectTrigger>
@@ -703,10 +712,10 @@ export default function ProductsPage() {
                   <SelectItem value="combo">Combo</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="relative w-64">
+              <div className="relative w-48">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Tìm kiếm món..."
+                  placeholder="Tìm kiếm..."
                   className="pl-10"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

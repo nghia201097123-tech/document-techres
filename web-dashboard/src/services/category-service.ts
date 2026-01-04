@@ -8,6 +8,7 @@ export interface Category {
   productType: ProductType;
   sortOrder: number;
   isActive: boolean;
+  brandId?: string;
   createdAt: string;
 }
 

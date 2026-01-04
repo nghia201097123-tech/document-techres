@@ -6,6 +6,7 @@ export interface Unit {
   description?: string;
   sortOrder: number;
   isActive: boolean;
+  brandId?: string;
   createdAt: string;
 }
 

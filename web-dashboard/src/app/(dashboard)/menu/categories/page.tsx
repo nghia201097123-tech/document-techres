@@ -44,6 +44,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { categoryService, type Category, type CreateCategoryDto, type UpdateCategoryDto } from "@/services/category-service";
 import { ProductType } from "@/services/product-service";
+import { BrandFilter } from "@/components/ui/brand-filter";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -59,6 +60,7 @@ export default function CategoriesPage() {
   const { toast } = useToast();
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [selectedCategory, setSelectedCategory] = React.useState<Category | null>(null);
@@ -195,9 +197,14 @@ export default function CategoriesPage() {
     }
   };
 
+  // Filter categories by brand
+  const filteredCategories = categories.filter((c) => {
+    return filterBrandId === "all" || c.brandId === filterBrandId;
+  });
+
   // Count categories by type
   const countByType = (type: string) => {
-    return categories.filter((c) => c.productType === type).length;
+    return filteredCategories.filter((c) => c.productType === type).length;
   };
 
   return (
@@ -207,10 +214,17 @@ export default function CategoriesPage() {
           <h1 className="text-2xl font-bold">Quản lý danh mục</h1>
           <p className="text-muted-foreground">Phân loại món ăn theo danh mục (thuộc 5 loại món)</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm danh mục
-        </Button>
+        <div className="flex items-center gap-2">
+          <BrandFilter
+            selectedBrandId={filterBrandId}
+            onBrandChange={setFilterBrandId}
+            className="w-[180px]"
+          />
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm danh mục
+          </Button>
+        </div>
       </div>
 
       {/* Category types */}
@@ -235,14 +249,14 @@ export default function CategoriesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Danh sách danh mục</CardTitle>
-          <CardDescription>Tổng cộng {categories.length} danh mục</CardDescription>
+          <CardDescription>Tổng cộng {filteredCategories.length} danh mục</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : categories.length === 0 ? (
+          ) : filteredCategories.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <FolderOpen className="h-10 w-10 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Chưa có danh mục nào</p>
@@ -252,7 +266,7 @@ export default function CategoriesPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {categories.map((category) => (
+              {filteredCategories.map((category) => (
                 <div
                   key={category.id}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"

@@ -28,11 +28,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type ProductNote, type Product, ProductType } from "@/services/product-service";
+import { BrandFilter } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
 export default function ProductNotesPage() {
   const { toast } = useToast();
+
+  // Filter state
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
 
   // State
   const [notes, setNotes] = React.useState<ProductNote[]>([]);
@@ -251,10 +255,12 @@ export default function ProductNotesPage() {
     p.code.toLowerCase().includes(productSearch.toLowerCase())
   );
 
-  // Filter notes
-  const filteredNotes = notes.filter(
-    (n) => n.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter notes by search and brand
+  const filteredNotes = notes.filter((n) => {
+    const matchesSearch = n.name.toLowerCase().includes(search.toLowerCase());
+    const matchesBrand = filterBrandId === "all" || n.brandId === filterBrandId;
+    return matchesSearch && matchesBrand;
+  });
 
   return (
     <div className="space-y-6">
@@ -263,10 +269,17 @@ export default function ProductNotesPage() {
           <h1 className="text-2xl font-bold">Quản lý ghi chú món ăn</h1>
           <p className="text-muted-foreground">Tạo các ghi chú để gán cho món ăn (VD: Không hành, Ít đá, Cay vừa)</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm ghi chú
-        </Button>
+        <div className="flex items-center gap-2">
+          <BrandFilter
+            selectedBrandId={filterBrandId}
+            onBrandChange={setFilterBrandId}
+            className="w-[180px]"
+          />
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm ghi chú
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -274,7 +287,7 @@ export default function ProductNotesPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách ghi chú</CardTitle>
-              <CardDescription>Tổng cộng {notes.length} ghi chú</CardDescription>
+              <CardDescription>Tổng cộng {filteredNotes.length} ghi chú</CardDescription>
             </div>
             <div className="relative w-64">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />

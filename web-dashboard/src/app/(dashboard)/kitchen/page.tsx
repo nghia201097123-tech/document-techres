@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type PrintMode } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BrandBranchFilter } from "@/components/ui/brand-filter";
 
 // Common paper sizes for thermal printers
 const PAPER_SIZE_SUGGESTIONS = ["58mm", "80mm", "76mm", "110mm", "A4"];
@@ -46,6 +47,11 @@ type DialogMode = "create" | "edit" | "products" | null;
 
 export default function KitchenPage() {
   const { toast } = useToast();
+
+  // Filter state
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBranchId, setFilterBranchId] = React.useState("all");
+
   const [kitchens, setKitchens] = React.useState<Kitchen[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
@@ -319,6 +325,13 @@ export default function KitchenPage() {
     combo: "Combo",
   };
 
+  // Filter kitchens by brand and branch
+  const filteredKitchens = kitchens.filter((k) => {
+    const matchesBrand = filterBrandId === "all" || k.brandId === filterBrandId;
+    const matchesBranch = filterBranchId === "all" || k.branchId === filterBranchId;
+    return matchesBrand && matchesBranch;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -326,24 +339,34 @@ export default function KitchenPage() {
           <h1 className="text-2xl font-bold">Quản lý bếp</h1>
           <p className="text-muted-foreground">Cấu hình bếp và gán món vào bếp để in</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm bếp
-        </Button>
+        <div className="flex items-center gap-2">
+          <BrandBranchFilter
+            selectedBrandId={filterBrandId}
+            selectedBranchId={filterBranchId}
+            onBrandChange={setFilterBrandId}
+            onBranchChange={setFilterBranchId}
+            brandClassName="w-[160px]"
+            branchClassName="w-[160px]"
+          />
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm bếp
+          </Button>
+        </div>
       </div>
 
       {/* Kitchen Stations */}
       <Card>
         <CardHeader>
           <CardTitle>Danh sách bếp</CardTitle>
-          <CardDescription>Tổng cộng {kitchens.length} bếp</CardDescription>
+          <CardDescription>Tổng cộng {filteredKitchens.length} bếp</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : kitchens.length === 0 ? (
+          ) : filteredKitchens.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <ChefHat className="h-10 w-10 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Chưa có bếp nào</p>
@@ -353,7 +376,7 @@ export default function KitchenPage() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {kitchens.map((kitchen) => (
+              {filteredKitchens.map((kitchen) => (
                 <Card key={kitchen.id} className="relative">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">

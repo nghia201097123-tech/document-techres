@@ -45,6 +45,7 @@ import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type Templ
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+import { BrandBranchFilter } from "@/components/ui/brand-filter";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -178,6 +179,8 @@ export default function StaffPage() {
 
   // Local state
   const [search, setSearch] = React.useState("");
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBranchId, setFilterBranchId] = React.useState("all");
   const [staffList, setStaffList] = React.useState<Staff[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
@@ -824,13 +827,16 @@ export default function StaffPage() {
     return dept?.name || "-";
   };
 
-  // Filter staff by search
-  const filteredStaff = staffList.filter(
-    (s) =>
+  // Filter staff by search, brand, and branch
+  const filteredStaff = staffList.filter((s) => {
+    const matchesSearch =
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.username?.toLowerCase().includes(search.toLowerCase()) ||
-      s.phone?.includes(search)
-  );
+      s.phone?.includes(search);
+    const matchesBrand = filterBrandId === "all" || s.brandId === filterBrandId;
+    const matchesBranch = filterBranchId === "all" || s.branchId === filterBranchId;
+    return matchesSearch && matchesBrand && matchesBranch;
+  });
 
   return (
     <div className="space-y-6">
@@ -887,10 +893,18 @@ export default function StaffPage() {
               <CardDescription>Tổng cộng {staffList.length} nhân viên</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <div className="relative w-64">
+              <BrandBranchFilter
+                selectedBrandId={filterBrandId}
+                selectedBranchId={filterBranchId}
+                onBrandChange={setFilterBrandId}
+                onBranchChange={setFilterBranchId}
+                brandClassName="w-[160px]"
+                branchClassName="w-[160px]"
+              />
+              <div className="relative w-56">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Tìm kiếm nhân viên..."
+                  placeholder="Tìm kiếm..."
                   className="pl-10"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

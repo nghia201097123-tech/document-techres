@@ -6,6 +6,8 @@ export interface Area {
   description?: string;
   sortOrder: number;
   isActive: boolean;
+  brandId?: string;
+  branchId?: string;
   createdAt: string;
 }
 

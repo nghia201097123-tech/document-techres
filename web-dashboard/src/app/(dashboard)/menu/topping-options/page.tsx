@@ -20,9 +20,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, ProductType, type ToppingGroup } from "@/services/product-service";
+import { BrandFilter } from "@/components/ui/brand-filter";
 
 export default function ToppingOptionsPage() {
   const { toast } = useToast();
+
+  // Filter state
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
 
   // State
   const [toppingGroups, setToppingGroups] = React.useState<ToppingGroup[]>([]);
@@ -335,16 +339,25 @@ export default function ToppingOptionsPage() {
     }).format(value);
   };
 
-  // Filter groups
-  const filteredGroups = toppingGroups.filter(g =>
-    g.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter groups by search and brand
+  const filteredGroups = toppingGroups.filter(g => {
+    const matchesSearch = g.name.toLowerCase().includes(search.toLowerCase());
+    const matchesBrand = filterBrandId === "all" || g.brandId === filterBrandId;
+    return matchesSearch && matchesBrand;
+  });
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Quản lý Topping Options</h1>
-        <p className="text-muted-foreground">Tạo nhóm topping dùng chung và gán vào các món ăn</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Quản lý Topping Options</h1>
+          <p className="text-muted-foreground">Tạo nhóm topping dùng chung và gán vào các món ăn</p>
+        </div>
+        <BrandFilter
+          selectedBrandId={filterBrandId}
+          onBrandChange={setFilterBrandId}
+          className="w-[180px]"
+        />
       </div>
 
       <Tabs defaultValue="groups" className="w-full">

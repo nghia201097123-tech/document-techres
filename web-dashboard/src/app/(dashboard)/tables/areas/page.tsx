@@ -37,6 +37,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto, type QuickTableDto } from "@/services/area-service";
+import { BrandBranchFilter } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -48,6 +49,11 @@ interface QuickTable {
 
 export default function AreasPage() {
   const { toast } = useToast();
+
+  // Filter state
+  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBranchId, setFilterBranchId] = React.useState("all");
+
   const [areas, setAreas] = React.useState<Area[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
@@ -253,6 +259,13 @@ export default function AreasPage() {
     }
   };
 
+  // Filter areas by brand and branch
+  const filteredAreas = areas.filter((a) => {
+    const matchesBrand = filterBrandId === "all" || a.brandId === filterBrandId;
+    const matchesBranch = filterBranchId === "all" || a.branchId === filterBranchId;
+    return matchesBrand && matchesBranch;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -260,23 +273,33 @@ export default function AreasPage() {
           <h1 className="text-2xl font-bold">Quản lý khu vực</h1>
           <p className="text-muted-foreground">Phân chia khu vực trong nhà hàng (Tầng 1, Tầng 2, Sân vườn...)</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm khu vực
-        </Button>
+        <div className="flex items-center gap-2">
+          <BrandBranchFilter
+            selectedBrandId={filterBrandId}
+            selectedBranchId={filterBranchId}
+            onBrandChange={setFilterBrandId}
+            onBranchChange={setFilterBranchId}
+            brandClassName="w-[160px]"
+            branchClassName="w-[160px]"
+          />
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm khu vực
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Danh sách khu vực</CardTitle>
-          <CardDescription>Tổng cộng {areas.length} khu vực</CardDescription>
+          <CardDescription>Tổng cộng {filteredAreas.length} khu vực</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : areas.length === 0 ? (
+          ) : filteredAreas.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <MapPin className="h-10 w-10 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Chưa có khu vực nào</p>
@@ -286,7 +309,7 @@ export default function AreasPage() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {areas.map((area) => (
+              {filteredAreas.map((area) => (
                 <Card key={area.id} className="relative">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
