@@ -19,10 +19,10 @@ export class CreateStaffDto {
   @IsEnum(Gender, { message: 'Giới tính không hợp lệ' })
   gender: Gender;
 
-  @ApiProperty({ example: '123 Nguyễn Văn Linh, P.1, Q.7, TP.HCM', description: 'Địa chỉ hành chính' })
-  @IsNotEmpty({ message: 'Địa chỉ hành chính không được để trống' })
+  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh, P.1, Q.7, TP.HCM', description: 'Địa chỉ hành chính' })
+  @IsOptional()
   @IsString()
-  address: string;
+  address?: string;
 
   @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố' })
   @IsOptional()

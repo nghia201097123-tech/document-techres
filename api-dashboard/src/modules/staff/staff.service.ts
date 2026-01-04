@@ -197,10 +197,6 @@ export class StaffService {
             result.errors.push({ row: rowNumber, message: 'Giới tính là bắt buộc' });
             continue;
           }
-          if (!item.address) {
-            result.errors.push({ row: rowNumber, message: 'Địa chỉ là bắt buộc' });
-            continue;
-          }
           if (!item.departmentId) {
             result.errors.push({ row: rowNumber, message: 'Bộ phận là bắt buộc' });
             continue;
