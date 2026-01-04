@@ -43,6 +43,26 @@ import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, typ
 import { permissionService, type Permission } from "@/services/permission-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+
+// Default column configuration for staff table
+const defaultStaffColumns: ColumnConfig[] = [
+  { key: "name", label: "Tên nhân viên", visible: true, locked: true },
+  { key: "username", label: "Username", visible: true },
+  { key: "phone", label: "Số điện thoại", visible: true },
+  { key: "email", label: "Email", visible: false },
+  { key: "birthDate", label: "Ngày sinh", visible: false },
+  { key: "gender", label: "Giới tính", visible: false },
+  { key: "idNumber", label: "CCCD", visible: false },
+  { key: "provinceName", label: "Tỉnh/Thành phố", visible: false },
+  { key: "wardName", label: "Phường/Xã", visible: false },
+  { key: "address", label: "Địa chỉ", visible: false },
+  { key: "brandName", label: "Thương hiệu", visible: false },
+  { key: "branchName", label: "Chi nhánh", visible: true },
+  { key: "departmentName", label: "Bộ phận", visible: false },
+  { key: "isActive", label: "Trạng thái", visible: true },
+];
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -137,6 +157,18 @@ export default function StaffPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Column configuration hook
+  const {
+    columns: staffColumns,
+    visibleColumns,
+    toggleColumn,
+    resetToDefault: resetColumns,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "staff-table-columns",
+    defaultColumns: defaultStaffColumns,
+  });
 
   // Redux selectors
   const { items: brands, loading: loadingBrands } = useAppSelector((state) => state.brands);
@@ -854,13 +886,20 @@ export default function StaffPage() {
               <CardTitle>Danh sách nhân viên</CardTitle>
               <CardDescription>Tổng cộng {staffList.length} nhân viên</CardDescription>
             </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm nhân viên..."
-                className="pl-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+            <div className="flex items-center gap-2">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm nhân viên..."
+                  className="pl-10"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <ColumnConfigDialog
+                columns={staffColumns}
+                onToggle={toggleColumn}
+                onReset={resetColumns}
               />
             </div>
           </div>
@@ -882,26 +921,46 @@ export default function StaffPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tên nhân viên</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Số điện thoại</TableHead>
-                  <TableHead>Chi nhánh</TableHead>
-                  <TableHead>Trạng thái</TableHead>
+                  {isColumnVisible("name") && <TableHead>Tên nhân viên</TableHead>}
+                  {isColumnVisible("username") && <TableHead>Username</TableHead>}
+                  {isColumnVisible("phone") && <TableHead>Số điện thoại</TableHead>}
+                  {isColumnVisible("email") && <TableHead>Email</TableHead>}
+                  {isColumnVisible("birthDate") && <TableHead>Ngày sinh</TableHead>}
+                  {isColumnVisible("gender") && <TableHead>Giới tính</TableHead>}
+                  {isColumnVisible("idNumber") && <TableHead>CCCD</TableHead>}
+                  {isColumnVisible("provinceName") && <TableHead>Tỉnh/TP</TableHead>}
+                  {isColumnVisible("wardName") && <TableHead>Phường/Xã</TableHead>}
+                  {isColumnVisible("address") && <TableHead>Địa chỉ</TableHead>}
+                  {isColumnVisible("brandName") && <TableHead>Thương hiệu</TableHead>}
+                  {isColumnVisible("branchName") && <TableHead>Chi nhánh</TableHead>}
+                  {isColumnVisible("departmentName") && <TableHead>Bộ phận</TableHead>}
+                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
                   <TableHead className="w-[80px]">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredStaff.map((staff) => (
                   <TableRow key={staff.id}>
-                    <TableCell className="font-medium">{staff.name}</TableCell>
-                    <TableCell className="font-mono text-sm">{staff.username}</TableCell>
-                    <TableCell>{staff.phone || "-"}</TableCell>
-                    <TableCell>{staff.branchName || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={staff.isActive ? "default" : "secondary"}>
-                        {staff.isActive ? "Hoạt động" : "Tạm ngưng"}
-                      </Badge>
-                    </TableCell>
+                    {isColumnVisible("name") && <TableCell className="font-medium">{staff.name}</TableCell>}
+                    {isColumnVisible("username") && <TableCell className="font-mono text-sm">{staff.username}</TableCell>}
+                    {isColumnVisible("phone") && <TableCell>{staff.phone || "-"}</TableCell>}
+                    {isColumnVisible("email") && <TableCell>{staff.email || "-"}</TableCell>}
+                    {isColumnVisible("birthDate") && <TableCell>{staff.birthDate || "-"}</TableCell>}
+                    {isColumnVisible("gender") && <TableCell>{staff.gender === "male" ? "Nam" : staff.gender === "female" ? "Nữ" : "-"}</TableCell>}
+                    {isColumnVisible("idNumber") && <TableCell>{staff.idNumber || "-"}</TableCell>}
+                    {isColumnVisible("provinceName") && <TableCell>{staff.provinceName || "-"}</TableCell>}
+                    {isColumnVisible("wardName") && <TableCell>{staff.wardName || "-"}</TableCell>}
+                    {isColumnVisible("address") && <TableCell className="max-w-[200px] truncate">{staff.address || "-"}</TableCell>}
+                    {isColumnVisible("brandName") && <TableCell>{staff.brandName || "-"}</TableCell>}
+                    {isColumnVisible("branchName") && <TableCell>{staff.branchName || "-"}</TableCell>}
+                    {isColumnVisible("departmentName") && <TableCell>{staff.departmentName || "-"}</TableCell>}
+                    {isColumnVisible("isActive") && (
+                      <TableCell>
+                        <Badge variant={staff.isActive ? "default" : "secondary"}>
+                          {staff.isActive ? "Hoạt động" : "Tạm ngưng"}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

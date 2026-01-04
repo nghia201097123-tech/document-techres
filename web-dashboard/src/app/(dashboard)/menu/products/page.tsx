@@ -59,6 +59,27 @@ import { categoryService } from "@/services/category-service";
 import { unitService, type Unit } from "@/services/unit-service";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+
+// Default column configuration for products table
+const defaultProductColumns: ColumnConfig[] = [
+  { key: "code", label: "Mã món", visible: true },
+  { key: "name", label: "Tên món", visible: true, locked: true },
+  { key: "type", label: "Loại", visible: true },
+  { key: "categoryName", label: "Danh mục", visible: true },
+  { key: "price", label: "Giá (đã VAT)", visible: true },
+  { key: "vatRate", label: "VAT (%)", visible: false },
+  { key: "costPrice", label: "Giá vốn", visible: false },
+  { key: "description", label: "Mô tả", visible: false },
+  { key: "preparationTime", label: "Thời gian chế biến", visible: false },
+  { key: "sellingType", label: "Loại bán", visible: false },
+  { key: "unit", label: "Đơn vị", visible: false },
+  { key: "printDish", label: "In món", visible: false },
+  { key: "printLabel", label: "In tem", visible: false },
+  { key: "printSeafood", label: "In hồ hải sản", visible: false },
+  { key: "isActive", label: "Trạng thái", visible: true },
+];
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -94,6 +115,18 @@ type DialogMode = "create" | "edit" | "view" | "toppings" | "combo" | null;
 export default function ProductsPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
+
+  // Column configuration hook
+  const {
+    columns: productColumns,
+    visibleColumns,
+    toggleColumn,
+    resetToDefault: resetColumns,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "products-table-columns",
+    defaultColumns: defaultProductColumns,
+  });
 
   // Redux selectors
   const { items: categories, byProductType: categoriesByType, loading: loadingCategories } = useAppSelector((state) => state.categories);
@@ -679,6 +712,11 @@ export default function ProductsPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <ColumnConfigDialog
+                columns={productColumns}
+                onToggle={toggleColumn}
+                onReset={resetColumns}
+              />
             </div>
           </div>
         </CardHeader>
@@ -699,32 +737,54 @@ export default function ProductsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mã</TableHead>
-                  <TableHead>Tên món</TableHead>
-                  <TableHead>Loại</TableHead>
-                  <TableHead>Danh mục</TableHead>
-                  <TableHead className="text-right">Giá (đã VAT)</TableHead>
-                  <TableHead>Trạng thái</TableHead>
+                  {isColumnVisible("code") && <TableHead>Mã</TableHead>}
+                  {isColumnVisible("name") && <TableHead>Tên món</TableHead>}
+                  {isColumnVisible("type") && <TableHead>Loại</TableHead>}
+                  {isColumnVisible("categoryName") && <TableHead>Danh mục</TableHead>}
+                  {isColumnVisible("price") && <TableHead className="text-right">Giá (đã VAT)</TableHead>}
+                  {isColumnVisible("vatRate") && <TableHead className="text-right">VAT (%)</TableHead>}
+                  {isColumnVisible("costPrice") && <TableHead className="text-right">Giá vốn</TableHead>}
+                  {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
+                  {isColumnVisible("preparationTime") && <TableHead>Thời gian CB</TableHead>}
+                  {isColumnVisible("sellingType") && <TableHead>Loại bán</TableHead>}
+                  {isColumnVisible("unit") && <TableHead>Đơn vị</TableHead>}
+                  {isColumnVisible("printDish") && <TableHead>In món</TableHead>}
+                  {isColumnVisible("printLabel") && <TableHead>In tem</TableHead>}
+                  {isColumnVisible("printSeafood") && <TableHead>In hải sản</TableHead>}
+                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
                   <TableHead className="w-[80px]">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-mono text-sm">{product.code}</TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                      <Badge className={typeLabels[product.type]?.color || ""}>
-                        {typeLabels[product.type]?.label || product.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{getCategoryName(product.categoryId)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
-                    <TableCell>
-                      <Badge variant={product.isActive ? "default" : "secondary"}>
-                        {product.isActive ? "Hoạt động" : "Tạm ngưng"}
-                      </Badge>
-                    </TableCell>
+                    {isColumnVisible("code") && <TableCell className="font-mono text-sm">{product.code}</TableCell>}
+                    {isColumnVisible("name") && <TableCell className="font-medium">{product.name}</TableCell>}
+                    {isColumnVisible("type") && (
+                      <TableCell>
+                        <Badge className={typeLabels[product.type]?.color || ""}>
+                          {typeLabels[product.type]?.label || product.type}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    {isColumnVisible("categoryName") && <TableCell>{getCategoryName(product.categoryId)}</TableCell>}
+                    {isColumnVisible("price") && <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>}
+                    {isColumnVisible("vatRate") && <TableCell className="text-right">{product.vatRate || 10}%</TableCell>}
+                    {isColumnVisible("costPrice") && <TableCell className="text-right">{formatCurrency(product.costPrice || 0)}</TableCell>}
+                    {isColumnVisible("description") && <TableCell className="max-w-[200px] truncate">{product.description || "-"}</TableCell>}
+                    {isColumnVisible("preparationTime") && <TableCell>{product.preparationTime ? `${product.preparationTime} phút` : "-"}</TableCell>}
+                    {isColumnVisible("sellingType") && <TableCell>{product.sellingType === "weight" ? "Theo cân" : "Theo phần"}</TableCell>}
+                    {isColumnVisible("unit") && <TableCell>{product.unit || "-"}</TableCell>}
+                    {isColumnVisible("printDish") && <TableCell>{product.printDish ? "Có" : "Không"}</TableCell>}
+                    {isColumnVisible("printLabel") && <TableCell>{product.printLabel ? "Có" : "Không"}</TableCell>}
+                    {isColumnVisible("printSeafood") && <TableCell>{product.printSeafood ? "Có" : "Không"}</TableCell>}
+                    {isColumnVisible("isActive") && (
+                      <TableCell>
+                        <Badge variant={product.isActive ? "default" : "secondary"}>
+                          {product.isActive ? "Hoạt động" : "Tạm ngưng"}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
