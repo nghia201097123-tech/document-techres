@@ -37,7 +37,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto, type QuickTableDto } from "@/services/area-service";
-import { BrandBranchFilter } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -51,8 +51,8 @@ export default function AreasPage() {
   const { toast } = useToast();
 
   // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
-  const [filterBranchId, setFilterBranchId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
+  const [filterBranchId, setFilterBranchId] = React.useState("");
 
   const [areas, setAreas] = React.useState<Area[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -72,11 +72,16 @@ export default function AreasPage() {
   const [newTableName, setNewTableName] = React.useState("");
   const [newTableCapacity, setNewTableCapacity] = React.useState(4);
 
-  // Load areas
-  const loadAreas = React.useCallback(async () => {
+  // Load areas - only when branch is selected
+  const loadAreas = React.useCallback(async (branchId: string) => {
+    if (!branchId) {
+      setAreas([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await areaService.getAll();
+      const data = await areaService.getAll(branchId);
       setAreas(data);
     } catch (error) {
       console.error("Error loading areas:", error);
@@ -87,8 +92,8 @@ export default function AreasPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadAreas();
-  }, [loadAreas]);
+    loadAreas(filterBranchId);
+  }, [filterBranchId, loadAreas]);
 
   // Open create dialog
   const handleOpenCreate = () => {
@@ -259,12 +264,8 @@ export default function AreasPage() {
     }
   };
 
-  // Filter areas by brand and branch
-  const filteredAreas = areas.filter((a) => {
-    const matchesBrand = filterBrandId === "all" || a.brandId === filterBrandId;
-    const matchesBranch = filterBranchId === "all" || a.branchId === filterBranchId;
-    return matchesBrand && matchesBranch;
-  });
+  // Filter areas (already filtered by API for branch)
+  const filteredAreas = areas;
 
   return (
     <div className="space-y-6">
@@ -279,6 +280,7 @@ export default function AreasPage() {
             selectedBranchId={filterBranchId}
             onBrandChange={setFilterBrandId}
             onBranchChange={setFilterBranchId}
+            showAllOption={false}
             brandClassName="w-[160px]"
             branchClassName="w-[160px]"
           />
@@ -289,6 +291,12 @@ export default function AreasPage() {
         </div>
       </div>
 
+      {!filterBranchId ? (
+        <FilterRequiredPlaceholder
+          title="Vui lòng chọn chi nhánh"
+          description="Chọn một chi nhánh từ bộ lọc phía trên để xem danh sách khu vực"
+        />
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>Danh sách khu vực</CardTitle>
@@ -367,6 +375,7 @@ export default function AreasPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Create/Edit Area Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>

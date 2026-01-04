@@ -57,7 +57,7 @@ import { useToast } from "@/hooks/use-toast";
 import { tableService, type Table, type CreateTableDto, type UpdateTableDto, TableStatus, tableStatusLabels } from "@/services/table-service";
 import { areaService, type Area } from "@/services/area-service";
 import { cn } from "@/lib/utils";
-import { BrandBranchFilter } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -65,8 +65,8 @@ export default function TablesPage() {
   const { toast } = useToast();
 
   // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
-  const [filterBranchId, setFilterBranchId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
+  const [filterBranchId, setFilterBranchId] = React.useState("");
 
   const [tables, setTables] = React.useState<Table[]>([]);
   const [areas, setAreas] = React.useState<Area[]>([]);
@@ -92,13 +92,19 @@ export default function TablesPage() {
   const [areaComboboxOpen, setAreaComboboxOpen] = React.useState(false);
   const [areaSearchValue, setAreaSearchValue] = React.useState("");
 
-  // Load data
-  const loadData = React.useCallback(async () => {
+  // Load data - only when branch is selected
+  const loadData = React.useCallback(async (branchId: string) => {
+    if (!branchId) {
+      setTables([]);
+      setAreas([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const [tablesData, areasData] = await Promise.all([
-        tableService.getAll(),
-        areaService.getAll(),
+        tableService.getAll(branchId),
+        areaService.getAll(branchId),
       ]);
       setTables(tablesData);
       setAreas(areasData);
@@ -111,18 +117,15 @@ export default function TablesPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData(filterBranchId);
+  }, [filterBranchId, loadData]);
 
-  // Filter tables by area, brand and branch
+  // Filter tables by area (already filtered by API for branch)
   const filteredTables = React.useMemo(() => {
     return tables.filter((t) => {
-      const matchesArea = filterAreaId === "all" || t.areaId === filterAreaId;
-      const matchesBrand = filterBrandId === "all" || t.brandId === filterBrandId;
-      const matchesBranch = filterBranchId === "all" || t.branchId === filterBranchId;
-      return matchesArea && matchesBrand && matchesBranch;
+      return filterAreaId === "all" || t.areaId === filterAreaId;
     });
-  }, [tables, filterAreaId, filterBrandId, filterBranchId]);
+  }, [tables, filterAreaId]);
 
   // Group tables by area
   const tablesByArea = React.useMemo(() => {
@@ -340,6 +343,7 @@ export default function TablesPage() {
             selectedBranchId={filterBranchId}
             onBrandChange={setFilterBrandId}
             onBranchChange={setFilterBranchId}
+            showAllOption={false}
             brandClassName="w-[150px]"
             branchClassName="w-[150px]"
           />
@@ -363,7 +367,12 @@ export default function TablesPage() {
         </div>
       </div>
 
-      {loading ? (
+      {!filterBranchId ? (
+        <FilterRequiredPlaceholder
+          title="Vui lòng chọn chi nhánh"
+          description="Chọn một chi nhánh từ bộ lọc phía trên để xem danh sách bàn"
+        />
+      ) : loading ? (
         <Card>
           <CardContent className="flex items-center justify-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

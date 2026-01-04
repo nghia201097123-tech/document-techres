@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type ProductNote, type Product, ProductType } from "@/services/product-service";
-import { BrandFilter } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 import { cn } from "@/lib/utils";
 
 type DialogMode = "create" | "edit" | null;
@@ -37,7 +37,7 @@ export default function ProductNotesPage() {
   const { toast } = useToast();
 
   // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
 
   // State
   const [notes, setNotes] = React.useState<ProductNote[]>([]);
@@ -62,11 +62,16 @@ export default function ProductNotesPage() {
   const [hasChanges, setHasChanges] = React.useState(false);
   const [originalProductIds, setOriginalProductIds] = React.useState<string[]>([]);
 
-  // Load notes
-  const loadNotes = React.useCallback(async () => {
+  // Load notes - only when brand is selected
+  const loadNotes = React.useCallback(async (brandId: string) => {
+    if (!brandId) {
+      setNotes([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await productService.getAllNotes();
+      const data = await productService.getAllNotes(brandId);
       setNotes(data);
     } catch (error) {
       console.error("Error loading notes:", error);
@@ -77,8 +82,8 @@ export default function ProductNotesPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadNotes();
-  }, [loadNotes]);
+    loadNotes(filterBrandId);
+  }, [filterBrandId, loadNotes]);
 
   // Load products when a note is selected
   const handleSelectNote = async (note: ProductNote) => {
@@ -294,11 +299,9 @@ export default function ProductNotesPage() {
     p.code.toLowerCase().includes(productSearch.toLowerCase())
   );
 
-  // Filter notes by search and brand
+  // Filter notes by search (already filtered by API for brand)
   const filteredNotes = notes.filter((n) => {
-    const matchesSearch = n.name.toLowerCase().includes(search.toLowerCase());
-    const matchesBrand = filterBrandId === "all" || n.brandId === filterBrandId;
-    return matchesSearch && matchesBrand;
+    return n.name.toLowerCase().includes(search.toLowerCase());
   });
 
   // Count selected in filtered
@@ -316,6 +319,7 @@ export default function ProductNotesPage() {
           <BrandFilter
             selectedBrandId={filterBrandId}
             onBrandChange={setFilterBrandId}
+            showAllOption={false}
             className="w-[180px]"
           />
           <Button onClick={handleOpenCreate}>
@@ -325,6 +329,12 @@ export default function ProductNotesPage() {
         </div>
       </div>
 
+      {!filterBrandId ? (
+        <FilterRequiredPlaceholder
+          title="Vui lòng chọn thương hiệu"
+          description="Chọn một thương hiệu từ bộ lọc phía trên để quản lý ghi chú"
+        />
+      ) : (
       <div className="grid grid-cols-12 gap-6">
         {/* Left panel - Notes list */}
         <div className="col-span-5">
@@ -553,6 +563,7 @@ export default function ProductNotesPage() {
           </Card>
         </div>
       </div>
+      )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>

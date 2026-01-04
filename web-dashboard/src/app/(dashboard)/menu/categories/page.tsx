@@ -44,7 +44,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { categoryService, type Category, type CreateCategoryDto, type UpdateCategoryDto } from "@/services/category-service";
 import { ProductType } from "@/services/product-service";
-import { BrandFilter } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -60,7 +60,7 @@ export default function CategoriesPage() {
   const { toast } = useToast();
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [selectedCategory, setSelectedCategory] = React.useState<Category | null>(null);
@@ -73,11 +73,16 @@ export default function CategoriesPage() {
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
-  // Load categories
-  const loadCategories = React.useCallback(async () => {
+  // Load categories - only when brand is selected
+  const loadCategories = React.useCallback(async (brandId: string) => {
+    if (!brandId) {
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await categoryService.getAll();
+      const data = await categoryService.getAll(brandId);
       setCategories(data);
     } catch (error) {
       console.error("Error loading categories:", error);
@@ -88,8 +93,8 @@ export default function CategoriesPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+    loadCategories(filterBrandId);
+  }, [filterBrandId, loadCategories]);
 
   // Open create dialog
   const handleOpenCreate = () => {
@@ -197,10 +202,8 @@ export default function CategoriesPage() {
     }
   };
 
-  // Filter categories by brand
-  const filteredCategories = categories.filter((c) => {
-    return filterBrandId === "all" || c.brandId === filterBrandId;
-  });
+  // Filter categories by brand (already filtered by API)
+  const filteredCategories = categories;
 
   // Count categories by type
   const countByType = (type: string) => {
@@ -218,6 +221,7 @@ export default function CategoriesPage() {
           <BrandFilter
             selectedBrandId={filterBrandId}
             onBrandChange={setFilterBrandId}
+            showAllOption={false}
             className="w-[180px]"
           />
           <Button onClick={handleOpenCreate}>
@@ -252,7 +256,12 @@ export default function CategoriesPage() {
           <CardDescription>Tổng cộng {filteredCategories.length} danh mục</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {!filterBrandId ? (
+            <FilterRequiredPlaceholder
+              title="Vui lòng chọn thương hiệu"
+              description="Chọn một thương hiệu từ bộ lọc phía trên để xem danh sách danh mục"
+            />
+          ) : loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>

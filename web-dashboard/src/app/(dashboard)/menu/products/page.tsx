@@ -61,7 +61,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
-import { BrandFilter } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 // Default column configuration for products table
 const defaultProductColumns: ColumnConfig[] = [
@@ -135,7 +135,7 @@ export default function ProductsPage() {
   // Local state
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("all");
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
   const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
@@ -182,12 +182,17 @@ export default function ProductsPage() {
     return categoriesByType[formData.type]?.filter(c => c.isActive) || [];
   }, [formData.type, categories, categoriesByType]);
 
-  // Load products
-  const loadProducts = React.useCallback(async () => {
+  // Load products - only when brand is selected
+  const loadProducts = React.useCallback(async (brandId: string) => {
+    if (!brandId) {
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const filterType = typeFilter === "all" ? undefined : (typeFilter as ProductType);
-      const data = await productService.getAll(undefined, filterType);
+      const data = await productService.getAll(brandId, filterType);
       setProducts(data);
     } catch (error) {
       console.error("Error loading products:", error);
@@ -198,8 +203,8 @@ export default function ProductsPage() {
   }, [typeFilter, toast]);
 
   React.useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+    loadProducts(filterBrandId);
+  }, [filterBrandId, loadProducts]);
 
   // Load categories when dialog opens (using Redux - cached data)
   React.useEffect(() => {
@@ -696,6 +701,7 @@ export default function ProductsPage() {
               <BrandFilter
                 selectedBrandId={filterBrandId}
                 onBrandChange={setFilterBrandId}
+                showAllOption={false}
                 className="w-[160px]"
               />
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -730,7 +736,12 @@ export default function ProductsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {!filterBrandId ? (
+            <FilterRequiredPlaceholder
+              title="Vui lòng chọn thương hiệu"
+              description="Chọn một thương hiệu từ bộ lọc phía trên để xem danh sách món ăn"
+            />
+          ) : loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>

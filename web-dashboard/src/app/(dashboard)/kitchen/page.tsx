@@ -38,7 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type PrintMode } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BrandBranchFilter } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 // Common paper sizes for thermal printers
 const PAPER_SIZE_SUGGESTIONS = ["58mm", "80mm", "76mm", "110mm", "A4"];
@@ -49,8 +49,8 @@ export default function KitchenPage() {
   const { toast } = useToast();
 
   // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
-  const [filterBranchId, setFilterBranchId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
+  const [filterBranchId, setFilterBranchId] = React.useState("");
 
   const [kitchens, setKitchens] = React.useState<Kitchen[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -76,11 +76,16 @@ export default function KitchenPage() {
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = React.useState("");
 
-  // Load kitchens
-  const loadKitchens = React.useCallback(async () => {
+  // Load kitchens - only when branch is selected
+  const loadKitchens = React.useCallback(async (branchId: string) => {
+    if (!branchId) {
+      setKitchens([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await kitchenService.getAll();
+      const data = await kitchenService.getAll(branchId);
       setKitchens(data);
     } catch (error) {
       console.error("Error loading kitchens:", error);
@@ -91,8 +96,8 @@ export default function KitchenPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadKitchens();
-  }, [loadKitchens]);
+    loadKitchens(filterBranchId);
+  }, [filterBranchId, loadKitchens]);
 
   // Open create dialog
   const handleOpenCreate = () => {
@@ -325,12 +330,8 @@ export default function KitchenPage() {
     combo: "Combo",
   };
 
-  // Filter kitchens by brand and branch
-  const filteredKitchens = kitchens.filter((k) => {
-    const matchesBrand = filterBrandId === "all" || k.brandId === filterBrandId;
-    const matchesBranch = filterBranchId === "all" || k.branchId === filterBranchId;
-    return matchesBrand && matchesBranch;
-  });
+  // Filter kitchens (already filtered by API for branch)
+  const filteredKitchens = kitchens;
 
   return (
     <div className="space-y-6">
@@ -345,6 +346,7 @@ export default function KitchenPage() {
             selectedBranchId={filterBranchId}
             onBrandChange={setFilterBrandId}
             onBranchChange={setFilterBranchId}
+            showAllOption={false}
             brandClassName="w-[160px]"
             branchClassName="w-[160px]"
           />
@@ -356,6 +358,12 @@ export default function KitchenPage() {
       </div>
 
       {/* Kitchen Stations */}
+      {!filterBranchId ? (
+        <FilterRequiredPlaceholder
+          title="Vui lòng chọn chi nhánh"
+          description="Chọn một chi nhánh từ bộ lọc phía trên để xem danh sách bếp"
+        />
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>Danh sách bếp</CardTitle>
@@ -440,6 +448,7 @@ export default function KitchenPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Create/Edit Kitchen Dialog */}
       <Dialog open={dialogMode === "create" || dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>

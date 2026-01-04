@@ -45,7 +45,7 @@ import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type Templ
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
-import { BrandBranchFilter } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -179,8 +179,8 @@ export default function StaffPage() {
 
   // Local state
   const [search, setSearch] = React.useState("");
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
-  const [filterBranchId, setFilterBranchId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
+  const [filterBranchId, setFilterBranchId] = React.useState("");
   const [staffList, setStaffList] = React.useState<Staff[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
@@ -219,11 +219,16 @@ export default function StaffPage() {
   const importBranches = importSettings.brandId ? branchesByBrand[importSettings.brandId] || [] : [];
   const importWards = importSettings.provinceCode ? wardsByProvince[importSettings.provinceCode] || [] : [];
 
-  // Load staff list
-  const loadStaff = React.useCallback(async () => {
+  // Load staff list - only when branch is selected
+  const loadStaff = React.useCallback(async (branchId: string) => {
+    if (!branchId) {
+      setStaffList([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await staffService.getAll();
+      const data = await staffService.getAll(branchId);
       setStaffList(data);
     } catch (error) {
       console.error("Error loading staff:", error);
@@ -234,8 +239,8 @@ export default function StaffPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadStaff();
-  }, [loadStaff]);
+    loadStaff(filterBranchId);
+  }, [filterBranchId, loadStaff]);
 
   // Load branches when brand changes (using Redux)
   React.useEffect(() => {
@@ -797,7 +802,7 @@ export default function StaffPage() {
           description: `Đã tạo mới ${result.created} và cập nhật ${result.updated} nhân viên`,
         });
         handleCloseDialog();
-        loadStaff();
+        loadStaff(filterBranchId);
       }
     } catch (error: any) {
       console.error("Error importing:", error);
@@ -827,16 +832,17 @@ export default function StaffPage() {
     return dept?.name || "-";
   };
 
-  // Filter staff by search, brand, and branch
+  // Filter staff by search (branch filter is already applied when loading)
   const filteredStaff = staffList.filter((s) => {
     const matchesSearch =
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.username?.toLowerCase().includes(search.toLowerCase()) ||
       s.phone?.includes(search);
-    const matchesBrand = filterBrandId === "all" || s.brandId === filterBrandId;
-    const matchesBranch = filterBranchId === "all" || s.branchId === filterBranchId;
-    return matchesSearch && matchesBrand && matchesBranch;
+    return matchesSearch;
   });
+
+  // Check if branch is selected
+  const isBranchSelected = filterBranchId && filterBranchId !== "";
 
   return (
     <div className="space-y-6">
@@ -890,7 +896,9 @@ export default function StaffPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách nhân viên</CardTitle>
-              <CardDescription>Tổng cộng {staffList.length} nhân viên</CardDescription>
+              <CardDescription>
+                {isBranchSelected ? `Tổng cộng ${staffList.length} nhân viên` : "Vui lòng chọn chi nhánh"}
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <BrandBranchFilter
@@ -900,26 +908,37 @@ export default function StaffPage() {
                 onBranchChange={setFilterBranchId}
                 brandClassName="w-[160px]"
                 branchClassName="w-[160px]"
+                showAllOption={false}
               />
-              <div className="relative w-56">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Tìm kiếm..."
-                  className="pl-10"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <ColumnConfigDialog
-                columns={staffColumns}
-                onToggle={toggleColumn}
-                onReset={resetColumns}
-              />
+              {isBranchSelected && (
+                <>
+                  <div className="relative w-56">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Tìm kiếm..."
+                      className="pl-10"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <ColumnConfigDialog
+                    columns={staffColumns}
+                    onToggle={toggleColumn}
+                    onReset={resetColumns}
+                  />
+                </>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {!isBranchSelected ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Users className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-muted-foreground">Chọn chi nhánh để xem nhân viên</p>
+              <p className="text-sm text-muted-foreground mt-1">Vui lòng chọn thương hiệu và chi nhánh từ bộ lọc phía trên</p>
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>

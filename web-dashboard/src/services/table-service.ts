@@ -51,8 +51,8 @@ export interface TableCountByArea {
 }
 
 export const tableService = {
-  getAll: async (areaId?: string): Promise<Table[]> => {
-    const params = areaId ? { areaId } : {};
+  getAll: async (branchId?: string): Promise<Table[]> => {
+    const params = branchId ? { branchId } : {};
     const response = await api.get<Table[]>("/tables", { params });
     return response.data;
   },

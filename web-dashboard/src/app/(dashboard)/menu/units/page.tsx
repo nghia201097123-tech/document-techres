@@ -35,7 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { unitService, type Unit, type CreateUnitDto, type UpdateUnitDto } from "@/services/unit-service";
-import { BrandFilter } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -43,7 +43,7 @@ export default function UnitsPage() {
   const { toast } = useToast();
   const [units, setUnits] = React.useState<Unit[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [selectedUnit, setSelectedUnit] = React.useState<Unit | null>(null);
@@ -54,11 +54,16 @@ export default function UnitsPage() {
     sortOrder: 0,
   });
 
-  // Load units
-  const loadUnits = React.useCallback(async () => {
+  // Load units - only when brand is selected
+  const loadUnits = React.useCallback(async (brandId: string) => {
+    if (!brandId) {
+      setUnits([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await unitService.getAll();
+      const data = await unitService.getAll(brandId);
       setUnits(data);
     } catch (error) {
       console.error("Error loading units:", error);
@@ -69,8 +74,8 @@ export default function UnitsPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadUnits();
-  }, [loadUnits]);
+    loadUnits(filterBrandId);
+  }, [filterBrandId, loadUnits]);
 
   // Open create dialog
   const handleOpenCreate = () => {
@@ -172,10 +177,8 @@ export default function UnitsPage() {
     }
   };
 
-  // Filter units by brand
-  const filteredUnits = units.filter((u) => {
-    return filterBrandId === "all" || u.brandId === filterBrandId;
-  });
+  // Filter units by brand (already filtered by API)
+  const filteredUnits = units;
 
   return (
     <div className="space-y-6">
@@ -188,6 +191,7 @@ export default function UnitsPage() {
           <BrandFilter
             selectedBrandId={filterBrandId}
             onBrandChange={setFilterBrandId}
+            showAllOption={false}
             className="w-[180px]"
           />
           <Button onClick={handleOpenCreate}>
@@ -203,7 +207,12 @@ export default function UnitsPage() {
           <CardDescription>Tổng cộng {filteredUnits.length} đơn vị</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {!filterBrandId ? (
+            <FilterRequiredPlaceholder
+              title="Vui lòng chọn thương hiệu"
+              description="Chọn một thương hiệu từ bộ lọc phía trên để xem danh sách đơn vị tính"
+            />
+          ) : loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>

@@ -20,13 +20,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, ProductType, type ToppingGroup } from "@/services/product-service";
-import { BrandFilter } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
 
 export default function ToppingOptionsPage() {
   const { toast } = useToast();
 
   // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("all");
+  const [filterBrandId, setFilterBrandId] = React.useState("");
 
   // State
   const [toppingGroups, setToppingGroups] = React.useState<ToppingGroup[]>([]);
@@ -68,14 +68,21 @@ export default function ToppingOptionsPage() {
   const [assignedGroupIds, setAssignedGroupIds] = React.useState<string[]>([]);
   const [loadingAssignments, setLoadingAssignments] = React.useState(false);
 
-  // Load data
-  const loadData = React.useCallback(async () => {
+  // Load data - only when brand is selected
+  const loadData = React.useCallback(async (brandId: string) => {
+    if (!brandId) {
+      setToppingGroups([]);
+      setAvailableToppings([]);
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const [groups, toppings, allProducts] = await Promise.all([
-        productService.getAllToppingGroups(),
-        productService.getAvailableToppings(),
-        productService.getAll(),
+        productService.getAllToppingGroups(brandId),
+        productService.getAvailableToppings(brandId),
+        productService.getAll(brandId),
       ]);
       setToppingGroups(groups);
       setAvailableToppings(toppings);
@@ -90,8 +97,8 @@ export default function ToppingOptionsPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData(filterBrandId);
+  }, [filterBrandId, loadData]);
 
   // Select a group
   const handleSelectGroup = (group: ToppingGroup) => {
@@ -339,11 +346,9 @@ export default function ToppingOptionsPage() {
     }).format(value);
   };
 
-  // Filter groups by search and brand
+  // Filter groups by search (already filtered by API for brand)
   const filteredGroups = toppingGroups.filter(g => {
-    const matchesSearch = g.name.toLowerCase().includes(search.toLowerCase());
-    const matchesBrand = filterBrandId === "all" || g.brandId === filterBrandId;
-    return matchesSearch && matchesBrand;
+    return g.name.toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -356,10 +361,17 @@ export default function ToppingOptionsPage() {
         <BrandFilter
           selectedBrandId={filterBrandId}
           onBrandChange={setFilterBrandId}
+          showAllOption={false}
           className="w-[180px]"
         />
       </div>
 
+      {!filterBrandId ? (
+        <FilterRequiredPlaceholder
+          title="Vui lòng chọn thương hiệu"
+          description="Chọn một thương hiệu từ bộ lọc phía trên để quản lý topping"
+        />
+      ) : (
       <Tabs defaultValue="groups" className="w-full">
         <TabsList>
           <TabsTrigger value="groups">Nhóm Topping</TabsTrigger>
@@ -657,6 +669,7 @@ export default function ToppingOptionsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      )}
 
       {/* Add Topping Dialog */}
       <Dialog open={showAddToppingDialog} onOpenChange={handleCloseAddToppingDialog}>

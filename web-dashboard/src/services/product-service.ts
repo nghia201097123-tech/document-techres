@@ -209,8 +209,9 @@ export const productService = {
 
   // === Shared Topping Group Management ===
 
-  getAllToppingGroups: async (): Promise<ToppingGroup[]> => {
-    const response = await api.get<ToppingGroup[]>("/products/topping-groups");
+  getAllToppingGroups: async (brandId?: string): Promise<ToppingGroup[]> => {
+    const params = brandId ? { brandId } : {};
+    const response = await api.get<ToppingGroup[]>("/products/topping-groups", { params });
     return response.data;
   },
 
@@ -279,8 +280,9 @@ export const productService = {
 
   // === Product Notes Management ===
 
-  getAllNotes: async (): Promise<ProductNote[]> => {
-    const response = await api.get<ProductNote[]>("/products/notes/all");
+  getAllNotes: async (brandId?: string): Promise<ProductNote[]> => {
+    const params = brandId ? { brandId } : {};
+    const response = await api.get<ProductNote[]>("/products/notes/all", { params });
     return response.data;
   },
 
