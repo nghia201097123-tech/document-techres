@@ -85,7 +85,7 @@ const defaultProductColumns: ColumnConfig[] = [
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchCategories } from "@/store/slices/categoriesSlice";
+import { fetchCategories, invalidateCategoriesCache } from "@/store/slices/categoriesSlice";
 
 // Excel column configuration for export
 const excelColumns = [
@@ -257,12 +257,14 @@ export default function ProductsPage() {
     loadProducts(filterBrandId);
   }, [filterBrandId, loadProducts]);
 
-  // Load categories when dialog opens (using Redux - cached data)
+  // Load categories when brand is selected (for displaying category names in table)
   React.useEffect(() => {
-    if (dialogMode === "create" || dialogMode === "edit") {
-      dispatch(fetchCategories());
+    if (filterBrandId) {
+      // Invalidate cache and fetch fresh categories when brand changes
+      dispatch(invalidateCategoriesCache());
+      dispatch(fetchCategories(filterBrandId));
     }
-  }, [dialogMode, dispatch]);
+  }, [filterBrandId, dispatch]);
 
   // Load units when dialog opens
   React.useEffect(() => {
@@ -558,7 +560,8 @@ export default function ProductsPage() {
       productType: productType,
     });
     // Refresh categories
-    dispatch(fetchCategories());
+    dispatch(invalidateCategoriesCache());
+    dispatch(fetchCategories(filterBrandId));
     toast({ title: "Thành công", description: `Đã tạo danh mục "${categoryName}"` });
     return newCategory.id;
   };
@@ -727,7 +730,7 @@ export default function ProductsPage() {
   // Download template with dropdowns
   const handleDownloadTemplate = async () => {
     // Load categories if not loaded
-    await dispatch(fetchCategories());
+    await dispatch(fetchCategories(filterBrandId));
 
     // Wait for Redux state to update
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -789,7 +792,7 @@ export default function ProductsPage() {
       const result = await readExcelFile<ImportDataWithNames>(file, importColumnMapping);
 
       // Load categories if not available
-      await dispatch(fetchCategories());
+      await dispatch(fetchCategories(filterBrandId));
 
       // Wait for Redux state to update
       await new Promise((resolve) => setTimeout(resolve, 100));

@@ -29,7 +29,7 @@ const CACHE_DURATION = 5 * 60 * 1000;
 
 export const fetchCategories = createAsyncThunk(
   "categories/fetchCategories",
-  async (_, { getState, rejectWithValue }) => {
+  async (brandId: string | undefined, { getState, rejectWithValue }) => {
     try {
       const state = getState() as { categories: CategoriesState };
       const now = Date.now();
@@ -39,7 +39,7 @@ export const fetchCategories = createAsyncThunk(
         return state.categories.items;
       }
 
-      const data = await categoryService.getAll();
+      const data = await categoryService.getAll(brandId);
       return data;
     } catch (error) {
       return rejectWithValue("Failed to fetch categories");
