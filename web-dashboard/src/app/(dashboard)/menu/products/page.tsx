@@ -54,7 +54,7 @@ import {
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem } from "@/services/product-service";
-import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
+import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
 import { unitService, type Unit } from "@/services/unit-service";
@@ -729,58 +729,69 @@ export default function ProductsPage() {
 
   // Download template with dropdowns
   const handleDownloadTemplate = async () => {
-    // Load categories if not loaded
-    await dispatch(fetchCategories(filterBrandId));
+    try {
+      // Load categories and units
+      await dispatch(fetchCategories(filterBrandId));
+      const unitsData = await unitService.getAll(filterBrandId);
 
-    // Wait for Redux state to update
-    await new Promise((resolve) => setTimeout(resolve, 200));
+      // Wait for Redux state to update
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Build columns with dropdown options
-    const columnsWithDropdowns: TemplateColumnWithDropdown[] = [
-      { header: "ID", example: "(để trống nếu tạo mới)", required: false },
-      { header: "Mã món", example: "(tự động tạo nếu mới)", required: false },
-      { header: "Tên món", example: "Phở bò tái", required: true },
-      {
-        header: "Loại",
-        example: "Đồ ăn",
-        required: true,
-        dropdown: [
-          { value: "food", label: "Đồ ăn" },
-          { value: "drink", label: "Đồ uống" },
-          { value: "other", label: "Khác" },
-          { value: "topping", label: "Topping" },
-          { value: "combo", label: "Combo" },
-        ],
-        dropdownSheetName: "LoaiMon",
-      },
-      {
-        header: "Danh mục",
-        example: categories[0]?.name || "Món chính",
-        required: false,
-        dropdown: categories.map((c) => ({ value: c.id, label: c.name })),
-        dropdownSheetName: "DanhMuc",
-      },
-      { header: "Giá (VNĐ)", example: "50000", required: true },
-      { header: "VAT (%)", example: "10", required: false },
-      { header: "Giá vốn", example: "30000", required: false },
-      { header: "Đơn vị", example: "phần", required: false },
-      { header: "Mô tả", example: "Phở bò tái thơm ngon", required: false },
-      { header: "Thời gian CB (phút)", example: "15", required: false },
-      {
-        header: "Loại bán",
-        example: "Theo phần",
-        required: false,
-        dropdown: [
-          { value: "portion", label: "Theo phần" },
-          { value: "weight", label: "Theo cân" },
-        ],
-        dropdownSheetName: "LoaiBan",
-      },
-      { header: "URL Hình ảnh", example: "https://example.com/image.jpg", required: false },
-    ];
+      // Build columns with dropdown options
+      const columnsWithDropdowns: TemplateColumnWithDropdown[] = [
+        { header: "ID", example: "(để trống nếu tạo mới)", required: false },
+        { header: "Mã món", example: "(tự động tạo nếu mới)", required: false },
+        { header: "Tên món", example: "Phở bò tái", required: true },
+        {
+          header: "Loại",
+          example: "Đồ ăn",
+          required: true,
+          dropdown: [
+            { value: "food", label: "Đồ ăn" },
+            { value: "drink", label: "Đồ uống" },
+            { value: "other", label: "Khác" },
+            { value: "topping", label: "Topping" },
+            { value: "combo", label: "Combo" },
+          ],
+          dropdownSheetName: "LoaiMon",
+        },
+        {
+          header: "Danh mục",
+          example: categories[0]?.name || "Món chính",
+          required: false,
+          dropdown: categories.map((c) => ({ value: c.id, label: c.name })),
+          dropdownSheetName: "DanhMuc",
+        },
+        { header: "Giá (VNĐ)", example: "50000", required: true },
+        { header: "VAT (%)", example: "10", required: false },
+        { header: "Giá vốn", example: "30000", required: false },
+        {
+          header: "Đơn vị",
+          example: unitsData[0]?.name || "phần",
+          required: false,
+          dropdown: unitsData.map((u) => ({ value: u.name, label: u.name })),
+          dropdownSheetName: "DonVi",
+        },
+        { header: "Mô tả", example: "Phở bò tái thơm ngon", required: false },
+        { header: "Thời gian CB (phút)", example: "15", required: false },
+        {
+          header: "Loại bán",
+          example: "Theo phần",
+          required: false,
+          dropdown: [
+            { value: "portion", label: "Theo phần" },
+            { value: "weight", label: "Theo cân" },
+          ],
+          dropdownSheetName: "LoaiBan",
+        },
+        { header: "URL Hình ảnh", example: "https://example.com/image.jpg", required: false },
+      ];
 
-    downloadTemplateWithDropdowns(columnsWithDropdowns, "mau_import_mon_an", 50);
-    toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown chọn sẵn" });
+      await downloadTemplateWithRealDropdowns(columnsWithDropdowns, "mau_import_mon_an", 100);
+      toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown chọn sẵn" });
+    } catch (error) {
+      toast({ title: "Lỗi", description: "Không thể tải file mẫu", variant: "destructive" });
+    }
   };
 
   // Handle file input change

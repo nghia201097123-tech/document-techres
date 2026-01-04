@@ -1,4 +1,6 @@
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 /**
  * Export data to Excel file and trigger download
@@ -205,6 +207,101 @@ export function downloadTemplateWithDropdowns(
 
   // Generate file and trigger download
   XLSX.writeFile(wb, `${filename}_template.xlsx`);
+}
+
+/**
+ * Create a template Excel file with REAL dropdown data validation using ExcelJS
+ */
+export async function downloadTemplateWithRealDropdowns(
+  columns: TemplateColumnWithDropdown[],
+  filename: string,
+  rowCount: number = 100
+) {
+  const workbook = new ExcelJS.Workbook();
+
+  // Create main data entry sheet
+  const mainSheet = workbook.addWorksheet("NhapDuLieu");
+
+  // Add headers
+  const headerRow = mainSheet.getRow(1);
+  columns.forEach((col, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = col.required ? `${col.header} *` : col.header;
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE0E0E0" },
+    };
+  });
+
+  // Add example row
+  const exampleRow = mainSheet.getRow(2);
+  columns.forEach((col, index) => {
+    exampleRow.getCell(index + 1).value = col.example || "";
+  });
+
+  // Set column widths
+  columns.forEach((col, index) => {
+    mainSheet.getColumn(index + 1).width = col.dropdown ? 25 : 20;
+  });
+
+  // Create reference sheet for dropdown values
+  const dropdownColumns = columns.filter((col) => col.dropdown && col.dropdown.length > 0);
+
+  if (dropdownColumns.length > 0) {
+    const refSheet = workbook.addWorksheet("DanhSachChon");
+
+    // Add dropdown values to reference sheet
+    dropdownColumns.forEach((col, colIndex) => {
+      // Header
+      const headerCell = refSheet.getCell(1, colIndex + 1);
+      headerCell.value = col.header;
+      headerCell.font = { bold: true };
+
+      // Values - use label for display
+      col.dropdown!.forEach((option, rowIndex) => {
+        refSheet.getCell(rowIndex + 2, colIndex + 1).value = option.label;
+      });
+
+      refSheet.getColumn(colIndex + 1).width = 25;
+    });
+
+    // Apply data validation to main sheet columns
+    columns.forEach((col, colIndex) => {
+      if (col.dropdown && col.dropdown.length > 0) {
+        // Find the index in dropdownColumns
+        const dropdownColIndex = dropdownColumns.findIndex((dc) => dc.header === col.header);
+        if (dropdownColIndex !== -1) {
+          const colLetter = getColumnLetter(dropdownColIndex);
+          const valueCount = col.dropdown.length;
+
+          // Apply data validation to each row in the column
+          for (let row = 2; row <= rowCount + 1; row++) {
+            const cell = mainSheet.getCell(row, colIndex + 1);
+            cell.dataValidation = {
+              type: "list",
+              allowBlank: !col.required,
+              formulae: [`DanhSachChon!$${colLetter}$2:$${colLetter}$${valueCount + 1}`],
+              showErrorMessage: true,
+              errorTitle: "Giá trị không hợp lệ",
+              error: `Vui lòng chọn một giá trị từ danh sách cho cột "${col.header}"`,
+              showInputMessage: true,
+              promptTitle: col.header,
+              prompt: "Chọn một giá trị từ danh sách",
+            };
+          }
+        }
+      }
+    });
+  }
+
+  // Generate and download file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  saveAs(blob, `${filename}_template.xlsx`);
 }
 
 /**
