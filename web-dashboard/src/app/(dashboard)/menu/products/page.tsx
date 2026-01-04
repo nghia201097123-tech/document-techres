@@ -1092,7 +1092,7 @@ export default function ProductsPage() {
                         </Badge>
                       </TableCell>
                     )}
-                    {isColumnVisible("categoryName") && <TableCell>{getCategoryName(product.categoryId)}</TableCell>}
+                    {isColumnVisible("categoryName") && <TableCell>{product.categoryName || getCategoryName(product.categoryId)}</TableCell>}
                     {isColumnVisible("price") && <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>}
                     {isColumnVisible("vatRate") && <TableCell className="text-right">{product.vatRate || 10}%</TableCell>}
                     {isColumnVisible("costPrice") && <TableCell className="text-right">{formatCurrency(product.costPrice || 0)}</TableCell>}
