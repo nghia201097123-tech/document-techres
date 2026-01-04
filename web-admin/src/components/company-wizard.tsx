@@ -183,28 +183,51 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
     handleChange("branch", "wardCode", "");
   };
 
-  const validateStep = (step: number): boolean => {
+  const validateStep = (step: number): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
     switch (step) {
       case 1:
-        return !!(wizardData.company.name && wizardData.company.alias && wizardData.company.email);
+        if (!wizardData.company.name?.trim()) {
+          errors.push("Tên công ty là bắt buộc");
+        }
+        if (!wizardData.company.alias?.trim()) {
+          errors.push("Tiên định danh là bắt buộc");
+        }
+        if (!wizardData.company.email?.trim()) {
+          errors.push("Email công ty là bắt buộc");
+        }
+        break;
       case 2:
-        return !!(wizardData.brand.name);
+        if (!wizardData.brand.name?.trim()) {
+          errors.push("Tên thương hiệu là bắt buộc");
+        }
+        break;
       case 3:
-        return !!(wizardData.branch.name);
+        if (!wizardData.branch.name?.trim()) {
+          errors.push("Tên chi nhánh là bắt buộc");
+        }
+        break;
       case 4:
-        // Bắt buộc tên và mã đăng nhập phải đủ 2 ký tự
-        return !!(wizardData.staff.name && wizardData.staff.usernamePrefix?.length === 2);
-      default:
-        return false;
+        if (!wizardData.staff.name?.trim()) {
+          errors.push("Tên chủ nhà hàng là bắt buộc");
+        }
+        if (!wizardData.staff.usernamePrefix || wizardData.staff.usernamePrefix.length !== 2) {
+          errors.push("Mã đăng nhập phải đủ 2 ký tự");
+        }
+        break;
     }
+
+    return { valid: errors.length === 0, errors };
   };
 
   const handleNext = () => {
-    if (!validateStep(currentStep)) {
+    const validation = validateStep(currentStep);
+    if (!validation.valid) {
       toast({
         variant: "destructive",
-        title: "Lỗi",
-        description: "Vui lòng điền đầy đủ thông tin bắt buộc",
+        title: "Vui lòng điền đầy đủ thông tin",
+        description: validation.errors.join(", "),
       });
       return;
     }
@@ -220,11 +243,12 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(4)) {
+    const validation = validateStep(4);
+    if (!validation.valid) {
       toast({
         variant: "destructive",
-        title: "Lỗi",
-        description: "Vui lòng điền đầy đủ thông tin bắt buộc",
+        title: "Vui lòng điền đầy đủ thông tin",
+        description: validation.errors.join(", "),
       });
       return;
     }
