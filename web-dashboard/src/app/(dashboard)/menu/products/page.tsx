@@ -72,6 +72,7 @@ const defaultProductColumns: ColumnConfig[] = [
   { key: "categoryName", label: "Danh mục", visible: true },
   { key: "price", label: "Giá (đã VAT)", visible: true },
   { key: "priceBeforeVat", label: "Giá trước VAT", visible: true },
+  { key: "vatAmount", label: "Tiền thuế VAT", visible: true },
   { key: "vatRate", label: "VAT (%)", visible: false },
   { key: "costPrice", label: "Giá vốn", visible: false },
   { key: "description", label: "Mô tả", visible: false },
@@ -1082,6 +1083,7 @@ export default function ProductsPage() {
                   {isColumnVisible("categoryName") && <TableHead>Danh mục</TableHead>}
                   {isColumnVisible("price") && <TableHead className="text-right">Giá (đã VAT)</TableHead>}
                   {isColumnVisible("priceBeforeVat") && <TableHead className="text-right">Giá trước VAT</TableHead>}
+                  {isColumnVisible("vatAmount") && <TableHead className="text-right">Tiền thuế VAT</TableHead>}
                   {isColumnVisible("vatRate") && <TableHead className="text-right">VAT (%)</TableHead>}
                   {isColumnVisible("costPrice") && <TableHead className="text-right">Giá vốn</TableHead>}
                   {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
@@ -1110,6 +1112,7 @@ export default function ProductsPage() {
                     {isColumnVisible("categoryName") && <TableCell>{product.categoryName || getCategoryName(product.categoryId)}</TableCell>}
                     {isColumnVisible("price") && <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>}
                     {isColumnVisible("priceBeforeVat") && <TableCell className="text-right">{formatCurrency(Math.round(product.price / (1 + (product.vatRate || 10) / 100)))}</TableCell>}
+                    {isColumnVisible("vatAmount") && <TableCell className="text-right">{formatCurrency(Math.round(product.price - product.price / (1 + (product.vatRate || 10) / 100)))}</TableCell>}
                     {isColumnVisible("vatRate") && <TableCell className="text-right">{product.vatRate || 10}%</TableCell>}
                     {isColumnVisible("costPrice") && <TableCell className="text-right">{formatCurrency(product.costPrice || 0)}</TableCell>}
                     {isColumnVisible("description") && <TableCell className="max-w-[200px] truncate">{product.description || "-"}</TableCell>}
