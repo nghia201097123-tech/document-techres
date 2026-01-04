@@ -4,12 +4,14 @@ import { Repository, In, Not } from 'typeorm';
 import {
   Product,
   ProductType,
+  SellingType,
   ToppingGroup,
   ToppingGroupItem,
   ProductToppingGroup,
   ProductNote,
   ProductNoteAssignment,
   ComboItem,
+  Category,
 } from '../../database/entities';
 import {
   CreateProductDto,
@@ -24,6 +26,8 @@ import {
   AssignNoteToProductsDto,
   AssignToppingGroupsDto,
   AssignComboItemsDto,
+  BulkImportProductDto,
+  BulkProductItemDto,
 } from './dto';
 
 @Injectable()
@@ -43,6 +47,8 @@ export class ProductsService {
     private readonly productNoteAssignmentRepository: Repository<ProductNoteAssignment>,
     @InjectRepository(ComboItem)
     private readonly comboItemRepository: Repository<ComboItem>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
   ) {}
 
   async findAll(tenantId: string, brandId?: string, type?: ProductType) {
@@ -840,5 +846,116 @@ export class ProductsService {
     }
 
     return this.getComboItems(tenantId, comboId);
+  }
+
+  // === Bulk Import ===
+
+  async bulkImport(tenantId: string, dto: BulkImportProductDto) {
+    const { items, brandId } = dto;
+    const result = {
+      created: 0,
+      updated: 0,
+      errors: [] as { row: number; message: string }[],
+      products: [] as Product[],
+    };
+
+    // Load all categories for this brand to lookup by name
+    const categories = await this.categoryRepository.find({
+      where: { tenantId, brandId },
+    });
+    const categoryByName = new Map<string, Category>();
+    categories.forEach((cat) => {
+      categoryByName.set(cat.name.toLowerCase().trim(), cat);
+    });
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const rowNumber = i + 2; // Excel row (1-indexed + header)
+
+      try {
+        // Resolve categoryId from categoryName if needed
+        let categoryId = item.categoryId;
+        if (!categoryId && item.categoryName) {
+          const category = categoryByName.get(item.categoryName.toLowerCase().trim());
+          if (category) {
+            categoryId = category.id;
+          }
+        }
+
+        // Check if updating existing product
+        let existingProduct: Product | null = null;
+
+        if (item.id) {
+          existingProduct = await this.productRepository.findOne({
+            where: { tenantId, id: item.id },
+          });
+        } else if (item.code) {
+          existingProduct = await this.productRepository.findOne({
+            where: { tenantId, code: item.code },
+          });
+        }
+
+        if (existingProduct) {
+          // Update existing product
+          const updateData: Partial<Product> = {
+            name: item.name,
+            type: item.type,
+            price: item.price,
+          };
+
+          if (categoryId !== undefined) updateData.categoryId = categoryId;
+          if (item.vatRate !== undefined) updateData.vatRate = item.vatRate;
+          if (item.unit !== undefined) updateData.unit = item.unit;
+          if (item.description !== undefined) updateData.description = item.description;
+          if (item.imageUrl !== undefined) updateData.imageUrl = item.imageUrl;
+          if (item.preparationTime !== undefined) updateData.preparationTime = item.preparationTime;
+          if (item.costPrice !== undefined) updateData.costPrice = item.costPrice;
+          if (item.sellingType !== undefined) updateData.sellingType = item.sellingType as SellingType;
+          if (item.printDish !== undefined) updateData.printDish = item.printDish;
+          if (item.printLabel !== undefined) updateData.printLabel = item.printLabel;
+          if (item.printSeafood !== undefined) updateData.printSeafood = item.printSeafood;
+
+          Object.assign(existingProduct, updateData);
+          const saved = await this.productRepository.save(existingProduct);
+          result.updated++;
+          result.products.push(saved as Product);
+        } else {
+          // Create new product
+          const code = await this.generateCode(item.type);
+          const newProduct = this.productRepository.create({
+            tenantId,
+            brandId,
+            code,
+            name: item.name,
+            type: item.type,
+            categoryId,
+            price: item.price,
+            vatRate: item.vatRate ?? 10,
+            unit: item.unit,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            preparationTime: item.preparationTime ?? 0,
+            costPrice: item.costPrice ?? 0,
+            sellingType: item.sellingType ?? SellingType.PORTION,
+            printDish: item.printDish ?? true,
+            printLabel: item.printLabel ?? false,
+            printSeafood: item.printSeafood ?? false,
+            isActive: true,
+            sortOrder: 0,
+          });
+
+          const saved = await this.productRepository.save(newProduct);
+          result.created++;
+          result.products.push(saved as Product);
+        }
+      } catch (error) {
+        result.errors.push({
+          row: rowNumber,
+          message: error instanceof Error ? error.message : 'Lỗi không xác định',
+        });
+      }
+    }
+
+    return result;
   }
 }

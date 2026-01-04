@@ -179,7 +179,6 @@ export interface BulkProductItem {
   categoryId?: string;
   categoryName?: string; // For lookup
   price: number;
-  discountPrice?: number;
   vatRate?: number;
   unit?: string;
   description?: string;

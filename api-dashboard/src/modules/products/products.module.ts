@@ -8,6 +8,7 @@ import {
   ProductNote,
   ProductNoteAssignment,
   ComboItem,
+  Category,
 } from '../../database/entities';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
@@ -22,6 +23,7 @@ import { ProductsController } from './products.controller';
       ProductNote,
       ProductNoteAssignment,
       ComboItem,
+      Category,
     ]),
   ],
   controllers: [ProductsController],

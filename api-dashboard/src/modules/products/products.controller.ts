@@ -15,6 +15,7 @@ import {
   AssignNoteToProductsDto,
   AssignToppingGroupsDto,
   AssignComboItemsDto,
+  BulkImportProductDto,
 } from './dto';
 import { ProductType } from '../../database/entities';
 
@@ -155,6 +156,14 @@ export class ProductsController {
     @Param('groupId') groupId: string,
   ) {
     return this.productsService.removeToppingGroupFromProduct(req.user.tenantId, id, groupId);
+  }
+
+  // === Bulk Import ===
+
+  @Post('bulk-import')
+  @ApiOperation({ summary: 'Import nhiều món từ Excel' })
+  bulkImport(@Request() req, @Body() dto: BulkImportProductDto) {
+    return this.productsService.bulkImport(req.user.tenantId, dto);
   }
 
   // === Product CRUD ===
