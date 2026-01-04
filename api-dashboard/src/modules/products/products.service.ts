@@ -939,6 +939,15 @@ export class ProductsService {
           });
         }
 
+        // Validate categoryId for new products
+        if (!existingProduct && !categoryId) {
+          result.errors.push({
+            row: rowNumber,
+            message: 'Danh mục là bắt buộc khi tạo món mới',
+          });
+          continue;
+        }
+
         if (existingProduct) {
           // Update existing product
           const updateData: Partial<Product> = {

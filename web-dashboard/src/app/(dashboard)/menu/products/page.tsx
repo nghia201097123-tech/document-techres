@@ -636,6 +636,12 @@ export default function ProductsPage() {
       return;
     }
 
+    // Check if category is provided (either selected or will be created)
+    if (!formData.categoryId && !categorySearchValue.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập danh mục cho món", variant: "destructive" });
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -657,7 +663,7 @@ export default function ProductsPage() {
         type: formData.type,
         price: Number(formData.price) || 0,
         vatRate: parseFloat(String(formData.vatRate)) || 0,
-        categoryId: categoryId || undefined,
+        categoryId: categoryId,
         description: formData.description || undefined,
         imageUrl: formData.imageUrl || undefined,
         preparationTime: Number(formData.preparationTime) || 0,

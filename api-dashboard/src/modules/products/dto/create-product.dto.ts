@@ -46,10 +46,10 @@ export class CreateProductDto {
   @IsEnum(ProductType, { message: 'Loại sản phẩm không hợp lệ' })
   type: ProductType;
 
-  @ApiPropertyOptional({ description: 'ID danh mục' })
-  @IsOptional()
+  @ApiProperty({ description: 'ID danh mục' })
+  @IsNotEmpty({ message: 'Danh mục không được để trống' })
   @IsString()
-  categoryId?: string;
+  categoryId: string;
 
   @ApiPropertyOptional({ example: 'https://example.com/image.jpg' })
   @IsOptional()
