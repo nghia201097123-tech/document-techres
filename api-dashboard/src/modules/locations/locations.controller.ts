@@ -21,4 +21,10 @@ export class LocationsController {
   findWardsByProvince(@Param('provinceCode') provinceCode: string) {
     return this.locationsService.findWardsByProvince(provinceCode);
   }
+
+  @Get('wards')
+  @ApiOperation({ summary: 'Lấy tất cả phường/xã' })
+  findAllWards() {
+    return this.locationsService.findAllWards();
+  }
 }

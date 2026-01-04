@@ -24,4 +24,10 @@ export class LocationsService {
       order: { name: 'ASC' },
     });
   }
+
+  async findAllWards() {
+    return this.wardRepository.find({
+      order: { provinceCode: 'ASC', name: 'ASC' },
+    });
+  }
 }

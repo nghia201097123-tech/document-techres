@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
+import { locationService } from "@/services/location-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
@@ -322,8 +323,7 @@ export default function StaffPage() {
     if (dialogMode === "create") {
       // Validate required fields for create
       if (!formData.name.trim() || !formData.birthDate || !formData.gender ||
-          !formData.address.trim() || !formData.departmentId ||
-          !formData.brandId || !formData.branchId) {
+          !formData.departmentId || !formData.brandId || !formData.branchId) {
         toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ các trường bắt buộc", variant: "destructive" });
         return;
       }
@@ -546,10 +546,11 @@ export default function StaffPage() {
   // Download template with dropdowns
   const handleDownloadTemplate = async () => {
     // Load data for dropdowns if not loaded
-    await Promise.all([
+    const [, , , allWards] = await Promise.all([
       dispatch(fetchDepartments()),
       dispatch(fetchBrands()),
       dispatch(fetchProvinces()),
+      locationService.getAllWards(),
     ]);
 
     // Wait for Redux state to update
@@ -580,8 +581,14 @@ export default function StaffPage() {
         dropdown: provinces.map((p) => ({ value: p.code, label: p.fullName || p.name })),
         dropdownSheetName: "TinhTP",
       },
-      { header: "Phường/Xã", example: "Phường Bến Nghé", required: false },
-      { header: "Địa chỉ", example: "123 Nguyễn Văn Linh", required: true },
+      {
+        header: "Phường/Xã",
+        example: allWards[0]?.fullName || "Phường Bến Nghé",
+        required: false,
+        dropdown: allWards.map((w) => ({ value: w.code, label: w.fullName || w.name })),
+        dropdownSheetName: "PhuongXa",
+      },
+      { header: "Địa chỉ", example: "123 Nguyễn Văn Linh", required: false },
       {
         header: "Thương hiệu",
         example: brands[0]?.name || "The Coffee House",
@@ -1527,13 +1534,12 @@ export default function StaffPage() {
 
                 {/* Row 4: Address */}
                 <div className="grid gap-2">
-                  <Label htmlFor="address">Địa chỉ chi tiết *</Label>
+                  <Label htmlFor="address">Địa chỉ chi tiết</Label>
                   <Input
                     id="address"
                     placeholder="123 Nguyễn Văn Linh"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    required={dialogMode === "create"}
                   />
                 </div>
 
@@ -1655,7 +1661,7 @@ export default function StaffPage() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={saving || (dialogMode === "create" && (!formData.name.trim() || !formData.birthDate || !formData.address.trim() || !formData.departmentId || !formData.brandId || !formData.branchId))}
+                    disabled={saving || (dialogMode === "create" && (!formData.name.trim() || !formData.birthDate || !formData.departmentId || !formData.brandId || !formData.branchId))}
                   >
                     {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {dialogMode === "create" ? "Tạo nhân viên" : "Cập nhật"}

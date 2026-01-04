@@ -25,4 +25,9 @@ export const locationService = {
     );
     return response.data;
   },
+
+  async getAllWards(): Promise<Ward[]> {
+    const response = await api.get<Ward[]>("/locations/wards");
+    return response.data;
+  },
 };
