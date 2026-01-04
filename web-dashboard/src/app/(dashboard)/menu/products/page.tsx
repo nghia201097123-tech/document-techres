@@ -1406,10 +1406,10 @@ export default function ProductsPage() {
                     id="price"
                     type="number"
                     min="0"
-                    step="1000"
+                    step="1"
                     placeholder="0"
-                    value={formData.price ?? ""}
-                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) || 0 })}
+                    value={formData.price ? Math.floor(formData.price) : ""}
+                    onChange={(e) => setFormData({ ...formData, price: Math.floor(Number(e.target.value)) || 0 })}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1419,10 +1419,10 @@ export default function ProductsPage() {
                     type="number"
                     min="0"
                     max="100"
-                    step="0.01"
+                    step="1"
                     placeholder="10"
-                    value={formData.vatRate ?? ""}
-                    onChange={(e) => setFormData({ ...formData, vatRate: parseFloat(e.target.value) || 0 })}
+                    value={formData.vatRate ? Math.floor(formData.vatRate) : ""}
+                    onChange={(e) => setFormData({ ...formData, vatRate: Math.floor(Number(e.target.value)) || 0 })}
                   />
                 </div>
               </div>
@@ -1480,10 +1480,10 @@ export default function ProductsPage() {
                     id="costPrice"
                     type="number"
                     min="0"
-                    step="1000"
+                    step="1"
                     placeholder="30000"
-                    value={formData.costPrice || ""}
-                    onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
+                    value={formData.costPrice ? Math.floor(formData.costPrice) : ""}
+                    onChange={(e) => setFormData({ ...formData, costPrice: Math.floor(Number(e.target.value)) || 0 })}
                   />
                 </div>
               </div>
