@@ -12,7 +12,34 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchBrands } from "@/store/slices/brandsSlice";
 import { fetchBranchesByBrand } from "@/store/slices/branchesSlice";
+import { setBrandId, setBranchId, loadFiltersFromStorage } from "@/store/slices/filtersSlice";
 import { Card, CardContent } from "@/components/ui/card";
+
+// Hook to use global filters - returns filter values and setters from Redux store
+export function useGlobalFilters() {
+  const dispatch = useAppDispatch();
+  const { brandId, branchId } = useAppSelector((state) => state.filters);
+
+  // Load filters from localStorage on mount
+  React.useEffect(() => {
+    dispatch(loadFiltersFromStorage());
+  }, [dispatch]);
+
+  const setGlobalBrandId = React.useCallback((id: string) => {
+    dispatch(setBrandId(id));
+  }, [dispatch]);
+
+  const setGlobalBranchId = React.useCallback((id: string) => {
+    dispatch(setBranchId(id));
+  }, [dispatch]);
+
+  return {
+    brandId,
+    branchId,
+    setBrandId: setGlobalBrandId,
+    setBranchId: setGlobalBranchId,
+  };
+}
 
 // Placeholder component when filter is required but not selected
 interface FilterRequiredPlaceholderProps {

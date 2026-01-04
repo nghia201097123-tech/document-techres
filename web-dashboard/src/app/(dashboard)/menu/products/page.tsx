@@ -61,7 +61,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
-import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 // Default column configuration for products table
 const defaultProductColumns: ColumnConfig[] = [
@@ -132,10 +132,12 @@ export default function ProductsPage() {
   // Redux selectors
   const { items: categories, byProductType: categoriesByType, loading: loadingCategories } = useAppSelector((state) => state.categories);
 
+  // Global filter state from Redux
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+
   // Local state
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("all");
-  const [filterBrandId, setFilterBrandId] = React.useState("");
   const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);

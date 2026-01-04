@@ -44,7 +44,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { categoryService, type Category, type CreateCategoryDto, type UpdateCategoryDto } from "@/services/category-service";
 import { ProductType } from "@/services/product-service";
-import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -58,9 +58,12 @@ type DialogMode = "create" | "edit" | null;
 
 export default function CategoriesPage() {
   const { toast } = useToast();
+
+  // Global filter state from Redux
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [filterBrandId, setFilterBrandId] = React.useState("");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [selectedCategory, setSelectedCategory] = React.useState<Category | null>(null);

@@ -45,7 +45,7 @@ import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type Templ
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
-import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -177,10 +177,11 @@ export default function StaffPage() {
   const { items: departments, loading: loadingDepartments } = useAppSelector((state) => state.departments);
   const { provinces, wardsByProvince, loadingProvinces, loadingWards } = useAppSelector((state) => state.locations);
 
+  // Global filter state from Redux
+  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
+
   // Local state
   const [search, setSearch] = React.useState("");
-  const [filterBrandId, setFilterBrandId] = React.useState("");
-  const [filterBranchId, setFilterBranchId] = React.useState("");
   const [staffList, setStaffList] = React.useState<Staff[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);

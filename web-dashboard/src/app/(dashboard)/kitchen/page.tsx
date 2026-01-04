@@ -38,7 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type PrintMode } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 // Common paper sizes for thermal printers
 const PAPER_SIZE_SUGGESTIONS = ["58mm", "80mm", "76mm", "110mm", "A4"];
@@ -48,9 +48,8 @@ type DialogMode = "create" | "edit" | "products" | null;
 export default function KitchenPage() {
   const { toast } = useToast();
 
-  // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("");
-  const [filterBranchId, setFilterBranchId] = React.useState("");
+  // Global filter state from Redux
+  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
 
   const [kitchens, setKitchens] = React.useState<Kitchen[]>([]);
   const [loading, setLoading] = React.useState(true);

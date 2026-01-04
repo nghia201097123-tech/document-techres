@@ -20,13 +20,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, ProductType, type ToppingGroup } from "@/services/product-service";
-import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 export default function ToppingOptionsPage() {
   const { toast } = useToast();
 
-  // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("");
+  // Global filter state from Redux
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
 
   // State
   const [toppingGroups, setToppingGroups] = React.useState<ToppingGroup[]>([]);

@@ -37,7 +37,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto, type QuickTableDto } from "@/services/area-service";
-import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -50,9 +50,8 @@ interface QuickTable {
 export default function AreasPage() {
   const { toast } = useToast();
 
-  // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("");
-  const [filterBranchId, setFilterBranchId] = React.useState("");
+  // Global filter state from Redux
+  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
 
   const [areas, setAreas] = React.useState<Area[]>([]);
   const [loading, setLoading] = React.useState(true);

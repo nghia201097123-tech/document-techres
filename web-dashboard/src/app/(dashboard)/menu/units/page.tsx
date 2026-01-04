@@ -35,15 +35,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { unitService, type Unit, type CreateUnitDto, type UpdateUnitDto } from "@/services/unit-service";
-import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
 export default function UnitsPage() {
   const { toast } = useToast();
+
+  // Global filter state from Redux
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+
   const [units, setUnits] = React.useState<Unit[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [filterBrandId, setFilterBrandId] = React.useState("");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [selectedUnit, setSelectedUnit] = React.useState<Unit | null>(null);

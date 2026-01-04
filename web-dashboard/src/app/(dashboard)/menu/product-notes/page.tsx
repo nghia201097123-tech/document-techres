@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type ProductNote, type Product, ProductType } from "@/services/product-service";
-import { BrandFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { cn } from "@/lib/utils";
 
 type DialogMode = "create" | "edit" | null;
@@ -36,8 +36,8 @@ const typeLabels: Record<string, { label: string; color: string }> = {
 export default function ProductNotesPage() {
   const { toast } = useToast();
 
-  // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("");
+  // Global filter state from Redux
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
 
   // State
   const [notes, setNotes] = React.useState<ProductNote[]>([]);

@@ -57,16 +57,15 @@ import { useToast } from "@/hooks/use-toast";
 import { tableService, type Table, type CreateTableDto, type UpdateTableDto, TableStatus, tableStatusLabels } from "@/services/table-service";
 import { areaService, type Area } from "@/services/area-service";
 import { cn } from "@/lib/utils";
-import { BrandBranchFilter, FilterRequiredPlaceholder } from "@/components/ui/brand-filter";
+import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
 
 export default function TablesPage() {
   const { toast } = useToast();
 
-  // Filter state
-  const [filterBrandId, setFilterBrandId] = React.useState("");
-  const [filterBranchId, setFilterBranchId] = React.useState("");
+  // Global filter state from Redux
+  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
 
   const [tables, setTables] = React.useState<Table[]>([]);
   const [areas, setAreas] = React.useState<Area[]>([]);
