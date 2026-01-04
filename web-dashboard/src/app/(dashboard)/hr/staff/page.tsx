@@ -191,6 +191,9 @@ export default function StaffPage() {
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [createdStaff, setCreatedStaff] = React.useState<(Staff & { temporaryPassword: string }) | null>(null);
 
+  // Track newly created staff IDs for "New" badge
+  const [newStaffIds, setNewStaffIds] = React.useState<Set<string>>(new Set());
+
   // Import state
   const [importData, setImportData] = React.useState<Partial<BulkStaffItem>[]>([]);
   const [importErrors, setImportErrors] = React.useState<string[]>([]);
@@ -293,6 +296,14 @@ export default function StaffPage() {
   const handleOpenView = (staff: Staff) => {
     setSelectedStaff(staff);
     setDialogMode("view");
+    // Remove "new" badge when viewing
+    if (newStaffIds.has(staff.id)) {
+      setNewStaffIds((prev) => {
+        const next = new Set(prev);
+        next.delete(staff.id);
+        return next;
+      });
+    }
   };
 
   // Open edit dialog
@@ -314,6 +325,14 @@ export default function StaffPage() {
       usernamePrefix: "tr",
     });
     setDialogMode("edit");
+    // Remove "new" badge when editing
+    if (newStaffIds.has(staff.id)) {
+      setNewStaffIds((prev) => {
+        const next = new Set(prev);
+        next.delete(staff.id);
+        return next;
+      });
+    }
   };
 
   // Handle form submit (create or update)
@@ -332,6 +351,8 @@ export default function StaffPage() {
         setSaving(true);
         const result = await staffService.create(formData);
         setStaffList((prev) => [...prev, result]);
+        // Mark as new staff
+        setNewStaffIds((prev) => new Set(prev).add(result.id));
 
         if (continueCreating) {
           // Reset form but keep brand, branch, department for continuous creation
@@ -982,7 +1003,16 @@ export default function StaffPage() {
               <TableBody>
                 {filteredStaff.map((staff) => (
                   <TableRow key={staff.id}>
-                    {isColumnVisible("name") && <TableCell className="font-medium">{staff.name}</TableCell>}
+                    {isColumnVisible("name") && (
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {staff.name}
+                          {newStaffIds.has(staff.id) && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Mới</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
                     {isColumnVisible("username") && <TableCell className="font-mono text-sm">{staff.username}</TableCell>}
                     {isColumnVisible("phone") && <TableCell>{staff.phone || "-"}</TableCell>}
                     {isColumnVisible("email") && <TableCell>{staff.email || "-"}</TableCell>}

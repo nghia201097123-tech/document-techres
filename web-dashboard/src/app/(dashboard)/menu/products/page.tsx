@@ -229,6 +229,9 @@ export default function ProductsPage() {
   const [importErrors, setImportErrors] = React.useState<string[]>([]);
   const [importing, setImporting] = React.useState(false);
 
+  // Track newly created product IDs for "New" badge
+  const [newProductIds, setNewProductIds] = React.useState<Set<string>>(new Set());
+
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
     if (!formData.type) return categories.filter(c => c.isActive);
@@ -299,6 +302,14 @@ export default function ProductsPage() {
   const handleOpenView = (product: Product) => {
     setSelectedProduct(product);
     setDialogMode("view");
+    // Remove "new" badge when viewing
+    if (newProductIds.has(product.id)) {
+      setNewProductIds((prev) => {
+        const next = new Set(prev);
+        next.delete(product.id);
+        return next;
+      });
+    }
   };
 
   // Open edit dialog
@@ -326,6 +337,14 @@ export default function ProductsPage() {
     // Set unit search value
     setUnitSearchValue(product.unit || "");
     setDialogMode("edit");
+    // Remove "new" badge when editing
+    if (newProductIds.has(product.id)) {
+      setNewProductIds((prev) => {
+        const next = new Set(prev);
+        next.delete(product.id);
+        return next;
+      });
+    }
   };
 
   // Open toppings management dialog (show assigned groups)
@@ -649,6 +668,8 @@ export default function ProductsPage() {
       if (dialogMode === "create") {
         const result = await productService.create(preparedData);
         setProducts((prev) => [...prev, result]);
+        // Mark as new product
+        setNewProductIds((prev) => new Set(prev).add(result.id));
         toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });
         if (continueCreating) {
           // Reset form for next creation
@@ -1101,7 +1122,16 @@ export default function ProductsPage() {
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     {isColumnVisible("code") && <TableCell className="font-mono text-sm">{product.code}</TableCell>}
-                    {isColumnVisible("name") && <TableCell className="font-medium">{product.name}</TableCell>}
+                    {isColumnVisible("name") && (
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {product.name}
+                          {newProductIds.has(product.id) && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Mới</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
                     {isColumnVisible("type") && (
                       <TableCell>
                         <Badge className={typeLabels[product.type]?.color || ""}>
