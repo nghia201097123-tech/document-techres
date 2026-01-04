@@ -12,6 +12,7 @@ import {
   ProductNoteAssignment,
   ComboItem,
   Category,
+  Unit,
 } from '../../database/entities';
 import {
   CreateProductDto,
@@ -49,6 +50,8 @@ export class ProductsService {
     private readonly comboItemRepository: Repository<ComboItem>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(Unit)
+    private readonly unitRepository: Repository<Unit>,
   ) {}
 
   async findAll(tenantId: string, brandId?: string, type?: ProductType) {
@@ -868,6 +871,15 @@ export class ProductsService {
       categoryByName.set(cat.name.toLowerCase().trim(), cat);
     });
 
+    // Load all units for this brand to lookup by name
+    const units = await this.unitRepository.find({
+      where: { tenantId, brandId },
+    });
+    const unitByName = new Map<string, Unit>();
+    units.forEach((unit) => {
+      unitByName.set(unit.name.toLowerCase().trim(), unit);
+    });
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const rowNumber = i + 2; // Excel row (1-indexed + header)
@@ -879,6 +891,24 @@ export class ProductsService {
           const category = categoryByName.get(item.categoryName.toLowerCase().trim());
           if (category) {
             categoryId = category.id;
+          }
+        }
+
+        // Auto-create unit if it doesn't exist
+        let unitName = item.unit;
+        if (unitName && unitName.trim()) {
+          const unitKey = unitName.toLowerCase().trim();
+          if (!unitByName.has(unitKey)) {
+            // Create new unit
+            const newUnit = this.unitRepository.create({
+              tenantId,
+              brandId,
+              name: unitName.trim(),
+              isActive: true,
+              sortOrder: 0,
+            });
+            const savedUnit = await this.unitRepository.save(newUnit);
+            unitByName.set(unitKey, savedUnit);
           }
         }
 
