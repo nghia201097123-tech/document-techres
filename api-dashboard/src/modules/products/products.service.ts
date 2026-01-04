@@ -885,13 +885,27 @@ export class ProductsService {
       const rowNumber = i + 2; // Excel row (1-indexed + header)
 
       try {
-        // Resolve categoryId from categoryName if needed
+        // Resolve categoryId from categoryName if needed, auto-create if not exists
         let categoryId = item.categoryId;
         if (!categoryId && item.categoryName) {
-          const category = categoryByName.get(item.categoryName.toLowerCase().trim());
-          if (category) {
-            categoryId = category.id;
+          const categoryKey = item.categoryName.toLowerCase().trim();
+          let category = categoryByName.get(categoryKey);
+
+          if (!category) {
+            // Create new category
+            const newCategory = this.categoryRepository.create({
+              tenantId,
+              brandId,
+              name: item.categoryName.trim(),
+              productType: item.type, // Use the product's type for the category
+              isActive: true,
+              sortOrder: 0,
+            });
+            category = await this.categoryRepository.save(newCategory);
+            categoryByName.set(categoryKey, category);
           }
+
+          categoryId = category.id;
         }
 
         // Auto-create unit if it doesn't exist

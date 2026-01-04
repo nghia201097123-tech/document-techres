@@ -148,6 +148,7 @@ export interface TemplateColumnWithDropdown {
   required?: boolean;
   dropdown?: DropdownOption[];
   dropdownSheetName?: string;
+  allowCustomValue?: boolean; // Allow user to enter custom values not in dropdown
 }
 
 /**
@@ -279,17 +280,32 @@ export async function downloadTemplateWithRealDropdowns(
           // Apply data validation to each row in the column
           for (let row = 2; row <= rowCount + 1; row++) {
             const cell = mainSheet.getCell(row, colIndex + 1);
-            cell.dataValidation = {
-              type: "list",
-              allowBlank: !col.required,
-              formulae: [`DanhSachChon!$${colLetter}$2:$${colLetter}$${valueCount + 1}`],
-              showErrorMessage: true,
-              errorTitle: "Giá trị không hợp lệ",
-              error: `Vui lòng chọn một giá trị từ danh sách cho cột "${col.header}"`,
-              showInputMessage: true,
-              promptTitle: col.header,
-              prompt: "Chọn một giá trị từ danh sách",
-            };
+
+            if (col.allowCustomValue) {
+              // Allow custom values - show dropdown but don't enforce
+              cell.dataValidation = {
+                type: "list",
+                allowBlank: true,
+                formulae: [`DanhSachChon!$${colLetter}$2:$${colLetter}$${valueCount + 1}`],
+                showErrorMessage: false, // Don't show error for custom values
+                showInputMessage: true,
+                promptTitle: col.header,
+                prompt: "Chọn từ danh sách hoặc nhập giá trị mới",
+              };
+            } else {
+              // Strict validation - must select from dropdown
+              cell.dataValidation = {
+                type: "list",
+                allowBlank: !col.required,
+                formulae: [`DanhSachChon!$${colLetter}$2:$${colLetter}$${valueCount + 1}`],
+                showErrorMessage: true,
+                errorTitle: "Giá trị không hợp lệ",
+                error: `Vui lòng chọn một giá trị từ danh sách cho cột "${col.header}"`,
+                showInputMessage: true,
+                promptTitle: col.header,
+                prompt: "Chọn một giá trị từ danh sách",
+              };
+            }
           }
         }
       }

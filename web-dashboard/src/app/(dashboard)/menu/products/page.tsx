@@ -761,6 +761,7 @@ export default function ProductsPage() {
           required: false,
           dropdown: categories.map((c) => ({ value: c.id, label: c.name })),
           dropdownSheetName: "DanhMuc",
+          allowCustomValue: true, // Cho phép nhập danh mục mới
         },
         { header: "Giá (VNĐ)", example: "50000", required: true },
         { header: "VAT (%)", example: "10", required: false },
@@ -771,6 +772,7 @@ export default function ProductsPage() {
           required: false,
           dropdown: unitsData.map((u) => ({ value: u.name, label: u.name })),
           dropdownSheetName: "DonVi",
+          allowCustomValue: true, // Cho phép nhập đơn vị mới
         },
         { header: "Mô tả", example: "Phở bò tái thơm ngon", required: false },
         { header: "Thời gian CB (phút)", example: "15", required: false },
