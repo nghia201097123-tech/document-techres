@@ -11,12 +11,16 @@ import {
   ArrowRight,
   Clock,
   Zap,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { QuickEntryForm } from "@/components/ui/quick-entry-form";
 import { InlineEditableTable, Column } from "@/components/ui/inline-editable-table";
+import { useToast } from "@/hooks/use-toast";
+import { dashboardService, type RecentCompany, type RecentBranch } from "@/services/dashboard-service";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface StatCardProps {
   title: string;
@@ -29,9 +33,10 @@ interface StatCardProps {
     isPositive: boolean;
   };
   color: string;
+  loading?: boolean;
 }
 
-function StatCard({ title, value, description, icon: Icon, href, trend, color }: StatCardProps) {
+function StatCard({ title, value, description, icon: Icon, href, trend, color, loading }: StatCardProps) {
   return (
     <Link href={href}>
       <Card className="transition-all hover:shadow-md hover:border-primary/20 cursor-pointer group">
@@ -44,35 +49,39 @@ function StatCard({ title, value, description, icon: Icon, href, trend, color }:
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="text-2xl font-bold">{value}</div>
-              {description && (
-                <p className="text-xs text-muted-foreground">{description}</p>
-              )}
-              {trend && (
-                <div className="mt-1 flex items-center text-xs">
-                  <TrendingUp
-                    className={`mr-1 h-3 w-3 ${
-                      trend.isPositive ? "text-green-500" : "text-red-500 rotate-180"
-                    }`}
-                  />
-                  <span className={trend.isPositive ? "text-green-500" : "text-red-500"}>
-                    {trend.isPositive ? "+" : "-"}{trend.value}%
-                  </span>
-                  <span className="ml-1 text-muted-foreground">tháng này</span>
-                </div>
-              )}
+          {loading ? (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          ) : (
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-2xl font-bold">{value}</div>
+                {description && (
+                  <p className="text-xs text-muted-foreground">{description}</p>
+                )}
+                {trend && (
+                  <div className="mt-1 flex items-center text-xs">
+                    <TrendingUp
+                      className={`mr-1 h-3 w-3 ${
+                        trend.isPositive ? "text-green-500" : "text-red-500 rotate-180"
+                      }`}
+                    />
+                    <span className={trend.isPositive ? "text-green-500" : "text-red-500"}>
+                      {trend.isPositive ? "+" : "-"}{trend.value}%
+                    </span>
+                    <span className="ml-1 text-muted-foreground">tháng này</span>
+                  </div>
+                )}
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          </div>
+          )}
         </CardContent>
       </Card>
     </Link>
   );
 }
 
-// Mock data for companies
+// Interface for inline editable company data
 interface CompanyData {
   id: string;
   name: string;
@@ -81,17 +90,6 @@ interface CompanyData {
   isActive: boolean;
   createdAt: string;
 }
-
-const mockCompanies: CompanyData[] = [
-  { id: "1", name: "Công ty TNHH ABC", code: "ABC", email: "contact@abc.vn", isActive: true, createdAt: "2 giờ trước" },
-  { id: "2", name: "Công ty Cổ phần XYZ", code: "XYZ", email: "info@xyz.com", isActive: true, createdAt: "5 giờ trước" },
-  { id: "3", name: "Công ty TNHH DEF", code: "DEF", email: "hello@def.vn", isActive: false, createdAt: "1 ngày trước" },
-];
-
-const mockBrands = [
-  { id: "1", name: "Coffee House" },
-  { id: "2", name: "The Pizza Company" },
-];
 
 const companyColumns: Column<CompanyData>[] = [
   { key: "name", title: "Tên công ty", editable: true },
@@ -102,55 +100,148 @@ const companyColumns: Column<CompanyData>[] = [
 ];
 
 export default function DashboardPage() {
-  const [companies, setCompanies] = React.useState(mockCompanies);
+  const { toast } = useToast();
+  const [loading, setLoading] = React.useState(true);
+  const [stats, setStats] = React.useState({
+    companies: 0,
+    brands: 0,
+    branches: 0,
+    packages: 0,
+  });
+  const [recentCompanies, setRecentCompanies] = React.useState<RecentCompany[]>([]);
+  const [recentBranches, setRecentBranches] = React.useState<RecentBranch[]>([]);
 
-  // Stats data
-  const stats = {
-    companies: 25,
-    brands: 48,
-    branches: 156,
-    packages: 4,
-  };
+  // Convert RecentCompany to CompanyData for inline editing
+  const [companies, setCompanies] = React.useState<CompanyData[]>([]);
+
+  // Mock brands for quick entry form
+  const mockBrands = [
+    { id: "1", name: "Coffee House" },
+    { id: "2", name: "The Pizza Company" },
+  ];
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [statsData, companiesData, branches] = await Promise.all([
+          dashboardService.getStats(),
+          dashboardService.getRecentCompanies(5),
+          dashboardService.getRecentBranches(3),
+        ]);
+        setStats(statsData);
+        setRecentCompanies(companiesData);
+        setRecentBranches(branches);
+
+        // Convert to editable format
+        setCompanies(companiesData.map((c, index) => ({
+          id: c.id,
+          name: c.name,
+          code: `C${String(index + 1).padStart(3, '0')}`,
+          email: '',
+          isActive: true,
+          createdAt: formatRelativeTime(c.createdAt),
+        })));
+      } catch (error) {
+        toast({
+          title: "Lỗi",
+          description: "Không thể tải dữ liệu dashboard",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
 
   // Handle quick entry submission
   const handleQuickEntry = async (type: string, data: Record<string, string>) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    console.log("Quick entry:", type, data);
+    try {
+      // TODO: Call actual API
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log("Quick entry:", type, data);
 
-    if (type === "company") {
-      const newCompany: CompanyData = {
-        id: String(Date.now()),
-        name: data.name,
-        code: data.code,
-        email: data.email || "",
-        isActive: true,
-        createdAt: "Vừa xong",
-      };
-      setCompanies((prev) => [newCompany, ...prev]);
+      if (type === "company") {
+        const newCompany: CompanyData = {
+          id: String(Date.now()),
+          name: data.name,
+          code: data.code,
+          email: data.email || "",
+          isActive: true,
+          createdAt: "Vừa xong",
+        };
+        setCompanies((prev) => [newCompany, ...prev]);
+        toast({
+          title: "Thành công",
+          description: `Đã tạo ${data.name}`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể tạo dữ liệu",
+        variant: "destructive",
+      });
     }
   };
 
   // Handle inline update
   const handleUpdate = async (id: string, field: string, value: unknown) => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    setCompanies((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
-    );
+    try {
+      // TODO: Call actual API
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      setCompanies((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
+      );
+      toast({
+        title: "Đã cập nhật",
+        description: "Thay đổi đã được lưu",
+      });
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle delete
   const handleDelete = async (id: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    setCompanies((prev) => prev.filter((c) => c.id !== id));
+    try {
+      // TODO: Call actual API
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      setCompanies((prev) => prev.filter((c) => c.id !== id));
+      toast({
+        title: "Đã xóa",
+        description: "Dữ liệu đã được xóa",
+      });
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể xóa",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle toggle status
   const handleToggleStatus = async (id: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    setCompanies((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, isActive: !c.isActive } : c))
-    );
+    try {
+      // TODO: Call actual API
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      setCompanies((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, isActive: !c.isActive } : c))
+      );
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể thay đổi trạng thái",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -183,6 +274,7 @@ export default function DashboardPage() {
           href="/companies"
           trend={{ value: 12, isPositive: true }}
           color="bg-blue-500/10 text-blue-500"
+          loading={loading}
         />
         <StatCard
           title="Thương hiệu"
@@ -192,6 +284,7 @@ export default function DashboardPage() {
           href="/brands"
           trend={{ value: 8, isPositive: true }}
           color="bg-purple-500/10 text-purple-500"
+          loading={loading}
         />
         <StatCard
           title="Chi nhánh"
@@ -201,6 +294,7 @@ export default function DashboardPage() {
           href="/branches"
           trend={{ value: 15, isPositive: true }}
           color="bg-green-500/10 text-green-500"
+          loading={loading}
         />
         <StatCard
           title="Gói App Food"
@@ -209,13 +303,14 @@ export default function DashboardPage() {
           icon={Package}
           href="/packages"
           color="bg-orange-500/10 text-orange-500"
+          loading={loading}
         />
       </div>
 
       {/* Quick Entry Form */}
       <QuickEntryForm
         onSubmit={handleQuickEntry}
-        companies={mockCompanies.map((c) => ({ id: c.id, name: c.name }))}
+        companies={companies.map((c) => ({ id: c.id, name: c.name }))}
         brands={mockBrands}
       />
 
@@ -243,18 +338,24 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            <InlineEditableTable
-              data={companies}
-              columns={companyColumns}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
-              onToggleStatus={handleToggleStatus}
-              emptyMessage="Chưa có công ty nào"
-            />
+            {loading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <InlineEditableTable
+                data={companies}
+                columns={companyColumns}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                onToggleStatus={handleToggleStatus}
+                emptyMessage="Chưa có công ty nào"
+              />
+            )}
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
+        {/* Recent Branches */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -262,77 +363,53 @@ export default function DashboardPage() {
                 <Clock className="h-4 w-4 text-green-500" />
               </div>
               <div>
-                <CardTitle className="text-base">Hoạt động gần đây</CardTitle>
+                <CardTitle className="text-base">Chi nhánh mới</CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Cập nhật từ hệ thống
                 </p>
               </div>
             </div>
+            <Link href="/branches">
+              <Button variant="ghost" size="sm">
+                Xem tất cả
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  icon: Building2,
-                  iconBg: "bg-blue-500/10",
-                  iconColor: "text-blue-500",
-                  title: "Thêm công ty mới",
-                  description: "Công ty TNHH ABC đã được tạo",
-                  time: "2 giờ trước",
-                  badge: { text: "Mới", variant: "success" as const },
-                },
-                {
-                  icon: Store,
-                  iconBg: "bg-purple-500/10",
-                  iconColor: "text-purple-500",
-                  title: "Cập nhật thương hiệu",
-                  description: "Coffee House đã cập nhật thông tin",
-                  time: "4 giờ trước",
-                  badge: { text: "Cập nhật", variant: "secondary" as const },
-                },
-                {
-                  icon: MapPin,
-                  iconBg: "bg-green-500/10",
-                  iconColor: "text-green-500",
-                  title: "Chi nhánh mới",
-                  description: "Chi nhánh Quận 1 đã được thêm",
-                  time: "6 giờ trước",
-                  badge: { text: "Mới", variant: "success" as const },
-                },
-                {
-                  icon: Package,
-                  iconBg: "bg-orange-500/10",
-                  iconColor: "text-orange-500",
-                  title: "Nâng cấp gói",
-                  description: "XYZ Corp nâng cấp lên Premium",
-                  time: "1 ngày trước",
-                  badge: { text: "Nâng cấp", variant: "warning" as const },
-                },
-              ].map((activity, i) => {
-                const Icon = activity.icon;
-                return (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${activity.iconBg}`}>
-                      <Icon className={`h-4 w-4 ${activity.iconColor}`} />
+            {loading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : recentBranches.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Chưa có chi nhánh nào
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {recentBranches.map((branch) => (
+                  <div key={branch.id} className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
+                      <MapPin className="h-4 w-4 text-green-500" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{activity.title}</p>
-                        <Badge variant={activity.badge.variant} className="text-[10px] px-1.5 py-0">
-                          {activity.badge.text}
+                        <p className="text-sm font-medium truncate">{branch.name}</p>
+                        <Badge variant="success" className="text-[10px] px-1.5 py-0">
+                          Mới
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {activity.description}
+                        {branch.brandName}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {activity.time}
+                      {formatRelativeTime(branch.createdAt)}
                     </span>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

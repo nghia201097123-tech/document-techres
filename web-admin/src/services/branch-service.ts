@@ -1,6 +1,8 @@
 import api from "./api";
 import type { Branch } from "@/types";
 
+export type { Branch };
+
 interface BranchListParams {
   page?: number;
   limit?: number;
@@ -37,7 +39,17 @@ interface UpdateBranchData extends Partial<CreateBranchData> {
 
 export const branchService = {
   async getList(params?: BranchListParams): Promise<BranchListResponse> {
-    const response = await api.get<BranchListResponse>("/branches", { params });
+    // Filter out empty/undefined params
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) => value !== undefined && value !== ""
+          )
+        )
+      : undefined;
+    const response = await api.get<BranchListResponse>("/branches", {
+      params: cleanParams,
+    });
     return response.data;
   },
 
@@ -63,5 +75,12 @@ export const branchService = {
   async toggleStatus(id: string): Promise<Branch> {
     const response = await api.patch<Branch>(`/branches/${id}/toggle-status`);
     return response.data;
+  },
+
+  async getByBrand(brandId: string): Promise<Branch[]> {
+    const response = await api.get<BranchListResponse>("/branches", {
+      params: { brandId, limit: 100 },
+    });
+    return response.data.data;
   },
 };

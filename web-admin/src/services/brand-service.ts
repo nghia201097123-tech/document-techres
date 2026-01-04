@@ -1,6 +1,8 @@
 import api from "./api";
 import type { Brand, BusinessModel } from "@/types";
 
+export type { Brand };
+
 interface BrandListParams {
   page?: number;
   limit?: number;
@@ -32,7 +34,17 @@ interface UpdateBrandData extends Partial<CreateBrandData> {
 
 export const brandService = {
   async getList(params?: BrandListParams): Promise<BrandListResponse> {
-    const response = await api.get<BrandListResponse>("/brands", { params });
+    // Filter out empty/undefined params
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) => value !== undefined && value !== ""
+          )
+        )
+      : undefined;
+    const response = await api.get<BrandListResponse>("/brands", {
+      params: cleanParams,
+    });
     return response.data;
   },
 
@@ -58,5 +70,12 @@ export const brandService = {
   async toggleStatus(id: string): Promise<Brand> {
     const response = await api.patch<Brand>(`/brands/${id}/toggle-status`);
     return response.data;
+  },
+
+  async getByCompany(companyId: string): Promise<Brand[]> {
+    const response = await api.get<BrandListResponse>("/brands", {
+      params: { companyId, limit: 100 },
+    });
+    return response.data.data;
   },
 };

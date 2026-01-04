@@ -9,6 +9,9 @@ import {
   Min,
   IsDateString,
   ValidateNested,
+  IsBoolean,
+  Matches,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -16,6 +19,7 @@ import { SubscriptionPlan, BusinessModel } from '../../../database/entities';
 
 /**
  * Bước 1: Thông tin Công ty
+ * Mã công ty (code) sẽ tự động sinh từ alias (tiên định danh)
  */
 export class WizardCompanyDto {
   @ApiProperty({ example: 'Công ty TNHH ABC Food' })
@@ -24,11 +28,16 @@ export class WizardCompanyDto {
   @MaxLength(255)
   name: string;
 
-  @ApiProperty({ example: 'abcfood', description: 'Mã công ty, dùng làm tenant_id để đăng nhập' })
-  @IsNotEmpty({ message: 'Mã công ty không được để trống' })
+  @ApiProperty({ example: 'CTAF', description: 'Tiên định danh - viết tắt tên công ty, dùng làm mã công ty' })
+  @IsNotEmpty({ message: 'Tiên định danh không được để trống' })
   @IsString()
-  @MaxLength(50)
-  code: string;
+  @MaxLength(20)
+  @Matches(/^[A-Z0-9]+$/, { message: 'Tiên định danh chỉ chứa chữ in hoa và số' })
+  alias: string;
+
+  @ApiProperty({ example: false, description: 'true = dùng thử 15 ngày, false = chính thức' })
+  @IsBoolean()
+  isTrial: boolean;
 
   @ApiPropertyOptional({ example: 'https://example.com/logo.png' })
   @IsOptional()
@@ -41,10 +50,22 @@ export class WizardCompanyDto {
   @MaxLength(50)
   taxCode?: string;
 
-  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh, Q7, TP.HCM' })
+  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh' })
   @IsOptional()
   @IsString()
-  address?: string;
+  addressDetail?: string;
+
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố (34 tỉnh sau sáp nhập)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '26734', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  wardCode?: string;
 
   @ApiPropertyOptional({ example: '028 1234 5678' })
   @IsOptional()
@@ -52,11 +73,11 @@ export class WizardCompanyDto {
   @MaxLength(50)
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'contact@abc.vn' })
-  @IsOptional()
+  @ApiProperty({ example: 'contact@abc.vn' })
+  @IsNotEmpty({ message: 'Email công ty không được để trống' })
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @MaxLength(255)
-  email?: string;
+  email: string;
 
   @ApiPropertyOptional({ example: 'Nguyễn Văn A' })
   @IsOptional()
@@ -89,6 +110,7 @@ export class WizardCompanyDto {
 
 /**
  * Bước 2: Thương hiệu đầu tiên (Bắt buộc)
+ * Mã thương hiệu sẽ tự động sinh từ tên
  */
 export class WizardBrandDto {
   @ApiProperty({ example: 'Phở 24' })
@@ -96,12 +118,6 @@ export class WizardBrandDto {
   @IsString()
   @MaxLength(255)
   name: string;
-
-  @ApiProperty({ example: 'PHO24', description: 'Mã thương hiệu' })
-  @IsNotEmpty({ message: 'Mã thương hiệu không được để trống' })
-  @IsString()
-  @MaxLength(50)
-  code: string;
 
   @ApiPropertyOptional({ example: 'https://example.com/brand-logo.png' })
   @IsOptional()
@@ -121,19 +137,14 @@ export class WizardBrandDto {
 
 /**
  * Bước 3: Chi nhánh đầu tiên (Bắt buộc)
+ * Mã chi nhánh sẽ tự động sinh từ tên
  */
 export class WizardBranchDto {
-  @ApiProperty({ example: 'Phở 24 - Quận 1' })
+  @ApiProperty({ example: 'Chi nhánh Quận 1' })
   @IsNotEmpty({ message: 'Tên chi nhánh không được để trống' })
   @IsString()
   @MaxLength(255)
   name: string;
-
-  @ApiProperty({ example: 'PHO24-Q1', description: 'Mã chi nhánh' })
-  @IsNotEmpty({ message: 'Mã chi nhánh không được để trống' })
-  @IsString()
-  @MaxLength(50)
-  code: string;
 
   @ApiPropertyOptional({
     example: 'https://example.com/branch-logo.png',
@@ -143,22 +154,28 @@ export class WizardBranchDto {
   @IsString()
   logoUrl?: string;
 
-  @ApiProperty({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
-  @IsNotEmpty({ message: 'Địa chỉ chi nhánh không được để trống' })
+  @ApiPropertyOptional({ example: '123 Nguyễn Huệ', description: 'Địa chỉ chi tiết (số nhà, đường)' })
+  @IsOptional()
   @IsString()
-  address: string;
+  addressDetail?: string;
+
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '26734', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  wardCode?: string;
 
   @ApiPropertyOptional({ example: '028 1234 5678' })
   @IsOptional()
   @IsString()
   @MaxLength(50)
   phone?: string;
-
-  @ApiPropertyOptional({ example: 'pho24q1@abc.vn' })
-  @IsOptional()
-  @IsEmail({}, { message: 'Email không hợp lệ' })
-  @MaxLength(255)
-  email?: string;
 
   @ApiPropertyOptional({ example: 'Nguyễn Văn B' })
   @IsOptional()
@@ -189,31 +206,49 @@ export class WizardBranchDto {
 }
 
 /**
- * Thông tin Owner (tự động tạo khi hoàn thành wizard)
+ * Bước 4: Nhân viên đầu tiên (Bắt buộc - thường là chủ nhà hàng)
+ * Email không bắt buộc
  */
-export class WizardOwnerDto {
-  @ApiPropertyOptional({ example: 'Nguyễn Văn A' })
-  @IsOptional()
+export class WizardStaffDto {
+  @ApiProperty({ example: 'Nguyễn Văn A' })
+  @IsNotEmpty({ message: 'Tên nhân viên không được để trống' })
   @IsString()
   @MaxLength(255)
-  name?: string;
-
-  @ApiPropertyOptional({ example: 'owner@abc.vn', description: 'Email dùng để gửi thông tin đăng nhập' })
-  @IsOptional()
-  @IsEmail({}, { message: 'Email không hợp lệ' })
-  @MaxLength(255)
-  email?: string;
+  name: string;
 
   @ApiPropertyOptional({ example: '0901234567' })
   @IsOptional()
   @IsString()
   @MaxLength(20)
   phone?: string;
+
+  @ApiPropertyOptional({ example: 'nva@abc.vn', description: 'Email nhân viên (không bắt buộc)' })
+  @IsOptional()
+  @ValidateIf((o) => o.email && o.email.length > 0)
+  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @MaxLength(255)
+  email?: string;
+
+  @ApiPropertyOptional({ example: 'owner', description: 'Vai trò: owner, manager, staff' })
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @ApiPropertyOptional({
+    example: 'tr',
+    description: 'Mã đăng nhập (2 ký tự), mặc định "tr". Username sẽ là: tr000001'
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  usernamePrefix?: string;
 }
 
 /**
- * DTO cho Wizard tạo công ty 3 bước (Company + Brand + Branch)
- * Bắt buộc phải hoàn thành cả 3 bước mới lưu được
+ * DTO cho Wizard tạo công ty 4 bước
+ * (Company + Brand + Branch + Staff)
+ * Bộ phận "Chủ nhà hàng" sẽ được tự động tạo ngầm
+ * Mã (code) sẽ được tự động sinh
  */
 export class CreateCompanyWizardDto {
   @ApiProperty({ description: 'Bước 1: Thông tin công ty' })
@@ -231,11 +266,10 @@ export class CreateCompanyWizardDto {
   @Type(() => WizardBranchDto)
   branch: WizardBranchDto;
 
-  @ApiPropertyOptional({ description: 'Thông tin Owner (tùy chọn, sẽ tự động tạo)' })
-  @IsOptional()
+  @ApiProperty({ description: 'Bước 4: Nhân viên đầu tiên (bắt buộc)' })
   @ValidateNested()
-  @Type(() => WizardOwnerDto)
-  owner?: WizardOwnerDto;
+  @Type(() => WizardStaffDto)
+  staff: WizardStaffDto;
 }
 
 /**
@@ -257,8 +291,14 @@ export class CreateCompanyWizardResponseDto {
     name: string;
     code: string;
   };
-  owner?: {
+  department: {
     id: string;
+    name: string;
+    code: string;
+  };
+  staff: {
+    id: string;
+    name: string;
     username: string;
     temporaryPassword: string;
   };

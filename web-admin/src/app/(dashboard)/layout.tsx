@@ -11,20 +11,16 @@ export default function DashboardRootLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, setLoading } = useAuthStore();
+  const { isAuthenticated, isHydrated } = useAuthStore();
 
   React.useEffect(() => {
-    // Check if running on client
-    setLoading(false);
-  }, [setLoading]);
-
-  React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isHydrated && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isHydrated, router]);
 
-  if (isLoading) {
+  // Wait for hydration before rendering anything
+  if (!isHydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -33,7 +29,11 @@ export default function DashboardRootLayout({
   }
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   return <DashboardLayout>{children}</DashboardLayout>;

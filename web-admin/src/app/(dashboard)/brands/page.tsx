@@ -7,9 +7,10 @@ import {
   Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
   Eye,
   Building2,
+  Loader2,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,8 +46,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Brand, BusinessModel } from "@/types";
+import type { Brand, BusinessModel, Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
+import { brandService } from "@/services/brand-service";
+import { companyService } from "@/services/company-service";
+import { useToast } from "@/hooks/use-toast";
 
 const businessModelLabels: Record<BusinessModel, string> = {
   order_only: "Chỉ Order",
@@ -59,73 +63,6 @@ const businessModelColors: Record<BusinessModel, "default" | "secondary" | "succ
   ccb_only: "default",
   full_system: "success",
 };
-
-// Mock data
-const mockBrands: Brand[] = [
-  {
-    id: "1",
-    companyId: "1",
-    companyName: "Công ty TNHH ABC Food",
-    name: "Coffee House ABC",
-    code: "CHABC",
-    businessModel: "full_system",
-    logo: "",
-    description: "Chuỗi cà phê cao cấp",
-    isActive: true,
-    branchCount: 15,
-    createdAt: "2024-01-20T10:30:00Z",
-    updatedAt: "2024-01-20T10:30:00Z",
-  },
-  {
-    id: "2",
-    companyId: "1",
-    companyName: "Công ty TNHH ABC Food",
-    name: "Trà Sữa ABC",
-    code: "TSABC",
-    businessModel: "order_only",
-    logo: "",
-    description: "Chuỗi trà sữa",
-    isActive: true,
-    branchCount: 8,
-    createdAt: "2024-02-15T14:45:00Z",
-    updatedAt: "2024-02-15T14:45:00Z",
-  },
-  {
-    id: "3",
-    companyId: "2",
-    companyName: "Công ty Cổ phần XYZ Restaurant",
-    name: "Nhà hàng XYZ Premium",
-    code: "XYZPM",
-    businessModel: "full_system",
-    logo: "",
-    description: "Nhà hàng cao cấp",
-    isActive: true,
-    branchCount: 5,
-    createdAt: "2024-03-10T09:15:00Z",
-    updatedAt: "2024-03-10T09:15:00Z",
-  },
-  {
-    id: "4",
-    companyId: "2",
-    companyName: "Công ty Cổ phần XYZ Restaurant",
-    name: "XYZ Express",
-    code: "XYZEX",
-    businessModel: "ccb_only",
-    logo: "",
-    description: "Ẩm thực nhanh",
-    isActive: false,
-    branchCount: 3,
-    createdAt: "2024-03-20T11:00:00Z",
-    updatedAt: "2024-03-20T11:00:00Z",
-  },
-];
-
-// Mock companies for select
-const mockCompanies = [
-  { id: "1", name: "Công ty TNHH ABC Food" },
-  { id: "2", name: "Công ty Cổ phần XYZ Restaurant" },
-  { id: "3", name: "Công ty TNHH DEF Beverages" },
-];
 
 interface BrandFormData {
   companyId: string;
@@ -144,23 +81,58 @@ const initialFormData: BrandFormData = {
 };
 
 export default function BrandsPage() {
-  const [brands, setBrands] = React.useState<Brand[]>(mockBrands);
+  const [brands, setBrands] = React.useState<Brand[]>([]);
+  const [companies, setCompanies] = React.useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterCompany, setFilterCompany] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedBrand, setSelectedBrand] = React.useState<Brand | null>(null);
   const [formData, setFormData] = React.useState<BrandFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { toast } = useToast();
 
-  const filteredBrands = brands.filter((brand) => {
-    const matchesSearch =
-      brand.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      brand.code.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCompany =
-      filterCompany === "all" || brand.companyId === filterCompany;
-    return matchesSearch && matchesCompany;
-  });
+  // Fetch brands from API
+  const fetchBrands = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const params: { search?: string; companyId?: string } = {};
+      if (searchQuery) params.search = searchQuery;
+      if (filterCompany !== "all") params.companyId = filterCompany;
+
+      const response = await brandService.getList(params);
+      setBrands(response.data);
+    } catch (error: any) {
+      console.error("Error fetching brands:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách thương hiệu",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, filterCompany, toast]);
+
+  // Fetch companies for dropdown
+  const fetchCompanies = React.useCallback(async () => {
+    try {
+      const response = await companyService.getList({ limit: 100 });
+      setCompanies(response.data);
+    } catch (error: any) {
+      console.error("Error fetching companies:", error);
+    }
+  }, []);
+
+  // Initial fetch
+  React.useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
+
+  React.useEffect(() => {
+    fetchBrands();
+  }, [fetchBrands]);
 
   const handleOpenCreate = () => {
     setSelectedBrand(null);
@@ -195,54 +167,53 @@ export default function BrandsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleOpenDelete = (brand: Brand) => {
-    setSelectedBrand(brand);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const company = mockCompanies.find((c) => c.id === formData.companyId);
-    if (selectedBrand) {
-      setBrands((prev) =>
-        prev.map((b) =>
-          b.id === selectedBrand.id
-            ? {
-                ...b,
-                ...formData,
-                companyName: company?.name || "",
-                updatedAt: new Date().toISOString(),
-              }
-            : b
-        )
-      );
-    } else {
-      const newBrand: Brand = {
-        id: String(Date.now()),
-        ...formData,
-        companyName: company?.name || "",
-        isActive: true,
-        branchCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setBrands((prev) => [newBrand, ...prev]);
-    }
-    setIsDialogOpen(false);
-  };
-
-  const handleDelete = () => {
-    if (selectedBrand) {
-      setBrands((prev) => prev.filter((b) => b.id !== selectedBrand.id));
-      setIsDeleteDialogOpen(false);
-      setSelectedBrand(null);
+    setIsSubmitting(true);
+    try {
+      if (selectedBrand) {
+        await brandService.update(selectedBrand.id, formData);
+        toast({
+          title: "Thành công",
+          description: "Cập nhật thương hiệu thành công",
+        });
+      } else {
+        await brandService.create(formData);
+        toast({
+          title: "Thành công",
+          description: "Tạo thương hiệu mới thành công",
+        });
+      }
+      setIsDialogOpen(false);
+      fetchBrands();
+    } catch (error: any) {
+      console.error("Error saving brand:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể lưu thương hiệu",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (brand: Brand) => {
-    setBrands((prev) =>
-      prev.map((b) => (b.id === brand.id ? { ...b, isActive: !b.isActive } : b))
-    );
+  const handleToggleStatus = async (brand: Brand) => {
+    try {
+      await brandService.toggleStatus(brand.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${brand.isActive ? "tạm dừng" : "kích hoạt"} thương hiệu`,
+      });
+      fetchBrands();
+    } catch (error: any) {
+      console.error("Error toggling status:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể thay đổi trạng thái",
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,7 +244,7 @@ export default function BrandsPage() {
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-lg">
-              Danh sách thương hiệu ({filteredBrands.length})
+              Danh sách thương hiệu ({brands.length})
             </CardTitle>
             <div className="flex gap-2">
               <Select value={filterCompany} onValueChange={setFilterCompany}>
@@ -282,7 +253,7 @@ export default function BrandsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả công ty</SelectItem>
-                  {mockCompanies.map((company) => (
+                  {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
                     </SelectItem>
@@ -315,7 +286,7 @@ export default function BrandsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBrands.map((brand) => (
+              {!isLoading && brands.map((brand) => (
                 <TableRow key={brand.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -341,7 +312,7 @@ export default function BrandsPage() {
                       {businessModelLabels[brand.businessModel]}
                     </Badge>
                   </TableCell>
-                  <TableCell>{brand.branchCount} chi nhánh</TableCell>
+                  <TableCell>{brand.branchCount || 0} chi nhánh</TableCell>
                   <TableCell>
                     <Badge
                       variant={brand.isActive ? "success" : "secondary"}
@@ -370,19 +341,26 @@ export default function BrandsPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(brand)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
+                        <DropdownMenuItem onClick={() => handleToggleStatus(brand)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {brand.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredBrands.length === 0 && (
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      Đang tải...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && brands.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
                     Không tìm thấy thương hiệu nào
@@ -428,7 +406,7 @@ export default function BrandsPage() {
                     <SelectValue placeholder="Chọn công ty" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockCompanies.map((company) => (
+                    {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
                       </SelectItem>
@@ -504,7 +482,8 @@ export default function BrandsPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedBrand ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
@@ -514,30 +493,6 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn xóa thương hiệu{" "}
-              <span className="font-medium">{selectedBrand?.name}</span>? Hành
-              động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Xóa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

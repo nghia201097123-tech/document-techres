@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Company, Brand, Branch, Staff, StaffRole, BusinessModel } from '../../database/entities';
+import { Company, Brand, Branch, Department, Staff, StaffRole, BusinessModel } from '../../database/entities';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import {
@@ -20,6 +20,8 @@ export class CompaniesService {
     private readonly brandRepository: Repository<Brand>,
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
+    @InjectRepository(Department)
+    private readonly departmentRepository: Repository<Department>,
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
     private readonly dataSource: DataSource,
@@ -39,34 +41,85 @@ export class CompaniesService {
   }
 
   /**
-   * Wizard tạo công ty 3 bước: Company + Brand + Branch
+   * Tạo mã code từ tên (loại bỏ dấu, viết hoa, lấy chữ cái đầu)
+   */
+  private generateCodeFromName(name: string, prefix: string = ''): string {
+    // Loại bỏ dấu tiếng Việt
+    const normalized = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+
+    // Lấy chữ cái đầu của mỗi từ
+    const words = normalized.split(/\s+/).filter(w => w.length > 0);
+    const initials = words.map(w => w[0].toUpperCase()).join('');
+
+    // Thêm số ngẫu nhiên để tránh trùng
+    const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+
+    return `${prefix}${initials}${randomSuffix}`;
+  }
+
+  /**
+   * Wizard tạo công ty 4 bước: Company + Brand + Branch + Staff
+   * Bộ phận "Chủ nhà hàng" sẽ được tự động tạo ngầm
+   * Mã (code) sẽ được tự động sinh từ alias/tên
    * Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
    */
   async createWithWizard(
     wizardDto: CreateCompanyWizardDto,
   ): Promise<CreateCompanyWizardResponseDto> {
-    const { company: companyDto, brand: brandDto, branch: branchDto, owner: ownerDto } = wizardDto;
+    const {
+      company: companyDto,
+      brand: brandDto,
+      branch: branchDto,
+      staff: staffDto,
+    } = wizardDto;
 
-    // Validate unique codes trước khi tạo
+    // Company code = alias (đã validate uppercase từ DTO)
+    const companyCode = companyDto.alias;
+
+    // Validate unique company code (alias)
     const existingCompany = await this.companyRepository.findOne({
-      where: { code: companyDto.code },
+      where: { code: companyCode },
     });
     if (existingCompany) {
-      throw new ConflictException('Mã công ty đã tồn tại');
+      throw new ConflictException('Tiên định danh (mã công ty) đã tồn tại');
     }
 
-    const existingBrand = await this.brandRepository.findOne({
-      where: { code: brandDto.code },
+    // Kiểm tra alias đã tồn tại chưa
+    const existingAlias = await this.companyRepository.findOne({
+      where: { alias: companyDto.alias },
     });
-    if (existingBrand) {
-      throw new ConflictException('Mã thương hiệu đã tồn tại');
+    if (existingAlias) {
+      throw new ConflictException('Tiên định danh đã tồn tại');
     }
 
-    const existingBranch = await this.branchRepository.findOne({
-      where: { code: branchDto.code },
+    // Auto-generate brand code từ tên thương hiệu
+    let brandCode = this.generateCodeFromName(brandDto.name, 'BR');
+    let existingBrand = await this.brandRepository.findOne({
+      where: { code: brandCode },
     });
-    if (existingBranch) {
-      throw new ConflictException('Mã chi nhánh đã tồn tại');
+    // Nếu trùng, thử lại với số khác
+    while (existingBrand) {
+      brandCode = this.generateCodeFromName(brandDto.name, 'BR');
+      existingBrand = await this.brandRepository.findOne({
+        where: { code: brandCode },
+      });
+    }
+
+    // Auto-generate branch code từ tên chi nhánh
+    let branchCode = this.generateCodeFromName(branchDto.name, 'CN');
+    let existingBranch = await this.branchRepository.findOne({
+      where: { code: branchCode },
+    });
+    // Nếu trùng, thử lại với số khác
+    while (existingBranch) {
+      branchCode = this.generateCodeFromName(branchDto.name, 'CN');
+      existingBranch = await this.branchRepository.findOne({
+        where: { code: branchCode },
+      });
     }
 
     // Sử dụng transaction để tạo tất cả
@@ -75,20 +128,30 @@ export class CompaniesService {
     await queryRunner.startTransaction();
 
     try {
-      // Bước 1: Tạo Company
+      // Bước 1: Tạo Company (địa chỉ 2 cấp: Tỉnh → Xã/Phường, không còn Quận/Huyện)
       const companyData: Partial<Company> = {
         name: companyDto.name,
-        code: companyDto.code,
+        code: companyCode, // Auto-generated từ alias
+        alias: companyDto.alias,
         logoUrl: companyDto.logoUrl,
         taxCode: companyDto.taxCode,
-        address: companyDto.address,
+        addressDetail: companyDto.addressDetail,
+        provinceCode: companyDto.provinceCode,
+        wardCode: companyDto.wardCode,
         phone: companyDto.phone,
         email: companyDto.email,
         representative: companyDto.representative,
+        isTrial: companyDto.isTrial,
         subscriptionPlan: companyDto.subscriptionPlan,
         maxBranches: companyDto.maxBranches,
         maxUsers: companyDto.maxUsers,
       };
+      // Nếu dùng thử, set ngày hết hạn 15 ngày
+      if (companyDto.isTrial) {
+        const trialExpires = new Date();
+        trialExpires.setDate(trialExpires.getDate() + 15);
+        companyData.trialExpiresAt = trialExpires;
+      }
       if (companyDto.subscriptionExpiresAt) {
         companyData.subscriptionExpiresAt = new Date(companyDto.subscriptionExpiresAt);
       }
@@ -103,23 +166,24 @@ export class CompaniesService {
         tenantId,
         companyId: savedCompany.id,
         name: brandDto.name,
-        code: brandDto.code,
+        code: brandCode, // Auto-generated từ tên
         logoUrl: brandDto.logoUrl,
         description: brandDto.description,
         businessModel: brandDto.businessModel || BusinessModel.FULL_SYSTEM,
       });
       const savedBrand = await queryRunner.manager.save(brand);
 
-      // Bước 3: Tạo Branch (Chi nhánh đầu tiên)
+      // Bước 3: Tạo Branch (Chi nhánh đầu tiên - địa chỉ 2 cấp)
       const branch = queryRunner.manager.create(Branch, {
         tenantId,
         brandId: savedBrand.id,
         name: branchDto.name,
-        code: branchDto.code,
-        logoUrl: branchDto.logoUrl || brandDto.logoUrl, // Mặc định dùng logo thương hiệu
-        address: branchDto.address,
+        code: branchCode, // Auto-generated từ tên
+        logoUrl: branchDto.logoUrl || brandDto.logoUrl,
+        addressDetail: branchDto.addressDetail,
+        provinceCode: branchDto.provinceCode,
+        wardCode: branchDto.wardCode,
         phone: branchDto.phone,
-        email: branchDto.email,
         manager: branchDto.manager,
         businessModel: branchDto.businessModel || BusinessModel.CCB_ONLY,
         openTime: branchDto.openTime,
@@ -128,30 +192,45 @@ export class CompaniesService {
       });
       const savedBranch = await queryRunner.manager.save(branch);
 
-      // Bước 4: Tạo Owner (tùy chọn)
-      let savedOwner: Staff | null = null;
-      let temporaryPassword: string | null = null;
+      // Bước 4: Tự động tạo Department "Chủ nhà hàng"
+      const department = queryRunner.manager.create(Department, {
+        tenantId,
+        companyId: savedCompany.id,
+        branchId: savedBranch.id,
+        name: 'Chủ nhà hàng',
+        code: 'CHUNHAHANG',
+        description: 'Bộ phận chủ nhà hàng - tự động tạo khi khởi tạo công ty',
+      });
+      const savedDepartment = await queryRunner.manager.save(department);
 
-      if (ownerDto) {
-        // Tạo username mặc định: owner hoặc lấy từ email
-        const username = ownerDto.email?.split('@')[0] || 'owner';
-        temporaryPassword = this.generateTemporaryPassword();
-        const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+      // Bước 5: Tạo Staff (Nhân viên đầu tiên - thuộc bộ phận Chủ nhà hàng)
+      // Username: prefix (2 ký tự, mặc định "tr") + số tự động tăng 6 chữ số
+      // Ví dụ: tr000001, ab000001
+      const prefix = (staffDto.usernamePrefix || 'tr').toLowerCase().substring(0, 2);
+      const username = await this.generateUsername(queryRunner, tenantId, prefix);
+      const temporaryPassword = this.generateTemporaryPassword();
+      const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
-        const owner = queryRunner.manager.create(Staff, {
-          tenantId,
-          companyId: savedCompany.id,
-          brandId: savedBrand.id,
-          branchId: savedBranch.id,
-          name: ownerDto.name || companyDto.representative || 'Owner',
-          email: ownerDto.email || companyDto.email,
-          phone: ownerDto.phone || companyDto.phone,
-          username,
-          passwordHash,
-          role: StaffRole.OWNER,
-        });
-        savedOwner = await queryRunner.manager.save(owner);
-      }
+      const staffRole = staffDto.role === 'owner'
+        ? StaffRole.OWNER
+        : staffDto.role === 'manager'
+        ? StaffRole.MANAGER
+        : StaffRole.STAFF;
+
+      const staff = queryRunner.manager.create(Staff, {
+        tenantId,
+        companyId: savedCompany.id,
+        brandId: savedBrand.id,
+        branchId: savedBranch.id,
+        departmentId: savedDepartment.id,
+        name: staffDto.name,
+        email: staffDto.email,
+        phone: staffDto.phone,
+        username,
+        passwordHash,
+        role: staffRole,
+      });
+      const savedStaff = await queryRunner.manager.save(staff);
 
       await queryRunner.commitTransaction();
 
@@ -171,13 +250,17 @@ export class CompaniesService {
           name: savedBranch.name,
           code: savedBranch.code,
         },
-        owner: savedOwner
-          ? {
-              id: savedOwner.id,
-              username: savedOwner.username,
-              temporaryPassword: temporaryPassword!,
-            }
-          : undefined,
+        department: {
+          id: savedDepartment.id,
+          name: savedDepartment.name,
+          code: savedDepartment.code,
+        },
+        staff: {
+          id: savedStaff.id,
+          name: savedStaff.name,
+          username: savedStaff.username,
+          temporaryPassword,
+        },
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -197,6 +280,24 @@ export class CompaniesService {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return password;
+  }
+
+  /**
+   * Tạo username theo pattern: prefix (2 ký tự) + số tự động tăng 6 chữ số
+   * Ví dụ: tr000001, tr000002, ab000001
+   */
+  private async generateUsername(
+    queryRunner: any,
+    tenantId: string,
+    prefix: string,
+  ): Promise<string> {
+    // Đếm số nhân viên hiện có trong tenant để lấy số tiếp theo
+    const count = await queryRunner.manager.count(Staff, {
+      where: { tenantId },
+    });
+    const nextNumber = count + 1;
+    // Format: prefix (2 chars) + 6-digit padded number
+    return `${prefix}${String(nextNumber).padStart(6, '0')}`;
   }
 
   async findAll(paginationDto: PaginationDto) {

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Branch, Brand } from '../../database/entities';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { BranchListDto } from './dto/branch-list.dto';
 
 @Injectable()
 export class BranchesService {
@@ -38,8 +38,8 @@ export class BranchesService {
     return this.branchRepository.save(branch);
   }
 
-  async findAll(paginationDto: PaginationDto & { brandId?: string }) {
-    const { page = 1, limit = 10, search, brandId } = paginationDto;
+  async findAll(query: BranchListDto) {
+    const { page = 1, limit = 10, search, brandId, companyId } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.branchRepository
@@ -57,6 +57,10 @@ export class BranchesService {
 
     if (brandId) {
       queryBuilder.andWhere('branch.brandId = :brandId', { brandId });
+    }
+
+    if (companyId) {
+      queryBuilder.andWhere('brand.companyId = :companyId', { companyId });
     }
 
     queryBuilder.orderBy('branch.createdAt', 'DESC').skip(skip).take(limit);

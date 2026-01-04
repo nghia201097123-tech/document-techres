@@ -11,6 +11,7 @@ import {
   Eye,
   Shield,
   Mail,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,83 +47,17 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { AdminUser, AdminRole } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import {
+  adminService,
+  type AdminUser,
+  type AdminRole,
+} from "@/services/admin-service";
+import {
+  permissionService,
+  type PermissionGroup,
+} from "@/services/permission-service";
 import { formatDateTime } from "@/lib/utils";
-
-// Mock data
-const mockAdmins: AdminUser[] = [
-  {
-    id: "1",
-    email: "superadmin@techres.vn",
-    name: "Super Admin",
-    phone: "0901234567",
-    role: "super_admin",
-    permissionGroupId: "1",
-    permissionGroupName: "Super Admin",
-    isActive: true,
-    lastLogin: "2024-12-15T10:30:00Z",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "2",
-    email: "admin@techres.vn",
-    name: "Admin User",
-    phone: "0909876543",
-    role: "super_admin",
-    permissionGroupId: "1",
-    permissionGroupName: "Super Admin",
-    isActive: true,
-    lastLogin: "2024-12-14T15:45:00Z",
-    createdAt: "2024-01-15T00:00:00Z",
-    updatedAt: "2024-01-15T00:00:00Z",
-  },
-  {
-    id: "3",
-    email: "support1@techres.vn",
-    name: "Support Staff 1",
-    phone: "0911223344",
-    role: "support",
-    permissionGroupId: "2",
-    permissionGroupName: "Support",
-    isActive: true,
-    lastLogin: "2024-12-13T09:00:00Z",
-    createdAt: "2024-02-01T00:00:00Z",
-    updatedAt: "2024-02-01T00:00:00Z",
-  },
-  {
-    id: "4",
-    email: "support2@techres.vn",
-    name: "Support Staff 2",
-    phone: "0922334455",
-    role: "support",
-    permissionGroupId: "2",
-    permissionGroupName: "Support",
-    isActive: false,
-    createdAt: "2024-02-15T00:00:00Z",
-    updatedAt: "2024-02-15T00:00:00Z",
-  },
-  {
-    id: "5",
-    email: "viewer@techres.vn",
-    name: "Viewer User",
-    phone: "0933445566",
-    role: "support",
-    permissionGroupId: "3",
-    permissionGroupName: "Viewer",
-    isActive: true,
-    lastLogin: "2024-12-10T11:20:00Z",
-    createdAt: "2024-03-01T00:00:00Z",
-    updatedAt: "2024-03-01T00:00:00Z",
-  },
-];
-
-// Mock permission groups for select
-const mockPermissionGroups = [
-  { id: "1", name: "Super Admin" },
-  { id: "2", name: "Support" },
-  { id: "3", name: "Viewer" },
-];
 
 const roleLabels: Record<AdminRole, string> = {
   super_admin: "Super Admin",
@@ -153,7 +88,10 @@ const initialFormData: AdminFormData = {
 };
 
 export default function AdminsPage() {
-  const [admins, setAdmins] = React.useState<AdminUser[]>(mockAdmins);
+  const { toast } = useToast();
+  const [admins, setAdmins] = React.useState<AdminUser[]>([]);
+  const [permissionGroups, setPermissionGroups] = React.useState<PermissionGroup[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterRole, setFilterRole] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -161,13 +99,35 @@ export default function AdminsPage() {
   const [selectedAdmin, setSelectedAdmin] = React.useState<AdminUser | null>(null);
   const [formData, setFormData] = React.useState<AdminFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const fetchData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const [adminsRes, groupsRes] = await Promise.all([
+        adminService.getAll({ search: searchQuery || undefined }),
+        permissionService.getAllGroups({ limit: 100 }),
+      ]);
+      setAdmins(adminsRes.data);
+      setPermissionGroups(groupsRes.data);
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải dữ liệu",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, toast]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const filteredAdmins = admins.filter((admin) => {
-    const matchesSearch =
-      admin.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      admin.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = filterRole === "all" || admin.role === filterRole;
-    return matchesSearch && matchesRole;
+    return matchesRole;
   });
 
   const handleOpenCreate = () => {
@@ -184,8 +144,8 @@ export default function AdminsPage() {
       name: admin.name,
       phone: admin.phone || "",
       role: admin.role,
-      permissionGroupId: admin.permissionGroupId || "",
-      password: "", // Don't show password
+      permissionGroupId: admin.permissionGroup?.id || "",
+      password: "",
     });
     setIsViewMode(false);
     setIsDialogOpen(true);
@@ -198,7 +158,7 @@ export default function AdminsPage() {
       name: admin.name,
       phone: admin.phone || "",
       role: admin.role,
-      permissionGroupId: admin.permissionGroupId || "",
+      permissionGroupId: admin.permissionGroup?.id || "",
       password: "",
     });
     setIsViewMode(true);
@@ -210,55 +170,78 @@ export default function AdminsPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const permissionGroup = mockPermissionGroups.find(
-      (g) => g.id === formData.permissionGroupId
-    );
-
-    if (selectedAdmin) {
-      setAdmins((prev) =>
-        prev.map((a) =>
-          a.id === selectedAdmin.id
-            ? {
-                ...a,
-                ...formData,
-                permissionGroupName: permissionGroup?.name,
-                updatedAt: new Date().toISOString(),
-              }
-            : a
-        )
-      );
-    } else {
-      const newAdmin: AdminUser = {
-        id: String(Date.now()),
-        email: formData.email,
-        name: formData.name,
-        phone: formData.phone,
-        role: formData.role,
-        permissionGroupId: formData.permissionGroupId,
-        permissionGroupName: permissionGroup?.name,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setAdmins((prev) => [newAdmin, ...prev]);
+    setIsSubmitting(true);
+    try {
+      if (selectedAdmin) {
+        await adminService.update(selectedAdmin.id, {
+          fullName: formData.name,
+          phone: formData.phone || undefined,
+          role: formData.role,
+          permissionGroupId: formData.permissionGroupId || undefined,
+          password: formData.password || undefined,
+        });
+        toast({ title: "Thành công", description: "Đã cập nhật quản trị viên" });
+      } else {
+        await adminService.create({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.name,
+          phone: formData.phone || undefined,
+          role: formData.role,
+          permissionGroupId: formData.permissionGroupId || undefined,
+        });
+        toast({ title: "Thành công", description: "Đã thêm quản trị viên mới" });
+      }
+      setIsDialogOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
-    if (selectedAdmin) {
-      setAdmins((prev) => prev.filter((a) => a.id !== selectedAdmin.id));
+  const handleDelete = async () => {
+    if (!selectedAdmin) return;
+    setIsSubmitting(true);
+    try {
+      await adminService.delete(selectedAdmin.id);
+      toast({ title: "Thành công", description: "Đã xóa quản trị viên" });
       setIsDeleteDialogOpen(false);
       setSelectedAdmin(null);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể xóa quản trị viên",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (admin: AdminUser) => {
-    setAdmins((prev) =>
-      prev.map((a) => (a.id === admin.id ? { ...a, isActive: !a.isActive } : a))
-    );
+  const handleToggleStatus = async (admin: AdminUser) => {
+    try {
+      await adminService.toggleStatus(admin.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${admin.isActive ? "tạm dừng" : "kích hoạt"} tài khoản`,
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,6 +250,14 @@ export default function AdminsPage() {
       [e.target.name]: e.target.value,
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -357,7 +348,7 @@ export default function AdminsPage() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Shield className="h-4 w-4 text-muted-foreground" />
-                      <span>{admin.permissionGroupName || "-"}</span>
+                      <span>{admin.permissionGroup?.name || "-"}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -471,9 +462,11 @@ export default function AdminsPage() {
                   disabled={isViewMode}
                 />
               </div>
-              {!isViewMode && !selectedAdmin && (
+              {!isViewMode && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Mật khẩu *</Label>
+                  <Label htmlFor="password">
+                    {selectedAdmin ? "Mật khẩu mới" : "Mật khẩu *"}
+                  </Label>
                   <Input
                     id="password"
                     name="password"
@@ -481,7 +474,7 @@ export default function AdminsPage() {
                     value={formData.password}
                     onChange={handleChange}
                     required={!selectedAdmin}
-                    placeholder="••••••••"
+                    placeholder={selectedAdmin ? "Để trống nếu không đổi" : "••••••••"}
                   />
                 </div>
               )}
@@ -516,7 +509,7 @@ export default function AdminsPage() {
                     <SelectValue placeholder="Chọn nhóm quyền" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockPermissionGroups.map((group) => (
+                    {permissionGroups.map((group) => (
                       <SelectItem key={group.id} value={group.id}>
                         {group.name}
                       </SelectItem>
@@ -539,7 +532,8 @@ export default function AdminsPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedAdmin ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
@@ -567,7 +561,8 @@ export default function AdminsPage() {
             >
               Hủy
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Xóa
             </Button>
           </DialogFooter>
