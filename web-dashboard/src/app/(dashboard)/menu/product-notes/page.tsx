@@ -72,7 +72,11 @@ export default function ProductNotesPage() {
     try {
       setLoading(true);
       const data = await productService.getAllNotes(brandId);
-      setNotes(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setNotes(sortedData);
     } catch (error) {
       console.error("Error loading notes:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách ghi chú", variant: "destructive" });

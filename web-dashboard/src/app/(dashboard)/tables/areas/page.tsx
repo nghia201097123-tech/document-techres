@@ -81,7 +81,11 @@ export default function AreasPage() {
     try {
       setLoading(true);
       const data = await areaService.getAll(branchId);
-      setAreas(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setAreas(sortedData);
     } catch (error) {
       console.error("Error loading areas:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách khu vực", variant: "destructive" });

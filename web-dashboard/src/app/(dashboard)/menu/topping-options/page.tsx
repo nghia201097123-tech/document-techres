@@ -84,10 +84,20 @@ export default function ToppingOptionsPage() {
         productService.getAvailableToppings(brandId),
         productService.getAll(brandId),
       ]);
-      setToppingGroups(groups);
-      setAvailableToppings(toppings);
+      // Sort by createdAt descending (newest first)
+      const sortedGroups = [...groups].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      const sortedToppings = [...toppings].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      const sortedProducts = [...allProducts].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setToppingGroups(sortedGroups);
+      setAvailableToppings(sortedToppings);
       // Filter out topping type products
-      setProducts(allProducts.filter(p => p.type !== ProductType.TOPPING));
+      setProducts(sortedProducts.filter(p => p.type !== ProductType.TOPPING));
     } catch (error) {
       console.error("Error loading data:", error);
       toast({ title: "Lỗi", description: "Không thể tải dữ liệu", variant: "destructive" });

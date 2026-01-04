@@ -249,7 +249,11 @@ export default function ProductsPage() {
       setLoading(true);
       const filterType = typeFilter === "all" ? undefined : (typeFilter as ProductType);
       const data = await productService.getAll(brandId, filterType);
-      setProducts(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setProducts(sortedData);
     } catch (error) {
       console.error("Error loading products:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách món ăn", variant: "destructive" });

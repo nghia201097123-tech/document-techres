@@ -105,8 +105,15 @@ export default function TablesPage() {
         tableService.getAll(branchId),
         areaService.getAll(branchId),
       ]);
-      setTables(tablesData);
-      setAreas(areasData);
+      // Sort by createdAt descending (newest first)
+      const sortedTables = [...tablesData].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      const sortedAreas = [...areasData].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setTables(sortedTables);
+      setAreas(sortedAreas);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({ title: "Lỗi", description: "Không thể tải dữ liệu", variant: "destructive" });

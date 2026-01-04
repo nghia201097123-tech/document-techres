@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +44,7 @@ import { permissionService, type Permission } from "@/services/permission-servic
 import { locationService } from "@/services/location-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
@@ -65,6 +66,30 @@ const defaultStaffColumns: ColumnConfig[] = [
   { key: "departmentName", label: "Bộ phận", visible: false },
   { key: "isActive", label: "Trạng thái", visible: true },
 ];
+
+// Detail view field configuration
+interface DetailFieldConfig {
+  key: string;
+  label: string;
+  visible: boolean;
+}
+
+const defaultDetailFields: DetailFieldConfig[] = [
+  { key: "name", label: "Tên nhân viên", visible: true },
+  { key: "username", label: "Username", visible: true },
+  { key: "birthDate", label: "Ngày sinh", visible: true },
+  { key: "gender", label: "Giới tính", visible: true },
+  { key: "phone", label: "Số điện thoại", visible: true },
+  { key: "email", label: "Email", visible: true },
+  { key: "idNumber", label: "CCCD", visible: true },
+  { key: "address", label: "Địa chỉ", visible: true },
+  { key: "branchName", label: "Chi nhánh", visible: true },
+  { key: "departmentName", label: "Bộ phận", visible: true },
+  { key: "isActive", label: "Trạng thái", visible: true },
+  { key: "createdAt", label: "Ngày tạo", visible: true },
+];
+
+const DETAIL_FIELDS_STORAGE_KEY = "staff-detail-fields-config";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -215,6 +240,51 @@ export default function StaffPage() {
   const [loadingPermissions, setLoadingPermissions] = React.useState(false);
   const [savingPermissions, setSavingPermissions] = React.useState(false);
 
+  // Detail view field configuration state
+  const [detailFields, setDetailFields] = React.useState<DetailFieldConfig[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(DETAIL_FIELDS_STORAGE_KEY);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          return defaultDetailFields;
+        }
+      }
+    }
+    return defaultDetailFields;
+  });
+  const [detailFieldsPopoverOpen, setDetailFieldsPopoverOpen] = React.useState(false);
+
+  // Helper to check if detail field is visible
+  const isDetailFieldVisible = (key: string) => {
+    const field = detailFields.find((f) => f.key === key);
+    return field?.visible ?? true;
+  };
+
+  // Toggle detail field visibility
+  const toggleDetailField = (key: string) => {
+    const newFields = detailFields.map((f) =>
+      f.key === key ? { ...f, visible: !f.visible } : f
+    );
+    setDetailFields(newFields);
+    localStorage.setItem(DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
+  };
+
+  // Show all detail fields
+  const showAllDetailFields = () => {
+    const newFields = detailFields.map((f) => ({ ...f, visible: true }));
+    setDetailFields(newFields);
+    localStorage.setItem(DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
+  };
+
+  // Hide all detail fields
+  const hideAllDetailFields = () => {
+    const newFields = detailFields.map((f) => ({ ...f, visible: false }));
+    setDetailFields(newFields);
+    localStorage.setItem(DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
+  };
+
   // Derived state from Redux - for create/edit form
   const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
   const wards = formData.provinceCode ? wardsByProvince[formData.provinceCode] || [] : [];
@@ -234,7 +304,11 @@ export default function StaffPage() {
     try {
       setLoading(true);
       const data = await staffService.getAll(branchId);
-      setStaffList(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setStaffList(sortedData);
     } catch (error) {
       console.error("Error loading staff:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách nhân viên", variant: "destructive" });
@@ -1075,72 +1149,150 @@ export default function StaffPage() {
       {/* View Staff Dialog */}
       <Dialog open={dialogMode === "view"} onOpenChange={() => handleCloseDialog()}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Chi tiết nhân viên</DialogTitle>
-            <DialogDescription>Thông tin chi tiết của nhân viên</DialogDescription>
+          <DialogHeader className="flex flex-row items-start justify-between">
+            <div>
+              <DialogTitle>Chi tiết nhân viên</DialogTitle>
+              <DialogDescription>Thông tin chi tiết của nhân viên</DialogDescription>
+            </div>
+            <Popover open={detailFieldsPopoverOpen} onOpenChange={setDetailFieldsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Cấu hình Fields
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64" align="end">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-sm">Hiển thị Fields</p>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={showAllDetailFields}>
+                        Tất cả
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={hideAllDetailFields}>
+                        Ẩn hết
+                      </Button>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[250px]">
+                    <div className="space-y-2">
+                      {detailFields.map((field) => (
+                        <div key={field.key} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`detail-field-${field.key}`}
+                            checked={field.visible}
+                            onCheckedChange={() => toggleDetailField(field.key)}
+                          />
+                          <Label
+                            htmlFor={`detail-field-${field.key}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {field.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </PopoverContent>
+            </Popover>
           </DialogHeader>
           {selectedStaff && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Tên nhân viên</Label>
-                  <p className="font-medium">{selectedStaff.name}</p>
+              {(isDetailFieldVisible("name") || isDetailFieldVisible("username")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("name") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Tên nhân viên</Label>
+                      <p className="font-medium">{selectedStaff.name}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("username") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Username</Label>
+                      <p className="font-mono">{selectedStaff.username}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Username</Label>
-                  <p className="font-mono">{selectedStaff.username}</p>
+              )}
+              {(isDetailFieldVisible("birthDate") || isDetailFieldVisible("gender")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("birthDate") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Ngày sinh</Label>
+                      <p>{formatDate(selectedStaff.birthDate)}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("gender") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Giới tính</Label>
+                      <p>{getGenderLabel(selectedStaff.gender)}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Ngày sinh</Label>
-                  <p>{formatDate(selectedStaff.birthDate)}</p>
+              )}
+              {(isDetailFieldVisible("phone") || isDetailFieldVisible("email")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("phone") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Số điện thoại</Label>
+                      <p>{selectedStaff.phone || "-"}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("email") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Email</Label>
+                      <p>{selectedStaff.email || "-"}</p>
+                    </div>
+                  )}
                 </div>
+              )}
+              {isDetailFieldVisible("idNumber") && (
                 <div>
-                  <Label className="text-muted-foreground text-xs">Giới tính</Label>
-                  <p>{getGenderLabel(selectedStaff.gender)}</p>
+                  <Label className="text-muted-foreground text-xs">CCCD</Label>
+                  <p>{selectedStaff.idNumber || "-"}</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              )}
+              {isDetailFieldVisible("address") && (
                 <div>
-                  <Label className="text-muted-foreground text-xs">Số điện thoại</Label>
-                  <p>{selectedStaff.phone || "-"}</p>
+                  <Label className="text-muted-foreground text-xs">Địa chỉ</Label>
+                  <p>{selectedStaff.address || "-"}</p>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Email</Label>
-                  <p>{selectedStaff.email || "-"}</p>
+              )}
+              {(isDetailFieldVisible("branchName") || isDetailFieldVisible("departmentName")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("branchName") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Chi nhánh</Label>
+                      <p>{selectedStaff.branchName || "-"}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("departmentName") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Bộ phận</Label>
+                      <p>{selectedStaff.departmentName || getDepartmentName(selectedStaff.departmentId)}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">CCCD</Label>
-                <p>{selectedStaff.idNumber || "-"}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Địa chỉ</Label>
-                <p>{selectedStaff.address || "-"}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Chi nhánh</Label>
-                  <p>{selectedStaff.branchName || "-"}</p>
+              )}
+              {(isDetailFieldVisible("isActive") || isDetailFieldVisible("createdAt")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("isActive") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Trạng thái</Label>
+                      <Badge variant={selectedStaff.isActive ? "default" : "secondary"}>
+                        {selectedStaff.isActive ? "Hoạt động" : "Tạm ngưng"}
+                      </Badge>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("createdAt") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Ngày tạo</Label>
+                      <p>{formatDate(selectedStaff.createdAt)}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Bộ phận</Label>
-                  <p>{selectedStaff.departmentName || getDepartmentName(selectedStaff.departmentId)}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Trạng thái</Label>
-                  <Badge variant={selectedStaff.isActive ? "default" : "secondary"}>
-                    {selectedStaff.isActive ? "Hoạt động" : "Tạm ngưng"}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Ngày tạo</Label>
-                  <p>{formatDate(selectedStaff.createdAt)}</p>
-                </div>
-              </div>
+              )}
             </div>
           )}
           <DialogFooter>

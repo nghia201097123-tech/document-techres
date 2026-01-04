@@ -78,9 +78,13 @@ export default function DepartmentsPage() {
     try {
       setLoading(true);
       const data = await departmentService.getAll();
-      setDepartments(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setDepartments(sortedData);
       // Auto expand all by default
-      setExpandedIds(new Set(data.map(d => d.id)));
+      setExpandedIds(new Set(sortedData.map(d => d.id)));
     } catch (error) {
       console.error("Error loading departments:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách bộ phận", variant: "destructive" });

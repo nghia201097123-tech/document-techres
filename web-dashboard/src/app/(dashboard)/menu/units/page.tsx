@@ -67,7 +67,11 @@ export default function UnitsPage() {
     try {
       setLoading(true);
       const data = await unitService.getAll(brandId);
-      setUnits(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setUnits(sortedData);
     } catch (error) {
       console.error("Error loading units:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách đơn vị tính", variant: "destructive" });

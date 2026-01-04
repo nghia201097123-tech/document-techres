@@ -86,7 +86,11 @@ export default function CategoriesPage() {
     try {
       setLoading(true);
       const data = await categoryService.getAll(brandId);
-      setCategories(data);
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setCategories(sortedData);
     } catch (error) {
       console.error("Error loading categories:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách danh mục", variant: "destructive" });
