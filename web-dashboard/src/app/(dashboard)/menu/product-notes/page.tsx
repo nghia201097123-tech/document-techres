@@ -1,20 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, Loader2, Pencil, Trash2, StickyNote, Power, LinkIcon } from "lucide-react";
+import { Plus, Search, Loader2, Pencil, Trash2, StickyNote, Power, Check, X, ChevronRight, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -29,8 +21,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type ProductNote, type Product, ProductType } from "@/services/product-service";
 import { BrandFilter } from "@/components/ui/brand-filter";
+import { cn } from "@/lib/utils";
 
 type DialogMode = "create" | "edit" | null;
+
+// Product type labels for display
+const typeLabels: Record<string, { label: string; color: string }> = {
+  food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
+  drink: { label: "Đồ uống", color: "bg-blue-100 text-blue-800" },
+  other: { label: "Khác", color: "bg-gray-100 text-gray-800" },
+  combo: { label: "Combo", color: "bg-green-100 text-green-800" },
+};
 
 export default function ProductNotesPage() {
   const { toast } = useToast();
@@ -44,21 +45,22 @@ export default function ProductNotesPage() {
   const [search, setSearch] = React.useState("");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
-  const [selectedNote, setSelectedNote] = React.useState<ProductNote | null>(null);
+  const [editingNote, setEditingNote] = React.useState<ProductNote | null>(null);
 
   // Form data
   const [formName, setFormName] = React.useState("");
   const [formDescription, setFormDescription] = React.useState("");
   const [continueCreating, setContinueCreating] = React.useState(false);
 
-  // Assign products state
-  const [assignDialogOpen, setAssignDialogOpen] = React.useState(false);
-  const [assigningNote, setAssigningNote] = React.useState<ProductNote | null>(null);
+  // Selected note for product assignment (inline)
+  const [selectedNote, setSelectedNote] = React.useState<ProductNote | null>(null);
   const [allProducts, setAllProducts] = React.useState<Product[]>([]);
-  const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
+  const [assignedProductIds, setAssignedProductIds] = React.useState<string[]>([]);
   const [loadingProducts, setLoadingProducts] = React.useState(false);
   const [savingAssign, setSavingAssign] = React.useState(false);
   const [productSearch, setProductSearch] = React.useState("");
+  const [hasChanges, setHasChanges] = React.useState(false);
+  const [originalProductIds, setOriginalProductIds] = React.useState<string[]>([]);
 
   // Load notes
   const loadNotes = React.useCallback(async () => {
@@ -78,17 +80,54 @@ export default function ProductNotesPage() {
     loadNotes();
   }, [loadNotes]);
 
+  // Load products when a note is selected
+  const handleSelectNote = async (note: ProductNote) => {
+    // Don't reload if same note is selected
+    if (selectedNote?.id === note.id) return;
+
+    // Check for unsaved changes
+    if (hasChanges) {
+      if (!confirm("Bạn có thay đổi chưa lưu. Bạn có muốn tiếp tục không?")) {
+        return;
+      }
+    }
+
+    setSelectedNote(note);
+    setProductSearch("");
+    setLoadingProducts(true);
+    setHasChanges(false);
+
+    try {
+      // Load all products (excluding toppings)
+      const products = await productService.getAll();
+      const filteredProducts = products.filter(p => p.type !== ProductType.TOPPING);
+      setAllProducts(filteredProducts);
+
+      // Load products that already have this note
+      const assignedProducts = await productService.getProductsByNote(note.id);
+      const ids = assignedProducts.map(p => p.id);
+      setAssignedProductIds(ids);
+      setOriginalProductIds(ids);
+    } catch (error) {
+      console.error("Error loading products:", error);
+      toast({ title: "Lỗi", description: "Không thể tải danh sách món", variant: "destructive" });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   // Open create dialog
   const handleOpenCreate = () => {
-    setSelectedNote(null);
+    setEditingNote(null);
     setFormName("");
     setFormDescription("");
     setDialogMode("create");
   };
 
   // Open edit dialog
-  const handleOpenEdit = (note: ProductNote) => {
-    setSelectedNote(note);
+  const handleOpenEdit = (note: ProductNote, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingNote(note);
     setFormName(note.name);
     setFormDescription(note.description || "");
     setDialogMode("edit");
@@ -97,7 +136,7 @@ export default function ProductNotesPage() {
   // Close dialog
   const handleCloseDialog = () => {
     setDialogMode(null);
-    setSelectedNote(null);
+    setEditingNote(null);
     setFormName("");
     setFormDescription("");
   };
@@ -124,12 +163,16 @@ export default function ProductNotesPage() {
           setFormDescription("");
           return;
         }
-      } else if (dialogMode === "edit" && selectedNote) {
-        const updatedNote = await productService.updateNote(selectedNote.id, {
+      } else if (dialogMode === "edit" && editingNote) {
+        const updatedNote = await productService.updateNote(editingNote.id, {
           name: formName.trim(),
           description: formDescription.trim() || undefined,
         });
-        setNotes((prev) => prev.map((n) => (n.id === selectedNote.id ? updatedNote : n)));
+        setNotes((prev) => prev.map((n) => (n.id === editingNote.id ? updatedNote : n)));
+        // Update selected note if it's the one being edited
+        if (selectedNote?.id === editingNote.id) {
+          setSelectedNote(updatedNote);
+        }
         toast({ title: "Thành công", description: "Đã cập nhật ghi chú" });
       }
       handleCloseDialog();
@@ -142,12 +185,18 @@ export default function ProductNotesPage() {
   };
 
   // Handle delete
-  const handleDelete = async (note: ProductNote) => {
+  const handleDelete = async (note: ProductNote, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm(`Bạn có chắc muốn xóa ghi chú "${note.name}"?`)) return;
 
     try {
       await productService.deleteNote(note.id);
       setNotes((prev) => prev.filter((n) => n.id !== note.id));
+      if (selectedNote?.id === note.id) {
+        setSelectedNote(null);
+        setAllProducts([]);
+        setAssignedProductIds([]);
+      }
       toast({ title: "Thành công", description: "Đã xóa ghi chú" });
     } catch (error: any) {
       console.error("Error deleting note:", error);
@@ -156,12 +205,16 @@ export default function ProductNotesPage() {
   };
 
   // Handle toggle active
-  const handleToggleActive = async (note: ProductNote) => {
+  const handleToggleActive = async (note: ProductNote, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const updatedNote = await productService.updateNote(note.id, {
         isActive: !note.isActive,
       });
       setNotes((prev) => prev.map((n) => (n.id === note.id ? updatedNote : n)));
+      if (selectedNote?.id === note.id) {
+        setSelectedNote(updatedNote);
+      }
       toast({
         title: "Thành công",
         description: `Đã ${updatedNote.isActive ? "kích hoạt" : "tạm ngưng"} ghi chú "${note.name}"`,
@@ -172,81 +225,67 @@ export default function ProductNotesPage() {
     }
   };
 
-  // Open assign products dialog
-  const handleOpenAssignProducts = async (note: ProductNote) => {
-    setAssigningNote(note);
-    setProductSearch("");
-    setAssignDialogOpen(true);
-    setLoadingProducts(true);
-
-    try {
-      // Load all products (excluding toppings)
-      const products = await productService.getAll();
-      const filteredProducts = products.filter(p => p.type !== ProductType.TOPPING);
-      setAllProducts(filteredProducts);
-
-      // Load products that already have this note
-      const assignedProducts = await productService.getProductsByNote(note.id);
-      setSelectedProductIds(assignedProducts.map(p => p.id));
-    } catch (error) {
-      console.error("Error loading products:", error);
-      toast({ title: "Lỗi", description: "Không thể tải danh sách món", variant: "destructive" });
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  // Close assign dialog
-  const handleCloseAssignDialog = () => {
-    setAssignDialogOpen(false);
-    setAssigningNote(null);
-    setAllProducts([]);
-    setSelectedProductIds([]);
-    setProductSearch("");
-  };
-
   // Toggle product selection
   const toggleProductSelection = (productId: string) => {
-    setSelectedProductIds(prev =>
-      prev.includes(productId)
+    setAssignedProductIds(prev => {
+      const newIds = prev.includes(productId)
         ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
+        : [...prev, productId];
+
+      // Check if there are changes
+      const hasChange = JSON.stringify(newIds.sort()) !== JSON.stringify(originalProductIds.sort());
+      setHasChanges(hasChange);
+
+      return newIds;
+    });
   };
 
   // Select all filtered products
   const selectAllFiltered = () => {
     const filteredIds = filteredProducts.map(p => p.id);
-    setSelectedProductIds(prev => {
+    setAssignedProductIds(prev => {
       const newSet = new Set([...prev, ...filteredIds]);
-      return Array.from(newSet);
+      const newIds = Array.from(newSet);
+      setHasChanges(JSON.stringify(newIds.sort()) !== JSON.stringify(originalProductIds.sort()));
+      return newIds;
     });
   };
 
   // Deselect all filtered products
   const deselectAllFiltered = () => {
     const filteredIds = new Set(filteredProducts.map(p => p.id));
-    setSelectedProductIds(prev => prev.filter(id => !filteredIds.has(id)));
+    setAssignedProductIds(prev => {
+      const newIds = prev.filter(id => !filteredIds.has(id));
+      setHasChanges(JSON.stringify(newIds.sort()) !== JSON.stringify(originalProductIds.sort()));
+      return newIds;
+    });
   };
 
   // Save product assignments
   const handleSaveAssignments = async () => {
-    if (!assigningNote) return;
+    if (!selectedNote) return;
 
     setSavingAssign(true);
     try {
-      await productService.assignNoteToProducts(assigningNote.id, selectedProductIds);
+      await productService.assignNoteToProducts(selectedNote.id, assignedProductIds);
+      setOriginalProductIds([...assignedProductIds]);
+      setHasChanges(false);
       toast({
         title: "Thành công",
-        description: `Đã gán ghi chú "${assigningNote.name}" cho ${selectedProductIds.length} món`,
+        description: `Đã lưu ${assignedProductIds.length} món cho ghi chú "${selectedNote.name}"`,
       });
-      handleCloseAssignDialog();
     } catch (error: any) {
       console.error("Error assigning note to products:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
     } finally {
       setSavingAssign(false);
     }
+  };
+
+  // Cancel changes
+  const handleCancelChanges = () => {
+    setAssignedProductIds([...originalProductIds]);
+    setHasChanges(false);
   };
 
   // Filter products by search
@@ -261,6 +300,10 @@ export default function ProductNotesPage() {
     const matchesBrand = filterBrandId === "all" || n.brandId === filterBrandId;
     return matchesSearch && matchesBrand;
   });
+
+  // Count selected in filtered
+  const selectedInFiltered = filteredProducts.filter(p => assignedProductIds.includes(p.id)).length;
+  const allFilteredSelected = filteredProducts.length > 0 && selectedInFiltered === filteredProducts.length;
 
   return (
     <div className="space-y-6">
@@ -282,102 +325,234 @@ export default function ProductNotesPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Danh sách ghi chú</CardTitle>
-              <CardDescription>Tổng cộng {filteredNotes.length} ghi chú</CardDescription>
-            </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm..."
-                className="pl-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <StickyNote className="h-10 w-10 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Chưa có ghi chú nào</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Nhấn &quot;Thêm ghi chú&quot; để bắt đầu
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tên ghi chú</TableHead>
-                  <TableHead>Mô tả</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="w-[120px]">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredNotes.map((note) => (
-                  <TableRow key={note.id}>
-                    <TableCell className="font-medium">{note.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {note.description || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={note.isActive ? "default" : "secondary"}>
-                        {note.isActive ? "Hoạt động" : "Tạm ngưng"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenAssignProducts(note)}
-                          title="Gán món"
-                        >
-                          <LinkIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenEdit(note)}
-                          title="Sửa"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleActive(note)}
-                          title={note.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(note)}
-                          title="Xóa"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left panel - Notes list */}
+        <div className="col-span-5">
+          <Card className="h-[calc(100vh-220px)]">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Danh sách ghi chú</CardTitle>
+                  <CardDescription>{filteredNotes.length} ghi chú</CardDescription>
+                </div>
+              </div>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm ghi chú..."
+                  className="pl-10"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[calc(100vh-380px)]">
+                {loading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredNotes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+                    <StickyNote className="h-10 w-10 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Chưa có ghi chú nào</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Nhấn &quot;Thêm ghi chú&quot; để bắt đầu
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {filteredNotes.map((note) => (
+                      <div
+                        key={note.id}
+                        onClick={() => handleSelectNote(note)}
+                        className={cn(
+                          "flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                          selectedNote?.id === note.id && "bg-primary/5 border-l-2 border-l-primary"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={cn(
+                            "p-2 rounded-lg",
+                            note.isActive ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-500"
+                          )}>
+                            <StickyNote className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{note.name}</p>
+                            {note.description && (
+                              <p className="text-xs text-muted-foreground truncate">{note.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2">
+                          <Badge variant={note.isActive ? "default" : "secondary"} className="text-xs">
+                            {note.isActive ? "Hoạt động" : "Ngưng"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => handleOpenEdit(note, e)}
+                            title="Sửa"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => handleToggleActive(note, e)}
+                            title={note.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                          >
+                            <Power className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => handleDelete(note, e)}
+                            title="Xóa"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right panel - Product assignment */}
+        <div className="col-span-7">
+          <Card className="h-[calc(100vh-220px)]">
+            {!selectedNote ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                <ChevronRight className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">Chọn một ghi chú</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Chọn ghi chú từ danh sách bên trái để gán món ăn
+                </p>
+              </div>
+            ) : (
+              <>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <StickyNote className="h-5 w-5 text-yellow-600" />
+                        {selectedNote.name}
+                      </CardTitle>
+                      <CardDescription>
+                        Đã chọn {assignedProductIds.length} món
+                        {hasChanges && <span className="text-orange-500 ml-2">• Có thay đổi chưa lưu</span>}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasChanges && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={handleCancelChanges}>
+                            <X className="mr-1 h-4 w-4" />
+                            Hủy
+                          </Button>
+                          <Button size="sm" onClick={handleSaveAssignments} disabled={savingAssign}>
+                            {savingAssign ? (
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="mr-1 h-4 w-4" />
+                            )}
+                            Lưu thay đổi
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Tìm món ăn..."
+                        className="pl-10"
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={allFilteredSelected ? deselectAllFiltered : selectAllFiltered}
+                      disabled={filteredProducts.length === 0}
+                    >
+                      {allFilteredSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    </Button>
+                  </div>
+                  {filteredProducts.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Đang hiển thị {filteredProducts.length} món • Đã chọn {selectedInFiltered} trong số này
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[calc(100vh-420px)]">
+                    {loadingProducts ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : filteredProducts.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+                        <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">Không tìm thấy món ăn</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {filteredProducts.map((product) => {
+                          const isSelected = assignedProductIds.includes(product.id);
+                          return (
+                            <div
+                              key={product.id}
+                              onClick={() => toggleProductSelection(product.id)}
+                              className={cn(
+                                "flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                                isSelected && "bg-primary/5"
+                              )}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleProductSelection(product.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{product.name}</span>
+                                  <span className="text-xs text-muted-foreground font-mono">{product.code}</span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <Badge className={cn("text-xs", typeLabels[product.type]?.color)}>
+                                    {typeLabels[product.type]?.label || product.type}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(product.price)}
+                                  </span>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <Check className="h-4 w-4 text-primary" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </>
+            )}
+          </Card>
+        </div>
+      </div>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>
@@ -439,99 +614,6 @@ export default function ProductNotesPage() {
               </div>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Products Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={() => handleCloseAssignDialog()}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Gán ghi chú cho món ăn</DialogTitle>
-            <DialogDescription>
-              Chọn các món ăn sẽ sử dụng ghi chú &quot;{assigningNote?.name}&quot;
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Search and select all buttons */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Tìm món ăn..."
-                  className="pl-10"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="sm" onClick={selectAllFiltered}>
-                Chọn tất cả
-              </Button>
-              <Button variant="outline" size="sm" onClick={deselectAllFiltered}>
-                Bỏ chọn tất cả
-              </Button>
-            </div>
-
-            {/* Selected count */}
-            <div className="text-sm text-muted-foreground">
-              Đã chọn: <span className="font-medium text-foreground">{selectedProductIds.length}</span> món
-              {productSearch && ` (Hiển thị ${filteredProducts.length}/${allProducts.length} món)`}
-            </div>
-
-            {/* Products list */}
-            {loadingProducts ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <ScrollArea className="h-[400px] border rounded-md">
-                <div className="p-4 space-y-2">
-                  {filteredProducts.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">Không tìm thấy món ăn</p>
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <div
-                        key={product.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedProductIds.includes(product.id)
-                            ? "bg-primary/10 border-primary"
-                            : "hover:bg-muted"
-                        }`}
-                        onClick={() => toggleProductSelection(product.id)}
-                      >
-                        <Checkbox
-                          checked={selectedProductIds.includes(product.id)}
-                          onCheckedChange={() => toggleProductSelection(product.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{product.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {product.code} • {new Intl.NumberFormat("vi-VN").format(product.price)}đ
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="shrink-0">
-                          {product.type === ProductType.FOOD && "Món ăn"}
-                          {product.type === ProductType.DRINK && "Đồ uống"}
-                          {product.type === ProductType.OTHER && "Khác"}
-                          {product.type === ProductType.COMBO && "Combo"}
-                        </Badge>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseAssignDialog}>
-              Hủy
-            </Button>
-            <Button onClick={handleSaveAssignments} disabled={savingAssign}>
-              {savingAssign && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Lưu ({selectedProductIds.length} món)
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
