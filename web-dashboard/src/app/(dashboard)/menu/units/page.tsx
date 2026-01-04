@@ -8,6 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -36,6 +44,16 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { unitService, type Unit, type CreateUnitDto, type UpdateUnitDto } from "@/services/unit-service";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+
+// Default column configuration
+const defaultColumns: ColumnConfig[] = [
+  { key: "name", label: "Tên đơn vị", visible: true, locked: true },
+  { key: "description", label: "Mô tả", visible: true },
+  { key: "sortOrder", label: "Thứ tự", visible: false },
+  { key: "isActive", label: "Trạng thái", visible: true },
+];
 
 type DialogMode = "create" | "edit" | null;
 
@@ -44,6 +62,17 @@ export default function UnitsPage() {
 
   // Global filter state from Redux
   const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+
+  // Column configuration
+  const {
+    columns,
+    toggleColumn,
+    resetToDefault,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "units-table-columns",
+    defaultColumns,
+  });
 
   const [units, setUnits] = React.useState<Unit[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -210,8 +239,19 @@ export default function UnitsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách đơn vị tính</CardTitle>
-          <CardDescription>Tổng cộng {filteredUnits.length} đơn vị</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Danh sách đơn vị tính</CardTitle>
+              <CardDescription>Tổng cộng {filteredUnits.length} đơn vị</CardDescription>
+            </div>
+            {filterBrandId && filteredUnits.length > 0 && (
+              <ColumnConfigDialog
+                columns={columns}
+                onToggle={toggleColumn}
+                onReset={resetToDefault}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {!filterBrandId ? (
@@ -232,58 +272,75 @@ export default function UnitsPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredUnits.map((unit) => (
-                <div
-                  key={unit.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
-                      <Scale className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{unit.name}</p>
-                      {unit.description && (
-                        <p className="text-xs text-muted-foreground max-w-[300px] truncate">
-                          {unit.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={unit.isActive ? "default" : "secondary"}>
-                      {unit.isActive ? "Hoạt động" : "Tạm ngưng"}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenEdit(unit)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Chỉnh sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleActive(unit)}>
-                          <Power className="mr-2 h-4 w-4" />
-                          {unit.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setDeleteUnit(unit)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {isColumnVisible("name") && <TableHead>Tên đơn vị</TableHead>}
+                  {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
+                  {isColumnVisible("sortOrder") && <TableHead>Thứ tự</TableHead>}
+                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
+                  <TableHead className="w-[80px]">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUnits.map((unit) => (
+                  <TableRow key={unit.id}>
+                    {isColumnVisible("name") && (
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded bg-blue-100 text-blue-800">
+                            <Scale className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="font-medium">{unit.name}</span>
+                        </div>
+                      </TableCell>
+                    )}
+                    {isColumnVisible("description") && (
+                      <TableCell className="max-w-[300px] truncate text-muted-foreground">
+                        {unit.description || "-"}
+                      </TableCell>
+                    )}
+                    {isColumnVisible("sortOrder") && (
+                      <TableCell>{unit.sortOrder}</TableCell>
+                    )}
+                    {isColumnVisible("isActive") && (
+                      <TableCell>
+                        <Badge variant={unit.isActive ? "default" : "secondary"}>
+                          {unit.isActive ? "Hoạt động" : "Tạm ngưng"}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEdit(unit)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Chỉnh sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleActive(unit)}>
+                            <Power className="mr-2 h-4 w-4" />
+                            {unit.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setDeleteUnit(unit)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

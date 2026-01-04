@@ -8,6 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,6 +53,8 @@ import { useToast } from "@/hooks/use-toast";
 import { categoryService, type Category, type CreateCategoryDto, type UpdateCategoryDto } from "@/services/category-service";
 import { ProductType } from "@/services/product-service";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -54,6 +64,15 @@ const typeLabels: Record<string, { label: string; color: string }> = {
   combo: { label: "Combo", color: "bg-green-100 text-green-800" },
 };
 
+// Default column configuration
+const defaultColumns: ColumnConfig[] = [
+  { key: "name", label: "Tên danh mục", visible: true, locked: true },
+  { key: "productType", label: "Loại món", visible: true },
+  { key: "description", label: "Mô tả", visible: true },
+  { key: "sortOrder", label: "Thứ tự", visible: false },
+  { key: "isActive", label: "Trạng thái", visible: true },
+];
+
 type DialogMode = "create" | "edit" | null;
 
 export default function CategoriesPage() {
@@ -61,6 +80,17 @@ export default function CategoriesPage() {
 
   // Global filter state from Redux
   const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+
+  // Column configuration
+  const {
+    columns,
+    toggleColumn,
+    resetToDefault,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "categories-table-columns",
+    defaultColumns,
+  });
 
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -259,8 +289,19 @@ export default function CategoriesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách danh mục</CardTitle>
-          <CardDescription>Tổng cộng {filteredCategories.length} danh mục</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Danh sách danh mục</CardTitle>
+              <CardDescription>Tổng cộng {filteredCategories.length} danh mục</CardDescription>
+            </div>
+            {filterBrandId && filteredCategories.length > 0 && (
+              <ColumnConfigDialog
+                columns={columns}
+                onToggle={toggleColumn}
+                onReset={resetToDefault}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {!filterBrandId ? (
@@ -281,62 +322,83 @@ export default function CategoriesPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredCategories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${typeLabels[category.productType]?.color || "bg-gray-100"}`}>
-                      <FolderOpen className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{category.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{typeLabels[category.productType]?.label || category.productType}</span>
-                        {category.description && (
-                          <>
-                            <span>•</span>
-                            <span className="max-w-[200px] truncate">{category.description}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={category.isActive ? "default" : "secondary"}>
-                      {category.isActive ? "Hoạt động" : "Tạm ngưng"}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenEdit(category)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Chỉnh sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleActive(category)}>
-                          <Power className="mr-2 h-4 w-4" />
-                          {category.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setDeleteCategory(category)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {isColumnVisible("name") && <TableHead>Tên danh mục</TableHead>}
+                  {isColumnVisible("productType") && <TableHead>Loại món</TableHead>}
+                  {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
+                  {isColumnVisible("sortOrder") && <TableHead>Thứ tự</TableHead>}
+                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
+                  <TableHead className="w-[80px]">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCategories.map((category) => (
+                  <TableRow key={category.id}>
+                    {isColumnVisible("name") && (
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1.5 rounded ${typeLabels[category.productType]?.color || "bg-gray-100"}`}>
+                            <FolderOpen className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="font-medium">{category.name}</span>
+                        </div>
+                      </TableCell>
+                    )}
+                    {isColumnVisible("productType") && (
+                      <TableCell>
+                        <Badge variant="outline" className={typeLabels[category.productType]?.color}>
+                          {typeLabels[category.productType]?.label || category.productType}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    {isColumnVisible("description") && (
+                      <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                        {category.description || "-"}
+                      </TableCell>
+                    )}
+                    {isColumnVisible("sortOrder") && (
+                      <TableCell>{category.sortOrder}</TableCell>
+                    )}
+                    {isColumnVisible("isActive") && (
+                      <TableCell>
+                        <Badge variant={category.isActive ? "default" : "secondary"}>
+                          {category.isActive ? "Hoạt động" : "Tạm ngưng"}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEdit(category)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Chỉnh sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleActive(category)}>
+                            <Power className="mr-2 h-4 w-4" />
+                            {category.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setDeleteCategory(category)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

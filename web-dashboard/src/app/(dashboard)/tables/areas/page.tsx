@@ -8,6 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -38,6 +46,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto, type QuickTableDto } from "@/services/area-service";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+
+// Default column configuration
+const defaultColumns: ColumnConfig[] = [
+  { key: "name", label: "Tên khu vực", visible: true, locked: true },
+  { key: "description", label: "Mô tả", visible: true },
+  { key: "sortOrder", label: "Thứ tự", visible: false },
+  { key: "isActive", label: "Trạng thái", visible: true },
+];
 
 type DialogMode = "create" | "edit" | null;
 
@@ -52,6 +70,17 @@ export default function AreasPage() {
 
   // Global filter state from Redux
   const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
+
+  // Column configuration
+  const {
+    columns,
+    toggleColumn,
+    resetToDefault,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "areas-table-columns",
+    defaultColumns,
+  });
 
   const [areas, setAreas] = React.useState<Area[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -302,8 +331,19 @@ export default function AreasPage() {
       ) : (
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách khu vực</CardTitle>
-          <CardDescription>Tổng cộng {filteredAreas.length} khu vực</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Danh sách khu vực</CardTitle>
+              <CardDescription>Tổng cộng {filteredAreas.length} khu vực</CardDescription>
+            </div>
+            {filteredAreas.length > 0 && (
+              <ColumnConfigDialog
+                columns={columns}
+                onToggle={toggleColumn}
+                onReset={resetToDefault}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -319,27 +359,48 @@ export default function AreasPage() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredAreas.map((area) => (
-                <Card key={area.id} className="relative">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <MapPin className="h-5 w-5 text-primary" />
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {isColumnVisible("name") && <TableHead>Tên khu vực</TableHead>}
+                  {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
+                  {isColumnVisible("sortOrder") && <TableHead>Thứ tự</TableHead>}
+                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
+                  <TableHead className="w-[80px]">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAreas.map((area) => (
+                  <TableRow key={area.id}>
+                    {isColumnVisible("name") && (
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded bg-primary/10">
+                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                          <span className="font-medium">{area.name}</span>
                         </div>
-                        <div>
-                          <p className="font-medium">{area.name}</p>
-                          {area.description && (
-                            <p className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate">
-                              {area.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      </TableCell>
+                    )}
+                    {isColumnVisible("description") && (
+                      <TableCell className="max-w-[300px] truncate text-muted-foreground">
+                        {area.description || "-"}
+                      </TableCell>
+                    )}
+                    {isColumnVisible("sortOrder") && (
+                      <TableCell>{area.sortOrder}</TableCell>
+                    )}
+                    {isColumnVisible("isActive") && (
+                      <TableCell>
+                        <Badge variant={area.isActive ? "default" : "secondary"}>
+                          {area.isActive ? "Hoạt động" : "Tạm ngưng"}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -362,19 +423,11 @@ export default function AreasPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <Badge variant={area.isActive ? "default" : "secondary"}>
-                        {area.isActive ? "Hoạt động" : "Tạm ngưng"}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        Thứ tự: {area.sortOrder}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
