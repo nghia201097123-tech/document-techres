@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
-import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
+
+// ExcelJS and file-saver are loaded dynamically to avoid slowing down the app
+// They are only needed when downloading templates with real dropdowns
 
 /**
  * Export data to Excel file and trigger download
@@ -212,13 +213,20 @@ export function downloadTemplateWithDropdowns(
 
 /**
  * Create a template Excel file with REAL dropdown data validation using ExcelJS
+ * Uses dynamic imports to avoid loading heavy libraries at startup
  */
 export async function downloadTemplateWithRealDropdowns(
   columns: TemplateColumnWithDropdown[],
   filename: string,
   rowCount: number = 100
 ) {
-  const workbook = new ExcelJS.Workbook();
+  // Dynamic imports to avoid slowing down the app
+  const [ExcelJS, { saveAs }] = await Promise.all([
+    import("exceljs"),
+    import("file-saver"),
+  ]);
+
+  const workbook = new ExcelJS.default.Workbook();
 
   // Create main data entry sheet
   const mainSheet = workbook.addWorksheet("NhapDuLieu");
