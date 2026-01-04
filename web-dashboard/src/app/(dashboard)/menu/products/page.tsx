@@ -1422,10 +1422,10 @@ export default function ProductsPage() {
                     type="number"
                     min="0"
                     max="100"
-                    step="1"
+                    step="0.01"
                     placeholder="10"
-                    value={formData.vatRate ? Math.floor(formData.vatRate) : ""}
-                    onChange={(e) => setFormData({ ...formData, vatRate: Math.floor(Number(e.target.value)) || 0 })}
+                    value={formData.vatRate ?? ""}
+                    onChange={(e) => setFormData({ ...formData, vatRate: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
               </div>
