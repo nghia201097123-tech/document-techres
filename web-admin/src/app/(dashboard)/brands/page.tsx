@@ -51,6 +51,7 @@ import { formatDateTime } from "@/lib/utils";
 import { brandService } from "@/services/brand-service";
 import { companyService } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
+import { BrandWizard } from "@/components/brand-wizard";
 
 const businessModelLabels: Record<BusinessModel, string> = {
   order_only: "Chỉ Order",
@@ -86,6 +87,7 @@ export default function BrandsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterCompany, setFilterCompany] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isWizardOpen, setIsWizardOpen] = React.useState(false);
   const [selectedBrand, setSelectedBrand] = React.useState<Brand | null>(null);
   const [formData, setFormData] = React.useState<BrandFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
@@ -135,10 +137,11 @@ export default function BrandsPage() {
   }, [fetchBrands]);
 
   const handleOpenCreate = () => {
-    setSelectedBrand(null);
-    setFormData(initialFormData);
-    setIsViewMode(false);
-    setIsDialogOpen(true);
+    setIsWizardOpen(true);
+  };
+
+  const handleWizardSuccess = () => {
+    fetchBrands();
   };
 
   const handleOpenEdit = (brand: Brand) => {
@@ -493,6 +496,12 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Brand Wizard for creating new brand with branch */}
+      <BrandWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        onSuccess={handleWizardSuccess}
+      />
     </div>
   );
 }
