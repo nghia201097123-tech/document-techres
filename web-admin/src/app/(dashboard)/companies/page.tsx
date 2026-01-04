@@ -43,6 +43,18 @@ import { formatDateTime } from "@/lib/utils";
 import { companyService } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
 import { CompanyWizard } from "@/components/company-wizard";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+
+// Default column configuration
+const defaultColumns: ColumnConfig[] = [
+  { key: "company", label: "Công ty", visible: true, locked: true },
+  { key: "taxCode", label: "Mã số thuế", visible: true },
+  { key: "representative", label: "Người đại diện", visible: true },
+  { key: "contact", label: "Liên hệ", visible: true },
+  { key: "isActive", label: "Trạng thái", visible: true },
+  { key: "createdAt", label: "Ngày tạo", visible: true },
+];
 
 interface CompanyFormData {
   name: string;
@@ -75,6 +87,17 @@ export default function CompaniesPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
+
+  // Column configuration
+  const {
+    columns,
+    toggleColumn,
+    resetToDefault,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "companies-table-columns",
+    defaultColumns,
+  });
 
   // Fetch companies from API
   const fetchCompanies = React.useCallback(async () => {
@@ -218,13 +241,20 @@ export default function CompaniesPage() {
             <CardTitle className="text-lg">
               Danh sách công ty ({filteredCompanies.length})
             </CardTitle>
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm theo tên, mã..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+            <div className="flex items-center gap-2">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm theo tên, mã..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <ColumnConfigDialog
+                columns={columns}
+                onToggle={toggleColumn}
+                onReset={resetToDefault}
               />
             </div>
           </div>
@@ -233,51 +263,63 @@ export default function CompaniesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Công ty</TableHead>
-                <TableHead>Mã số thuế</TableHead>
-                <TableHead>Người đại diện</TableHead>
-                <TableHead>Liên hệ</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Ngày tạo</TableHead>
+                {isColumnVisible("company") && <TableHead>Công ty</TableHead>}
+                {isColumnVisible("taxCode") && <TableHead>Mã số thuế</TableHead>}
+                {isColumnVisible("representative") && <TableHead>Người đại diện</TableHead>}
+                {isColumnVisible("contact") && <TableHead>Liên hệ</TableHead>}
+                {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
+                {isColumnVisible("createdAt") && <TableHead>Ngày tạo</TableHead>}
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!isLoading && filteredCompanies.map((company) => (
                 <TableRow key={company.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Building2 className="h-5 w-5 text-primary" />
+                  {isColumnVisible("company") && (
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{company.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {company.code}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{company.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {company.code}
-                        </p>
+                    </TableCell>
+                  )}
+                  {isColumnVisible("taxCode") && (
+                    <TableCell>{company.taxCode || "-"}</TableCell>
+                  )}
+                  {isColumnVisible("representative") && (
+                    <TableCell>{company.representative || "-"}</TableCell>
+                  )}
+                  {isColumnVisible("contact") && (
+                    <TableCell>
+                      <div className="text-sm">
+                        <p>{company.phone}</p>
+                        <p className="text-muted-foreground">{company.email}</p>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{company.taxCode || "-"}</TableCell>
-                  <TableCell>{company.representative || "-"}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <p>{company.phone}</p>
-                      <p className="text-muted-foreground">{company.email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={company.isActive ? "success" : "secondary"}
-                      className="cursor-pointer"
-                      onClick={() => handleToggleStatus(company)}
-                    >
-                      {company.isActive ? "Hoạt động" : "Tạm dừng"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(company.createdAt)}
-                  </TableCell>
+                    </TableCell>
+                  )}
+                  {isColumnVisible("isActive") && (
+                    <TableCell>
+                      <Badge
+                        variant={company.isActive ? "success" : "secondary"}
+                        className="cursor-pointer"
+                        onClick={() => handleToggleStatus(company)}
+                      >
+                        {company.isActive ? "Hoạt động" : "Tạm dừng"}
+                      </Badge>
+                    </TableCell>
+                  )}
+                  {isColumnVisible("createdAt") && (
+                    <TableCell className="text-muted-foreground">
+                      {formatDateTime(company.createdAt)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -305,7 +347,7 @@ export default function CompaniesPage() {
               ))}
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={columns.filter(c => c.visible).length + 1} className="h-24 text-center">
                     <div className="flex items-center justify-center">
                       <Loader2 className="h-6 w-6 animate-spin mr-2" />
                       Đang tải...
@@ -315,7 +357,7 @@ export default function CompaniesPage() {
               )}
               {!isLoading && filteredCompanies.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={columns.filter(c => c.visible).length + 1} className="h-24 text-center">
                     Không tìm thấy công ty nào
                   </TableCell>
                 </TableRow>
