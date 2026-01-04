@@ -139,7 +139,7 @@ export default function CategoriesPage() {
 
       if (dialogMode === "create") {
         const result = await categoryService.create(formData);
-        setCategories((prev) => [...prev, result]);
+        setCategories((prev) => [result, ...prev]);
         toast({ title: "Thành công", description: "Đã tạo danh mục mới" });
         if (continueCreating) {
           setFormData({ name: "", productType: formData.productType, description: "", sortOrder: 0 });

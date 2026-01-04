@@ -191,7 +191,7 @@ export default function AreasPage() {
             : undefined,
         };
         const result = await areaService.create(createData);
-        setAreas((prev) => [...prev, result]);
+        setAreas((prev) => [result, ...prev]);
         const tableCount = quickTables.length;
         toast({
           title: "Thành công",

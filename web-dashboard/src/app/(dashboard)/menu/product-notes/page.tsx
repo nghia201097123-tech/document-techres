@@ -165,7 +165,7 @@ export default function ProductNotesPage() {
           name: formName.trim(),
           description: formDescription.trim() || undefined,
         });
-        setNotes((prev) => [...prev, newNote]);
+        setNotes((prev) => [newNote, ...prev]);
         toast({ title: "Thành công", description: `Đã tạo ghi chú "${newNote.name}"` });
         if (continueCreating) {
           setFormName("");

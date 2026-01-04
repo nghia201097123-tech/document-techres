@@ -197,7 +197,7 @@ export default function TablesPage() {
 
     // Create new area
     const newArea = await areaService.create({ name: areaName });
-    setAreas(prev => [...prev, newArea]);
+    setAreas(prev => [newArea, ...prev]);
     toast({ title: "Thành công", description: `Đã tạo khu vực "${areaName}"` });
     return newArea.id;
   };
@@ -227,7 +227,7 @@ export default function TablesPage() {
 
       if (dialogMode === "create") {
         const result = await tableService.create({ ...formData, areaId });
-        setTables((prev) => [...prev, result]);
+        setTables((prev) => [result, ...prev]);
         toast({ title: "Thành công", description: `Đã tạo bàn "${result.name}"` });
 
         // If continue creating is checked, reset form but keep dialog open

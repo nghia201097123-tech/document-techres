@@ -424,7 +424,7 @@ export default function StaffPage() {
       try {
         setSaving(true);
         const result = await staffService.create(formData);
-        setStaffList((prev) => [...prev, result]);
+        setStaffList((prev) => [result, ...prev]);
         // Mark as new staff
         setNewStaffIds((prev) => new Set(prev).add(result.id));
 

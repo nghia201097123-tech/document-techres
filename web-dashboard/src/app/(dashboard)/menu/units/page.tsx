@@ -119,7 +119,7 @@ export default function UnitsPage() {
 
       if (dialogMode === "create") {
         const result = await unitService.create(formData);
-        setUnits((prev) => [...prev, result]);
+        setUnits((prev) => [result, ...prev]);
         toast({ title: "Thành công", description: "Đã tạo đơn vị tính mới" });
       } else if (dialogMode === "edit" && selectedUnit) {
         const updateData: UpdateUnitDto = {

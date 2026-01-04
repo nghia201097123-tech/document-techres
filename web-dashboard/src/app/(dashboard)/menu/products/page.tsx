@@ -671,7 +671,7 @@ export default function ProductsPage() {
 
       if (dialogMode === "create") {
         const result = await productService.create(preparedData);
-        setProducts((prev) => [...prev, result]);
+        setProducts((prev) => [result, ...prev]);
         // Mark as new product
         setNewProductIds((prev) => new Set(prev).add(result.id));
         toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });

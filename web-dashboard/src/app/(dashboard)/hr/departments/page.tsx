@@ -132,7 +132,7 @@ export default function DepartmentsPage() {
 
       if (dialogMode === "create") {
         const result = await departmentService.create(formData);
-        setDepartments((prev) => [...prev, result]);
+        setDepartments((prev) => [result, ...prev]);
         setExpandedIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: `Đã tạo bộ phận "${result.name}"` });
         if (continueCreating) {
