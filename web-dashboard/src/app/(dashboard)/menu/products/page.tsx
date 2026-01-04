@@ -1404,12 +1404,15 @@ export default function ProductsPage() {
                   <Label htmlFor="price">Giá đã bao gồm VAT (VNĐ) *</Label>
                   <Input
                     id="price"
-                    type="number"
-                    min="0"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
                     placeholder="0"
-                    value={formData.price ? Math.floor(formData.price) : ""}
-                    onChange={(e) => setFormData({ ...formData, price: Math.floor(Number(e.target.value)) || 0 })}
+                    value={formData.price ? new Intl.NumberFormat("vi-VN").format(Math.floor(formData.price)) : ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\./g, "");
+                      const numValue = parseInt(rawValue, 10);
+                      setFormData({ ...formData, price: isNaN(numValue) ? 0 : numValue });
+                    }}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1478,12 +1481,15 @@ export default function ProductsPage() {
                   <Label htmlFor="costPrice">Giá vốn (VNĐ)</Label>
                   <Input
                     id="costPrice"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="30000"
-                    value={formData.costPrice ? Math.floor(formData.costPrice) : ""}
-                    onChange={(e) => setFormData({ ...formData, costPrice: Math.floor(Number(e.target.value)) || 0 })}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="30.000"
+                    value={formData.costPrice ? new Intl.NumberFormat("vi-VN").format(Math.floor(formData.costPrice)) : ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\./g, "");
+                      const numValue = parseInt(rawValue, 10);
+                      setFormData({ ...formData, costPrice: isNaN(numValue) ? 0 : numValue });
+                    }}
                   />
                 </div>
               </div>
