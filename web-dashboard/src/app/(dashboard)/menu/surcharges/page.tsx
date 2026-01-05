@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -119,6 +120,9 @@ export default function SurchargesPage() {
   // Separate state for VAT input to allow decimal typing
   const [vatRateInput, setVatRateInput] = React.useState<string>("");
 
+  // Continue creating checkbox state
+  const [continueCreating, setContinueCreating] = React.useState(false);
+
   // Load surcharges - only when brand is selected
   const loadSurcharges = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -211,7 +215,13 @@ export default function SurchargesPage() {
         toast({ title: "Thành công", description: "Đã cập nhật phụ thu" });
       }
 
-      handleCloseDialog();
+      // If continue creating is checked and in create mode, reset form instead of closing
+      if (continueCreating && dialogMode === "create") {
+        setFormData({ name: "", description: "", amount: 0, vatRate: 0, sortOrder: 0 });
+        setVatRateInput("");
+      } else {
+        handleCloseDialog();
+      }
     } catch (error: any) {
       console.error("Error saving surcharge:", error);
       toast({
@@ -532,14 +542,28 @@ export default function SurchargesPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving || !formData.name.trim()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo phụ thu" : "Cập nhật"}
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-3">
+              {dialogMode === "create" && (
+                <div className="flex items-center space-x-2 mr-auto">
+                  <Checkbox
+                    id="continueCreating"
+                    checked={continueCreating}
+                    onCheckedChange={(checked) => setContinueCreating(checked as boolean)}
+                  />
+                  <Label htmlFor="continueCreating" className="text-sm font-normal cursor-pointer">
+                    Tiếp tục tạo
+                  </Label>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Hủy
+                </Button>
+                <Button type="submit" disabled={saving || !formData.name.trim()}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {dialogMode === "create" ? "Tạo phụ thu" : "Cập nhật"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
