@@ -454,10 +454,11 @@ export default function SurchargesPage() {
                     type="text"
                     inputMode="numeric"
                     placeholder="200000"
-                    value={formData.amount || ""}
+                    value={formData.amount ? new Intl.NumberFormat("vi-VN").format(Math.floor(formData.amount)) : ""}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/[^\d]/g, "");
-                      setFormData({ ...formData, amount: parseInt(value) || 0 });
+                      const rawValue = e.target.value.replace(/\./g, "");
+                      const numValue = parseInt(rawValue, 10);
+                      setFormData({ ...formData, amount: isNaN(numValue) ? 0 : numValue });
                     }}
                     required
                   />
