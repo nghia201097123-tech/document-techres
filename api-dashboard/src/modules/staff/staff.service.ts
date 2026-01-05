@@ -247,4 +247,155 @@ export class StaffService {
 
     return result;
   }
+
+  /**
+   * Bulk update department for multiple staff
+   */
+  async bulkUpdateDepartment(
+    tenantId: string,
+    staffIds: string[],
+    departmentId: string,
+  ): Promise<{ success: number; failed: number; errors: { staffId: string; message: string }[] }> {
+    const result = { success: 0, failed: 0, errors: [] as { staffId: string; message: string }[] };
+
+    for (const staffId of staffIds) {
+      try {
+        const staff = await this.staffRepository.findOne({
+          where: { tenantId, id: staffId },
+        });
+
+        if (!staff) {
+          result.errors.push({ staffId, message: 'Không tìm thấy nhân viên' });
+          result.failed++;
+          continue;
+        }
+
+        staff.departmentId = departmentId;
+        await this.staffRepository.save(staff);
+        result.success++;
+      } catch (error) {
+        result.errors.push({ staffId, message: error.message || 'Lỗi không xác định' });
+        result.failed++;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Bulk update branch for multiple staff
+   */
+  async bulkUpdateBranch(
+    tenantId: string,
+    staffIds: string[],
+    branchId: string,
+  ): Promise<{ success: number; failed: number; errors: { staffId: string; message: string }[] }> {
+    const result = { success: 0, failed: 0, errors: [] as { staffId: string; message: string }[] };
+
+    for (const staffId of staffIds) {
+      try {
+        const staff = await this.staffRepository.findOne({
+          where: { tenantId, id: staffId },
+        });
+
+        if (!staff) {
+          result.errors.push({ staffId, message: 'Không tìm thấy nhân viên' });
+          result.failed++;
+          continue;
+        }
+
+        staff.branchId = branchId;
+        await this.staffRepository.save(staff);
+        result.success++;
+      } catch (error) {
+        result.errors.push({ staffId, message: error.message || 'Lỗi không xác định' });
+        result.failed++;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Bulk toggle active status for multiple staff
+   */
+  async bulkToggleActive(
+    tenantId: string,
+    staffIds: string[],
+    isActive: boolean,
+  ): Promise<{ success: number; failed: number; errors: { staffId: string; message: string }[] }> {
+    const result = { success: 0, failed: 0, errors: [] as { staffId: string; message: string }[] };
+
+    for (const staffId of staffIds) {
+      try {
+        const staff = await this.staffRepository.findOne({
+          where: { tenantId, id: staffId },
+        });
+
+        if (!staff) {
+          result.errors.push({ staffId, message: 'Không tìm thấy nhân viên' });
+          result.failed++;
+          continue;
+        }
+
+        staff.isActive = isActive;
+        await this.staffRepository.save(staff);
+        result.success++;
+      } catch (error) {
+        result.errors.push({ staffId, message: error.message || 'Lỗi không xác định' });
+        result.failed++;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Bulk reset password for multiple staff
+   */
+  async bulkResetPassword(
+    tenantId: string,
+    staffIds: string[],
+    newPassword?: string,
+  ): Promise<{
+    success: number;
+    failed: number;
+    errors: { staffId: string; message: string }[];
+    passwords: { staffId: string; username: string; password: string }[];
+  }> {
+    const result = {
+      success: 0,
+      failed: 0,
+      errors: [] as { staffId: string; message: string }[],
+      passwords: [] as { staffId: string; username: string; password: string }[],
+    };
+
+    for (const staffId of staffIds) {
+      try {
+        const staff = await this.staffRepository.findOne({
+          where: { tenantId, id: staffId },
+        });
+
+        if (!staff) {
+          result.errors.push({ staffId, message: 'Không tìm thấy nhân viên' });
+          result.failed++;
+          continue;
+        }
+
+        const password = newPassword || this.generateTempPassword();
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        staff.passwordHash = passwordHash;
+        await this.staffRepository.save(staff);
+
+        result.passwords.push({ staffId, username: staff.username, password });
+        result.success++;
+      } catch (error) {
+        result.errors.push({ staffId, message: error.message || 'Lỗi không xác định' });
+        result.failed++;
+      }
+    }
+
+    return result;
+  }
 }

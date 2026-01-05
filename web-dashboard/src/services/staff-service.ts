@@ -125,3 +125,45 @@ export interface BulkImportResult {
   updated: number;
   errors: { row: number; message: string }[];
 }
+
+// Bulk Operations Types
+export interface BulkOperationResult {
+  success: number;
+  failed: number;
+  errors: { staffId: string; message: string }[];
+  passwords?: { staffId: string; username: string; password: string }[];
+}
+
+export const bulkStaffService = {
+  updateDepartment: async (staffIds: string[], departmentId: string): Promise<BulkOperationResult> => {
+    const response = await api.post<BulkOperationResult>("/staff/bulk/update-department", {
+      staffIds,
+      departmentId,
+    });
+    return response.data;
+  },
+
+  updateBranch: async (staffIds: string[], branchId: string): Promise<BulkOperationResult> => {
+    const response = await api.post<BulkOperationResult>("/staff/bulk/update-branch", {
+      staffIds,
+      branchId,
+    });
+    return response.data;
+  },
+
+  toggleActive: async (staffIds: string[], isActive: boolean): Promise<BulkOperationResult> => {
+    const response = await api.post<BulkOperationResult>("/staff/bulk/toggle-active", {
+      staffIds,
+      isActive,
+    });
+    return response.data;
+  },
+
+  resetPassword: async (staffIds: string[], newPassword?: string): Promise<BulkOperationResult> => {
+    const response = await api.post<BulkOperationResult>("/staff/bulk/reset-password", {
+      staffIds,
+      newPassword,
+    });
+    return response.data;
+  },
+};

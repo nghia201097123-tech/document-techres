@@ -2,7 +2,15 @@ import { Controller, Get, Post, Put, Patch, Param, Body, Query, UseGuards, Reque
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateStaffDto, UpdateStaffDto, BulkImportStaffDto } from './dto';
+import {
+  CreateStaffDto,
+  UpdateStaffDto,
+  BulkImportStaffDto,
+  BulkUpdateDepartmentDto,
+  BulkUpdateBranchDto,
+  BulkToggleActiveDto,
+  BulkResetPasswordDto,
+} from './dto';
 
 @ApiTags('Staff')
 @Controller('staff')
@@ -60,6 +68,46 @@ export class StaffController {
       req.user.tenantId,
       req.user.companyId,
       bulkDto,
+    );
+  }
+
+  @Post('bulk/update-department')
+  @ApiOperation({ summary: 'Chuyển bộ phận cho nhiều nhân viên' })
+  bulkUpdateDepartment(@Request() req, @Body() dto: BulkUpdateDepartmentDto) {
+    return this.staffService.bulkUpdateDepartment(
+      req.user.tenantId,
+      dto.staffIds,
+      dto.departmentId,
+    );
+  }
+
+  @Post('bulk/update-branch')
+  @ApiOperation({ summary: 'Chuyển chi nhánh cho nhiều nhân viên' })
+  bulkUpdateBranch(@Request() req, @Body() dto: BulkUpdateBranchDto) {
+    return this.staffService.bulkUpdateBranch(
+      req.user.tenantId,
+      dto.staffIds,
+      dto.branchId,
+    );
+  }
+
+  @Post('bulk/toggle-active')
+  @ApiOperation({ summary: 'Bật/tắt trạng thái nhiều nhân viên' })
+  bulkToggleActive(@Request() req, @Body() dto: BulkToggleActiveDto) {
+    return this.staffService.bulkToggleActive(
+      req.user.tenantId,
+      dto.staffIds,
+      dto.isActive,
+    );
+  }
+
+  @Post('bulk/reset-password')
+  @ApiOperation({ summary: 'Reset mật khẩu nhiều nhân viên' })
+  bulkResetPassword(@Request() req, @Body() dto: BulkResetPasswordDto) {
+    return this.staffService.bulkResetPassword(
+      req.user.tenantId,
+      dto.staffIds,
+      dto.newPassword,
     );
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2 } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, Building2, UserCog, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +40,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem } from "@/services/staff-service";
+import { staffService, bulkStaffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem, type BulkOperationResult } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
 import { locationService } from "@/services/location-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
@@ -183,6 +183,7 @@ const initialImportSettings: ImportSettings = {
 };
 
 type DialogMode = "create" | "edit" | "view" | "import" | null;
+type BulkOperation = "department" | "branch" | "activate" | "deactivate" | "reset-password" | null;
 
 export default function StaffPage() {
   const dispatch = useAppDispatch();
@@ -234,6 +235,15 @@ export default function StaffPage() {
 
   // Reset password state
   const [resetPasswordResult, setResetPasswordResult] = React.useState<{ staff: Staff; temporaryPassword: string } | null>(null);
+
+  // Bulk operations state
+  const [selectedStaffIds, setSelectedStaffIds] = React.useState<Set<string>>(new Set());
+  const [bulkOperation, setBulkOperation] = React.useState<BulkOperation>(null);
+  const [bulkDepartmentId, setBulkDepartmentId] = React.useState("");
+  const [bulkBranchId, setBulkBranchId] = React.useState("");
+  const [processingBulk, setProcessingBulk] = React.useState(false);
+  const [bulkResult, setBulkResult] = React.useState<BulkOperationResult | null>(null);
+  const [copiedPasswords, setCopiedPasswords] = React.useState<Set<string>>(new Set());
 
   // Permission states
   const [permissionDialogOpen, setPermissionDialogOpen] = React.useState(false);
@@ -515,6 +525,117 @@ export default function StaffPage() {
       console.error("Error resetting password:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi reset mật khẩu", variant: "destructive" });
     }
+  };
+
+  // Bulk selection handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedStaffIds(new Set(filteredStaff.map((s) => s.id)));
+    } else {
+      setSelectedStaffIds(new Set());
+    }
+  };
+
+  const handleSelectStaff = (staffId: string, checked: boolean) => {
+    const newSet = new Set(selectedStaffIds);
+    if (checked) {
+      newSet.add(staffId);
+    } else {
+      newSet.delete(staffId);
+    }
+    setSelectedStaffIds(newSet);
+  };
+
+  const isAllSelected = filteredStaff.length > 0 && selectedStaffIds.size === filteredStaff.length;
+  const isSomeSelected = selectedStaffIds.size > 0 && selectedStaffIds.size < filteredStaff.length;
+
+  // Bulk operation handlers
+  const handleCloseBulkDialog = () => {
+    setBulkOperation(null);
+    setBulkDepartmentId("");
+    setBulkBranchId("");
+    setBulkResult(null);
+    setCopiedPasswords(new Set());
+  };
+
+  const handleBulkOperation = async () => {
+    if (selectedStaffIds.size === 0) return;
+
+    const staffIds = Array.from(selectedStaffIds);
+    setProcessingBulk(true);
+
+    try {
+      let result: BulkOperationResult;
+
+      switch (bulkOperation) {
+        case "department":
+          if (!bulkDepartmentId) {
+            toast({ title: "Lỗi", description: "Vui lòng chọn bộ phận", variant: "destructive" });
+            return;
+          }
+          result = await bulkStaffService.updateDepartment(staffIds, bulkDepartmentId);
+          break;
+        case "branch":
+          if (!bulkBranchId) {
+            toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
+            return;
+          }
+          result = await bulkStaffService.updateBranch(staffIds, bulkBranchId);
+          break;
+        case "activate":
+          result = await bulkStaffService.toggleActive(staffIds, true);
+          break;
+        case "deactivate":
+          result = await bulkStaffService.toggleActive(staffIds, false);
+          break;
+        case "reset-password":
+          result = await bulkStaffService.resetPassword(staffIds);
+          setBulkResult(result);
+          return; // Don't close dialog, show passwords
+        default:
+          return;
+      }
+
+      toast({
+        title: "Thành công",
+        description: `Đã xử lý ${result.success}/${staffIds.length} nhân viên`,
+      });
+
+      // Reload staff list
+      loadStaff();
+      setSelectedStaffIds(new Set());
+      handleCloseBulkDialog();
+    } catch (error: any) {
+      console.error("Bulk operation error:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingBulk(false);
+    }
+  };
+
+  const handleCopyPassword = (password: string, staffId: string) => {
+    navigator.clipboard.writeText(password);
+    setCopiedPasswords(prev => new Set(prev).add(staffId));
+    setTimeout(() => {
+      setCopiedPasswords(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(staffId);
+        return newSet;
+      });
+    }, 2000);
+  };
+
+  const handleCopyAllPasswords = () => {
+    if (!bulkResult?.passwords) return;
+    const text = bulkResult.passwords
+      .map(p => `${p.username}: ${p.password}`)
+      .join("\n");
+    navigator.clipboard.writeText(text);
+    toast({ title: "Đã sao chép", description: "Tất cả mật khẩu đã được sao chép" });
   };
 
   // Open permission dialog
@@ -1072,10 +1193,68 @@ export default function StaffPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {isColumnVisible("avatar") && <TableHead className="w-[50px]">Ảnh</TableHead>}
+            <>
+              {/* Selection bar with bulk actions */}
+              {selectedStaffIds.size > 0 && (
+                <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-lg mb-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={handleSelectAll}
+                      className="data-[state=indeterminate]:bg-primary"
+                      {...(isSomeSelected ? { "data-state": "indeterminate" } : {})}
+                    />
+                    <span className="text-sm font-medium">
+                      Đã chọn {selectedStaffIds.size} nhân viên
+                    </span>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Thao tác hàng loạt
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => setBulkOperation("department")}>
+                        <UserCog className="mr-2 h-4 w-4" />
+                        Chuyển bộ phận
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("branch")}>
+                        <Building2 className="mr-2 h-4 w-4" />
+                        Chuyển chi nhánh
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBulkOperation("activate")}>
+                        <Power className="mr-2 h-4 w-4 text-green-600" />
+                        Kích hoạt tất cả
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("deactivate")}>
+                        <Power className="mr-2 h-4 w-4 text-orange-500" />
+                        Tạm ngưng tất cả
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBulkOperation("reset-password")}>
+                        <KeyRound className="mr-2 h-4 w-4" />
+                        Reset mật khẩu
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={handleSelectAll}
+                        className="data-[state=indeterminate]:bg-primary"
+                        {...(isSomeSelected ? { "data-state": "indeterminate" } : {})}
+                      />
+                    </TableHead>
+                    {isColumnVisible("avatar") && <TableHead className="w-[50px]">Ảnh</TableHead>}
                   {isColumnVisible("name") && <TableHead>Tên nhân viên</TableHead>}
                   {isColumnVisible("username") && <TableHead>Username</TableHead>}
                   {isColumnVisible("phone") && <TableHead>Số điện thoại</TableHead>}
@@ -1095,7 +1274,13 @@ export default function StaffPage() {
               </TableHeader>
               <TableBody>
                 {filteredStaff.map((staff) => (
-                  <TableRow key={staff.id}>
+                  <TableRow key={staff.id} className={selectedStaffIds.has(staff.id) ? "bg-muted/50" : ""}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedStaffIds.has(staff.id)}
+                        onCheckedChange={(checked) => handleSelectStaff(staff.id, checked as boolean)}
+                      />
+                    </TableCell>
                     {isColumnVisible("avatar") && (
                       <TableCell>
                         <Avatar className="h-8 w-8">
@@ -1173,9 +1358,161 @@ export default function StaffPage() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Operation Dialog */}
+      <Dialog open={bulkOperation !== null} onOpenChange={(open) => !open && handleCloseBulkDialog()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {bulkOperation === "department" && "Chuyển bộ phận"}
+              {bulkOperation === "branch" && "Chuyển chi nhánh"}
+              {bulkOperation === "activate" && "Kích hoạt nhân viên"}
+              {bulkOperation === "deactivate" && "Tạm ngưng nhân viên"}
+              {bulkOperation === "reset-password" && (bulkResult ? "Kết quả reset mật khẩu" : "Reset mật khẩu")}
+            </DialogTitle>
+            <DialogDescription>
+              {!bulkResult && `Thao tác sẽ áp dụng cho ${selectedStaffIds.size} nhân viên đã chọn`}
+              {bulkResult && `Đã reset thành công ${bulkResult.success}/${selectedStaffIds.size} mật khẩu`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Department selection */}
+          {bulkOperation === "department" && !bulkResult && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn bộ phận mới</Label>
+                <Select value={bulkDepartmentId} onValueChange={setBulkDepartmentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn bộ phận..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Branch selection */}
+          {bulkOperation === "branch" && !bulkResult && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn chi nhánh mới</Label>
+                <Select value={bulkBranchId} onValueChange={setBulkBranchId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn chi nhánh..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(filterBrandId && branchesByBrand[filterBrandId] || []).map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Activate/Deactivate confirmation */}
+          {(bulkOperation === "activate" || bulkOperation === "deactivate") && !bulkResult && (
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">
+                Bạn có chắc chắn muốn <strong>{bulkOperation === "activate" ? "kích hoạt" : "tạm ngưng"}</strong> {selectedStaffIds.size} nhân viên đã chọn?
+              </p>
+            </div>
+          )}
+
+          {/* Reset password confirmation or result */}
+          {bulkOperation === "reset-password" && (
+            <div className="py-4">
+              {!bulkResult ? (
+                <p className="text-sm text-muted-foreground">
+                  Bạn có chắc chắn muốn reset mật khẩu cho {selectedStaffIds.size} nhân viên đã chọn?
+                  <br />
+                  <span className="text-orange-500">Mật khẩu mới sẽ được hiển thị sau khi hoàn tất.</span>
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={handleCopyAllPasswords}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Sao chép tất cả
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-[300px] border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Username</TableHead>
+                          <TableHead>Mật khẩu mới</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bulkResult.passwords?.map((p) => (
+                          <TableRow key={p.staffId}>
+                            <TableCell className="font-mono text-sm">{p.username}</TableCell>
+                            <TableCell className="font-mono text-sm">{p.password}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleCopyPassword(p.password, p.staffId)}
+                              >
+                                {copiedPasswords.has(p.staffId) ? (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                  {bulkResult.errors.length > 0 && (
+                    <div className="text-sm text-destructive">
+                      {bulkResult.failed} nhân viên không thể reset mật khẩu
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseBulkDialog}>
+              {bulkResult ? "Đóng" : "Hủy"}
+            </Button>
+            {!bulkResult && (
+              <Button onClick={handleBulkOperation} disabled={processingBulk}>
+                {processingBulk && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Xác nhận
+              </Button>
+            )}
+            {bulkResult && (
+              <Button onClick={() => {
+                loadStaff();
+                setSelectedStaffIds(new Set());
+                handleCloseBulkDialog();
+              }}>
+                Hoàn tất
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Staff Dialog */}
       <Dialog open={dialogMode === "view"} onOpenChange={() => handleCloseDialog()}>
