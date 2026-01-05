@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Put, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateDepartmentDto, UpdateDepartmentDto } from './dto';
+import { CreateDepartmentDto, UpdateDepartmentDto, TransferAndDeleteDto } from './dto';
 
 @ApiTags('Departments')
 @Controller('departments')
@@ -50,5 +50,37 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Kích hoạt/Tạm ngưng bộ phận' })
   toggleActive(@Request() req, @Param('id') id: string) {
     return this.departmentsService.toggleActive(req.user.tenantId, id);
+  }
+
+  @Get(':id/staff-count')
+  @ApiOperation({ summary: 'Lấy số lượng nhân viên của bộ phận và các bộ phận con' })
+  getStaffCount(@Request() req, @Param('id') id: string) {
+    return this.departmentsService.getStaffCount(req.user.tenantId, id);
+  }
+
+  @Patch(':id/toggle-active-cascade')
+  @ApiOperation({ summary: 'Kích hoạt/Tạm ngưng bộ phận và tất cả bộ phận con, nhân viên' })
+  toggleActiveCascade(@Request() req, @Param('id') id: string) {
+    return this.departmentsService.toggleActiveCascade(req.user.tenantId, id);
+  }
+
+  @Post(':id/transfer-and-delete')
+  @ApiOperation({ summary: 'Chuyển nhân viên sang bộ phận khác và xóa bộ phận' })
+  transferAndDelete(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: TransferAndDeleteDto,
+  ) {
+    return this.departmentsService.transferStaffAndDelete(
+      req.user.tenantId,
+      id,
+      dto.targetDepartmentId,
+    );
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Xóa bộ phận (chỉ khi không có nhân viên)' })
+  delete(@Request() req, @Param('id') id: string) {
+    return this.departmentsService.delete(req.user.tenantId, id);
   }
 }
