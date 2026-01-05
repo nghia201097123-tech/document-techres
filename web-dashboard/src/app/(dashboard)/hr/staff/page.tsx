@@ -223,6 +223,8 @@ export default function StaffPage() {
 
   // Track newly created staff IDs for "New" badge
   const [newStaffIds, setNewStaffIds] = React.useState<Set<string>>(new Set());
+  // Track updated staff IDs for "Updated" badge
+  const [updatedStaffIds, setUpdatedStaffIds] = React.useState<Set<string>>(new Set());
 
   // Import state
   const [importData, setImportData] = React.useState<Partial<BulkStaffItem>[]>([]);
@@ -401,14 +403,9 @@ export default function StaffPage() {
   const handleOpenView = (staff: Staff) => {
     setSelectedStaff(staff);
     setDialogMode("view");
-    // Remove "new" badge when viewing
-    if (newStaffIds.has(staff.id)) {
-      setNewStaffIds((prev) => {
-        const next = new Set(prev);
-        next.delete(staff.id);
-        return next;
-      });
-    }
+    // Remove badges when viewing
+    setNewStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
+    setUpdatedStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
   };
 
   // Open edit dialog
@@ -431,14 +428,9 @@ export default function StaffPage() {
       usernamePrefix: "tr",
     });
     setDialogMode("edit");
-    // Remove "new" badge when editing
-    if (newStaffIds.has(staff.id)) {
-      setNewStaffIds((prev) => {
-        const next = new Set(prev);
-        next.delete(staff.id);
-        return next;
-      });
-    }
+    // Remove badges when editing
+    setNewStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
+    setUpdatedStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
   };
 
   // Handle form submit (create or update)
@@ -503,6 +495,14 @@ export default function StaffPage() {
         setSaving(true);
         const result = await staffService.update(selectedStaff.id, updateData);
         setStaffList((prev) => prev.map((s) => (s.id === selectedStaff.id ? result : s)));
+        // Mark as updated staff
+        setUpdatedStaffIds((prev) => new Set([...prev, result.id]));
+        // Remove from new if was new
+        setNewStaffIds((prev) => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật thông tin nhân viên" });
         handleCloseDialog();
       } catch (error: any) {
@@ -1313,6 +1313,9 @@ export default function StaffPage() {
                           {staff.name}
                           {newStaffIds.has(staff.id) && (
                             <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Mới</Badge>
+                          )}
+                          {updatedStaffIds.has(staff.id) && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Vừa cập nhật</Badge>
                           )}
                         </div>
                       </TableCell>

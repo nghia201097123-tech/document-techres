@@ -25,7 +25,10 @@ export class StaffService {
       .leftJoinAndSelect('staff.brand', 'brand')
       .where('staff.tenantId = :tenantId', { tenantId });
 
-    if (branchId) {
+    // Only filter by branchId if it's a valid UUID (not "all" or empty)
+    const isValidUUID = branchId && branchId !== 'all' && branchId !== '' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId);
+    if (isValidUUID) {
       query.andWhere('staff.branchId = :branchId', { branchId });
     }
 
