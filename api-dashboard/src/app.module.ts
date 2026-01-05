@@ -50,6 +50,7 @@ import {
   ComboItem,
   Surcharge,
   SeasonalPrice,
+  SeasonalPriceProduct,
   GiftItem,
   Voucher,
 } from './database/entities';
@@ -100,6 +101,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           ComboItem,
           Surcharge,
           SeasonalPrice,
+          SeasonalPriceProduct,
           GiftItem,
           Voucher,
         ],
