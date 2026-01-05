@@ -51,6 +51,7 @@ import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { useAuthStore } from "@/stores/auth-store";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -191,6 +192,7 @@ type BulkOperation = "department" | "branch" | "activate" | "deactivate" | "rese
 export default function StaffPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
+  const tenantId = useAuthStore((state) => state.tenantId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Column configuration hook
@@ -2452,7 +2454,7 @@ export default function StaffPage() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    const text = `Tên định danh: ${createdStaff.name}\nTài khoản: ${createdStaff.username}\nMật khẩu: ${createdStaff.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
+                    const text = `Tên định danh: ${tenantId}\nTài khoản: ${createdStaff.username}\nMật khẩu: ${createdStaff.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
                     navigator.clipboard.writeText(text);
                     toast({ title: "Đã copy thông tin đăng nhập" });
                   }}
@@ -2768,7 +2770,7 @@ export default function StaffPage() {
               variant="outline"
               onClick={() => {
                 if (resetPasswordResult) {
-                  const text = `Tên định danh: ${resetPasswordResult.staff.name}\nTài khoản: ${resetPasswordResult.staff.username}\nMật khẩu: ${resetPasswordResult.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
+                  const text = `Tên định danh: ${tenantId}\nTài khoản: ${resetPasswordResult.staff.username}\nMật khẩu: ${resetPasswordResult.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
                   navigator.clipboard.writeText(text);
                   toast({ title: "Đã copy thông tin đăng nhập" });
                 }
