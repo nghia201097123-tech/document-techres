@@ -1,4 +1,13 @@
-import api from "./api";
+import axios from "axios";
+
+// Upload service base URL - separate microservice
+const UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL || "http://localhost:3003/api";
+
+// Create axios instance for upload service
+const uploadApi = axios.create({
+  baseURL: UPLOAD_API_URL,
+  timeout: 120000, // 2 minutes for large files
+});
 
 export enum FileType {
   IMAGE = "image",
@@ -13,33 +22,29 @@ export interface UploadResult {
   fileName: string;
   mimeType: string;
   size: number;
-  bucket: string;
+  fileType: FileType;
   objectName: string;
   url: string;
-  shortUrl: string;
   shortCode: string;
+  shortUrl: string;
 }
 
 export interface FileInfo {
-  id: string;
-  originalName: string;
-  fileName: string;
-  mimeType: string;
-  fileSize: number;
-  fileType: FileType;
-  url: string;
-  shortUrl: string;
   shortCode: string;
+  url: string;
+  objectName: string;
+  shortUrl: string;
   createdAt: string;
 }
 
 export interface PresignedUrlResponse {
   url: string;
   expiresIn: number;
+  objectName: string;
 }
 
 /**
- * Upload Service - Dịch vụ upload file lên MinIO
+ * Upload Service - Dịch vụ upload file riêng biệt (api-upload microservice)
  *
  * Sử dụng:
  * - uploadService.uploadImage(file) - Upload 1 hình ảnh
@@ -48,7 +53,10 @@ export interface PresignedUrlResponse {
  * - uploadService.uploadDocument(file) - Upload tài liệu
  * - uploadService.uploadFile(file) - Upload file bất kỳ
  *
- * Response trả về shortUrl để hiển thị: /api/uploads/s/{shortCode}
+ * Response trả về:
+ * - url: URL đầy đủ trên MinIO
+ * - shortUrl: /api/uploads/s/{shortCode}
+ * - shortCode: Mã ngắn để truy cập file
  */
 export const uploadService = {
   /**
@@ -61,7 +69,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await api.post<UploadResult>("/uploads/image", formData, {
+    const response = await uploadApi.post<UploadResult>("/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
     });
@@ -80,7 +88,7 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await api.post<UploadResult[]>("/uploads/images", formData, {
+    const response = await uploadApi.post<UploadResult[]>("/uploads/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
     });
@@ -97,7 +105,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await api.post<UploadResult>("/uploads/video", formData, {
+    const response = await uploadApi.post<UploadResult>("/uploads/video", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
     });
@@ -114,7 +122,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await api.post<UploadResult>("/uploads/document", formData, {
+    const response = await uploadApi.post<UploadResult>("/uploads/document", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
     });
@@ -131,7 +139,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await api.post<UploadResult>("/uploads/file", formData, {
+    const response = await uploadApi.post<UploadResult>("/uploads/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
     });
@@ -150,7 +158,7 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await api.post<UploadResult[]>("/uploads/multiple", formData, {
+    const response = await uploadApi.post<UploadResult[]>("/uploads/multiple", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
     });
@@ -162,7 +170,7 @@ export const uploadService = {
    * @param shortCode Mã ngắn của file
    */
   getFileInfo: async (shortCode: string): Promise<FileInfo> => {
-    const response = await api.get<FileInfo>(`/uploads/info/${shortCode}`);
+    const response = await uploadApi.get<FileInfo>(`/uploads/info/${shortCode}`);
     return response.data;
   },
 
@@ -171,7 +179,7 @@ export const uploadService = {
    * @param shortCode Mã ngắn của file
    */
   deleteByShortCode: async (shortCode: string): Promise<{ success: boolean; message: string }> => {
-    const response = await api.delete<{ success: boolean; message: string }>(`/uploads/short/${shortCode}`);
+    const response = await uploadApi.delete<{ success: boolean; message: string }>(`/uploads/s/${shortCode}`);
     return response.data;
   },
 
@@ -179,32 +187,42 @@ export const uploadService = {
    * Xóa file theo object name
    * @param objectName Tên object trên MinIO
    */
-  deleteFile: async (objectName: string): Promise<{ success: boolean; message: string }> => {
-    const response = await api.delete<{ success: boolean; message: string }>(`/uploads/${encodeURIComponent(objectName)}`);
+  deleteByObjectName: async (objectName: string): Promise<{ success: boolean; message: string }> => {
+    const response = await uploadApi.delete<{ success: boolean; message: string }>(`/uploads/file/${encodeURIComponent(objectName)}`);
     return response.data;
   },
 
   /**
-   * Lấy URL truy cập có thời hạn
+   * Lấy URL truy cập có thời hạn (presigned URL)
    * @param objectName Tên object trên MinIO
    * @param expiry Thời gian hết hạn (giây), mặc định 3600 (1 giờ)
    */
   getPresignedUrl: async (objectName: string, expiry?: number): Promise<PresignedUrlResponse> => {
     const params = expiry ? { expiry } : {};
-    const response = await api.get<PresignedUrlResponse>(`/uploads/presigned/${encodeURIComponent(objectName)}`, { params });
+    const response = await uploadApi.get<PresignedUrlResponse>(`/uploads/presigned/${encodeURIComponent(objectName)}`, { params });
     return response.data;
   },
 
   /**
-   * Helper: Tạo URL đầy đủ từ short code
+   * Kiểm tra trạng thái service
+   */
+  healthCheck: async (): Promise<{ status: string; service: string; timestamp: string }> => {
+    const response = await uploadApi.get<{ status: string; service: string; timestamp: string }>("/uploads/health");
+    return response.data;
+  },
+
+  // ==================== Helper Functions ====================
+
+  /**
+   * Tạo URL đầy đủ cho short code (để hiển thị)
    * @param shortCode Mã ngắn của file
    */
   getShortUrl: (shortCode: string): string => {
-    return `/api/uploads/s/${shortCode}`;
+    return `${UPLOAD_API_URL}/uploads/s/${shortCode}`;
   },
 
   /**
-   * Helper: Kiểm tra file có phải là hình ảnh không
+   * Kiểm tra file có phải là hình ảnh không
    * @param file File cần kiểm tra
    */
   isImage: (file: File): boolean => {
@@ -212,7 +230,7 @@ export const uploadService = {
   },
 
   /**
-   * Helper: Kiểm tra file có phải là video không
+   * Kiểm tra file có phải là video không
    * @param file File cần kiểm tra
    */
   isVideo: (file: File): boolean => {
@@ -220,7 +238,7 @@ export const uploadService = {
   },
 
   /**
-   * Helper: Kiểm tra kích thước file (MB)
+   * Kiểm tra kích thước file (MB)
    * @param file File cần kiểm tra
    * @param maxSizeMB Kích thước tối đa (MB)
    */
@@ -229,7 +247,7 @@ export const uploadService = {
   },
 
   /**
-   * Helper: Format kích thước file
+   * Format kích thước file cho hiển thị
    * @param bytes Kích thước (bytes)
    */
   formatFileSize: (bytes: number): string => {
@@ -238,5 +256,23 @@ export const uploadService = {
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  },
+
+  /**
+   * Lấy extension từ tên file
+   * @param filename Tên file
+   */
+  getExtension: (filename: string): string => {
+    return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
+  },
+
+  /**
+   * Kiểm tra extension có được phép không
+   * @param filename Tên file
+   * @param allowedExtensions Danh sách extension được phép
+   */
+  isAllowedExtension: (filename: string, allowedExtensions: string[]): boolean => {
+    const ext = uploadService.getExtension(filename);
+    return allowedExtensions.includes(ext);
   },
 };

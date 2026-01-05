@@ -1,17 +1,14 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
-import { UploadedFile } from '../../database/entities/uploaded-file.entity';
+import { MinioService } from './minio.service';
+import minioConfig from '../../config/minio.config';
 
 @Module({
-  imports: [
-    ConfigModule,
-    TypeOrmModule.forFeature([UploadedFile]),
-  ],
+  imports: [ConfigModule.forFeature(minioConfig)],
   controllers: [UploadsController],
-  providers: [UploadsService],
-  exports: [UploadsService],
+  providers: [UploadsService, MinioService],
+  exports: [UploadsService, MinioService],
 })
 export class UploadsModule {}
