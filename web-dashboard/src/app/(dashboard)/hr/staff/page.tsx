@@ -407,6 +407,14 @@ export default function StaffPage() {
     }
   }, [dialogMode, dispatch]);
 
+  // Load filter options when filter popover opens
+  React.useEffect(() => {
+    if (filterPopoverOpen) {
+      dispatch(fetchDepartments());
+      dispatch(fetchProvinces());
+    }
+  }, [filterPopoverOpen, dispatch]);
+
   // Load data for bulk operation dialogs
   React.useEffect(() => {
     if (bulkOperation === "department") {
