@@ -4,3 +4,4 @@ export * from './manage-toppings.dto';
 export * from './product-note.dto';
 export * from './combo-item.dto';
 export * from './bulk-import-product.dto';
+export * from './bulk-operations.dto';

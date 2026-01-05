@@ -16,6 +16,17 @@ import {
   AssignToppingGroupsDto,
   AssignComboItemsDto,
   BulkImportProductDto,
+  BulkUpdateCategoryDto,
+  BulkToggleActiveDto,
+  BulkDeleteProductsDto,
+  BulkUpdateVatRateDto,
+  BulkUpdatePriceDto,
+  BulkUpdatePrintLabelDto,
+  BulkUpdatePrintSeafoodDto,
+  BulkUpdatePrintDishDto,
+  BulkUpdateUnitDto,
+  BulkUpdateSellingTypeDto,
+  BulkUpdatePreparationTimeDto,
 } from './dto';
 import { ProductType } from '../../database/entities';
 
@@ -172,12 +183,118 @@ export class ProductsController {
     return this.productsService.removeToppingGroupFromProduct(req.user.tenantId, id, groupId);
   }
 
-  // === Bulk Import ===
+  // === Bulk Operations (MUST be before :id routes) ===
 
   @Post('bulk-import')
   @ApiOperation({ summary: 'Import nhiều món từ Excel' })
   bulkImport(@Request() req, @Body() dto: BulkImportProductDto) {
     return this.productsService.bulkImport(req.user.tenantId, dto);
+  }
+
+  @Post('bulk/update-category')
+  @ApiOperation({ summary: 'Chuyển danh mục cho nhiều món' })
+  bulkUpdateCategory(@Request() req, @Body() dto: BulkUpdateCategoryDto) {
+    return this.productsService.bulkUpdateCategory(
+      req.user.tenantId,
+      dto.productIds,
+      dto.categoryId,
+    );
+  }
+
+  @Post('bulk/toggle-active')
+  @ApiOperation({ summary: 'Bật/tắt trạng thái nhiều món' })
+  bulkToggleActive(@Request() req, @Body() dto: BulkToggleActiveDto) {
+    return this.productsService.bulkToggleActive(
+      req.user.tenantId,
+      dto.productIds,
+      dto.isActive,
+    );
+  }
+
+  @Post('bulk/delete')
+  @ApiOperation({ summary: 'Xóa nhiều món' })
+  bulkDelete(@Request() req, @Body() dto: BulkDeleteProductsDto) {
+    return this.productsService.bulkDelete(req.user.tenantId, dto.productIds);
+  }
+
+  @Post('bulk/update-vat-rate')
+  @ApiOperation({ summary: 'Cập nhật VAT cho nhiều món' })
+  bulkUpdateVatRate(@Request() req, @Body() dto: BulkUpdateVatRateDto) {
+    return this.productsService.bulkUpdateVatRate(
+      req.user.tenantId,
+      dto.productIds,
+      dto.vatRate,
+    );
+  }
+
+  @Post('bulk/update-price')
+  @ApiOperation({ summary: 'Cập nhật giá cho nhiều món' })
+  bulkUpdatePrice(@Request() req, @Body() dto: BulkUpdatePriceDto) {
+    return this.productsService.bulkUpdatePrice(
+      req.user.tenantId,
+      dto.productIds,
+      dto.price,
+    );
+  }
+
+  @Post('bulk/update-print-label')
+  @ApiOperation({ summary: 'Cập nhật in tem cho nhiều món' })
+  bulkUpdatePrintLabel(@Request() req, @Body() dto: BulkUpdatePrintLabelDto) {
+    return this.productsService.bulkUpdatePrintLabel(
+      req.user.tenantId,
+      dto.productIds,
+      dto.printLabel,
+    );
+  }
+
+  @Post('bulk/update-print-seafood')
+  @ApiOperation({ summary: 'Cập nhật in hồ hải sản cho nhiều món' })
+  bulkUpdatePrintSeafood(@Request() req, @Body() dto: BulkUpdatePrintSeafoodDto) {
+    return this.productsService.bulkUpdatePrintSeafood(
+      req.user.tenantId,
+      dto.productIds,
+      dto.printSeafood,
+    );
+  }
+
+  @Post('bulk/update-print-dish')
+  @ApiOperation({ summary: 'Cập nhật in món cho nhiều món' })
+  bulkUpdatePrintDish(@Request() req, @Body() dto: BulkUpdatePrintDishDto) {
+    return this.productsService.bulkUpdatePrintDish(
+      req.user.tenantId,
+      dto.productIds,
+      dto.printDish,
+    );
+  }
+
+  @Post('bulk/update-unit')
+  @ApiOperation({ summary: 'Cập nhật đơn vị cho nhiều món' })
+  bulkUpdateUnit(@Request() req, @Body() dto: BulkUpdateUnitDto) {
+    return this.productsService.bulkUpdateUnit(
+      req.user.tenantId,
+      dto.productIds,
+      dto.unit,
+    );
+  }
+
+  @Post('bulk/update-selling-type')
+  @ApiOperation({ summary: 'Cập nhật loại bán cho nhiều món' })
+  bulkUpdateSellingType(@Request() req, @Body() dto: BulkUpdateSellingTypeDto) {
+    return this.productsService.bulkUpdateSellingType(
+      req.user.tenantId,
+      dto.productIds,
+      dto.sellingType,
+    );
+  }
+
+  @Post('bulk/update-preparation-time')
+  @ApiOperation({ summary: 'Cập nhật thời gian chế biến cho nhiều món' })
+  bulkUpdatePreparationTime(@Request() req, @Body() dto: BulkUpdatePreparationTimeDto) {
+    return this.productsService.bulkUpdatePreparationTime(
+      req.user.tenantId,
+      dto.productIds,
+      dto.preparationTime,
+    );
   }
 
   // === Product CRUD ===

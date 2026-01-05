@@ -1132,4 +1132,302 @@ export class ProductsService {
 
     return result;
   }
+
+  // === Bulk Operations ===
+
+  async bulkUpdateCategory(tenantId: string, productIds: string[], categoryId: string) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.categoryId = categoryId;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkToggleActive(tenantId: string, productIds: string[], isActive: boolean) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.isActive = isActive;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkDelete(tenantId: string, productIds: string[]) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        await this.productRepository.remove(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdateVatRate(tenantId: string, productIds: string[], vatRate: number) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.vatRate = vatRate;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdatePrice(tenantId: string, productIds: string[], price: number) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.price = price;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdatePrintLabel(tenantId: string, productIds: string[], printLabel: boolean) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.printLabel = printLabel;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdatePrintSeafood(tenantId: string, productIds: string[], printSeafood: boolean) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.printSeafood = printSeafood;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdatePrintDish(tenantId: string, productIds: string[], printDish: boolean) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.printDish = printDish;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdateUnit(tenantId: string, productIds: string[], unit: string) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.unit = unit;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdateSellingType(tenantId: string, productIds: string[], sellingType: SellingType) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.sellingType = sellingType;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
+
+  async bulkUpdatePreparationTime(tenantId: string, productIds: string[], preparationTime: number) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        product.preparationTime = preparationTime;
+        await this.productRepository.save(product);
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
 }

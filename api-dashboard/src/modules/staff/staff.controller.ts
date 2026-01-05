@@ -26,12 +26,6 @@ export class StaffController {
     return this.staffService.findAll(req.user.tenantId, branchId);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Lấy thông tin nhân viên' })
-  findOne(@Request() req, @Param('id') id: string) {
-    return this.staffService.findOne(req.user.tenantId, id);
-  }
-
   @Post()
   @ApiOperation({ summary: 'Tạo nhân viên mới' })
   create(@Request() req, @Body() createDto: CreateStaffDto) {
@@ -43,23 +37,7 @@ export class StaffController {
     );
   }
 
-  @Put(':id')
-  @ApiOperation({ summary: 'Cập nhật thông tin nhân viên' })
-  update(@Request() req, @Param('id') id: string, @Body() updateDto: UpdateStaffDto) {
-    return this.staffService.update(req.user.tenantId, id, updateDto);
-  }
-
-  @Patch(':id/toggle-active')
-  @ApiOperation({ summary: 'Kích hoạt/Tạm ngưng nhân viên' })
-  toggleActive(@Request() req, @Param('id') id: string) {
-    return this.staffService.toggleActive(req.user.tenantId, id);
-  }
-
-  @Post(':id/reset-password')
-  @ApiOperation({ summary: 'Reset mật khẩu nhân viên' })
-  resetPassword(@Request() req, @Param('id') id: string) {
-    return this.staffService.resetPassword(req.user.tenantId, id);
-  }
+  // === Bulk Operations (MUST be before :id routes) ===
 
   @Post('bulk-import')
   @ApiOperation({ summary: 'Import/cập nhật nhân viên hàng loạt' })
@@ -109,5 +87,31 @@ export class StaffController {
       dto.staffIds,
       dto.newPassword,
     );
+  }
+
+  // === Individual Staff Operations (with :id parameter) ===
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Lấy thông tin nhân viên' })
+  findOne(@Request() req, @Param('id') id: string) {
+    return this.staffService.findOne(req.user.tenantId, id);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Cập nhật thông tin nhân viên' })
+  update(@Request() req, @Param('id') id: string, @Body() updateDto: UpdateStaffDto) {
+    return this.staffService.update(req.user.tenantId, id, updateDto);
+  }
+
+  @Patch(':id/toggle-active')
+  @ApiOperation({ summary: 'Kích hoạt/Tạm ngưng nhân viên' })
+  toggleActive(@Request() req, @Param('id') id: string) {
+    return this.staffService.toggleActive(req.user.tenantId, id);
+  }
+
+  @Post(':id/reset-password')
+  @ApiOperation({ summary: 'Reset mật khẩu nhân viên' })
+  resetPassword(@Request() req, @Param('id') id: string) {
+    return this.staffService.resetPassword(req.user.tenantId, id);
   }
 }
