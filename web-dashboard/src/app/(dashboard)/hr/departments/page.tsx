@@ -338,133 +338,196 @@ export default function DepartmentsPage() {
     return children.reduce((sum, child) => sum + 1 + countDescendants(child.id), 0);
   };
 
-  // Level colors for mindmap nodes
+  // Level colors for OKR-style cards
   const levelColors = [
-    { bg: "bg-amber-100 dark:bg-amber-900/30", border: "border-amber-400", text: "text-amber-800 dark:text-amber-200" },
-    { bg: "bg-blue-100 dark:bg-blue-900/30", border: "border-blue-400", text: "text-blue-800 dark:text-blue-200" },
-    { bg: "bg-green-100 dark:bg-green-900/30", border: "border-green-400", text: "text-green-800 dark:text-green-200" },
-    { bg: "bg-purple-100 dark:bg-purple-900/30", border: "border-purple-400", text: "text-purple-800 dark:text-purple-200" },
-    { bg: "bg-pink-100 dark:bg-pink-900/30", border: "border-pink-400", text: "text-pink-800 dark:text-pink-200" },
-    { bg: "bg-orange-100 dark:bg-orange-900/30", border: "border-orange-400", text: "text-orange-800 dark:text-orange-200" },
+    { badge: "bg-amber-500", border: "border-l-amber-500", bar: "bg-amber-500", label: "C", labelFull: "Chủ" },
+    { badge: "bg-blue-500", border: "border-l-blue-500", bar: "bg-blue-500", label: "L1", labelFull: "Cấp 1" },
+    { badge: "bg-emerald-500", border: "border-l-emerald-500", bar: "bg-emerald-500", label: "L2", labelFull: "Cấp 2" },
+    { badge: "bg-purple-500", border: "border-l-purple-500", bar: "bg-purple-500", label: "L3", labelFull: "Cấp 3" },
+    { badge: "bg-pink-500", border: "border-l-pink-500", bar: "bg-pink-500", label: "L4", labelFull: "Cấp 4" },
+    { badge: "bg-orange-500", border: "border-l-orange-500", bar: "bg-orange-500", label: "L5", labelFull: "Cấp 5+" },
   ];
 
-  // Render mindmap node
+  // Render OKR-style card node
   const renderMindmapNode = (dept: Department, level: number = 0) => {
     const children = getChildren(dept.id);
     const hasChildren = children.length > 0;
     const isExpanded = expandedIds.has(dept.id);
-    const colorIndex = level % levelColors.length;
+    const colorIndex = Math.min(level, levelColors.length - 1);
     const colors = levelColors[colorIndex];
     const isOwner = isOwnerDepartment(dept);
+    const descendantCount = countDescendants(dept.id);
 
     return (
       <div key={dept.id} className="flex items-start">
-        {/* Node */}
-        <div className="flex flex-col items-center">
-          {/* Department Card - Mindmap style */}
+        {/* OKR Card Node */}
+        <div className="relative group">
           <div
             className={cn(
-              "relative px-4 py-2 rounded-full border-2 transition-all duration-200 cursor-pointer",
-              "hover:shadow-lg hover:scale-105",
-              isOwner
-                ? "bg-gradient-to-r from-amber-400 to-amber-500 border-amber-600 text-white shadow-amber-200 dark:shadow-amber-900/50 shadow-md"
-                : cn(colors.bg, colors.border, colors.text),
+              "relative w-56 bg-card border rounded-lg shadow-sm transition-all duration-200",
+              "hover:shadow-md border-l-4",
+              colors.border,
               !dept.isActive && "opacity-60"
             )}
-            onClick={() => hasChildren && toggleExpand(dept.id)}
           >
-            <div className="flex items-center gap-2">
-              {isOwner ? (
-                <Building2 className="h-4 w-4" />
-              ) : hasChildren ? (
-                isExpanded ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />
-              ) : (
-                <Building2 className="h-4 w-4" />
+            {/* Card Header */}
+            <div className="p-3 pb-2">
+              <div className="flex items-start justify-between gap-2">
+                {/* Badge and Code */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "flex items-center justify-center w-7 h-7 rounded text-white text-xs font-bold",
+                      colors.badge
+                    )}
+                  >
+                    {isOwner ? "C" : colors.label}
+                  </div>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    BP-{dept.id.slice(0, 6).toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Action Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleOpenCreate(dept.id)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Thêm bộ phận con
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleOpenEdit(dept)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Chỉnh sửa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleOpenPermissions(dept)}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      Phân quyền
+                    </DropdownMenuItem>
+                    {!isOwner && (
+                      <DropdownMenuItem onClick={() => handleToggleActive(dept)}>
+                        <Power className="mr-2 h-4 w-4" />
+                        {dept.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                      </DropdownMenuItem>
+                    )}
+                    {!isOwner && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleteDepartment(dept)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Xóa
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Department Name */}
+              <h4 className="font-semibold text-sm mt-2 line-clamp-2">{dept.name}</h4>
+
+              {/* Description if exists */}
+              {dept.description && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                  {dept.description}
+                </p>
               )}
-              <span className="font-semibold text-sm whitespace-nowrap">{dept.name}</span>
-              {hasChildren && (
-                <span className="text-xs opacity-75">({children.length})</span>
+            </div>
+
+            {/* Card Footer with Status */}
+            <div className="px-3 pb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  {hasChildren && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 px-1.5 text-xs"
+                      onClick={() => toggleExpand(dept.id)}
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="h-3 w-3 mr-0.5" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3 mr-0.5" />
+                      )}
+                      {children.length} con
+                    </Button>
+                  )}
+                </div>
+                <Badge
+                  variant={dept.isActive ? "default" : "secondary"}
+                  className={cn(
+                    "text-[10px] px-1.5 py-0",
+                    dept.isActive ? colors.badge : ""
+                  )}
+                >
+                  {dept.isActive ? "Hoạt động" : "Tạm ngưng"}
+                </Badge>
+              </div>
+
+              {/* Progress-like status bar */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    dept.isActive ? colors.bar : "bg-muted-foreground/30"
+                  )}
+                  style={{
+                    width: dept.isActive ? "100%" : "30%"
+                  }}
+                />
+              </div>
+
+              {/* Descendants info */}
+              {descendantCount > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1.5 text-right">
+                  Tổng: {descendantCount} bộ phận trực thuộc
+                </p>
               )}
             </div>
           </div>
-
-          {/* Action buttons below node */}
-          <div className="flex items-center gap-1 mt-1 opacity-0 hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenCreate(dept.id);
-              }}
-              title="Thêm bộ phận con"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <MoreHorizontal className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center">
-                <DropdownMenuItem onClick={() => handleOpenEdit(dept)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Chỉnh sửa
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleOpenPermissions(dept)}>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Phân quyền
-                </DropdownMenuItem>
-                {!isOwner && (
-                  <DropdownMenuItem onClick={() => handleToggleActive(dept)}>
-                    <Power className="mr-2 h-4 w-4" />
-                    {dept.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                  </DropdownMenuItem>
-                )}
-                {!isOwner && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setDeleteDepartment(dept)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Xóa
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </div>
 
-        {/* Children branch */}
+        {/* Children branch - horizontal connector to vertical stack */}
         {hasChildren && isExpanded && (
-          <div className="flex items-center ml-2">
-            {/* Horizontal connector */}
-            <div className="w-6 h-0.5 bg-border" />
+          <div className="flex items-center">
+            {/* Horizontal connector line */}
+            <div className="w-8 h-0.5 bg-border self-center" style={{ marginTop: '40px' }} />
 
-            {/* Children container */}
-            <div className="flex flex-col gap-3 relative">
+            {/* Children container with vertical connector */}
+            <div className="relative flex flex-col gap-4 py-2">
               {/* Vertical connector line */}
               {children.length > 1 && (
                 <div
                   className="absolute left-0 w-0.5 bg-border"
                   style={{
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    height: `calc(100% - 20px)`
+                    top: `calc(40px + 8px)`,
+                    height: `calc(100% - 80px - 16px)`
                   }}
                 />
               )}
 
               {children.map((child, index) => (
-                <div key={child.id} className="flex items-center">
-                  {/* Branch connector */}
-                  <div className="w-4 h-0.5 bg-border" />
-                  {renderMindmapNode(child, level + 1)}
+                <div key={child.id} className="flex items-start relative">
+                  {/* Horizontal branch connector to each child */}
+                  <div
+                    className="absolute w-6 h-0.5 bg-border"
+                    style={{ left: 0, top: '40px' }}
+                  />
+                  <div className="ml-6">
+                    {renderMindmapNode(child, level + 1)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -556,30 +619,18 @@ export default function DepartmentsPage() {
               </div>
             )}
           </div>
-          {/* Color legend */}
+          {/* Color legend - OKR style */}
           {departments.length > 0 && (
             <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t text-sm">
-              <span className="text-muted-foreground">Màu theo cấp bậc:</span>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500" />
-                <span>Chủ nhà hàng</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-blue-400" />
-                <span>Cấp 2</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-green-400" />
-                <span>Cấp 3</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-purple-400" />
-                <span>Cấp 4</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-pink-400" />
-                <span>Cấp 5+</span>
-              </div>
+              <span className="text-muted-foreground">Cấp bậc:</span>
+              {levelColors.map((color, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <div className={cn("w-5 h-5 rounded text-white text-[10px] font-bold flex items-center justify-center", color.badge)}>
+                    {color.label}
+                  </div>
+                  <span className="text-xs">{color.labelFull}</span>
+                </div>
+              ))}
             </div>
           )}
         </CardHeader>
