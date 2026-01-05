@@ -348,8 +348,8 @@ function getColumnLetter(index: number): string {
 export interface DependentDropdownConfig {
   parentHeader: string;           // Header of the parent column (e.g., "Tỉnh/Thành phố")
   childHeader: string;            // Header of the child column (e.g., "Phường/Xã")
-  parentOptions: DropdownOption[]; // Parent dropdown options
-  childOptionsByParent: Map<string, DropdownOption[]>; // Map of parent label -> child options
+  parentOptions: DropdownOption[]; // Parent dropdown options (value = code, label = display name)
+  childOptionsByParent: Map<string, DropdownOption[]>; // Map of parent LABEL -> child options
 }
 
 /**
@@ -357,18 +357,15 @@ export interface DependentDropdownConfig {
  * Excel named ranges cannot contain spaces or special characters
  */
 function sanitizeForNamedRange(str: string): string {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-    .replace(/đ/g, "d").replace(/Đ/g, "D") // Handle Vietnamese đ
+  // Use a simple prefix + the original string sanitized
+  return ("R_" + str)
     .replace(/[^a-zA-Z0-9]/g, "_") // Replace non-alphanumeric with underscore
-    .replace(/^(\d)/, "_$1") // Prefix with _ if starts with number
     .substring(0, 30); // Limit length
 }
 
 /**
  * Create a template Excel file with dependent dropdowns using ExcelJS
- * Supports cascading dropdowns where child options depend on parent selection
+ * Uses VLOOKUP + INDEX/OFFSET approach for reliable cascading dropdowns
  */
 export async function downloadTemplateWithDependentDropdowns(
   columns: TemplateColumnWithDropdown[],
@@ -462,56 +459,41 @@ export async function downloadTemplateWithDependentDropdowns(
     });
   }
 
-  // Create sheets for dependent dropdowns
+  // Create sheets for dependent dropdowns using INDEX/MATCH approach
   for (const depConfig of dependentDropdowns) {
-    const depSheet = workbook.addWorksheet(sanitizeForNamedRange(depConfig.childHeader).substring(0, 20));
+    const sheetName = sanitizeForNamedRange(depConfig.childHeader).substring(0, 20);
+    const depSheet = workbook.addWorksheet(sheetName);
 
-    // Build columns for each parent option
-    let colIndex = 0;
-    const namedRanges: { name: string; ref: string }[] = [];
+    // Row 1: Parent labels (for MATCH lookup)
+    // Row 2+: Child options for each parent
+
+    // Find max number of children
+    let maxChildren = 0;
+    const parentLabelsWithChildren: string[] = [];
 
     for (const parentOption of depConfig.parentOptions) {
       const childOptions = depConfig.childOptionsByParent.get(parentOption.label) || [];
-      if (childOptions.length === 0) continue;
-
-      // Header (parent name)
-      const headerCell = depSheet.getCell(1, colIndex + 1);
-      headerCell.value = parentOption.label;
-      headerCell.font = { bold: true };
-
-      // Child values
-      childOptions.forEach((childOpt, rowIndex) => {
-        depSheet.getCell(rowIndex + 2, colIndex + 1).value = childOpt.label;
-      });
-
-      depSheet.getColumn(colIndex + 1).width = 30;
-
-      // Create named range for this parent's children
-      const rangeName = sanitizeForNamedRange(parentOption.label);
-      const colLetter = getColumnLetter(colIndex);
-      const sheetName = depSheet.name;
-
-      // Add named range to workbook
-      namedRanges.push({
-        name: rangeName,
-        ref: `'${sheetName}'!$${colLetter}$2:$${colLetter}$${childOptions.length + 1}`,
-      });
-
-      colIndex++;
+      if (childOptions.length > 0) {
+        parentLabelsWithChildren.push(parentOption.label);
+        if (childOptions.length > maxChildren) {
+          maxChildren = childOptions.length;
+        }
+      }
     }
 
-    // Define named ranges in workbook
-    // ExcelJS doesn't have direct named range support, so we need to use definedNames
-    namedRanges.forEach(({ name, ref }) => {
-      // @ts-ignore - ExcelJS internal API
-      if (!workbook.definedNames) {
-        // @ts-ignore
-        workbook.definedNames = { model: [] };
-      }
-      // @ts-ignore
-      workbook.definedNames.model.push({
-        name: name,
-        ranges: [ref],
+    // Write parent labels in row 1
+    parentLabelsWithChildren.forEach((parentLabel, colIndex) => {
+      const headerCell = depSheet.getCell(1, colIndex + 1);
+      headerCell.value = parentLabel;
+      headerCell.font = { bold: true };
+      depSheet.getColumn(colIndex + 1).width = 30;
+    });
+
+    // Write child options below each parent
+    parentLabelsWithChildren.forEach((parentLabel, colIndex) => {
+      const childOptions = depConfig.childOptionsByParent.get(parentLabel) || [];
+      childOptions.forEach((childOpt, rowIndex) => {
+        depSheet.getCell(rowIndex + 2, colIndex + 1).value = childOpt.label;
       });
     });
 
@@ -522,20 +504,28 @@ export async function downloadTemplateWithDependentDropdowns(
     if (parentColIndex !== -1 && childColIndex !== -1) {
       const parentColLetter = getColumnLetter(parentColIndex);
       const childCol = columns[childColIndex];
+      const numParents = parentLabelsWithChildren.length;
+      const lastColLetter = getColumnLetter(numParents - 1);
 
-      // Apply INDIRECT validation to child column
+      // Apply validation using INDEX/MATCH formula
+      // INDEX(range, MATCH(parent_value, header_row, 0)) returns the column of matching parent
+      // We use OFFSET to get a range from that column
+
       for (let row = 2; row <= rowCount + 1; row++) {
         const cell = mainSheet.getCell(row, childColIndex + 1);
 
-        // Use INDIRECT formula to reference named range based on parent cell value
-        // The formula sanitizes the parent value to match our named range names
+        // Formula: Get the column number where parent matches, then use INDEX to get values from that column
+        // INDIRECT(ADDRESS(ROW,MATCH(parent,headers,0),4,,"SheetName")) - but this is complex
+        // Simpler: Use OFFSET with MATCH
+        // =OFFSET(SheetName!$A$1, 1, MATCH($H2, SheetName!$1:$1, 0)-1, maxChildren, 1)
+
+        const formula = `OFFSET('${sheetName}'!$A$1,1,MATCH($${parentColLetter}${row},'${sheetName}'!$A$1:$${lastColLetter}$1,0)-1,${maxChildren},1)`;
+
         cell.dataValidation = {
           type: "list",
           allowBlank: !childCol?.required,
-          // INDIRECT formula that references the named range based on parent selection
-          // We use SUBSTITUTE to handle Vietnamese characters and spaces
-          formulae: [`INDIRECT(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE($${parentColLetter}$${row}," ","_"),"ắ","a"),"ằ","a"),"ẳ","a"),"ẵ","a"))`],
-          showErrorMessage: false, // Don't show error since INDIRECT might fail
+          formulae: [formula],
+          showErrorMessage: false, // Don't show error since formula might fail if parent not selected
           showInputMessage: true,
           promptTitle: depConfig.childHeader,
           prompt: `Chọn ${depConfig.childHeader} phù hợp với ${depConfig.parentHeader} đã chọn`,
