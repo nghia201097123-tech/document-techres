@@ -399,10 +399,10 @@ export default function ProductsPage() {
     }
   }, [filterBrandId, dispatch]);
 
-  // Load units when dialog opens
+  // Load units when dialog opens or bulk unit operation
   React.useEffect(() => {
     const loadUnits = async () => {
-      if (dialogMode === "create" || dialogMode === "edit") {
+      if (dialogMode === "create" || dialogMode === "edit" || bulkOperation === "unit") {
         setLoadingUnits(true);
         try {
           const data = await unitService.getAll();
@@ -415,7 +415,7 @@ export default function ProductsPage() {
       }
     };
     loadUnits();
-  }, [dialogMode]);
+  }, [dialogMode, bulkOperation]);
 
   // Load notes when dialog opens
   React.useEffect(() => {
