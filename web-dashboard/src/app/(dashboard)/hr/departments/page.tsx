@@ -42,10 +42,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { departmentService, type Department, type CreateDepartmentDto, type UpdateDepartmentDto } from "@/services/department-service";
+import { departmentService, type Department, type CreateDepartmentDto, type UpdateDepartmentDto, type DepartmentStaffCount } from "@/services/department-service";
 import { permissionService, type Permission } from "@/services/permission-service";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertTriangle, Users, ArrowRight } from "lucide-react";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -65,7 +66,6 @@ export default function DepartmentsPage() {
   const [saving, setSaving] = React.useState(false);
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
   const [selectedDepartment, setSelectedDepartment] = React.useState<Department | null>(null);
-  const [deleteDepartment, setDeleteDepartment] = React.useState<Department | null>(null);
   const [continueCreating, setContinueCreating] = React.useState(false);
   const [formData, setFormData] = React.useState<CreateDepartmentDto>({
     name: "",
@@ -80,6 +80,20 @@ export default function DepartmentsPage() {
   const [selectedPermissionIds, setSelectedPermissionIds] = React.useState<Set<string>>(new Set());
   const [loadingPermissions, setLoadingPermissions] = React.useState(false);
   const [savingPermissions, setSavingPermissions] = React.useState(false);
+
+  // Cascade toggle states
+  const [toggleDepartment, setToggleDepartment] = React.useState<Department | null>(null);
+  const [toggleStaffCount, setToggleStaffCount] = React.useState<DepartmentStaffCount | null>(null);
+  const [loadingToggleInfo, setLoadingToggleInfo] = React.useState(false);
+  const [togglingCascade, setTogglingCascade] = React.useState(false);
+
+  // Staff transfer states (for delete)
+  const [transferDialogOpen, setTransferDialogOpen] = React.useState(false);
+  const [transferDepartment, setTransferDepartment] = React.useState<Department | null>(null);
+  const [transferStaffCount, setTransferStaffCount] = React.useState<DepartmentStaffCount | null>(null);
+  const [targetDepartmentId, setTargetDepartmentId] = React.useState<string>("");
+  const [loadingTransferInfo, setLoadingTransferInfo] = React.useState(false);
+  const [transferring, setTransferring] = React.useState(false);
 
   // Load departments
   const loadDepartments = React.useCallback(async () => {
@@ -184,14 +198,53 @@ export default function DepartmentsPage() {
     }
   };
 
-  // Handle toggle active
-  const handleToggleActive = async (dept: Department) => {
+  // Open toggle confirmation dialog
+  const handleOpenToggle = async (dept: Department) => {
+    setToggleDepartment(dept);
+    setLoadingToggleInfo(true);
+    setToggleStaffCount(null);
+
     try {
-      const updated = await departmentService.toggleActive(dept.id);
-      setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
+      // Get staff count for department and children
+      const staffCount = await departmentService.getStaffCount(dept.id);
+      setToggleStaffCount(staffCount);
+    } catch (error) {
+      console.error("Error loading staff count:", error);
+      // Still allow toggle even if we can't get staff count
+    } finally {
+      setLoadingToggleInfo(false);
+    }
+  };
+
+  // Handle toggle active with cascade
+  const handleToggleActiveCascade = async () => {
+    if (!toggleDepartment) return;
+
+    try {
+      setTogglingCascade(true);
+      const result = await departmentService.toggleActiveCascade(toggleDepartment.id);
+
+      // Update all affected departments in state
+      setDepartments((prev) => {
+        const updatedIds = new Set([
+          result.department.id,
+          ...result.affectedDepartments.map(d => d.id)
+        ]);
+        return prev.map((d) => {
+          if (d.id === result.department.id) return result.department;
+          const affected = result.affectedDepartments.find(ad => ad.id === d.id);
+          return affected || d;
+        });
+      });
+
+      const action = result.department.isActive ? "kích hoạt" : "tạm ngưng";
       toast({
         title: "Thành công",
-        description: `Đã ${updated.isActive ? "kích hoạt" : "tạm ngưng"} bộ phận "${dept.name}"`,
+        description: `Đã ${action} bộ phận "${toggleDepartment.name}"${
+          result.affectedDepartments.length > 0
+            ? ` và ${result.affectedDepartments.length} bộ phận con`
+            : ""
+        }${result.affectedStaffCount > 0 ? `, ${result.affectedStaffCount} nhân viên` : ""}`,
       });
     } catch (error: any) {
       console.error("Error toggling department:", error);
@@ -200,17 +253,81 @@ export default function DepartmentsPage() {
         description: error.response?.data?.message || "Có lỗi xảy ra",
         variant: "destructive",
       });
+    } finally {
+      setTogglingCascade(false);
+      setToggleDepartment(null);
+      setToggleStaffCount(null);
     }
   };
 
-  // Handle delete
-  const handleDelete = async () => {
-    if (!deleteDepartment) return;
+  // Open transfer dialog before delete
+  const handleOpenDelete = async (dept: Department) => {
+    setTransferDepartment(dept);
+    setTransferDialogOpen(true);
+    setLoadingTransferInfo(true);
+    setTargetDepartmentId("");
+    setTransferStaffCount(null);
 
     try {
-      await departmentService.delete(deleteDepartment.id);
-      setDepartments((prev) => prev.filter((d) => d.id !== deleteDepartment.id));
-      toast({ title: "Thành công", description: `Đã xóa bộ phận "${deleteDepartment.name}"` });
+      // Get staff count for department and children
+      const staffCount = await departmentService.getStaffCount(dept.id);
+      setTransferStaffCount(staffCount);
+    } catch (error) {
+      console.error("Error loading staff count:", error);
+    } finally {
+      setLoadingTransferInfo(false);
+    }
+  };
+
+  // Get all descendant IDs for a department
+  const getAllDescendantIds = (deptId: string): string[] => {
+    const children = getChildren(deptId);
+    return children.flatMap(child => [child.id, ...getAllDescendantIds(child.id)]);
+  };
+
+  // Get available departments for staff transfer (exclude self and descendants)
+  const getTransferTargetDepartments = () => {
+    if (!transferDepartment) return [];
+    const excludeIds = new Set([transferDepartment.id, ...getAllDescendantIds(transferDepartment.id)]);
+    return departments.filter(d => !excludeIds.has(d.id) && d.isActive);
+  };
+
+  // Handle transfer staff and delete
+  const handleTransferAndDelete = async () => {
+    if (!transferDepartment) return;
+
+    // Check if there are staff to transfer
+    const hasStaff = transferStaffCount && transferStaffCount.totalStaffCount > 0;
+
+    if (hasStaff && !targetDepartmentId) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng chọn bộ phận để chuyển nhân viên",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setTransferring(true);
+
+      if (hasStaff) {
+        // Transfer staff then delete
+        const result = await departmentService.transferStaffAndDelete(transferDepartment.id, targetDepartmentId);
+        toast({
+          title: "Thành công",
+          description: `Đã chuyển ${result.transferredCount} nhân viên và xóa bộ phận "${transferDepartment.name}"`,
+        });
+      } else {
+        // No staff to transfer, just delete
+        await departmentService.delete(transferDepartment.id);
+        toast({ title: "Thành công", description: `Đã xóa bộ phận "${transferDepartment.name}"` });
+      }
+
+      // Remove department and all descendants from state
+      const removeIds = new Set([transferDepartment.id, ...getAllDescendantIds(transferDepartment.id)]);
+      setDepartments((prev) => prev.filter((d) => !removeIds.has(d.id)));
+
     } catch (error: any) {
       console.error("Error deleting department:", error);
       toast({
@@ -219,7 +336,11 @@ export default function DepartmentsPage() {
         variant: "destructive",
       });
     } finally {
-      setDeleteDepartment(null);
+      setTransferring(false);
+      setTransferDialogOpen(false);
+      setTransferDepartment(null);
+      setTransferStaffCount(null);
+      setTargetDepartmentId("");
     }
   };
 
@@ -413,7 +534,7 @@ export default function DepartmentsPage() {
                       Phân quyền
                     </DropdownMenuItem>
                     {!isOwner && (
-                      <DropdownMenuItem onClick={() => handleToggleActive(dept)}>
+                      <DropdownMenuItem onClick={() => handleOpenToggle(dept)}>
                         <Power className="mr-2 h-4 w-4" />
                         {dept.isActive ? "Tạm ngưng" : "Kích hoạt"}
                       </DropdownMenuItem>
@@ -422,7 +543,7 @@ export default function DepartmentsPage() {
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => setDeleteDepartment(dept)}
+                          onClick={() => handleOpenDelete(dept)}
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -757,29 +878,6 @@ export default function DepartmentsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDepartment !== null} onOpenChange={() => setDeleteDepartment(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa bộ phận &quot;{deleteDepartment?.name}&quot;?
-              {getChildren(deleteDepartment?.id || "").length > 0 && (
-                <span className="block mt-2 text-destructive font-medium">
-                  Cảnh báo: Bộ phận này có {countDescendants(deleteDepartment?.id || "")} bộ phận con. Tất cả sẽ bị xóa theo.
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Xóa
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Permission Assignment Dialog */}
       <Dialog open={permissionDialogOpen} onOpenChange={setPermissionDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
@@ -870,6 +968,172 @@ export default function DepartmentsPage() {
             <Button onClick={handleSavePermissions} disabled={savingPermissions}>
               {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu quyền
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cascade Toggle Confirmation Dialog */}
+      <AlertDialog open={toggleDepartment !== null} onOpenChange={() => {
+        if (!togglingCascade) {
+          setToggleDepartment(null);
+          setToggleStaffCount(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {toggleDepartment?.isActive ? "Tạm ngưng bộ phận" : "Kích hoạt bộ phận"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Bạn có chắc chắn muốn {toggleDepartment?.isActive ? "tạm ngưng" : "kích hoạt"} bộ phận &quot;{toggleDepartment?.name}&quot;?
+                </p>
+
+                {loadingToggleInfo ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : toggleStaffCount && (toggleStaffCount.totalStaffCount > 0 || getChildren(toggleDepartment?.id || "").length > 0) ? (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-2">
+                    <p className="font-medium text-amber-800 dark:text-amber-200">
+                      {toggleDepartment?.isActive ? "Các đối tượng sẽ bị tạm ngưng:" : "Các đối tượng sẽ được kích hoạt:"}
+                    </p>
+                    <ul className="text-sm space-y-1 text-amber-700 dark:text-amber-300">
+                      {getChildren(toggleDepartment?.id || "").length > 0 && (
+                        <li className="flex items-center gap-2">
+                          <FolderTree className="h-4 w-4" />
+                          {countDescendants(toggleDepartment?.id || "")} bộ phận con
+                        </li>
+                      )}
+                      {toggleStaffCount.totalStaffCount > 0 && (
+                        <li className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          {toggleStaffCount.totalStaffCount} nhân viên
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={togglingCascade}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleToggleActiveCascade}
+              disabled={togglingCascade || loadingToggleInfo}
+              className={toggleDepartment?.isActive ? "bg-amber-600 hover:bg-amber-700" : ""}
+            >
+              {togglingCascade && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {toggleDepartment?.isActive ? "Tạm ngưng" : "Kích hoạt"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Staff Transfer Dialog (before delete) */}
+      <Dialog open={transferDialogOpen} onOpenChange={(open) => {
+        if (!transferring && !open) {
+          setTransferDialogOpen(false);
+          setTransferDepartment(null);
+          setTransferStaffCount(null);
+          setTargetDepartmentId("");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Xóa bộ phận
+            </DialogTitle>
+            <DialogDescription>
+              Xóa bộ phận &quot;{transferDepartment?.name}&quot;
+              {getChildren(transferDepartment?.id || "").length > 0 && (
+                <span className="block mt-1 text-destructive">
+                  và {countDescendants(transferDepartment?.id || "")} bộ phận con
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingTransferInfo ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              {transferStaffCount && transferStaffCount.totalStaffCount > 0 ? (
+                <>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-5 w-5 text-amber-600" />
+                      <span className="font-medium text-amber-800 dark:text-amber-200">
+                        {transferStaffCount.totalStaffCount} nhân viên cần chuyển
+                      </span>
+                    </div>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      Trước khi xóa bộ phận, bạn cần chọn bộ phận để chuyển nhân viên sang.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="targetDept" className="flex items-center gap-2">
+                      <ArrowRight className="h-4 w-4" />
+                      Chuyển nhân viên đến bộ phận *
+                    </Label>
+                    <Select value={targetDepartmentId} onValueChange={setTargetDepartmentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn bộ phận đích" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getTransferTargetDepartments().map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-muted rounded-lg p-4 text-center">
+                  <p className="text-muted-foreground">
+                    Không có nhân viên nào thuộc bộ phận này hoặc các bộ phận con.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTransferDialogOpen(false);
+                setTransferDepartment(null);
+                setTransferStaffCount(null);
+                setTargetDepartmentId("");
+              }}
+              disabled={transferring}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleTransferAndDelete}
+              disabled={
+                transferring ||
+                loadingTransferInfo ||
+                (transferStaffCount && transferStaffCount.totalStaffCount > 0 && !targetDepartmentId)
+              }
+            >
+              {transferring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {transferStaffCount && transferStaffCount.totalStaffCount > 0
+                ? "Chuyển & Xóa"
+                : "Xóa bộ phận"}
             </Button>
           </DialogFooter>
         </DialogContent>

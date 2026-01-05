@@ -26,6 +26,20 @@ export interface UpdateDepartmentDto {
   sortOrder?: number;
 }
 
+export interface DepartmentStaffCount {
+  departmentId: string;
+  departmentName: string;
+  staffCount: number;
+  childDepartments: DepartmentStaffCount[];
+  totalStaffCount: number; // Including children
+}
+
+export interface CascadeToggleResult {
+  department: Department;
+  affectedDepartments: Department[];
+  affectedStaffCount: number;
+}
+
 export const departmentService = {
   getAll: async (companyId?: string): Promise<Department[]> => {
     const params = companyId ? { companyId } : {};
@@ -56,6 +70,26 @@ export const departmentService = {
 
   toggleActive: async (id: string): Promise<Department> => {
     const response = await api.patch<Department>(`/departments/${id}/toggle-active`);
+    return response.data;
+  },
+
+  // Cascade toggle - deactivates/activates department, all children, and all staff
+  toggleActiveCascade: async (id: string): Promise<CascadeToggleResult> => {
+    const response = await api.patch<CascadeToggleResult>(`/departments/${id}/toggle-active-cascade`);
+    return response.data;
+  },
+
+  // Get staff count for department and all children
+  getStaffCount: async (id: string): Promise<DepartmentStaffCount> => {
+    const response = await api.get<DepartmentStaffCount>(`/departments/${id}/staff-count`);
+    return response.data;
+  },
+
+  // Transfer all staff from department (and children) to target department, then delete
+  transferStaffAndDelete: async (id: string, targetDepartmentId: string): Promise<{ transferredCount: number }> => {
+    const response = await api.post<{ transferredCount: number }>(`/departments/${id}/transfer-and-delete`, {
+      targetDepartmentId,
+    });
     return response.data;
   },
 
