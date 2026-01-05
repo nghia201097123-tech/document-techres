@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { staffService, bulkStaffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem, type BulkOperationResult } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
 import { locationService } from "@/services/location-service";
-import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
+import { exportToExcel, readExcelFile, downloadTemplateWithDependentDropdowns, type TemplateColumnWithDropdown, type DependentDropdownConfig, type DropdownOption } from "@/lib/excel-utils";
 import { branchService, type Branch } from "@/services/branch-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -782,16 +782,50 @@ export default function StaffPage() {
 
   // Download template with dropdowns
   const handleDownloadTemplate = async () => {
-    toast({ title: "Đang tải...", description: "Đang tạo file mẫu với dropdown" });
+    toast({ title: "Đang tải...", description: "Đang tạo file mẫu với dropdown (có thể mất vài giây)" });
 
     // Load data for dropdowns
-    const [departmentsResult, brandsResult, provincesResult, allWards, allBranches] = await Promise.all([
+    const [departmentsResult, brandsResult, provincesResult, wardsGroupedByProvince, allBranches] = await Promise.all([
       dispatch(fetchDepartments()).unwrap(),
       dispatch(fetchBrands()).unwrap(),
       dispatch(fetchProvinces()).unwrap(),
-      locationService.getAllWards(),
+      locationService.getWardsGroupedByProvince(), // Get wards grouped by province for dependent dropdown
       branchService.getAll(), // Get all branches from all brands
     ]);
+
+    // Build province options
+    const provinceOptions: DropdownOption[] = provincesResult.map((p) => ({
+      value: p.code,
+      label: p.fullName || p.name,
+    }));
+
+    // Build brand options
+    const brandOptions: DropdownOption[] = brandsResult.map((b) => ({
+      value: b.id,
+      label: b.name,
+    }));
+
+    // Build wards by province map for dependent dropdown
+    const wardsByProvince = new Map<string, DropdownOption[]>();
+    for (const [provinceCode, wards] of Object.entries(wardsGroupedByProvince)) {
+      // Find province label
+      const province = provincesResult.find((p) => p.code === provinceCode);
+      const provinceLabel = province?.fullName || province?.name || provinceCode;
+      wardsByProvince.set(
+        provinceLabel,
+        (wards as any[]).map((w) => ({ value: w.code, label: w.fullName || w.name }))
+      );
+    }
+
+    // Build branches by brand map for dependent dropdown
+    const branchesByBrand = new Map<string, DropdownOption[]>();
+    for (const brand of brandsResult) {
+      const brandBranches = allBranches.filter((b) => b.brandId === brand.id);
+      branchesByBrand.set(
+        brand.name,
+        brandBranches.map((b) => ({ value: b.id, label: b.name }))
+      );
+    }
 
     // Build columns with dropdown options using fresh data
     const columnsWithDropdowns: TemplateColumnWithDropdown[] = [
@@ -808,51 +842,59 @@ export default function StaffPage() {
           { value: "male", label: "Nam" },
           { value: "female", label: "Nữ" },
         ],
-        dropdownSheetName: "GioiTinh",
       },
       { header: "CCCD", example: "001234567890", required: false },
       {
         header: "Tỉnh/Thành phố",
         example: provincesResult[0]?.fullName || "Thành phố Hồ Chí Minh",
         required: false,
-        dropdown: provincesResult.map((p) => ({ value: p.code, label: p.fullName || p.name })),
-        dropdownSheetName: "TinhTP",
+        dropdown: provinceOptions,
       },
       {
         header: "Phường/Xã",
-        example: allWards[0]?.fullName || "Phường Bến Nghé",
+        example: "Phường Bến Nghé",
         required: false,
-        dropdown: allWards.map((w) => ({ value: w.code, label: w.fullName || w.name })),
-        dropdownSheetName: "PhuongXa",
-        allowCustomValue: true, // Allow custom because wards depend on province
+        // No direct dropdown - will be handled by dependent dropdown
       },
       { header: "Địa chỉ", example: "123 Nguyễn Văn Linh", required: false },
       {
         header: "Thương hiệu",
         example: brandsResult[0]?.name || "The Coffee House",
         required: true,
-        dropdown: brandsResult.map((b) => ({ value: b.id, label: b.name })),
-        dropdownSheetName: "ThuongHieu",
+        dropdown: brandOptions,
       },
       {
         header: "Chi nhánh",
         example: allBranches[0]?.name || "Chi nhánh Quận 1",
         required: true,
-        dropdown: allBranches.map((b) => ({ value: b.id, label: b.name })),
-        dropdownSheetName: "ChiNhanh",
-        allowCustomValue: true, // Allow custom because branches depend on brand
+        // No direct dropdown - will be handled by dependent dropdown
       },
       {
         header: "Bộ phận",
         example: departmentsResult[0]?.name || "Phục vụ",
         required: true,
         dropdown: departmentsResult.map((d) => ({ value: d.id, label: d.name })),
-        dropdownSheetName: "BoPhan",
       },
     ];
 
-    await downloadTemplateWithRealDropdowns(columnsWithDropdowns, "mau_import_nhan_vien", 100);
-    toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown chọn sẵn" });
+    // Configure dependent dropdowns
+    const dependentDropdowns: DependentDropdownConfig[] = [
+      {
+        parentHeader: "Tỉnh/Thành phố",
+        childHeader: "Phường/Xã",
+        parentOptions: provinceOptions,
+        childOptionsByParent: wardsByProvince,
+      },
+      {
+        parentHeader: "Thương hiệu",
+        childHeader: "Chi nhánh",
+        parentOptions: brandOptions,
+        childOptionsByParent: branchesByBrand,
+      },
+    ];
+
+    await downloadTemplateWithDependentDropdowns(columnsWithDropdowns, dependentDropdowns, "mau_import_nhan_vien", 100);
+    toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown phụ thuộc" });
   };
 
   // Handle file input change - auto lookup IDs from names

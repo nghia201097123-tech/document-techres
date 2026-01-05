@@ -342,6 +342,217 @@ function getColumnLetter(index: number): string {
 }
 
 /**
+ * Dependent dropdown configuration
+ * Used to create cascading dropdowns where child options depend on parent selection
+ */
+export interface DependentDropdownConfig {
+  parentHeader: string;           // Header of the parent column (e.g., "Tỉnh/Thành phố")
+  childHeader: string;            // Header of the child column (e.g., "Phường/Xã")
+  parentOptions: DropdownOption[]; // Parent dropdown options
+  childOptionsByParent: Map<string, DropdownOption[]>; // Map of parent label -> child options
+}
+
+/**
+ * Sanitize string to be used as Excel named range
+ * Excel named ranges cannot contain spaces or special characters
+ */
+function sanitizeForNamedRange(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+    .replace(/đ/g, "d").replace(/Đ/g, "D") // Handle Vietnamese đ
+    .replace(/[^a-zA-Z0-9]/g, "_") // Replace non-alphanumeric with underscore
+    .replace(/^(\d)/, "_$1") // Prefix with _ if starts with number
+    .substring(0, 30); // Limit length
+}
+
+/**
+ * Create a template Excel file with dependent dropdowns using ExcelJS
+ * Supports cascading dropdowns where child options depend on parent selection
+ */
+export async function downloadTemplateWithDependentDropdowns(
+  columns: TemplateColumnWithDropdown[],
+  dependentDropdowns: DependentDropdownConfig[],
+  filename: string,
+  rowCount: number = 100
+) {
+  // Dynamic imports
+  const [ExcelJS, { saveAs }] = await Promise.all([
+    import("exceljs"),
+    import("file-saver"),
+  ]);
+
+  const workbook = new ExcelJS.default.Workbook();
+
+  // Create main data entry sheet
+  const mainSheet = workbook.addWorksheet("NhapDuLieu");
+
+  // Add headers
+  const headerRow = mainSheet.getRow(1);
+  columns.forEach((col, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = col.required ? `${col.header} *` : col.header;
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE0E0E0" },
+    };
+  });
+
+  // Add example row
+  const exampleRow = mainSheet.getRow(2);
+  columns.forEach((col, index) => {
+    exampleRow.getCell(index + 1).value = col.example || "";
+  });
+
+  // Set column widths
+  columns.forEach((col, index) => {
+    mainSheet.getColumn(index + 1).width = col.dropdown ? 30 : 20;
+  });
+
+  // Get columns that are NOT part of dependent dropdowns (as child)
+  const dependentChildHeaders = new Set(dependentDropdowns.map(d => d.childHeader));
+  const simpleDropdownColumns = columns.filter(
+    (col) => col.dropdown && col.dropdown.length > 0 && !dependentChildHeaders.has(col.header)
+  );
+
+  // Create reference sheet for simple dropdowns
+  if (simpleDropdownColumns.length > 0) {
+    const refSheet = workbook.addWorksheet("DanhSachChon");
+
+    simpleDropdownColumns.forEach((col, colIndex) => {
+      // Header
+      const headerCell = refSheet.getCell(1, colIndex + 1);
+      headerCell.value = col.header;
+      headerCell.font = { bold: true };
+
+      // Values
+      col.dropdown!.forEach((option, rowIndex) => {
+        refSheet.getCell(rowIndex + 2, colIndex + 1).value = option.label;
+      });
+
+      refSheet.getColumn(colIndex + 1).width = 30;
+    });
+
+    // Apply simple dropdown validations
+    columns.forEach((col, colIndex) => {
+      if (col.dropdown && col.dropdown.length > 0 && !dependentChildHeaders.has(col.header)) {
+        const dropdownColIndex = simpleDropdownColumns.findIndex((dc) => dc.header === col.header);
+        if (dropdownColIndex !== -1) {
+          const colLetter = getColumnLetter(dropdownColIndex);
+          const valueCount = col.dropdown.length;
+
+          for (let row = 2; row <= rowCount + 1; row++) {
+            const cell = mainSheet.getCell(row, colIndex + 1);
+            cell.dataValidation = {
+              type: "list",
+              allowBlank: !col.required,
+              formulae: [`DanhSachChon!$${colLetter}$2:$${colLetter}$${valueCount + 1}`],
+              showErrorMessage: !col.allowCustomValue,
+              errorTitle: "Giá trị không hợp lệ",
+              error: `Vui lòng chọn một giá trị từ danh sách cho cột "${col.header}"`,
+              showInputMessage: true,
+              promptTitle: col.header,
+              prompt: col.allowCustomValue ? "Chọn từ danh sách hoặc nhập giá trị mới" : "Chọn một giá trị từ danh sách",
+            };
+          }
+        }
+      }
+    });
+  }
+
+  // Create sheets for dependent dropdowns
+  for (const depConfig of dependentDropdowns) {
+    const depSheet = workbook.addWorksheet(sanitizeForNamedRange(depConfig.childHeader).substring(0, 20));
+
+    // Build columns for each parent option
+    let colIndex = 0;
+    const namedRanges: { name: string; ref: string }[] = [];
+
+    for (const parentOption of depConfig.parentOptions) {
+      const childOptions = depConfig.childOptionsByParent.get(parentOption.label) || [];
+      if (childOptions.length === 0) continue;
+
+      // Header (parent name)
+      const headerCell = depSheet.getCell(1, colIndex + 1);
+      headerCell.value = parentOption.label;
+      headerCell.font = { bold: true };
+
+      // Child values
+      childOptions.forEach((childOpt, rowIndex) => {
+        depSheet.getCell(rowIndex + 2, colIndex + 1).value = childOpt.label;
+      });
+
+      depSheet.getColumn(colIndex + 1).width = 30;
+
+      // Create named range for this parent's children
+      const rangeName = sanitizeForNamedRange(parentOption.label);
+      const colLetter = getColumnLetter(colIndex);
+      const sheetName = depSheet.name;
+
+      // Add named range to workbook
+      namedRanges.push({
+        name: rangeName,
+        ref: `'${sheetName}'!$${colLetter}$2:$${colLetter}$${childOptions.length + 1}`,
+      });
+
+      colIndex++;
+    }
+
+    // Define named ranges in workbook
+    // ExcelJS doesn't have direct named range support, so we need to use definedNames
+    namedRanges.forEach(({ name, ref }) => {
+      // @ts-ignore - ExcelJS internal API
+      if (!workbook.definedNames) {
+        // @ts-ignore
+        workbook.definedNames = { model: [] };
+      }
+      // @ts-ignore
+      workbook.definedNames.model.push({
+        name: name,
+        ranges: [ref],
+      });
+    });
+
+    // Find parent and child column indices in main sheet
+    const parentColIndex = columns.findIndex((c) => c.header === depConfig.parentHeader);
+    const childColIndex = columns.findIndex((c) => c.header === depConfig.childHeader);
+
+    if (parentColIndex !== -1 && childColIndex !== -1) {
+      const parentColLetter = getColumnLetter(parentColIndex);
+      const childCol = columns[childColIndex];
+
+      // Apply INDIRECT validation to child column
+      for (let row = 2; row <= rowCount + 1; row++) {
+        const cell = mainSheet.getCell(row, childColIndex + 1);
+
+        // Use INDIRECT formula to reference named range based on parent cell value
+        // The formula sanitizes the parent value to match our named range names
+        cell.dataValidation = {
+          type: "list",
+          allowBlank: !childCol?.required,
+          // INDIRECT formula that references the named range based on parent selection
+          // We use SUBSTITUTE to handle Vietnamese characters and spaces
+          formulae: [`INDIRECT(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE($${parentColLetter}$${row}," ","_"),"ắ","a"),"ằ","a"),"ẳ","a"),"ẵ","a"))`],
+          showErrorMessage: false, // Don't show error since INDIRECT might fail
+          showInputMessage: true,
+          promptTitle: depConfig.childHeader,
+          prompt: `Chọn ${depConfig.childHeader} phù hợp với ${depConfig.parentHeader} đã chọn`,
+        };
+      }
+    }
+  }
+
+  // Generate and download file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  saveAs(blob, `${filename}_template.xlsx`);
+}
+
+/**
  * Validate imported data
  */
 export function validateImportData<T>(

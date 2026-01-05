@@ -30,4 +30,18 @@ export const locationService = {
     const response = await api.get<Ward[]>("/locations/wards");
     return response.data;
   },
+
+  async getWardsGroupedByProvince(): Promise<Record<string, Ward[]>> {
+    const allWards = await this.getAllWards();
+    // Group wards by provinceCode
+    const grouped: Record<string, Ward[]> = {};
+    for (const ward of allWards) {
+      const key = ward.provinceCode;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(ward);
+    }
+    return grouped;
+  },
 };
