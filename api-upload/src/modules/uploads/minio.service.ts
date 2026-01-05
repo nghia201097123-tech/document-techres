@@ -52,14 +52,43 @@ export class MinioService implements OnModuleInit {
         this.logger.log(`Bucket "${this.bucket}" does not exist, creating...`);
         await this.client.makeBucket(this.bucket);
         this.logger.log(`Bucket "${this.bucket}" created successfully`);
+
+        // Set public read policy
+        await this.setBucketPublicPolicy();
       } else {
         this.logger.log(`Bucket "${this.bucket}" exists`);
+        // Ensure public policy is set
+        await this.setBucketPublicPolicy();
       }
     } catch (error: any) {
       this.logger.error(`Failed to check/create bucket: ${error.message}`);
       throw error;
     }
     this.logger.log(`MinIO Service initialized for bucket: ${this.bucket}`);
+  }
+
+  /**
+   * Set bucket policy to allow public read access
+   */
+  private async setBucketPublicPolicy(): Promise<void> {
+    const policy = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Principal: { AWS: ['*'] },
+          Action: ['s3:GetObject'],
+          Resource: [`arn:aws:s3:::${this.bucket}/*`],
+        },
+      ],
+    };
+
+    try {
+      await this.client.setBucketPolicy(this.bucket, JSON.stringify(policy));
+      this.logger.log(`Public read policy set for bucket "${this.bucket}"`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to set bucket policy: ${error.message}`);
+    }
   }
 
   getClient(): Minio.Client {
