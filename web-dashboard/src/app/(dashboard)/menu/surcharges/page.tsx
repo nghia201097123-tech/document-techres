@@ -47,12 +47,14 @@ import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/comp
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 
-// Format currency
+// Format currency (no decimals for VND)
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
-  }).format(amount);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(amount));
 };
 
 // Calculate VAT breakdown (amount is total including VAT)
@@ -443,12 +445,14 @@ export default function SurchargesPage() {
                   <Label htmlFor="amount">Tổng tiền (VNĐ) *</Label>
                   <Input
                     id="amount"
-                    type="number"
-                    min="0"
-                    step="1000"
+                    type="text"
+                    inputMode="numeric"
                     placeholder="200000"
                     value={formData.amount || ""}
-                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d]/g, "");
+                      setFormData({ ...formData, amount: parseInt(value) || 0 });
+                    }}
                     required
                   />
                 </div>
@@ -456,13 +460,15 @@ export default function SurchargesPage() {
                   <Label htmlFor="vatRate">VAT (%)</Label>
                   <Input
                     id="vatRate"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="8.5"
                     value={formData.vatRate || ""}
-                    onChange={(e) => setFormData({ ...formData, vatRate: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      // Allow digits, dot and comma for decimal
+                      const value = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                      setFormData({ ...formData, vatRate: parseFloat(value) || 0 });
+                    }}
                   />
                 </div>
               </div>
