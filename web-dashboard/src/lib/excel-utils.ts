@@ -201,6 +201,7 @@ export async function exportToExcelWithDropdowns<T extends Record<string, any>>(
 
     if (parentColIndex !== -1 && childColIndex !== -1) {
       const parentColLetter = getColumnLetter(parentColIndex);
+      const childColLetter = getColumnLetter(childColIndex);
       const numParents = parentLabelsWithChildren.length;
       const lastColLetter = getColumnLetter(numParents - 1);
 
@@ -218,6 +219,32 @@ export async function exportToExcelWithDropdowns<T extends Record<string, any>>(
           prompt: `Chọn ${depConfig.childHeader} phù hợp với ${depConfig.parentHeader}`,
         };
       }
+
+      // Add conditional formatting to highlight mismatched child values
+      // Formula: If parent is not empty AND child is not empty AND child is not in valid list -> highlight red
+      const cfFormula = `AND($${parentColLetter}2<>"",$${childColLetter}2<>"",ISERROR(MATCH($${childColLetter}2,OFFSET('${sheetName}'!$A$1,1,MATCH($${parentColLetter}2,'${sheetName}'!$A$1:$${lastColLetter}$1,0)-1,${maxChildren},1),0)))`;
+
+      mainSheet.addConditionalFormatting({
+        ref: `${childColLetter}2:${childColLetter}${totalRows}`,
+        rules: [
+          {
+            type: "expression",
+            formulae: [cfFormula],
+            style: {
+              fill: {
+                type: "pattern",
+                pattern: "solid",
+                bgColor: { argb: "FFFF6B6B" }, // Light red background
+              },
+              font: {
+                color: { argb: "FF8B0000" }, // Dark red text
+                bold: true,
+              },
+            },
+            priority: 1,
+          },
+        ],
+      });
     }
   }
 
