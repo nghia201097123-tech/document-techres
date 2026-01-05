@@ -116,6 +116,9 @@ export default function SurchargesPage() {
   const [newSurchargeIds, setNewSurchargeIds] = React.useState<Set<string>>(new Set());
   const [updatedSurchargeIds, setUpdatedSurchargeIds] = React.useState<Set<string>>(new Set());
 
+  // Separate state for VAT input to allow decimal typing
+  const [vatRateInput, setVatRateInput] = React.useState<string>("");
+
   // Load surcharges - only when brand is selected
   const loadSurcharges = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -147,6 +150,7 @@ export default function SurchargesPage() {
   const handleOpenCreate = () => {
     setSelectedSurcharge(null);
     setFormData({ name: "", description: "", amount: 0, vatRate: 0, sortOrder: 0 });
+    setVatRateInput("");
     setDialogMode("create");
   };
 
@@ -160,6 +164,7 @@ export default function SurchargesPage() {
       vatRate: surcharge.vatRate,
       sortOrder: surcharge.sortOrder,
     });
+    setVatRateInput(surcharge.vatRate ? String(surcharge.vatRate) : "");
     setDialogMode("edit");
     // Remove badges when editing
     setNewSurchargeIds(prev => { const next = new Set(prev); next.delete(surcharge.id); return next; });
@@ -171,6 +176,7 @@ export default function SurchargesPage() {
     setDialogMode(null);
     setSelectedSurcharge(null);
     setFormData({ name: "", description: "", amount: 0, vatRate: 0, sortOrder: 0 });
+    setVatRateInput("");
   };
 
   // Handle form submit (create or update)
@@ -463,10 +469,18 @@ export default function SurchargesPage() {
                     type="text"
                     inputMode="decimal"
                     placeholder="8.5"
-                    value={formData.vatRate || ""}
+                    value={vatRateInput}
                     onChange={(e) => {
                       // Allow digits, dot and comma for decimal
-                      const value = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                      let value = e.target.value.replace(",", ".");
+                      // Only allow digits and one dot
+                      value = value.replace(/[^\d.]/g, "");
+                      // Prevent multiple dots
+                      const parts = value.split(".");
+                      if (parts.length > 2) {
+                        value = parts[0] + "." + parts.slice(1).join("");
+                      }
+                      setVatRateInput(value);
                       setFormData({ ...formData, vatRate: parseFloat(value) || 0 });
                     }}
                   />
@@ -483,7 +497,7 @@ export default function SurchargesPage() {
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Tiền VAT ({formData.vatRate}%):</span>
+                    <span>Tiền VAT ({vatRateInput || formData.vatRate}%):</span>
                     <span className="font-medium text-blue-600">
                       {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate).vatAmount)}
                     </span>
