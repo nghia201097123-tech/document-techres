@@ -2452,7 +2452,7 @@ export default function StaffPage() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    const text = `Tên viết tắt: ${createdStaff.name}\nTài khoản: ${createdStaff.username}\nMật khẩu: ${createdStaff.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
+                    const text = `Tên định danh: ${createdStaff.name}\nTài khoản: ${createdStaff.username}\nMật khẩu: ${createdStaff.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
                     navigator.clipboard.writeText(text);
                     toast({ title: "Đã copy thông tin đăng nhập" });
                   }}
@@ -2768,7 +2768,7 @@ export default function StaffPage() {
               variant="outline"
               onClick={() => {
                 if (resetPasswordResult) {
-                  const text = `Tên viết tắt: ${resetPasswordResult.staff.name}\nTài khoản: ${resetPasswordResult.staff.username}\nMật khẩu: ${resetPasswordResult.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
+                  const text = `Tên định danh: ${resetPasswordResult.staff.name}\nTài khoản: ${resetPasswordResult.staff.username}\nMật khẩu: ${resetPasswordResult.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
                   navigator.clipboard.writeText(text);
                   toast({ title: "Đã copy thông tin đăng nhập" });
                 }
