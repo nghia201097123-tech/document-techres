@@ -18,9 +18,8 @@ export class MinioService implements OnModuleInit {
     const useSSL = this.configService.get<string>('CONFIG_MINIO_ENABLE_SSL', 'true') === 'true';
     const accessKey = this.configService.get<string>('CONFIG_MINIO_ACCESSKEY', '');
     const secretKey = this.configService.get<string>('CONFIG_MINIO_SECRETKEY', '');
-    const region = this.configService.get<string>('CONFIG_MINIO_REGION', 'us-east-1');
 
-    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL}, Region: ${region})`);
+    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL})`);
 
     // Create custom transport agent to handle SSL
     const transportAgent = useSSL
@@ -33,20 +32,33 @@ export class MinioService implements OnModuleInit {
       useSSL: useSSL,
       accessKey: accessKey,
       secretKey: secretKey,
-      region: region,
       pathStyle: true,
       transportAgent: transportAgent,
     });
 
     this.bucket = this.configService.get<string>('CONFIG_MINIO_BUCKET', 'techres-uploads');
     const protocol = useSSL ? 'https' : 'http';
-    this.baseUrl = `${protocol}://${endpoint}/${this.bucket}`;
+    this.baseUrl = `${protocol}://${endpoint}:${port}/${this.bucket}`;
 
     this.logger.log(`Bucket: ${this.bucket}`);
     this.logger.log(`Base URL: ${this.baseUrl}`);
   }
 
   async onModuleInit() {
+    // Check if bucket exists, create if not
+    try {
+      const exists = await this.client.bucketExists(this.bucket);
+      if (!exists) {
+        this.logger.log(`Bucket "${this.bucket}" does not exist, creating...`);
+        await this.client.makeBucket(this.bucket);
+        this.logger.log(`Bucket "${this.bucket}" created successfully`);
+      } else {
+        this.logger.log(`Bucket "${this.bucket}" exists`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Failed to check/create bucket: ${error.message}`);
+      throw error;
+    }
     this.logger.log(`MinIO Service initialized for bucket: ${this.bucket}`);
   }
 
