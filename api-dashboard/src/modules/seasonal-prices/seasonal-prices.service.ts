@@ -27,10 +27,10 @@ export class SeasonalPricesService {
     });
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(tenantId: string, id: string, loadRelations = true) {
     const seasonalPrice = await this.seasonalPriceRepository.findOne({
       where: { tenantId, id },
-      relations: ['seasonalPriceProducts', 'seasonalPriceProducts.product'],
+      relations: loadRelations ? ['seasonalPriceProducts', 'seasonalPriceProducts.product'] : [],
     });
     if (!seasonalPrice) {
       throw new NotFoundException('Không tìm thấy giá thời vụ');
@@ -141,7 +141,8 @@ export class SeasonalPricesService {
   }
 
   async update(tenantId: string, id: string, updateDto: UpdateSeasonalPriceDto) {
-    const seasonalPrice = await this.findOne(tenantId, id);
+    // Load WITHOUT relations to avoid cascade issues
+    const seasonalPrice = await this.findOne(tenantId, id, false);
     const { productIds, ...seasonalPriceData } = updateDto;
 
     // Validate date range if provided
@@ -187,9 +188,6 @@ export class SeasonalPricesService {
         tenantId,
         seasonalPriceId: id,
       });
-
-      // Clear the in-memory array to prevent cascade re-insert
-      seasonalPrice.seasonalPriceProducts = [];
 
       // Create new assignments
       if (productIds.length > 0) {
