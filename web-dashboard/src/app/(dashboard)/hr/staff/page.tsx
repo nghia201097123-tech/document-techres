@@ -43,7 +43,8 @@ import { useToast } from "@/hooks/use-toast";
 import { staffService, bulkStaffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem, type BulkOperationResult } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
 import { locationService } from "@/services/location-service";
-import { exportToExcel, readExcelFile, downloadTemplateWithDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
+import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
+import { branchService, type Branch } from "@/services/branch-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
@@ -781,18 +782,18 @@ export default function StaffPage() {
 
   // Download template with dropdowns
   const handleDownloadTemplate = async () => {
-    // Load data for dropdowns if not loaded
-    const [, , , allWards] = await Promise.all([
-      dispatch(fetchDepartments()),
-      dispatch(fetchBrands()),
-      dispatch(fetchProvinces()),
+    toast({ title: "Đang tải...", description: "Đang tạo file mẫu với dropdown" });
+
+    // Load data for dropdowns
+    const [departmentsResult, brandsResult, provincesResult, allWards, allBranches] = await Promise.all([
+      dispatch(fetchDepartments()).unwrap(),
+      dispatch(fetchBrands()).unwrap(),
+      dispatch(fetchProvinces()).unwrap(),
       locationService.getAllWards(),
+      branchService.getAll(), // Get all branches from all brands
     ]);
 
-    // Wait for Redux state to update
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    // Build columns with dropdown options
+    // Build columns with dropdown options using fresh data
     const columnsWithDropdowns: TemplateColumnWithDropdown[] = [
       { header: "ID", example: "(để trống nếu tạo mới)", required: false },
       { header: "Tên nhân viên", example: "Nguyễn Văn A", required: true },
@@ -812,9 +813,9 @@ export default function StaffPage() {
       { header: "CCCD", example: "001234567890", required: false },
       {
         header: "Tỉnh/Thành phố",
-        example: provinces[0]?.fullName || "Thành phố Hồ Chí Minh",
+        example: provincesResult[0]?.fullName || "Thành phố Hồ Chí Minh",
         required: false,
-        dropdown: provinces.map((p) => ({ value: p.code, label: p.fullName || p.name })),
+        dropdown: provincesResult.map((p) => ({ value: p.code, label: p.fullName || p.name })),
         dropdownSheetName: "TinhTP",
       },
       {
@@ -823,26 +824,34 @@ export default function StaffPage() {
         required: false,
         dropdown: allWards.map((w) => ({ value: w.code, label: w.fullName || w.name })),
         dropdownSheetName: "PhuongXa",
+        allowCustomValue: true, // Allow custom because wards depend on province
       },
       { header: "Địa chỉ", example: "123 Nguyễn Văn Linh", required: false },
       {
         header: "Thương hiệu",
-        example: brands[0]?.name || "The Coffee House",
+        example: brandsResult[0]?.name || "The Coffee House",
         required: true,
-        dropdown: brands.map((b) => ({ value: b.id, label: b.name })),
+        dropdown: brandsResult.map((b) => ({ value: b.id, label: b.name })),
         dropdownSheetName: "ThuongHieu",
       },
-      { header: "Chi nhánh", example: "Chi nhánh Quận 1", required: true },
+      {
+        header: "Chi nhánh",
+        example: allBranches[0]?.name || "Chi nhánh Quận 1",
+        required: true,
+        dropdown: allBranches.map((b) => ({ value: b.id, label: b.name })),
+        dropdownSheetName: "ChiNhanh",
+        allowCustomValue: true, // Allow custom because branches depend on brand
+      },
       {
         header: "Bộ phận",
-        example: departments[0]?.name || "Phục vụ",
+        example: departmentsResult[0]?.name || "Phục vụ",
         required: true,
-        dropdown: departments.map((d) => ({ value: d.id, label: d.name })),
+        dropdown: departmentsResult.map((d) => ({ value: d.id, label: d.name })),
         dropdownSheetName: "BoPhan",
       },
     ];
 
-    downloadTemplateWithDropdowns(columnsWithDropdowns, "mau_import_nhan_vien", 50);
+    await downloadTemplateWithRealDropdowns(columnsWithDropdowns, "mau_import_nhan_vien", 100);
     toast({ title: "Thành công", description: "Đã tải file mẫu với dropdown chọn sẵn" });
   };
 
