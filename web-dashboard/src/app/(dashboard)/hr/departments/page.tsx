@@ -338,119 +338,77 @@ export default function DepartmentsPage() {
     return children.reduce((sum, child) => sum + 1 + countDescendants(child.id), 0);
   };
 
-  // Level colors for visual hierarchy
+  // Level colors for mindmap nodes
   const levelColors = [
-    "border-l-blue-500",
-    "border-l-green-500",
-    "border-l-orange-500",
-    "border-l-purple-500",
-    "border-l-pink-500",
+    { bg: "bg-amber-100 dark:bg-amber-900/30", border: "border-amber-400", text: "text-amber-800 dark:text-amber-200" },
+    { bg: "bg-blue-100 dark:bg-blue-900/30", border: "border-blue-400", text: "text-blue-800 dark:text-blue-200" },
+    { bg: "bg-green-100 dark:bg-green-900/30", border: "border-green-400", text: "text-green-800 dark:text-green-200" },
+    { bg: "bg-purple-100 dark:bg-purple-900/30", border: "border-purple-400", text: "text-purple-800 dark:text-purple-200" },
+    { bg: "bg-pink-100 dark:bg-pink-900/30", border: "border-pink-400", text: "text-pink-800 dark:text-pink-200" },
+    { bg: "bg-orange-100 dark:bg-orange-900/30", border: "border-orange-400", text: "text-orange-800 dark:text-orange-200" },
   ];
 
-  const levelBgColors = [
-    "bg-blue-50 dark:bg-blue-950/20",
-    "bg-green-50 dark:bg-green-950/20",
-    "bg-orange-50 dark:bg-orange-950/20",
-    "bg-purple-50 dark:bg-purple-950/20",
-    "bg-pink-50 dark:bg-pink-950/20",
-  ];
-
-  // Render department item with visual tree hierarchy
-  const renderDepartment = (dept: Department, level: number = 0) => {
+  // Render mindmap node
+  const renderMindmapNode = (dept: Department, level: number = 0) => {
     const children = getChildren(dept.id);
     const hasChildren = children.length > 0;
     const isExpanded = expandedIds.has(dept.id);
-    const descendantCount = countDescendants(dept.id);
     const colorIndex = level % levelColors.length;
+    const colors = levelColors[colorIndex];
     const isOwner = isOwnerDepartment(dept);
 
     return (
-      <div key={dept.id} className="relative">
-        {/* Department Card */}
-        <div
-          className={cn(
-            "relative border rounded-lg mb-2 transition-all duration-200",
-            "border-l-4",
-            isOwner ? "border-l-amber-500 bg-amber-50 dark:bg-amber-950/20" : levelColors[colorIndex],
-            !isOwner && (level === 0 ? "bg-card" : levelBgColors[colorIndex]),
-            "hover:shadow-md"
-          )}
-          style={{ marginLeft: level * 24 }}
-        >
-          <div className="flex items-center p-3 gap-3">
-            {/* Expand/Collapse Button */}
-            <button
-              className={cn(
-                "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
-                hasChildren ? "hover:bg-muted cursor-pointer" : "cursor-default opacity-50"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (hasChildren) toggleExpand(dept.id);
-              }}
-            >
-              {hasChildren ? (
-                isExpanded ? (
-                  <FolderOpen className={cn("h-5 w-5", isOwner ? "text-amber-600" : "text-amber-600")} />
-                ) : (
-                  <Folder className={cn("h-5 w-5", isOwner ? "text-amber-500" : "text-amber-500")} />
-                )
+      <div key={dept.id} className="flex items-start">
+        {/* Node */}
+        <div className="flex flex-col items-center">
+          {/* Department Card - Mindmap style */}
+          <div
+            className={cn(
+              "relative px-4 py-2 rounded-full border-2 transition-all duration-200 cursor-pointer",
+              "hover:shadow-lg hover:scale-105",
+              isOwner
+                ? "bg-gradient-to-r from-amber-400 to-amber-500 border-amber-600 text-white shadow-amber-200 dark:shadow-amber-900/50 shadow-md"
+                : cn(colors.bg, colors.border, colors.text),
+              !dept.isActive && "opacity-60"
+            )}
+            onClick={() => hasChildren && toggleExpand(dept.id)}
+          >
+            <div className="flex items-center gap-2">
+              {isOwner ? (
+                <Building2 className="h-4 w-4" />
+              ) : hasChildren ? (
+                isExpanded ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />
               ) : (
-                <Building2 className="h-5 w-5 text-muted-foreground" />
+                <Building2 className="h-4 w-4" />
               )}
-            </button>
-
-            {/* Department Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className={cn("font-semibold text-base", isOwner && "text-amber-700 dark:text-amber-400")}>
-                  {dept.name}
-                </span>
-                {isOwner && (
-                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs">
-                    Cao nhất
-                  </Badge>
-                )}
-                {hasChildren && (
-                  <Badge variant="outline" className="text-xs font-normal">
-                    {descendantCount} cấp dưới
-                  </Badge>
-                )}
-                {level > 0 && (
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                    Cấp {level + 1}
-                  </span>
-                )}
-              </div>
-              {dept.description && (
-                <p className="text-sm text-muted-foreground mt-0.5 truncate max-w-md">
-                  {dept.description}
-                </p>
+              <span className="font-semibold text-sm whitespace-nowrap">{dept.name}</span>
+              {hasChildren && (
+                <span className="text-xs opacity-75">({children.length})</span>
               )}
             </div>
+          </div>
 
-            {/* Status Badge */}
-            <Badge
-              variant={dept.isActive ? "default" : "secondary"}
-              className={cn(
-                dept.isActive ? "bg-green-600 hover:bg-green-700" : ""
-              )}
+          {/* Action buttons below node */}
+          <div className="flex items-center gap-1 mt-1 opacity-0 hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenCreate(dept.id);
+              }}
+              title="Thêm bộ phận con"
             >
-              {dept.isActive ? "Hoạt động" : "Tạm ngưng"}
-            </Badge>
-
-            {/* Actions Dropdown */}
+              <Plus className="h-3 w-3" />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <MoreHorizontal className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleOpenCreate(dept.id)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Thêm bộ phận con
-                </DropdownMenuItem>
+              <DropdownMenuContent align="center">
                 <DropdownMenuItem onClick={() => handleOpenEdit(dept)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Chỉnh sửa
@@ -480,42 +438,36 @@ export default function DepartmentsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
-          {/* Visual connector line to children */}
-          {hasChildren && isExpanded && (
-            <div
-              className="absolute left-8 top-full w-0.5 bg-border z-10"
-              style={{ height: 8 }}
-            />
-          )}
         </div>
 
-        {/* Children with connecting lines */}
-        {isExpanded && hasChildren && (
-          <div className="relative">
-            {/* Vertical line connecting to children */}
-            <div
-              className="absolute w-0.5 bg-border"
-              style={{
-                left: level * 24 + 32,
-                top: 0,
-                bottom: 8
-              }}
-            />
-            {children.map((child, index) => (
-              <div key={child.id} className="relative">
-                {/* Horizontal connector line */}
+        {/* Children branch */}
+        {hasChildren && isExpanded && (
+          <div className="flex items-center ml-2">
+            {/* Horizontal connector */}
+            <div className="w-6 h-0.5 bg-border" />
+
+            {/* Children container */}
+            <div className="flex flex-col gap-3 relative">
+              {/* Vertical connector line */}
+              {children.length > 1 && (
                 <div
-                  className="absolute h-0.5 bg-border"
+                  className="absolute left-0 w-0.5 bg-border"
                   style={{
-                    left: level * 24 + 32,
-                    top: 24,
-                    width: 16
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    height: `calc(100% - 20px)`
                   }}
                 />
-                {renderDepartment(child, level + 1)}
-              </div>
-            ))}
+              )}
+
+              {children.map((child, index) => (
+                <div key={child.id} className="flex items-center">
+                  {/* Branch connector */}
+                  <div className="w-4 h-0.5 bg-border" />
+                  {renderMindmapNode(child, level + 1)}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -609,23 +561,23 @@ export default function DepartmentsPage() {
             <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t text-sm">
               <span className="text-muted-foreground">Màu theo cấp bậc:</span>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                <span>Cấp 1</span>
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500" />
+                <span>Chủ nhà hàng</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-green-500" />
+                <div className="w-3 h-3 rounded-full bg-blue-400" />
                 <span>Cấp 2</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-orange-500" />
+                <div className="w-3 h-3 rounded-full bg-green-400" />
                 <span>Cấp 3</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-purple-500" />
+                <div className="w-3 h-3 rounded-full bg-purple-400" />
                 <span>Cấp 4</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-pink-500" />
+                <div className="w-3 h-3 rounded-full bg-pink-400" />
                 <span>Cấp 5+</span>
               </div>
             </div>
@@ -645,8 +597,10 @@ export default function DepartmentsPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {rootDepartments.map((dept) => renderDepartment(dept, 0))}
+            <div className="overflow-x-auto pb-4">
+              <div className="inline-flex min-w-full p-6">
+                {rootDepartments.map((dept) => renderMindmapNode(dept, 0))}
+              </div>
             </div>
           )}
         </CardContent>
