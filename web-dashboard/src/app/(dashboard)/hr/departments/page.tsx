@@ -845,7 +845,7 @@ export default function DepartmentsPage() {
                   onValueChange={(value) =>
                     setFormData({ ...formData, parentId: value === "none" ? undefined : value })
                   }
-                  disabled={isEditingOwner}
+                  disabled={!!isEditingOwner}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn bộ phận cha" />
@@ -1158,7 +1158,7 @@ export default function DepartmentsPage() {
               disabled={
                 transferring ||
                 loadingTransferInfo ||
-                (transferStaffCount && transferStaffCount.totalStaffCount > 0 && !targetDepartmentId)
+                !!(transferStaffCount && transferStaffCount.totalStaffCount > 0 && !targetDepartmentId)
               }
             >
               {transferring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -90,13 +90,13 @@ export default function ToppingOptionsPage() {
       ]);
       // Sort by createdAt descending (newest first)
       const sortedGroups = [...groups].sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
       const sortedToppings = [...toppings].sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
       const sortedProducts = [...allProducts].sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
       setToppingGroups(sortedGroups);
       setAvailableToppings(sortedToppings);
@@ -137,7 +137,7 @@ export default function ToppingOptionsPage() {
       const groups = await productService.getAllToppingGroups();
       // Sort by createdAt descending to put new group at top
       const sortedGroups = [...groups].sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
       setToppingGroups(sortedGroups);
       setSelectedGroup(newGroup);

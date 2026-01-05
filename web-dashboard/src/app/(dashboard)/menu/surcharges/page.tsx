@@ -504,19 +504,19 @@ export default function SurchargesPage() {
                 </div>
               </div>
               {/* VAT Breakdown Preview */}
-              {formData.amount > 0 && formData.vatRate > 0 && (
+              {formData.amount > 0 && (formData.vatRate ?? 0) > 0 && (
                 <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
                   <p className="text-sm font-medium text-muted-foreground">Chi tiết VAT:</p>
                   <div className="flex justify-between text-sm">
                     <span>Giá trước VAT:</span>
                     <span className="font-medium">
-                      {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate).priceBeforeVat)}
+                      {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate ?? 0).priceBeforeVat)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Tiền VAT ({vatRateInput || formData.vatRate}%):</span>
+                    <span>Tiền VAT ({vatRateInput || (formData.vatRate ?? 0)}%):</span>
                     <span className="font-medium text-blue-600">
-                      {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate).vatAmount)}
+                      {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate ?? 0).vatAmount)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm border-t pt-1.5">

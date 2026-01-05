@@ -362,6 +362,19 @@ export default function StaffPage() {
     }
   }, [dialogMode, dispatch]);
 
+  // Load data for bulk operation dialogs
+  React.useEffect(() => {
+    if (bulkOperation === "department") {
+      dispatch(fetchDepartments());
+    } else if (bulkOperation === "branch") {
+      dispatch(fetchBrands());
+      // Load branches for current filter brand
+      if (filterBrandId && filterBrandId !== "" && filterBrandId !== "all") {
+        dispatch(fetchBranchesByBrand(filterBrandId));
+      }
+    }
+  }, [bulkOperation, filterBrandId, dispatch]);
+
   // Load branches for import settings
   React.useEffect(() => {
     if (importSettings.brandId) {
@@ -599,7 +612,7 @@ export default function StaffPage() {
       });
 
       // Reload staff list
-      loadStaff();
+      loadStaff(filterBranchId, filterBrandId);
       setSelectedStaffIds(new Set());
       handleCloseBulkDialog();
     } catch (error: any) {
@@ -1504,7 +1517,7 @@ export default function StaffPage() {
             )}
             {bulkResult && (
               <Button onClick={() => {
-                loadStaff();
+                loadStaff(filterBranchId, filterBrandId);
                 setSelectedStaffIds(new Set());
                 handleCloseBulkDialog();
               }}>

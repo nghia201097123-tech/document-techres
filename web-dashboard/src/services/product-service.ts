@@ -1,4 +1,5 @@
 import api from "./api";
+import { AdjustmentType } from "./seasonal-price-service";
 
 export enum ProductType {
   FOOD = "food",
@@ -11,11 +12,6 @@ export enum ProductType {
 export enum SellingType {
   PORTION = "portion",
   WEIGHT = "weight",
-}
-
-export enum AdjustmentType {
-  PERCENTAGE = 'percentage',
-  FIXED = 'fixed',
 }
 
 export interface SeasonalPriceInfo {
@@ -156,6 +152,8 @@ export interface ToppingGroup {
   sortOrder: number;
   brandId?: string;
   items: ToppingItem[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateToppingGroupDto {
