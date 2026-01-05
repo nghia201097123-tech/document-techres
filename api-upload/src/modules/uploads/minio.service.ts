@@ -29,6 +29,7 @@ export class MinioService implements OnModuleInit {
       accessKey: accessKey,
       secretKey: secretKey,
       region: region,
+      pathStyle: true, // Use path-style URLs instead of virtual-hosted style
     });
 
     this.bucket = this.configService.get<string>('CONFIG_MINIO_BUCKET', 'techres-uploads');
@@ -64,11 +65,21 @@ export class MinioService implements OnModuleInit {
     size: number,
     contentType: string,
   ): Promise<string> {
-    await this.client.putObject(this.bucket, objectName, buffer, size, {
-      'Content-Type': contentType,
-    });
-
-    return `${this.baseUrl}/${objectName}`;
+    try {
+      this.logger.log(`Uploading ${objectName} (${size} bytes, ${contentType})`);
+      await this.client.putObject(this.bucket, objectName, buffer, size, {
+        'Content-Type': contentType,
+      });
+      this.logger.log(`Upload successful: ${objectName}`);
+      return `${this.baseUrl}/${objectName}`;
+    } catch (error: any) {
+      this.logger.error(`Upload failed for ${objectName}:`, error);
+      this.logger.error(`Error code: ${error.code}`);
+      this.logger.error(`Error message: ${error.message}`);
+      if (error.resource) this.logger.error(`Resource: ${error.resource}`);
+      if (error.requestId) this.logger.error(`RequestId: ${error.requestId}`);
+      throw error;
+    }
   }
 
   /**
