@@ -500,6 +500,155 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Combo items table created successfully');
       }
 
+      // 25. Create surcharges table
+      const surchargesExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'surcharges'
+        );
+      `);
+
+      if (!surchargesExists[0].exists) {
+        this.logger.log('Creating surcharges table...');
+        await queryRunner.query(`
+          CREATE TABLE surcharges (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            amount DECIMAL(15,2) DEFAULT 0,
+            vat_rate DECIMAL(5,2) DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_surcharges_tenant ON surcharges(tenant_id);
+          CREATE INDEX idx_surcharges_tenant_brand ON surcharges(tenant_id, brand_id);
+        `);
+        this.logger.log('Surcharges table created successfully');
+      }
+
+      // 26. Create adjustment_type enum and seasonal_prices table
+      this.logger.log('Creating adjustment_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE adjustment_type AS ENUM ('percentage', 'fixed');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const seasonalPricesExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'seasonal_prices'
+        );
+      `);
+
+      if (!seasonalPricesExists[0].exists) {
+        this.logger.log('Creating seasonal_prices table...');
+        await queryRunner.query(`
+          CREATE TABLE seasonal_prices (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            adjustment_type adjustment_type DEFAULT 'percentage',
+            adjustment_value DECIMAL(15,2) DEFAULT 0,
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_seasonal_prices_tenant ON seasonal_prices(tenant_id);
+          CREATE INDEX idx_seasonal_prices_tenant_branch ON seasonal_prices(tenant_id, branch_id);
+        `);
+        this.logger.log('Seasonal prices table created successfully');
+      }
+
+      // 27. Create gift_items table
+      const giftItemsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'gift_items'
+        );
+      `);
+
+      if (!giftItemsExists[0].exists) {
+        this.logger.log('Creating gift_items table...');
+        await queryRunner.query(`
+          CREATE TABLE gift_items (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+            max_quantity INTEGER DEFAULT 1,
+            min_order_amount DECIMAL(15,2) DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_gift_items_tenant ON gift_items(tenant_id);
+          CREATE INDEX idx_gift_items_tenant_branch ON gift_items(tenant_id, branch_id);
+        `);
+        this.logger.log('Gift items table created successfully');
+      }
+
+      // 28. Create voucher_type enum and vouchers table
+      this.logger.log('Creating voucher_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE voucher_type AS ENUM ('percentage', 'fixed');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const vouchersExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'vouchers'
+        );
+      `);
+
+      if (!vouchersExists[0].exists) {
+        this.logger.log('Creating vouchers table...');
+        await queryRunner.query(`
+          CREATE TABLE vouchers (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            code VARCHAR(50) NOT NULL UNIQUE,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            voucher_type voucher_type DEFAULT 'percentage',
+            discount_value DECIMAL(15,2) DEFAULT 0,
+            max_discount DECIMAL(15,2),
+            min_order_amount DECIMAL(15,2) DEFAULT 0,
+            usage_limit INTEGER,
+            usage_count INTEGER DEFAULT 0,
+            start_date DATE,
+            end_date DATE,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_vouchers_tenant ON vouchers(tenant_id);
+          CREATE INDEX idx_vouchers_tenant_brand ON vouchers(tenant_id, brand_id);
+          CREATE INDEX idx_vouchers_code ON vouchers(code);
+        `);
+        this.logger.log('Vouchers table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

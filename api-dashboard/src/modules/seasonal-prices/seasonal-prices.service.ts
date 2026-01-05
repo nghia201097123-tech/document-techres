@@ -13,7 +13,7 @@ export class SeasonalPricesService {
 
   async findAll(tenantId: string, branchId?: string) {
     const where: any = { tenantId };
-    if (branchId) {
+    if (branchId && branchId !== 'all') {
       where.branchId = branchId;
     }
     return this.seasonalPriceRepository.find({
