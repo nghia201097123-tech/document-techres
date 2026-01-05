@@ -5,6 +5,16 @@ export enum AdjustmentType {
   FIXED = 'fixed',
 }
 
+export interface SeasonalPriceProduct {
+  id: string;
+  productId: string;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+  };
+}
+
 export interface SeasonalPrice {
   id: string;
   name: string;
@@ -17,6 +27,7 @@ export interface SeasonalPrice {
   isActive: boolean;
   branchId?: string;
   createdAt: string;
+  seasonalPriceProducts?: SeasonalPriceProduct[];
 }
 
 export interface CreateSeasonalPriceDto {
@@ -27,6 +38,7 @@ export interface CreateSeasonalPriceDto {
   startDate: string;
   endDate: string;
   sortOrder?: number;
+  productIds: string[];
 }
 
 export interface UpdateSeasonalPriceDto {
@@ -37,6 +49,7 @@ export interface UpdateSeasonalPriceDto {
   startDate?: string;
   endDate?: string;
   sortOrder?: number;
+  productIds?: string[];
 }
 
 export const seasonalPriceService = {

@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { Branch } from './branch.entity';
+import { SeasonalPriceProduct } from './seasonal-price-product.entity';
 
 export enum AdjustmentType {
   PERCENTAGE = 'percentage',
@@ -61,4 +63,7 @@ export class SeasonalPrice {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => SeasonalPriceProduct, (spp) => spp.seasonalPrice, { cascade: true })
+  seasonalPriceProducts: SeasonalPriceProduct[];
 }

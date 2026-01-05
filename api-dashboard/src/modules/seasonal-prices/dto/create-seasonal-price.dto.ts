@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, IsEnum, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, IsEnum, IsDateString, IsArray, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdjustmentType } from '../../../database/entities/seasonal-price.entity';
 
@@ -37,4 +37,9 @@ export class CreateSeasonalPriceDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @ApiProperty({ example: ['uuid-1', 'uuid-2'], description: 'Danh sách ID sản phẩm áp dụng giá thời vụ' })
+  @IsArray({ message: 'Danh sách sản phẩm phải là mảng' })
+  @IsUUID('4', { each: true, message: 'ID sản phẩm không hợp lệ' })
+  productIds: string[];
 }

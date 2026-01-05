@@ -649,6 +649,32 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Vouchers table created successfully');
       }
 
+      // 29. Create seasonal_price_products junction table
+      const seasonalPriceProductsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'seasonal_price_products'
+        );
+      `);
+
+      if (!seasonalPriceProductsExists[0].exists) {
+        this.logger.log('Creating seasonal_price_products table...');
+        await queryRunner.query(`
+          CREATE TABLE seasonal_price_products (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            seasonal_price_id UUID NOT NULL REFERENCES seasonal_prices(id) ON DELETE CASCADE,
+            product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(seasonal_price_id, product_id)
+          );
+          CREATE INDEX idx_seasonal_price_products_tenant ON seasonal_price_products(tenant_id);
+          CREATE INDEX idx_seasonal_price_products_tenant_sp ON seasonal_price_products(tenant_id, seasonal_price_id);
+          CREATE INDEX idx_seasonal_price_products_tenant_prod ON seasonal_price_products(tenant_id, product_id);
+        `);
+        this.logger.log('Seasonal price products table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
