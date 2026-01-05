@@ -63,9 +63,11 @@ import { cn } from "@/lib/utils";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 // Default column configuration for products table
 const defaultProductColumns: ColumnConfig[] = [
+  { key: "image", label: "Ảnh", visible: true },
   { key: "code", label: "Mã món", visible: true },
   { key: "name", label: "Tên món", visible: true, locked: true },
   { key: "type", label: "Loại", visible: true },
@@ -1113,6 +1115,7 @@ export default function ProductsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {isColumnVisible("image") && <TableHead className="w-[50px]">Ảnh</TableHead>}
                   {isColumnVisible("code") && <TableHead>Mã</TableHead>}
                   {isColumnVisible("name") && <TableHead>Tên món</TableHead>}
                   {isColumnVisible("type") && <TableHead>Loại</TableHead>}
@@ -1136,6 +1139,21 @@ export default function ProductsPage() {
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
+                    {isColumnVisible("image") && (
+                      <TableCell>
+                        {product.imageUrl ? (
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                            <UtensilsCrossed className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
                     {isColumnVisible("code") && <TableCell className="font-mono text-sm">{product.code}</TableCell>}
                     {isColumnVisible("name") && (
                       <TableCell className="font-medium">
@@ -1354,15 +1372,31 @@ export default function ProductsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Tên món *</Label>
-                <Input
-                  id="name"
-                  placeholder="Phở bò tái"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+              {/* Image and Name Row */}
+              <div className="grid grid-cols-[150px_1fr] gap-4">
+                <div className="grid gap-2">
+                  <Label>Hình ảnh</Label>
+                  <ImageUpload
+                    value={formData.imageUrl}
+                    onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                    aspectRatio={1}
+                    maxWidth={500}
+                    maxHeight={500}
+                    folder="products"
+                    className="w-[134px] h-[134px]"
+                    placeholder="Chọn ảnh"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Tên món *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Phở bò tái"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

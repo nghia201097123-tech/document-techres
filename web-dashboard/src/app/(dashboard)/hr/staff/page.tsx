@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { staffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
@@ -48,9 +49,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
+  { key: "avatar", label: "Ảnh", visible: true },
   { key: "name", label: "Tên nhân viên", visible: true, locked: true },
   { key: "username", label: "Username", visible: true },
   { key: "phone", label: "Số điện thoại", visible: true },
@@ -100,6 +103,7 @@ import { fetchProvinces, fetchWardsByProvince } from "@/store/slices/locationsSl
 
 const initialFormData: CreateStaffDto = {
   name: "",
+  avatarUrl: "",
   email: "",
   phone: "",
   birthDate: "",
@@ -389,6 +393,7 @@ export default function StaffPage() {
     setSelectedStaff(staff);
     setFormData({
       name: staff.name,
+      avatarUrl: staff.avatarUrl || "",
       email: staff.email || "",
       phone: staff.phone || "",
       birthDate: staff.birthDate || "",
@@ -909,7 +914,7 @@ export default function StaffPage() {
           description: `Đã tạo mới ${result.created} và cập nhật ${result.updated} nhân viên`,
         });
         handleCloseDialog();
-        loadStaff(filterBranchId);
+        loadStaff(filterBranchId, filterBrandId);
       }
     } catch (error: any) {
       console.error("Error importing:", error);
@@ -1069,6 +1074,7 @@ export default function StaffPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {isColumnVisible("avatar") && <TableHead className="w-[50px]">Ảnh</TableHead>}
                   {isColumnVisible("name") && <TableHead>Tên nhân viên</TableHead>}
                   {isColumnVisible("username") && <TableHead>Username</TableHead>}
                   {isColumnVisible("phone") && <TableHead>Số điện thoại</TableHead>}
@@ -1089,6 +1095,18 @@ export default function StaffPage() {
               <TableBody>
                 {filteredStaff.map((staff) => (
                   <TableRow key={staff.id}>
+                    {isColumnVisible("avatar") && (
+                      <TableCell>
+                        <Avatar className="h-8 w-8">
+                          {staff.avatarUrl ? (
+                            <AvatarImage src={staff.avatarUrl} alt={staff.name} />
+                          ) : null}
+                          <AvatarFallback className="text-xs">
+                            {staff.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+                    )}
                     {isColumnVisible("name") && (
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -1211,6 +1229,18 @@ export default function StaffPage() {
           </DialogHeader>
           {selectedStaff && (
             <div className="space-y-4">
+              {/* Avatar */}
+              <div className="flex justify-center">
+                <Avatar className="h-24 w-24">
+                  {selectedStaff.avatarUrl ? (
+                    <AvatarImage src={selectedStaff.avatarUrl} alt={selectedStaff.name} />
+                  ) : null}
+                  <AvatarFallback className="text-xl">
+                    {selectedStaff.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+
               {(isDetailFieldVisible("name") || isDetailFieldVisible("username")) && (
                 <div className="grid grid-cols-2 gap-4">
                   {isDetailFieldVisible("name") && (
@@ -1618,6 +1648,24 @@ export default function StaffPage() {
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
+                {/* Avatar Upload */}
+                <div className="flex justify-center">
+                  <div className="grid gap-2 text-center">
+                    <Label>Ảnh đại diện</Label>
+                    <ImageUpload
+                      value={formData.avatarUrl}
+                      onChange={(url) => setFormData({ ...formData, avatarUrl: url })}
+                      aspectRatio={1}
+                      maxWidth={400}
+                      maxHeight={400}
+                      folder="staff"
+                      circular
+                      className="w-32 h-32 mx-auto"
+                      placeholder="Chọn ảnh"
+                    />
+                  </div>
+                </div>
+
                 {/* Row 1: Name and Username Prefix */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">

@@ -6,6 +6,7 @@ export interface Staff {
   id: string;
   name: string;
   username: string;
+  avatarUrl?: string;
   email?: string;
   phone?: string;
   birthDate?: string;
@@ -28,6 +29,7 @@ export interface Staff {
 
 export interface CreateStaffDto {
   name: string;
+  avatarUrl?: string;
   email?: string;
   phone?: string;
   birthDate: string; // Required - YYYY-MM-DD
@@ -44,6 +46,7 @@ export interface CreateStaffDto {
 
 export interface UpdateStaffDto {
   name?: string;
+  avatarUrl?: string;
   email?: string;
   phone?: string;
   birthDate?: string;

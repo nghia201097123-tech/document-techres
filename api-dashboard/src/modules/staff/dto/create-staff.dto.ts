@@ -9,6 +9,11 @@ export class CreateStaffDto {
   @MaxLength(255)
   name: string;
 
+  @ApiPropertyOptional({ example: 'https://s3.techres.vn/techres-uploads/staff/avatar.jpg', description: 'URL ảnh đại diện' })
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
+
   @ApiProperty({ example: '1990-01-15', description: 'Ngày sinh (YYYY-MM-DD)' })
   @IsNotEmpty({ message: 'Ngày sinh không được để trống' })
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
