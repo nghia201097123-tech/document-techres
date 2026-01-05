@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { staffService, bulkStaffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem, type BulkOperationResult } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
 import { locationService } from "@/services/location-service";
-import { exportToExcel, readExcelFile, downloadTemplateWithDependentDropdowns, type TemplateColumnWithDropdown, type DependentDropdownConfig, type DropdownOption } from "@/lib/excel-utils";
+import { exportToExcel, exportToExcelWithDropdowns, readExcelFile, downloadTemplateWithDependentDropdowns, type TemplateColumnWithDropdown, type DependentDropdownConfig, type DropdownOption, type ExportColumnWithDropdown } from "@/lib/excel-utils";
 import { branchService, type Branch } from "@/services/branch-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -761,11 +761,54 @@ export default function StaffPage() {
     setFormData({ ...formData, brandId, branchId: "" });
   };
 
-  // Export to Excel
-  const handleExport = () => {
+  // Export to Excel with dropdowns
+  const handleExport = async () => {
     if (staffList.length === 0) {
       toast({ title: "Thông báo", description: "Không có dữ liệu để xuất", variant: "destructive" });
       return;
+    }
+
+    toast({ title: "Đang tải...", description: "Đang tạo file Excel với dropdown" });
+
+    // Load data for dropdowns
+    const [departmentsResult, brandsResult, provincesResult, wardsGroupedByProvince, allBranches] = await Promise.all([
+      dispatch(fetchDepartments()).unwrap(),
+      dispatch(fetchBrands()).unwrap(),
+      dispatch(fetchProvinces()).unwrap(),
+      locationService.getWardsGroupedByProvince(),
+      branchService.getAll(),
+    ]);
+
+    // Build dropdown options
+    const provinceOptions: DropdownOption[] = provincesResult.map((p) => ({
+      value: p.code,
+      label: p.fullName || p.name,
+    }));
+
+    const brandOptions: DropdownOption[] = brandsResult.map((b) => ({
+      value: b.id,
+      label: b.name,
+    }));
+
+    // Build wards by province map
+    const wardsByProvince = new Map<string, DropdownOption[]>();
+    for (const [provinceCode, wards] of Object.entries(wardsGroupedByProvince)) {
+      const province = provincesResult.find((p) => p.code === provinceCode);
+      const provinceLabel = province?.fullName || province?.name || provinceCode;
+      wardsByProvince.set(
+        provinceLabel,
+        (wards as any[]).map((w) => ({ value: w.code, label: w.fullName || w.name }))
+      );
+    }
+
+    // Build branches by brand map
+    const branchesByBrand = new Map<string, DropdownOption[]>();
+    for (const brand of brandsResult) {
+      const brandBranches = allBranches.filter((b) => b.brandId === brand.id);
+      branchesByBrand.set(
+        brand.name,
+        brandBranches.map((b) => ({ value: b.id, label: b.name }))
+      );
     }
 
     // Transform data for export
@@ -776,8 +819,72 @@ export default function StaffPage() {
       isActive: staff.isActive ? "Có" : "Không",
     }));
 
-    exportToExcel(exportData, excelColumns, `danh_sach_nhan_vien_${new Date().toISOString().split("T")[0]}`);
-    toast({ title: "Thành công", description: "Đã xuất file Excel" });
+    // Define columns with dropdowns
+    const columnsWithDropdowns: ExportColumnWithDropdown<typeof exportData[0]>[] = [
+      { key: "id", header: "ID", width: 40 },
+      { key: "name", header: "Tên nhân viên", width: 25 },
+      { key: "username", header: "Username", width: 15 },
+      { key: "phone", header: "Số điện thoại", width: 15 },
+      { key: "email", header: "Email", width: 25 },
+      { key: "birthDate", header: "Ngày sinh", width: 12 },
+      {
+        key: "gender",
+        header: "Giới tính",
+        width: 10,
+        dropdown: [
+          { value: "male", label: "Nam" },
+          { value: "female", label: "Nữ" },
+        ],
+      },
+      { key: "idNumber", header: "CCCD", width: 15 },
+      {
+        key: "provinceName",
+        header: "Tỉnh/Thành phố",
+        width: 25,
+        dropdown: provinceOptions,
+      },
+      { key: "wardName", header: "Phường/Xã", width: 25 },
+      { key: "address", header: "Địa chỉ", width: 30 },
+      {
+        key: "brandName",
+        header: "Thương hiệu",
+        width: 20,
+        dropdown: brandOptions,
+      },
+      { key: "branchName", header: "Chi nhánh", width: 20 },
+      {
+        key: "departmentName",
+        header: "Bộ phận",
+        width: 20,
+        dropdown: departmentsResult.map((d) => ({ value: d.id, label: d.name })),
+      },
+      { key: "isActive", header: "Hoạt động", width: 10 },
+    ];
+
+    // Configure dependent dropdowns
+    const dependentDropdowns: DependentDropdownConfig[] = [
+      {
+        parentHeader: "Tỉnh/Thành phố",
+        childHeader: "Phường/Xã",
+        parentOptions: provinceOptions,
+        childOptionsByParent: wardsByProvince,
+      },
+      {
+        parentHeader: "Thương hiệu",
+        childHeader: "Chi nhánh",
+        parentOptions: brandOptions,
+        childOptionsByParent: branchesByBrand,
+      },
+    ];
+
+    await exportToExcelWithDropdowns(
+      exportData,
+      columnsWithDropdowns,
+      dependentDropdowns,
+      `danh_sach_nhan_vien_${new Date().toISOString().split("T")[0]}`,
+      50
+    );
+    toast({ title: "Thành công", description: "Đã xuất file Excel với dropdown" });
   };
 
   // Download template with dropdowns

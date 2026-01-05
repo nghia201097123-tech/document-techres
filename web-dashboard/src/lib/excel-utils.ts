@@ -4,6 +4,16 @@ import * as XLSX from "xlsx";
 // They are only needed when downloading templates with real dropdowns
 
 /**
+ * Column configuration for export with dropdown
+ */
+export interface ExportColumnWithDropdown<T> {
+  key: keyof T;
+  header: string;
+  width?: number;
+  dropdown?: DropdownOption[];
+}
+
+/**
  * Export data to Excel file and trigger download
  */
 export function exportToExcel<T extends Record<string, any>>(
@@ -40,6 +50,183 @@ export function exportToExcel<T extends Record<string, any>>(
 
   // Generate file and trigger download
   XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
+/**
+ * Export data to Excel with dropdown validations using ExcelJS
+ * Supports both simple dropdowns and dependent/cascading dropdowns
+ */
+export async function exportToExcelWithDropdowns<T extends Record<string, any>>(
+  data: T[],
+  columns: ExportColumnWithDropdown<T>[],
+  dependentDropdowns: DependentDropdownConfig[],
+  filename: string,
+  extraRowCount: number = 50 // Extra empty rows for new data entry
+) {
+  // Dynamic imports
+  const [ExcelJS, { saveAs }] = await Promise.all([
+    import("exceljs"),
+    import("file-saver"),
+  ]);
+
+  const workbook = new ExcelJS.default.Workbook();
+  const mainSheet = workbook.addWorksheet("DuLieu");
+
+  // Add headers
+  const headerRow = mainSheet.getRow(1);
+  columns.forEach((col, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = col.header;
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4CAF50" },
+    };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  });
+
+  // Add data rows
+  data.forEach((item, rowIndex) => {
+    const row = mainSheet.getRow(rowIndex + 2);
+    columns.forEach((col, colIndex) => {
+      const value = item[col.key] as unknown;
+      let cellValue: string | number | boolean | Date = "";
+
+      if (value instanceof Date) {
+        cellValue = value.toLocaleDateString("vi-VN");
+      } else if (typeof value === "boolean") {
+        cellValue = value ? "Có" : "Không";
+      } else {
+        cellValue = (value as string) ?? "";
+      }
+
+      row.getCell(colIndex + 1).value = cellValue;
+    });
+  });
+
+  // Set column widths
+  columns.forEach((col, index) => {
+    mainSheet.getColumn(index + 1).width = col.width || 15;
+  });
+
+  const totalRows = data.length + extraRowCount + 1; // +1 for header
+
+  // Get columns that are NOT part of dependent dropdowns (as child)
+  const dependentChildHeaders = new Set(dependentDropdowns.map(d => d.childHeader));
+  const simpleDropdownColumns = columns.filter(
+    (col) => col.dropdown && col.dropdown.length > 0 && !dependentChildHeaders.has(col.header)
+  );
+
+  // Create reference sheet for simple dropdowns
+  if (simpleDropdownColumns.length > 0) {
+    const refSheet = workbook.addWorksheet("DanhSachChon");
+
+    simpleDropdownColumns.forEach((col, colIndex) => {
+      const headerCell = refSheet.getCell(1, colIndex + 1);
+      headerCell.value = col.header;
+      headerCell.font = { bold: true };
+
+      col.dropdown!.forEach((option, rowIndex) => {
+        refSheet.getCell(rowIndex + 2, colIndex + 1).value = option.label;
+      });
+
+      refSheet.getColumn(colIndex + 1).width = 30;
+    });
+
+    // Apply simple dropdown validations
+    columns.forEach((col, colIndex) => {
+      if (col.dropdown && col.dropdown.length > 0 && !dependentChildHeaders.has(col.header)) {
+        const dropdownColIndex = simpleDropdownColumns.findIndex((dc) => dc.header === col.header);
+        if (dropdownColIndex !== -1) {
+          const colLetter = getColumnLetter(dropdownColIndex);
+          const valueCount = col.dropdown.length;
+
+          for (let row = 2; row <= totalRows; row++) {
+            const cell = mainSheet.getCell(row, colIndex + 1);
+            cell.dataValidation = {
+              type: "list",
+              allowBlank: true,
+              formulae: [`DanhSachChon!$${colLetter}$2:$${colLetter}$${valueCount + 1}`],
+              showErrorMessage: true,
+              errorTitle: "Giá trị không hợp lệ",
+              error: `Vui lòng chọn từ danh sách`,
+              showInputMessage: true,
+              promptTitle: col.header,
+              prompt: "Chọn từ danh sách",
+            };
+          }
+        }
+      }
+    });
+  }
+
+  // Create sheets for dependent dropdowns
+  for (const depConfig of dependentDropdowns) {
+    const sheetName = sanitizeForNamedRange(depConfig.childHeader).substring(0, 20);
+    const depSheet = workbook.addWorksheet(sheetName);
+
+    let maxChildren = 0;
+    const parentLabelsWithChildren: string[] = [];
+
+    for (const parentOption of depConfig.parentOptions) {
+      const childOptions = depConfig.childOptionsByParent.get(parentOption.label) || [];
+      if (childOptions.length > 0) {
+        parentLabelsWithChildren.push(parentOption.label);
+        if (childOptions.length > maxChildren) {
+          maxChildren = childOptions.length;
+        }
+      }
+    }
+
+    // Write parent labels in row 1
+    parentLabelsWithChildren.forEach((parentLabel, colIndex) => {
+      const headerCell = depSheet.getCell(1, colIndex + 1);
+      headerCell.value = parentLabel;
+      headerCell.font = { bold: true };
+      depSheet.getColumn(colIndex + 1).width = 30;
+    });
+
+    // Write child options below each parent
+    parentLabelsWithChildren.forEach((parentLabel, colIndex) => {
+      const childOptions = depConfig.childOptionsByParent.get(parentLabel) || [];
+      childOptions.forEach((childOpt, rowIndex) => {
+        depSheet.getCell(rowIndex + 2, colIndex + 1).value = childOpt.label;
+      });
+    });
+
+    // Find parent and child column indices
+    const parentColIndex = columns.findIndex((c) => c.header === depConfig.parentHeader);
+    const childColIndex = columns.findIndex((c) => c.header === depConfig.childHeader);
+
+    if (parentColIndex !== -1 && childColIndex !== -1) {
+      const parentColLetter = getColumnLetter(parentColIndex);
+      const numParents = parentLabelsWithChildren.length;
+      const lastColLetter = getColumnLetter(numParents - 1);
+
+      for (let row = 2; row <= totalRows; row++) {
+        const cell = mainSheet.getCell(row, childColIndex + 1);
+        const formula = `OFFSET('${sheetName}'!$A$1,1,MATCH($${parentColLetter}${row},'${sheetName}'!$A$1:$${lastColLetter}$1,0)-1,${maxChildren},1)`;
+
+        cell.dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [formula],
+          showErrorMessage: false,
+          showInputMessage: true,
+          promptTitle: depConfig.childHeader,
+          prompt: `Chọn ${depConfig.childHeader} phù hợp với ${depConfig.parentHeader}`,
+        };
+      }
+    }
+  }
+
+  // Generate and download file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  saveAs(blob, `${filename}.xlsx`);
 }
 
 /**
