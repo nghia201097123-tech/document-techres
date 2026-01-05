@@ -679,7 +679,7 @@ export default function GiftItemsPage() {
 
       {/* Edit Dialog - Single product */}
       <Dialog open={dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Chỉnh sửa món tặng</DialogTitle>
             <DialogDescription>
@@ -688,12 +688,64 @@ export default function GiftItemsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              {/* Show current product */}
+              {/* Select product */}
               <div className="grid gap-2">
-                <Label>Món ăn</Label>
-                <div className="p-3 bg-muted/50 rounded-md">
-                  <p className="font-medium">{selectedItem?.product?.name || selectedItem?.name}</p>
+                <Label>Món ăn *</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Tìm kiếm món ăn..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
+                <ScrollArea className="h-[200px] border rounded-md">
+                  {loadingProducts ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : products.filter(p =>
+                    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    p.code?.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <p className="text-muted-foreground">Không tìm thấy món ăn</p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {products
+                        .filter(p =>
+                          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.code?.toLowerCase().includes(searchQuery.toLowerCase())
+                        )
+                        .map((product) => {
+                          const isSelected = formData.productId === product.id;
+                          return (
+                            <div
+                              key={product.id}
+                              className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${
+                                isSelected ? "bg-primary/10 border border-primary" : ""
+                              }`}
+                              onClick={() => setFormData({ ...formData, productId: product.id })}
+                            >
+                              <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                isSelected ? "bg-primary border-primary" : "border-input"
+                              }`}>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{product.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {product.code} - {formatCurrency(Number(product.price))}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </ScrollArea>
               </div>
 
               {/* Custom name (optional) */}
