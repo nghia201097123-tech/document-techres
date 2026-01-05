@@ -118,6 +118,7 @@ export interface BulkStaffItem {
   departmentId?: string;
   brandId?: string;
   branchId?: string;
+  isActive?: boolean;
 }
 
 export interface BulkImportResult {

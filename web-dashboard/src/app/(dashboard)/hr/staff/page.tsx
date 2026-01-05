@@ -139,12 +139,13 @@ const excelColumns = [
 ];
 
 // Extended import data with name fields for lookup
-interface ImportDataWithNames extends Partial<BulkStaffItem> {
+interface ImportDataWithNames extends Omit<Partial<BulkStaffItem>, 'isActive'> {
   provinceName?: string;
   wardName?: string;
   brandName?: string;
   branchName?: string;
   departmentName?: string;
+  isActive?: string | boolean; // Can be "Có"/"Không" from Excel or boolean
 }
 
 // Excel column mapping for import - includes both ID and NAME columns
@@ -163,6 +164,7 @@ const importColumnMapping: { excelHeader: string; key: keyof ImportDataWithNames
   { excelHeader: "Thương hiệu", key: "brandName" },
   { excelHeader: "Chi nhánh", key: "branchName" },
   { excelHeader: "Bộ phận", key: "departmentName" },
+  { excelHeader: "Hoạt động", key: "isActive" },
 ];
 
 
@@ -908,7 +910,15 @@ export default function StaffPage() {
         width: 20,
         dropdown: departmentsResult.map((d) => ({ value: d.id, label: d.name })),
       },
-      { key: "isActive", header: "Hoạt động", width: 10 },
+      {
+        key: "isActive",
+        header: "Hoạt động",
+        width: 10,
+        dropdown: [
+          { value: "true", label: "Có" },
+          { value: "false", label: "Không" },
+        ],
+      },
     ];
 
     // Configure dependent dropdowns
@@ -1032,6 +1042,15 @@ export default function StaffPage() {
         required: true,
         dropdown: departmentsResult.map((d) => ({ value: d.id, label: d.name })),
       },
+      {
+        header: "Hoạt động",
+        example: "Có",
+        required: false,
+        dropdown: [
+          { value: "true", label: "Có" },
+          { value: "false", label: "Không" },
+        ],
+      },
     ];
 
     // Configure dependent dropdowns
@@ -1096,6 +1115,12 @@ export default function StaffPage() {
                                            genderStr === "nữ" || genderStr === "female" ? "female" :
                                            undefined;
 
+        // Convert isActive string from Excel (could be "Có", "Không", "true", "false")
+        const isActiveStr = String(item.isActive || "").toLowerCase();
+        const isActive: boolean | undefined = isActiveStr === "có" || isActiveStr === "true" ? true :
+                                              isActiveStr === "không" || isActiveStr === "false" ? false :
+                                              undefined;
+
         const transformedItem: Partial<BulkStaffItem> = {
           id: item.id,
           name: item.name,
@@ -1105,6 +1130,7 @@ export default function StaffPage() {
           gender,
           idNumber: item.idNumber,
           address: item.address,
+          isActive,
         };
 
         // Lookup province code from name
