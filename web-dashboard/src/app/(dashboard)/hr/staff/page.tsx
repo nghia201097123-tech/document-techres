@@ -977,10 +977,33 @@ export default function StaffPage() {
         // Lookup ward code from name (need province first)
         if (item.wardName && transformedItem.provinceCode) {
           const provinceWards = freshWardsByProvince[transformedItem.provinceCode] || [];
-          const ward = provinceWards.find(
-            (w: any) => w.fullName?.toLowerCase() === item.wardName?.toLowerCase() ||
-                   w.name?.toLowerCase() === item.wardName?.toLowerCase()
+          const wardNameLower = item.wardName.toLowerCase().trim();
+          // Try exact match first
+          let ward = provinceWards.find(
+            (w: any) => w.fullName?.toLowerCase() === wardNameLower ||
+                   w.name?.toLowerCase() === wardNameLower
           );
+          // Try partial match (contains) as fallback
+          if (!ward) {
+            ward = provinceWards.find(
+              (w: any) => w.fullName?.toLowerCase().includes(wardNameLower) ||
+                     wardNameLower.includes(w.fullName?.toLowerCase()) ||
+                     w.name?.toLowerCase().includes(wardNameLower) ||
+                     wardNameLower.includes(w.name?.toLowerCase())
+            );
+          }
+          // Try matching without prefix (Phường/Xã/Thị trấn)
+          if (!ward) {
+            const wardNameWithoutPrefix = wardNameLower
+              .replace(/^(phường|xã|thị trấn)\s*/i, "").trim();
+            ward = provinceWards.find(
+              (w: any) => {
+                const wNameWithoutPrefix = (w.name || "").toLowerCase()
+                  .replace(/^(phường|xã|thị trấn)\s*/i, "").trim();
+                return wNameWithoutPrefix === wardNameWithoutPrefix;
+              }
+            );
+          }
           if (ward) {
             transformedItem.wardCode = ward.code;
           } else if (provinceWards.length > 0) {
