@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -185,13 +185,101 @@ export default function ProductsPage() {
 
   // Local state
   const [search, setSearch] = React.useState("");
-  const [typeFilter, setTypeFilter] = React.useState("all");
   const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [saving, setSaving] = React.useState(false);
   const [formData, setFormData] = React.useState<CreateProductDto>(initialFormData);
   const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
+
+  // Sorting state
+  type SortKey = "code" | "name" | "type" | "categoryName" | "price" | "vatRate" | "costPrice" | "unit" | "sellingType" | "isActive" | "createdAt";
+  type SortDirection = "asc" | "desc";
+  const [sortKey, setSortKey] = React.useState<SortKey>("createdAt");
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>("desc");
+
+  // Filter state
+  const [filterPopoverOpen, setFilterPopoverOpen] = React.useState(false);
+  const [typeFilter, setTypeFilter] = React.useState<Set<string>>(new Set()); // Multi-select
+  const [categoryFilter, setCategoryFilter] = React.useState<Set<string>>(new Set()); // Multi-select
+  const [vatFilter, setVatFilter] = React.useState<string>("all"); // "all" | "has_vat" | "no_vat"
+  const [unitFilter, setUnitFilter] = React.useState<string>("all");
+  const [printDishFilter, setPrintDishFilter] = React.useState<string>("all"); // "all" | "yes" | "no"
+  const [printLabelFilter, setPrintLabelFilter] = React.useState<string>("all");
+  const [printSeafoodFilter, setPrintSeafoodFilter] = React.useState<string>("all");
+  const [sellingTypeFilter, setSellingTypeFilter] = React.useState<string>("all");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+
+  // Check if any filter is active
+  const hasActiveFilters = typeFilter.size > 0 || categoryFilter.size > 0 || vatFilter !== "all" ||
+    unitFilter !== "all" || printDishFilter !== "all" || printLabelFilter !== "all" ||
+    printSeafoodFilter !== "all" || sellingTypeFilter !== "all" || statusFilter !== "all";
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setTypeFilter(new Set());
+    setCategoryFilter(new Set());
+    setVatFilter("all");
+    setUnitFilter("all");
+    setPrintDishFilter("all");
+    setPrintLabelFilter("all");
+    setPrintSeafoodFilter("all");
+    setSellingTypeFilter("all");
+    setStatusFilter("all");
+  };
+
+  // Handle sort click
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
+
+  // Get sort icon
+  const getSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    return sortDirection === "asc"
+      ? <ArrowUp className="ml-1 h-3 w-3" />
+      : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
+
+  // Toggle type filter (multi-select)
+  const toggleTypeFilter = (type: string) => {
+    setTypeFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  };
+
+  // Toggle category filter (multi-select)
+  const toggleCategoryFilter = (categoryId: string) => {
+    setCategoryFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
+  // Get unique units from products for filter
+  const uniqueUnits = React.useMemo(() => {
+    const units = new Set<string>();
+    products.forEach(p => {
+      if (p.unit) units.add(p.unit);
+    });
+    return Array.from(units).sort();
+  }, [products]);
 
   // Topping management state
   const [availableToppings, setAvailableToppings] = React.useState<Product[]>([]);
@@ -270,23 +358,18 @@ export default function ProductsPage() {
     }
     try {
       setLoading(true);
-      const filterType = typeFilter === "all" ? undefined : (typeFilter as ProductType);
-      // Use the seasonal price API if branch is selected
+      // Load all products, filtering will happen in filteredProducts
       const data = branchId
-        ? await productService.getAllWithSeasonalPrices(brandId, branchId, filterType)
-        : await productService.getAll(brandId, filterType);
-      // Sort by createdAt descending (newest first)
-      const sortedData = [...data].sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setProducts(sortedData);
+        ? await productService.getAllWithSeasonalPrices(brandId, branchId)
+        : await productService.getAll(brandId);
+      setProducts(data);
     } catch (error) {
       console.error("Error loading products:", error);
       toast({ title: "Lỗi", description: "Không thể tải danh sách món ăn", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, toast]);
+  }, [toast]);
 
   React.useEffect(() => {
     loadProducts(filterBrandId, filterBranchId);
@@ -1190,14 +1273,92 @@ export default function ProductsPage() {
     return category?.name || "-";
   };
 
-  // Filter products by search and brand
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.code?.toLowerCase().includes(search.toLowerCase());
-    const matchesBrand = filterBrandId === "all" || p.brandId === filterBrandId;
-    return matchesSearch && matchesBrand;
-  });
+  // Filter and sort products
+  const filteredProducts = React.useMemo(() => {
+    // First filter
+    let result = products.filter((p) => {
+      // Search filter
+      const matchesSearch =
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.code?.toLowerCase().includes(search.toLowerCase());
+
+      // Brand filter
+      const matchesBrand = filterBrandId === "all" || p.brandId === filterBrandId;
+
+      // Type filter (multi-select)
+      const matchesType = typeFilter.size === 0 || typeFilter.has(p.type);
+
+      // Category filter (multi-select)
+      const matchesCategory = categoryFilter.size === 0 || categoryFilter.has(p.categoryId || "");
+
+      // VAT filter
+      const matchesVat = vatFilter === "all" ||
+        (vatFilter === "has_vat" && (p.vatRate || 0) > 0) ||
+        (vatFilter === "no_vat" && (p.vatRate || 0) === 0);
+
+      // Unit filter
+      const matchesUnit = unitFilter === "all" || p.unit === unitFilter;
+
+      // Print Dish filter
+      const matchesPrintDish = printDishFilter === "all" ||
+        (printDishFilter === "yes" && p.printDish) ||
+        (printDishFilter === "no" && !p.printDish);
+
+      // Print Label filter
+      const matchesPrintLabel = printLabelFilter === "all" ||
+        (printLabelFilter === "yes" && p.printLabel) ||
+        (printLabelFilter === "no" && !p.printLabel);
+
+      // Print Seafood filter
+      const matchesPrintSeafood = printSeafoodFilter === "all" ||
+        (printSeafoodFilter === "yes" && p.printSeafood) ||
+        (printSeafoodFilter === "no" && !p.printSeafood);
+
+      // Selling Type filter
+      const matchesSellingType = sellingTypeFilter === "all" || p.sellingType === sellingTypeFilter;
+
+      // Status filter
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && p.isActive) ||
+        (statusFilter === "inactive" && !p.isActive);
+
+      return matchesSearch && matchesBrand && matchesType && matchesCategory &&
+        matchesVat && matchesUnit && matchesPrintDish && matchesPrintLabel &&
+        matchesPrintSeafood && matchesSellingType && matchesStatus;
+    });
+
+    // Then sort
+    result.sort((a, b) => {
+      let aValue: any = a[sortKey as keyof Product];
+      let bValue: any = b[sortKey as keyof Product];
+
+      // Handle special cases
+      if (sortKey === "createdAt") {
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+      } else if (sortKey === "price" || sortKey === "costPrice" || sortKey === "vatRate") {
+        aValue = aValue || 0;
+        bValue = bValue || 0;
+      } else if (sortKey === "isActive") {
+        aValue = a.isActive ? 1 : 0;
+        bValue = b.isActive ? 1 : 0;
+      } else if (sortKey === "categoryName") {
+        aValue = (a.categoryName || getCategoryName(a.categoryId) || "").toLowerCase();
+        bValue = (b.categoryName || getCategoryName(b.categoryId) || "").toLowerCase();
+      } else if (typeof aValue === "string") {
+        aValue = (aValue || "").toLowerCase();
+        bValue = (bValue || "").toLowerCase();
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [products, search, filterBrandId, typeFilter, categoryFilter, vatFilter, unitFilter,
+      printDishFilter, printLabelFilter, printSeafoodFilter, sellingTypeFilter, statusFilter,
+      sortKey, sortDirection, getCategoryName]);
 
   return (
     <div className="space-y-6">
@@ -1261,20 +1422,6 @@ export default function ProductsPage() {
                 showAllOption={false}
                 className="w-[160px]"
               />
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[130px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Loại món" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="food">Đồ ăn</SelectItem>
-                  <SelectItem value="drink">Đồ uống</SelectItem>
-                  <SelectItem value="other">Khác</SelectItem>
-                  <SelectItem value="topping">Topping</SelectItem>
-                  <SelectItem value="combo">Combo</SelectItem>
-                </SelectContent>
-              </Select>
               <div className="relative w-48">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -1284,6 +1431,190 @@ export default function ProductsPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              {/* Filter Popover */}
+              <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Bộ lọc
+                    {hasActiveFilters && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                        {[
+                          typeFilter.size > 0 ? 1 : 0,
+                          categoryFilter.size > 0 ? 1 : 0,
+                          vatFilter !== "all" ? 1 : 0,
+                          unitFilter !== "all" ? 1 : 0,
+                          printDishFilter !== "all" ? 1 : 0,
+                          printLabelFilter !== "all" ? 1 : 0,
+                          printSeafoodFilter !== "all" ? 1 : 0,
+                          sellingTypeFilter !== "all" ? 1 : 0,
+                          statusFilter !== "all" ? 1 : 0,
+                        ].reduce((a, b) => a + b, 0)}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96" align="end">
+                  <ScrollArea className="h-[500px] pr-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Bộ lọc</h4>
+                        {hasActiveFilters && (
+                          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 px-2 text-xs">
+                            <X className="mr-1 h-3 w-3" />
+                            Xóa tất cả
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Type Filter - Multi-select */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Loại món ăn</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(typeLabels).map(([type, { label, color }]) => (
+                            <Badge
+                              key={type}
+                              variant={typeFilter.has(type) ? "default" : "outline"}
+                              className={cn(
+                                "cursor-pointer transition-colors",
+                                typeFilter.has(type) ? color : "hover:bg-muted"
+                              )}
+                              onClick={() => toggleTypeFilter(type)}
+                            >
+                              {typeFilter.has(type) && <Check className="mr-1 h-3 w-3" />}
+                              {label}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Category Filter - Multi-select */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Danh mục món ăn</Label>
+                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                          {categories.filter(c => c.isActive).map((cat) => (
+                            <Badge
+                              key={cat.id}
+                              variant={categoryFilter.has(cat.id) ? "default" : "outline"}
+                              className="cursor-pointer transition-colors hover:bg-muted"
+                              onClick={() => toggleCategoryFilter(cat.id)}
+                            >
+                              {categoryFilter.has(cat.id) && <Check className="mr-1 h-3 w-3" />}
+                              {cat.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* VAT Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">VAT</Label>
+                        <Select value={vatFilter} onValueChange={setVatFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="has_vat">Có VAT</SelectItem>
+                            <SelectItem value="no_vat">Không VAT</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Unit Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Đơn vị</Label>
+                        <Select value={unitFilter} onValueChange={setUnitFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            {uniqueUnits.map((unit) => (
+                              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Print Dish Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">In món</Label>
+                        <Select value={printDishFilter} onValueChange={setPrintDishFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="yes">Có</SelectItem>
+                            <SelectItem value="no">Không</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Print Label Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">In tem</Label>
+                        <Select value={printLabelFilter} onValueChange={setPrintLabelFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="yes">Có</SelectItem>
+                            <SelectItem value="no">Không</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Print Seafood Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">In hồ hải sản</Label>
+                        <Select value={printSeafoodFilter} onValueChange={setPrintSeafoodFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="yes">Có</SelectItem>
+                            <SelectItem value="no">Không</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Selling Type Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Loại bán</Label>
+                        <Select value={sellingTypeFilter} onValueChange={setSellingTypeFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="portion">Theo phần</SelectItem>
+                            <SelectItem value="weight">Theo cân</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Status Filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Trạng thái</Label>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Tất cả" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="active">Hoạt động</SelectItem>
+                            <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
               <ColumnConfigDialog
                 columns={productColumns}
                 onToggle={toggleColumn}
@@ -1315,23 +1646,63 @@ export default function ProductsPage() {
               <TableHeader>
                 <TableRow>
                   {isColumnVisible("image") && <TableHead className="w-[50px]">Ảnh</TableHead>}
-                  {isColumnVisible("code") && <TableHead>Mã</TableHead>}
-                  {isColumnVisible("name") && <TableHead>Tên món</TableHead>}
-                  {isColumnVisible("type") && <TableHead>Loại</TableHead>}
-                  {isColumnVisible("categoryName") && <TableHead>Danh mục</TableHead>}
-                  {isColumnVisible("price") && <TableHead className="text-right">Giá (đã VAT)</TableHead>}
+                  {isColumnVisible("code") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("code")}>
+                      <div className="flex items-center">Mã{getSortIcon("code")}</div>
+                    </TableHead>
+                  )}
+                  {isColumnVisible("name") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("name")}>
+                      <div className="flex items-center">Tên món{getSortIcon("name")}</div>
+                    </TableHead>
+                  )}
+                  {isColumnVisible("type") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("type")}>
+                      <div className="flex items-center">Loại{getSortIcon("type")}</div>
+                    </TableHead>
+                  )}
+                  {isColumnVisible("categoryName") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("categoryName")}>
+                      <div className="flex items-center">Danh mục{getSortIcon("categoryName")}</div>
+                    </TableHead>
+                  )}
+                  {isColumnVisible("price") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50 text-right" onClick={() => handleSort("price")}>
+                      <div className="flex items-center justify-end">Giá (đã VAT){getSortIcon("price")}</div>
+                    </TableHead>
+                  )}
                   {isColumnVisible("priceBeforeVat") && <TableHead className="text-right">Giá trước VAT</TableHead>}
                   {isColumnVisible("vatAmount") && <TableHead className="text-right">Tiền thuế VAT</TableHead>}
-                  {isColumnVisible("vatRate") && <TableHead className="text-right">VAT (%)</TableHead>}
-                  {isColumnVisible("costPrice") && <TableHead className="text-right">Giá vốn</TableHead>}
+                  {isColumnVisible("vatRate") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50 text-right" onClick={() => handleSort("vatRate")}>
+                      <div className="flex items-center justify-end">VAT (%){getSortIcon("vatRate")}</div>
+                    </TableHead>
+                  )}
+                  {isColumnVisible("costPrice") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50 text-right" onClick={() => handleSort("costPrice")}>
+                      <div className="flex items-center justify-end">Giá vốn{getSortIcon("costPrice")}</div>
+                    </TableHead>
+                  )}
                   {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
                   {isColumnVisible("preparationTime") && <TableHead>Thời gian CB</TableHead>}
-                  {isColumnVisible("sellingType") && <TableHead>Loại bán</TableHead>}
-                  {isColumnVisible("unit") && <TableHead>Đơn vị</TableHead>}
+                  {isColumnVisible("sellingType") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("sellingType")}>
+                      <div className="flex items-center">Loại bán{getSortIcon("sellingType")}</div>
+                    </TableHead>
+                  )}
+                  {isColumnVisible("unit") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("unit")}>
+                      <div className="flex items-center">Đơn vị{getSortIcon("unit")}</div>
+                    </TableHead>
+                  )}
                   {isColumnVisible("printDish") && <TableHead>In món</TableHead>}
                   {isColumnVisible("printLabel") && <TableHead>In tem</TableHead>}
                   {isColumnVisible("printSeafood") && <TableHead>In hải sản</TableHead>}
-                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
+                  {isColumnVisible("isActive") && (
+                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("isActive")}>
+                      <div className="flex items-center">Trạng thái{getSortIcon("isActive")}</div>
+                    </TableHead>
+                  )}
                   <TableHead className="w-[80px]">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
