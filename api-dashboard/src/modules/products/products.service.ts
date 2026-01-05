@@ -103,17 +103,24 @@ export class ProductsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find all active seasonal prices for this branch that are currently valid
-    const activeSeasonalPrices = await this.seasonalPriceRepository.find({
-      where: {
-        tenantId,
-        branchId,
-        isActive: true,
-        startDate: LessThanOrEqual(today),
-        endDate: MoreThanOrEqual(today),
-      },
-      relations: ['seasonalPriceProducts'],
-    });
+    // Only query seasonal prices if branchId is a valid UUID (not "all" or empty)
+    const isValidUUID = branchId && branchId !== 'all' && branchId !== '' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId);
+
+    let activeSeasonalPrices: any[] = [];
+    if (isValidUUID) {
+      // Find all active seasonal prices for this branch that are currently valid
+      activeSeasonalPrices = await this.seasonalPriceRepository.find({
+        where: {
+          tenantId,
+          branchId,
+          isActive: true,
+          startDate: LessThanOrEqual(today),
+          endDate: MoreThanOrEqual(today),
+        },
+        relations: ['seasonalPriceProducts'],
+      });
+    }
 
     // Build a map of productId -> seasonal price info
     const productSeasonalPriceMap = new Map<string, {
