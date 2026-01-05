@@ -11,3 +11,4 @@ export * from "./surcharge-service";
 export * from "./seasonal-price-service";
 export * from "./gift-item-service";
 export * from "./voucher-service";
+export * from "./coupon-service";
