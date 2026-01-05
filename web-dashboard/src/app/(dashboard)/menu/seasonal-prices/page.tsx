@@ -578,7 +578,7 @@ export default function SeasonalPricesPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{dialogMode === "create" ? "Thêm giá thời vụ mới" : "Chỉnh sửa giá thời vụ"}</DialogTitle>
             <DialogDescription>
@@ -587,7 +587,8 @@ export default function SeasonalPricesPage() {
                 : "Cập nhật thông tin giá thời vụ"}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <ScrollArea className="flex-1 pr-4">
             <div className="grid gap-4 py-4">
               {/* Basic info */}
               <div className="grid gap-2">
@@ -743,7 +744,8 @@ export default function SeasonalPricesPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            </ScrollArea>
+            <DialogFooter className="mt-4">
               <Button type="button" variant="outline" onClick={handleCloseDialog}>
                 Hủy
               </Button>
