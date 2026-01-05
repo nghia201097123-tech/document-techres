@@ -87,6 +87,10 @@ export default function TablesPage() {
   // Continue creating checkbox
   const [continueCreating, setContinueCreating] = React.useState(false);
 
+  // Track newly created and updated table IDs for badges
+  const [newTableIds, setNewTableIds] = React.useState<Set<string>>(new Set());
+  const [updatedTableIds, setUpdatedTableIds] = React.useState<Set<string>>(new Set());
+
   // Area combobox state
   const [areaComboboxOpen, setAreaComboboxOpen] = React.useState(false);
   const [areaSearchValue, setAreaSearchValue] = React.useState("");
@@ -166,6 +170,9 @@ export default function TablesPage() {
     const area = areas.find(a => a.id === table.areaId);
     setAreaSearchValue(area?.name || "");
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewTableIds(prev => { const next = new Set(prev); next.delete(table.id); return next; });
+    setUpdatedTableIds(prev => { const next = new Set(prev); next.delete(table.id); return next; });
   };
 
   // Close dialog
@@ -228,6 +235,7 @@ export default function TablesPage() {
       if (dialogMode === "create") {
         const result = await tableService.create({ ...formData, areaId });
         setTables((prev) => [result, ...prev]);
+        setNewTableIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: `Đã tạo bàn "${result.name}"` });
 
         // If continue creating is checked, reset form but keep dialog open
@@ -250,6 +258,12 @@ export default function TablesPage() {
         };
         const result = await tableService.update(selectedTable.id, updateData);
         setTables((prev) => prev.map((t) => (t.id === selectedTable.id ? result : t)));
+        setUpdatedTableIds(prev => new Set([...prev, result.id]));
+        setNewTableIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật bàn" });
         handleCloseDialog();
       }
@@ -425,7 +439,15 @@ export default function TablesPage() {
                                 <Table2 className="h-4 w-4" />
                               </div>
                               <div>
-                                <p className="font-medium">{table.name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-medium">{table.name}</p>
+                                  {newTableIds.has(table.id) && (
+                                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                                  )}
+                                  {updatedTableIds.has(table.id) && (
+                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Users className="h-3 w-3" />
                                   <span>{table.capacity} chỗ</span>

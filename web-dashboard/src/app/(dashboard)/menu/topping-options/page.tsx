@@ -68,6 +68,10 @@ export default function ToppingOptionsPage() {
   const [assignedGroupIds, setAssignedGroupIds] = React.useState<string[]>([]);
   const [loadingAssignments, setLoadingAssignments] = React.useState(false);
 
+  // Track newly created and updated group IDs for badges
+  const [newGroupIds, setNewGroupIds] = React.useState<Set<string>>(new Set());
+  const [updatedGroupIds, setUpdatedGroupIds] = React.useState<Set<string>>(new Set());
+
   // Load data - only when brand is selected
   const loadData = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -114,6 +118,9 @@ export default function ToppingOptionsPage() {
   const handleSelectGroup = (group: ToppingGroup) => {
     setSelectedGroup(group);
     setShowNewGroupForm(false);
+    // Remove badges when selecting
+    setNewGroupIds(prev => { const next = new Set(prev); next.delete(group.id); return next; });
+    setUpdatedGroupIds(prev => { const next = new Set(prev); next.delete(group.id); return next; });
   };
 
   // Create topping group
@@ -128,8 +135,13 @@ export default function ToppingOptionsPage() {
         maxSelection: newGroupMaxSelection,
       });
       const groups = await productService.getAllToppingGroups();
-      setToppingGroups(groups);
+      // Sort by createdAt descending to put new group at top
+      const sortedGroups = [...groups].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setToppingGroups(sortedGroups);
       setSelectedGroup(newGroup);
+      setNewGroupIds(prev => new Set([...prev, newGroup.id]));
       setNewGroupName("");
       setNewGroupRequired(false);
       setNewGroupMinSelection(0);
@@ -169,6 +181,12 @@ export default function ToppingOptionsPage() {
       const groups = await productService.getAllToppingGroups();
       setToppingGroups(groups);
       setSelectedGroup(updated);
+      setUpdatedGroupIds(prev => new Set([...prev, updated.id]));
+      setNewGroupIds(prev => {
+        const next = new Set(prev);
+        next.delete(updated.id);
+        return next;
+      });
       setEditingGroup(null);
       toast({ title: "Thành công", description: "Đã cập nhật nhóm topping" });
     } catch (error: any) {
@@ -497,6 +515,12 @@ export default function ToppingOptionsPage() {
                             <div>
                               <div className="font-medium flex items-center gap-2">
                                 {group.name}
+                                {newGroupIds.has(group.id) && (
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                                )}
+                                {updatedGroupIds.has(group.id) && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                                )}
                                 {!group.isActive && (
                                   <Badge variant="secondary" className="text-xs">Tạm ngưng</Badge>
                                 )}

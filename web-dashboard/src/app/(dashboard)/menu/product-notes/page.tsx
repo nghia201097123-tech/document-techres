@@ -62,6 +62,10 @@ export default function ProductNotesPage() {
   const [hasChanges, setHasChanges] = React.useState(false);
   const [originalProductIds, setOriginalProductIds] = React.useState<string[]>([]);
 
+  // Track newly created and updated note IDs for badges
+  const [newNoteIds, setNewNoteIds] = React.useState<Set<string>>(new Set());
+  const [updatedNoteIds, setUpdatedNoteIds] = React.useState<Set<string>>(new Set());
+
   // Load notes - only when brand is selected
   const loadNotes = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -140,6 +144,9 @@ export default function ProductNotesPage() {
     setFormName(note.name);
     setFormDescription(note.description || "");
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewNoteIds(prev => { const next = new Set(prev); next.delete(note.id); return next; });
+    setUpdatedNoteIds(prev => { const next = new Set(prev); next.delete(note.id); return next; });
   };
 
   // Close dialog
@@ -166,6 +173,7 @@ export default function ProductNotesPage() {
           description: formDescription.trim() || undefined,
         });
         setNotes((prev) => [newNote, ...prev]);
+        setNewNoteIds(prev => new Set([...prev, newNote.id]));
         toast({ title: "Thành công", description: `Đã tạo ghi chú "${newNote.name}"` });
         if (continueCreating) {
           setFormName("");
@@ -182,6 +190,12 @@ export default function ProductNotesPage() {
         if (selectedNote?.id === editingNote.id) {
           setSelectedNote(updatedNote);
         }
+        setUpdatedNoteIds(prev => new Set([...prev, updatedNote.id]));
+        setNewNoteIds(prev => {
+          const next = new Set(prev);
+          next.delete(updatedNote.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật ghi chú" });
       }
       handleCloseDialog();
@@ -393,7 +407,15 @@ export default function ProductNotesPage() {
                             <StickyNote className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{note.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium truncate">{note.name}</p>
+                              {newNoteIds.has(note.id) && (
+                                <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0 shrink-0">Mới</Badge>
+                              )}
+                              {updatedNoteIds.has(note.id) && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0 shrink-0">Cập nhật</Badge>
+                              )}
+                            </div>
                             {note.description && (
                               <p className="text-xs text-muted-foreground truncate">{note.description}</p>
                             )}

@@ -68,6 +68,10 @@ export default function KitchenPage() {
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
+  // Track newly created and updated kitchen IDs for badges
+  const [newKitchenIds, setNewKitchenIds] = React.useState<Set<string>>(new Set());
+  const [updatedKitchenIds, setUpdatedKitchenIds] = React.useState<Set<string>>(new Set());
+
   // Product assignment state
   const [allProducts, setAllProducts] = React.useState<Product[]>([]);
   const [kitchenProducts, setKitchenProducts] = React.useState<Product[]>([]);
@@ -126,6 +130,9 @@ export default function KitchenPage() {
       description: kitchen.description || "",
     });
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewKitchenIds(prev => { const next = new Set(prev); next.delete(kitchen.id); return next; });
+    setUpdatedKitchenIds(prev => { const next = new Set(prev); next.delete(kitchen.id); return next; });
   };
 
   // Open products dialog
@@ -180,7 +187,8 @@ export default function KitchenPage() {
 
       if (dialogMode === "create") {
         const result = await kitchenService.create(formData);
-        setKitchens((prev) => [...prev, { ...result, productCount: 0 }]);
+        setKitchens((prev) => [{ ...result, productCount: 0 }, ...prev]);
+        setNewKitchenIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: "Đã tạo bếp mới" });
         if (continueCreating) {
           setFormData({
@@ -206,6 +214,12 @@ export default function KitchenPage() {
         };
         const result = await kitchenService.update(selectedKitchen.id, updateData);
         setKitchens((prev) => prev.map((k) => (k.id === selectedKitchen.id ? { ...result, productCount: k.productCount } : k)));
+        setUpdatedKitchenIds(prev => new Set([...prev, result.id]));
+        setNewKitchenIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật bếp" });
       }
 
@@ -392,7 +406,15 @@ export default function KitchenPage() {
                           <ChefHat className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="font-medium">{kitchen.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium">{kitchen.name}</p>
+                            {newKitchenIds.has(kitchen.id) && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                            )}
+                            {updatedKitchenIds.has(kitchen.id) && (
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground space-y-0.5">
                             {kitchen.printerName && <p>Máy in: {kitchen.printerName}</p>}
                             {kitchen.printerIp && (

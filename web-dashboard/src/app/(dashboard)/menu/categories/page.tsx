@@ -106,6 +106,10 @@ export default function CategoriesPage() {
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
+  // Track newly created and updated category IDs for badges
+  const [newCategoryIds, setNewCategoryIds] = React.useState<Set<string>>(new Set());
+  const [updatedCategoryIds, setUpdatedCategoryIds] = React.useState<Set<string>>(new Set());
+
   // Load categories - only when brand is selected
   const loadCategories = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -150,6 +154,9 @@ export default function CategoriesPage() {
       sortOrder: category.sortOrder,
     });
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewCategoryIds(prev => { const next = new Set(prev); next.delete(category.id); return next; });
+    setUpdatedCategoryIds(prev => { const next = new Set(prev); next.delete(category.id); return next; });
   };
 
   // Close dialog
@@ -170,6 +177,7 @@ export default function CategoriesPage() {
       if (dialogMode === "create") {
         const result = await categoryService.create(formData);
         setCategories((prev) => [result, ...prev]);
+        setNewCategoryIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: "Đã tạo danh mục mới" });
         if (continueCreating) {
           setFormData({ name: "", productType: formData.productType, description: "", sortOrder: 0 });
@@ -184,6 +192,12 @@ export default function CategoriesPage() {
         };
         const result = await categoryService.update(selectedCategory.id, updateData);
         setCategories((prev) => prev.map((c) => (c.id === selectedCategory.id ? result : c)));
+        setUpdatedCategoryIds(prev => new Set([...prev, result.id]));
+        setNewCategoryIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật danh mục" });
       }
 
@@ -343,6 +357,12 @@ export default function CategoriesPage() {
                             <FolderOpen className="h-3.5 w-3.5" />
                           </div>
                           <span className="font-medium">{category.name}</span>
+                          {newCategoryIds.has(category.id) && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                          )}
+                          {updatedCategoryIds.has(category.id) && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                          )}
                         </div>
                       </TableCell>
                     )}

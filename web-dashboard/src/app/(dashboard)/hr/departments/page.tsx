@@ -95,6 +95,10 @@ export default function DepartmentsPage() {
   const [loadingTransferInfo, setLoadingTransferInfo] = React.useState(false);
   const [transferring, setTransferring] = React.useState(false);
 
+  // Track newly created/updated department IDs for badges
+  const [newDeptIds, setNewDeptIds] = React.useState<Set<string>>(new Set());
+  const [updatedDeptIds, setUpdatedDeptIds] = React.useState<Set<string>>(new Set());
+
   // Load departments
   const loadDepartments = React.useCallback(async () => {
     try {
@@ -138,6 +142,17 @@ export default function DepartmentsPage() {
       description: dept.description || "",
     });
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewDeptIds(prev => {
+      const next = new Set(prev);
+      next.delete(dept.id);
+      return next;
+    });
+    setUpdatedDeptIds(prev => {
+      const next = new Set(prev);
+      next.delete(dept.id);
+      return next;
+    });
   };
 
   // Close dialog
@@ -169,6 +184,7 @@ export default function DepartmentsPage() {
         const result = await departmentService.create(formData);
         setDepartments((prev) => [result, ...prev]);
         setExpandedIds(prev => new Set([...prev, result.id]));
+        setNewDeptIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: `Đã tạo bộ phận "${result.name}"` });
         if (continueCreating) {
           setFormData({ name: "", parentId: formData.parentId, description: "" });
@@ -182,6 +198,13 @@ export default function DepartmentsPage() {
         };
         const result = await departmentService.update(selectedDepartment.id, updateData);
         setDepartments((prev) => prev.map((d) => (d.id === selectedDepartment.id ? result : d)));
+        setUpdatedDeptIds(prev => new Set([...prev, result.id]));
+        // Remove from new if it was there
+        setNewDeptIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật bộ phận" });
       }
 
@@ -556,7 +579,15 @@ export default function DepartmentsPage() {
               </div>
 
               {/* Department Name */}
-              <h4 className="font-semibold text-sm mt-2 line-clamp-2">{dept.name}</h4>
+              <div className="flex items-center gap-2 mt-2">
+                <h4 className="font-semibold text-sm line-clamp-2">{dept.name}</h4>
+                {newDeptIds.has(dept.id) && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                )}
+                {updatedDeptIds.has(dept.id) && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                )}
+              </div>
 
               {/* Description if exists */}
               {dept.description && (

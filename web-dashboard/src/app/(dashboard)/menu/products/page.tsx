@@ -229,8 +229,9 @@ export default function ProductsPage() {
   const [importErrors, setImportErrors] = React.useState<string[]>([]);
   const [importing, setImporting] = React.useState(false);
 
-  // Track newly created product IDs for "New" badge
+  // Track newly created and updated product IDs for badges
   const [newProductIds, setNewProductIds] = React.useState<Set<string>>(new Set());
+  const [updatedProductIds, setUpdatedProductIds] = React.useState<Set<string>>(new Set());
 
   // Get categories based on selected product type
   const availableCategories = React.useMemo(() => {
@@ -341,14 +342,9 @@ export default function ProductsPage() {
     // Set unit search value
     setUnitSearchValue(product.unit || "");
     setDialogMode("edit");
-    // Remove "new" badge when editing
-    if (newProductIds.has(product.id)) {
-      setNewProductIds((prev) => {
-        const next = new Set(prev);
-        next.delete(product.id);
-        return next;
-      });
-    }
+    // Remove badges when editing
+    setNewProductIds(prev => { const next = new Set(prev); next.delete(product.id); return next; });
+    setUpdatedProductIds(prev => { const next = new Set(prev); next.delete(product.id); return next; });
   };
 
   // Open toppings management dialog (show assigned groups)
@@ -692,6 +688,12 @@ export default function ProductsPage() {
       } else if (dialogMode === "edit" && selectedProduct) {
         const result = await productService.update(selectedProduct.id, preparedData);
         setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? result : p)));
+        setUpdatedProductIds(prev => new Set([...prev, result.id]));
+        setNewProductIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật thông tin món ăn" });
         handleCloseDialog();
       }
@@ -1138,6 +1140,9 @@ export default function ProductsPage() {
                           {product.name}
                           {newProductIds.has(product.id) && (
                             <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Mới</Badge>
+                          )}
+                          {updatedProductIds.has(product.id) && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Cập nhật</Badge>
                           )}
                         </div>
                       </TableCell>

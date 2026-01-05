@@ -86,6 +86,10 @@ export default function UnitsPage() {
     sortOrder: 0,
   });
 
+  // Track newly created and updated unit IDs for badges
+  const [newUnitIds, setNewUnitIds] = React.useState<Set<string>>(new Set());
+  const [updatedUnitIds, setUpdatedUnitIds] = React.useState<Set<string>>(new Set());
+
   // Load units - only when brand is selected
   const loadUnits = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -129,6 +133,9 @@ export default function UnitsPage() {
       sortOrder: unit.sortOrder,
     });
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewUnitIds(prev => { const next = new Set(prev); next.delete(unit.id); return next; });
+    setUpdatedUnitIds(prev => { const next = new Set(prev); next.delete(unit.id); return next; });
   };
 
   // Close dialog
@@ -149,6 +156,7 @@ export default function UnitsPage() {
       if (dialogMode === "create") {
         const result = await unitService.create(formData);
         setUnits((prev) => [result, ...prev]);
+        setNewUnitIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: "Đã tạo đơn vị tính mới" });
       } else if (dialogMode === "edit" && selectedUnit) {
         const updateData: UpdateUnitDto = {
@@ -158,6 +166,12 @@ export default function UnitsPage() {
         };
         const result = await unitService.update(selectedUnit.id, updateData);
         setUnits((prev) => prev.map((u) => (u.id === selectedUnit.id ? result : u)));
+        setUpdatedUnitIds(prev => new Set([...prev, result.id]));
+        setNewUnitIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật đơn vị tính" });
       }
 
@@ -292,6 +306,12 @@ export default function UnitsPage() {
                             <Scale className="h-3.5 w-3.5" />
                           </div>
                           <span className="font-medium">{unit.name}</span>
+                          {newUnitIds.has(unit.id) && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                          )}
+                          {updatedUnitIds.has(unit.id) && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                          )}
                         </div>
                       </TableCell>
                     )}

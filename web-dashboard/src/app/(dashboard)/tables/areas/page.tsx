@@ -95,6 +95,10 @@ export default function AreasPage() {
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
+  // Track newly created and updated area IDs for badges
+  const [newAreaIds, setNewAreaIds] = React.useState<Set<string>>(new Set());
+  const [updatedAreaIds, setUpdatedAreaIds] = React.useState<Set<string>>(new Set());
+
   // Quick table creation state
   const [quickTables, setQuickTables] = React.useState<QuickTable[]>([]);
   const [newTableName, setNewTableName] = React.useState("");
@@ -147,6 +151,9 @@ export default function AreasPage() {
     });
     setQuickTables([]);
     setDialogMode("edit");
+    // Remove badges when editing
+    setNewAreaIds(prev => { const next = new Set(prev); next.delete(area.id); return next; });
+    setUpdatedAreaIds(prev => { const next = new Set(prev); next.delete(area.id); return next; });
   };
 
   // Close dialog
@@ -221,6 +228,7 @@ export default function AreasPage() {
         };
         const result = await areaService.create(createData);
         setAreas((prev) => [result, ...prev]);
+        setNewAreaIds(prev => new Set([...prev, result.id]));
         const tableCount = quickTables.length;
         toast({
           title: "Thành công",
@@ -241,6 +249,12 @@ export default function AreasPage() {
         };
         const result = await areaService.update(selectedArea.id, updateData);
         setAreas((prev) => prev.map((a) => (a.id === selectedArea.id ? result : a)));
+        setUpdatedAreaIds(prev => new Set([...prev, result.id]));
+        setNewAreaIds(prev => {
+          const next = new Set(prev);
+          next.delete(result.id);
+          return next;
+        });
         toast({ title: "Thành công", description: "Đã cập nhật khu vực" });
       }
 
@@ -379,6 +393,12 @@ export default function AreasPage() {
                             <MapPin className="h-3.5 w-3.5 text-primary" />
                           </div>
                           <span className="font-medium">{area.name}</span>
+                          {newAreaIds.has(area.id) && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">Mới</Badge>
+                          )}
+                          {updatedAreaIds.has(area.id) && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">Cập nhật</Badge>
+                          )}
                         </div>
                       </TableCell>
                     )}
