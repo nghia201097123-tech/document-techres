@@ -517,9 +517,12 @@ export default function StaffPage() {
             provinceCode: formData.provinceCode,
             wardCode: formData.wardCode,
           });
+          // Auto copy to clipboard
+          const copyText = `Tên định danh: ${tenantId}\nTài khoản: ${result.username}\nMật khẩu: ${result.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
+          navigator.clipboard.writeText(copyText);
           toast({
-            title: "Thành công",
-            description: `Đã tạo ${result.name} (${result.username}). Mật khẩu: ${result.temporaryPassword}`,
+            title: "Thành công - Đã copy thông tin đăng nhập",
+            description: `Đã tạo ${result.name} (${result.username})`,
           });
         } else {
           setCreatedStaff(result);
