@@ -22,15 +22,24 @@ export class MinioService implements OnModuleInit {
 
     this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL}, Region: ${region})`);
 
-    this.client = new Minio.Client({
+    // Don't specify port when using default HTTPS port (443)
+    const clientConfig: Minio.ClientOptions = {
       endPoint: endpoint,
-      port: port,
       useSSL: useSSL,
       accessKey: accessKey,
       secretKey: secretKey,
       region: region,
       pathStyle: true, // Use path-style URLs instead of virtual-hosted style
-    });
+    };
+
+    // Only add port if it's not the default for the protocol
+    if ((useSSL && port !== 443) || (!useSSL && port !== 80)) {
+      clientConfig.port = port;
+    }
+
+    this.logger.log(`Client config: ${JSON.stringify({ ...clientConfig, accessKey: '***', secretKey: '***' })}`);
+
+    this.client = new Minio.Client(clientConfig);
 
     this.bucket = this.configService.get<string>('CONFIG_MINIO_BUCKET', 'techres-uploads');
     const protocol = useSSL ? 'https' : 'http';
