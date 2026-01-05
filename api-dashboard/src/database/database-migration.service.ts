@@ -675,6 +675,51 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Seasonal price products table created successfully');
       }
 
+      // 30. Create uploaded_file_type enum and uploaded_files table
+      this.logger.log('Creating uploaded_file_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE uploaded_file_type AS ENUM ('image', 'video', 'document', 'other');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const uploadedFilesExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'uploaded_files'
+        );
+      `);
+
+      if (!uploadedFilesExists[0].exists) {
+        this.logger.log('Creating uploaded_files table...');
+        await queryRunner.query(`
+          CREATE TABLE uploaded_files (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50),
+            original_name VARCHAR(500) NOT NULL,
+            file_name VARCHAR(500) NOT NULL,
+            mime_type VARCHAR(100) NOT NULL,
+            file_size BIGINT NOT NULL,
+            file_type uploaded_file_type DEFAULT 'other',
+            bucket VARCHAR(100) NOT NULL,
+            object_name VARCHAR(500) NOT NULL,
+            full_url TEXT NOT NULL,
+            short_code VARCHAR(16) NOT NULL UNIQUE,
+            folder VARCHAR(200),
+            uploaded_by VARCHAR(50),
+            is_public BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_uploaded_files_tenant ON uploaded_files(tenant_id);
+          CREATE INDEX idx_uploaded_files_short_code ON uploaded_files(short_code);
+          CREATE INDEX idx_uploaded_files_file_type ON uploaded_files(file_type);
+        `);
+        this.logger.log('Uploaded files table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

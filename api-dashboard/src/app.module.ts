@@ -18,6 +18,7 @@ import { SurchargesModule } from './modules/surcharges/surcharges.module';
 import { SeasonalPricesModule } from './modules/seasonal-prices/seasonal-prices.module';
 import { GiftItemsModule } from './modules/gift-items/gift-items.module';
 import { VouchersModule } from './modules/vouchers/vouchers.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
@@ -53,6 +54,7 @@ import {
   SeasonalPriceProduct,
   GiftItem,
   Voucher,
+  UploadedFile,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -104,6 +106,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           SeasonalPriceProduct,
           GiftItem,
           Voucher,
+          UploadedFile,
         ],
         synchronize: false,
       }),
@@ -127,6 +130,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     SeasonalPricesModule,
     GiftItemsModule,
     VouchersModule,
+    UploadsModule,
   ],
   providers: [DatabaseMigrationService],
 })

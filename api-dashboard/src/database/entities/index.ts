@@ -32,3 +32,4 @@ export * from './seasonal-price.entity';
 export * from './gift-item.entity';
 export * from './voucher.entity';
 export * from './seasonal-price-product.entity';
+export * from './uploaded-file.entity';
