@@ -418,3 +418,35 @@ export const productService = {
     return response.data;
   },
 };
+
+// Bulk Operations Types
+export interface ProductBulkOperationResult {
+  success: number;
+  failed: number;
+  errors: { productId: string; message: string }[];
+}
+
+export const bulkProductService = {
+  updateCategory: async (productIds: string[], categoryId: string): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-category", {
+      productIds,
+      categoryId,
+    });
+    return response.data;
+  },
+
+  toggleActive: async (productIds: string[], isActive: boolean): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/toggle-active", {
+      productIds,
+      isActive,
+    });
+    return response.data;
+  },
+
+  delete: async (productIds: string[]): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/delete", {
+      productIds,
+    });
+    return response.data;
+  },
+};

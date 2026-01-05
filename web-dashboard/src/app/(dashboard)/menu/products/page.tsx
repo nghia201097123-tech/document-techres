@@ -53,7 +53,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment } from "@/services/product-service";
+import { productService, bulkProductService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment, type ProductBulkOperationResult } from "@/services/product-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
@@ -280,6 +280,14 @@ export default function ProductsPage() {
     });
     return Array.from(units).sort();
   }, [products]);
+
+  // Bulk operations state
+  type BulkOperation = "category" | "activate" | "deactivate" | "delete" | null;
+  const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
+  const [bulkOperation, setBulkOperation] = React.useState<BulkOperation>(null);
+  const [bulkCategoryId, setBulkCategoryId] = React.useState("");
+  const [processingBulk, setProcessingBulk] = React.useState(false);
+  const [bulkResult, setBulkResult] = React.useState<ProductBulkOperationResult | null>(null);
 
   // Topping management state
   const [availableToppings, setAvailableToppings] = React.useState<Product[]>([]);
@@ -1360,6 +1368,85 @@ export default function ProductsPage() {
       printDishFilter, printLabelFilter, printSeafoodFilter, sellingTypeFilter, statusFilter,
       sortKey, sortDirection, getCategoryName]);
 
+  // Bulk selection derived state (must be after filteredProducts)
+  const isAllSelected = filteredProducts.length > 0 && selectedProductIds.size === filteredProducts.length;
+  const isSomeSelected = selectedProductIds.size > 0 && selectedProductIds.size < filteredProducts.length;
+
+  // Handle select all/none
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProductIds(new Set(filteredProducts.map(p => p.id)));
+    } else {
+      setSelectedProductIds(new Set());
+    }
+  };
+
+  // Handle select single product
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    const newSet = new Set(selectedProductIds);
+    if (checked) {
+      newSet.add(productId);
+    } else {
+      newSet.delete(productId);
+    }
+    setSelectedProductIds(newSet);
+  };
+
+  // Bulk operation handlers
+  const handleCloseBulkDialog = () => {
+    setBulkOperation(null);
+    setBulkCategoryId("");
+    setBulkResult(null);
+  };
+
+  const handleBulkOperation = async () => {
+    if (selectedProductIds.size === 0) return;
+
+    const productIds = Array.from(selectedProductIds);
+    setProcessingBulk(true);
+
+    try {
+      let result: ProductBulkOperationResult;
+
+      switch (bulkOperation) {
+        case "category":
+          if (!bulkCategoryId) {
+            toast({ title: "Lỗi", description: "Vui lòng chọn danh mục", variant: "destructive" });
+            setProcessingBulk(false);
+            return;
+          }
+          result = await bulkProductService.updateCategory(productIds, bulkCategoryId);
+          break;
+        case "activate":
+          result = await bulkProductService.toggleActive(productIds, true);
+          break;
+        case "deactivate":
+          result = await bulkProductService.toggleActive(productIds, false);
+          break;
+        case "delete":
+          result = await bulkProductService.delete(productIds);
+          break;
+        default:
+          return;
+      }
+
+      toast({
+        title: "Thành công",
+        description: `Đã thực hiện thành công ${result.success}/${selectedProductIds.size} món ăn`,
+      });
+
+      // Reload products and clear selection
+      loadProducts(filterBrandId, filterBranchId);
+      setSelectedProductIds(new Set());
+      handleCloseBulkDialog();
+    } catch (error: any) {
+      console.error("Bulk operation error:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setProcessingBulk(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1642,9 +1729,60 @@ export default function ProductsPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <>
+              {/* Selection bar with bulk actions */}
+              {selectedProductIds.size > 0 && (
+                <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-lg mb-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      {...(isSomeSelected ? { "data-state": "indeterminate" } : {})}
+                    />
+                    <span className="text-sm font-medium">
+                      Đã chọn {selectedProductIds.size} món ăn
+                    </span>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Thao tác hàng loạt
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => setBulkOperation("category")}>
+                        <UtensilsCrossed className="mr-2 h-4 w-4" />
+                        Chuyển danh mục
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBulkOperation("activate")}>
+                        <Power className="mr-2 h-4 w-4 text-green-600" />
+                        Kích hoạt tất cả
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("deactivate")}>
+                        <Power className="mr-2 h-4 w-4 text-orange-500" />
+                        Tạm ngưng tất cả
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBulkOperation("delete")} className="text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Xóa tất cả
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+              <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      {...(isSomeSelected ? { "data-state": "indeterminate" } : {})}
+                    />
+                  </TableHead>
                   {isColumnVisible("image") && <TableHead className="w-[50px]">Ảnh</TableHead>}
                   {isColumnVisible("code") && (
                     <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("code")}>
@@ -1708,7 +1846,13 @@ export default function ProductsPage() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
+                  <TableRow key={product.id} className={selectedProductIds.has(product.id) ? "bg-muted/50" : ""}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedProductIds.has(product.id)}
+                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                      />
+                    </TableCell>
                     {isColumnVisible("image") && (
                       <TableCell>
                         {product.imageUrl ? (
@@ -1830,9 +1974,80 @@ export default function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Operation Dialog */}
+      <Dialog open={bulkOperation !== null} onOpenChange={(open) => !open && handleCloseBulkDialog()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {bulkOperation === "category" && "Chuyển danh mục"}
+              {bulkOperation === "activate" && "Kích hoạt món ăn"}
+              {bulkOperation === "deactivate" && "Tạm ngưng món ăn"}
+              {bulkOperation === "delete" && "Xóa món ăn"}
+            </DialogTitle>
+            <DialogDescription>
+              Thao tác sẽ áp dụng cho {selectedProductIds.size} món ăn đã chọn
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Category selection */}
+          {bulkOperation === "category" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn danh mục mới</Label>
+                <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn danh mục..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.filter(c => c.isActive).map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Activate/Deactivate confirmation */}
+          {(bulkOperation === "activate" || bulkOperation === "deactivate") && (
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">
+                Bạn có chắc chắn muốn <strong>{bulkOperation === "activate" ? "kích hoạt" : "tạm ngưng"}</strong> {selectedProductIds.size} món ăn đã chọn?
+              </p>
+            </div>
+          )}
+
+          {/* Delete confirmation */}
+          {bulkOperation === "delete" && (
+            <div className="py-4">
+              <p className="text-sm text-destructive">
+                Bạn có chắc chắn muốn <strong>xóa</strong> {selectedProductIds.size} món ăn đã chọn?
+                <br />
+                <span className="text-xs">Hành động này không thể hoàn tác.</span>
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseBulkDialog}>
+              Hủy
+            </Button>
+            <Button
+              onClick={handleBulkOperation}
+              disabled={processingBulk}
+              variant={bulkOperation === "delete" ? "destructive" : "default"}
+            >
+              {processingBulk && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xác nhận
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Product Dialog */}
       <Dialog open={dialogMode === "view"} onOpenChange={() => handleCloseDialog()}>
