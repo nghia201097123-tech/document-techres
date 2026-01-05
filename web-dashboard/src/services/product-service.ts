@@ -513,4 +513,18 @@ export const bulkProductService = {
     });
     return response.data;
   },
+
+  updateAvatars: async (items: { productCode: string; avatarUrl: string }[]): Promise<BulkAvatarUpdateResult> => {
+    const response = await api.post<BulkAvatarUpdateResult>("/products/bulk/update-avatar", {
+      items,
+    });
+    return response.data;
+  },
 };
+
+export interface BulkAvatarUpdateResult {
+  success: number;
+  failed: number;
+  errors: { productCode: string; message: string }[];
+  updated: { productCode: string; productName: string }[];
+}

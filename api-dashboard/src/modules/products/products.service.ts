@@ -1430,4 +1430,37 @@ export class ProductsService {
 
     return result;
   }
+
+  async bulkUpdateAvatar(tenantId: string, items: { productCode: string; avatarUrl: string }[]) {
+    const result = {
+      success: 0,
+      failed: 0,
+      errors: [] as { productCode: string; message: string }[],
+      updated: [] as { productCode: string; productName: string }[]
+    };
+
+    for (const item of items) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, code: item.productCode },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productCode: item.productCode, message: 'Không tìm thấy món ăn với mã này' });
+          continue;
+        }
+
+        product.imageUrl = item.avatarUrl;
+        await this.productRepository.save(product);
+        result.success++;
+        result.updated.push({ productCode: item.productCode, productName: product.name });
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productCode: item.productCode, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
 }

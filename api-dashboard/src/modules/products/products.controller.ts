@@ -27,6 +27,7 @@ import {
   BulkUpdateUnitDto,
   BulkUpdateSellingTypeDto,
   BulkUpdatePreparationTimeDto,
+  BulkUpdateAvatarDto,
 } from './dto';
 import { ProductType } from '../../database/entities';
 
@@ -295,6 +296,12 @@ export class ProductsController {
       dto.productIds,
       dto.preparationTime,
     );
+  }
+
+  @Post('bulk/update-avatar')
+  @ApiOperation({ summary: 'Cập nhật ảnh cho nhiều món (theo mã món)' })
+  bulkUpdateAvatar(@Request() req, @Body() dto: BulkUpdateAvatarDto) {
+    return this.productsService.bulkUpdateAvatar(req.user.tenantId, dto.items);
   }
 
   // === Product CRUD ===

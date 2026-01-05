@@ -121,3 +121,19 @@ export class BulkUpdatePreparationTimeDto {
   @Min(0)
   preparationTime: number;
 }
+
+export class BulkAvatarItemDto {
+  @ApiProperty({ description: 'Mã món ăn' })
+  @IsString()
+  productCode: string;
+
+  @ApiProperty({ description: 'URL ảnh' })
+  @IsString()
+  avatarUrl: string;
+}
+
+export class BulkUpdateAvatarDto {
+  @ApiProperty({ description: 'Danh sách ảnh cần cập nhật', type: [BulkAvatarItemDto] })
+  @IsArray()
+  items: BulkAvatarItemDto[];
+}

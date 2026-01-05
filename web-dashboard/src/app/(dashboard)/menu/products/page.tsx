@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +53,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { productService, bulkProductService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment, type ProductBulkOperationResult } from "@/services/product-service";
+import { productService, bulkProductService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment, type ProductBulkOperationResult, type BulkAvatarUpdateResult } from "@/services/product-service";
+import { uploadService } from "@/services/upload-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
@@ -295,6 +296,19 @@ export default function ProductsPage() {
   const [bulkPreparationTime, setBulkPreparationTime] = React.useState<number>(0);
   const [processingBulk, setProcessingBulk] = React.useState(false);
   const [bulkResult, setBulkResult] = React.useState<ProductBulkOperationResult | null>(null);
+
+  // Bulk avatar upload state
+  const [bulkAvatarDialogOpen, setBulkAvatarDialogOpen] = React.useState(false);
+  const [bulkAvatarFiles, setBulkAvatarFiles] = React.useState<File[]>([]);
+  const [bulkAvatarPreviews, setBulkAvatarPreviews] = React.useState<{
+    file: File;
+    productCode: string;
+    matchedProduct: Product | null;
+    previewUrl: string;
+  }[]>([]);
+  const [uploadingAvatars, setUploadingAvatars] = React.useState(false);
+  const [bulkAvatarResult, setBulkAvatarResult] = React.useState<BulkAvatarUpdateResult | null>(null);
+  const bulkAvatarInputRef = React.useRef<HTMLInputElement>(null);
 
   // Topping management state
   const [availableToppings, setAvailableToppings] = React.useState<Product[]>([]);
@@ -1421,6 +1435,92 @@ export default function ProductsPage() {
     setBulkResult(null);
   };
 
+  // Bulk avatar upload handlers
+  const handleBulkAvatarFilesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setBulkAvatarFiles(files);
+
+    // Process files: extract product code from filename and match with products
+    const previews = files.map((file) => {
+      // Extract product code from filename (remove extension)
+      const productCode = file.name.replace(/\.[^/.]+$/, "").toUpperCase();
+
+      // Find matching product
+      const matchedProduct = products.find(
+        (p) => p.code?.toUpperCase() === productCode
+      ) || null;
+
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+
+      return { file, productCode, matchedProduct, previewUrl };
+    });
+
+    setBulkAvatarPreviews(previews);
+    setBulkAvatarDialogOpen(true);
+  };
+
+  const handleCloseBulkAvatarDialog = () => {
+    // Cleanup preview URLs
+    bulkAvatarPreviews.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+
+    setBulkAvatarDialogOpen(false);
+    setBulkAvatarFiles([]);
+    setBulkAvatarPreviews([]);
+    setBulkAvatarResult(null);
+
+    // Reset file input
+    if (bulkAvatarInputRef.current) {
+      bulkAvatarInputRef.current.value = "";
+    }
+  };
+
+  const handleBulkAvatarUpload = async () => {
+    const matchedPreviews = bulkAvatarPreviews.filter((p) => p.matchedProduct);
+
+    if (matchedPreviews.length === 0) {
+      toast({ title: "Lỗi", description: "Không có ảnh nào khớp với mã món ăn", variant: "destructive" });
+      return;
+    }
+
+    setUploadingAvatars(true);
+
+    try {
+      // Upload all images first
+      const uploadPromises = matchedPreviews.map(async (preview) => {
+        const uploadResult = await uploadService.uploadImage(preview.file, "products");
+        return {
+          productCode: preview.productCode,
+          avatarUrl: uploadResult.url,
+        };
+      });
+
+      const uploadedItems = await Promise.all(uploadPromises);
+
+      // Update products with new avatar URLs
+      const result = await bulkProductService.updateAvatars(uploadedItems);
+
+      setBulkAvatarResult(result);
+
+      if (result.success > 0) {
+        toast({
+          title: "Thành công",
+          description: `Đã cập nhật ảnh cho ${result.success} món ăn`,
+        });
+
+        // Reload products to show new avatars
+        loadProducts(filterBrandId, filterBranchId);
+      }
+    } catch (error: any) {
+      console.error("Bulk avatar upload error:", error);
+      toast({ title: "Lỗi", description: error.message || "Có lỗi xảy ra khi upload ảnh", variant: "destructive" });
+    } finally {
+      setUploadingAvatars(false);
+    }
+  };
+
   const handleBulkOperation = async () => {
     if (selectedProductIds.size === 0) return;
 
@@ -1537,6 +1637,10 @@ export default function ProductsPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="outline" onClick={() => bulkAvatarInputRef.current?.click()}>
+            <ImageIcon className="mr-2 h-4 w-4" />
+            Cập nhật ảnh
+          </Button>
           <Button onClick={handleOpenCreate}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm món ăn
@@ -1550,6 +1654,16 @@ export default function ProductsPage() {
         ref={fileInputRef}
         onChange={handleFileChange}
         accept=".xlsx,.xls"
+        className="hidden"
+      />
+
+      {/* Hidden file input for bulk avatar upload */}
+      <input
+        type="file"
+        ref={bulkAvatarInputRef}
+        onChange={handleBulkAvatarFilesSelect}
+        accept="image/*"
+        multiple
         className="hidden"
       />
 
@@ -3425,6 +3539,136 @@ export default function ProductsPage() {
               Import {importData.length} dòng
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Avatar Upload Dialog */}
+      <Dialog open={bulkAvatarDialogOpen} onOpenChange={(open) => !open && handleCloseBulkAvatarDialog()}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Cập nhật ảnh hàng loạt
+            </DialogTitle>
+            <DialogDescription>
+              Đặt tên file ảnh theo mã món ăn (VD: SP001.jpg, M002.png).
+              Hệ thống sẽ tự động map ảnh với món ăn tương ứng.
+            </DialogDescription>
+          </DialogHeader>
+
+          {bulkAvatarResult ? (
+            // Show result
+            <div className="space-y-4">
+              <div className="rounded-lg bg-green-50 p-4 border border-green-200">
+                <p className="font-medium text-green-800">Kết quả cập nhật</p>
+                <div className="mt-2 space-y-1 text-sm text-green-700">
+                  <p>Thành công: {bulkAvatarResult.success} món</p>
+                  <p>Thất bại: {bulkAvatarResult.failed} món</p>
+                </div>
+              </div>
+
+              {bulkAvatarResult.errors.length > 0 && (
+                <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+                  <p className="font-medium text-red-800">Lỗi</p>
+                  <ul className="mt-2 space-y-1 text-sm text-red-700 list-disc pl-4">
+                    {bulkAvatarResult.errors.map((err, i) => (
+                      <li key={i}>{err.productCode}: {err.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {bulkAvatarResult.updated.length > 0 && (
+                <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
+                  <p className="font-medium text-blue-800">Đã cập nhật</p>
+                  <ul className="mt-2 space-y-1 text-sm text-blue-700 list-disc pl-4">
+                    {bulkAvatarResult.updated.map((item, i) => (
+                      <li key={i}>{item.productCode}: {item.productName}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button onClick={handleCloseBulkAvatarDialog}>Đóng</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            // Show preview
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Đã chọn {bulkAvatarPreviews.length} ảnh,
+                  khớp {bulkAvatarPreviews.filter(p => p.matchedProduct).length} món ăn
+                </div>
+                <Button variant="outline" size="sm" onClick={() => bulkAvatarInputRef.current?.click()}>
+                  Chọn thêm ảnh
+                </Button>
+              </div>
+
+              <ScrollArea className="h-[400px] border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-20">Ảnh</TableHead>
+                      <TableHead>Tên file</TableHead>
+                      <TableHead>Mã món</TableHead>
+                      <TableHead>Tên món ăn</TableHead>
+                      <TableHead className="text-center">Trạng thái</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bulkAvatarPreviews.map((preview, index) => (
+                      <TableRow key={index} className={!preview.matchedProduct ? "bg-red-50" : ""}>
+                        <TableCell>
+                          <img
+                            src={preview.previewUrl}
+                            alt={preview.file.name}
+                            className="h-12 w-12 object-cover rounded"
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{preview.file.name}</TableCell>
+                        <TableCell className="font-mono">{preview.productCode}</TableCell>
+                        <TableCell>
+                          {preview.matchedProduct ? (
+                            preview.matchedProduct.name
+                          ) : (
+                            <span className="text-red-500">Không tìm thấy</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {preview.matchedProduct ? (
+                            <Badge variant="default" className="bg-green-500">
+                              <Check className="h-3 w-3 mr-1" />
+                              Khớp
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">
+                              <X className="h-3 w-3 mr-1" />
+                              Không khớp
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={handleCloseBulkAvatarDialog}>
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleBulkAvatarUpload}
+                  disabled={uploadingAvatars || bulkAvatarPreviews.filter(p => p.matchedProduct).length === 0}
+                >
+                  {uploadingAvatars && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Upload {bulkAvatarPreviews.filter(p => p.matchedProduct).length} ảnh
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
