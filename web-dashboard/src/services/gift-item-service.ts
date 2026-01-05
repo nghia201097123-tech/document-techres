@@ -18,18 +18,18 @@ export interface GiftItem {
 }
 
 export interface CreateGiftItemDto {
-  name: string;
+  productId: string;
+  name?: string;
   description?: string;
-  productId?: string;
   maxQuantity?: number;
   minOrderAmount?: number;
   sortOrder?: number;
 }
 
 export interface UpdateGiftItemDto {
+  productId?: string;
   name?: string;
   description?: string;
-  productId?: string;
   maxQuantity?: number;
   minOrderAmount?: number;
   sortOrder?: number;

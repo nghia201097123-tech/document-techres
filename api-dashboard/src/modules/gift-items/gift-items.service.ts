@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { GiftItem } from '../../database/entities';
+import { GiftItem, Product } from '../../database/entities';
 import { CreateGiftItemDto, UpdateGiftItemDto } from './dto';
 
 @Injectable()
@@ -9,6 +9,8 @@ export class GiftItemsService {
   constructor(
     @InjectRepository(GiftItem)
     private readonly giftItemRepository: Repository<GiftItem>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
   ) {}
 
   async findAll(tenantId: string, branchId?: string) {
@@ -35,8 +37,20 @@ export class GiftItemsService {
   }
 
   async create(tenantId: string, branchId: string, createDto: CreateGiftItemDto) {
+    // Get product name if name is not provided
+    let name = createDto.name;
+    if (!name && createDto.productId) {
+      const product = await this.productRepository.findOne({
+        where: { id: createDto.productId, tenantId },
+      });
+      if (product) {
+        name = product.name;
+      }
+    }
+
     const giftItem = this.giftItemRepository.create({
       ...createDto,
+      name: name || 'Món tặng',
       tenantId,
       branchId,
       isActive: true,

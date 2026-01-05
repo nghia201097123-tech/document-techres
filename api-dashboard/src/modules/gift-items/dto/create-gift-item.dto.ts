@@ -2,21 +2,21 @@ import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, IsUU
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateGiftItemDto {
-  @ApiProperty({ example: 'Nước ngọt tặng kèm' })
-  @IsNotEmpty({ message: 'Tên món tặng không được để trống' })
+  @ApiProperty({ example: 'uuid-of-product', description: 'ID của món ăn được chọn làm món tặng' })
+  @IsNotEmpty({ message: 'Vui lòng chọn món ăn' })
+  @IsUUID('4', { message: 'ID sản phẩm không hợp lệ' })
+  productId: string;
+
+  @ApiPropertyOptional({ example: 'Nước ngọt tặng kèm', description: 'Tên hiển thị (nếu để trống sẽ dùng tên món ăn)' })
+  @IsOptional()
   @IsString()
   @MaxLength(200)
-  name: string;
+  name?: string;
 
   @ApiPropertyOptional({ example: 'Tặng nước ngọt khi hóa đơn trên 500k' })
   @IsOptional()
   @IsString()
   description?: string;
-
-  @ApiPropertyOptional({ example: 'uuid-of-product' })
-  @IsOptional()
-  @IsUUID('4', { message: 'ID sản phẩm không hợp lệ' })
-  productId?: string;
 
   @ApiPropertyOptional({ example: 2, default: 1 })
   @IsOptional()
