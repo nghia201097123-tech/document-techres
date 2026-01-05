@@ -1,6 +1,6 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as Minio from 'minio';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as Minio from "minio";
 
 @Injectable()
 export class MinioService implements OnModuleInit {
@@ -11,16 +11,41 @@ export class MinioService implements OnModuleInit {
 
   constructor(private configService: ConfigService) {
     // Read from CONFIG_MINIO_* environment variables (same as other services)
-    const endpoint = this.configService.get<string>('CONFIG_MINIO_ENDPOINT', 's3.techres.vn');
-    const port = parseInt(this.configService.get<string>('CONFIG_MINIO_PORT', '443'), 10);
-    const useSSL = this.configService.get<string>('CONFIG_MINIO_ENABLE_SSL', 'true') === 'true';
-    const accessKey = this.configService.get<string>('CONFIG_MINIO_ACCESSKEY', '');
-    const secretKey = this.configService.get<string>('CONFIG_MINIO_SECRETKEY', '');
+    const endpoint = this.configService.get<string>(
+      "CONFIG_MINIO_ENDPOINT",
+      "s3.techres.vn"
+    );
+    const port = parseInt(
+      this.configService.get<string>("CONFIG_MINIO_PORT", "443"),
+      10
+    );
+    const useSSL =
+      this.configService.get<string>("CONFIG_MINIO_ENABLE_SSL", "true") ===
+      "true";
+    const accessKey = this.configService.get<string>(
+      "CONFIG_MINIO_ACCESSKEY",
+      ""
+    );
+    const secretKey = this.configService.get<string>(
+      "CONFIG_MINIO_SECRETKEY",
+      ""
+    );
+
+    console.log("accessKey", accessKey);
+    console.log("secretKey", secretKey);
+    console.log("endpoint", endpoint);
+    console.log("port", port);
+    console.log("useSSL", useSSL);
 
     // Get region from config - required to bypass auto-detection (which causes Access Denied)
-    const region = this.configService.get<string>('CONFIG_MINIO_REGION', 'us-east-1');
+    const region = this.configService.get<string>(
+      "CONFIG_MINIO_REGION",
+      "us-east-1"
+    );
 
-    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL}, Region: ${region})`);
+    this.logger.log(
+      `Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL}, Region: ${region})`
+    );
 
     // Don't specify port when using default HTTPS port (443)
     const clientConfig: Minio.ClientOptions = {
@@ -37,12 +62,17 @@ export class MinioService implements OnModuleInit {
       clientConfig.port = port;
     }
 
-    this.logger.log(`Client config: ${JSON.stringify({ ...clientConfig, accessKey: '***', secretKey: '***' })}`);
+    this.logger.log(
+      `Client config: ${JSON.stringify({ ...clientConfig, accessKey: "***", secretKey: "***" })}`
+    );
 
     this.client = new Minio.Client(clientConfig);
 
-    this.bucket = this.configService.get<string>('CONFIG_MINIO_BUCKET', 'techres-uploads');
-    const protocol = useSSL ? 'https' : 'http';
+    this.bucket = this.configService.get<string>(
+      "CONFIG_MINIO_BUCKET",
+      "techres-uploads"
+    );
+    const protocol = useSSL ? "https" : "http";
     this.baseUrl = `${protocol}://${endpoint}/${this.bucket}`;
   }
 
@@ -72,18 +102,22 @@ export class MinioService implements OnModuleInit {
     objectName: string,
     buffer: Buffer,
     size: number,
-    contentType: string,
+    contentType: string
   ): Promise<string> {
     try {
-      this.logger.log(`Uploading ${objectName} (${size} bytes, ${contentType})`);
+      this.logger.log(
+        `Uploading ${objectName} (${size} bytes, ${contentType})`
+      );
       await this.client.putObject(this.bucket, objectName, buffer, size, {
-        'Content-Type': contentType,
+        "Content-Type": contentType,
       });
       this.logger.log(`Upload successful: ${objectName}`);
       return `${this.baseUrl}/${objectName}`;
     } catch (error: any) {
       this.logger.error(`Upload failed for ${objectName}`);
-      this.logger.error(`Full error: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`);
+      this.logger.error(
+        `Full error: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`
+      );
       this.logger.error(`Error name: ${error.name}`);
       this.logger.error(`Error code: ${error.code}`);
       this.logger.error(`Error message: ${error.message}`);
@@ -106,8 +140,15 @@ export class MinioService implements OnModuleInit {
   /**
    * Get presigned URL for temporary access
    */
-  async getPresignedUrl(objectName: string, expirySeconds: number = 3600): Promise<string> {
-    return await this.client.presignedGetObject(this.bucket, objectName, expirySeconds);
+  async getPresignedUrl(
+    objectName: string,
+    expirySeconds: number = 3600
+  ): Promise<string> {
+    return await this.client.presignedGetObject(
+      this.bucket,
+      objectName,
+      expirySeconds
+    );
   }
 
   /**
