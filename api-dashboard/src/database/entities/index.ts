@@ -27,3 +27,7 @@ export * from './product-kitchen.entity';
 export * from './department-permission.entity';
 export * from './staff-permission.entity';
 export * from './combo-item.entity';
+export * from './surcharge.entity';
+export * from './seasonal-price.entity';
+export * from './gift-item.entity';
+export * from './voucher.entity';

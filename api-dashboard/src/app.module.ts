@@ -14,6 +14,10 @@ import { AreasModule } from './modules/areas/areas.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { UnitsModule } from './modules/units/units.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
+import { SurchargesModule } from './modules/surcharges/surcharges.module';
+import { SeasonalPricesModule } from './modules/seasonal-prices/seasonal-prices.module';
+import { GiftItemsModule } from './modules/gift-items/gift-items.module';
+import { VouchersModule } from './modules/vouchers/vouchers.module';
 import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
@@ -44,6 +48,10 @@ import {
   DepartmentPermission,
   StaffPermission,
   ComboItem,
+  Surcharge,
+  SeasonalPrice,
+  GiftItem,
+  Voucher,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -90,6 +98,10 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           DepartmentPermission,
           StaffPermission,
           ComboItem,
+          Surcharge,
+          SeasonalPrice,
+          GiftItem,
+          Voucher,
         ],
         synchronize: false,
       }),
@@ -109,6 +121,10 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     TablesModule,
     UnitsModule,
     PermissionsModule,
+    SurchargesModule,
+    SeasonalPricesModule,
+    GiftItemsModule,
+    VouchersModule,
   ],
   providers: [DatabaseMigrationService],
 })

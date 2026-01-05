@@ -19,6 +19,10 @@ import {
   Cherry,
   StickyNote,
   Scale,
+  Receipt,
+  Calendar,
+  Gift,
+  Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -54,6 +58,10 @@ const menuItems: MenuItem[] = [
       { title: "Đơn vị tính", href: "/menu/units", icon: Scale },
       { title: "Topping Options", href: "/menu/topping-options", icon: Cherry },
       { title: "Ghi chú", href: "/menu/product-notes", icon: StickyNote },
+      { title: "Phụ thu", href: "/menu/surcharges", icon: Receipt },
+      { title: "Giá thời vụ", href: "/menu/seasonal-prices", icon: Calendar },
+      { title: "Món tặng", href: "/menu/gift-items", icon: Gift },
+      { title: "Voucher", href: "/menu/vouchers", icon: Ticket },
     ],
   },
   {
