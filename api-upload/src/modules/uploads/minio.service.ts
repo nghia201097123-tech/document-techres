@@ -1,12 +1,13 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import * as Minio from 'minio';
+import * as https from 'https';
+import * as http from 'http';
 
 @Injectable()
 export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
-  private client: S3Client;
+  private client: Minio.Client;
   private bucket: string;
   private baseUrl: string;
 
@@ -19,24 +20,26 @@ export class MinioService implements OnModuleInit {
     const secretKey = this.configService.get<string>('CONFIG_MINIO_SECRETKEY', '');
     const region = this.configService.get<string>('CONFIG_MINIO_REGION', 'us-east-1');
 
-    const protocol = useSSL ? 'https' : 'http';
-    const endpointUrl = port === 443 || port === 80
-      ? `${protocol}://${endpoint}`
-      : `${protocol}://${endpoint}:${port}`;
+    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL}, Region: ${region})`);
 
-    this.logger.log(`Connecting to S3 at ${endpointUrl} (Region: ${region})`);
+    // Create custom transport agent to handle SSL
+    const transportAgent = useSSL
+      ? new https.Agent({ rejectUnauthorized: true })
+      : new http.Agent();
 
-    this.client = new S3Client({
-      endpoint: endpointUrl,
+    this.client = new Minio.Client({
+      endPoint: endpoint,
+      port: port,
+      useSSL: useSSL,
+      accessKey: accessKey,
+      secretKey: secretKey,
       region: region,
-      credentials: {
-        accessKeyId: accessKey,
-        secretAccessKey: secretKey,
-      },
-      forcePathStyle: true, // Required for S3-compatible services like MinIO
+      pathStyle: true,
+      transportAgent: transportAgent,
     });
 
     this.bucket = this.configService.get<string>('CONFIG_MINIO_BUCKET', 'techres-uploads');
+    const protocol = useSSL ? 'https' : 'http';
     this.baseUrl = `${protocol}://${endpoint}/${this.bucket}`;
 
     this.logger.log(`Bucket: ${this.bucket}`);
@@ -44,10 +47,10 @@ export class MinioService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    this.logger.log(`S3 Service initialized for bucket: ${this.bucket}`);
+    this.logger.log(`MinIO Service initialized for bucket: ${this.bucket}`);
   }
 
-  getClient(): S3Client {
+  getClient(): Minio.Client {
     return this.client;
   }
 
@@ -60,7 +63,7 @@ export class MinioService implements OnModuleInit {
   }
 
   /**
-   * Upload file to S3/MinIO
+   * Upload file to MinIO
    */
   async uploadFile(
     objectName: string,
@@ -71,51 +74,42 @@ export class MinioService implements OnModuleInit {
     try {
       this.logger.log(`Uploading ${objectName} (${size} bytes, ${contentType})`);
 
-      const command = new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: objectName,
-        Body: buffer,
-        ContentType: contentType,
-        ContentLength: size,
+      const result = await this.client.putObject(this.bucket, objectName, buffer, size, {
+        'Content-Type': contentType,
       });
 
-      const result = await this.client.send(command);
-      this.logger.log(`Upload successful: ${objectName}, ETag: ${result.ETag}`);
-
+      this.logger.log(`Upload successful: ${objectName}, ETag: ${result.etag}`);
       return `${this.baseUrl}/${objectName}`;
     } catch (error: any) {
       this.logger.error(`Upload failed for ${objectName}`);
+      this.logger.error(`Error: ${error}`);
       this.logger.error(`Error name: ${error.name}`);
       this.logger.error(`Error message: ${error.message}`);
-      this.logger.error(`Error code: ${error.Code || error.$metadata?.httpStatusCode}`);
-      if (error.$metadata) {
-        this.logger.error(`HTTP Status: ${error.$metadata.httpStatusCode}`);
-        this.logger.error(`Request ID: ${error.$metadata.requestId}`);
+      this.logger.error(`Error code: ${error.code}`);
+      this.logger.error(`Error resource: ${error.resource}`);
+      this.logger.error(`Error requestId: ${error.requestId}`);
+
+      // Try to get more details
+      if (error.cause) {
+        this.logger.error(`Error cause: ${error.cause}`);
       }
+
       throw error;
     }
   }
 
   /**
-   * Delete file from S3/MinIO
+   * Delete file from MinIO
    */
   async deleteFile(objectName: string): Promise<void> {
-    const command = new DeleteObjectCommand({
-      Bucket: this.bucket,
-      Key: objectName,
-    });
-    await this.client.send(command);
+    await this.client.removeObject(this.bucket, objectName);
   }
 
   /**
    * Get presigned URL for temporary access
    */
   async getPresignedUrl(objectName: string, expirySeconds: number = 3600): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: objectName,
-    });
-    return await getSignedUrl(this.client, command, { expiresIn: expirySeconds });
+    return await this.client.presignedGetObject(this.bucket, objectName, expirySeconds);
   }
 
   /**
@@ -123,11 +117,7 @@ export class MinioService implements OnModuleInit {
    */
   async fileExists(objectName: string): Promise<boolean> {
     try {
-      const command = new HeadObjectCommand({
-        Bucket: this.bucket,
-        Key: objectName,
-      });
-      await this.client.send(command);
+      await this.client.statObject(this.bucket, objectName);
       return true;
     } catch {
       return false;
