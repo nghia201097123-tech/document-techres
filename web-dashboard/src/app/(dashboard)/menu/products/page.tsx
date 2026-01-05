@@ -231,6 +231,7 @@ export default function ProductsPage() {
   const [showQuickCreateTopping, setShowQuickCreateTopping] = React.useState(false);
   const [quickToppingName, setQuickToppingName] = React.useState("");
   const [quickToppingPrice, setQuickToppingPrice] = React.useState<number>(0);
+  const [quickToppingVat, setQuickToppingVat] = React.useState<number>(0);
   const [creatingQuickTopping, setCreatingQuickTopping] = React.useState(false);
   const [addingToppingToGroupId, setAddingToppingToGroupId] = React.useState<string | null>(null);
 
@@ -668,12 +669,12 @@ export default function ProductsPage() {
     if (!quickToppingName.trim()) return;
     setCreatingQuickTopping(true);
     try {
-      // Create new topping product
+      // Create new topping product (categoryId will be auto-assigned by backend)
       const newTopping = await productService.create({
         name: quickToppingName.trim(),
         type: ProductType.TOPPING,
         price: quickToppingPrice || 0,
-        vatRate: 0,
+        vatRate: quickToppingVat || 0,
       });
       // Add to group
       await productService.addToppingItem(groupId, {
@@ -691,6 +692,7 @@ export default function ProductsPage() {
       // Reset quick create form
       setQuickToppingName("");
       setQuickToppingPrice(0);
+      setQuickToppingVat(0);
       setShowQuickCreateTopping(false);
       setAddingToppingToGroupId(null);
       toast({ title: "Thành công", description: `Đã tạo và thêm "${quickToppingName}" vào nhóm` });
@@ -936,6 +938,7 @@ export default function ProductsPage() {
     setShowQuickCreateTopping(false);
     setQuickToppingName("");
     setQuickToppingPrice(0);
+    setQuickToppingVat(0);
     // Reset import state
     setImportData([]);
     setImportErrors([]);
@@ -2278,7 +2281,14 @@ export default function ProductsPage() {
                                               placeholder="Giá"
                                               value={quickToppingPrice || ""}
                                               onChange={(e) => setQuickToppingPrice(Number(e.target.value))}
-                                              className="w-24"
+                                              className="w-20"
+                                            />
+                                            <Input
+                                              type="number"
+                                              placeholder="VAT %"
+                                              value={quickToppingVat || ""}
+                                              onChange={(e) => setQuickToppingVat(Number(e.target.value))}
+                                              className="w-16"
                                             />
                                             <Button
                                               size="sm"

@@ -179,8 +179,30 @@ export class ProductsService {
 
   async create(tenantId: string, brandId: string, createDto: CreateProductDto) {
     const code = await this.generateCode(createDto.type);
+
+    // Auto-assign category for toppings if not provided
+    let categoryId = createDto.categoryId;
+    if (!categoryId && createDto.type === ProductType.TOPPING) {
+      // Find or create default "Topping" category
+      let toppingCategory = await this.categoryRepository.findOne({
+        where: { tenantId, brandId, name: 'Topping', productType: ProductType.TOPPING },
+      });
+      if (!toppingCategory) {
+        toppingCategory = this.categoryRepository.create({
+          tenantId,
+          brandId,
+          name: 'Topping',
+          productType: ProductType.TOPPING,
+          isActive: true,
+        });
+        toppingCategory = await this.categoryRepository.save(toppingCategory);
+      }
+      categoryId = toppingCategory.id;
+    }
+
     const product = this.productRepository.create({
       ...createDto,
+      categoryId,
       tenantId,
       brandId,
       code,

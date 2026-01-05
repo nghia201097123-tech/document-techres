@@ -47,9 +47,9 @@ export class CreateProductDto {
   type: ProductType;
 
   @ApiProperty({ description: 'ID danh mục' })
-  @IsNotEmpty({ message: 'Danh mục không được để trống' })
+  @IsOptional()
   @IsString()
-  categoryId: string;
+  categoryId?: string;
 
   @ApiPropertyOptional({ example: 'https://example.com/image.jpg' })
   @IsOptional()
