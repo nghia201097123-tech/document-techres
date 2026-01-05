@@ -852,7 +852,7 @@ export default function StaffPage() {
       },
       {
         header: "Phường/Xã",
-        example: "Phường Bến Nghé",
+        example: "", // Leave empty - user must select province first
         required: false,
         // No direct dropdown - will be handled by dependent dropdown
       },
@@ -865,7 +865,7 @@ export default function StaffPage() {
       },
       {
         header: "Chi nhánh",
-        example: allBranches[0]?.name || "Chi nhánh Quận 1",
+        example: "", // Leave empty - user must select brand first
         required: true,
         // No direct dropdown - will be handled by dependent dropdown
       },
