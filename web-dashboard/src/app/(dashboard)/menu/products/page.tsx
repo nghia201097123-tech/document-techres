@@ -290,6 +290,7 @@ export default function ProductsPage() {
   const [bulkPrice, setBulkPrice] = React.useState<number>(0);
   const [bulkPrintValue, setBulkPrintValue] = React.useState<boolean>(true);
   const [bulkUnit, setBulkUnit] = React.useState("");
+  const [bulkUnitComboboxOpen, setBulkUnitComboboxOpen] = React.useState(false);
   const [bulkSellingType, setBulkSellingType] = React.useState<SellingType>(SellingType.PORTION);
   const [bulkPreparationTime, setBulkPreparationTime] = React.useState<number>(0);
   const [processingBulk, setProcessingBulk] = React.useState(false);
@@ -881,6 +882,15 @@ export default function ProductsPage() {
   const isNewUnit = unitSearchValue.trim() &&
     !units.some(u => u.name.toLowerCase() === unitSearchValue.toLowerCase());
 
+  // Filter units for bulk operation combobox
+  const filteredBulkUnits = units.filter(unit =>
+    unit.name.toLowerCase().includes(bulkUnit.toLowerCase())
+  );
+
+  // Check if bulk unit is a new unit
+  const isBulkNewUnit = bulkUnit.trim() &&
+    !units.some(u => u.name.toLowerCase() === bulkUnit.toLowerCase());
+
   // Get or create unit by name
   const getOrCreateUnit = async (unitName: string): Promise<string> => {
     // Check if unit already exists (case-insensitive)
@@ -1460,11 +1470,13 @@ export default function ProductsPage() {
           break;
         case "unit":
           if (!bulkUnit.trim()) {
-            toast({ title: "Lỗi", description: "Vui lòng nhập đơn vị", variant: "destructive" });
+            toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập đơn vị", variant: "destructive" });
             setProcessingBulk(false);
             return;
           }
-          result = await bulkProductService.updateUnit(productIds, bulkUnit);
+          // Get or create unit if it doesn't exist
+          const unitName = await getOrCreateUnit(bulkUnit.trim());
+          result = await bulkProductService.updateUnit(productIds, unitName);
           break;
         case "selling-type":
           result = await bulkProductService.updateSellingType(productIds, bulkSellingType);
@@ -2105,18 +2117,19 @@ export default function ProductsPage() {
           {bulkOperation === "vat" && (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Chọn mức VAT (%)</Label>
-                <Select value={String(bulkVatRate)} onValueChange={(v) => setBulkVatRate(Number(v))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn mức VAT..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0% (Không VAT)</SelectItem>
-                    <SelectItem value="5">5%</SelectItem>
-                    <SelectItem value="8">8%</SelectItem>
-                    <SelectItem value="10">10%</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Nhập mức VAT (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  placeholder="Nhập % VAT..."
+                  value={bulkVatRate}
+                  onChange={(e) => setBulkVatRate(Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nhập giá trị từ 0 đến 100. Ví dụ: 0, 5, 8, 10...
+                </p>
               </div>
             </div>
           )}
@@ -2165,12 +2178,81 @@ export default function ProductsPage() {
           {bulkOperation === "unit" && (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Nhập đơn vị</Label>
-                <Input
-                  placeholder="VD: phần, ly, lon, chai..."
-                  value={bulkUnit}
-                  onChange={(e) => setBulkUnit(e.target.value)}
-                />
+                <Label>Chọn hoặc tạo đơn vị</Label>
+                <Popover open={bulkUnitComboboxOpen} onOpenChange={setBulkUnitComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={bulkUnitComboboxOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      {bulkUnit || "Chọn đơn vị..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Tìm hoặc tạo đơn vị..."
+                        value={bulkUnit}
+                        onValueChange={setBulkUnit}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {bulkUnit.trim() ? (
+                            <div className="py-2 px-4 text-sm">
+                              <span className="text-muted-foreground">Nhấn để tạo: </span>
+                              <span className="font-medium">&quot;{bulkUnit}&quot;</span>
+                            </div>
+                          ) : (
+                            <div className="py-2 px-4 text-sm text-muted-foreground">
+                              Nhập tên đơn vị để tìm hoặc tạo mới
+                            </div>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {/* Option to create new unit if not exists */}
+                          {isBulkNewUnit && (
+                            <CommandItem
+                              value={`create-${bulkUnit}`}
+                              onSelect={() => {
+                                setBulkUnitComboboxOpen(false);
+                              }}
+                              className="text-primary"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Tạo mới: &quot;{bulkUnit}&quot;
+                            </CommandItem>
+                          )}
+                          {filteredBulkUnits.map((unit) => (
+                            <CommandItem
+                              key={unit.id}
+                              value={unit.name}
+                              onSelect={() => {
+                                setBulkUnit(unit.name);
+                                setBulkUnitComboboxOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  bulkUnit === unit.name ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {unit.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {isBulkNewUnit && (
+                  <p className="text-xs text-muted-foreground">
+                    Đơn vị &quot;{bulkUnit}&quot; sẽ được tạo tự động khi cập nhật
+                  </p>
+                )}
               </div>
             </div>
           )}
