@@ -38,6 +38,20 @@ export class ProductsController {
     return this.productsService.findAll(req.user.tenantId, brandId, type);
   }
 
+  @Get('with-seasonal-prices')
+  @ApiOperation({ summary: 'Lấy danh sách món với thông tin giá thời vụ' })
+  @ApiQuery({ name: 'brandId', required: true })
+  @ApiQuery({ name: 'branchId', required: true })
+  @ApiQuery({ name: 'type', required: false, enum: ProductType })
+  findAllWithSeasonalPrices(
+    @Request() req,
+    @Query('brandId') brandId: string,
+    @Query('branchId') branchId: string,
+    @Query('type') type?: ProductType,
+  ) {
+    return this.productsService.findAllWithSeasonalPrices(req.user.tenantId, brandId, branchId, type);
+  }
+
   @Get('toppings/available')
   @ApiOperation({ summary: 'Lấy danh sách topping có thể gán' })
   @ApiQuery({ name: 'brandId', required: false })

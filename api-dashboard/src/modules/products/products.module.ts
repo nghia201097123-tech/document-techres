@@ -10,6 +10,8 @@ import {
   ComboItem,
   Category,
   Unit,
+  SeasonalPrice,
+  SeasonalPriceProduct,
 } from '../../database/entities';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
@@ -26,6 +28,8 @@ import { ProductsController } from './products.controller';
       ComboItem,
       Category,
       Unit,
+      SeasonalPrice,
+      SeasonalPriceProduct,
     ]),
   ],
   controllers: [ProductsController],

@@ -179,7 +179,7 @@ export default function ProductsPage() {
   const { items: categories, byProductType: categoriesByType, loading: loadingCategories } = useAppSelector((state) => state.categories);
 
   // Global filter state from Redux
-  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId } = useGlobalFilters();
 
   // Local state
   const [search, setSearch] = React.useState("");
@@ -240,7 +240,7 @@ export default function ProductsPage() {
   }, [formData.type, categories, categoriesByType]);
 
   // Load products - only when brand is selected
-  const loadProducts = React.useCallback(async (brandId: string) => {
+  const loadProducts = React.useCallback(async (brandId: string, branchId?: string) => {
     if (!brandId) {
       setProducts([]);
       setLoading(false);
@@ -249,7 +249,10 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       const filterType = typeFilter === "all" ? undefined : (typeFilter as ProductType);
-      const data = await productService.getAll(brandId, filterType);
+      // Use the seasonal price API if branch is selected
+      const data = branchId
+        ? await productService.getAllWithSeasonalPrices(brandId, branchId, filterType)
+        : await productService.getAll(brandId, filterType);
       // Sort by createdAt descending (newest first)
       const sortedData = [...data].sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -264,8 +267,8 @@ export default function ProductsPage() {
   }, [typeFilter, toast]);
 
   React.useEffect(() => {
-    loadProducts(filterBrandId);
-  }, [filterBrandId, loadProducts]);
+    loadProducts(filterBrandId, filterBranchId);
+  }, [filterBrandId, filterBranchId, loadProducts]);
 
   // Load categories when brand is selected (for displaying category names in table)
   React.useEffect(() => {
@@ -1138,6 +1141,11 @@ export default function ProductsPage() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {product.name}
+                          {product.seasonalPrice && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs" title={product.seasonalPrice.seasonalPriceName}>
+                              Giá thời vụ
+                            </Badge>
+                          )}
                           {newProductIds.has(product.id) && (
                             <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Mới</Badge>
                           )}
@@ -1155,7 +1163,27 @@ export default function ProductsPage() {
                       </TableCell>
                     )}
                     {isColumnVisible("categoryName") && <TableCell>{product.categoryName || getCategoryName(product.categoryId)}</TableCell>}
-                    {isColumnVisible("price") && <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>}
+                    {isColumnVisible("price") && (
+                      <TableCell className="text-right">
+                        {product.seasonalPrice ? (
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="font-medium text-orange-600">
+                              {formatCurrency(product.seasonalPrice.adjustedPrice)}
+                            </span>
+                            <span className="text-xs text-muted-foreground line-through">
+                              {formatCurrency(product.price)}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-orange-50 text-orange-600 border-orange-200">
+                              {product.seasonalPrice.adjustmentType === 'percentage'
+                                ? `+${product.seasonalPrice.adjustmentValue}%`
+                                : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
+                            </Badge>
+                          </div>
+                        ) : (
+                          formatCurrency(product.price)
+                        )}
+                      </TableCell>
+                    )}
                     {isColumnVisible("priceBeforeVat") && <TableCell className="text-right">{formatCurrency(Math.round(product.price / (1 + (product.vatRate || 10) / 100)))}</TableCell>}
                     {isColumnVisible("vatAmount") && <TableCell className="text-right">{formatCurrency(Math.round(product.price - product.price / (1 + (product.vatRate || 10) / 100)))}</TableCell>}
                     {isColumnVisible("vatRate") && <TableCell className="text-right">{product.vatRate || 10}%</TableCell>}

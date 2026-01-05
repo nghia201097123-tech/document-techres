@@ -13,6 +13,22 @@ export enum SellingType {
   WEIGHT = "weight",
 }
 
+export enum AdjustmentType {
+  PERCENTAGE = 'percentage',
+  FIXED = 'fixed',
+}
+
+export interface SeasonalPriceInfo {
+  seasonalPriceId: string;
+  seasonalPriceName: string;
+  adjustmentType: AdjustmentType;
+  adjustmentValue: number;
+  startDate: string;
+  endDate: string;
+  originalPrice: number;
+  adjustedPrice: number;
+}
+
 export interface Product {
   id: string;
   code: string;
@@ -36,6 +52,7 @@ export interface Product {
   sortOrder: number;
   brandId?: string;
   createdAt: string;
+  seasonalPrice?: SeasonalPriceInfo | null;
 }
 
 export interface CreateProductDto {
@@ -204,6 +221,13 @@ export const productService = {
     if (brandId) params.brandId = brandId;
     if (type) params.type = type;
     const response = await api.get<Product[]>("/products", { params });
+    return response.data;
+  },
+
+  getAllWithSeasonalPrices: async (brandId: string, branchId: string, type?: ProductType): Promise<Product[]> => {
+    const params: Record<string, any> = { brandId, branchId };
+    if (type) params.type = type;
+    const response = await api.get<Product[]>("/products/with-seasonal-prices", { params });
     return response.data;
   },
 

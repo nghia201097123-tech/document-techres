@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Not } from 'typeorm';
+import { Repository, In, Not, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import {
   Product,
   ProductType,
@@ -13,7 +13,10 @@ import {
   ComboItem,
   Category,
   Unit,
+  SeasonalPrice,
+  SeasonalPriceProduct,
 } from '../../database/entities';
+import { AdjustmentType } from '../../database/entities/seasonal-price.entity';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -52,6 +55,10 @@ export class ProductsService {
     private readonly categoryRepository: Repository<Category>,
     @InjectRepository(Unit)
     private readonly unitRepository: Repository<Unit>,
+    @InjectRepository(SeasonalPrice)
+    private readonly seasonalPriceRepository: Repository<SeasonalPrice>,
+    @InjectRepository(SeasonalPriceProduct)
+    private readonly seasonalPriceProductRepository: Repository<SeasonalPriceProduct>,
   ) {}
 
   async findAll(tenantId: string, brandId?: string, type?: ProductType) {
@@ -76,6 +83,91 @@ export class ProductsService {
       throw new NotFoundException('Không tìm thấy món');
     }
     return product;
+  }
+
+  /**
+   * Get products with their active seasonal price info for a specific branch
+   */
+  async findAllWithSeasonalPrices(tenantId: string, brandId: string, branchId: string, type?: ProductType) {
+    const where: any = { tenantId, brandId };
+    if (type) {
+      where.type = type;
+    }
+
+    const products = await this.productRepository.find({
+      where,
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
+
+    // Get current date for checking active seasonal prices
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find all active seasonal prices for this branch that are currently valid
+    const activeSeasonalPrices = await this.seasonalPriceRepository.find({
+      where: {
+        tenantId,
+        branchId,
+        isActive: true,
+        startDate: LessThanOrEqual(today),
+        endDate: MoreThanOrEqual(today),
+      },
+      relations: ['seasonalPriceProducts'],
+    });
+
+    // Build a map of productId -> seasonal price info
+    const productSeasonalPriceMap = new Map<string, {
+      seasonalPriceId: string;
+      seasonalPriceName: string;
+      adjustmentType: AdjustmentType;
+      adjustmentValue: number;
+      startDate: Date;
+      endDate: Date;
+    }>();
+
+    for (const sp of activeSeasonalPrices) {
+      for (const spp of sp.seasonalPriceProducts || []) {
+        // If a product already has a seasonal price, keep the first one (or could implement priority logic)
+        if (!productSeasonalPriceMap.has(spp.productId)) {
+          productSeasonalPriceMap.set(spp.productId, {
+            seasonalPriceId: sp.id,
+            seasonalPriceName: sp.name,
+            adjustmentType: sp.adjustmentType,
+            adjustmentValue: Number(sp.adjustmentValue),
+            startDate: sp.startDate,
+            endDate: sp.endDate,
+          });
+        }
+      }
+    }
+
+    // Enrich products with seasonal price info
+    return products.map(product => {
+      const seasonalPrice = productSeasonalPriceMap.get(product.id);
+      if (seasonalPrice) {
+        const originalPrice = Number(product.price);
+        let adjustedPrice = originalPrice;
+
+        if (seasonalPrice.adjustmentType === AdjustmentType.PERCENTAGE) {
+          adjustedPrice = originalPrice * (1 + seasonalPrice.adjustmentValue / 100);
+        } else {
+          adjustedPrice = originalPrice + seasonalPrice.adjustmentValue;
+        }
+
+        return {
+          ...product,
+          seasonalPrice: {
+            ...seasonalPrice,
+            originalPrice,
+            adjustedPrice: Math.round(adjustedPrice),
+          },
+        };
+      }
+      return {
+        ...product,
+        seasonalPrice: null,
+      };
+    });
   }
 
   async create(tenantId: string, brandId: string, createDto: CreateProductDto) {
