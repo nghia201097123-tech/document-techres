@@ -55,11 +55,23 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+// Calculate VAT breakdown (amount is total including VAT)
+const calculateVatBreakdown = (amount: number, vatRate: number) => {
+  if (vatRate <= 0) {
+    return { priceBeforeVat: amount, vatAmount: 0 };
+  }
+  const priceBeforeVat = amount / (1 + vatRate / 100);
+  const vatAmount = amount - priceBeforeVat;
+  return { priceBeforeVat, vatAmount };
+};
+
 // Default column configuration
 const defaultColumns: ColumnConfig[] = [
   { key: "name", label: "Tên phụ thu", visible: true, locked: true },
-  { key: "amount", label: "Số tiền", visible: true },
+  { key: "amount", label: "Tổng tiền", visible: true },
   { key: "vatRate", label: "VAT (%)", visible: true },
+  { key: "priceBeforeVat", label: "Giá trước VAT", visible: true },
+  { key: "vatAmount", label: "Tiền VAT", visible: true },
   { key: "description", label: "Mô tả", visible: true },
   { key: "sortOrder", label: "Thứ tự", visible: false },
   { key: "isActive", label: "Trạng thái", visible: true },
@@ -306,8 +318,10 @@ export default function SurchargesPage() {
               <TableHeader>
                 <TableRow>
                   {isColumnVisible("name") && <TableHead>Tên phụ thu</TableHead>}
-                  {isColumnVisible("amount") && <TableHead>Số tiền</TableHead>}
+                  {isColumnVisible("amount") && <TableHead>Tổng tiền</TableHead>}
                   {isColumnVisible("vatRate") && <TableHead>VAT (%)</TableHead>}
+                  {isColumnVisible("priceBeforeVat") && <TableHead>Giá trước VAT</TableHead>}
+                  {isColumnVisible("vatAmount") && <TableHead>Tiền VAT</TableHead>}
                   {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
                   {isColumnVisible("sortOrder") && <TableHead>Thứ tự</TableHead>}
                   {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
@@ -340,6 +354,16 @@ export default function SurchargesPage() {
                     )}
                     {isColumnVisible("vatRate") && (
                       <TableCell>{Number(surcharge.vatRate)}%</TableCell>
+                    )}
+                    {isColumnVisible("priceBeforeVat") && (
+                      <TableCell className="text-muted-foreground">
+                        {formatCurrency(calculateVatBreakdown(Number(surcharge.amount), Number(surcharge.vatRate)).priceBeforeVat)}
+                      </TableCell>
+                    )}
+                    {isColumnVisible("vatAmount") && (
+                      <TableCell className="text-blue-600">
+                        {formatCurrency(calculateVatBreakdown(Number(surcharge.amount), Number(surcharge.vatRate)).vatAmount)}
+                      </TableCell>
                     )}
                     {isColumnVisible("description") && (
                       <TableCell className="max-w-[300px] truncate text-muted-foreground">
@@ -416,7 +440,7 @@ export default function SurchargesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="amount">Số tiền (VNĐ) *</Label>
+                  <Label htmlFor="amount">Tổng tiền (VNĐ) *</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -435,13 +459,37 @@ export default function SurchargesPage() {
                     type="number"
                     min="0"
                     max="100"
-                    step="0.5"
-                    placeholder="10"
+                    step="0.01"
+                    placeholder="8.5"
                     value={formData.vatRate || ""}
                     onChange={(e) => setFormData({ ...formData, vatRate: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
               </div>
+              {/* VAT Breakdown Preview */}
+              {formData.amount > 0 && formData.vatRate > 0 && (
+                <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
+                  <p className="text-sm font-medium text-muted-foreground">Chi tiết VAT:</p>
+                  <div className="flex justify-between text-sm">
+                    <span>Giá trước VAT:</span>
+                    <span className="font-medium">
+                      {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate).priceBeforeVat)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Tiền VAT ({formData.vatRate}%):</span>
+                    <span className="font-medium text-blue-600">
+                      {formatCurrency(calculateVatBreakdown(formData.amount, formData.vatRate).vatAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t pt-1.5">
+                    <span className="font-medium">Tổng tiền:</span>
+                    <span className="font-bold text-orange-600">
+                      {formatCurrency(formData.amount)}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="description">Mô tả</Label>
                 <Textarea
