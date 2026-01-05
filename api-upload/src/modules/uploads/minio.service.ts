@@ -17,7 +17,10 @@ export class MinioService implements OnModuleInit {
     const accessKey = this.configService.get<string>('CONFIG_MINIO_ACCESSKEY', '');
     const secretKey = this.configService.get<string>('CONFIG_MINIO_SECRETKEY', '');
 
-    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL})`);
+    // Get region from config - required to bypass auto-detection (which causes Access Denied)
+    const region = this.configService.get<string>('CONFIG_MINIO_REGION', 'us-east-1');
+
+    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL}, Region: ${region})`);
 
     this.client = new Minio.Client({
       endPoint: endpoint,
@@ -25,6 +28,7 @@ export class MinioService implements OnModuleInit {
       useSSL: useSSL,
       accessKey: accessKey,
       secretKey: secretKey,
+      region: region,
     });
 
     this.bucket = this.configService.get<string>('CONFIG_MINIO_BUCKET', 'techres-uploads');
