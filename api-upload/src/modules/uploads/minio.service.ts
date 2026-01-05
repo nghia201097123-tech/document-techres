@@ -10,11 +10,14 @@ export class MinioService implements OnModuleInit {
   private baseUrl: string;
 
   constructor(private configService: ConfigService) {
-    const endpoint = this.configService.get<string>('minio.endpoint', 's3.techres.vn');
-    const port = this.configService.get<number>('minio.port', 443);
-    const useSSL = this.configService.get<boolean>('minio.useSSL', true);
-    const accessKey = this.configService.get<string>('minio.accessKey');
-    const secretKey = this.configService.get<string>('minio.secretKey');
+    // Read directly from environment variables
+    const endpoint = this.configService.get<string>('MINIO_ENDPOINT', 's3.techres.vn');
+    const port = parseInt(this.configService.get<string>('MINIO_PORT', '443'), 10);
+    const useSSL = this.configService.get<string>('MINIO_USE_SSL', 'true') === 'true';
+    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY', '');
+    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY', '');
+
+    this.logger.log(`Connecting to MinIO at ${endpoint}:${port} (SSL: ${useSSL})`);
 
     this.client = new Minio.Client({
       endPoint: endpoint,
@@ -24,7 +27,7 @@ export class MinioService implements OnModuleInit {
       secretKey: secretKey,
     });
 
-    this.bucket = this.configService.get<string>('minio.bucket', 'techres-uploads');
+    this.bucket = this.configService.get<string>('MINIO_BUCKET', 'techres-uploads');
     const protocol = useSSL ? 'https' : 'http';
     this.baseUrl = `${protocol}://${endpoint}/${this.bucket}`;
   }
@@ -55,10 +58,11 @@ export class MinioService implements OnModuleInit {
         await this.client.setBucketPolicy(this.bucket, JSON.stringify(policy));
         this.logger.log(`Bucket ${this.bucket} created with public read policy`);
       } else {
-        this.logger.log(`Bucket ${this.bucket} already exists`);
+        this.logger.log(`Connected to MinIO. Bucket ${this.bucket} is ready`);
       }
     } catch (error) {
-      this.logger.error(`Error ensuring bucket exists: ${error.message}`);
+      this.logger.error(`Error connecting to MinIO: ${error.message}`);
+      this.logger.warn('Upload service will retry on first upload request');
     }
   }
 
