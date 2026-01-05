@@ -73,11 +73,16 @@ export class MinioService implements OnModuleInit {
       this.logger.log(`Upload successful: ${objectName}`);
       return `${this.baseUrl}/${objectName}`;
     } catch (error: any) {
-      this.logger.error(`Upload failed for ${objectName}:`, error);
+      this.logger.error(`Upload failed for ${objectName}`);
+      this.logger.error(`Full error: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`);
+      this.logger.error(`Error name: ${error.name}`);
       this.logger.error(`Error code: ${error.code}`);
       this.logger.error(`Error message: ${error.message}`);
-      if (error.resource) this.logger.error(`Resource: ${error.resource}`);
-      if (error.requestId) this.logger.error(`RequestId: ${error.requestId}`);
+      this.logger.error(`Error stack: ${error.stack}`);
+      // Log all enumerable properties
+      for (const key of Object.keys(error)) {
+        this.logger.error(`Error.${key}: ${JSON.stringify(error[key])}`);
+      }
       throw error;
     }
   }
