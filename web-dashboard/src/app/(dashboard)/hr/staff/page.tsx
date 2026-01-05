@@ -854,12 +854,17 @@ export default function StaffPage() {
     try {
       const result = await readExcelFile<ImportDataWithNames>(file, importColumnMapping);
 
-      // Load reference data if not available
-      await Promise.all([
-        dispatch(fetchDepartments()),
-        dispatch(fetchBrands()),
-        dispatch(fetchProvinces()),
+      // Load reference data and get the results directly
+      const [departmentsResult, brandsResult, provincesResult] = await Promise.all([
+        dispatch(fetchDepartments()).unwrap(),
+        dispatch(fetchBrands()).unwrap(),
+        dispatch(fetchProvinces()).unwrap(),
       ]);
+
+      // Use the fresh data from dispatch results
+      const freshDepartments = departmentsResult || [];
+      const freshBrands = brandsResult || [];
+      const freshProvinces = provincesResult || [];
 
       // Transform data: convert names to IDs
       const transformedData: Partial<BulkStaffItem>[] = [];
@@ -872,9 +877,6 @@ export default function StaffPage() {
       // Load branches and wards for all relevant parents
       const brandLookup = new Map<string, string>();
       const provinceLookup = new Map<string, string>();
-
-      // Wait for Redux state to update, then get current state
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       for (let i = 0; i < result.data.length; i++) {
         const item = result.data[i];
@@ -899,7 +901,7 @@ export default function StaffPage() {
 
         // Lookup province code from name
         if (item.provinceName) {
-          const province = provinces.find(
+          const province = freshProvinces.find(
             (p) => p.fullName?.toLowerCase() === item.provinceName?.toLowerCase() ||
                    p.name?.toLowerCase() === item.provinceName?.toLowerCase()
           );
@@ -914,7 +916,7 @@ export default function StaffPage() {
 
         // Lookup brand ID from name
         if (item.brandName) {
-          const brand = brands.find(
+          const brand = freshBrands.find(
             (b) => b.name?.toLowerCase() === item.brandName?.toLowerCase()
           );
           if (brand) {
@@ -928,7 +930,7 @@ export default function StaffPage() {
 
         // Lookup department ID from name
         if (item.departmentName) {
-          const department = departments.find(
+          const department = freshDepartments.find(
             (d) => d.name?.toLowerCase() === item.departmentName?.toLowerCase()
           );
           if (department) {
@@ -941,10 +943,32 @@ export default function StaffPage() {
         transformedData.push(transformedItem);
       }
 
-      // Wait for branches/wards to load, then do second pass lookup
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Collect unique province codes and brand IDs that need children loaded
+      const uniqueProvinceCodes = [...new Set(transformedData.map(d => d.provinceCode).filter(Boolean))] as string[];
+      const uniqueBrandIds = [...new Set(transformedData.map(d => d.brandId).filter(Boolean))] as string[];
 
-      // Second pass: lookup ward and branch names (after their parents are loaded)
+      // Load wards and branches for all needed parents
+      const [wardsResults, branchesResults] = await Promise.all([
+        Promise.all(uniqueProvinceCodes.map(code => dispatch(fetchWardsByProvince(code)).unwrap().catch(() => ({ provinceCode: code, wards: [] })))),
+        Promise.all(uniqueBrandIds.map(id => dispatch(fetchBranchesByBrand(id)).unwrap().catch(() => []))),
+      ]);
+
+      // Build lookup maps from fresh data
+      const freshWardsByProvince: Record<string, any[]> = {};
+      wardsResults.forEach((res: any) => {
+        if (res && res.provinceCode) {
+          freshWardsByProvince[res.provinceCode] = res.wards || [];
+        }
+      });
+
+      const freshBranchesByBrand: Record<string, any[]> = {};
+      branchesResults.forEach((res: any) => {
+        if (res && res.brandId) {
+          freshBranchesByBrand[res.brandId] = res.branches || [];
+        }
+      });
+
+      // Second pass: lookup ward and branch names (using fresh data)
       for (let i = 0; i < result.data.length; i++) {
         const item = result.data[i];
         const transformedItem = transformedData[i];
@@ -952,9 +976,9 @@ export default function StaffPage() {
 
         // Lookup ward code from name (need province first)
         if (item.wardName && transformedItem.provinceCode) {
-          const provinceWards = wardsByProvince[transformedItem.provinceCode] || [];
+          const provinceWards = freshWardsByProvince[transformedItem.provinceCode] || [];
           const ward = provinceWards.find(
-            (w) => w.fullName?.toLowerCase() === item.wardName?.toLowerCase() ||
+            (w: any) => w.fullName?.toLowerCase() === item.wardName?.toLowerCase() ||
                    w.name?.toLowerCase() === item.wardName?.toLowerCase()
           );
           if (ward) {
@@ -966,9 +990,9 @@ export default function StaffPage() {
 
         // Lookup branch ID from name (need brand first)
         if (item.branchName && transformedItem.brandId) {
-          const brandBranches = branchesByBrand[transformedItem.brandId] || [];
+          const brandBranches = freshBranchesByBrand[transformedItem.brandId] || [];
           const branch = brandBranches.find(
-            (b) => b.name?.toLowerCase() === item.branchName?.toLowerCase()
+            (b: any) => b.name?.toLowerCase() === item.branchName?.toLowerCase()
           );
           if (branch) {
             transformedItem.branchId = branch.id;
