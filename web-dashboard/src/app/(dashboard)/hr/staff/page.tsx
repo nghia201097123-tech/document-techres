@@ -546,9 +546,6 @@ export default function StaffPage() {
     setSelectedStaffIds(newSet);
   };
 
-  const isAllSelected = filteredStaff.length > 0 && selectedStaffIds.size === filteredStaff.length;
-  const isSomeSelected = selectedStaffIds.size > 0 && selectedStaffIds.size < filteredStaff.length;
-
   // Bulk operation handlers
   const handleCloseBulkDialog = () => {
     setBulkOperation(null);
@@ -1074,6 +1071,10 @@ export default function StaffPage() {
       s.phone?.includes(search);
     return matchesSearch;
   });
+
+  // Bulk selection derived state
+  const isAllSelected = filteredStaff.length > 0 && selectedStaffIds.size === filteredStaff.length;
+  const isSomeSelected = selectedStaffIds.size > 0 && selectedStaffIds.size < filteredStaff.length;
 
   // Check if brand is selected (can view staff)
   const isBrandSelected = filterBrandId && filterBrandId !== "" && filterBrandId !== "all";
