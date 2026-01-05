@@ -49,6 +49,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type DialogMode = "create" | "edit" | null;
 
+// Owner department identifier - the root department that all others must be under
+const OWNER_DEPARTMENT_NAME = "Chủ nhà hàng";
+
+// Check if a department is the owner department
+const isOwnerDepartment = (dept: Department) => {
+  return dept.name === OWNER_DEPARTMENT_NAME && !dept.parentId;
+};
+
 export default function DepartmentsPage() {
   const { toast } = useToast();
   const [departments, setDepartments] = React.useState<Department[]>([]);
@@ -100,7 +108,10 @@ export default function DepartmentsPage() {
   // Open create dialog
   const handleOpenCreate = (parentId?: string) => {
     setSelectedDepartment(null);
-    setFormData({ name: "", parentId: parentId, description: "" });
+    // If no parentId provided and owner exists, default to owner as parent
+    // This ensures no department can be created at the same level as owner
+    const defaultParentId = parentId || ownerDepartment?.id;
+    setFormData({ name: "", parentId: defaultParentId, description: "" });
     setDialogMode("create");
   };
 
@@ -126,6 +137,16 @@ export default function DepartmentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
+
+    // Validate parent is required when owner exists (except when editing owner)
+    if (!canBeRootDepartment() && !formData.parentId) {
+      toast({
+        title: "Lỗi",
+        description: `Phải chọn bộ phận cha. Tất cả bộ phận phải nằm dưới "${OWNER_DEPARTMENT_NAME}"`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setSaving(true);
@@ -295,8 +316,21 @@ export default function DepartmentsPage() {
     return departments.filter((d) => d.parentId === parentId);
   };
 
-  // Get root departments (no parent)
-  const rootDepartments = departments.filter((d) => !d.parentId);
+  // Find the owner department
+  const ownerDepartment = React.useMemo(() => {
+    return departments.find(isOwnerDepartment);
+  }, [departments]);
+
+  // Get root departments - only owner should be at root level
+  // If owner exists, only show owner. Other root departments should be shown as orphans needing attention.
+  const rootDepartments = React.useMemo(() => {
+    const roots = departments.filter((d) => !d.parentId);
+    if (!ownerDepartment) return roots;
+    // Owner department should be first
+    const owner = roots.find(isOwnerDepartment);
+    const others = roots.filter(d => !isOwnerDepartment(d));
+    return owner ? [owner, ...others] : roots;
+  }, [departments, ownerDepartment]);
 
   // Count all descendants
   const countDescendants = (deptId: string): number => {
@@ -328,6 +362,7 @@ export default function DepartmentsPage() {
     const isExpanded = expandedIds.has(dept.id);
     const descendantCount = countDescendants(dept.id);
     const colorIndex = level % levelColors.length;
+    const isOwner = isOwnerDepartment(dept);
 
     return (
       <div key={dept.id} className="relative">
@@ -336,8 +371,8 @@ export default function DepartmentsPage() {
           className={cn(
             "relative border rounded-lg mb-2 transition-all duration-200",
             "border-l-4",
-            levelColors[colorIndex],
-            level === 0 ? "bg-card" : levelBgColors[colorIndex],
+            isOwner ? "border-l-amber-500 bg-amber-50 dark:bg-amber-950/20" : levelColors[colorIndex],
+            !isOwner && (level === 0 ? "bg-card" : levelBgColors[colorIndex]),
             "hover:shadow-md"
           )}
           style={{ marginLeft: level * 24 }}
@@ -356,9 +391,9 @@ export default function DepartmentsPage() {
             >
               {hasChildren ? (
                 isExpanded ? (
-                  <FolderOpen className="h-5 w-5 text-amber-600" />
+                  <FolderOpen className={cn("h-5 w-5", isOwner ? "text-amber-600" : "text-amber-600")} />
                 ) : (
-                  <Folder className="h-5 w-5 text-amber-500" />
+                  <Folder className={cn("h-5 w-5", isOwner ? "text-amber-500" : "text-amber-500")} />
                 )
               ) : (
                 <Building2 className="h-5 w-5 text-muted-foreground" />
@@ -368,7 +403,14 @@ export default function DepartmentsPage() {
             {/* Department Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-base">{dept.name}</span>
+                <span className={cn("font-semibold text-base", isOwner && "text-amber-700 dark:text-amber-400")}>
+                  {dept.name}
+                </span>
+                {isOwner && (
+                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs">
+                    Cao nhất
+                  </Badge>
+                )}
                 {hasChildren && (
                   <Badge variant="outline" className="text-xs font-normal">
                     {descendantCount} cấp dưới
@@ -417,18 +459,24 @@ export default function DepartmentsPage() {
                   <Shield className="mr-2 h-4 w-4" />
                   Phân quyền
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleToggleActive(dept)}>
-                  <Power className="mr-2 h-4 w-4" />
-                  {dept.isActive ? "Tạm ngưng" : "Kích hoạt"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setDeleteDepartment(dept)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa
-                </DropdownMenuItem>
+                {!isOwner && (
+                  <DropdownMenuItem onClick={() => handleToggleActive(dept)}>
+                    <Power className="mr-2 h-4 w-4" />
+                    {dept.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                  </DropdownMenuItem>
+                )}
+                {!isOwner && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteDepartment(dept)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Xóa
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -483,17 +531,32 @@ export default function DepartmentsPage() {
 
   // Get available parents (exclude self and descendants when editing)
   const getAvailableParents = () => {
-    if (!selectedDepartment) return departments;
-
-    // Get all descendants of the selected department
+    // Get all descendants of the selected department (if editing)
     const getDescendantIds = (deptId: string): string[] => {
       const children = getChildren(deptId);
       return children.flatMap(child => [child.id, ...getDescendantIds(child.id)]);
     };
 
-    const excludeIds = new Set([selectedDepartment.id, ...getDescendantIds(selectedDepartment.id)]);
-    return departments.filter(d => !excludeIds.has(d.id));
+    let availableParents = departments;
+
+    if (selectedDepartment) {
+      const excludeIds = new Set([selectedDepartment.id, ...getDescendantIds(selectedDepartment.id)]);
+      availableParents = departments.filter(d => !excludeIds.has(d.id));
+    }
+
+    return availableParents;
   };
+
+  // Check if "no parent" option should be available
+  // Only allow if: 1) No owner exists, OR 2) Editing the owner department itself
+  const canBeRootDepartment = () => {
+    if (!ownerDepartment) return true; // No owner yet, allow creating root
+    if (selectedDepartment && isOwnerDepartment(selectedDepartment)) return true; // Editing owner
+    return false; // All other cases, must have a parent
+  };
+
+  // Check if the selected department is the owner (for UI restrictions)
+  const isEditingOwner = selectedDepartment && isOwnerDepartment(selectedDepartment);
 
   return (
     <div className="space-y-6">
@@ -617,18 +680,23 @@ export default function DepartmentsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="parent">Bộ phận cha</Label>
+                <Label htmlFor="parent">
+                  Bộ phận cha {!canBeRootDepartment() && <span className="text-destructive">*</span>}
+                </Label>
                 <Select
                   value={formData.parentId || "none"}
                   onValueChange={(value) =>
                     setFormData({ ...formData, parentId: value === "none" ? undefined : value })
                   }
+                  disabled={isEditingOwner}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Chọn bộ phận cha (nếu có)" />
+                    <SelectValue placeholder="Chọn bộ phận cha" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Không có (Bộ phận gốc)</SelectItem>
+                    {canBeRootDepartment() && (
+                      <SelectItem value="none">Không có (Bộ phận gốc)</SelectItem>
+                    )}
                     {getAvailableParents().map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
@@ -636,6 +704,16 @@ export default function DepartmentsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {!canBeRootDepartment() && (
+                  <p className="text-xs text-muted-foreground">
+                    Tất cả bộ phận phải nằm dưới bộ phận "{OWNER_DEPARTMENT_NAME}"
+                  </p>
+                )}
+                {isEditingOwner && (
+                  <p className="text-xs text-amber-600">
+                    Bộ phận "{OWNER_DEPARTMENT_NAME}" luôn là bộ phận gốc, không thể thay đổi
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="description">Mô tả</Label>
