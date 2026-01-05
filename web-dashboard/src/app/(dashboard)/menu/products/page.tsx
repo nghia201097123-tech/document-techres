@@ -53,7 +53,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem } from "@/services/product-service";
+import { productService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment } from "@/services/product-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
@@ -215,6 +215,25 @@ export default function ProductsPage() {
   const [unitComboboxOpen, setUnitComboboxOpen] = React.useState(false);
   const [unitSearchValue, setUnitSearchValue] = React.useState("");
 
+  // Notes state
+  const [availableNotes, setAvailableNotes] = React.useState<ProductNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = React.useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = React.useState<Set<string>>(new Set());
+  const [noteSearchValue, setNoteSearchValue] = React.useState("");
+  const [notePopoverOpen, setNotePopoverOpen] = React.useState(false);
+  const [creatingNote, setCreatingNote] = React.useState(false);
+
+  // All topping groups for assignment
+  const [allToppingGroups, setAllToppingGroups] = React.useState<ToppingGroup[]>([]);
+  const [assignedGroupIds, setAssignedGroupIds] = React.useState<Set<string>>(new Set());
+
+  // Quick create topping state
+  const [showQuickCreateTopping, setShowQuickCreateTopping] = React.useState(false);
+  const [quickToppingName, setQuickToppingName] = React.useState("");
+  const [quickToppingPrice, setQuickToppingPrice] = React.useState<number>(0);
+  const [creatingQuickTopping, setCreatingQuickTopping] = React.useState(false);
+  const [addingToppingToGroupId, setAddingToppingToGroupId] = React.useState<string | null>(null);
+
   // Continue creating state
   const [continueCreating, setContinueCreating] = React.useState(false);
 
@@ -299,12 +318,32 @@ export default function ProductsPage() {
     loadUnits();
   }, [dialogMode]);
 
+  // Load notes when dialog opens
+  React.useEffect(() => {
+    const loadNotes = async () => {
+      if ((dialogMode === "create" || dialogMode === "edit") && filterBrandId) {
+        setLoadingNotes(true);
+        try {
+          const data = await productService.getAllNotes(filterBrandId);
+          setAvailableNotes(data.filter(n => n.isActive));
+        } catch (error) {
+          console.error("Error loading notes:", error);
+        } finally {
+          setLoadingNotes(false);
+        }
+      }
+    };
+    loadNotes();
+  }, [dialogMode, filterBrandId]);
+
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedProduct(null);
     setFormData(initialFormData);
     setCategorySearchValue("");
     setUnitSearchValue("");
+    setSelectedNoteIds(new Set());
+    setNoteSearchValue("");
     setDialogMode("create");
   };
 
@@ -323,7 +362,7 @@ export default function ProductsPage() {
   };
 
   // Open edit dialog
-  const handleOpenEdit = (product: Product) => {
+  const handleOpenEdit = async (product: Product) => {
     setSelectedProduct(product);
     setFormData({
       name: product.name,
@@ -346,6 +385,15 @@ export default function ProductsPage() {
     setCategorySearchValue(category?.name || "");
     // Set unit search value
     setUnitSearchValue(product.unit || "");
+    // Load product notes
+    try {
+      const productNotes = await productService.getProductNotes(product.id);
+      setSelectedNoteIds(new Set(productNotes.map(pn => pn.noteId)));
+    } catch (error) {
+      console.error("Error loading product notes:", error);
+      setSelectedNoteIds(new Set());
+    }
+    setNoteSearchValue("");
     setDialogMode("edit");
     // Remove badges when editing
     setNewProductIds(prev => { const next = new Set(prev); next.delete(product.id); return next; });
@@ -357,17 +405,24 @@ export default function ProductsPage() {
     setSelectedProduct(product);
     setDialogMode("toppings");
     setLoadingToppings(true);
+    setNewGroupName("");
+    setNewGroupRequired(false);
+    setNewGroupMinSelection(0);
+    setNewGroupMaxSelection(1);
+    setAddingToppingToGroupId(null);
+    setShowQuickCreateTopping(false);
     try {
       const [toppings, assignedGroups, allGroups] = await Promise.all([
-        productService.getAvailableToppings(),
+        productService.getAvailableToppings(filterBrandId),
         productService.getProductToppingGroups(product.id),
-        productService.getAllToppingGroups(),
+        productService.getAllToppingGroups(filterBrandId),
       ]);
       setAvailableToppings(toppings);
       setToppingGroups(assignedGroups);
-      // Store all groups for assignment dialog
-      (window as any).__allToppingGroups = allGroups;
-      // Expand all groups by default
+      setAllToppingGroups(allGroups);
+      // Set assigned group IDs
+      setAssignedGroupIds(new Set(assignedGroups.map(g => g.id)));
+      // Expand all assigned groups by default
       setExpandedGroups(new Set(assignedGroups.map(g => g.id)));
     } catch (error) {
       console.error("Error loading toppings:", error);
@@ -476,6 +531,10 @@ export default function ProductsPage() {
       // Assign to current product
       const result = await productService.addToppingGroupToProduct(selectedProduct.id, newGroup.id);
       setToppingGroups(result);
+      // Add to all groups list
+      setAllToppingGroups(prev => [newGroup, ...prev]);
+      // Mark as assigned
+      setAssignedGroupIds(prev => new Set([...prev, newGroup.id]));
       setNewGroupName("");
       setNewGroupRequired(false);
       setNewGroupMinSelection(0);
@@ -569,6 +628,119 @@ export default function ProductsPage() {
     const usedIds = new Set(group.items.map(i => i.toppingId));
     return availableToppings.filter(t => !usedIds.has(t.id));
   };
+
+  // Toggle topping group assignment to product
+  const handleToggleGroupAssignment = async (groupId: string, isAssigned: boolean) => {
+    if (!selectedProduct) return;
+    setSavingToppings(true);
+    try {
+      let result: ToppingGroup[];
+      if (isAssigned) {
+        // Unassign group from product
+        result = await productService.removeToppingGroupFromProduct(selectedProduct.id, groupId);
+        setAssignedGroupIds(prev => {
+          const next = new Set(prev);
+          next.delete(groupId);
+          return next;
+        });
+      } else {
+        // Assign group to product
+        result = await productService.addToppingGroupToProduct(selectedProduct.id, groupId);
+        setAssignedGroupIds(prev => new Set([...prev, groupId]));
+        // Expand the newly assigned group
+        setExpandedGroups(prev => new Set([...prev, groupId]));
+      }
+      setToppingGroups(result);
+      toast({
+        title: "Thành công",
+        description: isAssigned ? "Đã gỡ nhóm topping khỏi món" : "Đã gán nhóm topping vào món"
+      });
+    } catch (error: any) {
+      console.error("Error toggling group assignment:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setSavingToppings(false);
+    }
+  };
+
+  // Quick create topping and add to group
+  const handleQuickCreateTopping = async (groupId: string) => {
+    if (!quickToppingName.trim()) return;
+    setCreatingQuickTopping(true);
+    try {
+      // Create new topping product
+      const newTopping = await productService.create({
+        name: quickToppingName.trim(),
+        type: ProductType.TOPPING,
+        price: quickToppingPrice || 0,
+        vatRate: 0,
+      });
+      // Add to group
+      await productService.addToppingItem(groupId, {
+        toppingId: newTopping.id,
+        priceAdjustment: 0,
+        maxQuantity: 5,
+      });
+      // Refresh data
+      const [toppings, assignedGroups] = await Promise.all([
+        productService.getAvailableToppings(filterBrandId),
+        selectedProduct ? productService.getProductToppingGroups(selectedProduct.id) : Promise.resolve([]),
+      ]);
+      setAvailableToppings(toppings);
+      setToppingGroups(assignedGroups);
+      // Reset quick create form
+      setQuickToppingName("");
+      setQuickToppingPrice(0);
+      setShowQuickCreateTopping(false);
+      setAddingToppingToGroupId(null);
+      toast({ title: "Thành công", description: `Đã tạo và thêm "${quickToppingName}" vào nhóm` });
+    } catch (error: any) {
+      console.error("Error creating topping:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setCreatingQuickTopping(false);
+    }
+  };
+
+  // Create note and add to selection
+  const handleCreateNote = async (noteName: string) => {
+    if (!noteName.trim()) return;
+    setCreatingNote(true);
+    try {
+      const newNote = await productService.createNote({ name: noteName.trim() });
+      setAvailableNotes(prev => [...prev, newNote]);
+      setSelectedNoteIds(prev => new Set([...prev, newNote.id]));
+      setNoteSearchValue("");
+      toast({ title: "Thành công", description: `Đã tạo ghi chú "${noteName}"` });
+    } catch (error: any) {
+      console.error("Error creating note:", error);
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+    } finally {
+      setCreatingNote(false);
+    }
+  };
+
+  // Toggle note selection
+  const handleToggleNote = (noteId: string) => {
+    setSelectedNoteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(noteId)) {
+        next.delete(noteId);
+      } else {
+        next.add(noteId);
+      }
+      return next;
+    });
+  };
+
+  // Filter notes for selection
+  const filteredNotes = availableNotes.filter(note =>
+    note.name.toLowerCase().includes(noteSearchValue.toLowerCase())
+  );
+
+  // Check if search value is a new note
+  const isNewNote = noteSearchValue.trim() &&
+    !availableNotes.some(n => n.name.toLowerCase() === noteSearchValue.toLowerCase());
 
   // Get or create category by name
   const getOrCreateCategory = async (categoryName: string, productType: ProductType): Promise<string> => {
@@ -678,6 +850,14 @@ export default function ProductsPage() {
 
       if (dialogMode === "create") {
         const result = await productService.create(preparedData);
+        // Assign notes to the new product
+        if (selectedNoteIds.size > 0) {
+          try {
+            await productService.assignNotesToProduct(result.id, Array.from(selectedNoteIds));
+          } catch (error) {
+            console.error("Error assigning notes:", error);
+          }
+        }
         setProducts((prev) => [result, ...prev]);
         // Mark as new product
         setNewProductIds((prev) => new Set(prev).add(result.id));
@@ -687,11 +867,19 @@ export default function ProductsPage() {
           setFormData(initialFormData);
           setCategorySearchValue("");
           setUnitSearchValue("");
+          setSelectedNoteIds(new Set());
+          setNoteSearchValue("");
         } else {
           handleCloseDialog();
         }
       } else if (dialogMode === "edit" && selectedProduct) {
         const result = await productService.update(selectedProduct.id, preparedData);
+        // Update notes assignment
+        try {
+          await productService.assignNotesToProduct(selectedProduct.id, Array.from(selectedNoteIds));
+        } catch (error) {
+          console.error("Error assigning notes:", error);
+        }
         setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? result : p)));
         setUpdatedProductIds(prev => new Set([...prev, result.id]));
         setNewProductIds(prev => {
@@ -732,14 +920,22 @@ export default function ProductsPage() {
     setFormData(initialFormData);
     setCategorySearchValue("");
     setUnitSearchValue("");
+    setSelectedNoteIds(new Set());
+    setNoteSearchValue("");
     setAvailableToppings([]);
     setToppingGroups([]);
+    setAllToppingGroups([]);
+    setAssignedGroupIds(new Set());
     setExpandedGroups(new Set());
     setNewGroupName("");
     setNewGroupRequired(false);
     setNewGroupMinSelection(0);
     setNewGroupMaxSelection(1);
     setAddingToGroupId(null);
+    setAddingToppingToGroupId(null);
+    setShowQuickCreateTopping(false);
+    setQuickToppingName("");
+    setQuickToppingPrice(0);
     // Reset import state
     setImportData([]);
     setImportErrors([]);
@@ -1703,6 +1899,105 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* Ghi chú */}
+              <div className="grid gap-2">
+                <Label>Ghi chú cho món</Label>
+                <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={notePopoverOpen}
+                      className="w-full justify-between font-normal h-auto min-h-10"
+                      disabled={loadingNotes}
+                    >
+                      <div className="flex flex-wrap gap-1">
+                        {selectedNoteIds.size === 0 ? (
+                          <span className="text-muted-foreground">Chọn hoặc tạo ghi chú...</span>
+                        ) : (
+                          Array.from(selectedNoteIds).map(noteId => {
+                            const note = availableNotes.find(n => n.id === noteId);
+                            return note ? (
+                              <Badge key={noteId} variant="secondary" className="mr-1">
+                                {note.name}
+                                <button
+                                  type="button"
+                                  className="ml-1 hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleNote(noteId);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ) : null;
+                          })
+                        )}
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Tìm hoặc tạo ghi chú..."
+                        value={noteSearchValue}
+                        onValueChange={setNoteSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {noteSearchValue.trim() ? (
+                            <div className="py-2 px-4 text-sm">
+                              <span className="text-muted-foreground">Nhấn để tạo: </span>
+                              <span className="font-medium">&quot;{noteSearchValue}&quot;</span>
+                            </div>
+                          ) : (
+                            <div className="py-2 px-4 text-sm text-muted-foreground">
+                              Chưa có ghi chú nào. Nhập để tạo mới.
+                            </div>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {/* Option to create new note */}
+                          {isNewNote && (
+                            <CommandItem
+                              value={`create-${noteSearchValue}`}
+                              onSelect={() => handleCreateNote(noteSearchValue)}
+                              disabled={creatingNote}
+                              className="text-primary"
+                            >
+                              {creatingNote ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Plus className="mr-2 h-4 w-4" />
+                              )}
+                              Tạo mới: &quot;{noteSearchValue}&quot;
+                            </CommandItem>
+                          )}
+                          {filteredNotes.map((note) => (
+                            <CommandItem
+                              key={note.id}
+                              value={note.name}
+                              onSelect={() => handleToggleNote(note.id)}
+                            >
+                              <Checkbox
+                                checked={selectedNoteIds.has(note.id)}
+                                className="mr-2"
+                              />
+                              {note.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">
+                  Ghi chú sẽ hiển thị khi order món này (VD: &quot;Không hành&quot;, &quot;Ít đường&quot;...)
+                </p>
+              </div>
+
               {/* Setup in ấn */}
               <div className="grid gap-2">
                 <Label>Cài đặt in ấn</Label>
@@ -1766,11 +2061,11 @@ export default function ProductsPage() {
 
       {/* Toppings Management Dialog */}
       <Dialog open={dialogMode === "toppings"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Quản lý Topping - {selectedProduct?.name}</DialogTitle>
             <DialogDescription>
-              Tạo nhóm topping (ví dụ: Size, Topping) và thêm các lựa chọn vào từng nhóm
+              Chọn nhóm topping có sẵn hoặc tạo nhóm mới để gán vào món
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -1828,8 +2123,8 @@ export default function ProductsPage() {
                   </p>
                 </div>
 
-                {/* Existing groups */}
-                {toppingGroups.length === 0 ? (
+                {/* All topping groups with checkboxes */}
+                {allToppingGroups.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Cherry className="h-10 w-10 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">Chưa có nhóm topping nào</p>
@@ -1838,129 +2133,196 @@ export default function ProductsPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {toppingGroups.map((group) => (
-                      <div key={group.id} className="border rounded-lg">
-                        {/* Group header */}
-                        <div
-                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50"
-                          onClick={() => toggleGroupExpanded(group.id)}
-                        >
-                          <div className="flex items-center gap-2">
-                            {expandedGroups.has(group.id) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                            <span className="font-medium">{group.name}</span>
-                            <Badge variant={group.isRequired ? "default" : "secondary"} className="text-xs">
-                              {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              (chọn {group.minSelection}-{group.maxSelection})
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              • {group.items.length} item
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteGroup(group.id);
-                            }}
-                            disabled={savingToppings}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Danh sách nhóm topping</Label>
+                      <span className="text-xs text-muted-foreground">
+                        Đã chọn {assignedGroupIds.size}/{allToppingGroups.length} nhóm
+                      </span>
+                    </div>
+                    <ScrollArea className="h-[400px] pr-4">
+                      <div className="space-y-3">
+                        {allToppingGroups.map((group) => {
+                          const isAssigned = assignedGroupIds.has(group.id);
+                          // Get the group data with items from toppingGroups if assigned
+                          const groupWithItems = toppingGroups.find(g => g.id === group.id) || group;
 
-                        {/* Group items */}
-                        {expandedGroups.has(group.id) && (
-                          <div className="border-t p-3 space-y-2">
-                            {group.items.map((item) => (
+                          return (
+                            <div
+                              key={group.id}
+                              className={cn(
+                                "border rounded-lg transition-colors",
+                                isAssigned ? "border-primary bg-primary/5" : "border-border"
+                              )}
+                            >
+                              {/* Group header with checkbox */}
                               <div
-                                key={item.id}
-                                className="flex items-center justify-between p-2 rounded bg-muted/30"
+                                className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50"
+                                onClick={() => toggleGroupExpanded(group.id)}
                               >
-                                <div className="flex items-center gap-2">
-                                  <Cherry className="h-4 w-4 text-purple-500" />
-                                  <span>{item.topping.name}</span>
-                                  <span className="text-xs font-mono text-muted-foreground">
-                                    {item.topping.code}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-green-600">
-                                    {item.priceAdjustment > 0 && "+"}
-                                    {formatCurrency(item.priceAdjustment > 0 ? item.priceAdjustment : item.topping.price)}
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => handleRemoveToppingFromGroup(group.id, item.id)}
+                                <div className="flex items-center gap-3">
+                                  <Checkbox
+                                    checked={isAssigned}
+                                    onCheckedChange={() => handleToggleGroupAssignment(group.id, isAssigned)}
+                                    onClick={(e) => e.stopPropagation()}
                                     disabled={savingToppings}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                                  />
+                                  {expandedGroups.has(group.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span className="font-medium">{group.name}</span>
+                                  <Badge variant={group.isRequired ? "default" : "secondary"} className="text-xs">
+                                    {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    (chọn {group.minSelection}-{group.maxSelection})
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    • {groupWithItems.items?.length || 0} item
+                                  </span>
                                 </div>
                               </div>
-                            ))}
 
-                            {/* Add topping to group */}
-                            {addingToGroupId === group.id ? (
-                              <div className="p-2 border rounded">
-                                <Label className="text-xs">Chọn topping để thêm</Label>
-                                <div className="grid gap-1 mt-1 max-h-40 overflow-y-auto">
-                                  {getAvailableToppingsForGroup(group.id).map((topping) => (
-                                    <div
-                                      key={topping.id}
-                                      className="flex items-center justify-between p-2 rounded cursor-pointer hover:bg-muted"
-                                      onClick={() => handleAddToppingToGroup(group.id, topping.id)}
-                                    >
-                                      <span className="text-sm">{topping.name}</span>
-                                      <span className="text-sm text-green-600">{formatCurrency(topping.price)}</span>
-                                    </div>
-                                  ))}
-                                  {getAvailableToppingsForGroup(group.id).length === 0 && (
-                                    <p className="text-xs text-muted-foreground p-2">
-                                      Không còn topping nào để thêm
+                              {/* Group items - only show if expanded */}
+                              {expandedGroups.has(group.id) && (
+                                <div className="border-t p-3 space-y-2">
+                                  {/* Topping items */}
+                                  {groupWithItems.items?.length > 0 ? (
+                                    groupWithItems.items.map((item) => (
+                                      <div
+                                        key={item.id}
+                                        className="flex items-center justify-between p-2 rounded bg-muted/30"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Cherry className="h-4 w-4 text-purple-500" />
+                                          <span>{item.topping.name}</span>
+                                          <span className="text-xs font-mono text-muted-foreground">
+                                            {item.topping.code}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-green-600">
+                                            {item.priceAdjustment > 0 && "+"}
+                                            {formatCurrency(item.priceAdjustment > 0 ? item.priceAdjustment : item.topping.price)}
+                                          </span>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => handleRemoveToppingFromGroup(group.id, item.id)}
+                                            disabled={savingToppings}
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground py-2">
+                                      Chưa có topping nào trong nhóm này
                                     </p>
                                   )}
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full mt-2"
-                                  onClick={() => setAddingToGroupId(null)}
-                                >
-                                  Hủy
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                                onClick={() => setAddingToGroupId(group.id)}
-                                disabled={availableToppings.length === 0}
-                              >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Thêm topping vào nhóm
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
 
-                {availableToppings.length === 0 && (
-                  <div className="p-4 border rounded-lg bg-yellow-50 text-yellow-800 text-sm">
-                    Chưa có sản phẩm loại "Topping" nào. Hãy tạo sản phẩm loại Topping trước.
+                                  {/* Add topping section */}
+                                  {addingToppingToGroupId === group.id ? (
+                                    <div className="p-3 border rounded-lg bg-background space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-medium">Thêm topping vào nhóm</Label>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 text-xs"
+                                          onClick={() => {
+                                            setAddingToppingToGroupId(null);
+                                            setShowQuickCreateTopping(false);
+                                          }}
+                                        >
+                                          Đóng
+                                        </Button>
+                                      </div>
+
+                                      {/* Available toppings list */}
+                                      <div className="max-h-32 overflow-y-auto space-y-1">
+                                        {getAvailableToppingsForGroup(group.id).map((topping) => (
+                                          <div
+                                            key={topping.id}
+                                            className="flex items-center justify-between p-2 rounded cursor-pointer hover:bg-muted"
+                                            onClick={() => handleAddToppingToGroup(group.id, topping.id)}
+                                          >
+                                            <span className="text-sm">{topping.name}</span>
+                                            <span className="text-sm text-green-600">{formatCurrency(topping.price)}</span>
+                                          </div>
+                                        ))}
+                                        {getAvailableToppingsForGroup(group.id).length === 0 && !showQuickCreateTopping && (
+                                          <p className="text-xs text-muted-foreground p-2 text-center">
+                                            Không còn topping nào có sẵn
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      {/* Quick create topping */}
+                                      {showQuickCreateTopping ? (
+                                        <div className="space-y-2 border-t pt-3">
+                                          <Label className="text-xs">Tạo nhanh topping mới</Label>
+                                          <div className="flex gap-2">
+                                            <Input
+                                              placeholder="Tên topping"
+                                              value={quickToppingName}
+                                              onChange={(e) => setQuickToppingName(e.target.value)}
+                                              className="flex-1"
+                                            />
+                                            <Input
+                                              type="number"
+                                              placeholder="Giá"
+                                              value={quickToppingPrice || ""}
+                                              onChange={(e) => setQuickToppingPrice(Number(e.target.value))}
+                                              className="w-24"
+                                            />
+                                            <Button
+                                              size="sm"
+                                              onClick={() => handleQuickCreateTopping(group.id)}
+                                              disabled={!quickToppingName.trim() || creatingQuickTopping}
+                                            >
+                                              {creatingQuickTopping ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                              ) : (
+                                                <Check className="h-4 w-4" />
+                                              )}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full"
+                                          onClick={() => setShowQuickCreateTopping(true)}
+                                        >
+                                          <Plus className="h-4 w-4 mr-1" />
+                                          Tạo topping mới
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full"
+                                      onClick={() => setAddingToppingToGroupId(group.id)}
+                                    >
+                                      <Plus className="h-4 w-4 mr-1" />
+                                      Thêm topping vào nhóm
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
                   </div>
                 )}
               </div>
