@@ -188,6 +188,9 @@ export class SeasonalPricesService {
         seasonalPriceId: id,
       });
 
+      // Clear the in-memory array to prevent cascade re-insert
+      seasonalPrice.seasonalPriceProducts = [];
+
       // Create new assignments
       if (productIds.length > 0) {
         const productAssignments = productIds.map(productId => ({
