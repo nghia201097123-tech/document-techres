@@ -675,7 +675,59 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Seasonal price products table created successfully');
       }
 
-      // 30. Create uploaded_file_type enum and uploaded_files table
+      // 30. Create coupon_type enum and coupons table
+      this.logger.log('Creating coupon_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE coupon_type AS ENUM ('percentage', 'fixed');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const couponsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'coupons'
+        );
+      `);
+
+      if (!couponsExists[0].exists) {
+        this.logger.log('Creating coupons table...');
+        await queryRunner.query(`
+          CREATE TABLE coupons (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            code VARCHAR(50) NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            coupon_type coupon_type DEFAULT 'percentage',
+            discount_value DECIMAL(15,2) DEFAULT 0,
+            max_discount DECIMAL(15,2),
+            min_order_amount DECIMAL(15,2) DEFAULT 0,
+            usage_limit INTEGER,
+            usage_count INTEGER DEFAULT 0,
+            daily_limit INTEGER,
+            daily_usage_count INTEGER DEFAULT 0,
+            last_usage_date DATE,
+            requires_approval BOOLEAN DEFAULT FALSE,
+            approval_threshold DECIMAL(15,2),
+            start_date DATE,
+            end_date DATE,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_coupons_tenant ON coupons(tenant_id);
+          CREATE INDEX idx_coupons_tenant_branch ON coupons(tenant_id, branch_id);
+          CREATE INDEX idx_coupons_code ON coupons(code);
+        `);
+        this.logger.log('Coupons table created successfully');
+      }
+
+      // 31. Create uploaded_file_type enum and uploaded_files table
       this.logger.log('Creating uploaded_file_type enum...');
       await queryRunner.query(`
         DO $$ BEGIN
