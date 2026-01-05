@@ -116,6 +116,8 @@ interface BrandBranchFilterProps {
   onBrandChange: (brandId: string) => void;
   onBranchChange: (branchId: string) => void;
   showAllOption?: boolean;
+  showAllBrandOption?: boolean; // Override for brand "all" option
+  showAllBranchOption?: boolean; // Override for branch "all" option
   allBrandLabel?: string;
   allBranchLabel?: string;
   brandClassName?: string;
@@ -130,6 +132,8 @@ export function BrandBranchFilter({
   onBrandChange,
   onBranchChange,
   showAllOption = true,
+  showAllBrandOption,
+  showAllBranchOption,
   allBrandLabel = "Tất cả thương hiệu",
   allBranchLabel = "Tất cả chi nhánh",
   brandClassName,
@@ -137,6 +141,9 @@ export function BrandBranchFilter({
   brandPlaceholder = "Chọn thương hiệu",
   branchPlaceholder = "Chọn chi nhánh",
 }: BrandBranchFilterProps) {
+  // Use specific options if provided, otherwise fall back to showAllOption
+  const showBrandAll = showAllBrandOption ?? showAllOption;
+  const showBranchAll = showAllBranchOption ?? showAllOption;
   const dispatch = useAppDispatch();
   const { items: brands, loading: loadingBrands } = useAppSelector((state) => state.brands);
   const { byBrandId: branchesByBrand, loading: loadingBranches } = useAppSelector((state) => state.branches);
@@ -173,7 +180,7 @@ export function BrandBranchFilter({
           <SelectValue placeholder={brandPlaceholder} />
         </SelectTrigger>
         <SelectContent>
-          {showAllOption && <SelectItem value="all">{allBrandLabel}</SelectItem>}
+          {showBrandAll && <SelectItem value="all">{allBrandLabel}</SelectItem>}
           {brands.filter(b => b.isActive).map((brand) => (
             <SelectItem key={brand.id} value={brand.id}>
               {brand.name}
@@ -196,7 +203,7 @@ export function BrandBranchFilter({
           <SelectValue placeholder={branchPlaceholder} />
         </SelectTrigger>
         <SelectContent>
-          {showAllOption && <SelectItem value="all">{allBranchLabel}</SelectItem>}
+          {showBranchAll && <SelectItem value="all">{allBranchLabel}</SelectItem>}
           {branches.filter(b => b.isActive).map((branch) => (
             <SelectItem key={branch.id} value={branch.id}>
               {branch.name}

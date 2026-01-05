@@ -294,16 +294,17 @@ export default function StaffPage() {
   const importBranches = importSettings.brandId ? branchesByBrand[importSettings.brandId] || [] : [];
   const importWards = importSettings.provinceCode ? wardsByProvince[importSettings.provinceCode] || [] : [];
 
-  // Load staff list - only when branch is selected
-  const loadStaff = React.useCallback(async (branchId: string) => {
-    if (!branchId) {
+  // Load staff list - by branch or by brand (all branches)
+  const loadStaff = React.useCallback(async (branchId: string, brandId: string) => {
+    if (!brandId) {
       setStaffList([]);
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const data = await staffService.getAll(branchId);
+      // If branchId is empty but brandId exists, load all staff in the brand
+      const data = await staffService.getAll(branchId || undefined, branchId ? undefined : brandId);
       // Sort by createdAt descending (newest first)
       const sortedData = [...data].sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -318,8 +319,11 @@ export default function StaffPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    loadStaff(filterBranchId);
-  }, [filterBranchId, loadStaff]);
+    // Normalize "all" values to empty string
+    const branchId = filterBranchId === "all" ? "" : filterBranchId;
+    const brandId = filterBrandId === "all" ? "" : filterBrandId;
+    loadStaff(branchId, brandId);
+  }, [filterBranchId, filterBrandId, loadStaff]);
 
   // Load branches when brand changes (using Redux)
   React.useEffect(() => {
@@ -944,15 +948,19 @@ export default function StaffPage() {
     return matchesSearch;
   });
 
-  // Check if branch is selected
-  const isBranchSelected = filterBranchId && filterBranchId !== "";
+  // Check if brand is selected (can view staff)
+  const isBrandSelected = filterBrandId && filterBrandId !== "" && filterBrandId !== "all";
+  // Check if specific branch is selected (not "all" and not empty)
+  const isBranchSelected = filterBranchId && filterBranchId !== "" && filterBranchId !== "all";
+  // Check if viewing all branches
+  const isViewingAllBranches = isBrandSelected && !isBranchSelected;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Quản lý nhân viên</h1>
-          <p className="text-muted-foreground">Thêm, sửa và quản lý nhân viên trong chi nhánh</p>
+          <p className="text-muted-foreground">Thêm, sửa và quản lý nhân viên trong thương hiệu</p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
@@ -1000,7 +1008,9 @@ export default function StaffPage() {
             <div>
               <CardTitle>Danh sách nhân viên</CardTitle>
               <CardDescription>
-                {isBranchSelected ? `Tổng cộng ${staffList.length} nhân viên` : "Vui lòng chọn chi nhánh"}
+                {isBrandSelected
+                  ? `Tổng cộng ${staffList.length} nhân viên${isViewingAllBranches ? " (tất cả chi nhánh)" : ""}`
+                  : "Vui lòng chọn thương hiệu"}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -1011,9 +1021,11 @@ export default function StaffPage() {
                 onBranchChange={setFilterBranchId}
                 brandClassName="w-[160px]"
                 branchClassName="w-[160px]"
-                showAllOption={false}
+                showAllBrandOption={false}
+                showAllBranchOption={true}
+                allBranchLabel="Tất cả chi nhánh"
               />
-              {isBranchSelected && (
+              {isBrandSelected && (
                 <>
                   <div className="relative w-56">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -1035,11 +1047,11 @@ export default function StaffPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {!isBranchSelected ? (
+          {!isBrandSelected ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-muted-foreground">Chọn chi nhánh để xem nhân viên</p>
-              <p className="text-sm text-muted-foreground mt-1">Vui lòng chọn thương hiệu và chi nhánh từ bộ lọc phía trên</p>
+              <p className="text-lg font-medium text-muted-foreground">Chọn thương hiệu để xem nhân viên</p>
+              <p className="text-sm text-muted-foreground mt-1">Vui lòng chọn thương hiệu từ bộ lọc phía trên. Có thể chọn xem tất cả chi nhánh hoặc chi nhánh cụ thể.</p>
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center py-10">

@@ -56,8 +56,10 @@ export interface UpdateStaffDto {
 }
 
 export const staffService = {
-  getAll: async (branchId?: string): Promise<Staff[]> => {
-    const params = branchId ? { branchId } : {};
+  getAll: async (branchId?: string, brandId?: string): Promise<Staff[]> => {
+    const params: Record<string, string> = {};
+    if (branchId) params.branchId = branchId;
+    if (brandId) params.brandId = brandId;
     const response = await api.get<Staff[]>("/staff", { params });
     return response.data;
   },
