@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -282,10 +282,16 @@ export default function ProductsPage() {
   }, [products]);
 
   // Bulk operations state
-  type BulkOperation = "category" | "activate" | "deactivate" | "delete" | null;
+  type BulkOperation = "category" | "activate" | "deactivate" | "delete" | "vat" | "price" | "print-label" | "print-seafood" | "print-dish" | "unit" | "selling-type" | "preparation-time" | null;
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [bulkOperation, setBulkOperation] = React.useState<BulkOperation>(null);
   const [bulkCategoryId, setBulkCategoryId] = React.useState("");
+  const [bulkVatRate, setBulkVatRate] = React.useState<number>(10);
+  const [bulkPrice, setBulkPrice] = React.useState<number>(0);
+  const [bulkPrintValue, setBulkPrintValue] = React.useState<boolean>(true);
+  const [bulkUnit, setBulkUnit] = React.useState("");
+  const [bulkSellingType, setBulkSellingType] = React.useState<SellingType>(SellingType.PORTION);
+  const [bulkPreparationTime, setBulkPreparationTime] = React.useState<number>(0);
   const [processingBulk, setProcessingBulk] = React.useState(false);
   const [bulkResult, setBulkResult] = React.useState<ProductBulkOperationResult | null>(null);
 
@@ -1396,6 +1402,12 @@ export default function ProductsPage() {
   const handleCloseBulkDialog = () => {
     setBulkOperation(null);
     setBulkCategoryId("");
+    setBulkVatRate(10);
+    setBulkPrice(0);
+    setBulkPrintValue(true);
+    setBulkUnit("");
+    setBulkSellingType(SellingType.PORTION);
+    setBulkPreparationTime(0);
     setBulkResult(null);
   };
 
@@ -1425,6 +1437,40 @@ export default function ProductsPage() {
           break;
         case "delete":
           result = await bulkProductService.delete(productIds);
+          break;
+        case "vat":
+          result = await bulkProductService.updateVatRate(productIds, bulkVatRate);
+          break;
+        case "price":
+          if (bulkPrice <= 0) {
+            toast({ title: "Lỗi", description: "Vui lòng nhập giá hợp lệ", variant: "destructive" });
+            setProcessingBulk(false);
+            return;
+          }
+          result = await bulkProductService.updatePrice(productIds, bulkPrice);
+          break;
+        case "print-label":
+          result = await bulkProductService.updatePrintLabel(productIds, bulkPrintValue);
+          break;
+        case "print-seafood":
+          result = await bulkProductService.updatePrintSeafood(productIds, bulkPrintValue);
+          break;
+        case "print-dish":
+          result = await bulkProductService.updatePrintDish(productIds, bulkPrintValue);
+          break;
+        case "unit":
+          if (!bulkUnit.trim()) {
+            toast({ title: "Lỗi", description: "Vui lòng nhập đơn vị", variant: "destructive" });
+            setProcessingBulk(false);
+            return;
+          }
+          result = await bulkProductService.updateUnit(productIds, bulkUnit);
+          break;
+        case "selling-type":
+          result = await bulkProductService.updateSellingType(productIds, bulkSellingType);
+          break;
+        case "preparation-time":
+          result = await bulkProductService.updatePreparationTime(productIds, bulkPreparationTime);
           break;
         default:
           return;
@@ -1752,8 +1798,42 @@ export default function ProductsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuItem onClick={() => setBulkOperation("category")}>
-                        <UtensilsCrossed className="mr-2 h-4 w-4" />
+                        <Tag className="mr-2 h-4 w-4" />
                         Chuyển danh mục
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("vat")}>
+                        <Percent className="mr-2 h-4 w-4" />
+                        Cập nhật VAT
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("price")}>
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        Chỉnh sửa giá
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBulkOperation("print-dish")}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Cập nhật In món
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("print-label")}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Cập nhật In tem
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("print-seafood")}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Cập nhật In hồ hải sản
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBulkOperation("unit")}>
+                        <Scale className="mr-2 h-4 w-4" />
+                        Cập nhật Đơn vị
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("selling-type")}>
+                        <UtensilsCrossed className="mr-2 h-4 w-4" />
+                        Cập nhật Loại bán
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("preparation-time")}>
+                        <Clock className="mr-2 h-4 w-4" />
+                        Cập nhật Thời gian chế biến
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBulkOperation("activate")}>
@@ -1988,6 +2068,14 @@ export default function ProductsPage() {
               {bulkOperation === "activate" && "Kích hoạt món ăn"}
               {bulkOperation === "deactivate" && "Tạm ngưng món ăn"}
               {bulkOperation === "delete" && "Xóa món ăn"}
+              {bulkOperation === "vat" && "Cập nhật VAT"}
+              {bulkOperation === "price" && "Chỉnh sửa giá"}
+              {bulkOperation === "print-label" && "Cập nhật In tem"}
+              {bulkOperation === "print-seafood" && "Cập nhật In hồ hải sản"}
+              {bulkOperation === "print-dish" && "Cập nhật In món"}
+              {bulkOperation === "unit" && "Cập nhật Đơn vị"}
+              {bulkOperation === "selling-type" && "Cập nhật Loại bán"}
+              {bulkOperation === "preparation-time" && "Cập nhật Thời gian chế biến"}
             </DialogTitle>
             <DialogDescription>
               Thao tác sẽ áp dụng cho {selectedProductIds.size} món ăn đã chọn
@@ -2009,6 +2097,113 @@ export default function ProductsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          )}
+
+          {/* VAT selection */}
+          {bulkOperation === "vat" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn mức VAT (%)</Label>
+                <Select value={String(bulkVatRate)} onValueChange={(v) => setBulkVatRate(Number(v))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn mức VAT..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0% (Không VAT)</SelectItem>
+                    <SelectItem value="5">5%</SelectItem>
+                    <SelectItem value="8">8%</SelectItem>
+                    <SelectItem value="10">10%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Price input */}
+          {bulkOperation === "price" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Nhập giá mới (đã bao gồm VAT)</Label>
+                <Input
+                  type="number"
+                  placeholder="Nhập giá..."
+                  value={bulkPrice || ""}
+                  onChange={(e) => setBulkPrice(Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Giá này sẽ được áp dụng cho tất cả món ăn đã chọn
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Print options (label, seafood, dish) */}
+          {(bulkOperation === "print-label" || bulkOperation === "print-seafood" || bulkOperation === "print-dish") && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>
+                  {bulkOperation === "print-label" && "In tem"}
+                  {bulkOperation === "print-seafood" && "In hồ hải sản"}
+                  {bulkOperation === "print-dish" && "In món"}
+                </Label>
+                <Select value={String(bulkPrintValue)} onValueChange={(v) => setBulkPrintValue(v === "true")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Có</SelectItem>
+                    <SelectItem value="false">Không</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Unit input */}
+          {bulkOperation === "unit" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Nhập đơn vị</Label>
+                <Input
+                  placeholder="VD: phần, ly, lon, chai..."
+                  value={bulkUnit}
+                  onChange={(e) => setBulkUnit(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Selling type selection */}
+          {bulkOperation === "selling-type" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn loại bán</Label>
+                <Select value={bulkSellingType} onValueChange={(v) => setBulkSellingType(v as SellingType)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn loại bán..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SellingType.PORTION}>Theo phần</SelectItem>
+                    <SelectItem value={SellingType.WEIGHT}>Theo cân</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Preparation time input */}
+          {bulkOperation === "preparation-time" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Nhập thời gian chế biến (phút)</Label>
+                <Input
+                  type="number"
+                  placeholder="Nhập số phút..."
+                  value={bulkPreparationTime || ""}
+                  onChange={(e) => setBulkPreparationTime(Number(e.target.value))}
+                />
               </div>
             </div>
           )}

@@ -449,4 +449,68 @@ export const bulkProductService = {
     });
     return response.data;
   },
+
+  updateVatRate: async (productIds: string[], vatRate: number): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-vat-rate", {
+      productIds,
+      vatRate,
+    });
+    return response.data;
+  },
+
+  updatePrice: async (productIds: string[], price: number): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-price", {
+      productIds,
+      price,
+    });
+    return response.data;
+  },
+
+  updatePrintLabel: async (productIds: string[], printLabel: boolean): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-label", {
+      productIds,
+      printLabel,
+    });
+    return response.data;
+  },
+
+  updatePrintSeafood: async (productIds: string[], printSeafood: boolean): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-seafood", {
+      productIds,
+      printSeafood,
+    });
+    return response.data;
+  },
+
+  updatePrintDish: async (productIds: string[], printDish: boolean): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-dish", {
+      productIds,
+      printDish,
+    });
+    return response.data;
+  },
+
+  updateUnit: async (productIds: string[], unit: string): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-unit", {
+      productIds,
+      unit,
+    });
+    return response.data;
+  },
+
+  updateSellingType: async (productIds: string[], sellingType: SellingType): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-selling-type", {
+      productIds,
+      sellingType,
+    });
+    return response.data;
+  },
+
+  updatePreparationTime: async (productIds: string[], preparationTime: number): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-preparation-time", {
+      productIds,
+      preparationTime,
+    });
+    return response.data;
+  },
 };
