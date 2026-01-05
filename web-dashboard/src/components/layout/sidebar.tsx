@@ -23,6 +23,7 @@ import {
   Calendar,
   Gift,
   Ticket,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -62,6 +63,7 @@ const menuItems: MenuItem[] = [
       { title: "Giá thời vụ", href: "/menu/seasonal-prices", icon: Calendar },
       { title: "Món tặng", href: "/menu/gift-items", icon: Gift },
       { title: "Voucher", href: "/menu/vouchers", icon: Ticket },
+      { title: "Coupon", href: "/menu/coupons", icon: Percent },
     ],
   },
   {

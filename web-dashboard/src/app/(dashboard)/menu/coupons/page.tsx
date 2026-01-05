@@ -335,8 +335,8 @@ export default function CouponsPage() {
             <>
               <ColumnConfigDialog
                 columns={columns}
-                onToggleColumn={toggleColumn}
-                onResetToDefault={resetToDefault}
+                onToggle={toggleColumn}
+                onReset={resetToDefault}
               />
               <Button onClick={handleOpenCreate}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -360,8 +360,9 @@ export default function CouponsPage() {
         <CardContent>
           {!filterBranchId ? (
             <FilterRequiredPlaceholder
-              message="Vui lòng chọn chi nhánh để xem danh sách coupon"
               icon={<Tag className="h-10 w-10 text-muted-foreground/50" />}
+              title="Chọn chi nhánh"
+              description="Vui lòng chọn chi nhánh để xem danh sách coupon"
             />
           ) : loading ? (
             <div className="flex items-center justify-center py-10">
