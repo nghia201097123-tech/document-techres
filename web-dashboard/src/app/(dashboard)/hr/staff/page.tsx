@@ -473,6 +473,7 @@ export default function StaffPage() {
         provinceCode: formData.provinceCode || undefined,
         wardCode: formData.wardCode || undefined,
         departmentId: formData.departmentId || undefined,
+        avatarUrl: formData.avatarUrl || undefined,
       };
 
       try {
