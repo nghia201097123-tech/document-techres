@@ -161,14 +161,18 @@ export default function SurchargesPage() {
   // Open edit dialog
   const handleOpenEdit = (surcharge: Surcharge) => {
     setSelectedSurcharge(surcharge);
+    // Convert to numbers in case they come as strings from API
+    const amount = Number(surcharge.amount) || 0;
+    const vatRate = Number(surcharge.vatRate) || 0;
+    const sortOrder = Number(surcharge.sortOrder) || 0;
     setFormData({
       name: surcharge.name,
       description: surcharge.description || "",
-      amount: surcharge.amount,
-      vatRate: surcharge.vatRate,
-      sortOrder: surcharge.sortOrder,
+      amount,
+      vatRate,
+      sortOrder,
     });
-    setVatRateInput(surcharge.vatRate ? String(surcharge.vatRate) : "");
+    setVatRateInput(vatRate ? String(vatRate) : "");
     setDialogMode("edit");
     // Remove badges when editing
     setNewSurchargeIds(prev => { const next = new Set(prev); next.delete(surcharge.id); return next; });
@@ -191,20 +195,22 @@ export default function SurchargesPage() {
     try {
       setSaving(true);
 
+      // Ensure numbers are properly typed before sending
+      const submitData = {
+        name: formData.name.trim(),
+        description: formData.description || "",
+        amount: Number(formData.amount) || 0,
+        vatRate: Number(formData.vatRate) || 0,
+        sortOrder: Number(formData.sortOrder) || 0,
+      };
+
       if (dialogMode === "create") {
-        const result = await surchargeService.create(formData);
+        const result = await surchargeService.create(submitData);
         setSurcharges((prev) => [result, ...prev]);
         setNewSurchargeIds(prev => new Set([...prev, result.id]));
         toast({ title: "Thành công", description: "Đã tạo phụ thu mới" });
       } else if (dialogMode === "edit" && selectedSurcharge) {
-        const updateData: UpdateSurchargeDto = {
-          name: formData.name,
-          description: formData.description,
-          amount: formData.amount,
-          vatRate: formData.vatRate,
-          sortOrder: formData.sortOrder,
-        };
-        const result = await surchargeService.update(selectedSurcharge.id, updateData);
+        const result = await surchargeService.update(selectedSurcharge.id, submitData);
         setSurcharges((prev) => prev.map((s) => (s.id === selectedSurcharge.id ? result : s)));
         setUpdatedSurchargeIds(prev => new Set([...prev, result.id]));
         setNewSurchargeIds(prev => {
