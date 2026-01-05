@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, Building2, UserCog, Copy, Check } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -272,6 +272,48 @@ export default function StaffPage() {
     return defaultDetailFields;
   });
   const [detailFieldsPopoverOpen, setDetailFieldsPopoverOpen] = React.useState(false);
+
+  // Sorting state
+  type SortKey = "name" | "username" | "phone" | "email" | "birthDate" | "gender" | "provinceName" | "branchName" | "departmentName" | "isActive" | "createdAt";
+  type SortDirection = "asc" | "desc";
+  const [sortKey, setSortKey] = React.useState<SortKey>("createdAt");
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>("desc");
+
+  // Filter state
+  const [filterPopoverOpen, setFilterPopoverOpen] = React.useState(false);
+  const [genderFilter, setGenderFilter] = React.useState<string>("all");
+  const [provinceFilter, setProvinceFilter] = React.useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+
+  // Check if any filter is active
+  const hasActiveFilters = genderFilter !== "all" || provinceFilter !== "all" || departmentFilter !== "all" || statusFilter !== "all";
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setGenderFilter("all");
+    setProvinceFilter("all");
+    setDepartmentFilter("all");
+    setStatusFilter("all");
+  };
+
+  // Handle sort click
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
+
+  // Get sort icon
+  const getSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    return sortDirection === "asc"
+      ? <ArrowUp className="ml-1 h-3 w-3" />
+      : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
 
   // Helper to check if detail field is visible
   const isDetailFieldVisible = (key: string) => {
@@ -1281,14 +1323,57 @@ export default function StaffPage() {
     return dept?.name || "-";
   };
 
-  // Filter staff by search (branch filter is already applied when loading)
-  const filteredStaff = staffList.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.username?.toLowerCase().includes(search.toLowerCase()) ||
-      s.phone?.includes(search);
-    return matchesSearch;
-  });
+  // Filter and sort staff
+  const filteredStaff = React.useMemo(() => {
+    // First filter
+    let result = staffList.filter((s) => {
+      // Search filter
+      const matchesSearch =
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        s.username?.toLowerCase().includes(search.toLowerCase()) ||
+        s.phone?.includes(search);
+
+      // Gender filter
+      const matchesGender = genderFilter === "all" || s.gender === genderFilter;
+
+      // Province filter
+      const matchesProvince = provinceFilter === "all" || s.provinceCode === provinceFilter;
+
+      // Department filter
+      const matchesDepartment = departmentFilter === "all" || s.departmentId === departmentFilter;
+
+      // Status filter
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && s.isActive) ||
+        (statusFilter === "inactive" && !s.isActive);
+
+      return matchesSearch && matchesGender && matchesProvince && matchesDepartment && matchesStatus;
+    });
+
+    // Then sort
+    result.sort((a, b) => {
+      let aValue: any = a[sortKey];
+      let bValue: any = b[sortKey];
+
+      // Handle special cases
+      if (sortKey === "createdAt") {
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+      } else if (sortKey === "isActive") {
+        aValue = a.isActive ? 1 : 0;
+        bValue = b.isActive ? 1 : 0;
+      } else if (typeof aValue === "string") {
+        aValue = (aValue || "").toLowerCase();
+        bValue = (bValue || "").toLowerCase();
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [staffList, search, genderFilter, provinceFilter, departmentFilter, statusFilter, sortKey, sortDirection]);
 
   // Bulk selection derived state
   const isAllSelected = filteredStaff.length > 0 && selectedStaffIds.size === filteredStaff.length;
@@ -1382,6 +1467,93 @@ export default function StaffPage() {
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
+                  {/* Filter dropdown */}
+                  <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Filter className="h-4 w-4" />
+                        Bộ lọc
+                        {hasActiveFilters && (
+                          <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                            {[genderFilter, provinceFilter, departmentFilter, statusFilter].filter(f => f !== "all").length}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="end">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">Bộ lọc</h4>
+                          {hasActiveFilters && (
+                            <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 px-2 text-xs">
+                              <X className="mr-1 h-3 w-3" />
+                              Xóa tất cả
+                            </Button>
+                          )}
+                        </div>
+                        <div className="space-y-3">
+                          {/* Gender Filter */}
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Giới tính</Label>
+                            <Select value={genderFilter} onValueChange={setGenderFilter}>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Tất cả" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                <SelectItem value="male">Nam</SelectItem>
+                                <SelectItem value="female">Nữ</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {/* Province Filter */}
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Tỉnh/Thành phố</Label>
+                            <Select value={provinceFilter} onValueChange={setProvinceFilter}>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Tất cả" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                {provinces.map((p) => (
+                                  <SelectItem key={p.code} value={p.code}>{p.fullName || p.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {/* Department Filter */}
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Bộ phận</Label>
+                            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Tất cả" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                {departments.map((d) => (
+                                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {/* Status Filter */}
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Trạng thái</Label>
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Tất cả" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                <SelectItem value="active">Đang hoạt động</SelectItem>
+                                <SelectItem value="inactive">Ngưng hoạt động</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <ColumnConfigDialog
                     columns={staffColumns}
                     onToggle={toggleColumn}
@@ -1474,21 +1646,61 @@ export default function StaffPage() {
                       />
                     </TableHead>
                     {isColumnVisible("avatar") && <TableHead className="w-[50px]">Ảnh</TableHead>}
-                  {isColumnVisible("name") && <TableHead>Tên nhân viên</TableHead>}
-                  {isColumnVisible("username") && <TableHead>Username</TableHead>}
-                  {isColumnVisible("phone") && <TableHead>Số điện thoại</TableHead>}
-                  {isColumnVisible("email") && <TableHead>Email</TableHead>}
-                  {isColumnVisible("birthDate") && <TableHead>Ngày sinh</TableHead>}
-                  {isColumnVisible("gender") && <TableHead>Giới tính</TableHead>}
-                  {isColumnVisible("idNumber") && <TableHead>CCCD</TableHead>}
-                  {isColumnVisible("provinceName") && <TableHead>Tỉnh/TP</TableHead>}
-                  {isColumnVisible("wardName") && <TableHead>Phường/Xã</TableHead>}
-                  {isColumnVisible("address") && <TableHead>Địa chỉ</TableHead>}
-                  {isColumnVisible("brandName") && <TableHead>Thương hiệu</TableHead>}
-                  {isColumnVisible("branchName") && <TableHead>Chi nhánh</TableHead>}
-                  {isColumnVisible("departmentName") && <TableHead>Bộ phận</TableHead>}
-                  {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
-                  <TableHead className="w-[80px]">Thao tác</TableHead>
+                    {isColumnVisible("name") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("name")}>
+                        <div className="flex items-center">Tên nhân viên{getSortIcon("name")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("username") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("username")}>
+                        <div className="flex items-center">Username{getSortIcon("username")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("phone") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("phone")}>
+                        <div className="flex items-center">Số điện thoại{getSortIcon("phone")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("email") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("email")}>
+                        <div className="flex items-center">Email{getSortIcon("email")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("birthDate") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("birthDate")}>
+                        <div className="flex items-center">Ngày sinh{getSortIcon("birthDate")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("gender") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("gender")}>
+                        <div className="flex items-center">Giới tính{getSortIcon("gender")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("idNumber") && <TableHead>CCCD</TableHead>}
+                    {isColumnVisible("provinceName") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("provinceName")}>
+                        <div className="flex items-center">Tỉnh/TP{getSortIcon("provinceName")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("wardName") && <TableHead>Phường/Xã</TableHead>}
+                    {isColumnVisible("address") && <TableHead>Địa chỉ</TableHead>}
+                    {isColumnVisible("brandName") && <TableHead>Thương hiệu</TableHead>}
+                    {isColumnVisible("branchName") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("branchName")}>
+                        <div className="flex items-center">Chi nhánh{getSortIcon("branchName")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("departmentName") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("departmentName")}>
+                        <div className="flex items-center">Bộ phận{getSortIcon("departmentName")}</div>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("isActive") && (
+                      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("isActive")}>
+                        <div className="flex items-center">Trạng thái{getSortIcon("isActive")}</div>
+                      </TableHead>
+                    )}
+                    <TableHead className="w-[80px]">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
