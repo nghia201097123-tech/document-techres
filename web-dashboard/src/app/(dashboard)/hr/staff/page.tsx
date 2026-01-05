@@ -2436,18 +2436,56 @@ export default function StaffPage() {
                   <p className="text-sm text-green-700">
                     Tên nhân viên: <strong>{createdStaff.name}</strong>
                   </p>
-                  <p className="text-sm text-green-700">
-                    Tên đăng nhập: <strong className="font-mono">{createdStaff.username}</strong>
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Mật khẩu tạm thời: <strong className="font-mono">{createdStaff.temporaryPassword}</strong>
-                  </p>
+                  <div className="flex items-center gap-2 text-sm text-green-700">
+                    <span>Tên đăng nhập:</span>
+                    <strong className="font-mono">{createdStaff.username}</strong>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-green-600 hover:text-green-800 hover:bg-green-100"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdStaff.username);
+                        toast({ title: "Đã copy username" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-green-700">
+                    <span>Mật khẩu tạm thời:</span>
+                    <strong className="font-mono">{createdStaff.temporaryPassword}</strong>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-green-600 hover:text-green-800 hover:bg-green-100"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdStaff.temporaryPassword);
+                        toast({ title: "Đã copy mật khẩu" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
                 <p className="text-xs text-green-600 mt-3">
                   Vui lòng ghi lại thông tin này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập lần đầu.
                 </p>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const text = `Thông tin đăng nhập:\nTên: ${createdStaff.name}\nUsername: ${createdStaff.username}\nMật khẩu: ${createdStaff.temporaryPassword}`;
+                    navigator.clipboard.writeText(text);
+                    toast({ title: "Đã copy thông tin đăng nhập" });
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy tất cả
+                </Button>
                 <Button onClick={handleCloseDialog}>Đóng</Button>
               </DialogFooter>
             </div>
@@ -2737,12 +2775,38 @@ export default function StaffPage() {
                   <p className="text-sm text-green-700">
                     Nhân viên: <strong>{resetPasswordResult.staff.name}</strong>
                   </p>
-                  <p className="text-sm text-green-700">
-                    Username: <strong className="font-mono">{resetPasswordResult.staff.username}</strong>
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Mật khẩu mới: <strong className="font-mono text-lg">{resetPasswordResult.temporaryPassword}</strong>
-                  </p>
+                  <div className="flex items-center gap-2 text-sm text-green-700">
+                    <span>Username:</span>
+                    <strong className="font-mono">{resetPasswordResult.staff.username}</strong>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-green-600 hover:text-green-800 hover:bg-green-100"
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetPasswordResult.staff.username);
+                        toast({ title: "Đã copy username" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-green-700">
+                    <span>Mật khẩu mới:</span>
+                    <strong className="font-mono text-lg">{resetPasswordResult.temporaryPassword}</strong>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-green-600 hover:text-green-800 hover:bg-green-100"
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetPasswordResult.temporaryPassword);
+                        toast({ title: "Đã copy mật khẩu" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
                 <p className="text-xs text-green-600 mt-3">
                   Vui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.
@@ -2750,7 +2814,21 @@ export default function StaffPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (resetPasswordResult) {
+                  const text = `Thông tin đăng nhập:\nTên: ${resetPasswordResult.staff.name}\nUsername: ${resetPasswordResult.staff.username}\nMật khẩu: ${resetPasswordResult.temporaryPassword}`;
+                  navigator.clipboard.writeText(text);
+                  toast({ title: "Đã copy thông tin đăng nhập" });
+                }
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy tất cả
+            </Button>
             <Button onClick={() => setResetPasswordResult(null)}>Đóng</Button>
           </DialogFooter>
         </DialogContent>
