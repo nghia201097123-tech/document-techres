@@ -15,22 +15,37 @@ Hệ thống có nhiều API services phục vụ các mục đích khác nhau.
 │                                                                             │
 │   ┌─────────────────┐                                                       │
 │   │   API Gateway   │  ← Entry point cho tất cả requests                   │
-│   │   :3000         │                                                       │
+│   │     :3000       │                                                       │
 │   └────────┬────────┘                                                       │
 │            │                                                                │
-│   ┌────────┼────────────────┬──────────────────┬──────────────────┐        │
-│   │        │                │                  │                  │        │
-│   ▼        ▼                ▼                  ▼                  ▼        │
-│ ┌──────┐ ┌──────────┐ ┌───────────┐ ┌─────────────┐ ┌────────────┐        │
-│ │Admin │ │Dashboard │ │  Upload   │ │ Master Data │ │  Customer  │        │
-│ │:3001 │ │  :3002   │ │  :3003    │ │   :3004     │ │   :3005    │        │
-│ └──────┘ └──────────┘ └───────────┘ └─────────────┘ └────────────┘        │
-│    │          │            │              │               │                │
-│    │          │            │              │               │                │
-│    ▼          ▼            ▼              ▼               ▼                │
-│ ┌──────────────────────────────────────────────────────────────────┐      │
-│ │                      PostgreSQL Database                          │      │
-│ └──────────────────────────────────────────────────────────────────┘      │
+│   ┌────────┴────────────────────────────────────────────────────────┐      │
+│   │                                                                  │      │
+│   │  /api/auth/*  ──────────────────────────────────┐               │      │
+│   │                                                  │               │      │
+│   │  /api/admin/*  ──────────┐                      │               │      │
+│   │  /api/dashboard/* ────┐  │                      │               │      │
+│   │  /api/upload/* ─────┐ │  │                      │               │      │
+│   │  /api/master/* ───┐ │ │  │                      │               │      │
+│   │                   │ │ │  │                      │               │      │
+│   └───────────────────┼─┼─┼──┼──────────────────────┼───────────────┘      │
+│                       │ │ │  │                      │                      │
+│   ┌───────────────────┼─┼─┼──┼──────────────────────┼───────────────┐      │
+│   │                   ▼ ▼ ▼  ▼                      ▼               │      │
+│   │ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────────────┐ │      │
+│   │ │Master  │ │Upload  │ │Dashbrd │ │ Admin  │ │    OAuth       │ │      │
+│   │ │ :3004  │ │ :3003  │ │ :3002  │ │ :3001  │ │    :3005       │ │      │
+│   │ └────────┘ └────────┘ └────────┘ └────────┘ │  ┌───────────┐ │ │      │
+│   │                                              │  │• Login    │ │ │      │
+│   │                                              │  │• Register │ │ │      │
+│   │                                              │  │• 2FA      │ │ │      │
+│   │                                              │  │• Sessions │ │ │      │
+│   │                                              │  └───────────┘ │ │      │
+│   │                                              └────────────────┘ │      │
+│   │                                                                 │      │
+│   │  ┌──────────────────────────────────────────────────────────┐  │      │
+│   │  │                   PostgreSQL Database                     │  │      │
+│   │  └──────────────────────────────────────────────────────────┘  │      │
+│   └─────────────────────────────────────────────────────────────────┘      │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -61,41 +76,127 @@ Hệ thống có nhiều API services phục vụ các mục đích khác nhau.
 | **API Dashboard** | 3002 | Quản lý menu, staff, tables cho tenant | [api-dashboard.md](./rest/api-dashboard.md) |
 | **API Upload** | 3003 | Upload files, images, MinIO storage | [api-upload.md](./rest/api-upload.md) |
 | **API Master Data** | 3004 | Sync master data cho POS offline | [master-data.md](./rest/master-data.md) |
+| **API OAuth** | 3005 | Authentication tập trung (Login, 2FA, Sessions) | [api-oauth.md](./rest/api-oauth.md) |
 | **Local API** | 8080 | REST + WebSocket trên CCB App | [local/endpoints.md](./local/endpoints.md) |
 
-## Authentication
+## Authentication Architecture
 
-### API Admin / Dashboard
+Hệ thống sử dụng **API OAuth** làm service authentication tập trung:
 
-Sử dụng **JWT Token**:
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        AUTHENTICATION FLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                  │
+│   │ Web Admin   │     │Web Dashboard│     │ Mobile Apps │                  │
+│   └──────┬──────┘     └──────┬──────┘     └──────┬──────┘                  │
+│          │                   │                   │                          │
+│          └───────────────────┼───────────────────┘                          │
+│                              │                                              │
+│                    ┌─────────▼─────────┐                                   │
+│                    │   API Gateway     │                                   │
+│                    │     :3000         │                                   │
+│                    └─────────┬─────────┘                                   │
+│                              │                                              │
+│              /api/auth/* ────┼──────────────────────┐                      │
+│                              │                      │                      │
+│   ┌──────────────────────────┼──────────────────┐   │                      │
+│   │                          │                  │   ▼                      │
+│   ▼                          ▼                  ▼  ┌─────────────────┐     │
+│ ┌────────┐            ┌────────────┐     ┌──────┐ │   API OAuth     │     │
+│ │ Admin  │            │ Dashboard  │     │Upload│ │     :3005       │     │
+│ │ :3001  │            │   :3002    │     │:3003 │ ├─────────────────┤     │
+│ └────┬───┘            └─────┬──────┘     └──────┘ │ • Login/Logout  │     │
+│      │                      │                     │ • Register      │     │
+│      │  Verify Token        │  Verify Token       │ • Refresh Token │     │
+│      └──────────────────────┴─────────────────────│ • 2FA (TOTP)    │     │
+│                                                   │ • Sessions      │     │
+│                                                   │ • Password Reset│     │
+│                                                   │ • Audit Logs    │     │
+│                                                   └─────────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Authentication với API OAuth
+
+### Login Flow
 
 ```bash
-# Login
+# 1. Login
 POST /api/v1/auth/login
 {
-  "tenantId": "abcfood",  # Chỉ cần cho Dashboard
+  "tenantId": "abcfood",    # Chỉ cần cho tenant users
   "email": "owner@example.com",
-  "password": "xxx"
+  "password": "Password123!"
 }
 
-# Response
+# 2. Response (nếu 2FA chưa bật)
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2...",
-  "expiresIn": 3600,
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "expiresIn": 900,
+  "tokenType": "Bearer",
   "user": {
     "id": "uuid",
+    "email": "owner@example.com",
     "name": "Nguyen Van A",
-    "role": "owner"
+    "role": "owner",
+    "tenantId": "abcfood"
   }
 }
 
-# Sử dụng
+# 3. Response (nếu 2FA đã bật)
+{
+  "requiresTwoFactor": true
+}
+
+# 4. Login với 2FA code
+POST /api/v1/auth/login
+{
+  "tenantId": "abcfood",
+  "email": "owner@example.com",
+  "password": "Password123!",
+  "twoFactorCode": "123456"
+}
+```
+
+### Sử dụng Token
+
+```bash
+# Gọi API với access token
 GET /api/v1/products
 Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 ```
 
+### Refresh Token
+
+```bash
+# Khi access token hết hạn
+POST /api/v1/auth/refresh
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+
+# Response
+{
+  "accessToken": "new-access-token...",
+  "refreshToken": "new-refresh-token...",
+  "expiresIn": 900
+}
+```
+
+### Token Expiration
+
+| Token | Expiration | Mô tả |
+|-------|------------|-------|
+| **Access Token** | 15 phút | Short-lived, dùng cho API calls |
+| **Refresh Token** | 7 ngày | Long-lived, dùng để refresh |
+
 ### API Master Data (Device Auth)
+
+Device authentication cho POS apps:
 
 ```bash
 # Device Login
@@ -116,7 +217,7 @@ Authorization: Bearer <token>
 
 ### Local API (CCB)
 
-Sử dụng **PIN Code** hoặc **Session**:
+PIN-based authentication cho local network:
 
 ```bash
 # Login bằng PIN
@@ -182,6 +283,7 @@ POST /auth/login
 |------|-------|
 | 200 | Thành công |
 | 201 | Tạo mới thành công |
+| 204 | Thành công (no content) |
 | 400 | Request không hợp lệ |
 | 401 | Chưa xác thực |
 | 403 | Không có quyền |
@@ -218,7 +320,7 @@ Tất cả API Dashboard đều yêu cầu xác định tenant:
 
 ```bash
 # Option 1: Trong JWT token (recommended)
-# tenant_id được lưu trong payload khi login
+# tenant_id được lưu trong payload khi login qua API OAuth
 
 # Option 2: Trong header
 X-Tenant-ID: abcfood
