@@ -409,10 +409,8 @@ export default function ProductsPage() {
     }
     try {
       setLoading(true);
-      // Load all products, filtering will happen in filteredProducts
-      const data = branchId
-        ? await productService.getAllWithSeasonalPrices(brandId, branchId)
-        : await productService.getAll(brandId);
+      // Load all products without seasonal prices - seasonal prices only show on branch menu
+      const data = await productService.getAll(brandId);
       setProducts(data);
     } catch (error) {
       console.error("Error loading products:", error);
@@ -2204,45 +2202,7 @@ export default function ProductsPage() {
                     {isColumnVisible("categoryName") && <TableCell>{product.categoryName || getCategoryName(product.categoryId)}</TableCell>}
                     {isColumnVisible("price") && (
                       <TableCell className="text-right whitespace-nowrap">
-                        {product.seasonalPrice ? (
-                          <TooltipProvider delayDuration={100}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="text-orange-600 cursor-help">
-                                  {formatCurrency(product.seasonalPrice.adjustedPrice)}
-                                  <sup className="text-[9px] ml-0.5">
-                                    {product.seasonalPrice.adjustmentType === 'percentage'
-                                      ? `+${product.seasonalPrice.adjustmentValue}%`
-                                      : `+${Math.round(product.seasonalPrice.adjustmentValue / 1000)}k`}
-                                  </sup>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-orange-50 border-orange-200">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Giá gốc:</span>
-                                  <span className="font-medium line-through">{formatCurrency(product.price)}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Điều chỉnh:</span>
-                                  <span className="font-medium text-orange-600">
-                                    {product.seasonalPrice.adjustmentType === 'percentage'
-                                      ? `+${product.seasonalPrice.adjustmentValue}%`
-                                      : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Tăng:</span>
-                                  <span className="font-medium text-orange-600">
-                                    +{formatCurrency(product.seasonalPrice.adjustedPrice - product.price)}
-                                  </span>
-                                </div>
-                                <div className="text-orange-600 font-medium border-t border-orange-200 pt-1 mt-1">{product.seasonalPrice.seasonalPriceName}</div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          formatCurrency(product.price)
-                        )}
+                        {formatCurrency(product.price)}
                       </TableCell>
                     )}
                     {isColumnVisible("priceBeforeVat") && <TableCell className="text-right">{formatCurrency(Math.round(product.price / (1 + (product.vatRate || 10) / 100)))}</TableCell>}

@@ -43,6 +43,8 @@ import { branchProductService, type BranchProduct, type BranchProductStats } fro
 import { ProductType } from "@/services/product-service";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { cn } from "@/lib/utils";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -51,6 +53,22 @@ const typeLabels: Record<string, { label: string; color: string }> = {
   topping: { label: "Topping", color: "bg-purple-100 text-purple-800" },
   combo: { label: "Combo", color: "bg-green-100 text-green-800" },
 };
+
+// Default column configuration
+const defaultColumns: ColumnConfig[] = [
+  { key: "select", label: "Chọn", visible: true, locked: true },
+  { key: "image", label: "Ảnh", visible: true },
+  { key: "code", label: "Mã", visible: true },
+  { key: "name", label: "Tên món", visible: true, locked: true },
+  { key: "type", label: "Loại", visible: true },
+  { key: "originalPrice", label: "Giá gốc", visible: true },
+  { key: "branchPrice", label: "Giá bán CN", visible: true },
+  { key: "seasonalPrice", label: "Giá thời vụ", visible: true },
+  { key: "vat", label: "VAT", visible: true },
+  { key: "status", label: "Trạng thái", visible: true },
+  { key: "availability", label: "Bán tại CN", visible: true },
+  { key: "actions", label: "Thao tác", visible: true, locked: true },
+];
 
 // Format currency (no decimals for VND)
 const formatCurrency = (amount: number) => {
@@ -104,6 +122,18 @@ export default function BranchProductsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
   const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
+  // Column configuration
+  const {
+    columns,
+    visibleColumns,
+    toggleColumn,
+    resetToDefault: resetColumnsToDefault,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "branch-products-columns",
+    defaultColumns,
+  });
 
   // Load products when branch changes
   const loadProducts = React.useCallback(async (branchId: string) => {
@@ -634,6 +664,11 @@ export default function BranchProductsPage() {
                     <SelectItem value="unavailable">Không bán</SelectItem>
                   </SelectContent>
                 </Select>
+                <ColumnConfigDialog
+                  columns={columns}
+                  onToggle={toggleColumn}
+                  onReset={resetColumnsToDefault}
+                />
               </div>
             )}
           </div>
@@ -726,194 +761,220 @@ export default function BranchProductsPage() {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="w-[50px]">
-                      <Checkbox
-                        checked={isAllSelected}
-                        onCheckedChange={handleSelectAll}
-                        {...(isSomeSelected ? { "data-state": "indeterminate" } : {})}
-                      />
-                    </TableHead>
-                    <TableHead className="w-[80px]">Ảnh</TableHead>
-                    <TableHead>Mã</TableHead>
-                    <TableHead>Tên món</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead className="text-right">Giá gốc</TableHead>
-                    <TableHead className="text-right">Giá bán CN</TableHead>
-                    <TableHead className="text-right">Giá thời vụ</TableHead>
-                    <TableHead className="text-right">VAT</TableHead>
-                    <TableHead className="text-center">Trạng thái</TableHead>
-                    <TableHead className="text-center">Bán tại CN</TableHead>
-                    <TableHead className="w-[80px]">Thao tác</TableHead>
+                    {isColumnVisible("select") && (
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={isAllSelected}
+                          onCheckedChange={handleSelectAll}
+                          {...(isSomeSelected ? { "data-state": "indeterminate" } : {})}
+                        />
+                      </TableHead>
+                    )}
+                    {isColumnVisible("image") && <TableHead className="w-[80px]">Ảnh</TableHead>}
+                    {isColumnVisible("code") && <TableHead>Mã</TableHead>}
+                    {isColumnVisible("name") && <TableHead>Tên món</TableHead>}
+                    {isColumnVisible("type") && <TableHead>Loại</TableHead>}
+                    {isColumnVisible("originalPrice") && <TableHead className="text-right">Giá gốc</TableHead>}
+                    {isColumnVisible("branchPrice") && <TableHead className="text-right">Giá bán CN</TableHead>}
+                    {isColumnVisible("seasonalPrice") && <TableHead className="text-right">Giá thời vụ</TableHead>}
+                    {isColumnVisible("vat") && <TableHead className="text-right">VAT</TableHead>}
+                    {isColumnVisible("status") && <TableHead className="text-center">Trạng thái</TableHead>}
+                    {isColumnVisible("availability") && <TableHead className="text-center">Bán tại CN</TableHead>}
+                    {isColumnVisible("actions") && <TableHead className="w-[80px]">Thao tác</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedProducts.map((product) => (
                     <TableRow key={product.id} className={cn(!product.isAvailable && "opacity-60")}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedProductIds.has(product.id)}
-                          onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-12 h-12 rounded object-cover"
+                      {isColumnVisible("select") && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProductIds.has(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
                           />
-                        ) : (
-                          <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{product.code}</TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={typeLabels[product.type]?.color}>
-                          {typeLabels[product.type]?.label || product.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">{formatCurrency(product.price)}</TableCell>
-                      <TableCell className="text-right">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className={cn(
-                                "font-medium cursor-help",
-                                product.customPrice !== null && product.customPrice !== product.price
-                                  ? "text-orange-600"
-                                  : "text-green-600"
-                              )}>
-                                {formatCurrency(getEffectivePrice(product))}
-                                {product.customPrice !== null && product.customPrice !== product.price && (
-                                  <sup className="text-[9px] ml-0.5">CN</sup>
-                                )}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-xs space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Giá gốc:</span>
-                                  <span className="font-medium">{formatCurrency(product.price)}</span>
-                                </div>
-                                {product.customPrice !== null && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">Giá CN:</span>
-                                    <span className="font-medium text-orange-600">{formatCurrency(product.customPrice)}</span>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Chênh lệch:</span>
-                                  <span className={cn(
-                                    "font-medium",
-                                    getEffectivePrice(product) > product.price ? "text-green-600" :
-                                    getEffectivePrice(product) < product.price ? "text-red-600" : ""
-                                  )}>
-                                    {getEffectivePrice(product) >= product.price ? "+" : ""}
-                                    {formatCurrency(getEffectivePrice(product) - product.price)}
-                                  </span>
-                                </div>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {product.seasonalPrice ? (
+                        </TableCell>
+                      )}
+                      {isColumnVisible("image") && (
+                        <TableCell>
+                          {product.imageUrl ? (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="w-12 h-12 rounded object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                              <Package className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          )}
+                        </TableCell>
+                      )}
+                      {isColumnVisible("code") && (
+                        <TableCell className="font-mono text-sm">{product.code}</TableCell>
+                      )}
+                      {isColumnVisible("name") && (
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                      )}
+                      {isColumnVisible("type") && (
+                        <TableCell>
+                          <Badge variant="outline" className={typeLabels[product.type]?.color}>
+                            {typeLabels[product.type]?.label || product.type}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("originalPrice") && (
+                        <TableCell className="text-right text-muted-foreground">{formatCurrency(product.price)}</TableCell>
+                      )}
+                      {isColumnVisible("branchPrice") && (
+                        <TableCell className="text-right">
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="font-medium cursor-help text-orange-600">
-                                  {formatCurrency(product.seasonalPrice.adjustedPrice)}
-                                  <sup className="text-[9px] ml-0.5">TV</sup>
+                                <span className={cn(
+                                  "font-medium cursor-help",
+                                  product.customPrice !== null && product.customPrice !== product.price
+                                    ? "text-orange-600"
+                                    : "text-green-600"
+                                )}>
+                                  {formatCurrency(getEffectivePrice(product))}
+                                  {product.customPrice !== null && product.customPrice !== product.price && (
+                                    <sup className="text-[9px] ml-0.5">CN</sup>
+                                  )}
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
                                 <div className="text-xs space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">Giá gốc CN:</span>
-                                    <span className="font-medium">{formatCurrency(product.seasonalPrice.originalPrice)}</span>
+                                    <span className="text-muted-foreground">Giá gốc:</span>
+                                    <span className="font-medium">{formatCurrency(product.price)}</span>
                                   </div>
+                                  {product.customPrice !== null && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Giá CN:</span>
+                                      <span className="font-medium text-orange-600">{formatCurrency(product.customPrice)}</span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">Điều chỉnh:</span>
-                                    <span className="font-medium text-orange-600">
-                                      {product.seasonalPrice.adjustmentType === 'percentage'
-                                        ? `+${product.seasonalPrice.adjustmentValue}%`
-                                        : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
+                                    <span className="text-muted-foreground">Chênh lệch:</span>
+                                    <span className={cn(
+                                      "font-medium",
+                                      getEffectivePrice(product) > product.price ? "text-green-600" :
+                                      getEffectivePrice(product) < product.price ? "text-red-600" : ""
+                                    )}>
+                                      {getEffectivePrice(product) >= product.price ? "+" : ""}
+                                      {formatCurrency(getEffectivePrice(product) - product.price)}
                                     </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">Tăng thêm:</span>
-                                    <span className="font-medium text-green-600">
-                                      +{formatCurrency(product.seasonalPrice.adjustedPrice - product.seasonalPrice.originalPrice)}
-                                    </span>
-                                  </div>
-                                  <div className="text-orange-600 font-medium border-t border-orange-200 pt-1 mt-1">
-                                    {product.seasonalPrice.seasonalPriceName}
                                   </div>
                                 </div>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-muted-foreground cursor-help">
-                                {formatCurrency(calculateVatAmount(getFinalPrice(product), product.vatRate || 10))}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-xs space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">VAT:</span>
-                                  <span className="font-medium">{product.vatRate || 10}%</span>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("seasonalPrice") && (
+                        <TableCell className="text-right">
+                          {product.seasonalPrice ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="font-medium cursor-help text-orange-600">
+                                    {formatCurrency(product.seasonalPrice.adjustedPrice)}
+                                    <sup className="text-[9px] ml-0.5">TV</sup>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Giá gốc CN:</span>
+                                      <span className="font-medium">{formatCurrency(product.seasonalPrice.originalPrice)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Điều chỉnh:</span>
+                                      <span className="font-medium text-orange-600">
+                                        {product.seasonalPrice.adjustmentType === 'percentage'
+                                          ? `+${product.seasonalPrice.adjustmentValue}%`
+                                          : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Tăng thêm:</span>
+                                      <span className="font-medium text-green-600">
+                                        +{formatCurrency(product.seasonalPrice.adjustedPrice - product.seasonalPrice.originalPrice)}
+                                      </span>
+                                    </div>
+                                    <div className="text-orange-600 font-medium border-t border-orange-200 pt-1 mt-1">
+                                      {product.seasonalPrice.seasonalPriceName}
+                                    </div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {isColumnVisible("vat") && (
+                        <TableCell className="text-right">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-muted-foreground cursor-help">
+                                  {formatCurrency(calculateVatAmount(getFinalPrice(product), product.vatRate || 10))}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">VAT:</span>
+                                    <span className="font-medium">{product.vatRate || 10}%</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Giá bán cuối:</span>
+                                    <span className="font-medium">{formatCurrency(getFinalPrice(product))}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Giá trước VAT:</span>
+                                    <span className="font-medium">{formatCurrency(calculatePriceBeforeVat(getFinalPrice(product), product.vatRate || 10))}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Tiền thuế:</span>
+                                    <span className="font-medium">{formatCurrency(calculateVatAmount(getFinalPrice(product), product.vatRate || 10))}</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Giá bán cuối:</span>
-                                  <span className="font-medium">{formatCurrency(getFinalPrice(product))}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Giá trước VAT:</span>
-                                  <span className="font-medium">{formatCurrency(calculatePriceBeforeVat(getFinalPrice(product), product.vatRate || 10))}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Tiền thuế:</span>
-                                  <span className="font-medium">{formatCurrency(calculateVatAmount(getFinalPrice(product), product.vatRate || 10))}</span>
-                                </div>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={product.isActive ? "default" : "secondary"}>
-                          {product.isActive ? "Hoạt động" : "Tạm ngưng"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={product.isAvailable}
-                          disabled={processingIds.has(product.id)}
-                          onCheckedChange={() => handleToggleAvailability(product)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenEditPrice(product)}
-                          className="h-8 w-8"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("status") && (
+                        <TableCell className="text-center">
+                          <Badge variant={product.isActive ? "default" : "secondary"}>
+                            {product.isActive ? "Hoạt động" : "Tạm ngưng"}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("availability") && (
+                        <TableCell className="text-center">
+                          <Switch
+                            checked={product.isAvailable}
+                            disabled={processingIds.has(product.id)}
+                            onCheckedChange={() => handleToggleAvailability(product)}
+                          />
+                        </TableCell>
+                      )}
+                      {isColumnVisible("actions") && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEditPrice(product)}
+                            className="h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
