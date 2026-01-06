@@ -23,7 +23,7 @@ export class SeasonalPricesService {
     return this.seasonalPriceRepository.find({
       where,
       relations: ['seasonalPriceProducts', 'seasonalPriceProducts.product'],
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

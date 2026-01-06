@@ -22,7 +22,7 @@ export class CategoriesService {
     }
     return this.categoryRepository.find({
       where,
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

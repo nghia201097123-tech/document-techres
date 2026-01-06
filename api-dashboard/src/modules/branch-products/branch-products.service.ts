@@ -30,7 +30,6 @@ export class BranchProductsService {
     // Get all products for the brand
     const products = await this.productRepository.find({
       where: { tenantId, brandId: branch.brandId },
-      order: { sortOrder: 'ASC', name: 'ASC' },
     });
 
     // Get branch product assignments
@@ -44,7 +43,7 @@ export class BranchProductsService {
     );
 
     // Combine products with their branch availability
-    return products.map(product => {
+    const combined = products.map(product => {
       const branchProduct = branchProductMap.get(product.id);
       return {
         ...product,
@@ -53,6 +52,20 @@ export class BranchProductsService {
         customPrice: branchProduct?.customPrice || null,
         branchSortOrder: branchProduct?.sortOrder || product.sortOrder,
       };
+    });
+
+    // Sort by isAvailable DESC first, then by sortOrder and name
+    return combined.sort((a, b) => {
+      // Sort by isAvailable DESC (true before false)
+      if (a.isAvailable !== b.isAvailable) {
+        return a.isAvailable ? -1 : 1;
+      }
+      // Then by sortOrder ASC
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      // Then by name ASC
+      return a.name.localeCompare(b.name);
     });
   }
 

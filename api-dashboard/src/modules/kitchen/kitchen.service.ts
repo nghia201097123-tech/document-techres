@@ -22,7 +22,7 @@ export class KitchenService {
     }
     return this.kitchenRepository.find({
       where,
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

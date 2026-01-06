@@ -77,7 +77,7 @@ export class ProductsService {
     }
     return this.productRepository.find({
       where,
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 
@@ -102,7 +102,7 @@ export class ProductsService {
 
     const products = await this.productRepository.find({
       where,
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
 
     // Get current date for checking active seasonal prices
@@ -294,7 +294,7 @@ export class ProductsService {
   async getAllToppingGroups(tenantId: string) {
     const groups = await this.toppingGroupRepository.find({
       where: { tenantId },
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
 
     const result = await Promise.all(
@@ -644,7 +644,7 @@ export class ProductsService {
   async getAllNotes(tenantId: string) {
     return this.productNoteRepository.find({
       where: { tenantId },
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

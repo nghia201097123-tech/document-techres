@@ -30,7 +30,7 @@ export class DepartmentsService {
   async findAll(tenantId: string) {
     return this.departmentRepository.find({
       where: { tenantId },
-      order: { name: 'ASC' },
+      order: { isActive: 'DESC', name: 'ASC' },
     });
   }
 
@@ -38,7 +38,7 @@ export class DepartmentsService {
     // Return all departments (entity doesn't support parent-child yet)
     return this.departmentRepository.find({
       where: { tenantId },
-      order: { name: 'ASC' },
+      order: { isActive: 'DESC', name: 'ASC' },
     });
   }
 

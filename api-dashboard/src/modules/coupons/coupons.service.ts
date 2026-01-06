@@ -18,7 +18,7 @@ export class CouponsService {
     }
     return this.couponRepository.find({
       where,
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

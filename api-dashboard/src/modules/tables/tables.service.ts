@@ -19,7 +19,7 @@ export class TablesService {
     return this.tableRepository.find({
       where,
       relations: ['area'],
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

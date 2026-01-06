@@ -18,7 +18,7 @@ export class UnitsService {
     }
     return this.unitRepository.find({
       where,
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

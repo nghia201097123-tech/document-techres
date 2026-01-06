@@ -21,7 +21,7 @@ export class GiftItemsService {
     return this.giftItemRepository.find({
       where,
       relations: ['product'],
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

@@ -16,7 +16,7 @@ export class AreasService {
   async findAll(tenantId: string, branchId: string) {
     return this.areaRepository.find({
       where: { tenantId, branchId },
-      order: { sortOrder: 'ASC', name: 'ASC' },
+      order: { isActive: 'DESC', sortOrder: 'ASC', name: 'ASC' },
     });
   }
 

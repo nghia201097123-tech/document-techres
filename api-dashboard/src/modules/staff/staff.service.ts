@@ -32,7 +32,7 @@ export class StaffService {
       query.andWhere('staff.branchId = :branchId', { branchId });
     }
 
-    const staffList = await query.orderBy('staff.name', 'ASC').getMany();
+    const staffList = await query.orderBy('staff.isActive', 'DESC').addOrderBy('staff.name', 'ASC').getMany();
 
     // Get province/ward/department names
     const provinceCodes = [...new Set(staffList.map(s => s.provinceCode).filter(Boolean))] as string[];
