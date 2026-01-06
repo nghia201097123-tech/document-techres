@@ -15,7 +15,18 @@ export class BrandsService {
     private readonly companyRepository: Repository<Company>,
   ) {}
 
-  async create(createBrandDto: CreateBrandDto): Promise<Brand> {
+  /**
+   * Transform brand entity to response (map logoUrl to logo)
+   */
+  private transformBrand(brand: Brand): any {
+    const { logoUrl, ...rest } = brand as any;
+    return {
+      ...rest,
+      logo: logoUrl,
+    };
+  }
+
+  async create(createBrandDto: CreateBrandDto): Promise<any> {
     const company = await this.companyRepository.findOne({
       where: { id: createBrandDto.companyId },
     });
@@ -30,12 +41,19 @@ export class BrandsService {
       throw new ConflictException('Mã thương hiệu đã tồn tại');
     }
 
-    // Tự động set tenant_id = company.code
-    const brand = this.brandRepository.create({
-      ...createBrandDto,
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = createBrandDto as any;
+    const brandData: Partial<Brand> = {
+      ...restDto,
       tenantId: company.code,
-    });
-    return this.brandRepository.save(brand);
+    };
+    if (logo !== undefined) {
+      brandData.logoUrl = logo;
+    }
+
+    const brand = this.brandRepository.create(brandData);
+    const saved = await this.brandRepository.save(brand);
+    return this.transformBrand(saved);
   }
 
   async findAll(query: BrandListDto) {
@@ -63,7 +81,7 @@ export class BrandsService {
 
     return {
       data: data.map((brand) => ({
-        ...brand,
+        ...this.transformBrand(brand),
         companyName: brand.company?.name,
       })),
       total,
@@ -73,7 +91,7 @@ export class BrandsService {
     };
   }
 
-  async findOne(id: string): Promise<Brand> {
+  async findOne(id: string): Promise<any> {
     const brand = await this.brandRepository.findOne({
       where: { id },
       relations: ['company', 'branches'],
@@ -83,23 +101,51 @@ export class BrandsService {
       throw new NotFoundException('Không tìm thấy thương hiệu');
     }
 
-    return brand;
+    return this.transformBrand(brand);
   }
 
-  async update(id: string, updateBrandDto: UpdateBrandDto): Promise<Brand> {
-    const brand = await this.findOne(id);
-    Object.assign(brand, updateBrandDto);
-    return this.brandRepository.save(brand);
+  async update(id: string, updateBrandDto: UpdateBrandDto): Promise<any> {
+    const brand = await this.brandRepository.findOne({
+      where: { id },
+    });
+
+    if (!brand) {
+      throw new NotFoundException('Không tìm thấy thương hiệu');
+    }
+
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = updateBrandDto as any;
+    if (logo !== undefined) {
+      brand.logoUrl = logo;
+    }
+    Object.assign(brand, restDto);
+    const saved = await this.brandRepository.save(brand);
+    return this.transformBrand(saved);
   }
 
   async remove(id: string): Promise<void> {
-    const brand = await this.findOne(id);
+    const brand = await this.brandRepository.findOne({
+      where: { id },
+    });
+
+    if (!brand) {
+      throw new NotFoundException('Không tìm thấy thương hiệu');
+    }
+
     await this.brandRepository.remove(brand);
   }
 
-  async toggleStatus(id: string): Promise<Brand> {
-    const brand = await this.findOne(id);
+  async toggleStatus(id: string): Promise<any> {
+    const brand = await this.brandRepository.findOne({
+      where: { id },
+    });
+
+    if (!brand) {
+      throw new NotFoundException('Không tìm thấy thương hiệu');
+    }
+
     brand.isActive = !brand.isActive;
-    return this.brandRepository.save(brand);
+    const saved = await this.brandRepository.save(brand);
+    return this.transformBrand(saved);
   }
 }

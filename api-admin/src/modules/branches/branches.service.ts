@@ -15,7 +15,18 @@ export class BranchesService {
     private readonly brandRepository: Repository<Brand>,
   ) {}
 
-  async create(createBranchDto: CreateBranchDto): Promise<Branch> {
+  /**
+   * Transform branch entity to response (map logoUrl to logo)
+   */
+  private transformBranch(branch: Branch): any {
+    const { logoUrl, ...rest } = branch as any;
+    return {
+      ...rest,
+      logo: logoUrl,
+    };
+  }
+
+  async create(createBranchDto: CreateBranchDto): Promise<any> {
     const brand = await this.brandRepository.findOne({
       where: { id: createBranchDto.brandId },
     });
@@ -30,12 +41,19 @@ export class BranchesService {
       throw new ConflictException('Mã chi nhánh đã tồn tại');
     }
 
-    // Tự động set tenant_id từ brand
-    const branch = this.branchRepository.create({
-      ...createBranchDto,
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = createBranchDto as any;
+    const branchData: Partial<Branch> = {
+      ...restDto,
       tenantId: brand.tenantId,
-    });
-    return this.branchRepository.save(branch);
+    };
+    if (logo !== undefined) {
+      branchData.logoUrl = logo;
+    }
+
+    const branch = this.branchRepository.create(branchData);
+    const saved = await this.branchRepository.save(branch);
+    return this.transformBranch(saved);
   }
 
   async findAll(query: BranchListDto) {
@@ -69,7 +87,7 @@ export class BranchesService {
 
     return {
       data: data.map((branch) => ({
-        ...branch,
+        ...this.transformBranch(branch),
         brandName: branch.brand?.name,
         companyName: branch.brand?.company?.name,
         packageName: branch.package?.name,
@@ -81,7 +99,7 @@ export class BranchesService {
     };
   }
 
-  async findOne(id: string): Promise<Branch> {
+  async findOne(id: string): Promise<any> {
     const branch = await this.branchRepository.findOne({
       where: { id },
       relations: ['brand', 'brand.company', 'package'],
@@ -91,23 +109,51 @@ export class BranchesService {
       throw new NotFoundException('Không tìm thấy chi nhánh');
     }
 
-    return branch;
+    return this.transformBranch(branch);
   }
 
-  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<Branch> {
-    const branch = await this.findOne(id);
-    Object.assign(branch, updateBranchDto);
-    return this.branchRepository.save(branch);
+  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<any> {
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Không tìm thấy chi nhánh');
+    }
+
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = updateBranchDto as any;
+    if (logo !== undefined) {
+      branch.logoUrl = logo;
+    }
+    Object.assign(branch, restDto);
+    const saved = await this.branchRepository.save(branch);
+    return this.transformBranch(saved);
   }
 
   async remove(id: string): Promise<void> {
-    const branch = await this.findOne(id);
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Không tìm thấy chi nhánh');
+    }
+
     await this.branchRepository.remove(branch);
   }
 
-  async toggleStatus(id: string): Promise<Branch> {
-    const branch = await this.findOne(id);
+  async toggleStatus(id: string): Promise<any> {
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Không tìm thấy chi nhánh');
+    }
+
     branch.isActive = !branch.isActive;
-    return this.branchRepository.save(branch);
+    const saved = await this.branchRepository.save(branch);
+    return this.transformBranch(saved);
   }
 }

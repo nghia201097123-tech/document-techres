@@ -27,7 +27,7 @@ export class CompaniesService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
+  async create(createCompanyDto: CreateCompanyDto): Promise<any> {
     const existing = await this.companyRepository.findOne({
       where: { code: createCompanyDto.code },
     });
@@ -36,8 +36,16 @@ export class CompaniesService {
       throw new ConflictException('Mã công ty đã tồn tại');
     }
 
-    const company = this.companyRepository.create(createCompanyDto);
-    return this.companyRepository.save(company);
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = createCompanyDto as any;
+    const companyData: Partial<Company> = { ...restDto };
+    if (logo !== undefined) {
+      companyData.logoUrl = logo;
+    }
+
+    const company = this.companyRepository.create(companyData);
+    const saved = await this.companyRepository.save(company);
+    return this.transformCompany(saved);
   }
 
   /**
@@ -394,14 +402,29 @@ export class CompaniesService {
   }
 
   async remove(id: string): Promise<void> {
-    const company = await this.findOne(id);
+    const company = await this.companyRepository.findOne({
+      where: { id },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Không tìm thấy công ty');
+    }
+
     await this.companyRepository.remove(company);
   }
 
-  async toggleStatus(id: string): Promise<Company> {
-    const company = await this.findOne(id);
+  async toggleStatus(id: string): Promise<any> {
+    const company = await this.companyRepository.findOne({
+      where: { id },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Không tìm thấy công ty');
+    }
+
     company.isActive = !company.isActive;
-    return this.companyRepository.save(company);
+    const saved = await this.companyRepository.save(company);
+    return this.transformCompany(saved);
   }
 
   /**
