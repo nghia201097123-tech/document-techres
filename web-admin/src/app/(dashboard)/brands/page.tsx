@@ -13,6 +13,8 @@ import {
   Power,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,11 +92,13 @@ export default function BrandsPage() {
   const [filterCompany, setFilterCompany] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = React.useState(false);
   const [selectedBrand, setSelectedBrand] = React.useState<Brand | null>(null);
   const [formData, setFormData] = React.useState<BrandFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isDuplicating, setIsDuplicating] = React.useState(false);
   const { toast } = useToast();
 
   // Pagination state
@@ -246,6 +250,65 @@ export default function BrandsPage() {
     }));
   };
 
+  // Quick create handler
+  const handleQuickCreate = () => {
+    setFormData(initialFormData);
+    setSelectedBrand(null);
+    setIsQuickCreateOpen(true);
+  };
+
+  const handleQuickCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await brandService.create(formData);
+      toast({
+        title: "Thành công",
+        description: "Tạo thương hiệu mới thành công",
+      });
+      setIsQuickCreateOpen(false);
+      fetchBrands();
+    } catch (error: any) {
+      console.error("Error creating brand:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tạo thương hiệu",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Duplicate handler
+  const handleDuplicate = async (brand: Brand) => {
+    setIsDuplicating(true);
+    try {
+      const duplicateData = {
+        companyId: brand.companyId,
+        name: `${brand.name} (Bản sao)`,
+        code: `${brand.code}_COPY`,
+        businessModel: brand.businessModel,
+        description: brand.description || "",
+      };
+      await brandService.create(duplicateData);
+      toast({
+        title: "Thành công",
+        description: `Đã nhân bản thương hiệu "${brand.name}"`,
+      });
+      fetchBrands();
+    } catch (error: any) {
+      console.error("Error duplicating brand:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể nhân bản thương hiệu",
+      });
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -257,10 +320,16 @@ export default function BrandsPage() {
             Quản lý danh sách thương hiệu theo công ty
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm thương hiệu
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleQuickCreate}>
+            <Zap className="mr-2 h-4 w-4" />
+            Tạo nhanh
+          </Button>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm thương hiệu
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -363,6 +432,10 @@ export default function BrandsPage() {
                         <DropdownMenuItem onClick={() => handleOpenEdit(brand)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(brand)} disabled={isDuplicating}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          Nhân bản
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleToggleStatus(brand)}>
                           <Power className="mr-2 h-4 w-4" />
@@ -584,6 +657,95 @@ export default function BrandsPage() {
         onOpenChange={setIsWizardOpen}
         onSuccess={handleWizardSuccess}
       />
+
+      {/* Quick Create Dialog */}
+      <Dialog open={isQuickCreateOpen} onOpenChange={setIsQuickCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tạo nhanh thương hiệu</DialogTitle>
+            <DialogDescription>
+              Tạo thương hiệu mới với thông tin cơ bản
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleQuickCreateSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="quick-companyId">Công ty *</Label>
+                <Select
+                  value={formData.companyId}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, companyId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn công ty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-name">Tên thương hiệu *</Label>
+                <Input
+                  id="quick-name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="VD: Coffee House"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-code">Mã thương hiệu *</Label>
+                <Input
+                  id="quick-code"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  placeholder="VD: CFH"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-businessModel">Mô hình kinh doanh *</Label>
+                <Select
+                  value={formData.businessModel}
+                  onValueChange={(value: BusinessModel) =>
+                    setFormData((prev) => ({ ...prev, businessModel: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn mô hình" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="order_only">Chỉ Order</SelectItem>
+                    <SelectItem value="ccb_only">Chỉ Thu Ngân</SelectItem>
+                    <SelectItem value="full_system">Full Hệ Thống</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsQuickCreateOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={isSubmitting || !formData.companyId || !formData.name || !formData.code}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Tạo thương hiệu
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

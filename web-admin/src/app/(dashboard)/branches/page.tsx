@@ -15,6 +15,8 @@ import {
   Power,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,11 +90,13 @@ export default function BranchesPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterBrand, setFilterBrand] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = React.useState(false);
   const [selectedBranch, setSelectedBranch] = React.useState<Branch | null>(null);
   const [formData, setFormData] = React.useState<BranchFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isDuplicating, setIsDuplicating] = React.useState(false);
   const { toast } = useToast();
 
   // Pagination state
@@ -253,6 +257,70 @@ export default function BranchesPage() {
     }));
   };
 
+  // Quick create handler
+  const handleQuickCreate = () => {
+    setFormData(initialFormData);
+    setSelectedBranch(null);
+    setIsQuickCreateOpen(true);
+  };
+
+  const handleQuickCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await branchService.create(formData);
+      toast({
+        title: "Thành công",
+        description: "Tạo chi nhánh mới thành công",
+      });
+      setIsQuickCreateOpen(false);
+      fetchBranches();
+    } catch (error: any) {
+      console.error("Error creating branch:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tạo chi nhánh",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Duplicate handler
+  const handleDuplicate = async (branch: Branch) => {
+    setIsDuplicating(true);
+    try {
+      const duplicateData = {
+        brandId: branch.brandId,
+        name: `${branch.name} (Bản sao)`,
+        code: `${branch.code}_COPY`,
+        address: branch.address || "",
+        phone: branch.phone || "",
+        email: branch.email || "",
+        manager: branch.manager || "",
+        openTime: branch.openTime || "08:00",
+        closeTime: branch.closeTime || "22:00",
+        packageId: branch.packageId || "",
+      };
+      await branchService.create(duplicateData);
+      toast({
+        title: "Thành công",
+        description: `Đã nhân bản chi nhánh "${branch.name}"`,
+      });
+      fetchBranches();
+    } catch (error: any) {
+      console.error("Error duplicating branch:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể nhân bản chi nhánh",
+      });
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -262,10 +330,16 @@ export default function BranchesPage() {
             Quản lý danh sách chi nhánh theo thương hiệu
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm chi nhánh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleQuickCreate}>
+            <Zap className="mr-2 h-4 w-4" />
+            Tạo nhanh
+          </Button>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm chi nhánh
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -384,6 +458,10 @@ export default function BranchesPage() {
                         <DropdownMenuItem onClick={() => handleOpenEdit(branch)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(branch)} disabled={isDuplicating}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          Nhân bản
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleToggleStatus(branch)}>
                           <Power className="mr-2 h-4 w-4" />
@@ -637,6 +715,86 @@ export default function BranchesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Quick Create Dialog */}
+      <Dialog open={isQuickCreateOpen} onOpenChange={setIsQuickCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tạo nhanh chi nhánh</DialogTitle>
+            <DialogDescription>
+              Tạo chi nhánh mới với thông tin cơ bản
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleQuickCreateSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="quick-brandId">Thương hiệu *</Label>
+                <Select
+                  value={formData.brandId}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, brandId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn thương hiệu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-name">Tên chi nhánh *</Label>
+                <Input
+                  id="quick-name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="VD: Chi nhánh Quận 1"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-code">Mã chi nhánh *</Label>
+                <Input
+                  id="quick-code"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  placeholder="VD: CN-Q1"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-address">Địa chỉ</Label>
+                <Input
+                  id="quick-address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="VD: 123 Nguyễn Huệ, Q.1, TP.HCM"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsQuickCreateOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={isSubmitting || !formData.brandId || !formData.name || !formData.code}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Tạo chi nhánh
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
