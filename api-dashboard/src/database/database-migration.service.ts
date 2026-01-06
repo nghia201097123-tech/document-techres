@@ -727,7 +727,37 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Coupons table created successfully');
       }
 
-      // 31. Create uploaded_file_type enum and uploaded_files table
+      // 31. Create branch_products table
+      const branchProductsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'branch_products'
+        );
+      `);
+
+      if (!branchProductsExists[0].exists) {
+        this.logger.log('Creating branch_products table...');
+        await queryRunner.query(`
+          CREATE TABLE branch_products (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            is_available BOOLEAN DEFAULT TRUE,
+            custom_price DECIMAL(15,2),
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(branch_id, product_id)
+          );
+          CREATE INDEX idx_branch_products_tenant ON branch_products(tenant_id);
+          CREATE INDEX idx_branch_products_tenant_branch ON branch_products(tenant_id, branch_id);
+          CREATE INDEX idx_branch_products_tenant_product ON branch_products(tenant_id, product_id);
+        `);
+        this.logger.log('Branch products table created successfully');
+      }
+
+      // 32. Create uploaded_file_type enum and uploaded_files table
       this.logger.log('Creating uploaded_file_type enum...');
       await queryRunner.query(`
         DO $$ BEGIN
