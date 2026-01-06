@@ -99,8 +99,8 @@ const parseNumberInput = (value: string): number | null => {
 };
 
 // Format VAT rate (remove unnecessary decimals)
-const formatVatRate = (rate: number | undefined): string => {
-  const vatRate = rate || 10;
+const formatVatRate = (rate: number | string | undefined): string => {
+  const vatRate = Number(rate) || 10;
   return Number.isInteger(vatRate) ? String(vatRate) : vatRate.toFixed(1);
 };
 
