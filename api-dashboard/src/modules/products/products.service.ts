@@ -1160,6 +1160,9 @@ export class ProductsService {
           const saved = await this.productRepository.save(newProduct);
           result.created++;
           result.products.push(saved as Product);
+
+          // Sync new product to all branches of the brand
+          await this.syncProductToAllBranches(tenantId, brandId, saved.id);
         }
       } catch (error) {
         result.errors.push({
