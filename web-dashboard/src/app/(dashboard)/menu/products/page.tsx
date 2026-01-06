@@ -65,6 +65,7 @@ import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Default column configuration for products table
 const defaultProductColumns: ColumnConfig[] = [
@@ -2174,19 +2175,26 @@ export default function ProductsPage() {
                     {isColumnVisible("price") && (
                       <TableCell className="text-right">
                         {product.seasonalPrice ? (
-                          <div
-                            className="flex items-center justify-end gap-1.5 cursor-help"
-                            title={`Giá gốc: ${formatCurrency(product.price)} | ${product.seasonalPrice.seasonalPriceName}`}
-                          >
-                            <span className="font-medium text-orange-600">
-                              {formatCurrency(product.seasonalPrice.adjustedPrice)}
-                            </span>
-                            <span className="text-[10px] text-orange-500">
-                              {product.seasonalPrice.adjustmentType === 'percentage'
-                                ? `+${product.seasonalPrice.adjustmentValue}%`
-                                : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
-                            </span>
-                          </div>
+                          <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center justify-end gap-1.5 cursor-help">
+                                  <span className="font-medium text-orange-600">
+                                    {formatCurrency(product.seasonalPrice.adjustedPrice)}
+                                  </span>
+                                  <span className="text-[10px] text-orange-500">
+                                    {product.seasonalPrice.adjustmentType === 'percentage'
+                                      ? `+${product.seasonalPrice.adjustmentValue}%`
+                                      : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Giá gốc: {formatCurrency(product.price)}</p>
+                                <p className="text-muted-foreground">{product.seasonalPrice.seasonalPriceName}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
                           formatCurrency(product.price)
                         )}
