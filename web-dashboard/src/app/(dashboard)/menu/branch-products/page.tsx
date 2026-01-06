@@ -393,6 +393,7 @@ export default function BranchProductsPage() {
               <p className="text-muted-foreground">Không tìm thấy món ăn nào</p>
             </div>
           ) : (
+            <>
             <div className="flex-1 overflow-auto min-h-0">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
@@ -520,6 +521,7 @@ export default function BranchProductsPage() {
                 </Button>
               </div>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
