@@ -15,6 +15,8 @@ import {
   Unit,
   SeasonalPrice,
   SeasonalPriceProduct,
+  BranchProduct,
+  Branch,
 } from '../../database/entities';
 import { AdjustmentType } from '../../database/entities/seasonal-price.entity';
 import {
@@ -59,6 +61,10 @@ export class ProductsService {
     private readonly seasonalPriceRepository: Repository<SeasonalPrice>,
     @InjectRepository(SeasonalPriceProduct)
     private readonly seasonalPriceProductRepository: Repository<SeasonalPriceProduct>,
+    @InjectRepository(BranchProduct)
+    private readonly branchProductRepository: Repository<BranchProduct>,
+    @InjectRepository(Branch)
+    private readonly branchRepository: Repository<Branch>,
   ) {}
 
   async findAll(tenantId: string, brandId?: string, type?: ProductType) {
@@ -208,7 +214,40 @@ export class ProductsService {
       code,
       isActive: true,
     });
-    return this.productRepository.save(product);
+    const savedProduct = await this.productRepository.save(product);
+
+    // Auto-create BranchProduct entries for all branches of this brand
+    await this.syncProductToAllBranches(tenantId, brandId, savedProduct.id);
+
+    return savedProduct;
+  }
+
+  /**
+   * Sync a product to all branches of the brand
+   */
+  private async syncProductToAllBranches(tenantId: string, brandId: string, productId: string) {
+    const branches = await this.branchRepository.find({
+      where: { tenantId, brandId },
+    });
+
+    if (branches.length === 0) return;
+
+    const branchProducts = branches.map(branch =>
+      this.branchProductRepository.create({
+        tenantId,
+        branchId: branch.id,
+        productId,
+        isAvailable: true,
+      })
+    );
+
+    await this.branchProductRepository
+      .createQueryBuilder()
+      .insert()
+      .into(BranchProduct)
+      .values(branchProducts)
+      .orIgnore()
+      .execute();
   }
 
   async update(tenantId: string, id: string, updateDto: UpdateProductDto) {

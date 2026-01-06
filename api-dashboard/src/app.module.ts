@@ -19,6 +19,7 @@ import { SeasonalPricesModule } from './modules/seasonal-prices/seasonal-prices.
 import { GiftItemsModule } from './modules/gift-items/gift-items.module';
 import { VouchersModule } from './modules/vouchers/vouchers.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
+import { BranchProductsModule } from './modules/branch-products/branch-products.module';
 import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
@@ -55,6 +56,7 @@ import {
   GiftItem,
   Voucher,
   Coupon,
+  BranchProduct,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -107,6 +109,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           GiftItem,
           Voucher,
           Coupon,
+          BranchProduct,
         ],
         synchronize: false,
       }),
@@ -131,6 +134,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     GiftItemsModule,
     VouchersModule,
     CouponsModule,
+    BranchProductsModule,
   ],
   providers: [DatabaseMigrationService],
 })

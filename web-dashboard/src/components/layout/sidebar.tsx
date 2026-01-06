@@ -55,6 +55,7 @@ const menuItems: MenuItem[] = [
     icon: UtensilsCrossed,
     children: [
       { title: "Món ăn", href: "/menu/products", icon: UtensilsCrossed },
+      { title: "Món theo CN", href: "/menu/branch-products", icon: Store },
       { title: "Danh mục", href: "/menu/categories", icon: FolderOpen },
       { title: "Đơn vị tính", href: "/menu/units", icon: Scale },
       { title: "Topping Options", href: "/menu/topping-options", icon: Cherry },

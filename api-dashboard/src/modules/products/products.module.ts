@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Product,
@@ -12,6 +12,8 @@ import {
   Unit,
   SeasonalPrice,
   SeasonalPriceProduct,
+  BranchProduct,
+  Branch,
 } from '../../database/entities';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
@@ -30,6 +32,8 @@ import { ProductsController } from './products.controller';
       Unit,
       SeasonalPrice,
       SeasonalPriceProduct,
+      BranchProduct,
+      Branch,
     ]),
   ],
   controllers: [ProductsController],
