@@ -1135,7 +1135,7 @@ export default function StaffPage() {
           gender,
           idNumber: item.idNumber,
           address: item.address,
-          isActive,
+          // Note: isActive is not sent during import - all new staff are created as active
         };
 
         // Lookup province code from name
@@ -2218,118 +2218,6 @@ export default function StaffPage() {
                 </div>
               )}
             </div>
-
-            {/* Settings for new staff - only show if some new staff are missing required fields */}
-            {importData.some((d) => !d.id && (!d.brandId || !d.branchId || !d.departmentId)) && (
-              <div className="rounded-lg bg-blue-50 p-4 border border-blue-200 space-y-4">
-                <p className="text-sm font-medium text-blue-800">Cài đặt cho nhân viên mới:</p>
-
-                {/* Brand and Branch */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-sm">Thương hiệu *</Label>
-                    <Select
-                      value={importSettings.brandId}
-                      onValueChange={handleImportBrandChange}
-                      disabled={loadingBrands}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Chọn thương hiệu" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brands.map((brand) => (
-                          <SelectItem key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-sm">Chi nhánh *</Label>
-                    <Select
-                      value={importSettings.branchId}
-                      onValueChange={(value) => setImportSettings({ ...importSettings, branchId: value })}
-                      disabled={!importSettings.brandId || loadingBranches || importBranches.length === 0}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Chọn chi nhánh" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {importBranches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Department */}
-                <div className="grid gap-2">
-                  <Label className="text-sm">Bộ phận *</Label>
-                  <Select
-                    value={importSettings.departmentId}
-                    onValueChange={(value) => setImportSettings({ ...importSettings, departmentId: value })}
-                    disabled={loadingDepartments}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Chọn bộ phận" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Province and Ward */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-sm">Tỉnh/Thành phố</Label>
-                    <Select
-                      value={importSettings.provinceCode}
-                      onValueChange={handleImportProvinceChange}
-                      disabled={loadingProvinces}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Chọn tỉnh/thành phố" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {provinces.map((province) => (
-                          <SelectItem key={province.code} value={province.code}>
-                            {province.fullName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-sm">Phường/Xã</Label>
-                    <Select
-                      value={importSettings.wardCode}
-                      onValueChange={(value) => setImportSettings({ ...importSettings, wardCode: value })}
-                      disabled={!importSettings.provinceCode || loadingWards || importWards.length === 0}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Chọn phường/xã" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {importWards.map((ward) => (
-                          <SelectItem key={ward.code} value={ward.code}>
-                            {ward.fullName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Errors */}
             {importErrors.length > 0 && (
