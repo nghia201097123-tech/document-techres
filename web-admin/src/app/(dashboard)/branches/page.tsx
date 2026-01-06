@@ -67,6 +67,7 @@ interface BranchFormData {
   name: string;
   code: string;
   logo: string;
+  avatar: string;
   address: string;
   phone: string;
   email: string;
@@ -81,6 +82,7 @@ const initialFormData: BranchFormData = {
   name: "",
   code: "",
   logo: "",
+  avatar: "",
   address: "",
   phone: "",
   email: "",
@@ -240,6 +242,7 @@ export default function BranchesPage() {
       name: branch.name,
       code: branch.code,
       logo: branch.logo || "",
+      avatar: branch.avatar || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -259,6 +262,7 @@ export default function BranchesPage() {
       name: branch.name,
       code: branch.code,
       logo: branch.logo || "",
+      avatar: branch.avatar || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -739,12 +743,20 @@ export default function BranchesPage() {
                   />
                 </div>
               </div>
-              <ImagePicker
-                value={formData.logo}
-                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
-                disabled={isViewMode}
-                label="Logo"
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <ImagePicker
+                  value={formData.logo}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                  disabled={isViewMode}
+                  label="Logo"
+                />
+                <ImagePicker
+                  value={formData.avatar}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, avatar: value }))}
+                  disabled={isViewMode}
+                  label="Avatar"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Địa chỉ</Label>
                 <Input
