@@ -101,16 +101,48 @@ export class StaffService {
     });
 
     const saved = await this.staffRepository.save(staff);
+    const enriched = await this.enrichStaffData(saved);
     return {
-      ...saved,
+      ...enriched,
       temporaryPassword: tempPassword,
     };
   }
 
   async update(tenantId: string, id: string, updateDto: UpdateStaffDto) {
     const staff = await this.findOne(tenantId, id);
-    Object.assign(staff, updateDto);
-    return this.staffRepository.save(staff);
+    // Only update fields that are explicitly provided (not undefined)
+    // This prevents clearing fields when they're not in the request
+    Object.keys(updateDto).forEach((key) => {
+      const value = (updateDto as any)[key];
+      if (value !== undefined) {
+        (staff as any)[key] = value;
+      }
+    });
+    const saved = await this.staffRepository.save(staff);
+
+    // Return with enriched data (names for province, ward, department)
+    return this.enrichStaffData(saved);
+  }
+
+  private async enrichStaffData(staff: Staff) {
+    const [province, ward, department] = await Promise.all([
+      staff.provinceCode
+        ? this.provinceRepository.findOne({ where: { code: staff.provinceCode } })
+        : null,
+      staff.wardCode
+        ? this.wardRepository.findOne({ where: { code: staff.wardCode } })
+        : null,
+      staff.departmentId
+        ? this.departmentRepository.findOne({ where: { id: staff.departmentId } })
+        : null,
+    ]);
+
+    return {
+      ...staff,
+      provinceName: province?.fullName || null,
+      wardName: ward?.fullName || null,
+      departmentName: department?.name || null,
+    };
   }
 
   async toggleActive(tenantId: string, id: string) {

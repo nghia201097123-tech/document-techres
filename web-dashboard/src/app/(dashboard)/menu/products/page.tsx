@@ -3073,16 +3073,25 @@ export default function ProductsPage() {
                             return note ? (
                               <Badge key={noteId} variant="secondary" className="mr-1">
                                 {note.name}
-                                <button
-                                  type="button"
-                                  className="ml-1 hover:text-destructive"
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  className="ml-1 hover:text-destructive cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    e.preventDefault();
                                     handleToggleNote(noteId);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      handleToggleNote(noteId);
+                                    }
                                   }}
                                 >
                                   <X className="h-3 w-3" />
-                                </button>
+                                </span>
                               </Badge>
                             ) : null;
                           })
