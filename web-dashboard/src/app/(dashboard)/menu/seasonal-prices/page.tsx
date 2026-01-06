@@ -112,6 +112,7 @@ export default function SeasonalPricesPage() {
 
   // Form data
   const [formData, setFormData] = React.useState<CreateSeasonalPriceDto>({
+    branchId: "",
     name: "",
     description: "",
     adjustmentType: AdjustmentType.PERCENTAGE,
@@ -202,6 +203,7 @@ export default function SeasonalPricesPage() {
     setSearchQuery("");
     const today = new Date().toISOString().split('T')[0];
     setFormData({
+      branchId: filterBranchId,
       name: "",
       description: "",
       adjustmentType: AdjustmentType.PERCENTAGE,
@@ -224,6 +226,7 @@ export default function SeasonalPricesPage() {
     );
     setSelectedProductIds(existingProductIds);
     setFormData({
+      branchId: price.branchId || filterBranchId,
       name: price.name,
       description: price.description || "",
       adjustmentType: price.adjustmentType,
@@ -246,6 +249,7 @@ export default function SeasonalPricesPage() {
     setSelectedProductIds(new Set());
     setSearchQuery("");
     setFormData({
+      branchId: "",
       name: "",
       description: "",
       adjustmentType: AdjustmentType.PERCENTAGE,
@@ -302,7 +306,6 @@ export default function SeasonalPricesPage() {
 
       if (dialogMode === "create") {
         const submitData: CreateSeasonalPriceDto = {
-          branchId: filterBranchId,
           ...formData,
           productIds,
         };

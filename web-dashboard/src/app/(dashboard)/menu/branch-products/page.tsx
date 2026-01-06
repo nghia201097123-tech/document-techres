@@ -78,6 +78,32 @@ const formatCurrency = (amount: number) => {
   }).format(Math.round(amount)) + " đ";
 };
 
+// Format number for input display (with thousand separators, no decimals)
+const formatNumberInput = (value: string | number): string => {
+  if (value === "" || value === null || value === undefined) return "";
+  const num = typeof value === "string" ? parseFloat(value.replace(/\./g, "").replace(/,/g, "")) : value;
+  if (isNaN(num)) return "";
+  return new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(Math.round(num));
+};
+
+// Parse formatted number input back to number
+const parseNumberInput = (value: string): number | null => {
+  if (!value || value.trim() === "") return null;
+  // Remove thousand separators (dots in Vietnamese format)
+  const cleaned = value.replace(/\./g, "").replace(/,/g, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+};
+
+// Format VAT rate (remove unnecessary decimals)
+const formatVatRate = (rate: number | undefined): string => {
+  const vatRate = rate || 10;
+  return Number.isInteger(vatRate) ? String(vatRate) : vatRate.toFixed(1);
+};
+
 // Calculate price before VAT
 const calculatePriceBeforeVat = (price: number, vatRate: number) => {
   return Math.round(price / (1 + vatRate / 100));
@@ -231,7 +257,7 @@ export default function BranchProductsPage() {
     setEditingProduct(product);
     // Set initial price: customPrice if exists, otherwise original price
     const currentPrice = product.customPrice !== null ? product.customPrice : product.price;
-    setEditPrice(String(currentPrice));
+    setEditPrice(formatNumberInput(currentPrice));
   };
 
   // Close edit price dialog
@@ -244,10 +270,10 @@ export default function BranchProductsPage() {
   const handleSaveCustomPrice = async () => {
     if (!editingProduct) return;
 
-    const newPrice = editPrice.trim() === "" ? null : Number(editPrice);
+    const newPrice = parseNumberInput(editPrice);
 
     // Validate price
-    if (newPrice !== null && (isNaN(newPrice) || newPrice < 0)) {
+    if (newPrice !== null && newPrice < 0) {
       toast({
         title: "Lỗi",
         description: "Giá không hợp lệ",
@@ -1082,7 +1108,7 @@ export default function BranchProductsPage() {
                   <p className="font-medium text-lg">{formatCurrency(editingProduct.price)}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">VAT ({editingProduct.vatRate || 10}%)</Label>
+                  <Label className="text-muted-foreground">VAT ({formatVatRate(editingProduct.vatRate)}%)</Label>
                   <p className="font-medium">{formatCurrency(calculateVatAmount(editingProduct.price, editingProduct.vatRate || 10))}</p>
                 </div>
               </div>
@@ -1090,46 +1116,58 @@ export default function BranchProductsPage() {
               {/* Custom price input */}
               <div className="grid gap-2">
                 <Label htmlFor="customPrice">Giá bán tại chi nhánh (đã VAT)</Label>
-                <Input
-                  id="customPrice"
-                  type="number"
-                  placeholder="Để trống để dùng giá gốc"
-                  value={editPrice}
-                  onChange={(e) => setEditPrice(e.target.value)}
-                  min={0}
-                />
+                <div className="relative">
+                  <Input
+                    id="customPrice"
+                    type="text"
+                    placeholder="Để trống để dùng giá gốc"
+                    value={editPrice}
+                    onChange={(e) => {
+                      const rawValue = e.target.value;
+                      // Allow only digits and dots for formatting
+                      const cleaned = rawValue.replace(/[^\d]/g, "");
+                      if (cleaned === "") {
+                        setEditPrice("");
+                      } else {
+                        setEditPrice(formatNumberInput(cleaned));
+                      }
+                    }}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">đ</span>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Nhập giá bán mới cho chi nhánh này. Để trống nếu muốn sử dụng giá gốc từ thương hiệu.
                 </p>
               </div>
 
               {/* Preview new VAT calculation */}
-              {editPrice && Number(editPrice) > 0 && (
+              {editPrice && parseNumberInput(editPrice) !== null && parseNumberInput(editPrice)! > 0 && (
                 <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
                   <p className="text-sm font-medium text-orange-800 mb-2">Xem trước:</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Giá bán CN:</span>
-                      <span className="ml-2 font-medium text-orange-600">{formatCurrency(Number(editPrice))}</span>
+                      <span className="ml-2 font-medium text-orange-600">{formatCurrency(parseNumberInput(editPrice)!)}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Chênh lệch:</span>
                       <span className={cn(
                         "ml-2 font-medium",
-                        Number(editPrice) > editingProduct.price ? "text-green-600" :
-                        Number(editPrice) < editingProduct.price ? "text-red-600" : ""
+                        parseNumberInput(editPrice)! > editingProduct.price ? "text-green-600" :
+                        parseNumberInput(editPrice)! < editingProduct.price ? "text-red-600" : ""
                       )}>
-                        {Number(editPrice) >= editingProduct.price ? "+" : ""}
-                        {formatCurrency(Number(editPrice) - editingProduct.price)}
+                        {parseNumberInput(editPrice)! >= editingProduct.price ? "+" : ""}
+                        {formatCurrency(parseNumberInput(editPrice)! - editingProduct.price)}
                       </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Giá trước VAT:</span>
-                      <span className="ml-2 font-medium">{formatCurrency(calculatePriceBeforeVat(Number(editPrice), editingProduct.vatRate || 10))}</span>
+                      <span className="ml-2 font-medium">{formatCurrency(calculatePriceBeforeVat(parseNumberInput(editPrice)!, editingProduct.vatRate || 10))}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Tiền thuế VAT:</span>
-                      <span className="ml-2 font-medium">{formatCurrency(calculateVatAmount(Number(editPrice), editingProduct.vatRate || 10))}</span>
+                      <span className="ml-2 font-medium">{formatCurrency(calculateVatAmount(parseNumberInput(editPrice)!, editingProduct.vatRate || 10))}</span>
                     </div>
                   </div>
                 </div>

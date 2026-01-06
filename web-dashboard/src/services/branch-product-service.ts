@@ -1,16 +1,5 @@
 import api from "./api";
-import { Product } from "./product-service";
-
-export interface SeasonalPriceInfo {
-  seasonalPriceId: string;
-  seasonalPriceName: string;
-  adjustmentType: 'percentage' | 'fixed';
-  adjustmentValue: number;
-  startDate: string;
-  endDate: string;
-  originalPrice: number;
-  adjustedPrice: number;
-}
+import { Product, SeasonalPriceInfo } from "./product-service";
 
 export interface BranchProduct extends Product {
   branchProductId: string | null;
