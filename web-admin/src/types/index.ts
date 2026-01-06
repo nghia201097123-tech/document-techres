@@ -5,6 +5,7 @@ export interface Company {
   id: string;
   name: string;
   code: string;
+  logo?: string;
   taxCode?: string;
   address?: string;
   phone?: string;
@@ -18,6 +19,7 @@ export interface Company {
 export interface CreateCompanyDto {
   name: string;
   code: string;
+  logo?: string;
   taxCode?: string;
   address?: string;
   phone?: string;
@@ -64,6 +66,7 @@ export interface Branch {
   companyName?: string;
   name: string;
   code: string;
+  logo?: string;
   address?: string;
   phone?: string;
   email?: string;

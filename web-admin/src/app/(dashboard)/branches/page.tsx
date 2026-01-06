@@ -17,6 +17,9 @@ import {
   ChevronRight,
   Copy,
   Zap,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +65,7 @@ interface BranchFormData {
   brandId: string;
   name: string;
   code: string;
+  logo: string;
   address: string;
   phone: string;
   email: string;
@@ -75,6 +79,7 @@ const initialFormData: BranchFormData = {
   brandId: "",
   name: "",
   code: "",
+  logo: "",
   address: "",
   phone: "",
   email: "",
@@ -83,6 +88,10 @@ const initialFormData: BranchFormData = {
   closeTime: "22:00",
   packageId: "",
 };
+
+// Sorting types
+type SortDirection = "asc" | "desc" | null;
+type SortableColumn = "name" | "code" | "brandName" | "phone" | "isActive" | "createdAt";
 
 export default function BranchesPage() {
   const [branches, setBranches] = React.useState<Branch[]>([]);
@@ -103,6 +112,10 @@ export default function BranchesPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
   const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = React.useState<SortableColumn | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>(null);
 
   // Fetch branches from API
   const fetchBranches = React.useCallback(async () => {
@@ -150,13 +163,67 @@ export default function BranchesPage() {
     setCurrentPage(1);
   }, [searchQuery, filterBrand]);
 
+  // Sorting logic
+  const sortedBranches = React.useMemo(() => {
+    if (!sortColumn || !sortDirection) return branches;
+
+    return [...branches].sort((a, b) => {
+      let aValue: any = a[sortColumn];
+      let bValue: any = b[sortColumn];
+
+      if (aValue == null) aValue = "";
+      if (bValue == null) bValue = "";
+
+      if (typeof aValue === "boolean") {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      }
+
+      if (sortColumn === "createdAt") {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [branches, sortColumn, sortDirection]);
+
+  // Handle column sort
+  const handleSort = (column: SortableColumn) => {
+    if (sortColumn === column) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  // Render sort icon
+  const renderSortIcon = (column: SortableColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortDirection === "asc") {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
   // Pagination calculations
-  const totalPages = Math.ceil(branches.length / pageSize);
+  const totalPages = Math.ceil(sortedBranches.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, branches.length);
+  const endIndex = Math.min(startIndex + pageSize, sortedBranches.length);
   const paginatedBranches = React.useMemo(() => {
-    return branches.slice(startIndex, endIndex);
-  }, [branches, startIndex, endIndex]);
+    return sortedBranches.slice(startIndex, endIndex);
+  }, [sortedBranches, startIndex, endIndex]);
 
   const handleOpenCreate = () => {
     setSelectedBranch(null);
@@ -171,6 +238,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
+      logo: branch.logo || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -189,6 +257,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
+      logo: branch.logo || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -378,12 +447,48 @@ export default function BranchesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Chi nhánh</TableHead>
-                <TableHead>Thương hiệu</TableHead>
-                <TableHead>Liên hệ</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("name")}
+                  >
+                    Chi nhánh
+                    {renderSortIcon("name")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("brandName")}
+                  >
+                    Thương hiệu
+                    {renderSortIcon("brandName")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("phone")}
+                  >
+                    Liên hệ
+                    {renderSortIcon("phone")}
+                  </Button>
+                </TableHead>
                 <TableHead>Giờ hoạt động</TableHead>
                 <TableHead>Gói dịch vụ</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("isActive")}
+                  >
+                    Trạng thái
+                    {renderSortIcon("isActive")}
+                  </Button>
+                </TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -392,7 +497,18 @@ export default function BranchesPage() {
                 <TableRow key={branch.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10">
+                      {branch.logo ? (
+                        <img
+                          src={branch.logo}
+                          alt={branch.name}
+                          className="h-10 w-10 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 ${branch.logo ? 'hidden' : ''}`}>
                         <MapPin className="h-5 w-5 text-orange-500" />
                       </div>
                       <div>
@@ -620,6 +736,33 @@ export default function BranchesPage() {
                     required
                     disabled={isViewMode || !!selectedBranch}
                   />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="logo">URL Logo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="logo"
+                    name="logo"
+                    value={formData.logo}
+                    onChange={handleChange}
+                    placeholder="https://example.com/logo.png"
+                    disabled={isViewMode}
+                    className="flex-1"
+                  />
+                  {formData.logo && (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border">
+                      <img
+                        src={formData.logo}
+                        alt="Preview"
+                        className="h-8 w-8 rounded object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '';
+                          (e.target as HTMLImageElement).alt = 'Invalid';
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">

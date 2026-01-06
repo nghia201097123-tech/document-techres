@@ -15,6 +15,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +78,7 @@ const defaultColumns: ColumnConfig[] = [
 interface CompanyFormData {
   name: string;
   code: string;
+  logo: string;
   taxCode: string;
   address: string;
   phone: string;
@@ -84,12 +89,17 @@ interface CompanyFormData {
 const initialFormData: CompanyFormData = {
   name: "",
   code: "",
+  logo: "",
   taxCode: "",
   address: "",
   phone: "",
   email: "",
   representative: "",
 };
+
+// Sorting types
+type SortDirection = "asc" | "desc" | null;
+type SortableColumn = "name" | "code" | "taxCode" | "representative" | "isActive" | "createdAt";
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = React.useState<Company[]>([]);
@@ -110,6 +120,10 @@ export default function CompaniesPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
   const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = React.useState<SortableColumn | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>(null);
 
   // Column configuration
   const {
@@ -145,7 +159,66 @@ export default function CompaniesPage() {
     fetchCompanies();
   }, [fetchCompanies]);
 
-  const filteredCompanies = companies;
+  // Sorting logic
+  const sortedCompanies = React.useMemo(() => {
+    if (!sortColumn || !sortDirection) return companies;
+
+    return [...companies].sort((a, b) => {
+      let aValue: any = a[sortColumn];
+      let bValue: any = b[sortColumn];
+
+      // Handle null/undefined
+      if (aValue == null) aValue = "";
+      if (bValue == null) bValue = "";
+
+      // Handle boolean
+      if (typeof aValue === "boolean") {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      }
+
+      // Handle dates
+      if (sortColumn === "createdAt") {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      // Compare
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [companies, sortColumn, sortDirection]);
+
+  const filteredCompanies = sortedCompanies;
+
+  // Handle column sort
+  const handleSort = (column: SortableColumn) => {
+    if (sortColumn === column) {
+      // Cycle: asc -> desc -> null
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  // Render sort icon
+  const renderSortIcon = (column: SortableColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortDirection === "asc") {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   // Reset to page 1 when search changes
   React.useEffect(() => {
@@ -173,6 +246,7 @@ export default function CompaniesPage() {
     setFormData({
       name: company.name,
       code: company.code,
+      logo: company.logo || "",
       taxCode: company.taxCode || "",
       address: company.address || "",
       phone: company.phone || "",
@@ -188,6 +262,7 @@ export default function CompaniesPage() {
     setFormData({
       name: company.name,
       code: company.code,
+      logo: company.logo || "",
       taxCode: company.taxCode || "",
       address: company.address || "",
       phone: company.phone || "",
@@ -320,12 +395,67 @@ export default function CompaniesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                {isColumnVisible("company") && <TableHead>Công ty</TableHead>}
-                {isColumnVisible("taxCode") && <TableHead>Mã số thuế</TableHead>}
-                {isColumnVisible("representative") && <TableHead>Người đại diện</TableHead>}
+                {isColumnVisible("company") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("name")}
+                    >
+                      Công ty
+                      {renderSortIcon("name")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("taxCode") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("taxCode")}
+                    >
+                      Mã số thuế
+                      {renderSortIcon("taxCode")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("representative") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("representative")}
+                    >
+                      Người đại diện
+                      {renderSortIcon("representative")}
+                    </Button>
+                  </TableHead>
+                )}
                 {isColumnVisible("contact") && <TableHead>Liên hệ</TableHead>}
-                {isColumnVisible("isActive") && <TableHead>Trạng thái</TableHead>}
-                {isColumnVisible("createdAt") && <TableHead>Ngày tạo</TableHead>}
+                {isColumnVisible("isActive") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("isActive")}
+                    >
+                      Trạng thái
+                      {renderSortIcon("isActive")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("createdAt") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("createdAt")}
+                    >
+                      Ngày tạo
+                      {renderSortIcon("createdAt")}
+                    </Button>
+                  </TableHead>
+                )}
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -335,7 +465,18 @@ export default function CompaniesPage() {
                   {isColumnVisible("company") && (
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        {company.logo ? (
+                          <img
+                            src={company.logo}
+                            alt={company.name}
+                            className="h-10 w-10 rounded-lg object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ${company.logo ? 'hidden' : ''}`}>
                           <Building2 className="h-5 w-5 text-primary" />
                         </div>
                         <div>
@@ -538,6 +679,33 @@ export default function CompaniesPage() {
                     required
                     disabled={isViewMode || !!selectedCompany}
                   />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="logo">URL Logo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="logo"
+                    name="logo"
+                    value={formData.logo}
+                    onChange={handleChange}
+                    placeholder="https://example.com/logo.png"
+                    disabled={isViewMode}
+                    className="flex-1"
+                  />
+                  {formData.logo && (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border">
+                      <img
+                        src={formData.logo}
+                        alt="Preview"
+                        className="h-8 w-8 rounded object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '';
+                          (e.target as HTMLImageElement).alt = 'Invalid';
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

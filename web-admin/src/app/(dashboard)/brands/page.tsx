@@ -15,6 +15,9 @@ import {
   ChevronRight,
   Copy,
   Zap,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +76,7 @@ interface BrandFormData {
   companyId: string;
   name: string;
   code: string;
+  logo: string;
   businessModel: BusinessModel;
   description: string;
 }
@@ -81,9 +85,14 @@ const initialFormData: BrandFormData = {
   companyId: "",
   name: "",
   code: "",
+  logo: "",
   businessModel: "full_system",
   description: "",
 };
+
+// Sorting types
+type SortDirection = "asc" | "desc" | null;
+type SortableColumn = "name" | "code" | "companyName" | "businessModel" | "branchCount" | "isActive" | "createdAt";
 
 export default function BrandsPage() {
   const [brands, setBrands] = React.useState<Brand[]>([]);
@@ -105,6 +114,10 @@ export default function BrandsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
   const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = React.useState<SortableColumn | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>(null);
 
   // Fetch brands from API
   const fetchBrands = React.useCallback(async () => {
@@ -152,13 +165,67 @@ export default function BrandsPage() {
     setCurrentPage(1);
   }, [searchQuery, filterCompany]);
 
+  // Sorting logic
+  const sortedBrands = React.useMemo(() => {
+    if (!sortColumn || !sortDirection) return brands;
+
+    return [...brands].sort((a, b) => {
+      let aValue: any = a[sortColumn];
+      let bValue: any = b[sortColumn];
+
+      if (aValue == null) aValue = "";
+      if (bValue == null) bValue = "";
+
+      if (typeof aValue === "boolean") {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      }
+
+      if (sortColumn === "createdAt") {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [brands, sortColumn, sortDirection]);
+
+  // Handle column sort
+  const handleSort = (column: SortableColumn) => {
+    if (sortColumn === column) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  // Render sort icon
+  const renderSortIcon = (column: SortableColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortDirection === "asc") {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
   // Pagination calculations
-  const totalPages = Math.ceil(brands.length / pageSize);
+  const totalPages = Math.ceil(sortedBrands.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, brands.length);
+  const endIndex = Math.min(startIndex + pageSize, sortedBrands.length);
   const paginatedBrands = React.useMemo(() => {
-    return brands.slice(startIndex, endIndex);
-  }, [brands, startIndex, endIndex]);
+    return sortedBrands.slice(startIndex, endIndex);
+  }, [sortedBrands, startIndex, endIndex]);
 
   const handleOpenCreate = () => {
     setIsWizardOpen(true);
@@ -174,6 +241,7 @@ export default function BrandsPage() {
       companyId: brand.companyId,
       name: brand.name,
       code: brand.code,
+      logo: brand.logo || "",
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -187,6 +255,7 @@ export default function BrandsPage() {
       companyId: brand.companyId,
       name: brand.name,
       code: brand.code,
+      logo: brand.logo || "",
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -368,12 +437,66 @@ export default function BrandsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Thương hiệu</TableHead>
-                <TableHead>Công ty</TableHead>
-                <TableHead>Mô hình</TableHead>
-                <TableHead>Chi nhánh</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Ngày tạo</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("name")}
+                  >
+                    Thương hiệu
+                    {renderSortIcon("name")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("companyName")}
+                  >
+                    Công ty
+                    {renderSortIcon("companyName")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("businessModel")}
+                  >
+                    Mô hình
+                    {renderSortIcon("businessModel")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("branchCount")}
+                  >
+                    Chi nhánh
+                    {renderSortIcon("branchCount")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("isActive")}
+                  >
+                    Trạng thái
+                    {renderSortIcon("isActive")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("createdAt")}
+                  >
+                    Ngày tạo
+                    {renderSortIcon("createdAt")}
+                  </Button>
+                </TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -382,7 +505,18 @@ export default function BrandsPage() {
                 <TableRow key={brand.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+                      {brand.logo ? (
+                        <img
+                          src={brand.logo}
+                          alt={brand.name}
+                          className="h-10 w-10 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 ${brand.logo ? 'hidden' : ''}`}>
                         <Store className="h-5 w-5 text-green-500" />
                       </div>
                       <div>
@@ -594,6 +728,33 @@ export default function BrandsPage() {
                     required
                     disabled={isViewMode || !!selectedBrand}
                   />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="logo">URL Logo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="logo"
+                    name="logo"
+                    value={formData.logo}
+                    onChange={handleChange}
+                    placeholder="https://example.com/logo.png"
+                    disabled={isViewMode}
+                    className="flex-1"
+                  />
+                  {formData.logo && (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border">
+                      <img
+                        src={formData.logo}
+                        alt="Preview"
+                        className="h-8 w-8 rounded object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '';
+                          (e.target as HTMLImageElement).alt = 'Invalid';
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
