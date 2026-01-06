@@ -1,10 +1,25 @@
 "use client";
 
 import * as React from "react";
-import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -42,6 +57,17 @@ const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN").format(amount) + " đ";
 };
 
+// Calculate price before VAT
+const calculatePriceBeforeVat = (price: number, vatRate: number) => {
+  return Math.round(price / (1 + vatRate / 100));
+};
+
+// Calculate VAT amount
+const calculateVatAmount = (price: number, vatRate: number) => {
+  const priceBeforeVat = calculatePriceBeforeVat(price, vatRate);
+  return price - priceBeforeVat;
+};
+
 export default function BranchProductsPage() {
   const { toast } = useToast();
 
@@ -56,6 +82,11 @@ export default function BranchProductsPage() {
   const [availabilityFilter, setAvailabilityFilter] = React.useState<string>("all");
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
+
+  // Edit price dialog state
+  const [editingProduct, setEditingProduct] = React.useState<BranchProduct | null>(null);
+  const [editPrice, setEditPrice] = React.useState<string>("");
+  const [savingPrice, setSavingPrice] = React.useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -151,6 +182,97 @@ export default function BranchProductsPage() {
         return next;
       });
     }
+  };
+
+  // Open edit price dialog
+  const handleOpenEditPrice = (product: BranchProduct) => {
+    setEditingProduct(product);
+    // Set initial price: customPrice if exists, otherwise original price
+    const currentPrice = product.customPrice !== null ? product.customPrice : product.price;
+    setEditPrice(String(currentPrice));
+  };
+
+  // Close edit price dialog
+  const handleCloseEditPrice = () => {
+    setEditingProduct(null);
+    setEditPrice("");
+  };
+
+  // Save custom price
+  const handleSaveCustomPrice = async () => {
+    if (!editingProduct) return;
+
+    const newPrice = editPrice.trim() === "" ? null : Number(editPrice);
+
+    // Validate price
+    if (newPrice !== null && (isNaN(newPrice) || newPrice < 0)) {
+      toast({
+        title: "Lỗi",
+        description: "Giá không hợp lệ",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingPrice(true);
+    try {
+      const result = await branchProductService.update(filterBranchId, editingProduct.id, {
+        customPrice: newPrice,
+      });
+      setProducts(prev => prev.map(p =>
+        p.id === editingProduct.id ? { ...p, customPrice: result.customPrice } : p
+      ));
+      toast({
+        title: "Thành công",
+        description: newPrice !== null
+          ? `Đã cập nhật giá "${editingProduct.name}" tại chi nhánh: ${formatCurrency(newPrice)}`
+          : `Đã xóa giá riêng của "${editingProduct.name}", sử dụng giá gốc`,
+      });
+      handleCloseEditPrice();
+    } catch (error: any) {
+      console.error("Error updating custom price:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể cập nhật giá",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPrice(false);
+    }
+  };
+
+  // Reset to original price
+  const handleResetToOriginalPrice = async () => {
+    if (!editingProduct) return;
+
+    setSavingPrice(true);
+    try {
+      const result = await branchProductService.update(filterBranchId, editingProduct.id, {
+        customPrice: null,
+      });
+      setProducts(prev => prev.map(p =>
+        p.id === editingProduct.id ? { ...p, customPrice: null } : p
+      ));
+      toast({
+        title: "Thành công",
+        description: `Đã khôi phục giá gốc cho "${editingProduct.name}"`,
+      });
+      handleCloseEditPrice();
+    } catch (error: any) {
+      console.error("Error resetting price:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể khôi phục giá",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPrice(false);
+    }
+  };
+
+  // Get effective price (customPrice or original price)
+  const getEffectivePrice = (product: BranchProduct) => {
+    return product.customPrice !== null ? product.customPrice : product.price;
   };
 
   // Bulk toggle availability
@@ -410,8 +532,11 @@ export default function BranchProductsPage() {
                     <TableHead>Tên món</TableHead>
                     <TableHead>Loại</TableHead>
                     <TableHead className="text-right">Giá gốc</TableHead>
+                    <TableHead className="text-right">Giá bán CN</TableHead>
+                    <TableHead className="text-right">VAT</TableHead>
                     <TableHead className="text-center">Trạng thái</TableHead>
                     <TableHead className="text-center">Bán tại CN</TableHead>
+                    <TableHead className="w-[80px]">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -443,7 +568,78 @@ export default function BranchProductsPage() {
                           {typeLabels[product.type]?.label || product.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{formatCurrency(product.price)}</TableCell>
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                "font-medium cursor-help",
+                                product.customPrice !== null && product.customPrice !== product.price
+                                  ? "text-orange-600"
+                                  : "text-green-600"
+                              )}>
+                                {formatCurrency(getEffectivePrice(product))}
+                                {product.customPrice !== null && product.customPrice !== product.price && (
+                                  <sup className="text-[9px] ml-0.5">CN</sup>
+                                )}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Giá gốc:</span>
+                                  <span className="font-medium">{formatCurrency(product.price)}</span>
+                                </div>
+                                {product.customPrice !== null && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Giá CN:</span>
+                                    <span className="font-medium text-orange-600">{formatCurrency(product.customPrice)}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Chênh lệch:</span>
+                                  <span className={cn(
+                                    "font-medium",
+                                    getEffectivePrice(product) > product.price ? "text-green-600" :
+                                    getEffectivePrice(product) < product.price ? "text-red-600" : ""
+                                  )}>
+                                    {getEffectivePrice(product) >= product.price ? "+" : ""}
+                                    {formatCurrency(getEffectivePrice(product) - product.price)}
+                                  </span>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-muted-foreground cursor-help">
+                                {formatCurrency(calculateVatAmount(getEffectivePrice(product), product.vatRate || 10))}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">VAT:</span>
+                                  <span className="font-medium">{product.vatRate || 10}%</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Giá trước VAT:</span>
+                                  <span className="font-medium">{formatCurrency(calculatePriceBeforeVat(getEffectivePrice(product), product.vatRate || 10))}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Tiền thuế:</span>
+                                  <span className="font-medium">{formatCurrency(calculateVatAmount(getEffectivePrice(product), product.vatRate || 10))}</span>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                       <TableCell className="text-center">
                         <Badge variant={product.isActive ? "default" : "secondary"}>
                           {product.isActive ? "Hoạt động" : "Tạm ngưng"}
@@ -455,6 +651,16 @@ export default function BranchProductsPage() {
                           disabled={processingIds.has(product.id)}
                           onCheckedChange={() => handleToggleAvailability(product)}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEditPrice(product)}
+                          className="h-8 w-8"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -525,6 +731,121 @@ export default function BranchProductsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Price Dialog */}
+      <Dialog open={editingProduct !== null} onOpenChange={() => handleCloseEditPrice()}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cập nhật giá bán tại chi nhánh</DialogTitle>
+            <DialogDescription>
+              Điều chỉnh giá bán riêng cho sản phẩm này tại chi nhánh. Để trống để sử dụng giá gốc.
+            </DialogDescription>
+          </DialogHeader>
+          {editingProduct && (
+            <div className="grid gap-4 py-4">
+              {/* Product info */}
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                {editingProduct.imageUrl ? (
+                  <img
+                    src={editingProduct.imageUrl}
+                    alt={editingProduct.name}
+                    className="w-12 h-12 rounded object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded bg-background flex items-center justify-center">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium">{editingProduct.name}</p>
+                  <p className="text-sm text-muted-foreground">{editingProduct.code}</p>
+                </div>
+              </div>
+
+              {/* Original price info */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <Label className="text-muted-foreground">Giá gốc (đã VAT)</Label>
+                  <p className="font-medium text-lg">{formatCurrency(editingProduct.price)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">VAT ({editingProduct.vatRate || 10}%)</Label>
+                  <p className="font-medium">{formatCurrency(calculateVatAmount(editingProduct.price, editingProduct.vatRate || 10))}</p>
+                </div>
+              </div>
+
+              {/* Custom price input */}
+              <div className="grid gap-2">
+                <Label htmlFor="customPrice">Giá bán tại chi nhánh (đã VAT)</Label>
+                <Input
+                  id="customPrice"
+                  type="number"
+                  placeholder="Để trống để dùng giá gốc"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  min={0}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nhập giá bán mới cho chi nhánh này. Để trống nếu muốn sử dụng giá gốc từ thương hiệu.
+                </p>
+              </div>
+
+              {/* Preview new VAT calculation */}
+              {editPrice && Number(editPrice) > 0 && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-sm font-medium text-orange-800 mb-2">Xem trước:</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Giá bán CN:</span>
+                      <span className="ml-2 font-medium text-orange-600">{formatCurrency(Number(editPrice))}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Chênh lệch:</span>
+                      <span className={cn(
+                        "ml-2 font-medium",
+                        Number(editPrice) > editingProduct.price ? "text-green-600" :
+                        Number(editPrice) < editingProduct.price ? "text-red-600" : ""
+                      )}>
+                        {Number(editPrice) >= editingProduct.price ? "+" : ""}
+                        {formatCurrency(Number(editPrice) - editingProduct.price)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Giá trước VAT:</span>
+                      <span className="ml-2 font-medium">{formatCurrency(calculatePriceBeforeVat(Number(editPrice), editingProduct.vatRate || 10))}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Tiền thuế VAT:</span>
+                      <span className="ml-2 font-medium">{formatCurrency(calculateVatAmount(Number(editPrice), editingProduct.vatRate || 10))}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {editingProduct?.customPrice !== null && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetToOriginalPrice}
+                disabled={savingPrice}
+                className="sm:mr-auto"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Khôi phục giá gốc
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={handleCloseEditPrice}>
+              Hủy
+            </Button>
+            <Button type="button" onClick={handleSaveCustomPrice} disabled={savingPrice}>
+              {savingPrice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
