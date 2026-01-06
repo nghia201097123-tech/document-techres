@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronLeft, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -214,6 +214,11 @@ export default function ProductsPage() {
   const [printSeafoodFilter, setPrintSeafoodFilter] = React.useState<string>("all");
   const [sellingTypeFilter, setSellingTypeFilter] = React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
 
   // Check if any filter is active
   const hasActiveFilters = typeFilter.size > 0 || categoryFilter.size > 0 || vatFilter !== "all" ||
@@ -1415,6 +1420,20 @@ export default function ProductsPage() {
       printDishFilter, printLabelFilter, printSeafoodFilter, sellingTypeFilter, statusFilter,
       sortKey, sortDirection, getCategoryName]);
 
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterBrandId, typeFilter, categoryFilter, vatFilter, unitFilter,
+      printDishFilter, printLabelFilter, printSeafoodFilter, sellingTypeFilter, statusFilter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredProducts.length);
+  const paginatedProducts = React.useMemo(() => {
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, startIndex, endIndex]);
+
   // Bulk selection derived state (must be after filteredProducts)
   const isAllSelected = filteredProducts.length > 0 && selectedProductIds.size === filteredProducts.length;
   const isSomeSelected = selectedProductIds.size > 0 && selectedProductIds.size < filteredProducts.length;
@@ -2109,7 +2128,7 @@ export default function ProductsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {paginatedProducts.map((product) => (
                   <TableRow key={product.id} className={selectedProductIds.has(product.id) ? "bg-muted/50" : ""}>
                     <TableCell>
                       <Checkbox
@@ -2273,6 +2292,66 @@ export default function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between px-2 py-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Hiển thị {startIndex + 1}-{endIndex} / {filteredProducts.length} món</span>
+                <span className="text-muted-foreground/50">|</span>
+                <div className="flex items-center gap-2">
+                  <span>Số dòng:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Đầu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Trang {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Cuối
+                </Button>
+              </div>
             </div>
             </>
           )}

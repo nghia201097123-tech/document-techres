@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, ChevronLeft, ChevronRight, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -289,6 +289,11 @@ export default function StaffPage() {
   const [provinceFilter, setProvinceFilter] = React.useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
 
   // Check if any filter is active
   const hasActiveFilters = genderFilter !== "all" || provinceFilter !== "all" || departmentFilter !== "all" || statusFilter !== "all";
@@ -1414,6 +1419,19 @@ export default function StaffPage() {
     return result;
   }, [staffList, search, genderFilter, provinceFilter, departmentFilter, statusFilter, sortKey, sortDirection]);
 
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, genderFilter, provinceFilter, departmentFilter, statusFilter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredStaff.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredStaff.length);
+  const paginatedStaff = React.useMemo(() => {
+    return filteredStaff.slice(startIndex, endIndex);
+  }, [filteredStaff, startIndex, endIndex]);
+
   // Bulk selection derived state
   const isAllSelected = filteredStaff.length > 0 && selectedStaffIds.size === filteredStaff.length;
   const isSomeSelected = selectedStaffIds.size > 0 && selectedStaffIds.size < filteredStaff.length;
@@ -1744,7 +1762,7 @@ export default function StaffPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStaff.map((staff) => (
+                {paginatedStaff.map((staff) => (
                   <TableRow key={staff.id} className={selectedStaffIds.has(staff.id) ? "bg-muted/50" : ""}>
                     <TableCell>
                       <Checkbox
@@ -1832,6 +1850,66 @@ export default function StaffPage() {
                 ))}
                 </TableBody>
               </Table>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between px-2 py-4 border-t">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Hiển thị {startIndex + 1}-{endIndex} / {filteredStaff.length} nhân viên</span>
+                  <span className="text-muted-foreground/50">|</span>
+                  <div className="flex items-center gap-2">
+                    <span>Số dòng:</span>
+                    <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pageSizeOptions.map((size) => (
+                          <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    Đầu
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm px-2">
+                    Trang {currentPage} / {totalPages || 1}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Cuối
+                  </Button>
+                </div>
               </div>
             </div>
           )}
