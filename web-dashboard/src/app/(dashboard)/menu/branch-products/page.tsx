@@ -59,7 +59,8 @@ export default function BranchProductsPage() {
 
   // Load products when branch changes
   const loadProducts = React.useCallback(async (branchId: string) => {
-    if (!branchId) {
+    // Don't load if no branch selected or "all" branches selected
+    if (!branchId || branchId === "all") {
       setProducts([]);
       setStats(null);
       setLoading(false);
@@ -357,11 +358,11 @@ export default function BranchProductsPage() {
           )}
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden p-0">
-          {!filterBranchId ? (
+          {!filterBranchId || filterBranchId === "all" ? (
             <div className="p-6">
               <FilterRequiredPlaceholder
                 title="Vui lòng chọn chi nhánh"
-                description="Chọn một chi nhánh từ bộ lọc phía trên để quản lý món ăn"
+                description="Chọn một chi nhánh cụ thể từ bộ lọc phía trên để quản lý món ăn"
               />
             </div>
           ) : loading ? (
