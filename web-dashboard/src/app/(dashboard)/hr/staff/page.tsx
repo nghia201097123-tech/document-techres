@@ -1473,7 +1473,7 @@ export default function StaffPage() {
       />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-0 z-10 bg-card border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách nhân viên</CardTitle>
