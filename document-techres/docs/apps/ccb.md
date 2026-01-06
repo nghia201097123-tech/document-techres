@@ -187,36 +187,281 @@ PENDING → PREPARING → READY → SERVED
 
 ---
 
-## Cấu trúc Project
+## CCB Android - Chi tiết Implementation
 
-### Android (Kotlin)
+### Cấu trúc Project
 
 ```
-ccb-app/
-├── app/src/main/
-│   ├── java/.../
-│   │   ├── di/                # Dependency Injection (Hilt/Koin)
-│   │   ├── data/
-│   │   │   ├── local/         # SQLite, Room Database
-│   │   │   ├── remote/        # API Client (Retrofit)
-│   │   │   └── repository/
-│   │   ├── domain/
-│   │   │   ├── model/
-│   │   │   └── usecase/
-│   │   ├── presentation/
-│   │   │   ├── screens/
-│   │   │   └── viewmodel/
-│   │   ├── mode/
-│   │   │   ├── standalone/    # Chế độ Standalone
-│   │   │   ├── client/        # Chế độ Client Thu ngân
-│   │   │   └── kitchen/       # Chế độ Client Bếp/Bar
-│   │   ├── printer/           # USB/Bluetooth/LAN printer
-│   │   └── websocket/         # SignalR client
-│   └── res/
-└── build.gradle.kts
+ccb-android/
+├── app/
+│   ├── build.gradle.kts
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       ├── java/com/techres/ccb/
+│       │   ├── CCBApplication.kt           # Hilt Application
+│       │   ├── data/
+│       │   │   ├── local/
+│       │   │   │   ├── CCBDatabase.kt      # Room Database
+│       │   │   │   ├── dao/                # Data Access Objects
+│       │   │   │   │   ├── CategoryDao.kt
+│       │   │   │   │   ├── ProductDao.kt
+│       │   │   │   │   ├── OrderDao.kt
+│       │   │   │   │   ├── OrderItemDao.kt
+│       │   │   │   │   ├── ShiftDao.kt
+│       │   │   │   │   ├── StaffDao.kt
+│       │   │   │   │   ├── AreaDao.kt
+│       │   │   │   │   └── TableDao.kt
+│       │   │   │   └── entity/             # Room Entities
+│       │   │   │       ├── CategoryEntity.kt
+│       │   │   │       ├── ProductEntity.kt
+│       │   │   │       ├── OrderEntity.kt
+│       │   │   │       ├── OrderItemEntity.kt
+│       │   │   │       ├── ShiftEntity.kt
+│       │   │   │       ├── StaffEntity.kt
+│       │   │   │       ├── AreaEntity.kt
+│       │   │   │       └── TableEntity.kt
+│       │   │   ├── remote/
+│       │   │   │   ├── api/
+│       │   │   │   │   └── MasterDataApi.kt  # Retrofit API interface
+│       │   │   │   └── dto/
+│       │   │   │       └── SyncDto.kt        # DTOs for sync
+│       │   │   └── repository/
+│       │   │       ├── AuthRepository.kt
+│       │   │       ├── SyncRepository.kt
+│       │   │       ├── CategoryRepository.kt
+│       │   │       ├── ProductRepository.kt
+│       │   │       ├── OrderRepository.kt
+│       │   │       ├── ShiftRepository.kt
+│       │   │       ├── StaffRepository.kt
+│       │   │       └── TableRepository.kt
+│       │   ├── di/                         # Hilt DI Modules
+│       │   │   ├── DatabaseModule.kt
+│       │   │   ├── NetworkModule.kt
+│       │   │   └── RepositoryModule.kt
+│       │   └── presentation/
+│       │       ├── MainActivity.kt
+│       │       ├── navigation/
+│       │       │   └── CCBNavHost.kt       # Compose Navigation
+│       │       ├── screens/
+│       │       │   ├── splash/             # Splash screen
+│       │       │   ├── auth/               # Login & PIN screens
+│       │       │   ├── home/               # Home screen
+│       │       │   ├── menu/               # Product menu
+│       │       │   ├── order/              # Order detail
+│       │       │   ├── payment/            # Payment screen
+│       │       │   ├── shift/              # Shift management
+│       │       │   └── settings/           # Settings
+│       │       └── theme/
+│       │           └── Theme.kt            # Material3 Theme
+│       └── res/
+│           └── values/
+│               ├── strings.xml
+│               ├── colors.xml
+│               └── themes.xml
+├── build.gradle.kts
+├── settings.gradle.kts
+└── gradle/
+    └── libs.versions.toml                  # Version Catalog
 ```
 
-### Windows (.NET)
+### Công nghệ sử dụng
+
+| Thành phần | Công nghệ |
+|------------|-----------|
+| **UI** | Jetpack Compose + Material3 |
+| **Architecture** | MVVM + Clean Architecture |
+| **DI** | Hilt |
+| **Database** | Room (SQLite) |
+| **Network** | Retrofit + OkHttp |
+| **State** | StateFlow + Compose State |
+| **Navigation** | Compose Navigation |
+| **Async** | Kotlin Coroutines + Flow |
+
+### Database Schema
+
+#### Entities
+
+```kotlin
+// CategoryEntity
+@Entity(tableName = "categories")
+data class CategoryEntity(
+    @PrimaryKey val id: String,
+    val branchId: String,
+    val name: String,
+    val displayOrder: Int,
+    val imageUrl: String?,
+    val isActive: Boolean,
+    val version: Int,
+    val syncStatus: String,
+    val syncedAt: String?
+)
+
+// ProductEntity
+@Entity(tableName = "products")
+data class ProductEntity(
+    @PrimaryKey val id: String,
+    val branchId: String,
+    val categoryId: String,
+    val code: String,
+    val name: String,
+    val description: String?,
+    val price: Double,
+    val imageUrl: String?,
+    val unit: String?,
+    val vatRate: Double,
+    val isActive: Boolean,
+    val displayOrder: Int,
+    val version: Int,
+    val syncStatus: String,
+    val syncedAt: String?
+)
+
+// OrderEntity
+@Entity(tableName = "orders")
+data class OrderEntity(
+    @PrimaryKey val id: String,
+    val branchId: String,
+    val orderNumber: String,
+    val tableId: String?,
+    val tableName: String?,
+    val staffId: String,
+    val staffName: String,
+    val status: String,           // pending, preparing, ready, completed, cancelled
+    val subtotal: Double,
+    val discountAmount: Double,
+    val discountPercent: Double,
+    val totalAmount: Double,
+    val paymentMethod: String?,   // cash, bank_transfer, card
+    val paidAmount: Double,
+    val changeAmount: Double,
+    val note: String?,
+    val shiftId: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncStatus: String,
+    val syncedAt: String?
+)
+
+// ShiftEntity
+@Entity(tableName = "shifts")
+data class ShiftEntity(
+    @PrimaryKey val id: String,
+    val branchId: String,
+    val staffId: String,
+    val staffName: String,
+    val startTime: String,
+    val endTime: String?,
+    val openingAmount: Double,
+    val closingAmount: Double?,
+    val expectedAmount: Double?,
+    val actualAmount: Double?,
+    val difference: Double?,
+    val totalOrders: Int,
+    val totalRevenue: Double,
+    val cashRevenue: Double,
+    val bankRevenue: Double,
+    val cardRevenue: Double,
+    val status: String,           // open, closed
+    val note: String?,
+    val syncStatus: String,
+    val syncedAt: String?
+)
+```
+
+### Luồng xác thực
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     LUỒNG XÁC THỰC CCB                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. ĐĂNG NHẬP THIẾT BỊ (1 lần duy nhất)                        │
+│  ┌─────────────┐                        ┌─────────────────────┐ │
+│  │ Màn hình    │  POST /auth/login      │  API Master Data    │ │
+│  │ Login       │ ───────────────────────▶│                     │ │
+│  │             │  {storeCode, deviceId}  │  Trả về:            │ │
+│  │             │◀───────────────────────│  - accessToken      │ │
+│  │             │                        │  - branchId         │ │
+│  └─────────────┘                        │  - branchName       │ │
+│        │                                └─────────────────────┘ │
+│        │ Lưu token vào SharedPreferences                        │
+│        ▼                                                        │
+│  2. XÁC THỰC NHÂN VIÊN (Mỗi lần mở app)                        │
+│  ┌─────────────┐                        ┌─────────────────────┐ │
+│  │ Màn hình    │  POST /auth/verify-pin │  API Master Data    │ │
+│  │ PIN         │ ───────────────────────▶│                     │ │
+│  │             │  {pinCode}              │  Trả về:            │ │
+│  │  [1][2][3]  │◀───────────────────────│  - staffId          │ │
+│  │  [4][5][6]  │                        │  - staffName        │ │
+│  │  [7][8][9]  │                        │  - role             │ │
+│  │     [0]     │                        └─────────────────────┘ │
+│  └─────────────┘                                                │
+│        │                                                        │
+│        ▼                                                        │
+│  3. VÀO MÀN HÌNH CHÍNH                                         │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                      HOME SCREEN                            ││
+│  │  - Tạo đơn mới                                              ││
+│  │  - Xem đơn đang phục vụ                                     ││
+│  │  - Quản lý ca làm việc                                      ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Luồng đồng bộ dữ liệu
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     SYNC MASTER DATA                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐     GET /sync/full      ┌─────────────────────┐│
+│  │ CCB App     │ ───────────────────────▶│ API Master Data     ││
+│  │             │                         │                     ││
+│  │             │◀───────────────────────│ Response:           ││
+│  │             │     FullSyncResponse    │ - categories[]      ││
+│  │             │                         │ - products[]        ││
+│  │             │                         │ - areas[]           ││
+│  │             │                         │ - tables[]          ││
+│  │             │                         │ - staff[]           ││
+│  │             │                         │ - syncedAt          ││
+│  └─────────────┘                         └─────────────────────┘│
+│        │                                                        │
+│        ▼                                                        │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                  ROOM DATABASE (SQLite)                     ││
+│  │  Transaction: Delete old → Insert new                       ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  INCREMENTAL SYNC (sau lần đầu)                                 │
+│  ┌─────────────┐   GET /sync/incremental  ┌────────────────────┐│
+│  │ CCB App     │   ?since={lastSyncTime}  │ API Master Data    ││
+│  │             │ ────────────────────────▶│                    ││
+│  │             │◀────────────────────────│ Chỉ trả về records ││
+│  │             │                          │ thay đổi sau since ││
+│  └─────────────┘                          └────────────────────┘│
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Màn hình ứng dụng
+
+| Màn hình | Mô tả | Route |
+|----------|-------|-------|
+| **Splash** | Kiểm tra trạng thái đăng nhập | `/splash` |
+| **Login** | Đăng nhập bằng mã cửa hàng | `/login` |
+| **PIN** | Xác thực nhân viên bằng mã PIN | `/pin` |
+| **Home** | Trang chủ, danh sách đơn đang phục vụ | `/home` |
+| **Menu** | Thực đơn sản phẩm theo danh mục | `/menu` |
+| **Order** | Chi tiết đơn hàng, thêm/sửa/xóa món | `/order/{orderId}` |
+| **Payment** | Thanh toán (tiền mặt/chuyển khoản/thẻ) | `/payment/{orderId}` |
+| **Shift** | Mở/chốt ca làm việc | `/shift` |
+| **Settings** | Cài đặt, đồng bộ dữ liệu | `/settings` |
+
+---
+
+## Windows (.NET)
 
 ```
 CCB.Windows/
@@ -239,35 +484,6 @@ CCB.Windows/
 │   └── Kitchen/
 └── CCB.Windows.csproj
 ```
-
----
-
-## Công nghệ sử dụng
-
-### Android (Kotlin)
-
-| Thành phần | Công nghệ |
-|------------|-----------|
-| UI | Jetpack Compose |
-| Architecture | MVVM + Clean Architecture |
-| DI | Hilt |
-| Database | Room (SQLite) |
-| Network | Retrofit + OkHttp |
-| WebSocket | OkHttp WebSocket |
-| Print | android-bluetooth-library |
-| State | StateFlow / LiveData |
-
-### Windows (.NET)
-
-| Thành phần | Công nghệ |
-|------------|-----------|
-| Framework | .NET 8 |
-| UI | WPF |
-| Architecture | MVVM |
-| Database | Microsoft.Data.Sqlite + EF Core |
-| HTTP | HttpClient |
-| WebSocket | Microsoft.AspNetCore.SignalR.Client |
-| Print | System.Drawing.Printing |
 
 ---
 
@@ -304,7 +520,7 @@ User chọn Server → Kết nối SignalR
 |----------|-----------|-------------|
 | RAM | 2GB | 4GB |
 | Storage | 1GB trống | 2GB trống |
-| Android | 8.0+ | 11+ |
+| Android | 8.0+ (API 26) | 11+ (API 30) |
 
 ### Windows
 

@@ -202,7 +202,50 @@ Mở app lần đầu
 
 ---
 
-## 6. Customer App
+## 6. API Master Data
+
+**Vai trò:** Service đồng bộ dữ liệu master từ cloud xuống các ứng dụng POS
+
+**Nền tảng:** NestJS + TypeORM + PostgreSQL
+
+### Chức năng chính
+
+- Xác thực thiết bị bằng mã cửa hàng
+- Xác thực nhân viên bằng mã PIN
+- Đồng bộ dữ liệu master (categories, products, areas, tables, staff)
+- Hỗ trợ full sync và incremental sync
+
+### Kiến trúc
+
+```
+┌─────────────────────────────────────────┐
+│         API Master Data                 │
+│           (NestJS)                      │
+├─────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────────┐   │
+│  │ Auth Module │  │  Sync Module    │   │
+│  │ - login     │  │  - full sync    │   │
+│  │ - verify-pin│  │  - incremental  │   │
+│  └─────────────┘  └─────────────────┘   │
+│                                         │
+│  ┌─────────────────────────────────────┐│
+│  │          PostgreSQL                 ││
+│  └─────────────────────────────────────┘│
+└─────────────────────────────────────────┘
+```
+
+### API Endpoints
+
+| Endpoint | Method | Mô tả |
+|----------|--------|-------|
+| `/api/v1/auth/login` | POST | Đăng nhập thiết bị |
+| `/api/v1/auth/verify-pin` | POST | Xác thực mã PIN |
+| `/api/v1/sync/full` | GET | Full sync master data |
+| `/api/v1/sync/incremental` | GET | Incremental sync |
+
+---
+
+## 7. Customer App
 
 **Vai trò:** App cho khách hàng - chỉ chạy **Online**
 

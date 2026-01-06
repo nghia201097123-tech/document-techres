@@ -101,6 +101,7 @@ TENANT (tenant_id) ← Cấp cao nhất, đại diện cho 1 khách hàng SaaS
 | **Web Dashboard** | React/Next.js | Chủ quán - Quản lý nhân sự, menu, bàn, bếp, ca, HĐĐT |
 | **API Admin** | NestJS | Backend API kết nối database PostgreSQL |
 | **API Gateway** | NestJS | Proxy/routing, không kết nối database |
+| **API Master Data** | NestJS | Đồng bộ dữ liệu master xuống CCB/Order App |
 | **Local Server** | .NET trên Windows | API Server local cho mô hình Full System |
 | **CCB App (Thu ngân)** | Kotlin/Android hoặc .NET/Windows | Thu ngân, thanh toán, in bill |
 | **CCB App (Bếp/Bar)** | Kotlin/Android hoặc .NET/Windows | Hiển thị món, in tem, đánh dấu hoàn thành |
@@ -317,15 +318,16 @@ Owner nhận email → Đăng nhập Web Dashboard
 | Thành phần | Công nghệ | Nền tảng |
 |------------|-----------|----------|
 | **Order App** | Kotlin (Native Android) | Android |
-| **CCB App (Android)** | Kotlin (Native Android) | Android |
+| **CCB App (Android)** | Kotlin + Jetpack Compose + Hilt + Room | Android |
 | **CCB App (Windows)** | .NET (WPF/WinForms) | Windows |
 | **Local Server** | .NET (ASP.NET Core) | Windows |
 | **Web Admin** | React/Next.js | Web |
 | **Web Dashboard** | React/Next.js | Web |
 | **API Admin** | NestJS + TypeORM | Cloud |
 | **API Gateway** | NestJS | Cloud |
+| **API Master Data** | NestJS + TypeORM + JWT | Cloud |
 | **Cloud Server** | .NET (ASP.NET Core) | Cloud |
 | **Database Server** | PostgreSQL | Cloud |
-| **Local Database** | SQLite | Local |
+| **Local Database** | SQLite (Room) | Local |
 | **WebSocket** | SignalR | All |
 | **Print** | ESC/POS Protocol | All |
