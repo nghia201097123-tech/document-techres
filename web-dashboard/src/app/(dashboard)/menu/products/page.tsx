@@ -203,6 +203,9 @@ export default function ProductsPage() {
   const [filterPopoverOpen, setFilterPopoverOpen] = React.useState(false);
   const [typeFilter, setTypeFilter] = React.useState<Set<string>>(new Set()); // Multi-select
   const [categoryFilter, setCategoryFilter] = React.useState<Set<string>>(new Set()); // Multi-select
+
+  // Collapsible filter sections state
+  const [collapsedFilters, setCollapsedFilters] = React.useState<Set<string>>(new Set());
   const [vatFilter, setVatFilter] = React.useState<string>("all"); // "all" | "has_vat" | "no_vat"
   const [unitFilter, setUnitFilter] = React.useState<string>("all");
   const [printDishFilter, setPrintDishFilter] = React.useState<string>("all"); // "all" | "yes" | "no"
@@ -227,6 +230,19 @@ export default function ProductsPage() {
     setPrintSeafoodFilter("all");
     setSellingTypeFilter("all");
     setStatusFilter("all");
+  };
+
+  // Toggle collapsible filter section
+  const toggleFilterSection = (sectionId: string) => {
+    setCollapsedFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
   };
 
   // Handle sort click
@@ -1726,43 +1742,83 @@ export default function ProductsPage() {
                         )}
                       </div>
 
-                      {/* Type Filter - Multi-select */}
+                      {/* Type Filter - Multi-select - Collapsible */}
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium">Loại món ăn</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(typeLabels).map(([type, { label, color }]) => (
-                            <Badge
-                              key={type}
-                              variant={typeFilter.has(type) ? "default" : "outline"}
-                              className={cn(
-                                "cursor-pointer transition-colors",
-                                typeFilter.has(type) ? color : "hover:bg-muted"
-                              )}
-                              onClick={() => toggleTypeFilter(type)}
-                            >
-                              {typeFilter.has(type) && <Check className="mr-1 h-3 w-3" />}
-                              {label}
-                            </Badge>
-                          ))}
-                        </div>
+                        <button
+                          type="button"
+                          className="flex items-center justify-between w-full text-left"
+                          onClick={() => toggleFilterSection('type')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium cursor-pointer">Loại món ăn</Label>
+                            {typeFilter.size > 0 && (
+                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                {typeFilter.size}
+                              </Badge>
+                            )}
+                          </div>
+                          {collapsedFilters.has('type') ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        {!collapsedFilters.has('type') && (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(typeLabels).map(([type, { label, color }]) => (
+                              <Badge
+                                key={type}
+                                variant={typeFilter.has(type) ? "default" : "outline"}
+                                className={cn(
+                                  "cursor-pointer transition-colors",
+                                  typeFilter.has(type) ? color : "hover:bg-muted"
+                                )}
+                                onClick={() => toggleTypeFilter(type)}
+                              >
+                                {typeFilter.has(type) && <Check className="mr-1 h-3 w-3" />}
+                                {label}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Category Filter - Multi-select */}
+                      {/* Category Filter - Multi-select - Collapsible */}
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium">Danh mục món ăn</Label>
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                          {categories.filter(c => c.isActive).map((cat) => (
-                            <Badge
-                              key={cat.id}
-                              variant={categoryFilter.has(cat.id) ? "default" : "outline"}
-                              className="cursor-pointer transition-colors hover:bg-muted"
-                              onClick={() => toggleCategoryFilter(cat.id)}
-                            >
-                              {categoryFilter.has(cat.id) && <Check className="mr-1 h-3 w-3" />}
-                              {cat.name}
-                            </Badge>
-                          ))}
-                        </div>
+                        <button
+                          type="button"
+                          className="flex items-center justify-between w-full text-left"
+                          onClick={() => toggleFilterSection('category')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium cursor-pointer">Danh mục món ăn</Label>
+                            {categoryFilter.size > 0 && (
+                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                {categoryFilter.size}
+                              </Badge>
+                            )}
+                          </div>
+                          {collapsedFilters.has('category') ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        {!collapsedFilters.has('category') && (
+                          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                            {categories.filter(c => c.isActive).map((cat) => (
+                              <Badge
+                                key={cat.id}
+                                variant={categoryFilter.has(cat.id) ? "default" : "outline"}
+                                className="cursor-pointer transition-colors hover:bg-muted"
+                                onClick={() => toggleCategoryFilter(cat.id)}
+                              >
+                                {categoryFilter.has(cat.id) && <Check className="mr-1 h-3 w-3" />}
+                                {cat.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* VAT Filter */}

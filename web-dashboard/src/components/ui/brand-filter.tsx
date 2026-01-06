@@ -169,7 +169,7 @@ export function BrandBranchFilter({
   };
 
   return (
-    <>
+    <div className="flex items-center gap-2">
       <Select value={selectedBrandId} onValueChange={handleBrandChange}>
         <SelectTrigger className={brandClassName || "w-[180px]"}>
           {loadingBrands ? (
@@ -211,6 +211,6 @@ export function BrandBranchFilter({
           ))}
         </SelectContent>
       </Select>
-    </>
+    </div>
   );
 }

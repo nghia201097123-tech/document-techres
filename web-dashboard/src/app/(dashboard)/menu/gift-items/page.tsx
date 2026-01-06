@@ -409,15 +409,13 @@ export default function GiftItemsPage() {
           <p className="text-muted-foreground">Chọn món ăn từ thực đơn để làm món tặng kèm (không bao gồm combo và topping)</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-[360px]">
-            <BrandBranchFilter
-              selectedBrandId={filterBrandId}
-              selectedBranchId={filterBranchId}
-              onBrandChange={setFilterBrandId}
-              onBranchChange={setFilterBranchId}
-              showAllBranchOption={false}
-            />
-          </div>
+          <BrandBranchFilter
+            selectedBrandId={filterBrandId}
+            selectedBranchId={filterBranchId}
+            onBrandChange={setFilterBrandId}
+            onBranchChange={setFilterBranchId}
+            showAllBranchOption={false}
+          />
           <Button onClick={handleOpenCreate} disabled={!filterBranchId}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm món tặng
