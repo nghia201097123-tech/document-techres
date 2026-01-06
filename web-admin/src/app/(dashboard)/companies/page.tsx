@@ -80,7 +80,6 @@ interface CompanyFormData {
   name: string;
   code: string;
   logo: string;
-  avatar: string;
   taxCode: string;
   address: string;
   phone: string;
@@ -92,7 +91,6 @@ const initialFormData: CompanyFormData = {
   name: "",
   code: "",
   logo: "",
-  avatar: "",
   taxCode: "",
   address: "",
   phone: "",
@@ -250,7 +248,6 @@ export default function CompaniesPage() {
       name: company.name,
       code: company.code,
       logo: company.logo || "",
-      avatar: company.avatar || "",
       taxCode: company.taxCode || "",
       address: company.address || "",
       phone: company.phone || "",
@@ -267,7 +264,6 @@ export default function CompaniesPage() {
       name: company.name,
       code: company.code,
       logo: company.logo || "",
-      avatar: company.avatar || "",
       taxCode: company.taxCode || "",
       address: company.address || "",
       phone: company.phone || "",
@@ -686,20 +682,12 @@ export default function CompaniesPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <ImagePicker
-                  value={formData.logo}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
-                  disabled={isViewMode}
-                  label="Logo"
-                />
-                <ImagePicker
-                  value={formData.avatar}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, avatar: value }))}
-                  disabled={isViewMode}
-                  label="Avatar"
-                />
-              </div>
+              <ImagePicker
+                value={formData.logo}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                disabled={isViewMode}
+                label="Logo"
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="taxCode">Mã số thuế</Label>

@@ -78,7 +78,6 @@ interface BrandFormData {
   name: string;
   code: string;
   logo: string;
-  avatar: string;
   businessModel: BusinessModel;
   description: string;
 }
@@ -88,7 +87,6 @@ const initialFormData: BrandFormData = {
   name: "",
   code: "",
   logo: "",
-  avatar: "",
   businessModel: "full_system",
   description: "",
 };
@@ -245,7 +243,6 @@ export default function BrandsPage() {
       name: brand.name,
       code: brand.code,
       logo: brand.logo || "",
-      avatar: brand.avatar || "",
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -260,7 +257,6 @@ export default function BrandsPage() {
       name: brand.name,
       code: brand.code,
       logo: brand.logo || "",
-      avatar: brand.avatar || "",
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -735,20 +731,12 @@ export default function BrandsPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <ImagePicker
-                  value={formData.logo}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
-                  disabled={isViewMode}
-                  label="Logo"
-                />
-                <ImagePicker
-                  value={formData.avatar}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, avatar: value }))}
-                  disabled={isViewMode}
-                  label="Avatar"
-                />
-              </div>
+              <ImagePicker
+                value={formData.logo}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                disabled={isViewMode}
+                label="Logo"
+              />
               <div className="space-y-2">
                 <Label htmlFor="businessModel">Mô hình kinh doanh *</Label>
                 <Select
