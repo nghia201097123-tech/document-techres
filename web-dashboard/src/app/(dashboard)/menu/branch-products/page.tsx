@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw } from "lucide-react";
+import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +54,10 @@ const typeLabels: Record<string, { label: string; color: string }> = {
 
 // Format currency (no decimals for VND)
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("vi-VN").format(amount) + " đ";
+  return new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(Math.round(amount)) + " đ";
 };
 
 // Calculate price before VAT
@@ -87,6 +90,15 @@ export default function BranchProductsPage() {
   const [editingProduct, setEditingProduct] = React.useState<BranchProduct | null>(null);
   const [editPrice, setEditPrice] = React.useState<string>("");
   const [savingPrice, setSavingPrice] = React.useState(false);
+
+  // Bulk price adjustment state
+  const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = React.useState(false);
+  const [bulkPriceMode, setBulkPriceMode] = React.useState<"fixed" | "adjust">("fixed");
+  const [bulkPriceValue, setBulkPriceValue] = React.useState<string>("");
+  const [bulkPriceAdjustType, setBulkPriceAdjustType] = React.useState<"increase" | "decrease">("increase");
+  const [bulkPriceAdjustMode, setBulkPriceAdjustMode] = React.useState<"amount" | "percent">("amount");
+  const [processingBulkPrice, setProcessingBulkPrice] = React.useState(false);
+  const [bulkPriceProgress, setBulkPriceProgress] = React.useState({ current: 0, total: 0 });
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -273,6 +285,156 @@ export default function BranchProductsPage() {
   // Get effective price (customPrice or original price)
   const getEffectivePrice = (product: BranchProduct) => {
     return product.customPrice !== null ? product.customPrice : product.price;
+  };
+
+  // Open bulk price dialog
+  const handleOpenBulkPriceDialog = () => {
+    setBulkPriceMode("fixed");
+    setBulkPriceValue("");
+    setBulkPriceAdjustType("increase");
+    setBulkPriceAdjustMode("amount");
+    setBulkPriceDialogOpen(true);
+  };
+
+  // Close bulk price dialog
+  const handleCloseBulkPriceDialog = () => {
+    setBulkPriceDialogOpen(false);
+    setBulkPriceValue("");
+    setBulkPriceProgress({ current: 0, total: 0 });
+  };
+
+  // Calculate new price based on adjustment settings
+  const calculateNewPrice = (currentPrice: number, originalPrice: number): number | null => {
+    if (bulkPriceMode === "fixed") {
+      const value = Number(bulkPriceValue);
+      if (isNaN(value) || value < 0) return null;
+      return Math.round(value);
+    } else {
+      // Adjust mode
+      const value = Number(bulkPriceValue);
+      if (isNaN(value) || value < 0) return null;
+
+      let adjustment = 0;
+      if (bulkPriceAdjustMode === "percent") {
+        adjustment = Math.round(originalPrice * value / 100);
+      } else {
+        adjustment = value;
+      }
+
+      if (bulkPriceAdjustType === "decrease") {
+        adjustment = -adjustment;
+      }
+
+      const newPrice = originalPrice + adjustment;
+      return Math.max(0, Math.round(newPrice));
+    }
+  };
+
+  // Bulk update prices
+  const handleBulkPriceUpdate = async () => {
+    if (selectedProductIds.size === 0 || !bulkPriceValue) return;
+
+    const selectedProducts = products.filter(p => selectedProductIds.has(p.id));
+    const total = selectedProducts.length;
+
+    setProcessingBulkPrice(true);
+    setBulkPriceProgress({ current: 0, total });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedProducts.length; i++) {
+      const product = selectedProducts[i];
+      const currentPrice = getEffectivePrice(product);
+      const newPrice = calculateNewPrice(currentPrice, product.price);
+
+      if (newPrice === null) {
+        failCount++;
+        continue;
+      }
+
+      try {
+        const result = await branchProductService.update(filterBranchId, product.id, {
+          customPrice: newPrice,
+        });
+        setProducts(prev => prev.map(p =>
+          p.id === product.id ? { ...p, customPrice: result.customPrice } : p
+        ));
+        successCount++;
+      } catch (error) {
+        console.error(`Error updating price for ${product.name}:`, error);
+        failCount++;
+      }
+
+      setBulkPriceProgress({ current: i + 1, total });
+    }
+
+    setProcessingBulkPrice(false);
+    setSelectedProductIds(new Set());
+    handleCloseBulkPriceDialog();
+
+    if (failCount === 0) {
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật giá cho ${successCount} món ăn`,
+      });
+    } else {
+      toast({
+        title: "Hoàn thành",
+        description: `Thành công: ${successCount}, Thất bại: ${failCount}`,
+        variant: failCount === total ? "destructive" : "default",
+      });
+    }
+  };
+
+  // Bulk reset prices to original
+  const handleBulkResetPrice = async () => {
+    if (selectedProductIds.size === 0) return;
+
+    const selectedProducts = products.filter(p => selectedProductIds.has(p.id) && p.customPrice !== null);
+
+    if (selectedProducts.length === 0) {
+      toast({
+        title: "Thông báo",
+        description: "Không có món nào có giá riêng để khôi phục",
+      });
+      return;
+    }
+
+    const total = selectedProducts.length;
+    setProcessingBulkPrice(true);
+    setBulkPriceProgress({ current: 0, total });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedProducts.length; i++) {
+      const product = selectedProducts[i];
+
+      try {
+        await branchProductService.update(filterBranchId, product.id, {
+          customPrice: null,
+        });
+        setProducts(prev => prev.map(p =>
+          p.id === product.id ? { ...p, customPrice: null } : p
+        ));
+        successCount++;
+      } catch (error) {
+        console.error(`Error resetting price for ${product.name}:`, error);
+        failCount++;
+      }
+
+      setBulkPriceProgress({ current: i + 1, total });
+    }
+
+    setProcessingBulkPrice(false);
+    setSelectedProductIds(new Set());
+    setBulkPriceProgress({ current: 0, total: 0 });
+
+    toast({
+      title: "Thành công",
+      description: `Đã khôi phục giá gốc cho ${successCount} món ăn`,
+    });
   };
 
   // Bulk toggle availability
@@ -465,7 +627,7 @@ export default function BranchProductsPage() {
           </div>
           {/* Bulk actions */}
           {selectedProductIds.size > 0 && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t flex-wrap">
               <span className="text-sm text-muted-foreground">
                 Đã chọn {selectedProductIds.size} món:
               </span>
@@ -474,6 +636,7 @@ export default function BranchProductsPage() {
                 variant="outline"
                 onClick={() => handleBulkToggle(true)}
                 className="text-green-600 border-green-600 hover:bg-green-50"
+                disabled={processingBulkPrice}
               >
                 <Check className="mr-1 h-4 w-4" />
                 Bật tất cả
@@ -483,14 +646,45 @@ export default function BranchProductsPage() {
                 variant="outline"
                 onClick={() => handleBulkToggle(false)}
                 className="text-red-600 border-red-600 hover:bg-red-50"
+                disabled={processingBulkPrice}
               >
                 <X className="mr-1 h-4 w-4" />
                 Tắt tất cả
+              </Button>
+              <div className="h-4 w-px bg-border" />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleOpenBulkPriceDialog}
+                className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                disabled={processingBulkPrice}
+              >
+                <DollarSign className="mr-1 h-4 w-4" />
+                Điều chỉnh giá
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkResetPrice}
+                disabled={processingBulkPrice}
+              >
+                {processingBulkPrice && bulkPriceProgress.total > 0 ? (
+                  <>
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    {bulkPriceProgress.current}/{bulkPriceProgress.total}
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="mr-1 h-4 w-4" />
+                    Khôi phục giá gốc
+                  </>
+                )}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setSelectedProductIds(new Set())}
+                disabled={processingBulkPrice}
               >
                 Bỏ chọn
               </Button>
@@ -842,6 +1036,177 @@ export default function BranchProductsPage() {
             <Button type="button" onClick={handleSaveCustomPrice} disabled={savingPrice}>
               {savingPrice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Price Adjustment Dialog */}
+      <Dialog open={bulkPriceDialogOpen} onOpenChange={handleCloseBulkPriceDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Điều chỉnh giá hàng loạt</DialogTitle>
+            <DialogDescription>
+              Cập nhật giá cho {selectedProductIds.size} món đã chọn tại chi nhánh này.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            {/* Mode selection */}
+            <div className="grid gap-2">
+              <Label>Phương thức điều chỉnh</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={bulkPriceMode === "fixed" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBulkPriceMode("fixed")}
+                  className="flex-1"
+                >
+                  Đặt giá cố định
+                </Button>
+                <Button
+                  type="button"
+                  variant={bulkPriceMode === "adjust" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBulkPriceMode("adjust")}
+                  className="flex-1"
+                >
+                  Tăng/Giảm từ giá gốc
+                </Button>
+              </div>
+            </div>
+
+            {bulkPriceMode === "fixed" ? (
+              /* Fixed price input */
+              <div className="grid gap-2">
+                <Label htmlFor="bulkPrice">Giá mới (đã VAT)</Label>
+                <Input
+                  id="bulkPrice"
+                  type="number"
+                  placeholder="Nhập giá mới cho tất cả món đã chọn"
+                  value={bulkPriceValue}
+                  onChange={(e) => setBulkPriceValue(e.target.value)}
+                  min={0}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Tất cả {selectedProductIds.size} món đã chọn sẽ có cùng giá này.
+                </p>
+              </div>
+            ) : (
+              /* Adjust price inputs */
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label>Loại điều chỉnh</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={bulkPriceAdjustType === "increase" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setBulkPriceAdjustType("increase")}
+                      className="flex-1"
+                    >
+                      Tăng giá
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={bulkPriceAdjustType === "decrease" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setBulkPriceAdjustType("decrease")}
+                      className="flex-1"
+                    >
+                      Giảm giá
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Cách tính</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={bulkPriceAdjustMode === "amount" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setBulkPriceAdjustMode("amount")}
+                      className="flex-1"
+                    >
+                      Số tiền (VNĐ)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={bulkPriceAdjustMode === "percent" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setBulkPriceAdjustMode("percent")}
+                      className="flex-1"
+                    >
+                      Phần trăm (%)
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="bulkAdjustValue">
+                    Giá trị {bulkPriceAdjustType === "increase" ? "tăng" : "giảm"} {bulkPriceAdjustMode === "percent" ? "(%)" : "(VNĐ)"}
+                  </Label>
+                  <Input
+                    id="bulkAdjustValue"
+                    type="number"
+                    placeholder={bulkPriceAdjustMode === "percent" ? "Ví dụ: 10" : "Ví dụ: 5000"}
+                    value={bulkPriceValue}
+                    onChange={(e) => setBulkPriceValue(e.target.value)}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {bulkPriceAdjustType === "increase" ? "Tăng" : "Giảm"} {bulkPriceAdjustMode === "percent" ? "phần trăm" : "số tiền cố định"} từ giá gốc của từng món.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Progress indicator */}
+            {processingBulkPrice && bulkPriceProgress.total > 0 && (
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Đang xử lý...</span>
+                  <span className="text-sm text-muted-foreground">
+                    {bulkPriceProgress.current}/{bulkPriceProgress.total}
+                  </span>
+                </div>
+                <div className="h-2 bg-background rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${(bulkPriceProgress.current / bulkPriceProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseBulkPriceDialog}
+              disabled={processingBulkPrice}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleBulkPriceUpdate}
+              disabled={processingBulkPrice || !bulkPriceValue}
+            >
+              {processingBulkPrice ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Áp dụng
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
