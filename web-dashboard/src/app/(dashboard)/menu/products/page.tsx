@@ -2154,11 +2154,6 @@ export default function ProductsPage() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {product.name}
-                          {product.seasonalPrice && (
-                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs" title={product.seasonalPrice.seasonalPriceName}>
-                              Giá thời vụ
-                            </Badge>
-                          )}
                           {newProductIds.has(product.id) && (
                             <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Mới</Badge>
                           )}
@@ -2179,18 +2174,18 @@ export default function ProductsPage() {
                     {isColumnVisible("price") && (
                       <TableCell className="text-right">
                         {product.seasonalPrice ? (
-                          <div className="flex flex-col items-end gap-0.5">
+                          <div
+                            className="flex items-center justify-end gap-1.5 cursor-help"
+                            title={`Giá gốc: ${formatCurrency(product.price)} | ${product.seasonalPrice.seasonalPriceName}`}
+                          >
                             <span className="font-medium text-orange-600">
                               {formatCurrency(product.seasonalPrice.adjustedPrice)}
                             </span>
-                            <span className="text-xs text-muted-foreground line-through">
-                              {formatCurrency(product.price)}
-                            </span>
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-orange-50 text-orange-600 border-orange-200">
+                            <span className="text-[10px] text-orange-500">
                               {product.seasonalPrice.adjustmentType === 'percentage'
                                 ? `+${product.seasonalPrice.adjustmentValue}%`
                                 : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
-                            </Badge>
+                            </span>
                           </div>
                         ) : (
                           formatCurrency(product.price)
