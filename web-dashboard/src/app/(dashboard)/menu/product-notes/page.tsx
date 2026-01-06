@@ -353,9 +353,9 @@ export default function ProductNotesPage() {
           description="Chọn một thương hiệu từ bộ lọc phía trên để quản lý ghi chú"
         />
       ) : (
-      <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-12 gap-6 flex-1 min-h-0 overflow-hidden">
         {/* Left panel - Notes list */}
-        <div className="col-span-5">
+        <div className="col-span-5 h-full overflow-hidden">
           <Card className="flex flex-col h-full overflow-hidden">
             <CardHeader className="flex-shrink-0 border-b pb-3">
               <div className="flex items-center justify-between">
@@ -463,7 +463,7 @@ export default function ProductNotesPage() {
         </div>
 
         {/* Right panel - Product assignment */}
-        <div className="col-span-7">
+        <div className="col-span-7 h-full overflow-hidden">
           <Card className="flex flex-col h-full overflow-hidden">
             {!selectedNote ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6">
