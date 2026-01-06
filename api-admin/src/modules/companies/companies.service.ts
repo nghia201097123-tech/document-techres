@@ -380,4 +380,240 @@ export class CompaniesService {
     company.isActive = !company.isActive;
     return this.companyRepository.save(company);
   }
+
+  /**
+   * Quick Create - Tạo nhanh công ty chỉ từ tên
+   * Tự động tạo alias, brand, branch, department, staff
+   */
+  async quickCreate(companyName: string, isTrial: boolean = false): Promise<CreateCompanyWizardResponseDto> {
+    // Tạo alias từ tên công ty
+    const alias = this.generateAliasFromName(companyName);
+
+    // Tạo email giả từ alias
+    const email = `${alias.toLowerCase()}@restaurant.vn`;
+
+    // Tạo wizard data với thông tin tự động
+    const wizardDto: CreateCompanyWizardDto = {
+      company: {
+        name: companyName,
+        alias,
+        email,
+        isTrial,
+      },
+      brand: {
+        name: companyName,
+        businessModel: BusinessModel.FULL_SYSTEM,
+      },
+      branch: {
+        name: 'Chi nhánh chính',
+        openTime: '08:00',
+        closeTime: '22:00',
+      },
+      staff: {
+        name: 'Chủ nhà hàng',
+        usernamePrefix: 'tr',
+        role: 'owner',
+      },
+    };
+
+    return this.createWithWizard(wizardDto);
+  }
+
+  /**
+   * Tạo alias từ tên công ty (lấy chữ cái đầu mỗi từ, viết hoa)
+   */
+  private generateAliasFromName(name: string): string {
+    const normalized = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+
+    const words = normalized.split(/\s+/).filter(w => w.length > 0);
+    let alias = words.map(w => w[0].toUpperCase()).join('');
+
+    // Đảm bảo alias có ít nhất 3 ký tự
+    if (alias.length < 3) {
+      alias = normalized.substring(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+
+    // Thêm số ngẫu nhiên để tránh trùng
+    const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `${alias}${randomSuffix}`;
+  }
+
+  /**
+   * Clone - Nhân bản công ty
+   */
+  async clone(
+    sourceCompanyId: string,
+    newCompanyName: string,
+    newAlias: string,
+    newEmail: string,
+    isTrial: boolean = false,
+    cloneOptions: {
+      brands: boolean;
+      branches: boolean;
+      products: boolean;
+      categories: boolean;
+      staff: boolean;
+    },
+  ): Promise<CreateCompanyWizardResponseDto> {
+    // Tìm công ty nguồn
+    const sourceCompany = await this.companyRepository.findOne({
+      where: { id: sourceCompanyId },
+    });
+    if (!sourceCompany) {
+      throw new NotFoundException('Không tìm thấy công ty nguồn');
+    }
+
+    // Validate unique alias
+    const existingAlias = await this.companyRepository.findOne({
+      where: { alias: newAlias },
+    });
+    if (existingAlias) {
+      throw new ConflictException('Tiên định danh đã tồn tại');
+    }
+
+    // Lấy thông tin brands, branches từ công ty nguồn
+    const sourceBrands = await this.brandRepository.find({
+      where: { tenantId: sourceCompany.code },
+    });
+
+    const firstBrand = sourceBrands[0];
+    const sourceBranches = firstBrand
+      ? await this.branchRepository.find({ where: { brandId: firstBrand.id } })
+      : [];
+
+    // Tạo wizard data từ thông tin công ty nguồn
+    const wizardDto: CreateCompanyWizardDto = {
+      company: {
+        name: newCompanyName,
+        alias: newAlias,
+        email: newEmail,
+        isTrial,
+        taxCode: sourceCompany.taxCode,
+        phone: sourceCompany.phone,
+        representative: sourceCompany.representative,
+      },
+      brand: {
+        name: firstBrand?.name || newCompanyName,
+        description: firstBrand?.description,
+        businessModel: firstBrand?.businessModel || BusinessModel.FULL_SYSTEM,
+      },
+      branch: {
+        name: sourceBranches[0]?.name || 'Chi nhánh chính',
+        phone: sourceBranches[0]?.phone,
+        openTime: sourceBranches[0]?.openTime || '08:00',
+        closeTime: sourceBranches[0]?.closeTime || '22:00',
+      },
+      staff: {
+        name: 'Chủ nhà hàng',
+        usernamePrefix: 'tr',
+        role: 'owner',
+      },
+    };
+
+    // Tạo công ty mới
+    const result = await this.createWithWizard(wizardDto);
+
+    // TODO: Nếu cloneOptions.products = true, clone danh mục và sản phẩm
+    // TODO: Nếu cloneOptions.categories = true, clone danh mục
+    // Đây là các tính năng mở rộng có thể thêm sau
+
+    return result;
+  }
+
+  /**
+   * Lấy thông tin chi tiết để clone
+   */
+  async getDetailsForClone(id: string) {
+    const company = await this.findOne(id);
+    const tenantId = company.code;
+
+    const brandsCount = await this.brandRepository.count({ where: { tenantId } });
+    const branchesCount = await this.branchRepository.count({ where: { tenantId } });
+    const staffCount = await this.staffRepository.count({ where: { tenantId } });
+
+    // TODO: Add products and categories count when those entities are available
+
+    return {
+      company,
+      brandsCount,
+      branchesCount,
+      productsCount: 0, // Placeholder
+      categoriesCount: 0, // Placeholder
+      staffCount,
+    };
+  }
+
+  /**
+   * Bulk Create - Tạo công ty với nhiều chi nhánh cùng lúc
+   */
+  async createWithBranches(
+    dto: CreateCompanyWizardDto & {
+      additionalBranches?: Array<{
+        name: string;
+        addressDetail?: string;
+        provinceCode?: string;
+        wardCode?: string;
+        phone?: string;
+      }>;
+    },
+  ): Promise<CreateCompanyWizardResponseDto & {
+    additionalBranches?: Array<{ id: string; name: string; code: string }>;
+  }> {
+    // Tạo công ty với wizard (tạo company, brand, branch chính, department, staff)
+    const result = await this.createWithWizard(dto);
+
+    // Nếu có chi nhánh bổ sung
+    if (dto.additionalBranches && dto.additionalBranches.length > 0) {
+      const tenantId = result.company.code;
+      const brandId = result.brand.id;
+      const additionalBranches: Array<{ id: string; name: string; code: string }> = [];
+
+      for (const branchData of dto.additionalBranches) {
+        // Auto-generate branch code từ tên chi nhánh
+        let branchCode = this.generateCodeFromName(branchData.name, 'CN');
+        let existingBranch = await this.branchRepository.findOne({
+          where: { code: branchCode },
+        });
+        // Nếu trùng, thử lại với số khác
+        while (existingBranch) {
+          branchCode = this.generateCodeFromName(branchData.name, 'CN');
+          existingBranch = await this.branchRepository.findOne({
+            where: { code: branchCode },
+          });
+        }
+
+        const branch = this.branchRepository.create({
+          tenantId,
+          brandId,
+          name: branchData.name,
+          code: branchCode,
+          addressDetail: branchData.addressDetail,
+          provinceCode: branchData.provinceCode,
+          wardCode: branchData.wardCode,
+          phone: branchData.phone,
+          openTime: '08:00',
+          closeTime: '22:00',
+          maxConnections: 3,
+        });
+        const savedBranch = await this.branchRepository.save(branch);
+
+        additionalBranches.push({
+          id: savedBranch.id,
+          name: savedBranch.name,
+          code: savedBranch.code,
+        });
+      }
+
+      return {
+        ...result,
+        additionalBranches,
+      };
+    }
+
+    return result;
+  }
 }

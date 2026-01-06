@@ -90,6 +90,41 @@ export interface WizardResponse {
   staff: { id: string; name: string; username: string; temporaryPassword: string };
 }
 
+// Quick Create - chỉ cần tên công ty
+export interface QuickCreateData {
+  companyName: string;
+  isTrial?: boolean;
+}
+
+// Bulk Create Branches
+export interface BulkBranchData {
+  name: string;
+  addressDetail?: string;
+  provinceCode?: string;
+  wardCode?: string;
+  phone?: string;
+}
+
+export interface CreateCompanyWithBranchesData extends CreateCompanyWizardData {
+  additionalBranches?: BulkBranchData[];
+}
+
+// Clone Company
+export interface CloneCompanyData {
+  sourceCompanyId: string;
+  newCompanyName: string;
+  newAlias: string;
+  newEmail: string;
+  isTrial?: boolean;
+  cloneOptions: {
+    brands: boolean;
+    branches: boolean;
+    products: boolean;
+    categories: boolean;
+    staff: boolean;
+  };
+}
+
 export const companyService = {
   async getList(params?: CompanyListParams): Promise<CompanyListResponse> {
     // Filter out empty/undefined params
@@ -140,5 +175,36 @@ export const companyService = {
       params: { limit: 100 },
     });
     return response.data.data;
+  },
+
+  // Quick Create - tự động điền thông tin từ tên công ty
+  async quickCreate(data: QuickCreateData): Promise<WizardResponse> {
+    const response = await api.post<WizardResponse>("/companies/quick-create", data);
+    return response.data;
+  },
+
+  // Create with multiple branches
+  async createWithBranches(data: CreateCompanyWithBranchesData): Promise<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }> {
+    const response = await api.post<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }>("/companies/wizard-bulk", data);
+    return response.data;
+  },
+
+  // Clone company
+  async clone(data: CloneCompanyData): Promise<WizardResponse> {
+    const response = await api.post<WizardResponse>("/companies/clone", data);
+    return response.data;
+  },
+
+  // Get company details for cloning (includes brands, branches count)
+  async getDetailsForClone(id: string): Promise<{
+    company: Company;
+    brandsCount: number;
+    branchesCount: number;
+    productsCount: number;
+    categoriesCount: number;
+    staffCount: number;
+  }> {
+    const response = await api.get(`/companies/${id}/clone-details`);
+    return response.data;
   },
 };

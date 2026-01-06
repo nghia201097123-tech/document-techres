@@ -17,6 +17,9 @@ import {
   CreateCompanyWizardDto,
   CreateCompanyWizardResponseDto,
 } from './dto/create-company-wizard.dto';
+import { QuickCreateDto } from './dto/quick-create.dto';
+import { CloneCompanyDto } from './dto/clone-company.dto';
+import { CreateCompanyWithBranchesDto } from './dto/bulk-create-branches.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
@@ -52,6 +55,70 @@ export class CompaniesController {
   })
   createWithWizard(@Body() wizardDto: CreateCompanyWizardDto) {
     return this.companiesService.createWithWizard(wizardDto);
+  }
+
+  @Post('quick-create')
+  @ApiOperation({
+    summary: 'Quick Create - Tạo nhanh công ty chỉ từ tên',
+    description:
+      'Tạo nhanh công ty với tất cả thông tin tự động điền. ' +
+      'Chỉ cần nhập tên công ty, hệ thống sẽ tự động tạo: ' +
+      'alias, brand, branch, department, staff.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo thành công công ty',
+    type: CreateCompanyWizardResponseDto,
+  })
+  quickCreate(@Body() dto: QuickCreateDto) {
+    return this.companiesService.quickCreate(dto.companyName, dto.isTrial);
+  }
+
+  @Post('wizard-bulk')
+  @ApiOperation({
+    summary: 'Create company with multiple branches',
+    description:
+      'Tạo công ty với wizard và thêm nhiều chi nhánh cùng lúc. ' +
+      'Ngoài chi nhánh chính trong wizard, có thể thêm các chi nhánh bổ sung.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo thành công công ty với nhiều chi nhánh',
+  })
+  createWithBranches(@Body() dto: CreateCompanyWithBranchesDto) {
+    return this.companiesService.createWithBranches(dto);
+  }
+
+  @Post('clone')
+  @ApiOperation({
+    summary: 'Clone - Nhân bản công ty',
+    description:
+      'Nhân bản công ty từ công ty có sẵn. ' +
+      'Có thể chọn clone: brands, branches, products, categories, staff.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Nhân bản thành công công ty',
+    type: CreateCompanyWizardResponseDto,
+  })
+  clone(@Body() dto: CloneCompanyDto) {
+    return this.companiesService.clone(
+      dto.sourceCompanyId,
+      dto.newCompanyName,
+      dto.newAlias,
+      dto.newEmail,
+      dto.isTrial,
+      dto.cloneOptions,
+    );
+  }
+
+  @Get(':id/clone-details')
+  @ApiOperation({
+    summary: 'Get company details for cloning',
+    description: 'Lấy thông tin chi tiết công ty để hiển thị khi clone',
+  })
+  getDetailsForClone(@Param('id') id: string) {
+    return this.companiesService.getDetailsForClone(id);
   }
 
   @Get()

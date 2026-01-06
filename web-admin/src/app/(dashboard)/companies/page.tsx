@@ -10,6 +10,9 @@ import {
   Eye,
   Loader2,
   Power,
+  Zap,
+  Files,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +37,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
@@ -43,6 +47,8 @@ import { formatDateTime } from "@/lib/utils";
 import { companyService } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
 import { CompanyWizard } from "@/components/company-wizard";
+import { QuickCreateDialog } from "@/components/quick-create-dialog";
+import { CloneCompanyDialog } from "@/components/clone-company-dialog";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 
@@ -80,6 +86,9 @@ export default function CompaniesPage() {
   const [companies, setCompanies] = React.useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = React.useState(false);
+  const [isCloneOpen, setIsCloneOpen] = React.useState(false);
+  const [companyToClone, setCompanyToClone] = React.useState<Company | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
   const [formData, setFormData] = React.useState<CompanyFormData>(initialFormData);
@@ -229,10 +238,31 @@ export default function CompaniesPage() {
             Quản lý danh sách các công ty trong hệ thống
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm công ty
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsQuickCreateOpen(true)}>
+            <Zap className="mr-2 h-4 w-4 text-yellow-500" />
+            Tạo nhanh
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm công ty
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleOpenCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Tạo theo wizard (4 bước)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsQuickCreateOpen(true)}>
+                <Zap className="mr-2 h-4 w-4 text-yellow-500" />
+                Tạo nhanh (1 bước)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <Card>
@@ -336,6 +366,15 @@ export default function CompaniesPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => {
+                          setCompanyToClone(company);
+                          setIsCloneOpen(true);
+                        }}>
+                          <Files className="mr-2 h-4 w-4 text-blue-500" />
+                          Nhân bản
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
                           <Power className="mr-2 h-4 w-4" />
                           {company.isActive ? "Tạm ngưng" : "Kích hoạt"}
@@ -497,6 +536,21 @@ export default function CompaniesPage() {
       <CompanyWizard
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
+        onSuccess={handleWizardSuccess}
+      />
+
+      {/* Quick Create Dialog */}
+      <QuickCreateDialog
+        open={isQuickCreateOpen}
+        onOpenChange={setIsQuickCreateOpen}
+        onSuccess={handleWizardSuccess}
+      />
+
+      {/* Clone Company Dialog */}
+      <CloneCompanyDialog
+        open={isCloneOpen}
+        onOpenChange={setIsCloneOpen}
+        sourceCompany={companyToClone}
         onSuccess={handleWizardSuccess}
       />
     </div>
