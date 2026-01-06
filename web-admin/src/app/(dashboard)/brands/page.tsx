@@ -59,6 +59,7 @@ import { brandService } from "@/services/brand-service";
 import { companyService } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
 import { BrandWizard } from "@/components/brand-wizard";
+import { ImagePicker } from "@/components/ui/image-picker";
 
 const businessModelLabels: Record<BusinessModel, string> = {
   order_only: "Chỉ Order",
@@ -730,33 +731,12 @@ export default function BrandsPage() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="logo">URL Logo</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="logo"
-                    name="logo"
-                    value={formData.logo}
-                    onChange={handleChange}
-                    placeholder="https://example.com/logo.png"
-                    disabled={isViewMode}
-                    className="flex-1"
-                  />
-                  {formData.logo && (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border">
-                      <img
-                        src={formData.logo}
-                        alt="Preview"
-                        className="h-8 w-8 rounded object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '';
-                          (e.target as HTMLImageElement).alt = 'Invalid';
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ImagePicker
+                value={formData.logo}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                disabled={isViewMode}
+                label="Logo"
+              />
               <div className="space-y-2">
                 <Label htmlFor="businessModel">Mô hình kinh doanh *</Label>
                 <Select
