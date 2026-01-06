@@ -90,9 +90,10 @@ export interface WizardResponse {
   staff: { id: string; name: string; username: string; temporaryPassword: string };
 }
 
-// Quick Create - chỉ cần tên công ty
+// Quick Create - tên công ty + tiên định danh
 export interface QuickCreateData {
   companyName: string;
+  alias: string;
   isTrial?: boolean;
 }
 
@@ -177,7 +178,13 @@ export const companyService = {
     return response.data.data;
   },
 
-  // Quick Create - tự động điền thông tin từ tên công ty
+  // Check if alias is available
+  async checkAlias(alias: string): Promise<{ available: boolean; alias: string }> {
+    const response = await api.get<{ available: boolean; alias: string }>(`/companies/check-alias/${alias}`);
+    return response.data;
+  },
+
+  // Quick Create - tạo nhanh công ty với tên và tiên định danh
   async quickCreate(data: QuickCreateData): Promise<WizardResponse> {
     const response = await api.post<WizardResponse>("/companies/quick-create", data);
     return response.data;

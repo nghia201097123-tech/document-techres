@@ -382,13 +382,26 @@ export class CompaniesService {
   }
 
   /**
-   * Quick Create - Tạo nhanh công ty chỉ từ tên
-   * Tự động tạo alias, brand, branch, department, staff
+   * Check if alias is available
    */
-  async quickCreate(companyName: string, isTrial: boolean = false): Promise<CreateCompanyWizardResponseDto> {
-    // Tạo alias từ tên công ty
-    const alias = this.generateAliasFromName(companyName);
+  async checkAlias(alias: string): Promise<{ available: boolean; alias: string }> {
+    const existing = await this.companyRepository.findOne({
+      where: [
+        { alias: alias },
+        { code: alias },
+      ],
+    });
+    return {
+      available: !existing,
+      alias,
+    };
+  }
 
+  /**
+   * Quick Create - Tạo nhanh công ty với tên và tiên định danh
+   * Tự động tạo brand, branch, department, staff
+   */
+  async quickCreate(companyName: string, alias: string, isTrial: boolean = false): Promise<CreateCompanyWizardResponseDto> {
     // Tạo email giả từ alias
     const email = `${alias.toLowerCase()}@restaurant.vn`;
 

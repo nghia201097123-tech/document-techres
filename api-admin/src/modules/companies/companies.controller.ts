@@ -57,13 +57,25 @@ export class CompaniesController {
     return this.companiesService.createWithWizard(wizardDto);
   }
 
+  @Get('check-alias/:alias')
+  @ApiOperation({
+    summary: 'Check if alias is available',
+    description: 'Kiểm tra xem tiên định danh đã tồn tại chưa',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Kết quả kiểm tra',
+  })
+  checkAlias(@Param('alias') alias: string) {
+    return this.companiesService.checkAlias(alias);
+  }
+
   @Post('quick-create')
   @ApiOperation({
-    summary: 'Quick Create - Tạo nhanh công ty chỉ từ tên',
+    summary: 'Quick Create - Tạo nhanh công ty với tên và tiên định danh',
     description:
-      'Tạo nhanh công ty với tất cả thông tin tự động điền. ' +
-      'Chỉ cần nhập tên công ty, hệ thống sẽ tự động tạo: ' +
-      'alias, brand, branch, department, staff.',
+      'Tạo nhanh công ty với thông tin cơ bản. ' +
+      'Hệ thống sẽ tự động tạo: brand, branch, department, staff.',
   })
   @ApiResponse({
     status: 201,
@@ -71,7 +83,7 @@ export class CompaniesController {
     type: CreateCompanyWizardResponseDto,
   })
   quickCreate(@Body() dto: QuickCreateDto) {
-    return this.companiesService.quickCreate(dto.companyName, dto.isTrial);
+    return this.companiesService.quickCreate(dto.companyName, dto.alias, dto.isTrial);
   }
 
   @Post('wizard-bulk')
