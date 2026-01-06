@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Store, Loader2, Search, Check, X, Package, Filter } from "lucide-react";
+import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +56,11 @@ export default function BranchProductsPage() {
   const [availabilityFilter, setAvailabilityFilter] = React.useState<string>("all");
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
 
   // Load products when branch changes
   const loadProducts = React.useCallback(async (branchId: string) => {
@@ -188,6 +193,19 @@ export default function BranchProductsPage() {
       return matchesSearch && matchesType && matchesAvailability;
     });
   }, [products, search, typeFilter, availabilityFilter]);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, typeFilter, availabilityFilter, filterBranchId]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredProducts.length);
+  const paginatedProducts = React.useMemo(() => {
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, startIndex, endIndex]);
 
   // Selection helpers
   const isAllSelected = filteredProducts.length > 0 &&
@@ -396,7 +414,7 @@ export default function BranchProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product) => (
+                  {paginatedProducts.map((product) => (
                     <TableRow key={product.id} className={cn(!product.isAvailable && "opacity-60")}>
                       <TableCell>
                         <Checkbox
@@ -441,6 +459,66 @@ export default function BranchProductsPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between px-2 py-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Hiển thị {startIndex + 1}-{endIndex} / {filteredProducts.length} món</span>
+                <span className="text-muted-foreground/50">|</span>
+                <div className="flex items-center gap-2">
+                  <span>Số dòng:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Đầu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Trang {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Cuối
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
