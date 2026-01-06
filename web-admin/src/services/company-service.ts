@@ -21,6 +21,7 @@ interface CompanyListResponse {
 interface CreateCompanyData {
   name: string;
   code: string;
+  logo?: string;
   taxCode?: string;
   address?: string;
   phone?: string;
@@ -153,7 +154,7 @@ export const companyService = {
   },
 
   async update(id: string, data: UpdateCompanyData): Promise<Company> {
-    const response = await api.put<Company>(`/companies/${id}`, data);
+    const response = await api.patch<Company>(`/companies/${id}`, data);
     return response.data;
   },
 

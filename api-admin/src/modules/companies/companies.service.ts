@@ -366,7 +366,12 @@ export class CompaniesService {
       }
     }
 
-    Object.assign(company, updateCompanyDto);
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = updateCompanyDto as any;
+    if (logo !== undefined) {
+      company.logoUrl = logo;
+    }
+    Object.assign(company, restDto);
     return this.companyRepository.save(company);
   }
 
