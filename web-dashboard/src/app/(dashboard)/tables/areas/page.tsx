@@ -314,8 +314,8 @@ export default function AreasPage() {
   const filteredAreas = areas;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý khu vực</h1>
           <p className="text-muted-foreground">Phân chia khu vực trong nhà hàng (Tầng 1, Tầng 2, Sân vườn...)</p>
@@ -343,8 +343,8 @@ export default function AreasPage() {
           description="Chọn một chi nhánh từ bộ lọc phía trên để xem danh sách khu vực"
         />
       ) : (
-      <Card>
-        <CardHeader>
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách khu vực</CardTitle>
@@ -359,7 +359,7 @@ export default function AreasPage() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -373,8 +373,9 @@ export default function AreasPage() {
               </p>
             </div>
           ) : (
+            <div className="flex-1 overflow-auto min-h-0">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   {isColumnVisible("name") && <TableHead>Tên khu vực</TableHead>}
                   {isColumnVisible("description") && <TableHead>Mô tả</TableHead>}
@@ -448,6 +449,7 @@ export default function AreasPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

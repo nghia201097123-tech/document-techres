@@ -403,8 +403,8 @@ export default function SeasonalPricesPage() {
   const filteredPrices = seasonalPrices;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý giá thời vụ</h1>
           <p className="text-muted-foreground">Điều chỉnh giá theo mùa vụ cho các sản phẩm (không bao gồm combo và topping)</p>
@@ -426,8 +426,8 @@ export default function SeasonalPricesPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách giá thời vụ</CardTitle>
@@ -442,7 +442,7 @@ export default function SeasonalPricesPage() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBranchId ? (
             <FilterRequiredPlaceholder
               title="Vui lòng chọn chi nhánh"
@@ -461,9 +461,10 @@ export default function SeasonalPricesPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
+            <div className="flex-1 overflow-auto min-h-0">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card">
+                  <TableRow>
                   {isColumnVisible("name") && <TableHead>Tên giá thời vụ</TableHead>}
                   {isColumnVisible("products") && <TableHead>Sản phẩm áp dụng</TableHead>}
                   {isColumnVisible("adjustment") && <TableHead>Điều chỉnh</TableHead>}
@@ -572,7 +573,8 @@ export default function SeasonalPricesPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

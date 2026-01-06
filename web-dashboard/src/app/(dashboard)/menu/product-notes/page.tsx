@@ -327,8 +327,8 @@ export default function ProductNotesPage() {
   const allFilteredSelected = filteredProducts.length > 0 && selectedInFiltered === filteredProducts.length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý ghi chú món ăn</h1>
           <p className="text-muted-foreground">Tạo các ghi chú để gán cho món ăn (VD: Không hành, Ít đá, Cay vừa)</p>
@@ -353,11 +353,11 @@ export default function ProductNotesPage() {
           description="Chọn một thương hiệu từ bộ lọc phía trên để quản lý ghi chú"
         />
       ) : (
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
         {/* Left panel - Notes list */}
         <div className="col-span-5">
-          <Card className="h-[calc(100vh-220px)]">
-            <CardHeader className="pb-3">
+          <Card className="flex flex-col h-full overflow-hidden">
+            <CardHeader className="flex-shrink-0 border-b pb-3">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-lg">Danh sách ghi chú</CardTitle>
@@ -374,8 +374,8 @@ export default function ProductNotesPage() {
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-380px)]">
+            <CardContent className="flex-1 overflow-hidden p-0">
+              <ScrollArea className="h-full">
                 {loading ? (
                   <div className="flex items-center justify-center py-10">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -464,7 +464,7 @@ export default function ProductNotesPage() {
 
         {/* Right panel - Product assignment */}
         <div className="col-span-7">
-          <Card className="h-[calc(100vh-220px)]">
+          <Card className="flex flex-col h-full overflow-hidden">
             {!selectedNote ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6">
                 <ChevronRight className="h-12 w-12 text-muted-foreground mb-4" />
@@ -475,7 +475,7 @@ export default function ProductNotesPage() {
               </div>
             ) : (
               <>
-                <CardHeader className="pb-3">
+                <CardHeader className="flex-shrink-0 border-b pb-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-lg flex items-center gap-2">
@@ -531,8 +531,8 @@ export default function ProductNotesPage() {
                     </p>
                   )}
                 </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[calc(100vh-420px)]">
+                <CardContent className="flex-1 overflow-hidden p-0">
+                  <ScrollArea className="h-full">
                     {loadingProducts ? (
                       <div className="flex items-center justify-center py-10">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

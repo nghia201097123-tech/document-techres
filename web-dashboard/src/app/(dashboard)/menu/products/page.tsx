@@ -1606,8 +1606,8 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý món ăn</h1>
           <p className="text-muted-foreground">Thêm, sửa và quản lý menu món ăn theo thương hiệu</p>
@@ -1667,8 +1667,8 @@ export default function ProductsPage() {
         className="hidden"
       />
 
-      <Card>
-        <CardHeader>
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách món ăn</CardTitle>
@@ -1882,7 +1882,7 @@ export default function ProductsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBrandId ? (
             <FilterRequiredPlaceholder
               title="Vui lòng chọn thương hiệu"
@@ -1979,8 +1979,9 @@ export default function ProductsPage() {
                   </DropdownMenu>
                 </div>
               )}
+              <div className="flex-1 overflow-auto min-h-0">
               <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead className="w-[40px]">
                     <Checkbox
@@ -2180,6 +2181,7 @@ export default function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
             </>
           )}
         </CardContent>

@@ -402,8 +402,8 @@ export default function GiftItemsPage() {
   const filteredItems = giftItems;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý món tặng</h1>
           <p className="text-muted-foreground">Chọn món ăn từ thực đơn để làm món tặng kèm (không bao gồm combo và topping)</p>
@@ -425,8 +425,8 @@ export default function GiftItemsPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách món tặng</CardTitle>
@@ -441,7 +441,7 @@ export default function GiftItemsPage() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBranchId ? (
             <FilterRequiredPlaceholder
               title="Vui lòng chọn chi nhánh"
@@ -460,9 +460,10 @@ export default function GiftItemsPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
+            <div className="flex-1 overflow-auto min-h-0">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card">
+                  <TableRow>
                   {isColumnVisible("name") && <TableHead>Món tặng</TableHead>}
                   {isColumnVisible("product") && <TableHead>Món ăn gốc</TableHead>}
                   {isColumnVisible("maxQuantity") && <TableHead>SL tối đa</TableHead>}
@@ -551,6 +552,7 @@ export default function GiftItemsPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

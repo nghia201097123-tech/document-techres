@@ -317,8 +317,8 @@ export default function CouponsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Coupon giảm giá</h1>
           <p className="text-muted-foreground">Quản lý coupon cho thu ngân sử dụng</p>
@@ -347,8 +347,8 @@ export default function CouponsPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <CardTitle className="flex items-center gap-2">
             <Tag className="h-5 w-5" />
             Danh sách coupon
@@ -357,7 +357,7 @@ export default function CouponsPage() {
             Coupon dành cho thu ngân sử dụng để giảm giá đơn hàng
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBranchId ? (
             <FilterRequiredPlaceholder
               icon={<Tag className="h-10 w-10 text-muted-foreground/50" />}
@@ -378,9 +378,10 @@ export default function CouponsPage() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
+            <div className="flex-1 overflow-auto min-h-0">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card">
+                  <TableRow>
                   {isColumnVisible("code") && <TableHead>Mã coupon</TableHead>}
                   {isColumnVisible("name") && <TableHead>Tên</TableHead>}
                   {isColumnVisible("discount") && <TableHead>Giảm giá</TableHead>}
@@ -533,6 +534,7 @@ export default function CouponsPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

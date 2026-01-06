@@ -380,8 +380,8 @@ export default function ToppingOptionsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý Topping Options</h1>
           <p className="text-muted-foreground">Tạo nhóm topping dùng chung và gán vào các món ăn</p>
@@ -659,46 +659,48 @@ export default function ToppingOptionsPage() {
 
         {/* Tab: Assign to Products */}
         <TabsContent value="assign" className="mt-4">
-          <Card>
-            <CardHeader>
+          <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <CardHeader className="flex-shrink-0 border-b">
               <CardTitle>Gán nhóm Topping vào món</CardTitle>
               <CardDescription>Chọn món để gán các nhóm topping</CardDescription>
             </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-10">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : products.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Chưa có món ăn nào</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-4">
-                  {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                      onClick={() => handleOpenAssignDialog(product)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <UtensilsCrossed className="h-5 w-5 text-primary" />
+            <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-auto min-h-0">
+                {loading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Chưa có món ăn nào</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4">
+                    {products.map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                        onClick={() => handleOpenAssignDialog(product)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <UtensilsCrossed className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            <div className="text-xs text-muted-foreground">{product.code}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-xs text-muted-foreground">{product.code}</div>
-                        </div>
+                        <Button variant="ghost" size="sm">
+                          <Package className="h-4 w-4 mr-1" />
+                          Gán
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Package className="h-4 w-4 mr-1" />
-                        Gán
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

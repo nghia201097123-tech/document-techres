@@ -262,8 +262,8 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý danh mục</h1>
           <p className="text-muted-foreground">Phân loại món ăn theo danh mục (thuộc 5 loại món)</p>
@@ -283,7 +283,7 @@ export default function CategoriesPage() {
       </div>
 
       {/* Category types */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-5 mb-4">
         {Object.entries(typeLabels).map(([key, { label, color }]) => (
           <Card key={key} className="cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="p-4">
@@ -301,8 +301,8 @@ export default function CategoriesPage() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách danh mục</CardTitle>
@@ -317,7 +317,7 @@ export default function CategoriesPage() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBrandId ? (
             <FilterRequiredPlaceholder
               title="Vui lòng chọn thương hiệu"
@@ -336,8 +336,9 @@ export default function CategoriesPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
+            <div className="flex-1 overflow-auto min-h-0">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   {isColumnVisible("name") && <TableHead>Tên danh mục</TableHead>}
                   {isColumnVisible("productType") && <TableHead>Loại món</TableHead>}
@@ -419,6 +420,7 @@ export default function CategoriesPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
