@@ -39,11 +39,11 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input value={company?.email || ""} placeholder="contact@company.vn" />
+              <Input defaultValue={company?.email || ""} placeholder="contact@company.vn" />
             </div>
             <div className="space-y-2">
               <Label>Số điện thoại</Label>
-              <Input value={company?.phone || ""} placeholder="028 1234 5678" />
+              <Input defaultValue={company?.phone || ""} placeholder="028 1234 5678" />
             </div>
             <Button>Lưu thay đổi</Button>
           </CardContent>
