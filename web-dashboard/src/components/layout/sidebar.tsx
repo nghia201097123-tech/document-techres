@@ -24,6 +24,8 @@ import {
   Gift,
   Ticket,
   Percent,
+  Link2,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -81,6 +83,13 @@ const menuItems: MenuItem[] = [
     icon: ChefHat,
   },
   {
+    title: "Kết nối",
+    icon: Link2,
+    children: [
+      { title: "App Food", href: "/integrations/food-partners", icon: Truck },
+    ],
+  },
+  {
     title: "Báo cáo",
     href: "/reports",
     icon: BarChart3,
@@ -95,7 +104,7 @@ const menuItems: MenuItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { company } = useAuthStore();
-  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn"]);
+  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Kết nối"]);
 
   const toggleExpand = (title: string) => {
     setExpandedItems((prev) =>
