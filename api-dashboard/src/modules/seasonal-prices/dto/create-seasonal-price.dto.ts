@@ -3,6 +3,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdjustmentType } from '../../../database/entities/seasonal-price.entity';
 
 export class CreateSeasonalPriceDto {
+  @ApiProperty({ example: 'uuid-branch-id', description: 'ID chi nhánh áp dụng giá thời vụ' })
+  @IsNotEmpty({ message: 'Chi nhánh không được để trống' })
+  @IsUUID('4', { message: 'ID chi nhánh không hợp lệ' })
+  branchId: string;
+
   @ApiProperty({ example: 'Giá mùa hè' })
   @IsNotEmpty({ message: 'Tên giá thời vụ không được để trống' })
   @IsString()

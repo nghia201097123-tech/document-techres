@@ -31,6 +31,7 @@ export interface SeasonalPrice {
 }
 
 export interface CreateSeasonalPriceDto {
+  branchId: string;
   name: string;
   description?: string;
   adjustmentType: AdjustmentType;

@@ -27,8 +27,7 @@ export class SeasonalPricesController {
   @Post()
   @ApiOperation({ summary: 'Tạo giá thời vụ mới' })
   create(@Request() req, @Body() createDto: CreateSeasonalPriceDto) {
-    const branchId = req.user.branchId;
-    return this.seasonalPricesService.create(req.user.tenantId, branchId, createDto);
+    return this.seasonalPricesService.create(req.user.tenantId, createDto.branchId, createDto);
   }
 
   @Put(':id')

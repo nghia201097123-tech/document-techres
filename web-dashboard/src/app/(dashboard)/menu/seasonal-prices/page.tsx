@@ -302,6 +302,7 @@ export default function SeasonalPricesPage() {
 
       if (dialogMode === "create") {
         const submitData: CreateSeasonalPriceDto = {
+          branchId: filterBranchId,
           ...formData,
           productIds,
         };
