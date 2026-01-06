@@ -67,15 +67,43 @@ export default function BranchProductsPage() {
     }
     try {
       setLoading(true);
-      const [productsData, statsData] = await Promise.all([
-        branchProductService.getByBranch(branchId),
-        branchProductService.getStats(branchId),
-      ]);
+      // Fetch products and stats separately to handle errors gracefully
+      let productsData: BranchProduct[] = [];
+      let statsData: BranchProductStats = { totalProducts: 0, availableCount: 0, unavailableCount: 0 };
+
+      try {
+        productsData = await branchProductService.getByBranch(branchId);
+      } catch (err: any) {
+        // If 404, branch might not exist or no products - this is OK, show empty state
+        if (err.response?.status !== 404) {
+          throw err;
+        }
+      }
+
+      try {
+        statsData = await branchProductService.getStats(branchId);
+      } catch (err: any) {
+        // If 404, use default stats
+        if (err.response?.status !== 404) {
+          console.error("Error loading stats:", err);
+        }
+      }
+
       setProducts(productsData);
       setStats(statsData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading branch products:", error);
-      toast({ title: "Lỗi", description: "Không thể tải danh sách món ăn", variant: "destructive" });
+      // Only show error toast for non-404 errors
+      if (error.response?.status !== 404) {
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Không thể tải danh sách món ăn",
+          variant: "destructive"
+        });
+      }
+      // Set empty state on error
+      setProducts([]);
+      setStats({ totalProducts: 0, availableCount: 0, unavailableCount: 0 });
     } finally {
       setLoading(false);
     }
