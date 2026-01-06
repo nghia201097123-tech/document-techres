@@ -300,6 +300,17 @@ export class CompaniesService {
     return `${prefix}${String(nextNumber).padStart(6, '0')}`;
   }
 
+  /**
+   * Transform company entity to response (map logoUrl to logo)
+   */
+  private transformCompany(company: Company): any {
+    const { logoUrl, ...rest } = company as any;
+    return {
+      ...rest,
+      logo: logoUrl,
+    };
+  }
+
   async findAll(paginationDto: PaginationDto) {
     const { page = 1, limit = 10, search } = paginationDto;
     const skip = (page - 1) * limit;
@@ -320,7 +331,7 @@ export class CompaniesService {
     const [data, total] = await queryBuilder.getManyAndCount();
 
     return {
-      data,
+      data: data.map(company => this.transformCompany(company)),
       total,
       page,
       limit,
@@ -328,7 +339,7 @@ export class CompaniesService {
     };
   }
 
-  async findOne(id: string): Promise<Company> {
+  async findOne(id: string): Promise<any> {
     const company = await this.companyRepository.findOne({
       where: { id },
       relations: ['brands'],
@@ -338,7 +349,7 @@ export class CompaniesService {
       throw new NotFoundException('Không tìm thấy công ty');
     }
 
-    return company;
+    return this.transformCompany(company);
   }
 
   async findByCode(code: string): Promise<Company> {
@@ -354,8 +365,14 @@ export class CompaniesService {
     return company;
   }
 
-  async update(id: string, updateCompanyDto: UpdateCompanyDto): Promise<Company> {
-    const company = await this.findOne(id);
+  async update(id: string, updateCompanyDto: UpdateCompanyDto): Promise<any> {
+    const company = await this.companyRepository.findOne({
+      where: { id },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Không tìm thấy công ty');
+    }
 
     if (updateCompanyDto.code && updateCompanyDto.code !== company.code) {
       const existing = await this.companyRepository.findOne({
@@ -372,7 +389,8 @@ export class CompaniesService {
       company.logoUrl = logo;
     }
     Object.assign(company, restDto);
-    return this.companyRepository.save(company);
+    const saved = await this.companyRepository.save(company);
+    return this.transformCompany(saved);
   }
 
   async remove(id: string): Promise<void> {
