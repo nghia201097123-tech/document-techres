@@ -111,9 +111,18 @@ export default function DepartmentsPage() {
       setDepartments(sortedData);
       // Auto expand all by default
       setExpandedIds(new Set(sortedData.map(d => d.id)));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading departments:", error);
-      toast({ title: "Lỗi", description: "Không thể tải danh sách bộ phận", variant: "destructive" });
+      // Only show error toast for non-404 errors (404 means no departments yet)
+      if (error.response?.status !== 404) {
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Không thể tải danh sách bộ phận",
+          variant: "destructive"
+        });
+      }
+      // Set empty state on error
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
