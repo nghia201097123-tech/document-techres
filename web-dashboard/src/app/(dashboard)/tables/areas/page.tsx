@@ -43,6 +43,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { areaService, type Area, type CreateAreaDto, type UpdateAreaDto, type QuickTableDto } from "@/services/area-service";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
@@ -88,6 +95,7 @@ export default function AreasPage() {
   const [saving, setSaving] = React.useState(false);
   const [selectedArea, setSelectedArea] = React.useState<Area | null>(null);
   const [deleteArea, setDeleteArea] = React.useState<Area | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [formData, setFormData] = React.useState<CreateAreaDto>({
     name: "",
     description: "",
@@ -311,7 +319,14 @@ export default function AreasPage() {
   };
 
   // Filter areas (already filtered by API for branch)
-  const filteredAreas = areas;
+  const filteredAreas = React.useMemo(() => {
+    return areas.filter((area) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "active") return area.isActive;
+      if (statusFilter === "inactive") return !area.isActive;
+      return true;
+    });
+  }, [areas, statusFilter]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
@@ -350,13 +365,35 @@ export default function AreasPage() {
               <CardTitle>Danh sách khu vực</CardTitle>
               <CardDescription>Tổng cộng {filteredAreas.length} khu vực</CardDescription>
             </div>
-            {filteredAreas.length > 0 && (
-              <ColumnConfigDialog
-                columns={columns}
-                onToggle={toggleColumn}
-                onReset={resetToDefault}
-              />
-            )}
+            <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="active">Hoạt động</SelectItem>
+                  <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                </SelectContent>
+              </Select>
+              {statusFilter !== "all" && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setStatusFilter("all")}
+                  title="Xóa bộ lọc"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+              {filteredAreas.length > 0 && (
+                <ColumnConfigDialog
+                  columns={columns}
+                  onToggle={toggleColumn}
+                  onReset={resetToDefault}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">

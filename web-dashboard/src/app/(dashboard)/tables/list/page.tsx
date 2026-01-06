@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Table2, Loader2, MoreHorizontal, Pencil, Power, Trash2, Users, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Table2, Loader2, MoreHorizontal, Pencil, Power, Trash2, Users, Check, ChevronsUpDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,6 +75,7 @@ export default function TablesPage() {
   const [selectedTable, setSelectedTable] = React.useState<Table | null>(null);
   const [deleteTable, setDeleteTable] = React.useState<Table | null>(null);
   const [filterAreaId, setFilterAreaId] = React.useState<string>("all");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Form data
   const [formData, setFormData] = React.useState<CreateTableDto>({
@@ -130,12 +131,14 @@ export default function TablesPage() {
     loadData(filterBranchId);
   }, [filterBranchId, loadData]);
 
-  // Filter tables by area (already filtered by API for branch)
+  // Filter tables by area and status (already filtered by API for branch)
   const filteredTables = React.useMemo(() => {
     return tables.filter((t) => {
-      return filterAreaId === "all" || t.areaId === filterAreaId;
+      const areaMatch = filterAreaId === "all" || t.areaId === filterAreaId;
+      const statusMatch = statusFilter === "all" || t.status === statusFilter;
+      return areaMatch && statusMatch;
     });
-  }, [tables, filterAreaId]);
+  }, [tables, filterAreaId, statusFilter]);
 
   // Group tables by area
   const tablesByArea = React.useMemo(() => {
@@ -380,6 +383,32 @@ export default function TablesPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Trạng thái" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả trạng thái</SelectItem>
+              {Object.entries(tableStatusLabels).map(([status, info]) => (
+                <SelectItem key={status} value={status}>
+                  {info.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(statusFilter !== "all" || filterAreaId !== "all") && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setStatusFilter("all");
+                setFilterAreaId("all");
+              }}
+              title="Xóa bộ lọc"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
           <Button onClick={handleOpenCreate}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm bàn

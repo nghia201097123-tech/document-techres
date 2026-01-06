@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Tag, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Copy, Check, ShieldCheck } from "lucide-react";
+import { Plus, Tag, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Copy, Check, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,10 +133,19 @@ export default function CouponsPage() {
   const [deleteCoupon, setDeleteCoupon] = React.useState<Coupon | null>(null);
   const [formData, setFormData] = React.useState<CreateCouponDto>(initialFormData);
   const [copied, setCopied] = React.useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Track newly created and updated IDs for badges
   const [newCouponIds, setNewCouponIds] = React.useState<Set<string>>(new Set());
   const [updatedCouponIds, setUpdatedCouponIds] = React.useState<Set<string>>(new Set());
+
+  // Filter coupons by status
+  const filteredCoupons = React.useMemo(() => {
+    if (statusFilter === "all") return coupons;
+    if (statusFilter === "active") return coupons.filter((c) => c.isActive);
+    if (statusFilter === "inactive") return coupons.filter((c) => !c.isActive);
+    return coupons;
+  }, [coupons, statusFilter]);
 
   // Load coupons
   const loadCoupons = React.useCallback(async (branchId: string) => {
@@ -349,13 +358,41 @@ export default function CouponsPage() {
 
       <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <CardHeader className="flex-shrink-0 border-b">
-          <CardTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5" />
-            Danh sách coupon
-          </CardTitle>
-          <CardDescription>
-            Coupon dành cho thu ngân sử dụng để giảm giá đơn hàng
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="h-5 w-5" />
+                Danh sách coupon
+              </CardTitle>
+              <CardDescription>
+                Coupon dành cho thu ngân sử dụng để giảm giá đơn hàng
+              </CardDescription>
+            </div>
+            {filterBranchId && coupons.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="active">Hoạt động</SelectItem>
+                    <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                  </SelectContent>
+                </Select>
+                {statusFilter !== "all" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setStatusFilter("all")}
+                    title="Xóa bộ lọc"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBranchId ? (
@@ -368,13 +405,22 @@ export default function CouponsPage() {
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : coupons.length === 0 ? (
+          ) : filteredCoupons.length === 0 && coupons.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <Tag className="h-10 w-10 text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">Chưa có coupon nào</p>
               <Button variant="outline" className="mt-4" onClick={handleOpenCreate}>
                 <Plus className="mr-2 h-4 w-4" />
                 Thêm coupon đầu tiên
+              </Button>
+            </div>
+          ) : filteredCoupons.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Tag className="h-10 w-10 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Không tìm thấy coupon phù hợp với bộ lọc</p>
+              <Button variant="outline" className="mt-4" onClick={() => setStatusFilter("all")}>
+                <X className="mr-2 h-4 w-4" />
+                Xóa bộ lọc
               </Button>
             </div>
           ) : (
@@ -395,7 +441,7 @@ export default function CouponsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {coupons.map((coupon) => (
+                {filteredCoupons.map((coupon) => (
                   <TableRow key={coupon.id}>
                     {isColumnVisible("code") && (
                       <TableCell>

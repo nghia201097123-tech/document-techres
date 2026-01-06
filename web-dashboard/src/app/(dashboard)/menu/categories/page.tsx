@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, FolderOpen, Loader2, MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, FolderOpen, Loader2, MoreHorizontal, Pencil, Power, Trash2, Filter, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,6 +109,10 @@ export default function CategoriesPage() {
   // Track newly created and updated category IDs for badges
   const [newCategoryIds, setNewCategoryIds] = React.useState<Set<string>>(new Set());
   const [updatedCategoryIds, setUpdatedCategoryIds] = React.useState<Set<string>>(new Set());
+
+  // Filter state
+  const [typeFilter, setTypeFilter] = React.useState<string>("all");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Load categories - only when brand is selected
   const loadCategories = React.useCallback(async (brandId: string) => {
@@ -253,12 +257,29 @@ export default function CategoriesPage() {
     }
   };
 
-  // Filter categories by brand (already filtered by API)
-  const filteredCategories = categories;
+  // Filter categories by type and status
+  const filteredCategories = React.useMemo(() => {
+    return categories.filter(cat => {
+      const matchesType = typeFilter === "all" || cat.productType === typeFilter;
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && cat.isActive) ||
+        (statusFilter === "inactive" && !cat.isActive);
+      return matchesType && matchesStatus;
+    });
+  }, [categories, typeFilter, statusFilter]);
 
-  // Count categories by type
+  // Check if any filter is active
+  const hasActiveFilters = typeFilter !== "all" || statusFilter !== "all";
+
+  // Clear all filters
+  const clearFilters = () => {
+    setTypeFilter("all");
+    setStatusFilter("all");
+  };
+
+  // Count categories by type (use original categories, not filtered)
   const countByType = (type: string) => {
-    return filteredCategories.filter((c) => c.productType === type).length;
+    return categories.filter((c) => c.productType === type).length;
   };
 
   return (
@@ -308,12 +329,41 @@ export default function CategoriesPage() {
               <CardTitle>Danh sách danh mục</CardTitle>
               <CardDescription>Tổng cộng {filteredCategories.length} danh mục</CardDescription>
             </div>
-            {filterBrandId && filteredCategories.length > 0 && (
-              <ColumnConfigDialog
-                columns={columns}
-                onToggle={toggleColumn}
-                onReset={resetToDefault}
-              />
+            {filterBrandId && (
+              <div className="flex items-center gap-2">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Loại món" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả loại</SelectItem>
+                    {Object.entries(typeLabels).map(([key, { label }]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="active">Hoạt động</SelectItem>
+                    <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                <ColumnConfigDialog
+                  columns={columns}
+                  onToggle={toggleColumn}
+                  onReset={resetToDefault}
+                />
+              </div>
             )}
           </div>
         </CardHeader>

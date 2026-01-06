@@ -1,13 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Receipt, Loader2, MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, Receipt, Loader2, MoreHorizontal, Pencil, Power, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -105,6 +112,7 @@ export default function SurchargesPage() {
   const [saving, setSaving] = React.useState(false);
   const [selectedSurcharge, setSelectedSurcharge] = React.useState<Surcharge | null>(null);
   const [deleteSurcharge, setDeleteSurcharge] = React.useState<Surcharge | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [formData, setFormData] = React.useState<CreateSurchargeDto>({
     name: "",
     description: "",
@@ -279,8 +287,15 @@ export default function SurchargesPage() {
     }
   };
 
-  // Filter surcharges by brand (already filtered by API)
-  const filteredSurcharges = surcharges;
+  // Filter surcharges by brand and status
+  const filteredSurcharges = React.useMemo(() => {
+    return surcharges.filter(item => {
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && item.isActive) ||
+        (statusFilter === "inactive" && !item.isActive);
+      return matchesStatus;
+    });
+  }, [surcharges, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -310,13 +325,32 @@ export default function SurchargesPage() {
               <CardTitle>Danh sách phụ thu</CardTitle>
               <CardDescription>Tổng cộng {filteredSurcharges.length} phụ thu</CardDescription>
             </div>
-            {filterBrandId && filteredSurcharges.length > 0 && (
-              <ColumnConfigDialog
-                columns={columns}
-                onToggle={toggleColumn}
-                onReset={resetToDefault}
-              />
-            )}
+            <div className="flex items-center gap-2">
+              {filterBrandId && surcharges.length > 0 && (
+                <>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="Trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="active">Hoạt động</SelectItem>
+                      <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {statusFilter !== "all" && (
+                    <Button variant="ghost" size="sm" onClick={() => setStatusFilter("all")} className="h-9 px-2">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <ColumnConfigDialog
+                    columns={columns}
+                    onToggle={toggleColumn}
+                    onReset={resetToDefault}
+                  />
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

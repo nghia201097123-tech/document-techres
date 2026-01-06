@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Calendar, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Search, Check, Package } from "lucide-react";
+import { Plus, Calendar, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Search, Check, Package, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,6 +125,9 @@ export default function SeasonalPricesPage() {
   // Multi-select state for products
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  // Status filter state
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Track newly created and updated IDs for badges
   const [newPriceIds, setNewPriceIds] = React.useState<Set<string>>(new Set());
@@ -399,8 +402,15 @@ export default function SeasonalPricesPage() {
     return `${products[0].product?.name}, ${products[1].product?.name} +${products.length - 2}`;
   };
 
-  // Filter seasonal prices by branch (already filtered by API)
-  const filteredPrices = seasonalPrices;
+  // Filter seasonal prices by status
+  const filteredPrices = React.useMemo(() => {
+    return seasonalPrices.filter((price) => {
+      // Filter by status
+      if (statusFilter === "active" && !price.isActive) return false;
+      if (statusFilter === "inactive" && price.isActive) return false;
+      return true;
+    });
+  }, [seasonalPrices, statusFilter]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
@@ -439,6 +449,33 @@ export default function SeasonalPricesPage() {
               />
             )}
           </div>
+          {filterBranchId && seasonalPrices.length > 0 && (
+            <div className="flex items-center gap-2 mt-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-normal whitespace-nowrap">Trạng thái:</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Tất cả" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="active">Hoạt động</SelectItem>
+                    <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {statusFilter !== "all" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setStatusFilter("all")}
+                  className="h-8 px-2"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!filterBranchId ? (

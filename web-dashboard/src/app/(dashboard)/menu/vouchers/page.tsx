@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Ticket, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Copy, Check } from "lucide-react";
+import { Plus, Ticket, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Copy, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,6 +105,7 @@ export default function VouchersPage() {
   const [selectedVoucher, setSelectedVoucher] = React.useState<Voucher | null>(null);
   const [deleteVoucher, setDeleteVoucher] = React.useState<Voucher | null>(null);
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [formData, setFormData] = React.useState<CreateVoucherDto>({
     code: "",
     name: "",
@@ -319,8 +320,18 @@ export default function VouchersPage() {
     return formatCurrency(value);
   };
 
-  // Filter vouchers by brand (already filtered by API)
-  const filteredVouchers = vouchers;
+  // Filter vouchers by brand and status
+  const filteredVouchers = React.useMemo(() => {
+    let filtered = vouchers;
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      const isActive = statusFilter === "true";
+      filtered = filtered.filter((voucher) => voucher.isActive === isActive);
+    }
+
+    return filtered;
+  }, [vouchers, statusFilter]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
@@ -350,12 +361,34 @@ export default function VouchersPage() {
               <CardTitle>Danh sách voucher</CardTitle>
               <CardDescription>Tổng cộng {filteredVouchers.length} voucher</CardDescription>
             </div>
-            {filterBrandId && filteredVouchers.length > 0 && (
-              <ColumnConfigDialog
-                columns={columns}
-                onToggle={toggleColumn}
-                onReset={resetToDefault}
-              />
+            {filterBrandId && vouchers.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Lọc trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                    <SelectItem value="true">Hoạt động</SelectItem>
+                    <SelectItem value="false">Tạm ngưng</SelectItem>
+                  </SelectContent>
+                </Select>
+                {statusFilter !== "all" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setStatusFilter("all")}
+                    className="h-9 w-9"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                <ColumnConfigDialog
+                  columns={columns}
+                  onToggle={toggleColumn}
+                  onReset={resetToDefault}
+                />
+              </div>
             )}
           </div>
         </CardHeader>

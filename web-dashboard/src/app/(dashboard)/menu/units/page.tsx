@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Scale, Loader2, MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, Scale, Loader2, MoreHorizontal, Pencil, Power, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,6 +96,9 @@ export default function UnitsPage() {
   // Track newly created and updated unit IDs for badges
   const [newUnitIds, setNewUnitIds] = React.useState<Set<string>>(new Set());
   const [updatedUnitIds, setUpdatedUnitIds] = React.useState<Set<string>>(new Set());
+
+  // Filter state
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Load units - only when brand is selected
   const loadUnits = React.useCallback(async (brandId: string) => {
@@ -227,8 +237,15 @@ export default function UnitsPage() {
     }
   };
 
-  // Filter units by brand (already filtered by API)
-  const filteredUnits = units;
+  // Filter units by status
+  const filteredUnits = React.useMemo(() => {
+    return units.filter(unit => {
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && unit.isActive) ||
+        (statusFilter === "inactive" && !unit.isActive);
+      return matchesStatus;
+    });
+  }, [units, statusFilter]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
@@ -258,12 +275,29 @@ export default function UnitsPage() {
               <CardTitle>Danh sách đơn vị tính</CardTitle>
               <CardDescription>Tổng cộng {filteredUnits.length} đơn vị</CardDescription>
             </div>
-            {filterBrandId && filteredUnits.length > 0 && (
-              <ColumnConfigDialog
-                columns={columns}
-                onToggle={toggleColumn}
-                onReset={resetToDefault}
-              />
+            {filterBrandId && (
+              <div className="flex items-center gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="active">Hoạt động</SelectItem>
+                    <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                  </SelectContent>
+                </Select>
+                {statusFilter !== "all" && (
+                  <Button variant="ghost" size="sm" onClick={() => setStatusFilter("all")} className="h-9 px-2">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                <ColumnConfigDialog
+                  columns={columns}
+                  onToggle={toggleColumn}
+                  onReset={resetToDefault}
+                />
+              </div>
             )}
           </div>
         </CardHeader>

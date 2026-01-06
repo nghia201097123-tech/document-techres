@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Gift, Loader2, MoreHorizontal, Pencil, Power, Trash2, Search, Check } from "lucide-react";
+import { Plus, Gift, Loader2, MoreHorizontal, Pencil, Power, Trash2, Search, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { giftItemService, type GiftItem, type CreateGiftItemDto, type UpdateGiftItemDto } from "@/services/gift-item-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
@@ -112,6 +119,9 @@ export default function GiftItemsPage() {
   // Multi-select state for create mode
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  // Status filter state
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Track newly created and updated IDs for badges
   const [newItemIds, setNewItemIds] = React.useState<Set<string>>(new Set());
@@ -398,8 +408,19 @@ export default function GiftItemsPage() {
     }
   };
 
-  // Filter gift items by branch (already filtered by API)
-  const filteredItems = giftItems;
+  // Filter gift items by status
+  const filteredItems = React.useMemo(() => {
+    if (statusFilter === "all") {
+      return giftItems;
+    }
+    if (statusFilter === "active") {
+      return giftItems.filter(item => item.isActive);
+    }
+    if (statusFilter === "inactive") {
+      return giftItems.filter(item => !item.isActive);
+    }
+    return giftItems;
+  }, [giftItems, statusFilter]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
@@ -430,13 +451,39 @@ export default function GiftItemsPage() {
               <CardTitle>Danh sách món tặng</CardTitle>
               <CardDescription>Tổng cộng {filteredItems.length} món tặng</CardDescription>
             </div>
-            {filterBranchId && filteredItems.length > 0 && (
-              <ColumnConfigDialog
-                columns={columns}
-                onToggle={toggleColumn}
-                onReset={resetToDefault}
-              />
-            )}
+            <div className="flex items-center gap-2">
+              {filterBranchId && giftItems.length > 0 && (
+                <>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="active">Hoạt động</SelectItem>
+                      <SelectItem value="inactive">Tạm ngưng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {statusFilter !== "all" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setStatusFilter("all")}
+                      className="h-9 w-9"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              )}
+              {filterBranchId && giftItems.length > 0 && (
+                <ColumnConfigDialog
+                  columns={columns}
+                  onToggle={toggleColumn}
+                  onReset={resetToDefault}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
