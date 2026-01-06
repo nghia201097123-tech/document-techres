@@ -1,11 +1,23 @@
 import api from "./api";
 import { Product } from "./product-service";
 
+export interface SeasonalPriceInfo {
+  seasonalPriceId: string;
+  seasonalPriceName: string;
+  adjustmentType: 'percentage' | 'fixed';
+  adjustmentValue: number;
+  startDate: string;
+  endDate: string;
+  originalPrice: number;
+  adjustedPrice: number;
+}
+
 export interface BranchProduct extends Product {
   branchProductId: string | null;
   isAvailable: boolean;
   customPrice: number | null;
   branchSortOrder: number;
+  seasonalPrice: SeasonalPriceInfo | null;
 }
 
 export interface BranchProductStats {

@@ -287,6 +287,15 @@ export default function BranchProductsPage() {
     return product.customPrice !== null ? product.customPrice : product.price;
   };
 
+  // Get final price (effective price + seasonal price adjustment)
+  const getFinalPrice = (product: BranchProduct) => {
+    const effectivePrice = getEffectivePrice(product);
+    if (product.seasonalPrice) {
+      return product.seasonalPrice.adjustedPrice;
+    }
+    return effectivePrice;
+  };
+
   // Open bulk price dialog
   const handleOpenBulkPriceDialog = () => {
     setBulkPriceMode("fixed");
@@ -730,6 +739,7 @@ export default function BranchProductsPage() {
                     <TableHead>Loại</TableHead>
                     <TableHead className="text-right">Giá gốc</TableHead>
                     <TableHead className="text-right">Giá bán CN</TableHead>
+                    <TableHead className="text-right">Giá thời vụ</TableHead>
                     <TableHead className="text-right">VAT</TableHead>
                     <TableHead className="text-center">Trạng thái</TableHead>
                     <TableHead className="text-center">Bán tại CN</TableHead>
@@ -811,11 +821,52 @@ export default function BranchProductsPage() {
                         </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-right">
+                        {product.seasonalPrice ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-medium cursor-help text-orange-600">
+                                  {formatCurrency(product.seasonalPrice.adjustedPrice)}
+                                  <sup className="text-[9px] ml-0.5">TV</sup>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Giá gốc CN:</span>
+                                    <span className="font-medium">{formatCurrency(product.seasonalPrice.originalPrice)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Điều chỉnh:</span>
+                                    <span className="font-medium text-orange-600">
+                                      {product.seasonalPrice.adjustmentType === 'percentage'
+                                        ? `+${product.seasonalPrice.adjustmentValue}%`
+                                        : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Tăng thêm:</span>
+                                    <span className="font-medium text-green-600">
+                                      +{formatCurrency(product.seasonalPrice.adjustedPrice - product.seasonalPrice.originalPrice)}
+                                    </span>
+                                  </div>
+                                  <div className="text-orange-600 font-medium border-t border-orange-200 pt-1 mt-1">
+                                    {product.seasonalPrice.seasonalPriceName}
+                                  </div>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="text-muted-foreground cursor-help">
-                                {formatCurrency(calculateVatAmount(getEffectivePrice(product), product.vatRate || 10))}
+                                {formatCurrency(calculateVatAmount(getFinalPrice(product), product.vatRate || 10))}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -825,12 +876,16 @@ export default function BranchProductsPage() {
                                   <span className="font-medium">{product.vatRate || 10}%</span>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Giá bán cuối:</span>
+                                  <span className="font-medium">{formatCurrency(getFinalPrice(product))}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground">Giá trước VAT:</span>
-                                  <span className="font-medium">{formatCurrency(calculatePriceBeforeVat(getEffectivePrice(product), product.vatRate || 10))}</span>
+                                  <span className="font-medium">{formatCurrency(calculatePriceBeforeVat(getFinalPrice(product), product.vatRate || 10))}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground">Tiền thuế:</span>
-                                  <span className="font-medium">{formatCurrency(calculateVatAmount(getEffectivePrice(product), product.vatRate || 10))}</span>
+                                  <span className="font-medium">{formatCurrency(calculateVatAmount(getFinalPrice(product), product.vatRate || 10))}</span>
                                 </div>
                               </div>
                             </TooltipContent>

@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { BranchProduct, Branch, Product } from '../../database/entities';
+import { Repository, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { BranchProduct, Branch, Product, SeasonalPrice, SeasonalPriceProduct } from '../../database/entities';
+import { AdjustmentType } from '../../database/entities/seasonal-price.entity';
 import { UpdateBranchProductDto, BulkToggleAvailabilityDto } from './dto';
 
 @Injectable()
@@ -13,10 +14,14 @@ export class BranchProductsService {
     private readonly branchRepository: Repository<Branch>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(SeasonalPrice)
+    private readonly seasonalPriceRepository: Repository<SeasonalPrice>,
+    @InjectRepository(SeasonalPriceProduct)
+    private readonly seasonalPriceProductRepository: Repository<SeasonalPriceProduct>,
   ) {}
 
   /**
-   * Get all products for a branch with availability status
+   * Get all products for a branch with availability status and seasonal price info
    */
   async findAllByBranch(tenantId: string, branchId: string) {
     // Get branch to verify it exists and get brandId
@@ -42,15 +47,79 @@ export class BranchProductsService {
       branchProducts.map(bp => [bp.productId, bp])
     );
 
-    // Combine products with their branch availability
+    // Get active seasonal prices for this branch
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const activeSeasonalPrices = await this.seasonalPriceRepository.find({
+      where: {
+        tenantId,
+        branchId,
+        isActive: true,
+        startDate: LessThanOrEqual(today),
+        endDate: MoreThanOrEqual(today),
+      },
+      relations: ['seasonalPriceProducts'],
+    });
+
+    // Build a map of productId -> seasonal price info
+    const productSeasonalPriceMap = new Map<string, {
+      seasonalPriceId: string;
+      seasonalPriceName: string;
+      adjustmentType: AdjustmentType;
+      adjustmentValue: number;
+      startDate: Date;
+      endDate: Date;
+    }>();
+
+    for (const sp of activeSeasonalPrices) {
+      for (const spp of sp.seasonalPriceProducts || []) {
+        // If a product already has a seasonal price, keep the first one
+        if (!productSeasonalPriceMap.has(spp.productId)) {
+          productSeasonalPriceMap.set(spp.productId, {
+            seasonalPriceId: sp.id,
+            seasonalPriceName: sp.name,
+            adjustmentType: sp.adjustmentType,
+            adjustmentValue: Number(sp.adjustmentValue),
+            startDate: sp.startDate,
+            endDate: sp.endDate,
+          });
+        }
+      }
+    }
+
+    // Combine products with their branch availability and seasonal price
     const combined = products.map(product => {
       const branchProduct = branchProductMap.get(product.id);
+      const seasonalPriceInfo = productSeasonalPriceMap.get(product.id);
+
+      // Calculate effective price considering customPrice and seasonalPrice
+      const basePrice = Number(product.price);
+      const customPrice = branchProduct?.customPrice ? Number(branchProduct.customPrice) : null;
+      const effectiveBasePrice = customPrice ?? basePrice;
+
+      let seasonalPrice = null;
+      if (seasonalPriceInfo) {
+        let adjustedPrice = effectiveBasePrice;
+        if (seasonalPriceInfo.adjustmentType === AdjustmentType.PERCENTAGE) {
+          adjustedPrice = effectiveBasePrice * (1 + seasonalPriceInfo.adjustmentValue / 100);
+        } else {
+          adjustedPrice = effectiveBasePrice + seasonalPriceInfo.adjustmentValue;
+        }
+        seasonalPrice = {
+          ...seasonalPriceInfo,
+          originalPrice: effectiveBasePrice,
+          adjustedPrice: Math.round(adjustedPrice),
+        };
+      }
+
       return {
         ...product,
         branchProductId: branchProduct?.id || null,
         isAvailable: branchProduct?.isAvailable ?? true, // Default to available if not set
-        customPrice: branchProduct?.customPrice || null,
+        customPrice: customPrice,
         branchSortOrder: branchProduct?.sortOrder || product.sortOrder,
+        seasonalPrice,
       };
     });
 
