@@ -2189,9 +2189,12 @@ export default function ProductsPage() {
                                   </span>
                                 </div>
                               </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Giá gốc: {formatCurrency(product.price)}</p>
-                                <p className="text-muted-foreground">{product.seasonalPrice.seasonalPriceName}</p>
+                              <TooltipContent className="bg-orange-50 border-orange-200">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Giá gốc:</span>
+                                  <span className="font-medium line-through">{formatCurrency(product.price)}</span>
+                                </div>
+                                <div className="text-orange-600 font-medium">{product.seasonalPrice.seasonalPriceName}</div>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
