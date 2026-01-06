@@ -33,8 +33,41 @@ export class UnitsService {
   }
 
   async create(tenantId: string, brandId: string, createDto: CreateUnitDto) {
+    // Check if unit with same name already exists (case-insensitive)
+    const existingUnit = await this.unitRepository
+      .createQueryBuilder('unit')
+      .where('unit.tenantId = :tenantId', { tenantId })
+      .andWhere('LOWER(unit.name) = LOWER(:name)', { name: createDto.name })
+      .getOne();
+
+    if (existingUnit) {
+      // Return existing unit instead of creating duplicate
+      return existingUnit;
+    }
+
     const unit = this.unitRepository.create({
       ...createDto,
+      tenantId,
+      brandId,
+      isActive: true,
+    });
+    return this.unitRepository.save(unit);
+  }
+
+  async findOrCreate(tenantId: string, brandId: string, name: string) {
+    // Check if unit with same name already exists (case-insensitive)
+    const existingUnit = await this.unitRepository
+      .createQueryBuilder('unit')
+      .where('unit.tenantId = :tenantId', { tenantId })
+      .andWhere('LOWER(unit.name) = LOWER(:name)', { name })
+      .getOne();
+
+    if (existingUnit) {
+      return existingUnit;
+    }
+
+    const unit = this.unitRepository.create({
+      name,
       tenantId,
       brandId,
       isActive: true,

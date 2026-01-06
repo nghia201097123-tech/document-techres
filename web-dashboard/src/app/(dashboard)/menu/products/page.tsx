@@ -442,7 +442,14 @@ export default function ProductsPage() {
         setLoadingUnits(true);
         try {
           const data = await unitService.getAll();
-          setUnits(data.filter(u => u.isActive));
+          // Filter active units and deduplicate by name (case-insensitive)
+          const activeUnits = data.filter(u => u.isActive);
+          const uniqueUnits = activeUnits.reduce((acc: typeof activeUnits, unit) => {
+            const exists = acc.some(u => u.name.toLowerCase() === unit.name.toLowerCase());
+            if (!exists) acc.push(unit);
+            return acc;
+          }, []);
+          setUnits(uniqueUnits);
         } catch (error) {
           console.error("Error loading units:", error);
         } finally {
@@ -937,10 +944,14 @@ export default function ProductsPage() {
       return existingUnit.name;
     }
 
-    // Create new unit
+    // Create new unit (backend will return existing if duplicate)
     const newUnit = await unitService.create({ name: unitName });
-    // Add to local units list
-    setUnits(prev => [...prev, newUnit]);
+    // Add to local units list only if not already there
+    setUnits(prev => {
+      const exists = prev.some(u => u.name.toLowerCase() === newUnit.name.toLowerCase());
+      if (exists) return prev;
+      return [...prev, newUnit];
+    });
     toast({ title: "Thành công", description: `Đã tạo đơn vị "${unitName}"` });
     return newUnit.name;
   };
