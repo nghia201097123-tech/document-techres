@@ -2173,21 +2173,19 @@ export default function ProductsPage() {
                     )}
                     {isColumnVisible("categoryName") && <TableCell>{product.categoryName || getCategoryName(product.categoryId)}</TableCell>}
                     {isColumnVisible("price") && (
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         {product.seasonalPrice ? (
                           <TooltipProvider delayDuration={100}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center justify-end gap-1.5 cursor-help">
-                                  <span className="font-medium text-orange-600">
-                                    {formatCurrency(product.seasonalPrice.adjustedPrice)}
-                                  </span>
-                                  <span className="text-[10px] text-orange-500">
+                                <span className="text-orange-600 cursor-help">
+                                  {formatCurrency(product.seasonalPrice.adjustedPrice)}
+                                  <sup className="text-[9px] ml-0.5">
                                     {product.seasonalPrice.adjustmentType === 'percentage'
                                       ? `+${product.seasonalPrice.adjustmentValue}%`
-                                      : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
-                                  </span>
-                                </div>
+                                      : `↑`}
+                                  </sup>
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent className="bg-orange-50 border-orange-200">
                                 <div className="flex items-center gap-2">
