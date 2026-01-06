@@ -1426,8 +1426,8 @@ export default function StaffPage() {
   const isViewingAllBranches = isBrandSelected && !isBranchSelected;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý nhân viên</h1>
           <p className="text-muted-foreground">Thêm, sửa và quản lý nhân viên trong thương hiệu</p>
@@ -1472,8 +1472,8 @@ export default function StaffPage() {
         onChange={handleFileChange}
       />
 
-      <Card>
-        <CardHeader className="sticky top-0 z-10 bg-card border-b">
+      <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Danh sách nhân viên</CardTitle>
@@ -1603,7 +1603,7 @@ export default function StaffPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!isBrandSelected ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />
@@ -1623,10 +1623,10 @@ export default function StaffPage() {
               </p>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col flex-1 min-h-0">
               {/* Selection bar with bulk actions */}
               {selectedStaffIds.size > 0 && (
-                <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-lg mb-4">
+                <div className="flex-shrink-0 flex items-center justify-between bg-muted/50 px-4 py-2 rounded-lg mb-4">
                   <div className="flex items-center gap-2">
                     <Checkbox
                       checked={isAllSelected}
@@ -1673,8 +1673,9 @@ export default function StaffPage() {
                 </div>
               )}
 
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-card">
+              <div className="flex-1 overflow-auto min-h-0">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
                     <TableHead className="w-[40px]">
                       <Checkbox
@@ -1829,9 +1830,10 @@ export default function StaffPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-            </>
+                </TableBody>
+              </Table>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
