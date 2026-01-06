@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { CommandPalette, useCommandPalette } from "@/components/ui/command-palette";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -13,9 +14,16 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
+  const authUser = useAuthStore((state) => state.user);
 
-  // TODO: Get user from auth context/store
-  const user = {
+  // Get user from auth store or use default
+  const user = authUser ? {
+    id: authUser.id,
+    name: authUser.name,
+    email: authUser.email,
+    role: authUser.role,
+  } : {
+    id: "",
     name: "Admin User",
     email: "admin@techres.vn",
     role: "super_admin",

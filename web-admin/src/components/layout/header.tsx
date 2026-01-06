@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Settings, User, Search, Command } from "lucide-react";
+import { Bell, LogOut, Settings, User, Search, Command, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,9 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { QuickCreateDropdown } from "@/components/ui/quick-create-dropdown";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 interface HeaderProps {
   user?: {
+    id: string;
     name: string;
     email: string;
     role: string;
@@ -26,6 +29,7 @@ interface HeaderProps {
 
 export function Header({ user, onOpenCommandPalette, onCreateItem }: HeaderProps) {
   const router = useRouter();
+  const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
 
   const handleLogout = () => {
     router.push("/login");
@@ -111,6 +115,10 @@ export function Header({ user, onOpenCommandPalette, onCreateItem }: HeaderProps
               <User className="mr-2 h-4 w-4" />
               Thông tin cá nhân
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowChangePasswordDialog(true)}>
+              <Lock className="mr-2 h-4 w-4" />
+              Đổi mật khẩu
+            </DropdownMenuItem>
             <DropdownMenuItem>
               <Settings className="mr-2 h-4 w-4" />
               Cài đặt
@@ -126,6 +134,15 @@ export function Header({ user, onOpenCommandPalette, onCreateItem }: HeaderProps
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Change Password Dialog */}
+      {user?.id && (
+        <ChangePasswordDialog
+          open={showChangePasswordDialog}
+          onOpenChange={setShowChangePasswordDialog}
+          userId={user.id}
+        />
+      )}
     </header>
   );
 }
