@@ -328,7 +328,7 @@ export default function ProductNotesPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold">Quản lý ghi chú món ăn</h1>
           <p className="text-muted-foreground">Tạo các ghi chú để gán cho món ăn (VD: Không hành, Ít đá, Cay vừa)</p>
