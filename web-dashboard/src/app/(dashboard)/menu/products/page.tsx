@@ -2200,7 +2200,13 @@ export default function ProductsPage() {
                                       : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
                                   </span>
                                 </div>
-                                <div className="text-orange-600 font-medium">{product.seasonalPrice.seasonalPriceName}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Tăng:</span>
+                                  <span className="font-medium text-orange-600">
+                                    +{formatCurrency(product.seasonalPrice.adjustedPrice - product.price)}
+                                  </span>
+                                </div>
+                                <div className="text-orange-600 font-medium border-t border-orange-200 pt-1 mt-1">{product.seasonalPrice.seasonalPriceName}</div>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
