@@ -11,6 +11,8 @@ import {
   Building2,
   Loader2,
   Power,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +97,11 @@ export default function BrandsPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
   // Fetch brands from API
   const fetchBrands = React.useCallback(async () => {
     try {
@@ -135,6 +142,19 @@ export default function BrandsPage() {
   React.useEffect(() => {
     fetchBrands();
   }, [fetchBrands]);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterCompany]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(brands.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, brands.length);
+  const paginatedBrands = React.useMemo(() => {
+    return brands.slice(startIndex, endIndex);
+  }, [brands, startIndex, endIndex]);
 
   const handleOpenCreate = () => {
     setIsWizardOpen(true);
@@ -289,7 +309,7 @@ export default function BrandsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!isLoading && brands.map((brand) => (
+              {!isLoading && paginatedBrands.map((brand) => (
                 <TableRow key={brand.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -372,6 +392,68 @@ export default function BrandsPage() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {!isLoading && brands.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Hiển thị {startIndex + 1}-{endIndex} / {brands.length} thương hiệu</span>
+                <span className="text-muted-foreground/50">|</span>
+                <div className="flex items-center gap-2">
+                  <span>Số dòng:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Đầu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Trang {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Cuối
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

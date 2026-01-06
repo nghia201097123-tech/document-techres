@@ -13,6 +13,8 @@ import {
   Zap,
   Files,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +44,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 import { companyService } from "@/services/company-service";
@@ -97,6 +106,11 @@ export default function CompaniesPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
   // Column configuration
   const {
     columns,
@@ -132,6 +146,19 @@ export default function CompaniesPage() {
   }, [fetchCompanies]);
 
   const filteredCompanies = companies;
+
+  // Reset to page 1 when search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCompanies.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredCompanies.length);
+  const paginatedCompanies = React.useMemo(() => {
+    return filteredCompanies.slice(startIndex, endIndex);
+  }, [filteredCompanies, startIndex, endIndex]);
 
   const handleOpenCreate = () => {
     setIsWizardOpen(true);
@@ -303,7 +330,7 @@ export default function CompaniesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!isLoading && filteredCompanies.map((company) => (
+              {!isLoading && paginatedCompanies.map((company) => (
                 <TableRow key={company.id}>
                   {isColumnVisible("company") && (
                     <TableCell>
@@ -403,6 +430,68 @@ export default function CompaniesPage() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {!isLoading && filteredCompanies.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Hiển thị {startIndex + 1}-{endIndex} / {filteredCompanies.length} công ty</span>
+                <span className="text-muted-foreground/50">|</span>
+                <div className="flex items-center gap-2">
+                  <span>Số dòng:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Đầu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Trang {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Cuối
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
