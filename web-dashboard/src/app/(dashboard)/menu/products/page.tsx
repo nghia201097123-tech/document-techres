@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2131,7 +2131,25 @@ export default function ProductsPage() {
                         )}
                       </TableCell>
                     )}
-                    {isColumnVisible("code") && <TableCell className="font-mono text-sm">{product.code}</TableCell>}
+                    {isColumnVisible("code") && (
+                      <TableCell className="font-mono text-sm">
+                        <div className="flex items-center gap-1.5 group">
+                          <span>{product.code}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(product.code || "");
+                              toast({ title: "Đã sao chép", description: `Mã "${product.code}" đã được sao chép` });
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-muted rounded"
+                            title="Sao chép mã"
+                          >
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                          </button>
+                        </div>
+                      </TableCell>
+                    )}
                     {isColumnVisible("name") && (
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
