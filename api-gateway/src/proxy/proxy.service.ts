@@ -18,12 +18,16 @@ export class ProxyService {
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
-      timeout: 30000,
+      timeout: 120000, // 2 minutes for large operations
+      maxBodyLength: 50 * 1024 * 1024, // 50MB
+      maxContentLength: 50 * 1024 * 1024, // 50MB
     });
 
     this.apiDashboardClient = axios.create({
       baseURL: apiDashboardUrl,
-      timeout: 30000,
+      timeout: 120000, // 2 minutes for large operations
+      maxBodyLength: 50 * 1024 * 1024, // 50MB
+      maxContentLength: 50 * 1024 * 1024, // 50MB
     });
   }
 
