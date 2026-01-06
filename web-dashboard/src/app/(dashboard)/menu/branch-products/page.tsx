@@ -305,6 +305,9 @@ export default function BranchProductsPage() {
 
   // Calculate new price based on adjustment settings
   const calculateNewPrice = (currentPrice: number, originalPrice: number): number | null => {
+    // Ensure values are numbers
+    const origPrice = Number(originalPrice);
+
     if (bulkPriceMode === "fixed") {
       const value = Number(bulkPriceValue);
       if (isNaN(value) || value < 0) return null;
@@ -316,16 +319,16 @@ export default function BranchProductsPage() {
 
       let adjustment = 0;
       if (bulkPriceAdjustMode === "percent") {
-        adjustment = Math.round(originalPrice * value / 100);
+        adjustment = Math.round(origPrice * value / 100);
       } else {
-        adjustment = value;
+        adjustment = Math.round(value);
       }
 
       if (bulkPriceAdjustType === "decrease") {
         adjustment = -adjustment;
       }
 
-      const newPrice = originalPrice + adjustment;
+      const newPrice = origPrice + adjustment;
       return Math.max(0, Math.round(newPrice));
     }
   };
