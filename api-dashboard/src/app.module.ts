@@ -20,6 +20,7 @@ import { GiftItemsModule } from './modules/gift-items/gift-items.module';
 import { VouchersModule } from './modules/vouchers/vouchers.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { BranchProductsModule } from './modules/branch-products/branch-products.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { DatabaseMigrationService } from './database/database-migration.service';
 import {
   Company,
@@ -57,6 +58,9 @@ import {
   Voucher,
   Coupon,
   BranchProduct,
+  PaymentMethod,
+  BankAccount,
+  EInvoiceConfig,
 } from './database/entities';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -110,6 +114,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
           Voucher,
           Coupon,
           BranchProduct,
+          PaymentMethod,
+          BankAccount,
+          EInvoiceConfig,
         ],
         synchronize: false,
       }),
@@ -135,6 +142,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     VouchersModule,
     CouponsModule,
     BranchProductsModule,
+    SettingsModule,
   ],
   providers: [DatabaseMigrationService],
 })

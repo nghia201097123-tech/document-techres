@@ -802,6 +802,131 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Uploaded files table created successfully');
       }
 
+      // 33. Create payment_method_type enum and payment_methods table
+      this.logger.log('Creating payment_method_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE payment_method_type AS ENUM ('cash', 'bank_transfer', 'credit_card', 'e_wallet', 'qr_code');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const paymentMethodsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'payment_methods'
+        );
+      `);
+
+      if (!paymentMethodsExists[0].exists) {
+        this.logger.log('Creating payment_methods table...');
+        await queryRunner.query(`
+          CREATE TABLE payment_methods (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            type payment_method_type NOT NULL,
+            description TEXT,
+            icon_url TEXT,
+            config JSONB,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_payment_methods_tenant ON payment_methods(tenant_id);
+          CREATE INDEX idx_payment_methods_tenant_brand ON payment_methods(tenant_id, brand_id);
+        `);
+        this.logger.log('Payment methods table created successfully');
+      }
+
+      // 34. Create bank_accounts table
+      const bankAccountsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'bank_accounts'
+        );
+      `);
+
+      if (!bankAccountsExists[0].exists) {
+        this.logger.log('Creating bank_accounts table...');
+        await queryRunner.query(`
+          CREATE TABLE bank_accounts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            branch_id UUID REFERENCES branches(id) ON DELETE CASCADE,
+            bank_code VARCHAR(50) NOT NULL,
+            bank_name VARCHAR(255) NOT NULL,
+            account_number VARCHAR(50) NOT NULL,
+            account_name VARCHAR(255) NOT NULL,
+            bank_bin VARCHAR(20),
+            transfer_template VARCHAR(255),
+            webhook_url TEXT,
+            webhook_secret VARCHAR(255),
+            api_key VARCHAR(255),
+            api_secret VARCHAR(255),
+            static_qr_url TEXT,
+            is_primary BOOLEAN DEFAULT FALSE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_bank_accounts_tenant ON bank_accounts(tenant_id);
+          CREATE INDEX idx_bank_accounts_tenant_brand ON bank_accounts(tenant_id, brand_id);
+        `);
+        this.logger.log('Bank accounts table created successfully');
+      }
+
+      // 35. Create einvoice_provider enum and einvoice_configs table
+      this.logger.log('Creating einvoice_provider enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE einvoice_provider AS ENUM ('fpt', 'vnpt', 'misa', 'viettel', 'mifi', 'invoice', 'hilo');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const einvoiceConfigsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'einvoice_configs'
+        );
+      `);
+
+      if (!einvoiceConfigsExists[0].exists) {
+        this.logger.log('Creating einvoice_configs table...');
+        await queryRunner.query(`
+          CREATE TABLE einvoice_configs (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            branch_id UUID REFERENCES branches(id) ON DELETE CASCADE,
+            provider einvoice_provider NOT NULL,
+            tax_code VARCHAR(20) NOT NULL,
+            company_name VARCHAR(255) NOT NULL,
+            company_address TEXT,
+            invoice_template VARCHAR(50),
+            invoice_series VARCHAR(20),
+            api_url TEXT,
+            api_username VARCHAR(255),
+            api_password VARCHAR(255),
+            api_token TEXT,
+            config JSONB,
+            auto_issue BOOLEAN DEFAULT FALSE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_einvoice_configs_tenant ON einvoice_configs(tenant_id);
+          CREATE INDEX idx_einvoice_configs_tenant_brand ON einvoice_configs(tenant_id, brand_id);
+        `);
+        this.logger.log('E-Invoice configs table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
