@@ -2183,7 +2183,7 @@ export default function ProductsPage() {
                                   <sup className="text-[9px] ml-0.5">
                                     {product.seasonalPrice.adjustmentType === 'percentage'
                                       ? `+${product.seasonalPrice.adjustmentValue}%`
-                                      : `↑`}
+                                      : `+${Math.round(product.seasonalPrice.adjustmentValue / 1000)}k`}
                                   </sup>
                                 </span>
                               </TooltipTrigger>
@@ -2191,6 +2191,14 @@ export default function ProductsPage() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground">Giá gốc:</span>
                                   <span className="font-medium line-through">{formatCurrency(product.price)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Điều chỉnh:</span>
+                                  <span className="font-medium text-orange-600">
+                                    {product.seasonalPrice.adjustmentType === 'percentage'
+                                      ? `+${product.seasonalPrice.adjustmentValue}%`
+                                      : `+${formatCurrency(product.seasonalPrice.adjustmentValue)}`}
+                                  </span>
                                 </div>
                                 <div className="text-orange-600 font-medium">{product.seasonalPrice.seasonalPriceName}</div>
                               </TooltipContent>
