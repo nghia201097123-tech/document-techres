@@ -47,10 +47,44 @@ interface LoginResponse {
   token: string;
 }
 
+// OAuth API response type (from api-oauth)
+interface OAuthLoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  tokenType: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    tenantId?: string;
+    branchId?: string;
+    isTwoFactorEnabled: boolean;
+  };
+  requiresTwoFactor?: boolean;
+}
+
 export const authService = {
   async login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await authApi.post<LoginResponse>("/auth/login", data);
-    return response.data;
+    const response = await authApi.post<OAuthLoginResponse>("/auth/login", data);
+    const oauthData = response.data;
+
+    // Transform OAuth response to expected format
+    const user: AdminUser = {
+      id: oauthData.user.id,
+      email: oauthData.user.email,
+      name: oauthData.user.name,
+      role: oauthData.user.role as AdminUser["role"],
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    return {
+      user,
+      token: oauthData.accessToken,
+    };
   },
 
   async logout(): Promise<void> {
