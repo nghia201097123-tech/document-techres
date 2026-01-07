@@ -34,7 +34,7 @@ import {
   TwoFactorSetupResponseDto,
 } from '../../dto/auth.dto';
 
-interface JwtPayload {
+export interface JwtPayload {
   sub: string;
   email: string;
   tenantId?: string;

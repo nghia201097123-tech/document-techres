@@ -16,7 +16,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { AuthService } from './auth.service';
+import { AuthService, JwtPayload } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   LoginDto,
@@ -203,7 +203,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify access token' })
   @ApiResponse({ status: 200, description: 'Token is valid' })
   @ApiResponse({ status: 401, description: 'Token is invalid' })
-  async verifyToken(@Body() verifyTokenDto: VerifyTokenDto) {
+  async verifyToken(@Body() verifyTokenDto: VerifyTokenDto): Promise<{ valid: boolean; payload?: JwtPayload }> {
     const payload = await this.authService.verifyToken(verifyTokenDto.accessToken);
     if (!payload) {
       return { valid: false };
