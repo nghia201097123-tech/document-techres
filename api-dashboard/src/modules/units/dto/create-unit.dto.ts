@@ -1,7 +1,12 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, Min } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, Min, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateUnitDto {
+  @ApiPropertyOptional({ description: 'Brand ID - lấy từ token nếu không truyền' })
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
   @ApiProperty({ example: 'Phần' })
   @IsNotEmpty({ message: 'Tên đơn vị không được để trống' })
   @IsString()
