@@ -1,8 +1,13 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum, MaxLength, IsInt, Min } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsEnum, MaxLength, IsInt, Min, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductType } from '../../products/dto/create-product.dto';
 
 export class CreateCategoryDto {
+  @ApiPropertyOptional({ description: 'Brand ID - lấy từ token nếu không truyền' })
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
   @ApiProperty({ example: 'Phở' })
   @IsNotEmpty({ message: 'Tên danh mục không được để trống' })
   @IsString()
