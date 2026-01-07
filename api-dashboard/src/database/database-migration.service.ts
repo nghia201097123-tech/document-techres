@@ -1227,12 +1227,18 @@ export class DatabaseMigrationService implements OnModuleInit {
           full_name_en VARCHAR(255),
           code_name VARCHAR(100),
           division_type VARCHAR(50),
+          short_codename VARCHAR(100),
           province_code VARCHAR(20) REFERENCES provinces(code)
         );
         CREATE INDEX idx_wards_name ON wards(name);
         CREATE INDEX idx_wards_province ON wards(province_code);
       `);
       this.logger.log('Wards table created successfully');
+    } else {
+      // Add short_codename column if missing
+      await queryRunner.query(`
+        ALTER TABLE wards ADD COLUMN IF NOT EXISTS short_codename VARCHAR(100)
+      `);
     }
 
     this.logger.log('Base tables created successfully');
