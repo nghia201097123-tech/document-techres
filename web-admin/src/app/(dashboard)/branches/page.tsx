@@ -60,7 +60,7 @@ import { formatDateTime } from "@/lib/utils";
 import { branchService } from "@/services/branch-service";
 import { brandService } from "@/services/brand-service";
 import { useToast } from "@/hooks/use-toast";
-import { ImagePicker } from "@/components/ui/image-picker";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface BranchFormData {
   brandId: string;
@@ -739,11 +739,15 @@ export default function BranchesPage() {
                   />
                 </div>
               </div>
-              <ImagePicker
+              <ImageUpload
                 value={formData.logo}
                 onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
                 disabled={isViewMode}
-                label="Logo"
+                label="Logo chi nhánh"
+                folder="branches"
+                aspectRatio={1}
+                maxWidth={400}
+                maxHeight={400}
               />
               <div className="space-y-2">
                 <Label htmlFor="address">Địa chỉ</Label>

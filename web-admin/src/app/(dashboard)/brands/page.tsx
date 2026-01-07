@@ -59,7 +59,7 @@ import { brandService } from "@/services/brand-service";
 import { companyService } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
 import { BrandWizard } from "@/components/brand-wizard";
-import { ImagePicker } from "@/components/ui/image-picker";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 const businessModelLabels: Record<BusinessModel, string> = {
   order_only: "Chỉ Order",
@@ -731,11 +731,15 @@ export default function BrandsPage() {
                   />
                 </div>
               </div>
-              <ImagePicker
+              <ImageUpload
                 value={formData.logo}
                 onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
                 disabled={isViewMode}
-                label="Logo"
+                label="Logo thương hiệu"
+                folder="brands"
+                aspectRatio={1}
+                maxWidth={400}
+                maxHeight={400}
               />
               <div className="space-y-2">
                 <Label htmlFor="businessModel">Mô hình kinh doanh *</Label>

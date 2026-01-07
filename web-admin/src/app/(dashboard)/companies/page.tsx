@@ -64,7 +64,7 @@ import { QuickCreateDialog } from "@/components/quick-create-dialog";
 import { CloneCompanyDialog } from "@/components/clone-company-dialog";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
-import { ImagePicker } from "@/components/ui/image-picker";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 // Default column configuration
 const defaultColumns: ColumnConfig[] = [
@@ -682,11 +682,15 @@ export default function CompaniesPage() {
                   />
                 </div>
               </div>
-              <ImagePicker
+              <ImageUpload
                 value={formData.logo}
                 onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
                 disabled={isViewMode}
-                label="Logo"
+                label="Logo công ty"
+                folder="companies"
+                aspectRatio={1}
+                maxWidth={400}
+                maxHeight={400}
               />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
