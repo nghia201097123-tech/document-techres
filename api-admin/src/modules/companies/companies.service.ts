@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, DataSource } from 'typeorm';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
 import * as bcrypt from 'bcrypt';
 import { Company, Brand, Branch, Department, Staff, StaffRole, BusinessModel } from '../../database/entities';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -13,6 +16,9 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @Injectable()
 export class CompaniesService {
+  private readonly logger = new Logger(CompaniesService.name);
+  private readonly oauthApiUrl: string;
+
   constructor(
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
@@ -25,7 +31,12 @@ export class CompaniesService {
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
     private readonly dataSource: DataSource,
-  ) {}
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {
+    // URL của api-oauth service
+    this.oauthApiUrl = this.configService.get('OAUTH_API_URL') || 'http://localhost:3005';
+  }
 
   async create(createCompanyDto: CreateCompanyDto): Promise<any> {
     const existing = await this.companyRepository.findOne({
@@ -242,6 +253,18 @@ export class CompaniesService {
 
       await queryRunner.commitTransaction();
 
+      // Sau khi tạo công ty thành công, tạo tenant user trong api-oauth
+      await this.createTenantUserInOAuth({
+        tenantId,
+        username,
+        password: temporaryPassword,
+        name: staffDto.name,
+        email: staffDto.email,
+        phone: staffDto.phone,
+        role: staffRole,
+        branchId: savedBranch.id,
+      });
+
       return {
         company: {
           id: savedCompany.id,
@@ -275,6 +298,44 @@ export class CompaniesService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Tạo tenant user trong api-oauth service
+   * Được gọi sau khi tạo công ty thành công
+   */
+  private async createTenantUserInOAuth(data: {
+    tenantId: string;
+    username: string;
+    password: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    role: StaffRole;
+    branchId?: string;
+  }): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(`${this.oauthApiUrl}/api/v1/auth/tenant-users`, {
+          tenantId: data.tenantId,
+          username: data.username,
+          password: data.password,
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          role: data.role,
+          branchId: data.branchId,
+        }),
+      );
+
+      this.logger.log(`Tenant user created in OAuth service: ${response.data.username}`);
+    } catch (error) {
+      // Log error nhưng không throw để không ảnh hưởng flow chính
+      // Company đã được tạo thành công, user có thể tạo lại sau
+      this.logger.error(`Failed to create tenant user in OAuth service: ${error.message}`);
+      this.logger.error(`Tenant: ${data.tenantId}, Username: ${data.username}`);
+      // Có thể thêm vào queue để retry sau nếu cần
     }
   }
 

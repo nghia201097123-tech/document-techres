@@ -10,7 +10,7 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserType } from '../entities/user.entity';
+import { UserType, UserRole } from '../entities/user.entity';
 
 export class LoginDto {
   @ApiPropertyOptional({ description: 'Tenant ID (required for tenant users)' })
@@ -175,6 +175,77 @@ export class RevokeSessionDto {
   @IsUUID()
   @IsNotEmpty()
   sessionId: string;
+}
+
+// DTO for creating tenant users (internal API)
+export class CreateTenantUserDto {
+  @ApiProperty({ description: 'Tenant ID (Company ID from api-admin)' })
+  @IsString()
+  @IsNotEmpty()
+  tenantId: string;
+
+  @ApiProperty({ example: 'admin', description: 'Username for tenant login' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(50)
+  username: string;
+
+  @ApiProperty({ example: 'password123' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  password: string;
+
+  @ApiProperty({ example: 'Nguyen Van A' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ example: '0901234567' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiPropertyOptional({ enum: UserRole, default: UserRole.OWNER })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
+
+  @ApiPropertyOptional({ description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+}
+
+// Response for created tenant user
+export class TenantUserResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  tenantId: string;
+
+  @ApiProperty()
+  username: string;
+
+  @ApiProperty()
+  email?: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  role: string;
+
+  @ApiProperty()
+  createdAt: Date;
 }
 
 // Response DTOs

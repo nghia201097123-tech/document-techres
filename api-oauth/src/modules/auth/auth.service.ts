@@ -17,6 +17,7 @@ import * as QRCode from 'qrcode';
 import {
   User,
   UserType,
+  UserRole,
   RefreshToken,
   Session,
   PasswordReset,
@@ -32,6 +33,8 @@ import {
   LoginResponseDto,
   TokenResponseDto,
   TwoFactorSetupResponseDto,
+  CreateTenantUserDto,
+  TenantUserResponseDto,
 } from '../../dto/auth.dto';
 
 export interface JwtPayload {
@@ -220,6 +223,63 @@ export class AuthService {
         branchId: user.branchId,
         isTwoFactorEnabled: user.isTwoFactorEnabled,
       },
+    };
+  }
+
+  // ==================== CREATE TENANT USER (Internal API) ====================
+  async createTenantUser(
+    createTenantUserDto: CreateTenantUserDto,
+  ): Promise<TenantUserResponseDto> {
+    const { tenantId, username, password, name, email, phone, role, branchId } = createTenantUserDto;
+
+    // Check if username already exists for this tenant
+    const existingUsername = await this.userRepository.findOne({
+      where: { username, tenantId },
+    });
+
+    if (existingUsername) {
+      throw new ConflictException('Username already exists for this tenant');
+    }
+
+    // Check if email already exists for this tenant (if email provided)
+    if (email) {
+      const existingEmail = await this.userRepository.findOne({
+        where: { email, tenantId },
+      });
+
+      if (existingEmail) {
+        throw new ConflictException('Email already exists for this tenant');
+      }
+    }
+
+    // Hash password
+    const saltRounds = this.configService.get('security.bcryptSaltRounds');
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Create tenant user
+    const user = this.userRepository.create({
+      tenantId,
+      username,
+      email: email || `${username}@tenant-${tenantId}.local`,
+      passwordHash,
+      name,
+      phone,
+      role: role || UserRole.OWNER,
+      branchId,
+      userType: UserType.TENANT,
+      isActive: true,
+    });
+
+    await this.userRepository.save(user);
+
+    return {
+      id: user.id,
+      tenantId: user.tenantId,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      createdAt: user.createdAt,
     };
   }
 

@@ -33,6 +33,8 @@ import {
   TokenResponseDto,
   TwoFactorSetupResponseDto,
   UserProfileResponseDto,
+  CreateTenantUserDto,
+  TenantUserResponseDto,
 } from '../../dto/auth.dto';
 
 @ApiTags('Authentication')
@@ -69,6 +71,17 @@ export class AuthController {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+  }
+
+  // ==================== CREATE TENANT USER (Internal API) ====================
+  @Post('tenant-users')
+  @ApiOperation({ summary: 'Create tenant user (Internal API for api-admin)' })
+  @ApiResponse({ status: 201, description: 'Tenant user created', type: TenantUserResponseDto })
+  @ApiResponse({ status: 409, description: 'Username or email already exists' })
+  async createTenantUser(
+    @Body() createTenantUserDto: CreateTenantUserDto,
+  ): Promise<TenantUserResponseDto> {
+    return this.authService.createTenantUser(createTenantUserDto);
   }
 
   // ==================== REFRESH TOKEN ====================
