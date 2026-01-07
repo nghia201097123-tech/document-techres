@@ -331,6 +331,7 @@ export default function ProductsPage() {
   }[]>([]);
   const [uploadingAvatars, setUploadingAvatars] = React.useState(false);
   const [bulkAvatarResult, setBulkAvatarResult] = React.useState<BulkAvatarUpdateResult | null>(null);
+  const [bulkAvatarProgress, setBulkAvatarProgress] = React.useState<{ stage: "upload" | "update"; current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const bulkAvatarInputRef = React.useRef<HTMLInputElement>(null);
 
   // Topping management state
@@ -1544,22 +1545,59 @@ export default function ProductsPage() {
     }
 
     setUploadingAvatars(true);
+    setBulkAvatarProgress(null);
 
     try {
-      // Upload all images first
-      const uploadPromises = matchedPreviews.map(async (preview) => {
-        const uploadResult = await uploadService.uploadImage(preview.file, "products");
-        return {
-          productCode: preview.productCode,
-          avatarUrl: uploadResult.url,
-        };
+      // Upload images in batches
+      const uploadBatchSize = 10; // Smaller batch for image uploads to avoid memory issues
+      const totalUploadBatches = Math.ceil(matchedPreviews.length / uploadBatchSize);
+      const uploadedItems: { productCode: string; avatarUrl: string }[] = [];
+
+      for (let i = 0; i < totalUploadBatches; i++) {
+        const start = i * uploadBatchSize;
+        const end = Math.min(start + uploadBatchSize, matchedPreviews.length);
+        const batch = matchedPreviews.slice(start, end);
+
+        setBulkAvatarProgress({
+          stage: "upload",
+          current: start,
+          total: matchedPreviews.length,
+          batchNumber: i + 1,
+          totalBatches: totalUploadBatches,
+        });
+
+        // Upload batch images in parallel
+        const batchResults = await Promise.all(
+          batch.map(async (preview) => {
+            try {
+              const uploadResult = await uploadService.uploadImage(preview.file, "products");
+              return {
+                productCode: preview.productCode,
+                avatarUrl: uploadResult.url,
+              };
+            } catch (error) {
+              console.error(`Failed to upload ${preview.productCode}:`, error);
+              return null;
+            }
+          })
+        );
+
+        // Filter successful uploads
+        uploadedItems.push(...batchResults.filter((item): item is { productCode: string; avatarUrl: string } => item !== null));
+      }
+
+      // Update products with new avatar URLs in batches
+      const result = await bulkProductService.updateAvatarsBatched(uploadedItems, {
+        batchSize: 50,
+        onProgress: (progress) => {
+          setBulkAvatarProgress({
+            stage: "update",
+            ...progress,
+          });
+        },
       });
 
-      const uploadedItems = await Promise.all(uploadPromises);
-
-      // Update products with new avatar URLs
-      const result = await bulkProductService.updateAvatars(uploadedItems);
-
+      setBulkAvatarProgress(null);
       setBulkAvatarResult(result);
 
       if (result.success > 0) {
@@ -1576,6 +1614,7 @@ export default function ProductsPage() {
       toast({ title: "Lỗi", description: error.message || "Có lỗi xảy ra khi upload ảnh", variant: "destructive" });
     } finally {
       setUploadingAvatars(false);
+      setBulkAvatarProgress(null);
     }
   };
 
@@ -3840,7 +3879,9 @@ export default function ProductsPage() {
                   disabled={uploadingAvatars || bulkAvatarPreviews.filter(p => p.matchedProduct).length === 0}
                 >
                   {uploadingAvatars && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Upload {bulkAvatarPreviews.filter(p => p.matchedProduct).length} ảnh
+                  {bulkAvatarProgress
+                    ? `${bulkAvatarProgress.stage === "upload" ? "Đang upload" : "Đang cập nhật"}... ${bulkAvatarProgress.current}/${bulkAvatarProgress.total} (batch ${bulkAvatarProgress.batchNumber}/${bulkAvatarProgress.totalBatches})`
+                    : `Upload ${bulkAvatarPreviews.filter(p => p.matchedProduct).length} ảnh`}
                 </Button>
               </DialogFooter>
             </div>

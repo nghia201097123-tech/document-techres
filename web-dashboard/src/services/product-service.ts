@@ -857,6 +857,63 @@ export const bulkProductService = {
     });
     return response.data;
   },
+
+  updateAvatarsBatched: async (
+    items: { productCode: string; avatarUrl: string }[],
+    options?: {
+      batchSize?: number;
+      onProgress?: (progress: ProductBatchProgressInfo) => void;
+    }
+  ): Promise<BulkAvatarUpdateResult> => {
+    const batchSize = options?.batchSize || 50;
+    const totalBatches = Math.ceil(items.length / batchSize);
+    const aggregatedResult: BulkAvatarUpdateResult = {
+      success: 0,
+      failed: 0,
+      errors: [],
+      updated: [],
+    };
+
+    for (let i = 0; i < totalBatches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize, items.length);
+      const batch = items.slice(start, end);
+
+      options?.onProgress?.({
+        current: start,
+        total: items.length,
+        batchNumber: i + 1,
+        totalBatches,
+      });
+
+      try {
+        const response = await api.post<BulkAvatarUpdateResult>("/products/bulk/update-avatar", {
+          items: batch,
+        });
+        aggregatedResult.success += response.data.success;
+        aggregatedResult.failed += response.data.failed;
+        aggregatedResult.errors.push(...response.data.errors);
+        aggregatedResult.updated.push(...response.data.updated);
+      } catch (error: any) {
+        aggregatedResult.failed += batch.length;
+        batch.forEach((item) => {
+          aggregatedResult.errors.push({
+            productCode: item.productCode,
+            message: error.response?.data?.message || error.message || "Unknown error",
+          });
+        });
+      }
+    }
+
+    options?.onProgress?.({
+      current: items.length,
+      total: items.length,
+      batchNumber: totalBatches,
+      totalBatches,
+    });
+
+    return aggregatedResult;
+  },
 };
 
 export interface BulkAvatarUpdateResult {
