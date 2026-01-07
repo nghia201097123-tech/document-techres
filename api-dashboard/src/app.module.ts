@@ -21,6 +21,7 @@ import { VouchersModule } from "./modules/vouchers/vouchers.module";
 import { CouponsModule } from "./modules/coupons/coupons.module";
 import { BranchProductsModule } from "./modules/branch-products/branch-products.module";
 import { SettingsModule } from "./modules/settings/settings.module";
+import { SyncModule } from "./modules/sync/sync.module";
 import { DatabaseMigrationService } from "./database/database-migration.service";
 import {
   Company,
@@ -143,6 +144,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     CouponsModule,
     BranchProductsModule,
     SettingsModule,
+    SyncModule,
   ],
   providers: [DatabaseMigrationService],
 })

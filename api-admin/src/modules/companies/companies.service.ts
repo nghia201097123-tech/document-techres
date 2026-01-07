@@ -18,6 +18,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 export class CompaniesService {
   private readonly logger = new Logger(CompaniesService.name);
   private readonly oauthApiUrl: string;
+  private readonly dashboardApiUrl: string;
 
   constructor(
     @InjectRepository(Company)
@@ -36,6 +37,8 @@ export class CompaniesService {
   ) {
     // URL của api-oauth service
     this.oauthApiUrl = this.configService.get('OAUTH_API_URL') || 'http://localhost:3005';
+    // URL của api-dashboard service
+    this.dashboardApiUrl = this.configService.get('DASHBOARD_API_URL') || 'http://localhost:4002';
   }
 
   async create(createCompanyDto: CreateCompanyDto): Promise<any> {
@@ -265,6 +268,68 @@ export class CompaniesService {
         branchId: savedBranch.id,
       });
 
+      // Sync dữ liệu sang api-dashboard
+      await this.syncToDashboard({
+        company: {
+          id: savedCompany.id,
+          code: savedCompany.code,
+          name: savedCompany.name,
+          logoUrl: savedCompany.logoUrl,
+          isActive: true,
+        },
+        brand: {
+          id: savedBrand.id,
+          tenantId,
+          companyId: savedCompany.id,
+          name: savedBrand.name,
+          code: savedBrand.code,
+          logoUrl: savedBrand.logoUrl,
+          description: savedBrand.description,
+          businessModel: savedBrand.businessModel,
+          isActive: true,
+        },
+        branch: {
+          id: savedBranch.id,
+          tenantId,
+          brandId: savedBrand.id,
+          name: savedBranch.name,
+          code: savedBranch.code,
+          logoUrl: savedBranch.logoUrl,
+          addressDetail: savedBranch.addressDetail,
+          provinceCode: savedBranch.provinceCode,
+          wardCode: savedBranch.wardCode,
+          phone: savedBranch.phone,
+          manager: savedBranch.manager,
+          openTime: savedBranch.openTime,
+          closeTime: savedBranch.closeTime,
+          businessModel: savedBranch.businessModel,
+          isActive: true,
+        },
+        department: {
+          id: savedDepartment.id,
+          tenantId,
+          branchId: savedBranch.id,
+          name: savedDepartment.name,
+          code: savedDepartment.code,
+          description: savedDepartment.description,
+          isActive: true,
+        },
+        staff: {
+          id: savedStaff.id,
+          tenantId,
+          branchId: savedBranch.id,
+          companyId: savedCompany.id,
+          brandId: savedBrand.id,
+          departmentId: savedDepartment.id,
+          name: savedStaff.name,
+          phone: savedStaff.phone,
+          email: savedStaff.email,
+          role: savedStaff.role,
+          username: savedStaff.username,
+          isActive: true,
+        },
+      });
+
       return {
         company: {
           id: savedCompany.id,
@@ -349,6 +414,97 @@ export class CompaniesService {
         // Network error (ECONNREFUSED, etc.)
         this.logger.error(`Error code: ${error.code}`);
         this.logger.error(`Có thể api-oauth chưa chạy hoặc URL không đúng`);
+      }
+      // Không throw error để không ảnh hưởng flow chính
+    }
+  }
+
+  /**
+   * Sync dữ liệu company/brand/branch/staff sang api-dashboard
+   * Được gọi sau khi tạo công ty thành công
+   */
+  private async syncToDashboard(data: {
+    company: {
+      id: string;
+      code: string;
+      name: string;
+      logoUrl?: string;
+      isActive: boolean;
+    };
+    brand: {
+      id: string;
+      tenantId: string;
+      companyId: string;
+      name: string;
+      code?: string;
+      logoUrl?: string;
+      description?: string;
+      businessModel?: string;
+      isActive: boolean;
+    };
+    branch: {
+      id: string;
+      tenantId: string;
+      brandId: string;
+      name: string;
+      code?: string;
+      logoUrl?: string;
+      addressDetail?: string;
+      provinceCode?: string;
+      wardCode?: string;
+      phone?: string;
+      manager?: string;
+      openTime?: string;
+      closeTime?: string;
+      businessModel?: string;
+      isActive: boolean;
+    };
+    department?: {
+      id: string;
+      tenantId: string;
+      branchId: string;
+      name: string;
+      code?: string;
+      description?: string;
+      isActive: boolean;
+    };
+    staff?: {
+      id: string;
+      tenantId: string;
+      branchId: string;
+      companyId?: string;
+      brandId?: string;
+      departmentId?: string;
+      name: string;
+      phone?: string;
+      email?: string;
+      role?: string;
+      username?: string;
+      isActive: boolean;
+    };
+  }): Promise<void> {
+    const url = `${this.dashboardApiUrl}/api/sync/company`;
+    this.logger.log(`Syncing company data to Dashboard: ${url}`);
+    this.logger.log(`Company: ${data.company.code}`);
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(url, data),
+      );
+
+      this.logger.log(`✅ Company data synced to Dashboard: ${response.data.message}`);
+    } catch (error: any) {
+      this.logger.error(`❌ Failed to sync company data to Dashboard`);
+      this.logger.error(`URL: ${url}`);
+      this.logger.error(`Company: ${data.company.code}`);
+      this.logger.error(`Error: ${error.message}`);
+
+      if (error.response) {
+        this.logger.error(`Status: ${error.response.status}`);
+        this.logger.error(`Response: ${JSON.stringify(error.response.data)}`);
+      } else if (error.code) {
+        this.logger.error(`Error code: ${error.code}`);
+        this.logger.error(`Có thể api-dashboard chưa chạy hoặc URL không đúng`);
       }
       // Không throw error để không ảnh hưởng flow chính
     }
