@@ -17,6 +17,9 @@ export class DatabaseMigrationService implements OnModuleInit {
     await queryRunner.connect();
 
     try {
+      // 0. Create base tables for microservices (without FK constraints to external databases)
+      await this.createBaseTables(queryRunner);
+
       // 1. Drop old enum type if exists
       this.logger.log('Checking for old enum types...');
       await queryRunner.query(`DROP TYPE IF EXISTS product_type_old CASCADE`);
@@ -47,7 +50,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE areas (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL,
             name VARCHAR(100) NOT NULL,
             description TEXT,
             sort_order INTEGER DEFAULT 0,
@@ -75,8 +78,8 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE tables (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-            area_id UUID NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL,
+            area_id UUID NOT NULL,
             name VARCHAR(50) NOT NULL,
             capacity INTEGER DEFAULT 4,
             status table_status NOT NULL DEFAULT 'available',
@@ -288,7 +291,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE kitchens (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL,
             name VARCHAR(100) NOT NULL,
             printer_name VARCHAR(100),
             printer_ip VARCHAR(50),
@@ -318,7 +321,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE units (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL,
             name VARCHAR(100) NOT NULL,
             description TEXT,
             sort_order INTEGER DEFAULT 0,
@@ -514,7 +517,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE surcharges (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL,
             name VARCHAR(200) NOT NULL,
             description TEXT,
             amount DECIMAL(15,2) DEFAULT 0,
@@ -553,7 +556,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE seasonal_prices (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL ,
             name VARCHAR(200) NOT NULL,
             description TEXT,
             adjustment_type adjustment_type DEFAULT 'percentage',
@@ -585,7 +588,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE gift_items (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL ,
             name VARCHAR(200) NOT NULL,
             description TEXT,
             product_id UUID REFERENCES products(id) ON DELETE SET NULL,
@@ -625,7 +628,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE vouchers (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL ,
             code VARCHAR(50) NOT NULL UNIQUE,
             name VARCHAR(200) NOT NULL,
             description TEXT,
@@ -698,7 +701,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE coupons (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL ,
             code VARCHAR(50) NOT NULL,
             name VARCHAR(200) NOT NULL,
             description TEXT,
@@ -741,7 +744,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE branch_products (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL ,
             product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
             is_available BOOLEAN DEFAULT TRUE,
             custom_price DECIMAL(15,2),
@@ -825,7 +828,7 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE payment_methods (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL ,
             name VARCHAR(100) NOT NULL,
             type payment_method_type NOT NULL,
             description TEXT,
@@ -856,8 +859,8 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE bank_accounts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
-            branch_id UUID REFERENCES branches(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL ,
+            branch_id UUID ,
             bank_code VARCHAR(50) NOT NULL,
             bank_name VARCHAR(255) NOT NULL,
             account_number VARCHAR(50) NOT NULL,
@@ -903,8 +906,8 @@ export class DatabaseMigrationService implements OnModuleInit {
           CREATE TABLE einvoice_configs (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id VARCHAR(50) NOT NULL,
-            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
-            branch_id UUID REFERENCES branches(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL ,
+            branch_id UUID ,
             provider einvoice_provider NOT NULL,
             tax_code VARCHAR(20) NOT NULL,
             company_name VARCHAR(255) NOT NULL,
@@ -933,6 +936,250 @@ export class DatabaseMigrationService implements OnModuleInit {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Create base tables for microservices architecture
+   * These tables store local copies of master data (synced from api-admin/techres_master)
+   * No foreign key constraints to external databases
+   */
+  private async createBaseTables(queryRunner: any) {
+    // Create companies table
+    const companiesExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'companies'
+      );
+    `);
+
+    if (!companiesExists[0].exists) {
+      this.logger.log('Creating companies table...');
+      await queryRunner.query(`
+        CREATE TABLE companies (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          code VARCHAR(50) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          logo_url TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_companies_code ON companies(code);
+      `);
+      this.logger.log('Companies table created successfully');
+    }
+
+    // Create brands table
+    const brandsExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'brands'
+      );
+    `);
+
+    if (!brandsExists[0].exists) {
+      this.logger.log('Creating brands table...');
+      await queryRunner.query(`
+        CREATE TABLE brands (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          company_id UUID NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          logo_url TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_brands_tenant ON brands(tenant_id);
+        CREATE INDEX idx_brands_company ON brands(company_id);
+      `);
+      this.logger.log('Brands table created successfully');
+    }
+
+    // Create branches table
+    const branchesExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'branches'
+      );
+    `);
+
+    if (!branchesExists[0].exists) {
+      this.logger.log('Creating branches table...');
+      await queryRunner.query(`
+        CREATE TABLE branches (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          brand_id UUID NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          address TEXT,
+          phone VARCHAR(20),
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_branches_tenant ON branches(tenant_id);
+        CREATE INDEX idx_branches_brand ON branches(brand_id);
+      `);
+      this.logger.log('Branches table created successfully');
+    }
+
+    // Create departments table
+    const departmentsExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'departments'
+      );
+    `);
+
+    if (!departmentsExists[0].exists) {
+      this.logger.log('Creating departments table...');
+      await queryRunner.query(`
+        CREATE TABLE departments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          branch_id UUID NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          parent_id UUID,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_departments_tenant ON departments(tenant_id);
+        CREATE INDEX idx_departments_branch ON departments(branch_id);
+        CREATE INDEX idx_departments_parent ON departments(parent_id);
+      `);
+      this.logger.log('Departments table created successfully');
+    }
+
+    // Create staff table
+    const staffExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'staff'
+      );
+    `);
+
+    if (!staffExists[0].exists) {
+      this.logger.log('Creating staff table...');
+      await queryRunner.query(`
+        CREATE TABLE staff (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          branch_id UUID NOT NULL,
+          department_id UUID,
+          code VARCHAR(50),
+          name VARCHAR(255) NOT NULL,
+          phone VARCHAR(20),
+          email VARCHAR(255),
+          avatar_url TEXT,
+          role VARCHAR(50) DEFAULT 'staff',
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_staff_tenant ON staff(tenant_id);
+        CREATE INDEX idx_staff_branch ON staff(branch_id);
+        CREATE INDEX idx_staff_department ON staff(department_id);
+      `);
+      this.logger.log('Staff table created successfully');
+    }
+
+    // Create permissions table
+    const permissionsExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'permissions'
+      );
+    `);
+
+    if (!permissionsExists[0].exists) {
+      this.logger.log('Creating permissions table...');
+      await queryRunner.query(`
+        CREATE TABLE permissions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          code VARCHAR(100) NOT NULL UNIQUE,
+          name VARCHAR(255) NOT NULL,
+          module VARCHAR(100),
+          description TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_permissions_code ON permissions(code);
+        CREATE INDEX idx_permissions_module ON permissions(module);
+      `);
+      this.logger.log('Permissions table created successfully');
+    }
+
+    // Create categories table
+    const categoriesExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'categories'
+      );
+    `);
+
+    if (!categoriesExists[0].exists) {
+      this.logger.log('Creating categories table...');
+      await queryRunner.query(`
+        CREATE TABLE categories (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          brand_id UUID NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          image_url TEXT,
+          parent_id UUID,
+          sort_order INTEGER DEFAULT 0,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_categories_tenant ON categories(tenant_id);
+        CREATE INDEX idx_categories_brand ON categories(brand_id);
+        CREATE INDEX idx_categories_parent ON categories(parent_id);
+      `);
+      this.logger.log('Categories table created successfully');
+    }
+
+    // Create products table
+    const productsExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'products'
+      );
+    `);
+
+    if (!productsExists[0].exists) {
+      this.logger.log('Creating products table...');
+      await queryRunner.query(`
+        CREATE TYPE product_type AS ENUM ('single', 'combo', 'topping', 'raw_material');
+        CREATE TABLE products (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          brand_id UUID NOT NULL,
+          category_id UUID,
+          code VARCHAR(50),
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          image_url TEXT,
+          price DECIMAL(15,2) DEFAULT 0,
+          product_type product_type DEFAULT 'single',
+          is_available BOOLEAN DEFAULT TRUE,
+          is_active BOOLEAN DEFAULT TRUE,
+          sort_order INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_products_tenant ON products(tenant_id);
+        CREATE INDEX idx_products_brand ON products(brand_id);
+        CREATE INDEX idx_products_category ON products(category_id);
+        CREATE INDEX idx_products_code ON products(code);
+      `);
+      this.logger.log('Products table created successfully');
+    }
+
+    this.logger.log('Base tables created successfully');
   }
 
   private async seedFnBPermissions(queryRunner: any) {
