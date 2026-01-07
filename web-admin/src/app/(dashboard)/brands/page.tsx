@@ -242,7 +242,7 @@ export default function BrandsPage() {
       companyId: brand.companyId,
       name: brand.name,
       code: brand.code,
-      logoUrl: brand.logoUrl || "",
+      logoUrl: brand.logo || "", // Read from 'logo', send as 'logoUrl'
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -256,7 +256,7 @@ export default function BrandsPage() {
       companyId: brand.companyId,
       name: brand.name,
       code: brand.code,
-      logoUrl: brand.logoUrl || "",
+      logoUrl: brand.logo || "", // Read from 'logo', send as 'logoUrl'
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -506,9 +506,9 @@ export default function BrandsPage() {
                 <TableRow key={brand.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      {brand.logoUrl ? (
+                      {brand.logo ? (
                         <img
-                          src={brand.logoUrl}
+                          src={brand.logo}
                           alt={brand.name}
                           className="h-10 w-10 rounded-lg object-cover"
                           onError={(e) => {
@@ -517,7 +517,7 @@ export default function BrandsPage() {
                           }}
                         />
                       ) : null}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 ${brand.logoUrl ? 'hidden' : ''}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 ${brand.logo ? 'hidden' : ''}`}>
                         <Store className="h-5 w-5 text-green-500" />
                       </div>
                       <div>

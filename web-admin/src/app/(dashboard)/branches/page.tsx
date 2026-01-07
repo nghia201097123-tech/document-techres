@@ -239,7 +239,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
-      logoUrl: branch.logoUrl || "",
+      logoUrl: branch.logo || "", // Read from 'logo', send as 'logoUrl'
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -258,7 +258,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
-      logoUrl: branch.logoUrl || "",
+      logoUrl: branch.logo || "", // Read from 'logo', send as 'logoUrl'
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -498,9 +498,9 @@ export default function BranchesPage() {
                 <TableRow key={branch.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      {branch.logoUrl ? (
+                      {branch.logo ? (
                         <img
-                          src={branch.logoUrl}
+                          src={branch.logo}
                           alt={branch.name}
                           className="h-10 w-10 rounded-lg object-cover"
                           onError={(e) => {
@@ -509,7 +509,7 @@ export default function BranchesPage() {
                           }}
                         />
                       ) : null}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 ${branch.logoUrl ? 'hidden' : ''}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 ${branch.logo ? 'hidden' : ''}`}>
                         <MapPin className="h-5 w-5 text-orange-500" />
                       </div>
                       <div>

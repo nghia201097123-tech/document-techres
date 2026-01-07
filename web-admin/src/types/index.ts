@@ -39,7 +39,7 @@ export interface Brand {
   name: string;
   code: string;
   businessModel: BusinessModel;
-  logoUrl?: string;
+  logo?: string; // Backend returns 'logo' in GET response
   description?: string;
   isActive: boolean;
   branchCount?: number;
@@ -66,7 +66,7 @@ export interface Branch {
   companyName?: string;
   name: string;
   code: string;
-  logoUrl?: string;
+  logo?: string; // Backend returns 'logo' in GET response
   address?: string;
   phone?: string;
   email?: string;
