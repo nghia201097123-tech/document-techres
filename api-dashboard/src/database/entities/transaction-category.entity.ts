@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 export enum TransactionType {
@@ -12,14 +13,19 @@ export enum TransactionType {
 }
 
 @Entity('transaction_categories')
+@Index(['tenantId', 'code'], { unique: true })
 export class TransactionCategory {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 255 })
+  @Column({ name: 'tenant_id' })
+  @Index()
+  tenantId: string;
+
+  @Column({ length: 200 })
   name: string;
 
-  @Column({ length: 50, unique: true })
+  @Column({ length: 50 })
   code: string;
 
   @Column({ type: 'enum', enum: TransactionType })

@@ -933,6 +933,116 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('E-Invoice configs table created successfully');
       }
 
+      // 36. Create transaction_type enum
+      this.logger.log('Creating transaction_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE transaction_type AS ENUM ('income', 'expense');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 37. Create transaction_voucher_status enum
+      this.logger.log('Creating transaction_voucher_status enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE transaction_voucher_status AS ENUM ('draft', 'pending', 'approved', 'cancelled');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 38. Create transaction_payment_type enum
+      this.logger.log('Creating transaction_payment_type enum...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE transaction_payment_type AS ENUM ('cash', 'bank');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 39. Create transaction_categories table
+      const transactionCategoriesExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'transaction_categories'
+        );
+      `);
+
+      if (!transactionCategoriesExists[0].exists) {
+        this.logger.log('Creating transaction_categories table...');
+        await queryRunner.query(`
+          CREATE TABLE transaction_categories (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            code VARCHAR(50) NOT NULL,
+            type transaction_type NOT NULL,
+            description TEXT,
+            is_system BOOLEAN DEFAULT FALSE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_transaction_categories_tenant ON transaction_categories(tenant_id);
+          CREATE INDEX idx_transaction_categories_type ON transaction_categories(tenant_id, type);
+          CREATE INDEX idx_transaction_categories_code ON transaction_categories(tenant_id, code);
+        `);
+        this.logger.log('Transaction categories table created successfully');
+      }
+
+      // 40. Create transaction_vouchers table
+      const transactionVouchersExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'transaction_vouchers'
+        );
+      `);
+
+      if (!transactionVouchersExists[0].exists) {
+        this.logger.log('Creating transaction_vouchers table...');
+        await queryRunner.query(`
+          CREATE TABLE transaction_vouchers (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            brand_id UUID NOT NULL,
+            branch_id UUID NOT NULL,
+            voucher_number VARCHAR(50) NOT NULL,
+            transaction_type transaction_type NOT NULL,
+            voucher_date DATE NOT NULL,
+            category_id UUID REFERENCES transaction_categories(id) ON DELETE SET NULL,
+            amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+            payment_type transaction_payment_type NOT NULL DEFAULT 'cash',
+            payment_method_id UUID REFERENCES payment_methods(id) ON DELETE SET NULL,
+            bank_account_id UUID REFERENCES bank_accounts(id) ON DELETE SET NULL,
+            counterparty_name VARCHAR(255),
+            counterparty_address TEXT,
+            counterparty_tax_code VARCHAR(50),
+            reason TEXT NOT NULL,
+            notes TEXT,
+            attachments JSONB,
+            status transaction_voucher_status NOT NULL DEFAULT 'draft',
+            created_by_id UUID REFERENCES staff(id) ON DELETE SET NULL,
+            approved_by_id UUID REFERENCES staff(id) ON DELETE SET NULL,
+            approved_at TIMESTAMP,
+            cancelled_reason TEXT,
+            reference_code VARCHAR(100),
+            reference_type VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_transaction_vouchers_tenant ON transaction_vouchers(tenant_id);
+          CREATE INDEX idx_transaction_vouchers_branch ON transaction_vouchers(tenant_id, branch_id);
+          CREATE INDEX idx_transaction_vouchers_type ON transaction_vouchers(tenant_id, transaction_type);
+          CREATE INDEX idx_transaction_vouchers_status ON transaction_vouchers(tenant_id, status);
+          CREATE INDEX idx_transaction_vouchers_date ON transaction_vouchers(tenant_id, voucher_date);
+          CREATE INDEX idx_transaction_vouchers_number ON transaction_vouchers(voucher_number);
+        `);
+        this.logger.log('Transaction vouchers table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

@@ -9,6 +9,7 @@ import {
   Body,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TransactionCategoriesService } from './transaction-categories.service';
@@ -33,13 +34,14 @@ export class TransactionCategoriesController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   findAll(
+    @Request() req,
     @Query('type') type?: TransactionType,
     @Query('search') search?: string,
     @Query('isActive') isActive?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.categoriesService.findAll({
+    return this.categoriesService.findAll(req.user.tenantId, {
       type,
       search,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
@@ -51,43 +53,43 @@ export class TransactionCategoriesController {
   @Get('dropdown')
   @ApiOperation({ summary: 'Lấy danh sách danh mục cho dropdown (không phân trang)' })
   @ApiQuery({ name: 'type', enum: TransactionType, required: false })
-  findAllForDropdown(@Query('type') type?: TransactionType) {
-    return this.categoriesService.findAllForDropdown(type);
+  findAllForDropdown(@Request() req, @Query('type') type?: TransactionType) {
+    return this.categoriesService.findAllForDropdown(req.user.tenantId, type);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết danh mục' })
-  findOne(@Param('id') id: string) {
-    return this.categoriesService.findOne(id);
+  findOne(@Request() req, @Param('id') id: string) {
+    return this.categoriesService.findOne(req.user.tenantId, id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Tạo danh mục mới' })
-  create(@Body() createDto: CreateTransactionCategoryDto) {
-    return this.categoriesService.create(createDto);
+  create(@Request() req, @Body() createDto: CreateTransactionCategoryDto) {
+    return this.categoriesService.create(req.user.tenantId, createDto);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật danh mục' })
-  update(@Param('id') id: string, @Body() updateDto: UpdateTransactionCategoryDto) {
-    return this.categoriesService.update(id, updateDto);
+  update(@Request() req, @Param('id') id: string, @Body() updateDto: UpdateTransactionCategoryDto) {
+    return this.categoriesService.update(req.user.tenantId, id, updateDto);
   }
 
   @Patch(':id/toggle-active')
   @ApiOperation({ summary: 'Kích hoạt/Tạm ngưng danh mục' })
-  toggleActive(@Param('id') id: string) {
-    return this.categoriesService.toggleActive(id);
+  toggleActive(@Request() req, @Param('id') id: string) {
+    return this.categoriesService.toggleActive(req.user.tenantId, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa danh mục (không áp dụng cho danh mục hệ thống)' })
-  delete(@Param('id') id: string) {
-    return this.categoriesService.delete(id);
+  delete(@Request() req, @Param('id') id: string) {
+    return this.categoriesService.delete(req.user.tenantId, id);
   }
 
   @Post('seed')
   @ApiOperation({ summary: 'Khởi tạo danh mục mặc định' })
-  seed() {
-    return this.categoriesService.seed();
+  seed(@Request() req) {
+    return this.categoriesService.seed(req.user.tenantId);
   }
 }

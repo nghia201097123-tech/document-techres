@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
 import { TransactionCategory, TransactionType } from '../../database/entities';
 import { CreateTransactionCategoryDto, UpdateTransactionCategoryDto } from './dto';
 
@@ -31,7 +31,7 @@ export class TransactionCategoriesService {
   /**
    * Lấy danh sách danh mục với filter và phân trang
    */
-  async findAll(options?: {
+  async findAll(tenantId: string, options?: {
     type?: TransactionType;
     search?: string;
     isActive?: boolean;
@@ -40,17 +40,8 @@ export class TransactionCategoriesService {
   }) {
     const { type, search, isActive, page = 1, limit = 50 } = options || {};
 
-    const where: FindOptionsWhere<TransactionCategory> = {};
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (isActive !== undefined) {
-      where.isActive = isActive;
-    }
-
-    let queryBuilder = this.categoryRepository.createQueryBuilder('category');
+    let queryBuilder = this.categoryRepository.createQueryBuilder('category')
+      .where('category.tenantId = :tenantId', { tenantId });
 
     if (type) {
       queryBuilder = queryBuilder.andWhere('category.type = :type', { type });
@@ -89,23 +80,29 @@ export class TransactionCategoriesService {
   /**
    * Lấy tất cả danh mục (không phân trang) - dùng cho dropdown
    */
-  async findAllForDropdown(type?: TransactionType) {
-    const where: FindOptionsWhere<TransactionCategory> = { isActive: true };
+  async findAllForDropdown(tenantId: string, type?: TransactionType) {
+    const queryBuilder = this.categoryRepository.createQueryBuilder('category')
+      .where('category.tenantId = :tenantId', { tenantId })
+      .andWhere('category.isActive = :isActive', { isActive: true });
+
     if (type) {
-      where.type = type;
+      queryBuilder.andWhere('category.type = :type', { type });
     }
 
-    return this.categoryRepository.find({
-      where,
-      order: { type: 'ASC', isSystem: 'DESC', name: 'ASC' },
-    });
+    return queryBuilder
+      .orderBy('category.type', 'ASC')
+      .addOrderBy('category.isSystem', 'DESC')
+      .addOrderBy('category.name', 'ASC')
+      .getMany();
   }
 
   /**
    * Lấy chi tiết danh mục
    */
-  async findOne(id: string) {
-    const category = await this.categoryRepository.findOne({ where: { id } });
+  async findOne(tenantId: string, id: string) {
+    const category = await this.categoryRepository.findOne({
+      where: { tenantId, id }
+    });
     if (!category) {
       throw new NotFoundException('Không tìm thấy danh mục');
     }
@@ -115,22 +112,25 @@ export class TransactionCategoriesService {
   /**
    * Tìm danh mục theo mã
    */
-  async findByCode(code: string) {
-    return this.categoryRepository.findOne({ where: { code: code.toUpperCase() } });
+  async findByCode(tenantId: string, code: string) {
+    return this.categoryRepository.findOne({
+      where: { tenantId, code: code.toUpperCase() }
+    });
   }
 
   /**
    * Tạo danh mục mới
    */
-  async create(createDto: CreateTransactionCategoryDto) {
+  async create(tenantId: string, createDto: CreateTransactionCategoryDto) {
     // Kiểm tra mã đã tồn tại
-    const existing = await this.findByCode(createDto.code);
+    const existing = await this.findByCode(tenantId, createDto.code);
     if (existing) {
       throw new ConflictException('Mã danh mục đã tồn tại');
     }
 
     const category = this.categoryRepository.create({
       ...createDto,
+      tenantId,
       code: createDto.code.toUpperCase(),
       isSystem: false,
       isActive: true,
@@ -142,8 +142,8 @@ export class TransactionCategoriesService {
   /**
    * Cập nhật danh mục
    */
-  async update(id: string, updateDto: UpdateTransactionCategoryDto) {
-    const category = await this.findOne(id);
+  async update(tenantId: string, id: string, updateDto: UpdateTransactionCategoryDto) {
+    const category = await this.findOne(tenantId, id);
 
     // Không cho phép sửa danh mục hệ thống
     if (category.isSystem) {
@@ -152,7 +152,7 @@ export class TransactionCategoriesService {
 
     // Nếu đổi mã, kiểm tra trùng
     if (updateDto.code && updateDto.code !== category.code) {
-      const existing = await this.findByCode(updateDto.code);
+      const existing = await this.findByCode(tenantId, updateDto.code);
       if (existing) {
         throw new ConflictException('Mã danh mục đã tồn tại');
       }
@@ -166,8 +166,8 @@ export class TransactionCategoriesService {
   /**
    * Xóa danh mục
    */
-  async delete(id: string) {
-    const category = await this.findOne(id);
+  async delete(tenantId: string, id: string) {
+    const category = await this.findOne(tenantId, id);
 
     // Không cho phép xóa danh mục hệ thống
     if (category.isSystem) {
@@ -181,8 +181,8 @@ export class TransactionCategoriesService {
   /**
    * Kích hoạt/Tạm ngưng danh mục
    */
-  async toggleActive(id: string) {
-    const category = await this.findOne(id);
+  async toggleActive(tenantId: string, id: string) {
+    const category = await this.findOne(tenantId, id);
 
     // Không cho phép tắt danh mục hệ thống
     if (category.isSystem && category.isActive) {
@@ -196,8 +196,8 @@ export class TransactionCategoriesService {
   /**
    * Khởi tạo danh mục mặc định
    */
-  async seed() {
-    const count = await this.categoryRepository.count();
+  async seed(tenantId: string) {
+    const count = await this.categoryRepository.count({ where: { tenantId } });
     if (count > 0) {
       return { message: 'Danh mục đã được khởi tạo trước đó', created: 0 };
     }
@@ -205,6 +205,7 @@ export class TransactionCategoriesService {
     const categories = DEFAULT_CATEGORIES.map(cat =>
       this.categoryRepository.create({
         ...cat,
+        tenantId,
         isActive: true,
       })
     );
