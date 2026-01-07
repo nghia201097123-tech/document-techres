@@ -151,13 +151,10 @@ export function Header({ user, onOpenCommandPalette, onCreateItem }: HeaderProps
       </div>
 
       {/* Change Password Dialog */}
-      {user?.id && (
-        <ChangePasswordDialog
-          open={showChangePasswordDialog}
-          onOpenChange={setShowChangePasswordDialog}
-          userId={user.id}
-        />
-      )}
+      <ChangePasswordDialog
+        open={showChangePasswordDialog}
+        onOpenChange={setShowChangePasswordDialog}
+      />
     </header>
   );
 }

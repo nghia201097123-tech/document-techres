@@ -20,13 +20,11 @@ import { useToast } from "@/hooks/use-toast";
 interface ChangePasswordDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userId: string;
 }
 
 export function ChangePasswordDialog({
   open,
   onOpenChange,
-  userId,
 }: ChangePasswordDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -62,8 +60,11 @@ export function ChangePasswordDialog({
     if (!formData.newPassword) {
       newErrors.newPassword = "Vui lòng nhập mật khẩu mới";
       isValid = false;
-    } else if (formData.newPassword.length < 6) {
-      newErrors.newPassword = "Mật khẩu mới phải có ít nhất 6 ký tự";
+    } else if (formData.newPassword.length < 8) {
+      newErrors.newPassword = "Mật khẩu mới phải có ít nhất 8 ký tự";
+      isValid = false;
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(formData.newPassword)) {
+      newErrors.newPassword = "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt";
       isValid = false;
     }
 
@@ -89,7 +90,6 @@ export function ChangePasswordDialog({
     setLoading(true);
     try {
       await authService.changePassword(
-        userId,
         formData.currentPassword,
         formData.newPassword
       );
@@ -196,7 +196,7 @@ export function ChangePasswordDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, newPassword: e.target.value })
                 }
-                placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+                placeholder="Nhập mật khẩu mới (ít nhất 8 ký tự)"
                 className={errors.newPassword ? "border-destructive" : ""}
               />
               <button

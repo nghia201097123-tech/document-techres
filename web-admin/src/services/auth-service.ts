@@ -2,13 +2,39 @@ import axios from "axios";
 import api from "./api";
 import type { AdminUser } from "@/types";
 
-// Separate axios instance for login (without auth interceptors)
+// API OAuth base URL
+const OAUTH_API_URL = "http://localhost:3005/api/v1";
+
+// Separate axios instance for auth (API OAuth service)
 const authApi = axios.create({
-  baseURL: "http://localhost:3002/api",
+  baseURL: OAUTH_API_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+// Add auth token to authApi for authenticated requests (logout, etc.)
+authApi.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const authStorage = localStorage.getItem("auth-storage");
+      if (authStorage) {
+        try {
+          const { state } = JSON.parse(authStorage);
+          if (state?.token) {
+            config.headers.Authorization = `Bearer ${state.token}`;
+          }
+        } catch (e) {
+          console.error("Error parsing auth storage:", e);
+        }
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 interface LoginRequest {
   email: string;
@@ -27,7 +53,7 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    await api.post("/auth/logout");
+    await authApi.post("/auth/logout");
   },
 
   async getCurrentUser(): Promise<AdminUser> {
@@ -36,15 +62,15 @@ export const authService = {
   },
 
   async forgotPassword(email: string): Promise<void> {
-    await api.post("/auth/forgot-password", { email });
+    await authApi.post("/auth/forgot-password", { email });
   },
 
-  async resetPassword(token: string, password: string): Promise<void> {
-    await api.post("/auth/reset-password", { token, password });
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await authApi.post("/auth/reset-password", { token, newPassword });
   },
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
-    await api.patch(`/admin-users/${userId}/change-password`, {
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await authApi.post("/auth/change-password", {
       currentPassword,
       newPassword,
     });
