@@ -389,6 +389,7 @@ export default function ProductsPage() {
   const [importData, setImportData] = React.useState<Partial<BulkProductItem>[]>([]);
   const [importErrors, setImportErrors] = React.useState<string[]>([]);
   const [importing, setImporting] = React.useState(false);
+  const [importProgress, setImportProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
 
   // Track newly created and updated product IDs for badges
   const [newProductIds, setNewProductIds] = React.useState<Set<string>>(new Set());
@@ -1297,7 +1298,17 @@ export default function ProductsPage() {
 
     try {
       setImporting(true);
-      const result = await productService.bulkImport(importData as BulkProductItem[], filterBrandId);
+      setImportProgress(null);
+
+      // Use batched import for large datasets to avoid timeout
+      const result = await productService.bulkImportBatched(
+        importData as BulkProductItem[],
+        filterBrandId,
+        {
+          batchSize: 100,
+          onProgress: (progress) => setImportProgress(progress),
+        }
+      );
 
       if (result.errors.length > 0) {
         toast({
@@ -1319,6 +1330,7 @@ export default function ProductsPage() {
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi import", variant: "destructive" });
     } finally {
       setImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -3689,7 +3701,9 @@ export default function ProductsPage() {
             </Button>
             <Button onClick={handleImport} disabled={importing || importData.length === 0}>
               {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Import {importData.length} dòng
+              {importing && importProgress
+                ? `Đang xử lý... ${importProgress.current}/${importProgress.total} (batch ${importProgress.batchNumber}/${importProgress.totalBatches})`
+                : `Import ${importData.length} dòng`}
             </Button>
           </DialogFooter>
         </DialogContent>

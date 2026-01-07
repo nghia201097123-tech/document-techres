@@ -417,6 +417,77 @@ export const productService = {
     const response = await api.post<ProductBulkImportResult>("/products/bulk-import", { items, brandId });
     return response.data;
   },
+
+  /**
+   * Bulk import with batch processing to avoid timeout errors
+   * Splits large datasets into smaller chunks and processes them sequentially
+   */
+  bulkImportBatched: async (
+    items: BulkProductItem[],
+    brandId: string,
+    options?: {
+      batchSize?: number;
+      onProgress?: (progress: { current: number; total: number; batchNumber: number; totalBatches: number }) => void;
+    }
+  ): Promise<ProductBulkImportResult> => {
+    const batchSize = options?.batchSize || 100; // Default 100 items per batch
+    const totalBatches = Math.ceil(items.length / batchSize);
+
+    const aggregatedResult: ProductBulkImportResult = {
+      created: 0,
+      updated: 0,
+      errors: [],
+      products: [],
+    };
+
+    for (let i = 0; i < totalBatches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize, items.length);
+      const batch = items.slice(start, end);
+
+      // Report progress before processing
+      options?.onProgress?.({
+        current: start,
+        total: items.length,
+        batchNumber: i + 1,
+        totalBatches,
+      });
+
+      try {
+        const response = await api.post<ProductBulkImportResult>("/products/bulk-import", {
+          items: batch,
+          brandId,
+        });
+
+        aggregatedResult.created += response.data.created;
+        aggregatedResult.updated += response.data.updated;
+        aggregatedResult.products.push(...response.data.products);
+
+        // Adjust error row numbers to reflect actual position in full dataset
+        const adjustedErrors = response.data.errors.map((err) => ({
+          row: start + err.row,
+          message: err.message,
+        }));
+        aggregatedResult.errors.push(...adjustedErrors);
+      } catch (error: any) {
+        // If batch fails, add error for entire batch range
+        aggregatedResult.errors.push({
+          row: start + 1,
+          message: `Batch ${i + 1} failed: ${error.response?.data?.message || error.message || "Unknown error"}`,
+        });
+      }
+    }
+
+    // Final progress update
+    options?.onProgress?.({
+      current: items.length,
+      total: items.length,
+      batchNumber: totalBatches,
+      totalBatches,
+    });
+
+    return aggregatedResult;
+  },
 };
 
 // Bulk Operations Types
