@@ -881,11 +881,10 @@ export default function StaffPage() {
       isActive: staff.isActive ? "Có" : "Không",
     }));
 
-    // Define columns with dropdowns
+    // Define columns with dropdowns - match template columns exactly
     const columnsWithDropdowns: ExportColumnWithDropdown<typeof exportData[0]>[] = [
       { key: "id", header: "ID", width: 40 },
       { key: "name", header: "Tên nhân viên", width: 25 },
-      { key: "username", header: "Username", width: 15 },
       { key: "phone", header: "Số điện thoại", width: 15 },
       { key: "email", header: "Email", width: 25 },
       { key: "birthDate", header: "Ngày sinh", width: 12 },
