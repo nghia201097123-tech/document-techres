@@ -20,6 +20,9 @@ export class DatabaseMigrationService implements OnModuleInit {
       // 0. Create base tables for microservices (without FK constraints to external databases)
       await this.createBaseTables(queryRunner);
 
+      // 0.1 Add missing columns to base tables (for entities compatibility)
+      await this.addMissingColumnsToBaseTables(queryRunner);
+
       // 1. Drop old enum type if exists
       this.logger.log('Checking for old enum types...');
       await queryRunner.query(`DROP TYPE IF EXISTS product_type_old CASCADE`);
@@ -1180,6 +1183,114 @@ export class DatabaseMigrationService implements OnModuleInit {
     }
 
     this.logger.log('Base tables created successfully');
+  }
+
+  /**
+   * Add missing columns to base tables for entity compatibility
+   * This ensures all columns expected by TypeORM entities exist in the database
+   */
+  private async addMissingColumnsToBaseTables(queryRunner: any) {
+    this.logger.log('Adding missing columns to base tables...');
+
+    // Add missing columns to brands table
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE business_model AS ENUM ('full_system', 'ccb_only');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE brands
+      ADD COLUMN IF NOT EXISTS code VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS description TEXT
+    `);
+
+    // Check if business_model column exists
+    const hasBrandBusinessModel = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'brands' AND column_name = 'business_model'
+      );
+    `);
+    if (!hasBrandBusinessModel[0].exists) {
+      await queryRunner.query(`
+        ALTER TABLE brands ADD COLUMN business_model business_model DEFAULT 'full_system'
+      `);
+    }
+
+    // Add missing columns to branches table
+    await queryRunner.query(`
+      ALTER TABLE branches
+      ADD COLUMN IF NOT EXISTS package_id UUID,
+      ADD COLUMN IF NOT EXISTS code VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS logo_url TEXT,
+      ADD COLUMN IF NOT EXISTS address_detail TEXT,
+      ADD COLUMN IF NOT EXISTS province_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS ward_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS manager VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS open_time VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS close_time VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS max_connections INTEGER DEFAULT 3
+    `);
+
+    // Check if business_model column exists in branches
+    const hasBranchBusinessModel = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'branches' AND column_name = 'business_model'
+      );
+    `);
+    if (!hasBranchBusinessModel[0].exists) {
+      await queryRunner.query(`
+        ALTER TABLE branches ADD COLUMN business_model business_model DEFAULT 'ccb_only'
+      `);
+    }
+
+    // Add missing columns to staff table
+    await queryRunner.query(`
+      ALTER TABLE staff
+      ADD COLUMN IF NOT EXISTS company_id UUID,
+      ADD COLUMN IF NOT EXISTS brand_id UUID,
+      ADD COLUMN IF NOT EXISTS birth_date DATE,
+      ADD COLUMN IF NOT EXISTS gender VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS id_number VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS birth_place VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS province_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS district_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS ward_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS address TEXT,
+      ADD COLUMN IF NOT EXISTS start_date DATE,
+      ADD COLUMN IF NOT EXISTS username VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS pin_code VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP
+    `);
+
+    // Add missing columns to products table
+    await queryRunner.query(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS vat_rate DECIMAL(5,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'single'
+    `);
+
+    // Add missing columns to categories table
+    await queryRunner.query(`
+      ALTER TABLE categories
+      ADD COLUMN IF NOT EXISTS product_type VARCHAR(50) DEFAULT 'single'
+    `);
+
+    // Add missing columns to departments table
+    await queryRunner.query(`
+      ALTER TABLE departments
+      ADD COLUMN IF NOT EXISTS company_id UUID,
+      ADD COLUMN IF NOT EXISTS code VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0
+    `);
+
+    this.logger.log('Missing columns added to base tables');
   }
 
   private async seedFnBPermissions(queryRunner: any) {
