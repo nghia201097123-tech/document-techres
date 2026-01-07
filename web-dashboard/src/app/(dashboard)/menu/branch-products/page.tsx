@@ -46,12 +46,13 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { branchProductService, type BranchProduct, type BranchProductStats, type BranchProductBatchProgressInfo } from "@/services/branch-product-service";
+import { branchProductService, type BranchProduct, type BranchProductStats } from "@/services/branch-product-service";
 import { ProductType } from "@/services/product-service";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { cn } from "@/lib/utils";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 
 const typeLabels: Record<string, { label: string; color: string }> = {
   food: { label: "Đồ ăn", color: "bg-orange-100 text-orange-800" },
@@ -124,6 +125,7 @@ const calculateVatAmount = (price: number, vatRate: number) => {
 
 export default function BranchProductsPage() {
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
 
   // Global filter state from Redux
   const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
@@ -148,10 +150,6 @@ export default function BranchProductsPage() {
   const [bulkPriceValue, setBulkPriceValue] = React.useState<string>("");
   const [bulkPriceAdjustType, setBulkPriceAdjustType] = React.useState<"increase" | "decrease">("increase");
   const [bulkPriceAdjustMode, setBulkPriceAdjustMode] = React.useState<"amount" | "percent">("amount");
-  const [processingBulkPrice, setProcessingBulkPrice] = React.useState(false);
-  const [bulkPriceProgress, setBulkPriceProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
-  const [processingBulkToggle, setProcessingBulkToggle] = React.useState(false);
-  const [bulkToggleProgress, setBulkToggleProgress] = React.useState<BranchProductBatchProgressInfo | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -375,7 +373,6 @@ export default function BranchProductsPage() {
   const handleCloseBulkPriceDialog = () => {
     setBulkPriceDialogOpen(false);
     setBulkPriceValue("");
-    setBulkPriceProgress({ current: 0, total: 0 });
   };
 
   // Calculate new price based on adjustment settings
@@ -416,91 +413,94 @@ export default function BranchProductsPage() {
     const total = selectedProducts.length;
     const batchSize = 50;
     const totalBatches = Math.ceil(total / batchSize);
+    const progressId = `bulk-price-${Date.now()}`;
 
-    setProcessingBulkPrice(true);
-    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches });
+    // Close dialog immediately and use background progress
+    handleCloseBulkPriceDialog();
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: "Cập nhật giá chi nhánh",
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
 
     let successCount = 0;
     let failCount = 0;
     const updatedProducts: Map<string, number | null> = new Map();
 
-    // Process in batches
-    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
-      const start = batchNum * batchSize;
-      const end = Math.min(start + batchSize, total);
-      const batch = selectedProducts.slice(start, end);
+    try {
+      // Process in batches
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const start = batchNum * batchSize;
+        const end = Math.min(start + batchSize, total);
+        const batch = selectedProducts.slice(start, end);
 
-      setBulkPriceProgress({
-        current: start,
-        total,
-        batchNumber: batchNum + 1,
-        totalBatches,
-      });
+        updateProgress(progressId, {
+          current: start,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
 
-      // Process batch in parallel
-      const batchResults = await Promise.all(
-        batch.map(async (product) => {
-          const currentPrice = getEffectivePrice(product);
-          const newPrice = calculateNewPrice(currentPrice, product.price);
+        // Process batch in parallel
+        const batchResults = await Promise.all(
+          batch.map(async (product) => {
+            const currentPrice = getEffectivePrice(product);
+            const newPrice = calculateNewPrice(currentPrice, product.price);
 
-          if (newPrice === null) {
-            return { success: false, productId: product.id, newPrice: null };
+            if (newPrice === null) {
+              return { success: false, productId: product.id, newPrice: null };
+            }
+
+            try {
+              await branchProductService.update(filterBranchId, product.id, {
+                customPrice: newPrice,
+              });
+              return { success: true, productId: product.id, newPrice };
+            } catch (error) {
+              console.error(`Error updating price for ${product.name}:`, error);
+              return { success: false, productId: product.id, newPrice: null };
+            }
+          })
+        );
+
+        // Count results and track updates
+        batchResults.forEach((result) => {
+          if (result.success) {
+            successCount++;
+            updatedProducts.set(result.productId, result.newPrice);
+          } else {
+            failCount++;
           }
+        });
 
-          try {
-            await branchProductService.update(filterBranchId, product.id, {
-              customPrice: newPrice,
-            });
-            return { success: true, productId: product.id, newPrice };
-          } catch (error) {
-            console.error(`Error updating price for ${product.name}:`, error);
-            return { success: false, productId: product.id, newPrice: null };
-          }
-        })
-      );
-
-      // Count results and track updates
-      batchResults.forEach((result) => {
-        if (result.success) {
-          successCount++;
-          updatedProducts.set(result.productId, result.newPrice);
-        } else {
-          failCount++;
-        }
-      });
-
-      setBulkPriceProgress({
-        current: end,
-        total,
-        batchNumber: batchNum + 1,
-        totalBatches,
-      });
-    }
-
-    // Update all products at once after all batches complete
-    setProducts(prev => prev.map(p => {
-      if (updatedProducts.has(p.id)) {
-        return { ...p, customPrice: updatedProducts.get(p.id)! };
+        updateProgress(progressId, {
+          current: end,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
       }
-      return p;
-    }));
 
-    setProcessingBulkPrice(false);
-    setBulkPriceProgress(null);
-    setSelectedProductIds(new Set());
-    handleCloseBulkPriceDialog();
+      // Update all products at once after all batches complete
+      setProducts(prev => prev.map(p => {
+        if (updatedProducts.has(p.id)) {
+          return { ...p, customPrice: updatedProducts.get(p.id)! };
+        }
+        return p;
+      }));
 
-    if (failCount === 0) {
-      toast({
-        title: "Thành công",
-        description: `Đã cập nhật giá cho ${successCount} món ăn`,
-      });
-    } else {
-      toast({
-        title: "Hoàn thành",
-        description: `Thành công: ${successCount}, Thất bại: ${failCount}`,
-        variant: failCount === total ? "destructive" : "default",
-      });
+      if (failCount === 0) {
+        completeProgress(progressId, `Đã cập nhật ${successCount} món`);
+      } else {
+        completeProgress(progressId, `Thành công: ${successCount}, Thất bại: ${failCount}`);
+      }
+    } catch (error) {
+      console.error("Error bulk updating prices:", error);
+      errorProgress(progressId, "Có lỗi xảy ra khi cập nhật giá");
     }
   };
 
@@ -521,83 +521,86 @@ export default function BranchProductsPage() {
     const total = selectedProducts.length;
     const batchSize = 50;
     const totalBatches = Math.ceil(total / batchSize);
+    const progressId = `bulk-reset-price-${Date.now()}`;
 
-    setProcessingBulkPrice(true);
-    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches });
+    // Clear selection immediately
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: "Khôi phục giá gốc",
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
 
     let successCount = 0;
     let failCount = 0;
     const resetProductIds: Set<string> = new Set();
 
-    // Process in batches
-    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
-      const start = batchNum * batchSize;
-      const end = Math.min(start + batchSize, total);
-      const batch = selectedProducts.slice(start, end);
+    try {
+      // Process in batches
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const start = batchNum * batchSize;
+        const end = Math.min(start + batchSize, total);
+        const batch = selectedProducts.slice(start, end);
 
-      setBulkPriceProgress({
-        current: start,
-        total,
-        batchNumber: batchNum + 1,
-        totalBatches,
-      });
+        updateProgress(progressId, {
+          current: start,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
 
-      // Process batch in parallel
-      const batchResults = await Promise.all(
-        batch.map(async (product) => {
-          try {
-            await branchProductService.update(filterBranchId, product.id, {
-              customPrice: null,
-            });
-            return { success: true, productId: product.id };
-          } catch (error) {
-            console.error(`Error resetting price for ${product.name}:`, error);
-            return { success: false, productId: product.id };
+        // Process batch in parallel
+        const batchResults = await Promise.all(
+          batch.map(async (product) => {
+            try {
+              await branchProductService.update(filterBranchId, product.id, {
+                customPrice: null,
+              });
+              return { success: true, productId: product.id };
+            } catch (error) {
+              console.error(`Error resetting price for ${product.name}:`, error);
+              return { success: false, productId: product.id };
+            }
+          })
+        );
+
+        // Count results and track updates
+        batchResults.forEach((result) => {
+          if (result.success) {
+            successCount++;
+            resetProductIds.add(result.productId);
+          } else {
+            failCount++;
           }
-        })
-      );
+        });
 
-      // Count results and track updates
-      batchResults.forEach((result) => {
-        if (result.success) {
-          successCount++;
-          resetProductIds.add(result.productId);
-        } else {
-          failCount++;
-        }
-      });
-
-      setBulkPriceProgress({
-        current: end,
-        total,
-        batchNumber: batchNum + 1,
-        totalBatches,
-      });
-    }
-
-    // Update all products at once after all batches complete
-    setProducts(prev => prev.map(p => {
-      if (resetProductIds.has(p.id)) {
-        return { ...p, customPrice: null };
+        updateProgress(progressId, {
+          current: end,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
       }
-      return p;
-    }));
 
-    setProcessingBulkPrice(false);
-    setSelectedProductIds(new Set());
-    setBulkPriceProgress(null);
+      // Update all products at once after all batches complete
+      setProducts(prev => prev.map(p => {
+        if (resetProductIds.has(p.id)) {
+          return { ...p, customPrice: null };
+        }
+        return p;
+      }));
 
-    if (failCount === 0) {
-      toast({
-        title: "Thành công",
-        description: `Đã khôi phục giá gốc cho ${successCount} món ăn`,
-      });
-    } else {
-      toast({
-        title: "Hoàn thành",
-        description: `Thành công: ${successCount}, Thất bại: ${failCount}`,
-        variant: failCount === total ? "destructive" : "default",
-      });
+      if (failCount === 0) {
+        completeProgress(progressId, `Đã khôi phục ${successCount} món`);
+      } else {
+        completeProgress(progressId, `Thành công: ${successCount}, Thất bại: ${failCount}`);
+      }
+    } catch (error) {
+      console.error("Error bulk resetting prices:", error);
+      errorProgress(progressId, "Có lỗi xảy ra khi khôi phục giá");
     }
   };
 
@@ -606,45 +609,58 @@ export default function BranchProductsPage() {
     if (selectedProductIds.size === 0) return;
 
     const productIds = Array.from(selectedProductIds);
-    setProcessingBulkToggle(true);
-    setBulkToggleProgress(null);
+    const total = productIds.length;
+    const batchSize = 50;
+    const totalBatches = Math.ceil(total / batchSize);
+    const progressId = `bulk-toggle-${Date.now()}`;
+    const action = isAvailable ? "Bật" : "Tắt";
+
+    // Clear selection immediately
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: `${action} món tại chi nhánh`,
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
 
     try {
       const result = await branchProductService.bulkToggleAvailabilityBatched(
         filterBranchId,
         { productIds, isAvailable },
         {
-          batchSize: 50,
-          onProgress: (progress) => setBulkToggleProgress(progress),
+          batchSize,
+          onProgress: (progress) => {
+            updateProgress(progressId, {
+              current: progress.current,
+              batchNumber: progress.batchNumber,
+              totalBatches: progress.totalBatches,
+            });
+          },
         }
       );
+
       setProducts(prev => prev.map(p =>
-        selectedProductIds.has(p.id) ? { ...p, isAvailable } : p
+        productIds.includes(p.id) ? { ...p, isAvailable } : p
       ));
+
       // Reload stats
       const statsData = await branchProductService.getStats(filterBranchId);
       setStats(statsData);
-      setSelectedProductIds(new Set());
 
       const failedCount = productIds.length - result.updated;
       if (failedCount > 0) {
-        toast({
-          title: "Hoàn thành",
-          description: `Đã ${isAvailable ? "bật" : "tắt"} ${result.updated}/${productIds.length} món ăn. Thất bại: ${failedCount}`,
-          variant: "default",
-        });
+        completeProgress(progressId, `${action} ${result.updated}/${productIds.length} món. Thất bại: ${failedCount}`);
       } else {
-        toast({
-          title: "Thành công",
-          description: `Đã ${isAvailable ? "bật" : "tắt"} ${result.updated} món ăn`,
-        });
+        completeProgress(progressId, `Đã ${action.toLowerCase()} ${result.updated} món`);
       }
     } catch (error) {
       console.error("Error bulk toggling:", error);
-      toast({ title: "Lỗi", description: "Không thể cập nhật hàng loạt", variant: "destructive" });
-    } finally {
-      setProcessingBulkToggle(false);
-      setBulkToggleProgress(null);
+      errorProgress(progressId, "Có lỗi xảy ra khi cập nhật");
     }
   };
 
@@ -828,36 +844,17 @@ export default function BranchProductsPage() {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={processingBulkPrice || processingBulkToggle}>
-                    {bulkToggleProgress ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {`Đang xử lý... ${bulkToggleProgress.current}/${bulkToggleProgress.total} (batch ${bulkToggleProgress.batchNumber}/${bulkToggleProgress.totalBatches})`}
-                      </>
-                    ) : bulkPriceProgress ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {`Đang xử lý... ${bulkPriceProgress.current}/${bulkPriceProgress.total}`}
-                      </>
-                    ) : (processingBulkPrice || processingBulkToggle) ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Đang xử lý...
-                      </>
-                    ) : (
-                      <>
-                        Thao tác hàng loạt
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      </>
-                    )}
+                  <Button variant="outline" size="sm">
+                    Thao tác hàng loạt
+                    <ChevronDown className="ml-2 h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => handleBulkToggle(true)} disabled={processingBulkToggle}>
+                  <DropdownMenuItem onClick={() => handleBulkToggle(true)}>
                     <Check className="mr-2 h-4 w-4 text-green-600" />
                     Bật tất cả
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleBulkToggle(false)} disabled={processingBulkToggle}>
+                  <DropdownMenuItem onClick={() => handleBulkToggle(false)}>
                     <X className="mr-2 h-4 w-4 text-red-600" />
                     Tắt tất cả
                   </DropdownMenuItem>
@@ -1435,23 +1432,6 @@ export default function BranchProductsPage() {
               </div>
             )}
 
-            {/* Progress indicator */}
-            {processingBulkPrice && bulkPriceProgress.total > 0 && (
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Đang xử lý...</span>
-                  <span className="text-sm text-muted-foreground">
-                    {bulkPriceProgress.current}/{bulkPriceProgress.total}
-                  </span>
-                </div>
-                <div className="h-2 bg-background rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${(bulkPriceProgress.current / bulkPriceProgress.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           <DialogFooter>
@@ -1459,26 +1439,16 @@ export default function BranchProductsPage() {
               type="button"
               variant="outline"
               onClick={handleCloseBulkPriceDialog}
-              disabled={processingBulkPrice}
             >
               Hủy
             </Button>
             <Button
               type="button"
               onClick={handleBulkPriceUpdate}
-              disabled={processingBulkPrice || !bulkPriceValue}
+              disabled={!bulkPriceValue}
             >
-              {processingBulkPrice ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Đang xử lý...
-                </>
-              ) : (
-                <>
-                  <DollarSign className="mr-2 h-4 w-4" />
-                  Áp dụng
-                </>
-              )}
+              <DollarSign className="mr-2 h-4 w-4" />
+              Áp dụng
             </Button>
           </DialogFooter>
         </DialogContent>

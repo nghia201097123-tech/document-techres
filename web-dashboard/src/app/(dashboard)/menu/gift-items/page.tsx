@@ -56,6 +56,7 @@ import { productService, type Product, ProductType } from "@/services/product-se
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 
 // Format currency (no decimals for VND)
 const formatCurrency = (amount: number) => {
@@ -82,6 +83,7 @@ type DialogMode = "create" | "edit" | null;
 
 export default function GiftItemsPage() {
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
 
   // Global filter state from Redux
   const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
@@ -290,13 +292,28 @@ export default function GiftItemsPage() {
         return;
       }
 
-      try {
-        setSaving(true);
-        setCreateProgress(null);
+      const productIdArray = Array.from(selectedProductIds);
+      const batchSize = 50;
+      const totalBatches = Math.ceil(productIdArray.length / batchSize);
+      const isLargeList = productIdArray.length > 10; // Use background for lists > 10
+      const progressId = `gift-items-${Date.now()}`;
 
-        const productIdArray = Array.from(selectedProductIds);
-        const batchSize = 50;
-        const totalBatches = Math.ceil(productIdArray.length / batchSize);
+      // For large lists, close dialog and use background progress
+      if (isLargeList) {
+        handleCloseDialog();
+        addProgress({
+          id: progressId,
+          title: "Tạo món tặng",
+          current: 0,
+          total: productIdArray.length,
+          batchNumber: 1,
+          totalBatches,
+        });
+      } else {
+        setSaving(true);
+      }
+
+      try {
         const createdItems: GiftItem[] = [];
         const errors: string[] = [];
 
@@ -306,12 +323,20 @@ export default function GiftItemsPage() {
           const end = Math.min(start + batchSize, productIdArray.length);
           const batch = productIdArray.slice(start, end);
 
-          setCreateProgress({
-            current: start,
-            total: productIdArray.length,
-            batchNumber: batchNum + 1,
-            totalBatches,
-          });
+          if (isLargeList) {
+            updateProgress(progressId, {
+              current: start,
+              batchNumber: batchNum + 1,
+              totalBatches,
+            });
+          } else {
+            setCreateProgress({
+              current: start,
+              total: productIdArray.length,
+              batchNumber: batchNum + 1,
+              totalBatches,
+            });
+          }
 
           // Process each product in batch
           for (let i = 0; i < batch.length; i++) {
@@ -327,12 +352,20 @@ export default function GiftItemsPage() {
               createdItems.push(result);
 
               // Update progress within batch
-              setCreateProgress({
-                current: start + i + 1,
-                total: productIdArray.length,
-                batchNumber: batchNum + 1,
-                totalBatches,
-              });
+              if (isLargeList) {
+                updateProgress(progressId, {
+                  current: start + i + 1,
+                  batchNumber: batchNum + 1,
+                  totalBatches,
+                });
+              } else {
+                setCreateProgress({
+                  current: start + i + 1,
+                  total: productIdArray.length,
+                  batchNumber: batchNum + 1,
+                  totalBatches,
+                });
+              }
             } catch (error: any) {
               const product = products.find(p => p.id === productId);
               errors.push(product?.name || productId);
@@ -340,38 +373,52 @@ export default function GiftItemsPage() {
           }
         }
 
-        setCreateProgress(null);
-
         if (createdItems.length > 0) {
           setGiftItems(prev => [...createdItems, ...prev]);
           createdItems.forEach(item => {
             setNewItemIds(prev => new Set([...prev, item.id]));
           });
-          toast({
-            title: "Thành công",
-            description: `Đã thêm ${createdItems.length} món tặng${errors.length > 0 ? `, ${errors.length} món lỗi` : ""}`
-          });
         }
 
-        if (errors.length > 0 && createdItems.length === 0) {
-          toast({
-            title: "Lỗi",
-            description: `Không thể thêm món tặng: ${errors.join(", ")}`,
-            variant: "destructive"
-          });
+        if (isLargeList) {
+          if (errors.length > 0) {
+            completeProgress(progressId, `Thành công: ${createdItems.length}, Lỗi: ${errors.length}`);
+          } else {
+            completeProgress(progressId, `Đã tạo ${createdItems.length} món tặng`);
+          }
+        } else {
+          setCreateProgress(null);
+          if (createdItems.length > 0) {
+            toast({
+              title: "Thành công",
+              description: `Đã thêm ${createdItems.length} món tặng${errors.length > 0 ? `, ${errors.length} món lỗi` : ""}`
+            });
+          }
+          if (errors.length > 0 && createdItems.length === 0) {
+            toast({
+              title: "Lỗi",
+              description: `Không thể thêm món tặng: ${errors.join(", ")}`,
+              variant: "destructive"
+            });
+          }
+          handleCloseDialog();
         }
-
-        handleCloseDialog();
       } catch (error: any) {
         console.error("Error creating gift items:", error);
-        toast({
-          title: "Lỗi",
-          description: error.response?.data?.message || "Có lỗi xảy ra khi thêm món tặng",
-          variant: "destructive",
-        });
+        if (isLargeList) {
+          errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra");
+        } else {
+          toast({
+            title: "Lỗi",
+            description: error.response?.data?.message || "Có lỗi xảy ra khi thêm món tặng",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setSaving(false);
-        setCreateProgress(null);
+        if (!isLargeList) {
+          setSaving(false);
+          setCreateProgress(null);
+        }
       }
     } else if (dialogMode === "edit" && selectedItem) {
       // Edit mode - single product

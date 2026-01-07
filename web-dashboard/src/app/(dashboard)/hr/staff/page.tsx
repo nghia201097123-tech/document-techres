@@ -52,6 +52,7 @@ import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -192,6 +193,7 @@ type BulkOperation = "department" | "branch" | "activate" | "deactivate" | "rese
 export default function StaffPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
   const tenantId = useAuthStore((state) => state.tenantId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -637,82 +639,122 @@ export default function StaffPage() {
     if (selectedStaffIds.size === 0) return;
 
     const staffIds = Array.from(selectedStaffIds);
-    setProcessingBulk(true);
-    setBulkProgress(null);
+    const total = staffIds.length;
+    const batchSize = 50;
+    const totalBatches = Math.ceil(total / batchSize);
 
-    const progressCallback = (progress: BatchProgressInfo) => setBulkProgress(progress);
+    // For reset-password, we need to show results in dialog, so don't use background progress
+    if (bulkOperation === "reset-password") {
+      setProcessingBulk(true);
+      setBulkProgress(null);
+      try {
+        const result = await bulkStaffService.resetPasswordBatched(staffIds, undefined, {
+          batchSize: 50,
+          onProgress: (progress) => setBulkProgress(progress),
+        });
+        setBulkResult(result);
+        setProcessingBulk(false);
+        setBulkProgress(null);
+        return; // Don't close dialog, show passwords
+      } catch (error: any) {
+        console.error("Bulk operation error:", error);
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Có lỗi xảy ra",
+          variant: "destructive",
+        });
+        setProcessingBulk(false);
+        setBulkProgress(null);
+        return;
+      }
+    }
+
+    // Validate required fields before starting
+    if (bulkOperation === "department" && !bulkDepartmentId) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn bộ phận", variant: "destructive" });
+      return;
+    }
+    if (bulkOperation === "branch" && !bulkBranchId) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
+      return;
+    }
+
+    // Create progress title
+    const operationTitles: Record<string, string> = {
+      department: "Cập nhật bộ phận",
+      branch: "Cập nhật chi nhánh",
+      activate: "Bật nhân viên",
+      deactivate: "Tắt nhân viên",
+    };
+    const progressTitle = operationTitles[bulkOperation || ""] || "Xử lý nhân viên";
+    const progressId = `bulk-staff-${Date.now()}`;
+
+    // Close dialog and clear selection immediately
+    handleCloseBulkDialog();
+    setSelectedStaffIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: progressTitle,
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
+
+    const progressCallback = (progress: BatchProgressInfo) => {
+      updateProgress(progressId, {
+        current: progress.current,
+        batchNumber: progress.batchNumber,
+        totalBatches: progress.totalBatches,
+      });
+    };
 
     try {
       let result: BulkOperationResult;
 
       switch (bulkOperation) {
         case "department":
-          if (!bulkDepartmentId) {
-            toast({ title: "Lỗi", description: "Vui lòng chọn bộ phận", variant: "destructive" });
-            setProcessingBulk(false);
-            return;
-          }
           result = await bulkStaffService.updateDepartmentBatched(staffIds, bulkDepartmentId, {
-            batchSize: 50,
+            batchSize,
             onProgress: progressCallback,
           });
           break;
         case "branch":
-          if (!bulkBranchId) {
-            toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
-            setProcessingBulk(false);
-            return;
-          }
           result = await bulkStaffService.updateBranchBatched(staffIds, bulkBranchId, {
-            batchSize: 50,
+            batchSize,
             onProgress: progressCallback,
           });
           break;
         case "activate":
           result = await bulkStaffService.toggleActiveBatched(staffIds, true, {
-            batchSize: 50,
+            batchSize,
             onProgress: progressCallback,
           });
           break;
         case "deactivate":
           result = await bulkStaffService.toggleActiveBatched(staffIds, false, {
-            batchSize: 50,
+            batchSize,
             onProgress: progressCallback,
           });
           break;
-        case "reset-password":
-          result = await bulkStaffService.resetPasswordBatched(staffIds, undefined, {
-            batchSize: 50,
-            onProgress: progressCallback,
-          });
-          setBulkResult(result);
-          setProcessingBulk(false);
-          setBulkProgress(null);
-          return; // Don't close dialog, show passwords
         default:
-          setProcessingBulk(false);
+          errorProgress(progressId, "Thao tác không hợp lệ");
           return;
       }
 
-      toast({
-        title: "Thành công",
-        description: `Đã xử lý ${result.success}/${staffIds.length} nhân viên`,
-      });
-
       // Reload staff list
       loadStaff(filterBranchId, filterBrandId);
-      setSelectedStaffIds(new Set());
-      handleCloseBulkDialog();
+
+      if (result.failed > 0) {
+        completeProgress(progressId, `Thành công: ${result.success}, Thất bại: ${result.failed}`);
+      } else {
+        completeProgress(progressId, `Đã xử lý ${result.success} nhân viên`);
+      }
     } catch (error: any) {
       console.error("Bulk operation error:", error);
-      toast({
-        title: "Lỗi",
-        description: error.response?.data?.message || "Có lỗi xảy ra",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessingBulk(false);
-      setBulkProgress(null);
+      errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra");
     }
   };
 

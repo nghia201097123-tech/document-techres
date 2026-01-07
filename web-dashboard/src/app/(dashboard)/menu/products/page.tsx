@@ -66,6 +66,7 @@ import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 
 // Default column configuration for products table
 const defaultProductColumns: ColumnConfig[] = [
@@ -165,6 +166,7 @@ type DialogMode = "create" | "edit" | "view" | "toppings" | "combo" | "import" |
 export default function ProductsPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Column configuration hook
@@ -1622,22 +1624,70 @@ export default function ProductsPage() {
     if (selectedProductIds.size === 0) return;
 
     const productIds = Array.from(selectedProductIds);
-    setProcessingBulk(true);
-    setBulkProgress(null);
+    const total = productIds.length;
+    const batchSize = 50;
+    const totalBatches = Math.ceil(total / batchSize);
 
-    const progressCallback = (progress: ProductBatchProgressInfo) => setBulkProgress(progress);
-    const batchOptions = { batchSize: 50, onProgress: progressCallback };
+    // Validate required fields before starting
+    if (bulkOperation === "category" && !bulkCategoryId) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn danh mục", variant: "destructive" });
+      return;
+    }
+    if (bulkOperation === "price" && bulkPrice <= 0) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập giá hợp lệ", variant: "destructive" });
+      return;
+    }
+    if (bulkOperation === "unit" && !bulkUnit.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập đơn vị", variant: "destructive" });
+      return;
+    }
+
+    // Create progress title
+    const operationTitles: Record<string, string> = {
+      category: "Cập nhật danh mục",
+      activate: "Bật sản phẩm",
+      deactivate: "Tắt sản phẩm",
+      delete: "Xóa sản phẩm",
+      vat: "Cập nhật VAT",
+      price: "Cập nhật giá",
+      "print-label": "Cập nhật in tem",
+      "print-seafood": "Cập nhật in hải sản",
+      "print-dish": "Cập nhật in món",
+      unit: "Cập nhật đơn vị",
+      "selling-type": "Cập nhật loại bán",
+      "preparation-time": "Cập nhật thời gian chế biến",
+    };
+    const progressTitle = operationTitles[bulkOperation || ""] || "Xử lý sản phẩm";
+    const progressId = `bulk-product-${Date.now()}`;
+
+    // Close dialog and clear selection immediately
+    handleCloseBulkDialog();
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: progressTitle,
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
+
+    const progressCallback = (progress: ProductBatchProgressInfo) => {
+      updateProgress(progressId, {
+        current: progress.current,
+        batchNumber: progress.batchNumber,
+        totalBatches: progress.totalBatches,
+      });
+    };
+    const batchOptions = { batchSize, onProgress: progressCallback };
 
     try {
       let result: ProductBulkOperationResult;
 
       switch (bulkOperation) {
         case "category":
-          if (!bulkCategoryId) {
-            toast({ title: "Lỗi", description: "Vui lòng chọn danh mục", variant: "destructive" });
-            setProcessingBulk(false);
-            return;
-          }
           result = await bulkProductService.updateCategoryBatched(productIds, bulkCategoryId, batchOptions);
           break;
         case "activate":
@@ -1653,11 +1703,6 @@ export default function ProductsPage() {
           result = await bulkProductService.updateVatRateBatched(productIds, bulkVatRate, batchOptions);
           break;
         case "price":
-          if (bulkPrice <= 0) {
-            toast({ title: "Lỗi", description: "Vui lòng nhập giá hợp lệ", variant: "destructive" });
-            setProcessingBulk(false);
-            return;
-          }
           result = await bulkProductService.updatePriceBatched(productIds, bulkPrice, batchOptions);
           break;
         case "print-label":
@@ -1670,11 +1715,6 @@ export default function ProductsPage() {
           result = await bulkProductService.updatePrintDishBatched(productIds, bulkPrintValue, batchOptions);
           break;
         case "unit":
-          if (!bulkUnit.trim()) {
-            toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập đơn vị", variant: "destructive" });
-            setProcessingBulk(false);
-            return;
-          }
           // Get or create unit if it doesn't exist
           const unitName = await getOrCreateUnit(bulkUnit.trim());
           result = await bulkProductService.updateUnitBatched(productIds, unitName, batchOptions);
@@ -1686,25 +1726,21 @@ export default function ProductsPage() {
           result = await bulkProductService.updatePreparationTimeBatched(productIds, bulkPreparationTime, batchOptions);
           break;
         default:
-          setProcessingBulk(false);
+          errorProgress(progressId, "Thao tác không hợp lệ");
           return;
       }
 
-      toast({
-        title: "Thành công",
-        description: `Đã thực hiện thành công ${result.success}/${selectedProductIds.size} món ăn`,
-      });
-
-      // Reload products and clear selection
+      // Reload products
       loadProducts(filterBrandId, filterBranchId);
-      setSelectedProductIds(new Set());
-      handleCloseBulkDialog();
+
+      if (result.failed > 0) {
+        completeProgress(progressId, `Thành công: ${result.success}, Thất bại: ${result.failed}`);
+      } else {
+        completeProgress(progressId, `Đã xử lý ${result.success} sản phẩm`);
+      }
     } catch (error: any) {
       console.error("Bulk operation error:", error);
-      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
-    } finally {
-      setProcessingBulk(false);
-      setBulkProgress(null);
+      errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra");
     }
   };
 

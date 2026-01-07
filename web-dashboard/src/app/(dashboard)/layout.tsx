@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { DashboardLayout } from "@/components/layout";
+import { BackgroundProgressProvider } from "@/components/ui/background-progress";
 
 export default function DashboardRootLayout({
   children,
@@ -31,5 +32,9 @@ export default function DashboardRootLayout({
     return null;
   }
 
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <BackgroundProgressProvider>
+      <DashboardLayout>{children}</DashboardLayout>
+    </BackgroundProgressProvider>
+  );
 }

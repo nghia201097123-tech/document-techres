@@ -55,6 +55,7 @@ import { productService, type Product, ProductType } from "@/services/product-se
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 
 // Format currency (no decimals for VND)
 const formatCurrency = (amount: number) => {
@@ -86,6 +87,7 @@ type DialogMode = "create" | "edit" | null;
 
 export default function SeasonalPricesPage() {
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
 
   // Global filter state from Redux
   const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
@@ -308,16 +310,31 @@ export default function SeasonalPricesPage() {
       return;
     }
 
-    try {
+    const productIds = Array.from(selectedProductIds);
+    const batchSize = 500;
+    const totalBatches = Math.ceil(productIds.length / batchSize);
+    const isLargeList = productIds.length > batchSize;
+    const progressId = `seasonal-price-${Date.now()}`;
+    const progressTitle = dialogMode === "create" ? "Tạo giá thời vụ" : "Cập nhật giá thời vụ";
+
+    // For large lists, close dialog and use background progress
+    if (isLargeList) {
+      handleCloseDialog();
+      addProgress({
+        id: progressId,
+        title: progressTitle,
+        current: 0,
+        total: productIds.length,
+        batchNumber: 1,
+        totalBatches,
+      });
+    } else {
       setSaving(true);
-      setSaveProgress(null);
+    }
 
-      const productIds = Array.from(selectedProductIds);
-      const batchSize = 500; // Larger batch for seasonal prices since it's one record
-      const totalBatches = Math.ceil(productIds.length / batchSize);
-
+    try {
       if (dialogMode === "create") {
-        if (productIds.length <= batchSize) {
+        if (!isLargeList) {
           // Small list - create in one go
           const submitData: CreateSeasonalPriceDto = {
             ...formData,
@@ -326,6 +343,8 @@ export default function SeasonalPricesPage() {
           const result = await seasonalPriceService.create(submitData);
           setSeasonalPrices((prev) => [result, ...prev]);
           setNewPriceIds(prev => new Set([...prev, result.id]));
+          toast({ title: "Thành công", description: `Đã tạo giá thời vụ mới với ${productIds.length} sản phẩm` });
+          handleCloseDialog();
         } else {
           // Large list - create with first batch, then update to add more
           let createdPrice: SeasonalPrice | null = null;
@@ -337,9 +356,8 @@ export default function SeasonalPricesPage() {
             const batch = productIds.slice(start, end);
             accumulatedProductIds.push(...batch);
 
-            setSaveProgress({
+            updateProgress(progressId, {
               current: end,
-              total: productIds.length,
               batchNumber: batchNum + 1,
               totalBatches,
             });
@@ -365,10 +383,10 @@ export default function SeasonalPricesPage() {
             setSeasonalPrices((prev) => [finalPrice, ...prev]);
             setNewPriceIds(prev => new Set([...prev, finalPrice.id]));
           }
+          completeProgress(progressId, `Đã tạo với ${productIds.length} sản phẩm`);
         }
-        toast({ title: "Thành công", description: `Đã tạo giá thời vụ mới với ${productIds.length} sản phẩm` });
       } else if (dialogMode === "edit" && selectedPrice) {
-        if (productIds.length <= batchSize) {
+        if (!isLargeList) {
           // Small list - update in one go
           const updateData: UpdateSeasonalPriceDto = {
             name: formData.name,
@@ -388,9 +406,12 @@ export default function SeasonalPricesPage() {
             next.delete(result.id);
             return next;
           });
+          toast({ title: "Thành công", description: `Đã cập nhật giá thời vụ với ${productIds.length} sản phẩm` });
+          handleCloseDialog();
         } else {
           // Large list - update in batches (accumulating products)
           const accumulatedProductIds: string[] = [];
+          const priceId = selectedPrice.id;
 
           for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
             const start = batchNum * batchSize;
@@ -398,9 +419,8 @@ export default function SeasonalPricesPage() {
             const batch = productIds.slice(start, end);
             accumulatedProductIds.push(...batch);
 
-            setSaveProgress({
+            updateProgress(progressId, {
               current: end,
-              total: productIds.length,
               batchNumber: batchNum + 1,
               totalBatches,
             });
@@ -418,33 +438,36 @@ export default function SeasonalPricesPage() {
                 }
               : { productIds: accumulatedProductIds };
 
-            await seasonalPriceService.update(selectedPrice.id, updateData);
+            await seasonalPriceService.update(priceId, updateData);
           }
 
           // Fetch the final state
-          const finalPrice = await seasonalPriceService.getById(selectedPrice.id);
-          setSeasonalPrices((prev) => prev.map((p) => (p.id === selectedPrice.id ? finalPrice : p)));
+          const finalPrice = await seasonalPriceService.getById(priceId);
+          setSeasonalPrices((prev) => prev.map((p) => (p.id === priceId ? finalPrice : p)));
           setUpdatedPriceIds(prev => new Set([...prev, finalPrice.id]));
           setNewPriceIds(prev => {
             const next = new Set(prev);
             next.delete(finalPrice.id);
             return next;
           });
+          completeProgress(progressId, `Đã cập nhật với ${productIds.length} sản phẩm`);
         }
-        toast({ title: "Thành công", description: `Đã cập nhật giá thời vụ với ${productIds.length} sản phẩm` });
       }
-
-      handleCloseDialog();
     } catch (error: any) {
       console.error("Error saving seasonal price:", error);
-      toast({
-        title: "Lỗi",
-        description: error.response?.data?.message || "Có lỗi xảy ra khi lưu giá thời vụ",
-        variant: "destructive",
-      });
+      if (isLargeList) {
+        errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra");
+      } else {
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Có lỗi xảy ra khi lưu giá thời vụ",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setSaving(false);
-      setSaveProgress(null);
+      if (!isLargeList) {
+        setSaving(false);
+      }
     }
   };
 
