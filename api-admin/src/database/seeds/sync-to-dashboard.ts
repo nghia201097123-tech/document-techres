@@ -82,10 +82,10 @@ async function syncAllData() {
   // Connect to techres_master database
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '172.16.10.146',
     port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
+    username: process.env.DB_USER || 'techres_master',
+    password: process.env.DB_PASSWORD || 'techres_master',
     database: process.env.DB_NAME || 'techres_master',
     synchronize: false,
     logging: false,
