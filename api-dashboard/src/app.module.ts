@@ -22,6 +22,8 @@ import { CouponsModule } from "./modules/coupons/coupons.module";
 import { BranchProductsModule } from "./modules/branch-products/branch-products.module";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { SyncModule } from "./modules/sync/sync.module";
+import { TransactionCategoriesModule } from "./modules/transaction-categories/transaction-categories.module";
+import { TransactionVouchersModule } from "./modules/transaction-vouchers/transaction-vouchers.module";
 import { DatabaseMigrationService } from "./database/database-migration.service";
 import {
   Company,
@@ -62,6 +64,7 @@ import {
   PaymentMethod,
   BankAccount,
   EInvoiceConfig,
+  TransactionVoucher,
 } from "./database/entities";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 
@@ -118,6 +121,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
           PaymentMethod,
           BankAccount,
           EInvoiceConfig,
+          TransactionVoucher,
         ],
         synchronize: false,
       }),
@@ -145,6 +149,8 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     BranchProductsModule,
     SettingsModule,
     SyncModule,
+    TransactionCategoriesModule,
+    TransactionVouchersModule,
   ],
   providers: [DatabaseMigrationService],
 })

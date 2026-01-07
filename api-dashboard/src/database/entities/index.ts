@@ -37,3 +37,4 @@ export * from './branch-product.entity';
 export * from './payment-method.entity';
 export * from './bank-account.entity';
 export * from './einvoice-config.entity';
+export * from './transaction-voucher.entity';
