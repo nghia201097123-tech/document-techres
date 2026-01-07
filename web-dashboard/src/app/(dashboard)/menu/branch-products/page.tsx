@@ -294,8 +294,9 @@ export default function BranchProductsPage() {
       const result = await branchProductService.update(filterBranchId, editingProduct.id, {
         customPrice: newPrice,
       });
+      // Use newPrice directly since result.customPrice may be a string from API
       setProducts(prev => prev.map(p =>
-        p.id === editingProduct.id ? { ...p, customPrice: result.customPrice } : p
+        p.id === editingProduct.id ? { ...p, customPrice: newPrice } : p
       ));
       toast({
         title: "Thành công",
@@ -429,11 +430,12 @@ export default function BranchProductsPage() {
       }
 
       try {
-        const result = await branchProductService.update(filterBranchId, product.id, {
+        await branchProductService.update(filterBranchId, product.id, {
           customPrice: newPrice,
         });
+        // Use newPrice directly since result.customPrice may be a string from API
         setProducts(prev => prev.map(p =>
-          p.id === product.id ? { ...p, customPrice: result.customPrice } : p
+          p.id === product.id ? { ...p, customPrice: newPrice } : p
         ));
         successCount++;
       } catch (error) {
