@@ -134,6 +134,14 @@ export default function SeasonalPricesPage() {
   const [newPriceIds, setNewPriceIds] = React.useState<Set<string>>(new Set());
   const [updatedPriceIds, setUpdatedPriceIds] = React.useState<Set<string>>(new Set());
 
+  // Progress state for saving
+  const [saveProgress, setSaveProgress] = React.useState<{
+    current: number;
+    total: number;
+    batchNumber: number;
+    totalBatches: number;
+  } | null>(null);
+
   // Load products when brand changes (exclude COMBO and TOPPING)
   const loadProducts = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -288,7 +296,7 @@ export default function SeasonalPricesPage() {
     setSelectedProductIds(new Set());
   };
 
-  // Handle form submit (create or update)
+  // Handle form submit (create or update) with batch processing for large product lists
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -302,37 +310,128 @@ export default function SeasonalPricesPage() {
 
     try {
       setSaving(true);
+      setSaveProgress(null);
+
       const productIds = Array.from(selectedProductIds);
+      const batchSize = 500; // Larger batch for seasonal prices since it's one record
+      const totalBatches = Math.ceil(productIds.length / batchSize);
 
       if (dialogMode === "create") {
-        const submitData: CreateSeasonalPriceDto = {
-          ...formData,
-          productIds,
-        };
-        const result = await seasonalPriceService.create(submitData);
-        setSeasonalPrices((prev) => [result, ...prev]);
-        setNewPriceIds(prev => new Set([...prev, result.id]));
-        toast({ title: "Thành công", description: "Đã tạo giá thời vụ mới" });
+        if (productIds.length <= batchSize) {
+          // Small list - create in one go
+          const submitData: CreateSeasonalPriceDto = {
+            ...formData,
+            productIds,
+          };
+          const result = await seasonalPriceService.create(submitData);
+          setSeasonalPrices((prev) => [result, ...prev]);
+          setNewPriceIds(prev => new Set([...prev, result.id]));
+        } else {
+          // Large list - create with first batch, then update to add more
+          let createdPrice: SeasonalPrice | null = null;
+          const accumulatedProductIds: string[] = [];
+
+          for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+            const start = batchNum * batchSize;
+            const end = Math.min(start + batchSize, productIds.length);
+            const batch = productIds.slice(start, end);
+            accumulatedProductIds.push(...batch);
+
+            setSaveProgress({
+              current: end,
+              total: productIds.length,
+              batchNumber: batchNum + 1,
+              totalBatches,
+            });
+
+            if (batchNum === 0) {
+              // First batch - create
+              const submitData: CreateSeasonalPriceDto = {
+                ...formData,
+                productIds: batch,
+              };
+              createdPrice = await seasonalPriceService.create(submitData);
+            } else if (createdPrice) {
+              // Subsequent batches - update with accumulated products
+              await seasonalPriceService.update(createdPrice.id, {
+                productIds: accumulatedProductIds,
+              });
+            }
+          }
+
+          if (createdPrice) {
+            // Fetch the final state
+            const finalPrice = await seasonalPriceService.getById(createdPrice.id);
+            setSeasonalPrices((prev) => [finalPrice, ...prev]);
+            setNewPriceIds(prev => new Set([...prev, finalPrice.id]));
+          }
+        }
+        toast({ title: "Thành công", description: `Đã tạo giá thời vụ mới với ${productIds.length} sản phẩm` });
       } else if (dialogMode === "edit" && selectedPrice) {
-        const updateData: UpdateSeasonalPriceDto = {
-          name: formData.name,
-          description: formData.description,
-          adjustmentType: formData.adjustmentType,
-          adjustmentValue: formData.adjustmentValue,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          sortOrder: formData.sortOrder,
-          productIds,
-        };
-        const result = await seasonalPriceService.update(selectedPrice.id, updateData);
-        setSeasonalPrices((prev) => prev.map((p) => (p.id === selectedPrice.id ? result : p)));
-        setUpdatedPriceIds(prev => new Set([...prev, result.id]));
-        setNewPriceIds(prev => {
-          const next = new Set(prev);
-          next.delete(result.id);
-          return next;
-        });
-        toast({ title: "Thành công", description: "Đã cập nhật giá thời vụ" });
+        if (productIds.length <= batchSize) {
+          // Small list - update in one go
+          const updateData: UpdateSeasonalPriceDto = {
+            name: formData.name,
+            description: formData.description,
+            adjustmentType: formData.adjustmentType,
+            adjustmentValue: formData.adjustmentValue,
+            startDate: formData.startDate,
+            endDate: formData.endDate,
+            sortOrder: formData.sortOrder,
+            productIds,
+          };
+          const result = await seasonalPriceService.update(selectedPrice.id, updateData);
+          setSeasonalPrices((prev) => prev.map((p) => (p.id === selectedPrice.id ? result : p)));
+          setUpdatedPriceIds(prev => new Set([...prev, result.id]));
+          setNewPriceIds(prev => {
+            const next = new Set(prev);
+            next.delete(result.id);
+            return next;
+          });
+        } else {
+          // Large list - update in batches (accumulating products)
+          const accumulatedProductIds: string[] = [];
+
+          for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+            const start = batchNum * batchSize;
+            const end = Math.min(start + batchSize, productIds.length);
+            const batch = productIds.slice(start, end);
+            accumulatedProductIds.push(...batch);
+
+            setSaveProgress({
+              current: end,
+              total: productIds.length,
+              batchNumber: batchNum + 1,
+              totalBatches,
+            });
+
+            const updateData: UpdateSeasonalPriceDto = batchNum === 0
+              ? {
+                  name: formData.name,
+                  description: formData.description,
+                  adjustmentType: formData.adjustmentType,
+                  adjustmentValue: formData.adjustmentValue,
+                  startDate: formData.startDate,
+                  endDate: formData.endDate,
+                  sortOrder: formData.sortOrder,
+                  productIds: accumulatedProductIds,
+                }
+              : { productIds: accumulatedProductIds };
+
+            await seasonalPriceService.update(selectedPrice.id, updateData);
+          }
+
+          // Fetch the final state
+          const finalPrice = await seasonalPriceService.getById(selectedPrice.id);
+          setSeasonalPrices((prev) => prev.map((p) => (p.id === selectedPrice.id ? finalPrice : p)));
+          setUpdatedPriceIds(prev => new Set([...prev, finalPrice.id]));
+          setNewPriceIds(prev => {
+            const next = new Set(prev);
+            next.delete(finalPrice.id);
+            return next;
+          });
+        }
+        toast({ title: "Thành công", description: `Đã cập nhật giá thời vụ với ${productIds.length} sản phẩm` });
       }
 
       handleCloseDialog();
@@ -345,6 +444,7 @@ export default function SeasonalPricesPage() {
       });
     } finally {
       setSaving(false);
+      setSaveProgress(null);
     }
   };
 
@@ -793,7 +893,9 @@ export default function SeasonalPricesPage() {
               </Button>
               <Button type="submit" disabled={saving || !formData.name.trim() || selectedProductIds.size === 0}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo giá thời vụ" : "Cập nhật"}
+                {saveProgress
+                  ? `Đang xử lý... ${saveProgress.current}/${saveProgress.total} (batch ${saveProgress.batchNumber}/${saveProgress.totalBatches})`
+                  : dialogMode === "create" ? "Tạo giá thời vụ" : "Cập nhật"}
               </Button>
             </DialogFooter>
           </form>

@@ -127,6 +127,14 @@ export default function GiftItemsPage() {
   const [newItemIds, setNewItemIds] = React.useState<Set<string>>(new Set());
   const [updatedItemIds, setUpdatedItemIds] = React.useState<Set<string>>(new Set());
 
+  // Progress state for batch creation
+  const [createProgress, setCreateProgress] = React.useState<{
+    current: number;
+    total: number;
+    batchNumber: number;
+    totalBatches: number;
+  } | null>(null);
+
   // Load products when brand changes (exclude COMBO and TOPPING)
   const loadProducts = React.useCallback(async (brandId: string) => {
     if (!brandId) {
@@ -276,7 +284,7 @@ export default function GiftItemsPage() {
     e.preventDefault();
 
     if (dialogMode === "create") {
-      // Create mode - multiple products
+      // Create mode - multiple products with batch processing
       if (selectedProductIds.size === 0) {
         toast({ title: "Lỗi", description: "Vui lòng chọn ít nhất một món ăn", variant: "destructive" });
         return;
@@ -284,25 +292,55 @@ export default function GiftItemsPage() {
 
       try {
         setSaving(true);
+        setCreateProgress(null);
+
+        const productIdArray = Array.from(selectedProductIds);
+        const batchSize = 50;
+        const totalBatches = Math.ceil(productIdArray.length / batchSize);
         const createdItems: GiftItem[] = [];
         const errors: string[] = [];
 
-        // Create gift items for each selected product
-        for (const productId of selectedProductIds) {
-          try {
-            const submitData = {
-              productId,
-              maxQuantity: Number(formData.maxQuantity) || 1,
-              minOrderAmount: Number(formData.minOrderAmount) || 0,
-              sortOrder: Number(formData.sortOrder) || 0,
-            };
-            const result = await giftItemService.create(submitData);
-            createdItems.push(result);
-          } catch (error: any) {
-            const product = products.find(p => p.id === productId);
-            errors.push(product?.name || productId);
+        // Create gift items in batches
+        for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+          const start = batchNum * batchSize;
+          const end = Math.min(start + batchSize, productIdArray.length);
+          const batch = productIdArray.slice(start, end);
+
+          setCreateProgress({
+            current: start,
+            total: productIdArray.length,
+            batchNumber: batchNum + 1,
+            totalBatches,
+          });
+
+          // Process each product in batch
+          for (let i = 0; i < batch.length; i++) {
+            const productId = batch[i];
+            try {
+              const submitData = {
+                productId,
+                maxQuantity: Number(formData.maxQuantity) || 1,
+                minOrderAmount: Number(formData.minOrderAmount) || 0,
+                sortOrder: Number(formData.sortOrder) || 0,
+              };
+              const result = await giftItemService.create(submitData);
+              createdItems.push(result);
+
+              // Update progress within batch
+              setCreateProgress({
+                current: start + i + 1,
+                total: productIdArray.length,
+                batchNumber: batchNum + 1,
+                totalBatches,
+              });
+            } catch (error: any) {
+              const product = products.find(p => p.id === productId);
+              errors.push(product?.name || productId);
+            }
           }
         }
+
+        setCreateProgress(null);
 
         if (createdItems.length > 0) {
           setGiftItems(prev => [...createdItems, ...prev]);
@@ -333,6 +371,7 @@ export default function GiftItemsPage() {
         });
       } finally {
         setSaving(false);
+        setCreateProgress(null);
       }
     } else if (dialogMode === "edit" && selectedItem) {
       // Edit mode - single product
@@ -718,7 +757,9 @@ export default function GiftItemsPage() {
               </Button>
               <Button type="submit" disabled={saving || selectedProductIds.size === 0}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Thêm {selectedProductIds.size > 0 ? `${selectedProductIds.size} món` : "món tặng"}
+                {createProgress
+                  ? `Đang xử lý... ${createProgress.current}/${createProgress.total} (batch ${createProgress.batchNumber}/${createProgress.totalBatches})`
+                  : `Thêm ${selectedProductIds.size > 0 ? `${selectedProductIds.size} món` : "món tặng"}`}
               </Button>
             </DialogFooter>
           </form>
