@@ -315,9 +315,13 @@ export class CompaniesService {
     role: StaffRole;
     branchId?: string;
   }): Promise<void> {
+    const url = `${this.oauthApiUrl}/api/v1/auth/tenant-users`;
+    this.logger.log(`Creating tenant user in OAuth service: ${url}`);
+    this.logger.log(`Data: tenantId=${data.tenantId}, username=${data.username}, name=${data.name}`);
+
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.oauthApiUrl}/api/v1/auth/tenant-users`, {
+        this.httpService.post(url, {
           tenantId: data.tenantId,
           username: data.username,
           password: data.password,
@@ -329,13 +333,24 @@ export class CompaniesService {
         }),
       );
 
-      this.logger.log(`Tenant user created in OAuth service: ${response.data.username}`);
-    } catch (error) {
-      // Log error nhưng không throw để không ảnh hưởng flow chính
-      // Company đã được tạo thành công, user có thể tạo lại sau
-      this.logger.error(`Failed to create tenant user in OAuth service: ${error.message}`);
+      this.logger.log(`✅ Tenant user created in OAuth service: ${response.data.username}`);
+    } catch (error: any) {
+      // Log detailed error information
+      this.logger.error(`❌ Failed to create tenant user in OAuth service`);
+      this.logger.error(`URL: ${url}`);
       this.logger.error(`Tenant: ${data.tenantId}, Username: ${data.username}`);
-      // Có thể thêm vào queue để retry sau nếu cần
+      this.logger.error(`Error: ${error.message}`);
+
+      if (error.response) {
+        // Server responded with error status
+        this.logger.error(`Status: ${error.response.status}`);
+        this.logger.error(`Response: ${JSON.stringify(error.response.data)}`);
+      } else if (error.code) {
+        // Network error (ECONNREFUSED, etc.)
+        this.logger.error(`Error code: ${error.code}`);
+        this.logger.error(`Có thể api-oauth chưa chạy hoặc URL không đúng`);
+      }
+      // Không throw error để không ảnh hưởng flow chính
     }
   }
 
