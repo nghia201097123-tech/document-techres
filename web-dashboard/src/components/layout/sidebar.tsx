@@ -26,6 +26,8 @@ import {
   Percent,
   Link2,
   Truck,
+  Wallet,
+  FolderTree,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -90,6 +92,14 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    title: "Tài chính",
+    icon: Wallet,
+    children: [
+      { title: "Danh mục thu chi", href: "/finance/categories", icon: FolderTree },
+      { title: "Phiếu thu chi", href: "/finance/vouchers", icon: Receipt },
+    ],
+  },
+  {
     title: "Báo cáo",
     href: "/reports",
     icon: BarChart3,
@@ -104,7 +114,7 @@ const menuItems: MenuItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { company } = useAuthStore();
-  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Kết nối"]);
+  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Kết nối", "Tài chính"]);
 
   const toggleExpand = (title: string) => {
     setExpandedItems((prev) =>
