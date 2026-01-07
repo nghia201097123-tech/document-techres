@@ -76,4 +76,35 @@ object DatabaseModule {
     fun provideShiftDao(database: CCBDatabase): ShiftDao {
         return database.shiftDao()
     }
+
+    // New DAOs for sync and offline support
+    @Provides
+    @Singleton
+    fun providePaymentDao(database: CCBDatabase): PaymentDao {
+        return database.paymentDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideVoucherDao(database: CCBDatabase): VoucherDao {
+        return database.voucherDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncQueueDao(database: CCBDatabase): SyncQueueDao {
+        return database.syncQueueDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncMetadataDao(database: CCBDatabase): SyncMetadataDao {
+        return database.syncMetadataDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncConflictDao(database: CCBDatabase): SyncConflictDao {
+        return database.syncConflictDao()
+    }
 }

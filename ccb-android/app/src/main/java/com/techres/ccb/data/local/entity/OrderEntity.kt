@@ -133,11 +133,20 @@ data class OrderEntity(
     val updatedAt: String,
 
     // Sync fields
+    @ColumnInfo(name = "idempotency_key")
+    val idempotencyKey: String, // UUID to prevent duplicate orders on server
+
+    @ColumnInfo(name = "server_id")
+    val serverId: String? = null, // ID from server after sync
+
     @ColumnInfo(name = "sync_status")
     val syncStatus: String = "pending", // pending, syncing, synced, failed
 
     @ColumnInfo(name = "synced_at")
     val syncedAt: String? = null,
+
+    @ColumnInfo(name = "sync_error")
+    val syncError: String? = null,
 
     @ColumnInfo(name = "retry_count")
     val retryCount: Int = 0,

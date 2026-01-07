@@ -225,3 +225,186 @@ data class BranchInfoResponse(
     @SerializedName("data") val data: BranchInfoDto?,
     @SerializedName("message") val message: String?
 )
+
+// ============ New Sync DTOs for Pull/Push Flow ============
+
+/**
+ * Response for PULL operations (Cloud → Local)
+ */
+data class PullSyncResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("data") val data: PullSyncData?,
+    @SerializedName("meta") val meta: SyncMeta?,
+    @SerializedName("message") val message: String?
+)
+
+data class PullSyncData(
+    @SerializedName("categories") val categories: List<SyncItem<CategoryDto>>?,
+    @SerializedName("products") val products: List<SyncItem<ProductDto>>?,
+    @SerializedName("staff") val staff: List<SyncItem<StaffDto>>?,
+    @SerializedName("vouchers") val vouchers: List<SyncItem<VoucherDto>>?,
+    @SerializedName("paymentMethods") val paymentMethods: List<PaymentMethodDto>?,
+    @SerializedName("deletedIds") val deletedIds: DeletedIds?
+)
+
+data class SyncItem<T>(
+    @SerializedName("data") val data: T,
+    @SerializedName("action") val action: String // UPSERT, UPDATE, DELETE
+)
+
+data class DeletedIds(
+    @SerializedName("categoryIds") val categoryIds: List<String>?,
+    @SerializedName("productIds") val productIds: List<String>?,
+    @SerializedName("staffIds") val staffIds: List<String>?,
+    @SerializedName("voucherIds") val voucherIds: List<String>?
+)
+
+data class SyncMeta(
+    @SerializedName("serverTimestamp") val serverTimestamp: Long,
+    @SerializedName("serverVersion") val serverVersion: Int,
+    @SerializedName("hasMore") val hasMore: Boolean,
+    @SerializedName("totalChanges") val totalChanges: Int,
+    @SerializedName("currentPage") val currentPage: Int?,
+    @SerializedName("totalPages") val totalPages: Int?
+)
+
+/**
+ * Payload for PUSH operations (Local → Cloud)
+ */
+data class OrderSyncPayload(
+    @SerializedName("order") val order: OrderPushDto,
+    @SerializedName("items") val items: List<OrderItemPushDto>,
+    @SerializedName("payments") val payments: List<PaymentPushDto>
+)
+
+data class OrderPushDto(
+    @SerializedName("localId") val localId: String,
+    @SerializedName("idempotencyKey") val idempotencyKey: String,
+    @SerializedName("orderNumber") val orderNumber: String,
+    @SerializedName("branchId") val branchId: String,
+    @SerializedName("shiftId") val shiftId: String?,
+    @SerializedName("staffId") val staffId: String?,
+    @SerializedName("staffName") val staffName: String?,
+    @SerializedName("tableId") val tableId: String?,
+    @SerializedName("tableName") val tableName: String?,
+    @SerializedName("customerName") val customerName: String?,
+    @SerializedName("customerPhone") val customerPhone: String?,
+    @SerializedName("status") val status: String,
+    @SerializedName("orderType") val orderType: String,
+    @SerializedName("subtotal") val subtotal: Double,
+    @SerializedName("discountAmount") val discountAmount: Double,
+    @SerializedName("surchargeAmount") val surchargeAmount: Double,
+    @SerializedName("vatAmount") val vatAmount: Double,
+    @SerializedName("totalAmount") val totalAmount: Double,
+    @SerializedName("paidAmount") val paidAmount: Double,
+    @SerializedName("paymentStatus") val paymentStatus: String,
+    @SerializedName("notes") val notes: String?,
+    @SerializedName("guestCount") val guestCount: Int,
+    @SerializedName("completedAt") val completedAt: String?,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("version") val version: Int
+)
+
+data class OrderItemPushDto(
+    @SerializedName("localId") val localId: String,
+    @SerializedName("productId") val productId: String?,
+    @SerializedName("productCode") val productCode: String,
+    @SerializedName("productName") val productName: String,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("unitPrice") val unitPrice: Double,
+    @SerializedName("originalPrice") val originalPrice: Double,
+    @SerializedName("discountAmount") val discountAmount: Double,
+    @SerializedName("totalPrice") val totalPrice: Double,
+    @SerializedName("vatRate") val vatRate: Double,
+    @SerializedName("notes") val notes: String?,
+    @SerializedName("status") val status: String,
+    @SerializedName("priceVersion") val priceVersion: Int,
+    @SerializedName("createdAt") val createdAt: String
+)
+
+data class PaymentPushDto(
+    @SerializedName("localId") val localId: String,
+    @SerializedName("idempotencyKey") val idempotencyKey: String,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("paymentMethod") val paymentMethod: String,
+    @SerializedName("paymentMethodName") val paymentMethodName: String,
+    @SerializedName("receivedAmount") val receivedAmount: Double?,
+    @SerializedName("changeAmount") val changeAmount: Double?,
+    @SerializedName("referenceCode") val referenceCode: String?,
+    @SerializedName("status") val status: String,
+    @SerializedName("paidAt") val paidAt: String
+)
+
+data class ShiftSyncPayload(
+    @SerializedName("localId") val localId: String,
+    @SerializedName("idempotencyKey") val idempotencyKey: String,
+    @SerializedName("branchId") val branchId: String,
+    @SerializedName("staffId") val staffId: String,
+    @SerializedName("staffName") val staffName: String,
+    @SerializedName("deviceId") val deviceId: String,
+    @SerializedName("deviceCode") val deviceCode: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("openingCash") val openingCash: Double,
+    @SerializedName("closingCash") val closingCash: Double?,
+    @SerializedName("expectedClosingCash") val expectedClosingCash: Double?,
+    @SerializedName("cashVariance") val cashVariance: Double?,
+    @SerializedName("totalCashSales") val totalCashSales: Double,
+    @SerializedName("totalBankSales") val totalBankSales: Double,
+    @SerializedName("totalOrders") val totalOrders: Int,
+    @SerializedName("totalRevenue") val totalRevenue: Double,
+    @SerializedName("totalDiscount") val totalDiscount: Double,
+    @SerializedName("notes") val notes: String?,
+    @SerializedName("openedAt") val openedAt: String,
+    @SerializedName("closedAt") val closedAt: String?,
+    @SerializedName("version") val version: Int
+)
+
+/**
+ * Response for PUSH operations (Local → Cloud)
+ */
+data class PushSyncResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("localId") val localId: String?,
+    @SerializedName("serverId") val serverId: String?,
+    @SerializedName("serverVersion") val serverVersion: Int?,
+    @SerializedName("syncedAt") val syncedAt: String?,
+    @SerializedName("error") val error: String?,
+    @SerializedName("conflictData") val conflictData: ConflictDataDto?
+)
+
+data class ConflictDataDto(
+    @SerializedName("serverData") val serverData: String, // JSON
+    @SerializedName("serverVersion") val serverVersion: Int,
+    @SerializedName("serverUpdatedAt") val serverUpdatedAt: String
+)
+
+// ============ Additional DTOs ============
+
+data class VoucherDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("discountType") val discountType: String,
+    @SerializedName("discountValue") val discountValue: Double,
+    @SerializedName("minOrderAmount") val minOrderAmount: Double?,
+    @SerializedName("maxDiscountAmount") val maxDiscountAmount: Double?,
+    @SerializedName("maxUsageCount") val maxUsageCount: Int?,
+    @SerializedName("maxUsagePerCustomer") val maxUsagePerCustomer: Int?,
+    @SerializedName("currentUsageCount") val currentUsageCount: Int,
+    @SerializedName("startDate") val startDate: Long,
+    @SerializedName("endDate") val endDate: Long,
+    @SerializedName("isActive") val isActive: Boolean,
+    @SerializedName("appliesTo") val appliesTo: String?,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+data class PaymentMethodDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("isActive") val isActive: Boolean,
+    @SerializedName("sortOrder") val sortOrder: Int
+)

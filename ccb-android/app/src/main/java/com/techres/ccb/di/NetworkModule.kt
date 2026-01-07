@@ -1,21 +1,36 @@
 package com.techres.ccb.di
 
+import android.os.Build
+import android.util.Log
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.remote.api.MasterDataApi
+import com.techres.ccb.data.remote.api.SyncApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
+import okhttp3.TlsVersion
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.net.InetAddress
+import java.net.Socket
+import java.security.KeyStore
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+
+    private const val TAG = "NetworkModule"
 
     @Provides
     @Singleton
@@ -28,7 +43,7 @@ object NetworkModule {
             }
         }
 
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
@@ -40,7 +55,45 @@ object NetworkModule {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .build()
+
+        // Enable TLS 1.2 for Android 6-7 (API 23-25)
+        // Android 6 doesn't enable TLS 1.2 by default
+        if (Build.VERSION.SDK_INT in 19..25) {
+            try {
+                val trustManager = getTrustManager()
+                val sslContext = SSLContext.getInstance("TLSv1.2")
+                sslContext.init(null, arrayOf(trustManager), null)
+
+                builder.sslSocketFactory(
+                    Tls12SocketFactory(sslContext.socketFactory),
+                    trustManager
+                )
+
+                // Enable TLS 1.2 protocols
+                val specs = listOf(
+                    ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                        .tlsVersions(TlsVersion.TLS_1_2)
+                        .build(),
+                    ConnectionSpec.CLEARTEXT
+                )
+                builder.connectionSpecs(specs)
+
+                Log.d(TAG, "TLS 1.2 enabled for Android ${Build.VERSION.SDK_INT}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enabling TLS 1.2", e)
+            }
+        }
+
+        return builder.build()
+    }
+
+    private fun getTrustManager(): X509TrustManager {
+        val trustManagerFactory = TrustManagerFactory.getInstance(
+            TrustManagerFactory.getDefaultAlgorithm()
+        )
+        trustManagerFactory.init(null as KeyStore?)
+        val trustManagers = trustManagerFactory.trustManagers
+        return trustManagers[0] as X509TrustManager
     }
 
     @Provides
@@ -57,5 +110,50 @@ object NetworkModule {
     @Singleton
     fun provideMasterDataApi(retrofit: Retrofit): MasterDataApi {
         return retrofit.create(MasterDataApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncApi(retrofit: Retrofit): SyncApi {
+        return retrofit.create(SyncApi::class.java)
+    }
+}
+
+/**
+ * Custom SSLSocketFactory to force TLS 1.2 on Android 6-7
+ * These Android versions don't enable TLS 1.2 by default
+ */
+class Tls12SocketFactory(
+    private val delegate: SSLSocketFactory
+) : SSLSocketFactory() {
+
+    override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
+    override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
+
+    override fun createSocket(s: Socket, host: String, port: Int, autoClose: Boolean): Socket {
+        return enableTls12(delegate.createSocket(s, host, port, autoClose))
+    }
+
+    override fun createSocket(host: String, port: Int): Socket {
+        return enableTls12(delegate.createSocket(host, port))
+    }
+
+    override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket {
+        return enableTls12(delegate.createSocket(host, port, localHost, localPort))
+    }
+
+    override fun createSocket(host: InetAddress, port: Int): Socket {
+        return enableTls12(delegate.createSocket(host, port))
+    }
+
+    override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket {
+        return enableTls12(delegate.createSocket(address, port, localAddress, localPort))
+    }
+
+    private fun enableTls12(socket: Socket): Socket {
+        if (socket is SSLSocket) {
+            socket.enabledProtocols = arrayOf("TLSv1.2")
+        }
+        return socket
     }
 }

@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.techres.ccb"
-        minSdk = 26
+        minSdk = 23  // Android 6.0 Marshmallow - Compatible với máy POS cũ
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
@@ -105,6 +105,11 @@ dependencies {
 
     // DataStore
     implementation(libs.datastore.preferences)
+
+    // WorkManager (Android 6+ compatible)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.work.compiler)
 
     // Image Loading
     implementation(libs.coil.compose)
