@@ -15,7 +15,8 @@ import { AdminUser } from '../../database/entities';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET'),
+        // Use same secret as api-oauth (default: 'your-secret-key')
+        secret: configService.get('JWT_SECRET') || 'your-secret-key',
         signOptions: {
           expiresIn: configService.get('JWT_EXPIRES_IN', '7d'),
         },
