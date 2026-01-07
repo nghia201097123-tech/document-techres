@@ -1182,6 +1182,59 @@ export class DatabaseMigrationService implements OnModuleInit {
       this.logger.log('Products table created successfully');
     }
 
+    // Create provinces table (for location data)
+    const provincesExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'provinces'
+      );
+    `);
+
+    if (!provincesExists[0].exists) {
+      this.logger.log('Creating provinces table...');
+      await queryRunner.query(`
+        CREATE TABLE provinces (
+          code VARCHAR(20) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          name_en VARCHAR(255),
+          full_name VARCHAR(255),
+          full_name_en VARCHAR(255),
+          code_name VARCHAR(100),
+          division_type VARCHAR(50),
+          phone_code VARCHAR(10)
+        );
+        CREATE INDEX idx_provinces_name ON provinces(name);
+      `);
+      this.logger.log('Provinces table created successfully');
+    }
+
+    // Create wards table (for location data - includes both district and ward level)
+    const wardsExists = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'wards'
+      );
+    `);
+
+    if (!wardsExists[0].exists) {
+      this.logger.log('Creating wards table...');
+      await queryRunner.query(`
+        CREATE TABLE wards (
+          code VARCHAR(20) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          name_en VARCHAR(255),
+          full_name VARCHAR(255),
+          full_name_en VARCHAR(255),
+          code_name VARCHAR(100),
+          division_type VARCHAR(50),
+          province_code VARCHAR(20) REFERENCES provinces(code)
+        );
+        CREATE INDEX idx_wards_name ON wards(name);
+        CREATE INDEX idx_wards_province ON wards(province_code);
+      `);
+      this.logger.log('Wards table created successfully');
+    }
+
     this.logger.log('Base tables created successfully');
   }
 
