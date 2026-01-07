@@ -707,10 +707,16 @@ export default function BranchProductsPage() {
           </div>
           {/* Bulk actions */}
           {selectedProductIds.size > 0 && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-              <span className="text-sm text-muted-foreground">
-                Đã chọn {selectedProductIds.size} món:
-              </span>
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={true}
+                  onCheckedChange={() => setSelectedProductIds(new Set())}
+                />
+                <span className="text-sm text-muted-foreground">
+                  Đã chọn {selectedProductIds.size} món ăn
+                </span>
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" disabled={processingBulkPrice}>
@@ -727,7 +733,7 @@ export default function BranchProductsPage() {
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem onClick={() => handleBulkToggle(true)}>
                     <Check className="mr-2 h-4 w-4 text-green-600" />
                     Bật tất cả
