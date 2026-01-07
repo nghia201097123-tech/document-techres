@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { QuickCreateDropdown } from "@/components/ui/quick-create-dropdown";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import { useAuthStore } from "@/stores/auth-store";
+import { authService } from "@/services/auth-service";
 
 interface HeaderProps {
   user?: {
@@ -30,8 +32,21 @@ interface HeaderProps {
 export function Header({ user, onOpenCommandPalette, onCreateItem }: HeaderProps) {
   const router = useRouter();
   const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
+  const logout = useAuthStore((state) => state.logout);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Call API to invalidate token on server
+      await authService.logout();
+    } catch (error) {
+      // Continue with logout even if API call fails
+      console.error("Logout API error:", error);
+    }
+
+    // Clear local auth state
+    logout();
+
+    // Redirect to login page
     router.push("/login");
   };
 
