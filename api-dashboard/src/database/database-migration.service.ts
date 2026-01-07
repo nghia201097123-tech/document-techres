@@ -1251,6 +1251,45 @@ export class DatabaseMigrationService implements OnModuleInit {
   private async addMissingColumnsToBaseTables(queryRunner: any) {
     this.logger.log('Adding missing columns to base tables...');
 
+    // Add missing columns to companies table (match Company entity)
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE subscription_plan AS ENUM ('basic', 'standard', 'premium', 'enterprise');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE companies
+      ADD COLUMN IF NOT EXISTS alias VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS tax_code VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS address_detail TEXT,
+      ADD COLUMN IF NOT EXISTS province_code VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS ward_code VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS representative VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS is_trial BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS max_branches INTEGER DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS max_users INTEGER DEFAULT 10
+    `);
+
+    // Check if subscription_plan column exists in companies
+    const hasSubscriptionPlan = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'companies' AND column_name = 'subscription_plan'
+      );
+    `);
+    if (!hasSubscriptionPlan[0].exists) {
+      await queryRunner.query(`
+        ALTER TABLE companies ADD COLUMN subscription_plan subscription_plan DEFAULT 'basic'
+      `);
+    }
+
     // Add missing columns to brands table
     await queryRunner.query(`
       DO $$ BEGIN
