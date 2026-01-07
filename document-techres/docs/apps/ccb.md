@@ -754,82 +754,667 @@ enum class SyncQueueStatus { PENDING, PROCESSING, COMPLETED, FAILED }
 
 ---
 
-## Sync Engine (Offline → Cloud)
+## Thiết kế Chi tiết Sync Engine (Android 6+ Compatible)
 
-### Kiến trúc Sync
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         SYNC ARCHITECTURE                               │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   LOCAL (Room DB)              SYNC ENGINE              CLOUD           │
-│  ┌─────────────┐            ┌─────────────┐        ┌──────────┐        │
-│  │   Orders    │ ────────── │  SyncQueue  │ ─────> │  API     │        │
-│  │  Payments   │            │  WorkManager│ <───── │  Server  │        │
-│  │   Shifts    │            │             │        │          │        │
-│  └─────────────┘            └─────────────┘        └──────────┘        │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### Sync Strategy
-
-| Strategy | Direction | Data Type | Priority |
-|----------|-----------|-----------|----------|
-| **PUSH** | Local → Cloud | Orders, Payments, Shifts | High |
-| **PULL** | Cloud → Local | Products, Categories, Staff | Medium |
-| **Conflict** | Merge/Last-Write-Wins | Tùy loại data | - |
-
-### PUSH Flow (Local → Cloud)
+### Tổng quan Kiến trúc
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ • Order created/updated locally                                  │
-│ • Payment processed locally                                      │
-│ • Shift opened/closed locally                                    │
-│                                                                   │
-│ Flow:                                                             │
-│ 1. Add to SyncQueue (status = PENDING)                           │
-│ 2. WorkManager picks up when online                              │
-│ 3. POST/PUT to API                                               │
-│ 4. On success: Update syncStatus = SYNCED                        │
-│ 5. On failure: Retry with exponential backoff                    │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                            SYNC ENGINE ARCHITECTURE (Android 6+)                         │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              ANDROID POS DEVICE                                  │    │
+│  │                                                                                  │    │
+│  │   ┌──────────────────────────────────────────────────────────────────────────┐ │    │
+│  │   │                          PRESENTATION LAYER                               │ │    │
+│  │   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐ │ │    │
+│  │   │  │   Menu UI   │  │  Cart UI    │  │ Payment UI  │  │ Sync Status UI  │ │ │    │
+│  │   │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘ │ │    │
+│  │   │         │                │                │                  │           │ │    │
+│  │   │         └────────────────┴────────────────┴──────────────────┘           │ │    │
+│  │   │                                   │ StateFlow/LiveData                    │ │    │
+│  │   └───────────────────────────────────┼──────────────────────────────────────┘ │    │
+│  │                                       ▼                                         │    │
+│  │   ┌──────────────────────────────────────────────────────────────────────────┐ │    │
+│  │   │                           DOMAIN LAYER                                    │ │    │
+│  │   │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │ │    │
+│  │   │  │  CreateOrder    │  │  ProcessPayment │  │  SyncManager            │  │ │    │
+│  │   │  │  UseCase        │  │  UseCase        │  │  (Orchestrator)         │  │ │    │
+│  │   │  └────────┬────────┘  └────────┬────────┘  └────────────┬────────────┘  │ │    │
+│  │   │           │                    │                        │               │ │    │
+│  │   │           └────────────────────┼────────────────────────┘               │ │    │
+│  │   │                                │ Repository Interface                    │ │    │
+│  │   └────────────────────────────────┼────────────────────────────────────────┘ │    │
+│  │                                    ▼                                          │    │
+│  │   ┌──────────────────────────────────────────────────────────────────────────┐ │    │
+│  │   │                            DATA LAYER                                     │ │    │
+│  │   │                                                                           │ │    │
+│  │   │  ┌─────────────────────────────────────────────────────────────────────┐│ │    │
+│  │   │  │                      LOCAL DATA SOURCE                              ││ │    │
+│  │   │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ ││ │    │
+│  │   │  │  │    Room     │  │   Sync      │  │   Sync      │  │  Shared   │ ││ │    │
+│  │   │  │  │   Database  │  │   Queue     │  │  Metadata   │  │   Prefs   │ ││ │    │
+│  │   │  │  │  (SQLite)   │  │   Table     │  │   Table     │  │           │ ││ │    │
+│  │   │  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └─────┬─────┘ ││ │    │
+│  │   │  │         │                │                │                │       ││ │    │
+│  │   │  │         └────────────────┴────────────────┴────────────────┘       ││ │    │
+│  │   │  └────────────────────────────────┬────────────────────────────────────┘│ │    │
+│  │   │                                   │                                      │ │    │
+│  │   │  ┌─────────────────────────────────────────────────────────────────────┐│ │    │
+│  │   │  │                     SYNC ENGINE (Core)                              ││ │    │
+│  │   │  │                                                                      ││ │    │
+│  │   │  │    ┌──────────────┐     ┌──────────────┐     ┌──────────────┐      ││ │    │
+│  │   │  │    │   PUSH       │     │   PULL       │     │   Conflict   │      ││ │    │
+│  │   │  │    │   Worker     │     │   Worker     │     │   Resolver   │      ││ │    │
+│  │   │  │    │ (Upload)     │     │ (Download)   │     │              │      ││ │    │
+│  │   │  │    └──────┬───────┘     └───────┬──────┘     └──────┬───────┘      ││ │    │
+│  │   │  │           │                     │                   │              ││ │    │
+│  │   │  │           ▼                     ▼                   ▼              ││ │    │
+│  │   │  │    ┌─────────────────────────────────────────────────────────┐    ││ │    │
+│  │   │  │    │              WorkManager / AlarmManager                 │    ││ │    │
+│  │   │  │    │           (Android 6 compatible scheduler)              │    ││ │    │
+│  │   │  │    └────────────────────────────┬────────────────────────────┘    ││ │    │
+│  │   │  └─────────────────────────────────┼─────────────────────────────────┘│ │    │
+│  │   │                                    │                                   │ │    │
+│  │   │  ┌─────────────────────────────────────────────────────────────────────┐│ │    │
+│  │   │  │                    REMOTE DATA SOURCE                               ││ │    │
+│  │   │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐││ │    │
+│  │   │  │  │  Retrofit   │  │   OkHttp    │  │  Network Monitor            │││ │    │
+│  │   │  │  │   (REST)    │  │  (Client)   │  │  (ConnectivityManager)      │││ │    │
+│  │   │  │  └──────┬──────┘  └──────┬──────┘  └─────────────┬───────────────┘││ │    │
+│  │   │  └─────────┼────────────────┼───────────────────────┼────────────────┘│ │    │
+│  │   └────────────┼────────────────┼───────────────────────┼─────────────────┘ │    │
+│  └────────────────┼────────────────┼───────────────────────┼───────────────────┘    │
+│                   │                │                       │                         │
+│                   └────────────────┼───────────────────────┘                         │
+│                                    │                                                  │
+│                                    ▼ HTTPS (TLS 1.2)                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐ │
+│  │                              CLOUD SERVER                                        │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐│ │
+│  │  │  API        │  │  Sync       │  │  Message    │  │  PostgreSQL             ││ │
+│  │  │  Gateway    │──│  Service    │──│  Queue      │──│  Database               ││ │
+│  │  │  (NestJS)   │  │             │  │  (Redis)    │  │                         ││ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                       │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### PULL Flow (Cloud → Local)
+---
+
+### PULL Flow Chi tiết (Cloud → Local)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ • Master data (Products, Categories, Staff)                      │
-│ • Vouchers, Coupons                                              │
-│ • Settings, Configurations                                       │
-│                                                                   │
-│ Flow:                                                             │
-│ 1. Check lastSyncTimestamp                                       │
-│ 2. GET /sync/changes?since={timestamp}                           │
-│ 3. Apply changes to local DB                                     │
-│ 4. Update lastSyncTimestamp                                      │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         PULL FLOW: CLOUD → LOCAL (Master Data)                          │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  TRIGGERS:                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ • App Start (First Launch)      • Shift Open           • Manual Refresh          │   │
+│  │ • Network Restored              • Periodic (15 min)    • Admin Force Sync        │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 1: CHECK SYNC METADATA                                                       │   │
+│  │                                                                                    │   │
+│  │  SELECT * FROM sync_metadata WHERE entity_type = 'master_data'                   │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │ SyncMetadata {                                                               ││   │
+│  │  │   entityType: "master_data",                                                 ││   │
+│  │  │   lastSyncAt: 1704585600000,           // 2026-01-07 00:00:00               ││   │
+│  │  │   serverVersion: 142,                   // Version từ server                 ││   │
+│  │  │   lastSyncStatus: "SUCCESS",                                                 ││   │
+│  │  │   totalRecords: 1250                                                         ││   │
+│  │  │ }                                                                            ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 2: BUILD API REQUEST                                                         │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │ Initial Sync (lastSyncAt = null):                                            ││   │
+│  │  │   GET /api/v1/sync/master-data/full                                          ││   │
+│  │  │   ?branchId={branchId}                                                       ││   │
+│  │  │   &deviceId={deviceId}                                                       ││   │
+│  │  │   &page=1&limit=100                                                          ││   │
+│  │  │                                                                               ││   │
+│  │  │ Delta Sync (lastSyncAt exists):                                              ││   │
+│  │  │   GET /api/v1/sync/master-data/delta                                         ││   │
+│  │  │   ?branchId={branchId}                                                       ││   │
+│  │  │   &since=1704585600000                                                       ││   │
+│  │  │   &version=142                                                               ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 3: SERVER RESPONSE PROCESSING                                                │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │ Response JSON:                                                               ││   │
+│  │  │ {                                                                            ││   │
+│  │  │   "success": true,                                                           ││   │
+│  │  │   "data": {                                                                  ││   │
+│  │  │     "categories": [                                                          ││   │
+│  │  │       { "id": "cat-1", "name": "Đồ uống", "action": "UPSERT", ... },        ││   │
+│  │  │       { "id": "cat-5", "action": "DELETE" }                                  ││   │
+│  │  │     ],                                                                       ││   │
+│  │  │     "products": [                                                            ││   │
+│  │  │       { "id": "prod-1", "name": "Cà phê", "price": 35000, ... },            ││   │
+│  │  │       { "id": "prod-99", "price": 40000, "action": "UPDATE" }               ││   │
+│  │  │     ],                                                                       ││   │
+│  │  │     "staff": [ ... ],                                                        ││   │
+│  │  │     "vouchers": [ ... ],                                                     ││   │
+│  │  │     "paymentMethods": [ ... ]                                                ││   │
+│  │  │   },                                                                         ││   │
+│  │  │   "meta": {                                                                  ││   │
+│  │  │     "serverTimestamp": 1704672000000,                                        ││   │
+│  │  │     "serverVersion": 145,                                                    ││   │
+│  │  │     "hasMore": false,                                                        ││   │
+│  │  │     "totalChanges": 23                                                       ││   │
+│  │  │   }                                                                          ││   │
+│  │  │ }                                                                            ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 4: APPLY CHANGES TO LOCAL DB (Transaction)                                   │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │ BEGIN TRANSACTION                                                            ││   │
+│  │  │                                                                               ││   │
+│  │  │ // 1. Process Categories                                                      ││   │
+│  │  │ FOR EACH category IN response.categories:                                     ││   │
+│  │  │   IF action == "DELETE":                                                      ││   │
+│  │  │     UPDATE categories SET isActive=0, deletedAt=NOW WHERE id=category.id     ││   │
+│  │  │   ELSE:                                                                       ││   │
+│  │  │     INSERT OR REPLACE INTO categories VALUES (...)                           ││   │
+│  │  │                                                                               ││   │
+│  │  │ // 2. Process Products                                                        ││   │
+│  │  │ FOR EACH product IN response.products:                                        ││   │
+│  │  │   IF action == "DELETE":                                                      ││   │
+│  │  │     UPDATE products SET isActive=0, deletedAt=NOW WHERE id=product.id        ││   │
+│  │  │   ELSE:                                                                       ││   │
+│  │  │     INSERT OR REPLACE INTO products VALUES (...)                             ││   │
+│  │  │     // Download thumbnail async (non-blocking)                               ││   │
+│  │  │     ENQUEUE downloadThumbnail(product.thumbnailUrl)                          ││   │
+│  │  │                                                                               ││   │
+│  │  │ // 3. Process Staff, Vouchers, PaymentMethods...                             ││   │
+│  │  │                                                                               ││   │
+│  │  │ // 4. Update Sync Metadata                                                    ││   │
+│  │  │ UPDATE sync_metadata SET                                                      ││   │
+│  │  │   lastSyncAt = response.meta.serverTimestamp,                                ││   │
+│  │  │   serverVersion = response.meta.serverVersion,                               ││   │
+│  │  │   lastSyncStatus = 'SUCCESS'                                                 ││   │
+│  │  │ WHERE entityType = 'master_data'                                             ││   │
+│  │  │                                                                               ││   │
+│  │  │ COMMIT TRANSACTION                                                            ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 5: NOTIFY UI + DOWNLOAD IMAGES                                               │   │
+│  │                                                                                    │   │
+│  │  ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────────────┐ │   │
+│  │  │ Emit StateFlow   │ ──> │ UI Updates       │     │ Background Image         │ │   │
+│  │  │ SyncComplete     │     │ Product List     │     │ Download Queue           │ │   │
+│  │  └──────────────────┘     └──────────────────┘     └──────────────────────────┘ │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Conflict Resolution
+---
 
-| Entity | Strategy | Lý do |
-|--------|----------|-------|
-| Order | Server wins | Admin có thể sửa |
-| Product | Server wins | Master data |
-| Payment | Local wins | Đã xử lý tại POS |
-| Shift | Merge | Cộng dồn nếu conflict |
+### PUSH Flow Chi tiết (Local → Cloud)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                        PUSH FLOW: LOCAL → CLOUD (Transactions)                          │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 1: LOCAL OPERATION (Offline-capable)                                         │   │
+│  │                                                                                    │   │
+│  │  User Action: Complete Payment                                                     │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │                                                                              ││   │
+│  │  │  BEGIN TRANSACTION                                                           ││   │
+│  │  │                                                                              ││   │
+│  │  │  // 1. Create/Update Order                                                   ││   │
+│  │  │  INSERT INTO orders (                                                        ││   │
+│  │  │    id,                          -- UUID: "POS01-xxx-xxx-xxx"                 ││   │
+│  │  │    idempotencyKey,              -- UUID: "abc-123-def-456"                   ││   │
+│  │  │    orderNumber,                 -- "P1-20260107-0042"                        ││   │
+│  │  │    status,                      -- "COMPLETED"                               ││   │
+│  │  │    syncStatus,                  -- "PENDING"   ← Chưa sync                   ││   │
+│  │  │    ...                                                                       ││   │
+│  │  │  )                                                                           ││   │
+│  │  │                                                                              ││   │
+│  │  │  // 2. Create Payment                                                        ││   │
+│  │  │  INSERT INTO payments (                                                      ││   │
+│  │  │    id, orderId, amount, paymentMethod,                                       ││   │
+│  │  │    syncStatus = "PENDING"       ← Chưa sync                                  ││   │
+│  │  │  )                                                                           ││   │
+│  │  │                                                                              ││   │
+│  │  │  // 3. Add to Sync Queue                                                     ││   │
+│  │  │  INSERT INTO sync_queue (                                                    ││   │
+│  │  │    entityType: "ORDER_BUNDLE",                                               ││   │
+│  │  │    entityId: order.id,                                                       ││   │
+│  │  │    action: "CREATE",                                                         ││   │
+│  │  │    priority: 10,                -- High priority                             ││   │
+│  │  │    status: "PENDING",                                                        ││   │
+│  │  │    payload: JSON.stringify({order, items, payment}),                         ││   │
+│  │  │    createdAt: NOW                                                            ││   │
+│  │  │  )                                                                           ││   │
+│  │  │                                                                              ││   │
+│  │  │  COMMIT TRANSACTION                                                          ││   │
+│  │  │                                                                              ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  │                                                                                    │   │
+│  │  → Print Receipt (không chờ sync)                                                 │   │
+│  │  → Return to Main Screen                                                          │   │
+│  │  → UI shows "Pending sync" indicator                                              │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 2: SYNC QUEUE PROCESSOR (Background)                                         │   │
+│  │                                                                                    │   │
+│  │  WorkManager/AlarmManager triggers (Android 6 compatible):                        │   │
+│  │  • Network available                                                              │   │
+│  │  • Periodic (every 5 minutes)                                                     │   │
+│  │  • App foreground                                                                 │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │                                                                              ││   │
+│  │  │  // Get pending items, sorted by priority and dependency                     ││   │
+│  │  │  SELECT * FROM sync_queue                                                    ││   │
+│  │  │  WHERE status IN ('PENDING', 'RETRY')                                        ││   │
+│  │  │  AND attempts < maxAttempts                                                  ││   │
+│  │  │  ORDER BY priority DESC, createdAt ASC                                       ││   │
+│  │  │  LIMIT 50                                                                    ││   │
+│  │  │                                                                              ││   │
+│  │  │  ┌─────────────────────────────────────────────────────────────────────┐   ││   │
+│  │  │  │ Sync Queue Items:                                                    │   ││   │
+│  │  │  │ ┌──────┬─────────────┬─────────┬────────┬─────────┬───────────────┐│   ││   │
+│  │  │  │ │ ID   │ EntityType  │ Status  │Priority│ Attempts│ DependsOn     ││   ││   │
+│  │  │  │ ├──────┼─────────────┼─────────┼────────┼─────────┼───────────────┤│   ││   │
+│  │  │  │ │ 1    │ SHIFT       │ PENDING │ 20     │ 0       │ null          ││   ││   │
+│  │  │  │ │ 2    │ ORDER_BUNDLE│ PENDING │ 10     │ 0       │ 1 (shift)     ││   ││   │
+│  │  │  │ │ 3    │ ORDER_BUNDLE│ RETRY   │ 10     │ 2       │ 1 (shift)     ││   ││   │
+│  │  │  │ │ 4    │ ORDER_BUNDLE│ PENDING │ 10     │ 0       │ 1 (shift)     ││   ││   │
+│  │  │  │ └──────┴─────────────┴─────────┴────────┴─────────┴───────────────┘│   ││   │
+│  │  │  └─────────────────────────────────────────────────────────────────────┘   ││   │
+│  │  │                                                                              ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 3: PROCESS EACH ITEM (With Dependency Check)                                 │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │                                                                              ││   │
+│  │  │  FOR EACH item IN pendingItems:                                              ││   │
+│  │  │                                                                              ││   │
+│  │  │    // Check dependency                                                       ││   │
+│  │  │    IF item.dependsOnId != null:                                              ││   │
+│  │  │      dependency = SELECT * FROM sync_queue WHERE id = item.dependsOnId       ││   │
+│  │  │      IF dependency.status != 'COMPLETED':                                    ││   │
+│  │  │        SKIP this item (wait for dependency)                                  ││   │
+│  │  │        CONTINUE                                                              ││   │
+│  │  │                                                                              ││   │
+│  │  │    // Update status to PROCESSING                                            ││   │
+│  │  │    UPDATE sync_queue SET status = 'PROCESSING' WHERE id = item.id            ││   │
+│  │  │                                                                              ││   │
+│  │  │    TRY:                                                                      ││   │
+│  │  │      result = syncToServer(item)                                             ││   │
+│  │  │      handleSuccess(item, result)                                             ││   │
+│  │  │    CATCH NetworkError:                                                       ││   │
+│  │  │      handleNetworkError(item)                                                ││   │
+│  │  │    CATCH ServerError:                                                        ││   │
+│  │  │      handleServerError(item, error)                                          ││   │
+│  │  │                                                                              ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 4: API CALL WITH IDEMPOTENCY                                                 │   │
+│  │                                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐│   │
+│  │  │                                                                              ││   │
+│  │  │  POST /api/v1/sync/orders                                                    ││   │
+│  │  │  Headers:                                                                    ││   │
+│  │  │    Authorization: Bearer {accessToken}                                       ││   │
+│  │  │    X-Device-Id: POS01                                                        ││   │
+│  │  │    X-Idempotency-Key: abc-123-def-456     ← Prevent duplicate               ││   │
+│  │  │    Content-Type: application/json                                            ││   │
+│  │  │                                                                              ││   │
+│  │  │  Body:                                                                       ││   │
+│  │  │  {                                                                           ││   │
+│  │  │    "order": {                                                                ││   │
+│  │  │      "localId": "POS01-xxx-xxx",                                             ││   │
+│  │  │      "orderNumber": "P1-20260107-0042",                                      ││   │
+│  │  │      "total": 220000,                                                        ││   │
+│  │  │      "status": "COMPLETED",                                                  ││   │
+│  │  │      "shiftId": "shift-local-id",                                            ││   │
+│  │  │      "createdAt": "2026-01-07T14:30:00Z",                                    ││   │
+│  │  │      ...                                                                     ││   │
+│  │  │    },                                                                        ││   │
+│  │  │    "items": [                                                                ││   │
+│  │  │      { "productId": "prod-1", "quantity": 2, "unitPrice": 35000, ... },     ││   │
+│  │  │      { "productId": "prod-5", "quantity": 1, "unitPrice": 80000, ... }      ││   │
+│  │  │    ],                                                                        ││   │
+│  │  │    "payments": [                                                             ││   │
+│  │  │      { "method": "CASH", "amount": 220000, "receivedAmount": 250000, ... }  ││   │
+│  │  │    ]                                                                         ││   │
+│  │  │  }                                                                           ││   │
+│  │  │                                                                              ││   │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘│   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                            ┌─────────────────┴─────────────────┐                        │
+│                            ▼                                   ▼                        │
+│  ┌────────────────────────────────────┐   ┌────────────────────────────────────────┐   │
+│  │ SUCCESS (200/201)                   │   │ ERROR                                   │   │
+│  │                                     │   │                                         │   │
+│  │ Response:                           │   │ ┌─────────────────────────────────────┐│   │
+│  │ {                                   │   │ │ 409 Conflict (Idempotency):         ││   │
+│  │   "success": true,                  │   │ │   → Order đã tồn tại                ││   │
+│  │   "data": {                         │   │ │   → Return existing serverId        ││   │
+│  │     "serverId": "srv-order-123",    │   │ │   → Mark as COMPLETED               ││   │
+│  │     "syncedAt": "2026-01-07T..."    │   │ │                                     ││   │
+│  │   }                                 │   │ │ 400 Bad Request:                    ││   │
+│  │ }                                   │   │ │   → Data validation failed          ││   │
+│  │                                     │   │ │   → Mark as FAILED (no retry)       ││   │
+│  │ Actions:                            │   │ │   → Log for admin review            ││   │
+│  │ 1. Update order.serverId            │   │ │                                     ││   │
+│  │ 2. Update order.syncStatus=SYNCED   │   │ │ 401 Unauthorized:                   ││   │
+│  │ 3. Update sync_queue status=DONE    │   │ │   → Token expired                   ││   │
+│  │ 4. Emit success event               │   │ │   → Refresh token & retry           ││   │
+│  │                                     │   │ │                                     ││   │
+│  │                                     │   │ │ 5xx Server Error:                   ││   │
+│  │                                     │   │ │   → Retry with backoff              ││   │
+│  │                                     │   │ │   → attempts++                      ││   │
+│  │                                     │   │ │   → nextRetryAt = now + backoff     ││   │
+│  │                                     │   │ └─────────────────────────────────────┘│   │
+│  └────────────────────────────────────┘   └────────────────────────────────────────┘   │
+│                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Sync Queue State Machine
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              SYNC QUEUE STATE MACHINE                                    │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│                              ┌──────────────────────┐                                   │
+│                              │                      │                                   │
+│            ┌─────────────────│      PENDING         │◄───────────────────┐             │
+│            │                 │                      │                    │             │
+│            │                 └──────────┬───────────┘                    │             │
+│            │                            │                                │             │
+│            │                            │ Worker picks up                │             │
+│            │                            ▼                                │             │
+│            │                 ┌──────────────────────┐                    │             │
+│            │                 │                      │                    │             │
+│            │                 │    PROCESSING        │                    │             │
+│            │                 │                      │                    │             │
+│            │                 └──────────┬───────────┘                    │             │
+│            │                            │                                │             │
+│            │          ┌─────────────────┼─────────────────┐             │             │
+│            │          │                 │                 │             │             │
+│            │          ▼                 ▼                 ▼             │             │
+│            │   ┌────────────┐   ┌────────────┐   ┌─────────────┐       │             │
+│            │   │            │   │            │   │             │       │             │
+│            │   │  SUCCESS   │   │   RETRY    │   │   FAILED    │       │             │
+│            │   │  (SYNCED)  │   │            │   │             │       │             │
+│            │   │            │   │            │   │             │       │             │
+│            │   └─────┬──────┘   └──────┬─────┘   └──────┬──────┘       │             │
+│            │         │                 │                │               │             │
+│            │         │                 │ After delay    │               │             │
+│            │         │                 │ (backoff)      │               │             │
+│            │         │                 │                │               │             │
+│            │         │                 └────────────────┼───────────────┘             │
+│            │         │                                  │                              │
+│            │         ▼                                  ▼                              │
+│            │   ┌────────────┐                   ┌─────────────┐                       │
+│            │   │            │                   │             │                       │
+│            │   │ COMPLETED  │                   │  DEAD_LETTER│                       │
+│            │   │ (Cleanup)  │                   │  (Manual)   │                       │
+│            │   │            │                   │             │                       │
+│            │   └────────────┘                   └─────────────┘                       │
+│            │                                           │                              │
+│            │                                           │ Admin resolves               │
+│            └───────────────────────────────────────────┘                              │
+│                                                                                          │
+│  ──────────────────────────────────────────────────────────────────────────────────── │
+│                                                                                          │
+│  Retry Policy (Exponential Backoff):                                                    │
+│  ┌────────────────────────────────────────────────────────────────────────────────┐    │
+│  │ Attempt │ Delay   │ Next Retry At        │ Notes                               │    │
+│  ├─────────┼─────────┼──────────────────────┼─────────────────────────────────────┤    │
+│  │ 1       │ 0s      │ Immediate            │ First try                           │    │
+│  │ 2       │ 2s      │ +2 seconds           │ Network glitch                      │    │
+│  │ 3       │ 4s      │ +4 seconds           │                                     │    │
+│  │ 4       │ 8s      │ +8 seconds           │                                     │    │
+│  │ 5       │ 16s     │ +16 seconds          │                                     │    │
+│  │ 6       │ 32s     │ +32 seconds          │ Max backoff                         │    │
+│  │ 7+      │ 32s     │ +32 seconds          │ Cap at 32s                          │    │
+│  │ >10     │ -       │ FAILED               │ Move to dead letter                 │    │
+│  └─────────┴─────────┴──────────────────────┴─────────────────────────────────────┘    │
+│                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Data Flow Timeline
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                            DATA FLOW TIMELINE (1 Order Lifecycle)                        │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  TIME     LOCAL DB              SYNC QUEUE           NETWORK          CLOUD SERVER      │
+│  ─────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                          │
+│  14:30:00 ┌─────────────────┐                                                           │
+│           │ Order Created   │                                                           │
+│           │ syncStatus:     │                                                           │
+│           │ PENDING         │                                                           │
+│           └────────┬────────┘                                                           │
+│                    │                                                                     │
+│  14:30:00          │           ┌─────────────────┐                                      │
+│                    └──────────>│ Queue Item      │                                      │
+│                                │ Added           │                                      │
+│                                │ status: PENDING │                                      │
+│                                └────────┬────────┘                                      │
+│                                         │                                                │
+│  14:30:01                               │           ┌───────────┐                       │
+│           [Print Receipt]               │           │  OFFLINE  │                       │
+│           [Return to Menu]              │           │  (No Wifi)│                       │
+│                                         │           └───────────┘                       │
+│                                         │                                                │
+│  14:35:00                               │           ┌───────────┐                       │
+│           (5 min later)                 │           │  ONLINE   │                       │
+│                                         │           │ (Restored)│                       │
+│                                         │           └─────┬─────┘                       │
+│                                         │                 │                              │
+│  14:35:01                      ┌────────┴────────┐        │                              │
+│                                │ Worker Wakes   │        │                              │
+│                                │ status:        │        │                              │
+│                                │ PROCESSING     │        │                              │
+│                                └────────┬───────┘        │                              │
+│                                         │                │                              │
+│  14:35:02                               │                │        ┌──────────────────┐  │
+│                                         │                │───────>│ POST /sync/orders│  │
+│                                         │                │        │                  │  │
+│                                         │                │        │ Processing...    │  │
+│                                         │                │        └────────┬─────────┘  │
+│                                         │                │                 │            │
+│  14:35:03                               │                │        ┌────────┴─────────┐  │
+│                                         │                │<───────│ 201 Created      │  │
+│                                         │                │        │ serverId: xxx    │  │
+│                                         │                │        └──────────────────┘  │
+│                                         │                │                              │
+│  14:35:03 ┌─────────────────┐  ┌────────┴────────┐                                      │
+│           │ Order Updated   │  │ status:         │                                      │
+│           │ serverId: xxx   │  │ COMPLETED       │                                      │
+│           │ syncStatus:     │  │                 │                                      │
+│           │ SYNCED          │  │ (Will cleanup   │                                      │
+│           └─────────────────┘  │  after 24h)     │                                      │
+│                                └─────────────────┘                                      │
+│                                                                                          │
+│  ─────────────────────────────────────────────────────────────────────────────────────  │
+│  TOTAL: Order created → synced in ~5 minutes (depending on network)                     │
+│  User experience: Instant (print receipt immediately, sync in background)               │
+│                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Conflict Resolution Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              CONFLICT RESOLUTION FLOW                                    │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           Scenario: Order Conflict                                │   │
+│  │                                                                                    │   │
+│  │  POS (Offline)                                     Server                         │   │
+│  │  ─────────────                                     ──────                         │   │
+│  │  Order #42                                         Order #42                      │   │
+│  │  total: 200,000                                    total: 180,000                 │   │
+│  │  discount: 0                                       discount: 20,000               │   │
+│  │  updatedAt: 14:30                                  updatedAt: 14:25               │   │
+│  │  version: 2                                        version: 3                     │   │
+│  │                                                    (Admin applied discount)       │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 1: POS goes online, tries to sync                                            │   │
+│  │                                                                                    │   │
+│  │  PUT /api/v1/orders/42                                                            │   │
+│  │  {                                                                                │   │
+│  │    ...orderData,                                                                  │   │
+│  │    expectedVersion: 2      ← POS thinks current version is 2                     │   │
+│  │  }                                                                                │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 2: Server detects version mismatch                                           │   │
+│  │                                                                                    │   │
+│  │  Server version: 3                                                                │   │
+│  │  Expected version: 2                                                              │   │
+│  │  → CONFLICT!                                                                      │   │
+│  │                                                                                    │   │
+│  │  Response: 409 Conflict                                                           │   │
+│  │  {                                                                                │   │
+│  │    "error": "VERSION_CONFLICT",                                                   │   │
+│  │    "serverData": {                                                                │   │
+│  │      "total": 180000,                                                             │   │
+│  │      "discount": 20000,                                                           │   │
+│  │      "version": 3,                                                                │   │
+│  │      "updatedAt": "2026-01-07T14:25:00Z",                                         │   │
+│  │      "updatedBy": "admin@techres.vn"                                              │   │
+│  │    }                                                                              │   │
+│  │  }                                                                                │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 3: Apply Resolution Strategy                                                 │   │
+│  │                                                                                    │   │
+│  │  ┌────────────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ Entity Type │ Strategy        │ Resolution                                  │ │   │
+│  │  ├─────────────┼─────────────────┼─────────────────────────────────────────────┤ │   │
+│  │  │ Order       │ SERVER_WINS     │ Accept server data (admin has authority)   │ │   │
+│  │  │ Product     │ SERVER_WINS     │ Always use server (master data)            │ │   │
+│  │  │ Payment     │ LOCAL_WINS      │ POS processed payment (can't undo)         │ │   │
+│  │  │ Shift       │ MERGE           │ Combine totals from both                   │ │   │
+│  │  │ Staff       │ SERVER_WINS     │ HR manages staff data                      │ │   │
+│  │  │ Voucher Use │ LOCAL_WINS      │ Customer already got discount              │ │   │
+│  │  └─────────────┴─────────────────┴─────────────────────────────────────────────┘ │   │
+│  │                                                                                    │   │
+│  │  For Order: SERVER_WINS                                                           │   │
+│  │  → Update local order with server data                                            │   │
+│  │  → Set syncStatus = SYNCED                                                        │   │
+│  │  → Log conflict for audit                                                         │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                              │                                           │
+│                                              ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │ STEP 4: Store Conflict for Audit                                                  │   │
+│  │                                                                                    │   │
+│  │  INSERT INTO sync_conflicts (                                                     │   │
+│  │    entityType: "ORDER",                                                           │   │
+│  │    entityId: "order-42",                                                          │   │
+│  │    localData: '{"total":200000,...}',                                             │   │
+│  │    serverData: '{"total":180000,...}',                                            │   │
+│  │    resolution: "SERVER_WINS",                                                     │   │
+│  │    resolvedAt: NOW,                                                               │   │
+│  │    deviceId: "POS01"                                                              │   │
+│  │  )                                                                                │   │
+│  │                                                                                    │   │
+│  │  → Admin có thể review conflicts trên Dashboard                                   │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Sync Strategy Matrix
+
+| Entity | Direction | Strategy | Conflict Resolution | Priority |
+|--------|-----------|----------|---------------------|----------|
+| **Shift** | PUSH | Immediate when online | MERGE (combine totals) | Critical (1) |
+| **Order** | PUSH | Queue → Batch | SERVER_WINS | Critical (2) |
+| **OrderItem** | PUSH | Bundle with Order | N/A (part of order) | Critical (2) |
+| **Payment** | PUSH | Bundle with Order | LOCAL_WINS | Critical (2) |
+| **Product** | PULL | Delta sync | SERVER_WINS | High |
+| **Category** | PULL | Delta sync | SERVER_WINS | High |
+| **Staff** | PULL | Delta sync | SERVER_WINS | High |
+| **Voucher** | PULL | Delta sync | SERVER_WINS | Medium |
+| **VoucherUsage** | PUSH | Queue | LOCAL_WINS | Medium |
+| **Settings** | PULL | Full replace | SERVER_WINS | Low |
+
+---
 
 ### Sync Triggers
 
-- Network connectivity restored
-- Periodic (every 5 minutes when online)
-- Manual trigger (pull-to-refresh)
-- App foreground
-- Before shift close
+| Trigger | Pull | Push | Điều kiện |
+|---------|------|------|-----------|
+| **App Start** | ✅ | ✅ | Always |
+| **Network Restored** | ✅ | ✅ | Was offline > 1 min |
+| **Shift Open** | ✅ (Force) | ❌ | Online required |
+| **Shift Close** | ❌ | ✅ (Force) | Try before close |
+| **Periodic (5 min)** | ❌ | ✅ | If has pending |
+| **Periodic (15 min)** | ✅ | ❌ | If online |
+| **Manual Refresh** | ✅ | ✅ | User action |
+| **Order Complete** | ❌ | ✅ (Queue) | Add to queue |
+| **Before App Close** | ❌ | ✅ | Try once |
 
 ---
 
@@ -907,11 +1492,433 @@ enum class SyncQueueStatus { PENDING, PROCESSING, COMPLETED, FAILED }
 
 | Cấu hình | Tối thiểu | Khuyến nghị |
 |----------|-----------|-------------|
-| RAM | 2GB | 4GB |
-| Storage | 1GB trống | 2GB trống |
-| Android | 8.0+ (API 26) | 11+ (API 30) |
+| RAM | 1GB | 2GB+ |
+| Storage | 500MB trống | 1GB trống |
+| Android | **6.0+ (API 23)** | 8.0+ (API 26) |
 | Screen | 7" | 10"+ |
 | Printer Port | USB/Bluetooth | USB + Ethernet |
+
+### Android 6.0 Compatibility Notes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         ANDROID 6 (API 23) COMPATIBILITY                                 │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ⚠️ LƯU Ý: Nhiều máy POS trên thị trường vẫn chạy Android 6.0                          │
+│                                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────────────────────┐│
+│  │ Component          │ Android 8+ Solution     │ Android 6 Alternative              ││
+│  ├────────────────────┼─────────────────────────┼────────────────────────────────────┤│
+│  │ Background Work    │ WorkManager             │ WorkManager + AlarmManager fallback││
+│  │ Network Monitor    │ NetworkCallback         │ BroadcastReceiver (deprecated)     ││
+│  │ TLS/SSL            │ TLS 1.3                 │ TLS 1.2 (enable manually)          ││
+│  │ Permissions        │ Implicit                │ Runtime permissions required       ││
+│  │ Storage            │ Scoped Storage          │ External storage permission        ││
+│  │ Bluetooth          │ Companion Device API    │ Classic Bluetooth API              ││
+│  │ USB                │ USB Host API            │ USB Host API (same)                ││
+│  └────────────────────┴─────────────────────────┴────────────────────────────────────┘│
+│                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Cấu hình build.gradle cho Android 6
+
+```kotlin
+android {
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 23        // Android 6.0 Marshmallow
+        targetSdk = 34
+        // ...
+    }
+}
+
+dependencies {
+    // WorkManager - backward compatible
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Room - works on API 23+
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+
+    // Retrofit - works on all versions
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+
+    // OkHttp với TLS 1.2 support
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Hilt - backward compatible
+    implementation("com.google.dagger:hilt-android:2.50")
+    kapt("com.google.dagger:hilt-compiler:2.50")
+}
+```
+
+#### Network Monitor cho Android 6
+
+```kotlin
+/**
+ * Network Monitor compatible với Android 6.0+
+ * Sử dụng BroadcastReceiver cho API < 24, NetworkCallback cho API >= 24
+ */
+class NetworkMonitor @Inject constructor(
+    private val context: Context
+) {
+    private val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+    private val _isOnline = MutableStateFlow(false)
+    val isOnline: StateFlow<Boolean> = _isOnline
+
+    // Cho Android 6-7 (API 23-24)
+    private val networkReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            updateNetworkStatus()
+        }
+    }
+
+    // Cho Android 7+ (API 24+)
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            _isOnline.value = true
+        }
+
+        override fun onLost(network: Network) {
+            _isOnline.value = false
+        }
+    }
+
+    fun startMonitoring() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            // API 24+ - sử dụng NetworkCallback
+            connectivityManager.registerDefaultNetworkCallback(networkCallback)
+        } else {
+            // API 23 - sử dụng BroadcastReceiver
+            @Suppress("DEPRECATION")
+            context.registerReceiver(
+                networkReceiver,
+                IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
+            )
+        }
+        updateNetworkStatus()
+    }
+
+    fun stopMonitoring() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        } else {
+            context.unregisterReceiver(networkReceiver)
+        }
+    }
+
+    private fun updateNetworkStatus() {
+        _isOnline.value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        } else {
+            @Suppress("DEPRECATION")
+            connectivityManager.activeNetworkInfo?.isConnected == true
+        }
+    }
+}
+```
+
+#### WorkManager với AlarmManager Fallback
+
+```kotlin
+/**
+ * SyncScheduler compatible với Android 6.0+
+ * WorkManager tự động fallback về AlarmManager trên Android 6-7
+ */
+class SyncScheduler @Inject constructor(
+    private val context: Context,
+    private val workManager: WorkManager
+) {
+    fun schedulePushSync() {
+        // Constraints - network required
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // One-time work khi có mạng
+        val pushWorkRequest = OneTimeWorkRequestBuilder<PushSyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                2, TimeUnit.SECONDS  // Min on API 23 is 10 seconds, but WorkManager handles this
+            )
+            .addTag("push_sync")
+            .build()
+
+        workManager.enqueueUniqueWork(
+            "push_sync_work",
+            ExistingWorkPolicy.KEEP,  // Không tạo duplicate
+            pushWorkRequest
+        )
+    }
+
+    fun schedulePeriodicPullSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // Periodic work - minimum 15 minutes trên tất cả Android versions
+        val pullWorkRequest = PeriodicWorkRequestBuilder<PullSyncWorker>(
+            15, TimeUnit.MINUTES,  // Repeat interval
+            5, TimeUnit.MINUTES    // Flex interval
+        )
+            .setConstraints(constraints)
+            .addTag("pull_sync")
+            .build()
+
+        workManager.enqueueUniquePeriodicWork(
+            "pull_sync_periodic",
+            ExistingPeriodicWorkPolicy.KEEP,
+            pullWorkRequest
+        )
+    }
+
+    fun cancelAllSync() {
+        workManager.cancelAllWorkByTag("push_sync")
+        workManager.cancelAllWorkByTag("pull_sync")
+    }
+}
+```
+
+#### Runtime Permissions cho Android 6
+
+```kotlin
+/**
+ * Permission Handler cho Android 6+
+ * Bluetooth, Storage, Camera đều cần runtime permission
+ */
+class PermissionHandler(private val activity: Activity) {
+
+    companion object {
+        private const val PERMISSION_REQUEST_CODE = 1001
+
+        val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION  // Required for BLE on API 23-30
+            )
+        }
+    }
+
+    fun checkAndRequestPermissions(): Boolean {
+        val missingPermissions = REQUIRED_PERMISSIONS.filter {
+            ContextCompat.checkSelfPermission(activity, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        return if (missingPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                activity,
+                missingPermissions.toTypedArray(),
+                PERMISSION_REQUEST_CODE
+            )
+            false
+        } else {
+            true
+        }
+    }
+
+    fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ): Boolean {
+        if (requestCode != PERMISSION_REQUEST_CODE) return false
+
+        return grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+    }
+}
+```
+
+#### OkHttp với TLS 1.2 cho Android 6
+
+```kotlin
+/**
+ * OkHttp Client với TLS 1.2 cho Android 6
+ * Android 6 mặc định không enable TLS 1.2
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        authInterceptor: AuthInterceptor
+    ): OkHttpClient {
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(authInterceptor)
+
+        // Enable TLS 1.2 cho Android 6-7 (API 23-24)
+        if (Build.VERSION.SDK_INT in 19..25) {
+            try {
+                val trustManager = getTrustManager()
+                val sslContext = SSLContext.getInstance("TLSv1.2")
+                sslContext.init(null, arrayOf(trustManager), null)
+
+                builder.sslSocketFactory(
+                    Tls12SocketFactory(sslContext.socketFactory),
+                    trustManager
+                )
+
+                // Enable TLS 1.2 protocols
+                val specs = listOf(
+                    ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                        .tlsVersions(TlsVersion.TLS_1_2)
+                        .build(),
+                    ConnectionSpec.CLEARTEXT
+                )
+                builder.connectionSpecs(specs)
+
+            } catch (e: Exception) {
+                Log.e("NetworkModule", "Error enabling TLS 1.2", e)
+            }
+        }
+
+        return builder.build()
+    }
+
+    private fun getTrustManager(): X509TrustManager {
+        val trustManagerFactory = TrustManagerFactory.getInstance(
+            TrustManagerFactory.getDefaultAlgorithm()
+        )
+        trustManagerFactory.init(null as KeyStore?)
+        val trustManagers = trustManagerFactory.trustManagers
+        return trustManagers[0] as X509TrustManager
+    }
+}
+
+/**
+ * Custom SSLSocketFactory để force TLS 1.2
+ */
+class Tls12SocketFactory(
+    private val delegate: SSLSocketFactory
+) : SSLSocketFactory() {
+
+    override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
+    override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
+
+    override fun createSocket(s: Socket, host: String, port: Int, autoClose: Boolean): Socket {
+        return enableTls12(delegate.createSocket(s, host, port, autoClose))
+    }
+
+    override fun createSocket(host: String, port: Int): Socket {
+        return enableTls12(delegate.createSocket(host, port))
+    }
+
+    override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket {
+        return enableTls12(delegate.createSocket(host, port, localHost, localPort))
+    }
+
+    override fun createSocket(host: InetAddress, port: Int): Socket {
+        return enableTls12(delegate.createSocket(host, port))
+    }
+
+    override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket {
+        return enableTls12(delegate.createSocket(address, port, localAddress, localPort))
+    }
+
+    private fun enableTls12(socket: Socket): Socket {
+        if (socket is SSLSocket) {
+            socket.enabledProtocols = arrayOf("TLSv1.2")
+        }
+        return socket
+    }
+}
+```
+
+#### Bluetooth Printer cho Android 6
+
+```kotlin
+/**
+ * Bluetooth Printer Manager compatible với Android 6+
+ * Sử dụng Classic Bluetooth API (không cần Companion Device API)
+ */
+class BluetoothPrinterManager @Inject constructor(
+    private val context: Context
+) {
+    private val bluetoothAdapter: BluetoothAdapter? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            context.getSystemService(BluetoothManager::class.java)?.adapter
+        } else {
+            @Suppress("DEPRECATION")
+            BluetoothAdapter.getDefaultAdapter()
+        }
+
+    private var socket: BluetoothSocket? = null
+    private var outputStream: OutputStream? = null
+
+    /**
+     * Kết nối với máy in Bluetooth
+     */
+    @SuppressLint("MissingPermission")  // Permission checked at call site
+    suspend fun connect(deviceAddress: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
+                ?: return@withContext Result.failure(Exception("Bluetooth not available"))
+
+            // UUID cho Serial Port Profile (SPP) - standard cho máy in
+            val uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+            socket = device.createRfcommSocketToServiceRecord(uuid)
+            socket?.connect()
+            outputStream = socket?.outputStream
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * In dữ liệu ESC/POS
+     */
+    suspend fun print(data: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            outputStream?.write(data)
+            outputStream?.flush()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Lấy danh sách thiết bị đã pair
+     */
+    @SuppressLint("MissingPermission")
+    fun getPairedDevices(): List<BluetoothDevice> {
+        return bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
+    }
+
+    fun disconnect() {
+        try {
+            outputStream?.close()
+            socket?.close()
+        } catch (e: Exception) {
+            // Ignore
+        }
+        outputStream = null
+        socket = null
+    }
+}
+```
 
 ### Máy in nhiệt
 
