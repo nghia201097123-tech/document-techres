@@ -528,10 +528,10 @@ export default function GiftItemsPage() {
     setCurrentPage(1);
   }, [statusFilter, filterBranchId]);
 
-  // Clear selection when page changes or filter changes
+  // Clear selection when filter changes (not when page changes)
   React.useEffect(() => {
     setSelectedItemIds(new Set());
-  }, [currentPage, statusFilter, filterBranchId]);
+  }, [statusFilter, filterBranchId]);
 
   // Toggle single item selection
   const toggleItemSelection = (itemId: string) => {
@@ -546,10 +546,10 @@ export default function GiftItemsPage() {
     });
   };
 
-  // Select all items on current page
-  const selectAllOnPage = () => {
-    const pageIds = paginatedItems.map(item => item.id);
-    setSelectedItemIds(new Set(pageIds));
+  // Select all filtered items (across all pages)
+  const selectAllFilteredItems = () => {
+    const allFilteredIds = filteredItems.map(item => item.id);
+    setSelectedItemIds(new Set(allFilteredIds));
   };
 
   // Deselect all items
@@ -557,8 +557,11 @@ export default function GiftItemsPage() {
     setSelectedItemIds(new Set());
   };
 
-  // Check if all items on current page are selected
-  const allOnPageSelected = paginatedItems.length > 0 && paginatedItems.every(item => selectedItemIds.has(item.id));
+  // Check if all filtered items are selected (across all pages)
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItemIds.has(item.id));
+
+  // Check if some items are selected (for indeterminate state)
+  const someItemsSelected = selectedItemIds.size > 0 && !allFilteredSelected;
 
   // Bulk toggle active with batch processing
   const handleBulkToggleActive = async (isActive: boolean) => {
@@ -810,7 +813,7 @@ export default function GiftItemsPage() {
                   onCheckedChange={() => deselectAllItems()}
                 />
                 <span className="text-sm text-muted-foreground">
-                  Đã chọn {selectedItemIds.size} món tặng
+                  Đã chọn <strong>{selectedItemIds.size}</strong> / {filteredItems.length} món tặng
                 </span>
               </div>
               <DropdownMenu>
@@ -871,16 +874,28 @@ export default function GiftItemsPage() {
                   <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow>
                       <TableHead className="w-[50px]">
-                        <Checkbox
-                          checked={allOnPageSelected}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              selectAllOnPage();
-                            } else {
-                              deselectAllItems();
-                            }
-                          }}
-                        />
+                        <div className="flex items-center gap-1">
+                          <Checkbox
+                            checked={allFilteredSelected}
+                            ref={(el) => {
+                              if (el) {
+                                (el as unknown as HTMLInputElement).indeterminate = someItemsSelected;
+                              }
+                            }}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                selectAllFilteredItems();
+                              } else {
+                                deselectAllItems();
+                              }
+                            }}
+                          />
+                          {filteredItems.length > pageSize && (
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              ({filteredItems.length})
+                            </span>
+                          )}
+                        </div>
                       </TableHead>
                       {isColumnVisible("name") && <TableHead>Món tặng</TableHead>}
                       {isColumnVisible("product") && <TableHead>Món ăn gốc</TableHead>}
