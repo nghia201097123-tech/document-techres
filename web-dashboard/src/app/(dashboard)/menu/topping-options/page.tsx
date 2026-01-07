@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, Loader2, Cherry, X, Trash2, ChevronDown, ChevronRight, UtensilsCrossed, Pencil, Check, Package } from "lucide-react";
+import { Plus, Search, Loader2, Cherry, X, Trash2, ChevronDown, ChevronRight, ChevronLeft, UtensilsCrossed, Pencil, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,12 +18,29 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { productService, type Product, ProductType, type ToppingGroup } from "@/services/product-service";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 
 export default function ToppingOptionsPage() {
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
 
   // Global filter state from Redux
   const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
@@ -71,6 +88,18 @@ export default function ToppingOptionsPage() {
   // Track newly created and updated group IDs for badges
   const [newGroupIds, setNewGroupIds] = React.useState<Set<string>>(new Set());
   const [updatedGroupIds, setUpdatedGroupIds] = React.useState<Set<string>>(new Set());
+
+  // Bulk assignment state
+  const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
+  const [productSearch, setProductSearch] = React.useState("");
+  const [productCurrentPage, setProductCurrentPage] = React.useState(1);
+  const [productPageSize, setProductPageSize] = React.useState(50);
+  const productPageSizeOptions = [10, 20, 50, 100, 200];
+
+  // Bulk assign dialog
+  const [showBulkAssignDialog, setShowBulkAssignDialog] = React.useState(false);
+  const [bulkAssignMode, setBulkAssignMode] = React.useState<"add" | "replace">("add");
+  const [bulkAssignGroupIds, setBulkAssignGroupIds] = React.useState<string[]>([]);
 
   // Load data - only when brand is selected
   const loadData = React.useCallback(async (brandId: string) => {
@@ -379,6 +408,250 @@ export default function ToppingOptionsPage() {
     return g.name.toLowerCase().includes(search.toLowerCase());
   });
 
+  // Filter products for assign tab
+  const filteredAssignProducts = React.useMemo(() => {
+    return products.filter(p => {
+      const matchesSearch = !productSearch ||
+        p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+        p.code?.toLowerCase().includes(productSearch.toLowerCase());
+      return matchesSearch;
+    });
+  }, [products, productSearch]);
+
+  // Pagination for products
+  const productTotalPages = Math.ceil(filteredAssignProducts.length / productPageSize);
+  const paginatedProducts = React.useMemo(() => {
+    const start = (productCurrentPage - 1) * productPageSize;
+    return filteredAssignProducts.slice(start, start + productPageSize);
+  }, [filteredAssignProducts, productCurrentPage, productPageSize]);
+
+  // Reset page when search changes
+  React.useEffect(() => {
+    setProductCurrentPage(1);
+  }, [productSearch]);
+
+  // Clear product selection when brand changes
+  React.useEffect(() => {
+    setSelectedProductIds(new Set());
+    setProductSearch("");
+    setProductCurrentPage(1);
+  }, [filterBrandId]);
+
+  // Toggle single product selection
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
+
+  // Select all filtered products
+  const selectAllFilteredProducts = () => {
+    const allIds = filteredAssignProducts.map(p => p.id);
+    setSelectedProductIds(new Set(allIds));
+  };
+
+  // Deselect all products
+  const deselectAllProducts = () => {
+    setSelectedProductIds(new Set());
+  };
+
+  // Check if all filtered products are selected
+  const allProductsSelected = filteredAssignProducts.length > 0 && filteredAssignProducts.every(p => selectedProductIds.has(p.id));
+  const someProductsSelected = selectedProductIds.size > 0 && !allProductsSelected;
+
+  // Open bulk assign dialog
+  const handleOpenBulkAssign = () => {
+    setBulkAssignGroupIds([]);
+    setBulkAssignMode("add");
+    setShowBulkAssignDialog(true);
+  };
+
+  // Close bulk assign dialog
+  const handleCloseBulkAssign = () => {
+    setShowBulkAssignDialog(false);
+    setBulkAssignGroupIds([]);
+  };
+
+  // Bulk assign topping groups to selected products with batch processing
+  const handleBulkAssign = async () => {
+    if (selectedProductIds.size === 0 || bulkAssignGroupIds.length === 0) return;
+
+    const productIds = Array.from(selectedProductIds);
+    const total = productIds.length;
+    const batchSize = 10;
+    const totalBatches = Math.ceil(total / batchSize);
+    const progressId = `bulk-topping-assign-${Date.now()}`;
+
+    // Close dialog and clear selection immediately
+    handleCloseBulkAssign();
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: bulkAssignMode === "add" ? "Thêm nhóm topping" : "Thay thế nhóm topping",
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Process in batches
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const start = batchNum * batchSize;
+        const end = Math.min(start + batchSize, total);
+        const batch = productIds.slice(start, end);
+
+        updateProgress(progressId, {
+          current: start,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
+
+        // Process batch in parallel
+        const batchResults = await Promise.all(
+          batch.map(async (productId) => {
+            try {
+              let groupIds = bulkAssignGroupIds;
+
+              // If mode is "add", we need to get existing groups first and merge
+              if (bulkAssignMode === "add") {
+                try {
+                  const existingGroups = await productService.getProductToppingGroups(productId);
+                  const existingIds = existingGroups.map(g => g.id);
+                  // Merge and deduplicate
+                  groupIds = [...new Set([...existingIds, ...bulkAssignGroupIds])];
+                } catch {
+                  // If can't get existing groups, just use the new ones
+                  groupIds = bulkAssignGroupIds;
+                }
+              }
+
+              await productService.assignToppingGroupsToProduct(productId, groupIds);
+              return { success: true, productId };
+            } catch (error) {
+              console.error(`Error assigning topping groups to product ${productId}:`, error);
+              return { success: false, productId };
+            }
+          })
+        );
+
+        // Count results
+        batchResults.forEach((result) => {
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        });
+
+        updateProgress(progressId, {
+          current: end,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
+      }
+
+      if (failCount === 0) {
+        completeProgress(progressId, `Đã gán ${bulkAssignGroupIds.length} nhóm cho ${successCount} món`);
+      } else {
+        completeProgress(progressId, `Thành công: ${successCount}, Thất bại: ${failCount}`);
+      }
+    } catch (error) {
+      console.error("Error bulk assigning topping groups:", error);
+      errorProgress(progressId, "Có lỗi xảy ra");
+    }
+  };
+
+  // Bulk remove all topping groups from selected products
+  const handleBulkRemoveAllGroups = async () => {
+    if (selectedProductIds.size === 0) return;
+
+    const productIds = Array.from(selectedProductIds);
+    const total = productIds.length;
+    const batchSize = 10;
+    const totalBatches = Math.ceil(total / batchSize);
+    const progressId = `bulk-topping-remove-${Date.now()}`;
+
+    // Clear selection immediately
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: "Xóa nhóm topping",
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Process in batches
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const start = batchNum * batchSize;
+        const end = Math.min(start + batchSize, total);
+        const batch = productIds.slice(start, end);
+
+        updateProgress(progressId, {
+          current: start,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
+
+        // Process batch in parallel
+        const batchResults = await Promise.all(
+          batch.map(async (productId) => {
+            try {
+              await productService.assignToppingGroupsToProduct(productId, []);
+              return { success: true };
+            } catch (error) {
+              console.error(`Error removing topping groups from product ${productId}:`, error);
+              return { success: false };
+            }
+          })
+        );
+
+        // Count results
+        batchResults.forEach((result) => {
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        });
+
+        updateProgress(progressId, {
+          current: end,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
+      }
+
+      if (failCount === 0) {
+        completeProgress(progressId, `Đã xóa nhóm topping khỏi ${successCount} món`);
+      } else {
+        completeProgress(progressId, `Thành công: ${successCount}, Thất bại: ${failCount}`);
+      }
+    } catch (error) {
+      console.error("Error bulk removing topping groups:", error);
+      errorProgress(progressId, "Có lỗi xảy ra");
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
       <div className="flex items-center justify-between mb-4">
@@ -659,48 +932,188 @@ export default function ToppingOptionsPage() {
 
         {/* Tab: Assign to Products */}
         <TabsContent value="assign" className="mt-4">
-          <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <Card className="flex flex-col flex-1 min-h-0 overflow-hidden h-[calc(100vh-280px)]">
             <CardHeader className="flex-shrink-0 border-b">
-              <CardTitle>Gán nhóm Topping vào món</CardTitle>
-              <CardDescription>Chọn món để gán các nhóm topping</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="flex-1 overflow-auto min-h-0">
-                {loading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : products.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">Chưa có món ăn nào</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-4">
-                    {products.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                        onClick={() => handleOpenAssignDialog(product)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <UtensilsCrossed className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-xs text-muted-foreground">{product.code}</div>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <Package className="h-4 w-4 mr-1" />
-                          Gán
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Gán nhóm Topping vào món</CardTitle>
+                  <CardDescription>Chọn món để gán các nhóm topping ({filteredAssignProducts.length} món)</CardDescription>
+                </div>
+                <div className="relative w-[300px]">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Tìm kiếm món ăn..."
+                    className="pl-10"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                  />
+                </div>
               </div>
+              {/* Bulk actions bar */}
+              {selectedProductIds.size > 0 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={true}
+                      onCheckedChange={() => deselectAllProducts()}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Đã chọn <strong>{selectedProductIds.size}</strong> / {filteredAssignProducts.length} món
+                    </span>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Thao tác hàng loạt
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={handleOpenBulkAssign}>
+                        <Package className="mr-2 h-4 w-4 text-green-600" />
+                        Gán nhóm topping
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleBulkRemoveAllGroups}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Xóa tất cả nhóm topping
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={deselectAllProducts}>
+                        Bỏ chọn
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden p-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : products.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Chưa có món ăn nào</p>
+                </div>
+              ) : filteredAssignProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Search className="h-10 w-10 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Không tìm thấy món ăn phù hợp</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 overflow-auto min-h-0 p-4">
+                    {/* Select all checkbox */}
+                    <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                      <Checkbox
+                        checked={allProductsSelected}
+                        ref={(el) => {
+                          if (el) {
+                            (el as unknown as HTMLInputElement).indeterminate = someProductsSelected;
+                          }
+                        }}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            selectAllFilteredProducts();
+                          } else {
+                            deselectAllProducts();
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        Chọn tất cả {filteredAssignProducts.length > productPageSize && `(${filteredAssignProducts.length} món)`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      {paginatedProducts.map((product) => (
+                        <div
+                          key={product.id}
+                          className={`flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors ${
+                            selectedProductIds.has(product.id) ? "bg-primary/5 border-primary" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={selectedProductIds.has(product.id)}
+                              onCheckedChange={() => toggleProductSelection(product.id)}
+                            />
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <UtensilsCrossed className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs text-muted-foreground">{product.code}</div>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenAssignDialog(product)}
+                          >
+                            <Package className="h-4 w-4 mr-1" />
+                            Gán
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pagination */}
+                  {productTotalPages > 1 && (
+                    <div className="flex items-center justify-between border-t px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Hiển thị</span>
+                        <Select value={productPageSize.toString()} onValueChange={(value) => { setProductPageSize(Number(value)); setProductCurrentPage(1); }}>
+                          <SelectTrigger className="w-[70px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productPageSizeOptions.map((size) => (
+                              <SelectItem key={size} value={size.toString()}>
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-sm text-muted-foreground">
+                          / {filteredAssignProducts.length} món
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Trang {productCurrentPage} / {productTotalPages}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setProductCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={productCurrentPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setProductCurrentPage((p) => Math.min(productTotalPages, p + 1))}
+                            disabled={productCurrentPage === productTotalPages}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -933,6 +1346,123 @@ export default function ToppingOptionsPage() {
             <Button onClick={handleSaveAssignments} disabled={savingGroups}>
               {savingGroups && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Lưu ({assignedGroupIds.length} nhóm)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Assign Dialog */}
+      <Dialog open={showBulkAssignDialog} onOpenChange={handleCloseBulkAssign}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Gán nhóm Topping hàng loạt</DialogTitle>
+            <DialogDescription>
+              Gán nhóm topping cho {selectedProductIds.size} món đã chọn
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Mode selection */}
+            <div className="space-y-3">
+              <Label>Chế độ gán</Label>
+              <RadioGroup value={bulkAssignMode} onValueChange={(value) => setBulkAssignMode(value as "add" | "replace")}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="add" id="mode-add" />
+                  <Label htmlFor="mode-add" className="font-normal cursor-pointer">
+                    <span className="font-medium">Thêm vào</span>
+                    <span className="text-muted-foreground ml-1">- Giữ nguyên nhóm hiện có và thêm nhóm mới</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="replace" id="mode-replace" />
+                  <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
+                    <span className="font-medium">Thay thế</span>
+                    <span className="text-muted-foreground ml-1">- Xóa tất cả và gán lại từ đầu</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Topping groups selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Chọn nhóm topping</Label>
+                {bulkAssignGroupIds.length > 0 && (
+                  <Badge variant="secondary">{bulkAssignGroupIds.length} nhóm đã chọn</Badge>
+                )}
+              </div>
+              {toppingGroups.filter(g => g.isActive).length === 0 ? (
+                <p className="text-center text-muted-foreground py-4 border rounded-lg">
+                  Chưa có nhóm topping nào. Hãy tạo nhóm trong tab "Nhóm Topping".
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto border rounded-lg p-3">
+                  {toppingGroups.filter(g => g.isActive).map((group) => (
+                    <div
+                      key={group.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
+                        bulkAssignGroupIds.includes(group.id) ? "bg-primary/10 border border-primary" : "border border-transparent"
+                      }`}
+                      onClick={() => {
+                        if (bulkAssignGroupIds.includes(group.id)) {
+                          setBulkAssignGroupIds(bulkAssignGroupIds.filter(id => id !== group.id));
+                        } else {
+                          setBulkAssignGroupIds([...bulkAssignGroupIds, group.id]);
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        checked={bulkAssignGroupIds.includes(group.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setBulkAssignGroupIds([...bulkAssignGroupIds, group.id]);
+                          } else {
+                            setBulkAssignGroupIds(bulkAssignGroupIds.filter(id => id !== group.id));
+                          }
+                        }}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">{group.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {group.items.length} topping • {group.isRequired ? "Bắt buộc" : "Tùy chọn"}
+                        </div>
+                      </div>
+                      {bulkAssignGroupIds.includes(group.id) && (
+                        <Check className="h-4 w-4 text-green-600" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick actions */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkAssignGroupIds(toppingGroups.filter(g => g.isActive).map(g => g.id))}
+              >
+                Chọn tất cả
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkAssignGroupIds([])}
+              >
+                Bỏ chọn
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseBulkAssign}>
+              Hủy
+            </Button>
+            <Button
+              onClick={handleBulkAssign}
+              disabled={bulkAssignGroupIds.length === 0}
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Gán {bulkAssignGroupIds.length > 0 ? `${bulkAssignGroupIds.length} nhóm cho ${selectedProductIds.size} món` : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
