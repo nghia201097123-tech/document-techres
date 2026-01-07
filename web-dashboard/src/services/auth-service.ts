@@ -1,12 +1,13 @@
 import axios from "axios";
 import type { LoginResponse, Staff, Company } from "@/types";
 
-// API OAuth base URL
-const OAUTH_API_URL = "http://localhost:3005/api/v1";
+// API Gateway URL for tenant auth endpoints
+// Gateway routes /api/tenant/auth/* -> api-oauth /api/v1/auth/*
+const API_GATEWAY_URL = "http://localhost:4000/api/tenant";
 
-// Create axios instance for OAuth API
+// Create axios instance for auth via API Gateway
 const authApi = axios.create({
-  baseURL: OAUTH_API_URL,
+  baseURL: API_GATEWAY_URL,
   headers: {
     "Content-Type": "application/json",
   },
