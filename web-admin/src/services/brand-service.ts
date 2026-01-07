@@ -59,7 +59,7 @@ export const brandService = {
   },
 
   async update(id: string, data: UpdateBrandData): Promise<Brand> {
-    const response = await api.put<Brand>(`/brands/${id}`, data);
+    const response = await api.patch<Brand>(`/brands/${id}`, data);
     return response.data;
   },
 
