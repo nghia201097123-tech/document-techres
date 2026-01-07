@@ -149,7 +149,7 @@ export default function BranchProductsPage() {
   const [bulkPriceAdjustType, setBulkPriceAdjustType] = React.useState<"increase" | "decrease">("increase");
   const [bulkPriceAdjustMode, setBulkPriceAdjustMode] = React.useState<"amount" | "percent">("amount");
   const [processingBulkPrice, setProcessingBulkPrice] = React.useState(false);
-  const [bulkPriceProgress, setBulkPriceProgress] = React.useState({ current: 0, total: 0, batchNumber: 0, totalBatches: 0 });
+  const [bulkPriceProgress, setBulkPriceProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const [processingBulkToggle, setProcessingBulkToggle] = React.useState(false);
   const [bulkToggleProgress, setBulkToggleProgress] = React.useState<BranchProductBatchProgressInfo | null>(null);
 
@@ -416,7 +416,7 @@ export default function BranchProductsPage() {
     const total = selectedProducts.length;
 
     setProcessingBulkPrice(true);
-    setBulkPriceProgress({ current: 0, total });
+    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches: 1 });
 
     let successCount = 0;
     let failCount = 0;
@@ -445,10 +445,11 @@ export default function BranchProductsPage() {
         failCount++;
       }
 
-      setBulkPriceProgress({ current: i + 1, total });
+      setBulkPriceProgress({ current: i + 1, total, batchNumber: 1, totalBatches: 1 });
     }
 
     setProcessingBulkPrice(false);
+    setBulkPriceProgress(null);
     setSelectedProductIds(new Set());
     handleCloseBulkPriceDialog();
 
@@ -482,7 +483,7 @@ export default function BranchProductsPage() {
 
     const total = selectedProducts.length;
     setProcessingBulkPrice(true);
-    setBulkPriceProgress({ current: 0, total });
+    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches: 1 });
 
     let successCount = 0;
     let failCount = 0;
@@ -503,12 +504,12 @@ export default function BranchProductsPage() {
         failCount++;
       }
 
-      setBulkPriceProgress({ current: i + 1, total });
+      setBulkPriceProgress({ current: i + 1, total, batchNumber: 1, totalBatches: 1 });
     }
 
     setProcessingBulkPrice(false);
     setSelectedProductIds(new Set());
-    setBulkPriceProgress({ current: 0, total: 0 });
+    setBulkPriceProgress(null);
 
     toast({
       title: "Thành công",
@@ -525,7 +526,7 @@ export default function BranchProductsPage() {
     setBulkToggleProgress(null);
 
     try {
-      await branchProductService.bulkToggleAvailabilityBatched(
+      const result = await branchProductService.bulkToggleAvailabilityBatched(
         filterBranchId,
         { productIds, isAvailable },
         {
@@ -540,10 +541,20 @@ export default function BranchProductsPage() {
       const statsData = await branchProductService.getStats(filterBranchId);
       setStats(statsData);
       setSelectedProductIds(new Set());
-      toast({
-        title: "Thành công",
-        description: `Đã ${isAvailable ? "bật" : "tắt"} ${productIds.length} món ăn`,
-      });
+
+      const failedCount = productIds.length - result.updated;
+      if (failedCount > 0) {
+        toast({
+          title: "Hoàn thành",
+          description: `Đã ${isAvailable ? "bật" : "tắt"} ${result.updated}/${productIds.length} món ăn. Thất bại: ${failedCount}`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Thành công",
+          description: `Đã ${isAvailable ? "bật" : "tắt"} ${result.updated} món ăn`,
+        });
+      }
     } catch (error) {
       console.error("Error bulk toggling:", error);
       toast({ title: "Lỗi", description: "Không thể cập nhật hàng loạt", variant: "destructive" });
@@ -734,12 +745,20 @@ export default function BranchProductsPage() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" disabled={processingBulkPrice || processingBulkToggle}>
-                    {(processingBulkPrice && bulkPriceProgress.total > 0) || (processingBulkToggle && bulkToggleProgress) ? (
+                    {bulkToggleProgress ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {processingBulkToggle && bulkToggleProgress
-                          ? `Đang xử lý... ${bulkToggleProgress.current}/${bulkToggleProgress.total} (batch ${bulkToggleProgress.batchNumber}/${bulkToggleProgress.totalBatches})`
-                          : `${bulkPriceProgress.current}/${bulkPriceProgress.total} (batch ${bulkPriceProgress.batchNumber}/${bulkPriceProgress.totalBatches})`}
+                        {`Đang xử lý... ${bulkToggleProgress.current}/${bulkToggleProgress.total} (batch ${bulkToggleProgress.batchNumber}/${bulkToggleProgress.totalBatches})`}
+                      </>
+                    ) : bulkPriceProgress ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {`Đang xử lý... ${bulkPriceProgress.current}/${bulkPriceProgress.total}`}
+                      </>
+                    ) : (processingBulkPrice || processingBulkToggle) ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Đang xử lý...
                       </>
                     ) : (
                       <>
