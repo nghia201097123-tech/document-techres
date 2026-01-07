@@ -24,12 +24,21 @@ interface CreateBrandData {
   name: string;
   code: string;
   businessModel: BusinessModel;
-  logo?: string;
+  logoUrl?: string;
   description?: string;
 }
 
 interface UpdateBrandData extends Partial<CreateBrandData> {
   isActive?: boolean;
+}
+
+// Helper to clean data - remove empty strings for optional fields
+function cleanBrandData<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(
+      ([, value]) => value !== undefined && value !== ""
+    )
+  ) as T;
 }
 
 export const brandService = {
@@ -54,12 +63,14 @@ export const brandService = {
   },
 
   async create(data: CreateBrandData): Promise<Brand> {
-    const response = await api.post<Brand>("/brands", data);
+    const cleanedData = cleanBrandData(data);
+    const response = await api.post<Brand>("/brands", cleanedData);
     return response.data;
   },
 
   async update(id: string, data: UpdateBrandData): Promise<Brand> {
-    const response = await api.patch<Brand>(`/brands/${id}`, data);
+    const cleanedData = cleanBrandData(data);
+    const response = await api.patch<Brand>(`/brands/${id}`, cleanedData);
     return response.data;
   },
 

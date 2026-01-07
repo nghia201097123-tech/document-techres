@@ -24,6 +24,7 @@ interface CreateBranchData {
   brandId: string;
   name: string;
   code: string;
+  logoUrl?: string;
   address?: string;
   phone?: string;
   email?: string;
@@ -35,6 +36,15 @@ interface CreateBranchData {
 
 interface UpdateBranchData extends Partial<CreateBranchData> {
   isActive?: boolean;
+}
+
+// Helper to clean data - remove empty strings for optional fields
+function cleanBranchData<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(
+      ([, value]) => value !== undefined && value !== ""
+    )
+  ) as T;
 }
 
 export const branchService = {
@@ -59,12 +69,14 @@ export const branchService = {
   },
 
   async create(data: CreateBranchData): Promise<Branch> {
-    const response = await api.post<Branch>("/branches", data);
+    const cleanedData = cleanBranchData(data);
+    const response = await api.post<Branch>("/branches", cleanedData);
     return response.data;
   },
 
   async update(id: string, data: UpdateBranchData): Promise<Branch> {
-    const response = await api.patch<Branch>(`/branches/${id}`, data);
+    const cleanedData = cleanBranchData(data);
+    const response = await api.patch<Branch>(`/branches/${id}`, cleanedData);
     return response.data;
   },
 
