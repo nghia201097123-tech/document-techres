@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsNumber, IsEnum, MaxLength, Min, IsBoolean, IsArray } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsNumber, IsEnum, MaxLength, Min, IsBoolean, IsArray, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 
@@ -16,6 +16,11 @@ export enum SellingType {
 }
 
 export class CreateProductDto {
+  @ApiPropertyOptional({ description: 'Brand ID - lấy từ token nếu không truyền' })
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
   @ApiProperty({ example: 'Phở bò tái' })
   @IsNotEmpty({ message: 'Tên món không được để trống' })
   @IsString()

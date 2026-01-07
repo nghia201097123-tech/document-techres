@@ -14,6 +14,7 @@ import {
   SeasonalPriceProduct,
   BranchProduct,
   Branch,
+  Brand,
 } from '../../database/entities';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
@@ -34,6 +35,7 @@ import { ProductsController } from './products.controller';
       SeasonalPriceProduct,
       BranchProduct,
       Branch,
+      Brand,
     ]),
   ],
   controllers: [ProductsController],

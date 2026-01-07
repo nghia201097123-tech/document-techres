@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Brand } from '../../database/entities';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -36,7 +39,11 @@ import { ProductType } from '../../database/entities';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    @InjectRepository(Brand)
+    private readonly brandRepository: Repository<Brand>,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách món' })
@@ -314,8 +321,21 @@ export class ProductsController {
 
   @Post()
   @ApiOperation({ summary: 'Tạo món mới' })
-  create(@Request() req, @Body() createDto: CreateProductDto) {
-    const brandId = req.user.brandId;
+  async create(@Request() req, @Body() createDto: CreateProductDto) {
+    // Ưu tiên: 1) brandId từ DTO, 2) brandId từ token, 3) brand đầu tiên của tenant
+    let brandId = createDto.brandId || req.user.brandId;
+
+    if (!brandId) {
+      const firstBrand = await this.brandRepository.findOne({
+        where: { tenantId: req.user.tenantId, isActive: true },
+        order: { createdAt: 'ASC' },
+      });
+      if (!firstBrand) {
+        throw new BadRequestException('Không tìm thấy thương hiệu. Vui lòng tạo thương hiệu trước.');
+      }
+      brandId = firstBrand.id;
+    }
+
     return this.productsService.create(req.user.tenantId, brandId, createDto);
   }
 

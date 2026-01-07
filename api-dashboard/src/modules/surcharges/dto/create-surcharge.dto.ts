@@ -1,7 +1,12 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, Max } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, Max, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSurchargeDto {
+  @ApiPropertyOptional({ description: 'Brand ID - lấy từ token nếu không truyền' })
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
   @ApiProperty({ example: 'Khách mang đồ ăn vào' })
   @IsNotEmpty({ message: 'Tên phụ thu không được để trống' })
   @IsString()

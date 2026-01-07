@@ -1,8 +1,13 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, Max, IsEnum, IsDateString, Matches } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsNumber, Min, Max, IsEnum, IsDateString, Matches, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VoucherType } from '../../../database/entities/voucher.entity';
 
 export class CreateVoucherDto {
+  @ApiPropertyOptional({ description: 'Brand ID - lấy từ token nếu không truyền' })
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
   @ApiProperty({ example: 'SALE20' })
   @IsNotEmpty({ message: 'Mã voucher không được để trống' })
   @IsString()

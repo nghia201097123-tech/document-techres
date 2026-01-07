@@ -1,15 +1,22 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SurchargesService } from './surcharges.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateSurchargeDto, UpdateSurchargeDto } from './dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Brand } from '../../database/entities';
 
 @ApiTags('Surcharges')
 @Controller('surcharges')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class SurchargesController {
-  constructor(private readonly surchargesService: SurchargesService) {}
+  constructor(
+    private readonly surchargesService: SurchargesService,
+    @InjectRepository(Brand)
+    private readonly brandRepository: Repository<Brand>,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách phụ thu' })
@@ -26,8 +33,20 @@ export class SurchargesController {
 
   @Post()
   @ApiOperation({ summary: 'Tạo phụ thu mới' })
-  create(@Request() req, @Body() createDto: CreateSurchargeDto) {
-    const brandId = req.user.brandId;
+  async create(@Request() req, @Body() createDto: CreateSurchargeDto) {
+    let brandId = createDto.brandId || req.user.brandId;
+
+    if (!brandId) {
+      const firstBrand = await this.brandRepository.findOne({
+        where: { tenantId: req.user.tenantId, isActive: true },
+        order: { createdAt: 'ASC' },
+      });
+      if (!firstBrand) {
+        throw new BadRequestException('Không tìm thấy thương hiệu. Vui lòng tạo thương hiệu trước.');
+      }
+      brandId = firstBrand.id;
+    }
+
     return this.surchargesService.create(req.user.tenantId, brandId, createDto);
   }
 
