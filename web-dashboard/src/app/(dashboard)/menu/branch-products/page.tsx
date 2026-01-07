@@ -408,45 +408,82 @@ export default function BranchProductsPage() {
     }
   };
 
-  // Bulk update prices
+  // Bulk update prices with batch processing (parallel within each batch)
   const handleBulkPriceUpdate = async () => {
     if (selectedProductIds.size === 0 || !bulkPriceValue) return;
 
     const selectedProducts = products.filter(p => selectedProductIds.has(p.id));
     const total = selectedProducts.length;
+    const batchSize = 50;
+    const totalBatches = Math.ceil(total / batchSize);
 
     setProcessingBulkPrice(true);
-    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches: 1 });
+    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches });
 
     let successCount = 0;
     let failCount = 0;
+    const updatedProducts: Map<string, number | null> = new Map();
 
-    for (let i = 0; i < selectedProducts.length; i++) {
-      const product = selectedProducts[i];
-      const currentPrice = getEffectivePrice(product);
-      const newPrice = calculateNewPrice(currentPrice, product.price);
+    // Process in batches
+    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+      const start = batchNum * batchSize;
+      const end = Math.min(start + batchSize, total);
+      const batch = selectedProducts.slice(start, end);
 
-      if (newPrice === null) {
-        failCount++;
-        continue;
-      }
+      setBulkPriceProgress({
+        current: start,
+        total,
+        batchNumber: batchNum + 1,
+        totalBatches,
+      });
 
-      try {
-        await branchProductService.update(filterBranchId, product.id, {
-          customPrice: newPrice,
-        });
-        // Use newPrice directly since result.customPrice may be a string from API
-        setProducts(prev => prev.map(p =>
-          p.id === product.id ? { ...p, customPrice: newPrice } : p
-        ));
-        successCount++;
-      } catch (error) {
-        console.error(`Error updating price for ${product.name}:`, error);
-        failCount++;
-      }
+      // Process batch in parallel
+      const batchResults = await Promise.all(
+        batch.map(async (product) => {
+          const currentPrice = getEffectivePrice(product);
+          const newPrice = calculateNewPrice(currentPrice, product.price);
 
-      setBulkPriceProgress({ current: i + 1, total, batchNumber: 1, totalBatches: 1 });
+          if (newPrice === null) {
+            return { success: false, productId: product.id, newPrice: null };
+          }
+
+          try {
+            await branchProductService.update(filterBranchId, product.id, {
+              customPrice: newPrice,
+            });
+            return { success: true, productId: product.id, newPrice };
+          } catch (error) {
+            console.error(`Error updating price for ${product.name}:`, error);
+            return { success: false, productId: product.id, newPrice: null };
+          }
+        })
+      );
+
+      // Count results and track updates
+      batchResults.forEach((result) => {
+        if (result.success) {
+          successCount++;
+          updatedProducts.set(result.productId, result.newPrice);
+        } else {
+          failCount++;
+        }
+      });
+
+      setBulkPriceProgress({
+        current: end,
+        total,
+        batchNumber: batchNum + 1,
+        totalBatches,
+      });
     }
+
+    // Update all products at once after all batches complete
+    setProducts(prev => prev.map(p => {
+      if (updatedProducts.has(p.id)) {
+        return { ...p, customPrice: updatedProducts.get(p.id)! };
+      }
+      return p;
+    }));
 
     setProcessingBulkPrice(false);
     setBulkPriceProgress(null);
@@ -467,7 +504,7 @@ export default function BranchProductsPage() {
     }
   };
 
-  // Bulk reset prices to original
+  // Bulk reset prices to original with batch processing
   const handleBulkResetPrice = async () => {
     if (selectedProductIds.size === 0) return;
 
@@ -482,39 +519,86 @@ export default function BranchProductsPage() {
     }
 
     const total = selectedProducts.length;
+    const batchSize = 50;
+    const totalBatches = Math.ceil(total / batchSize);
+
     setProcessingBulkPrice(true);
-    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches: 1 });
+    setBulkPriceProgress({ current: 0, total, batchNumber: 1, totalBatches });
 
     let successCount = 0;
     let failCount = 0;
+    const resetProductIds: Set<string> = new Set();
 
-    for (let i = 0; i < selectedProducts.length; i++) {
-      const product = selectedProducts[i];
+    // Process in batches
+    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+      const start = batchNum * batchSize;
+      const end = Math.min(start + batchSize, total);
+      const batch = selectedProducts.slice(start, end);
 
-      try {
-        await branchProductService.update(filterBranchId, product.id, {
-          customPrice: null,
-        });
-        setProducts(prev => prev.map(p =>
-          p.id === product.id ? { ...p, customPrice: null } : p
-        ));
-        successCount++;
-      } catch (error) {
-        console.error(`Error resetting price for ${product.name}:`, error);
-        failCount++;
-      }
+      setBulkPriceProgress({
+        current: start,
+        total,
+        batchNumber: batchNum + 1,
+        totalBatches,
+      });
 
-      setBulkPriceProgress({ current: i + 1, total, batchNumber: 1, totalBatches: 1 });
+      // Process batch in parallel
+      const batchResults = await Promise.all(
+        batch.map(async (product) => {
+          try {
+            await branchProductService.update(filterBranchId, product.id, {
+              customPrice: null,
+            });
+            return { success: true, productId: product.id };
+          } catch (error) {
+            console.error(`Error resetting price for ${product.name}:`, error);
+            return { success: false, productId: product.id };
+          }
+        })
+      );
+
+      // Count results and track updates
+      batchResults.forEach((result) => {
+        if (result.success) {
+          successCount++;
+          resetProductIds.add(result.productId);
+        } else {
+          failCount++;
+        }
+      });
+
+      setBulkPriceProgress({
+        current: end,
+        total,
+        batchNumber: batchNum + 1,
+        totalBatches,
+      });
     }
+
+    // Update all products at once after all batches complete
+    setProducts(prev => prev.map(p => {
+      if (resetProductIds.has(p.id)) {
+        return { ...p, customPrice: null };
+      }
+      return p;
+    }));
 
     setProcessingBulkPrice(false);
     setSelectedProductIds(new Set());
     setBulkPriceProgress(null);
 
-    toast({
-      title: "Thành công",
-      description: `Đã khôi phục giá gốc cho ${successCount} món ăn`,
-    });
+    if (failCount === 0) {
+      toast({
+        title: "Thành công",
+        description: `Đã khôi phục giá gốc cho ${successCount} món ăn`,
+      });
+    } else {
+      toast({
+        title: "Hoàn thành",
+        description: `Thành công: ${successCount}, Thất bại: ${failCount}`,
+        variant: failCount === total ? "destructive" : "default",
+      });
+    }
   };
 
   // Bulk toggle availability
