@@ -18,10 +18,15 @@ export class LoginDto {
   @IsString()
   tenantId?: string;
 
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiPropertyOptional({ example: 'user@example.com', description: 'Email (for admin users)' })
+  @IsOptional()
   @IsEmail()
-  @IsNotEmpty()
-  email: string;
+  email?: string;
+
+  @ApiPropertyOptional({ example: 'admin', description: 'Username (for tenant users)' })
+  @IsOptional()
+  @IsString()
+  username?: string;
 
   @ApiProperty({ example: 'password123' })
   @IsString()

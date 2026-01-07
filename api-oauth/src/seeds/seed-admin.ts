@@ -83,10 +83,49 @@ async function seed() {
       console.log('Password: Support@123');
     }
 
+    // Create tenant demo user for web-dashboard testing
+    const demoTenantId = 'DEMO';
+    const existingTenantUser = await userRepository.findOne({
+      where: { username: 'admin', tenantId: demoTenantId },
+    });
+
+    if (existingTenantUser) {
+      console.log('Tenant demo user already exists:', existingTenantUser.username);
+    } else {
+      const saltRounds = 10;
+      const passwordHash = await bcrypt.hash('Admin@123', saltRounds);
+
+      const tenantUser = userRepository.create({
+        email: 'admin@demo.techres.vn',
+        username: 'admin',
+        passwordHash,
+        name: 'Demo Admin',
+        phone: '0900000002',
+        tenantId: demoTenantId,
+        userType: UserType.TENANT,
+        role: UserRole.OWNER,
+        isActive: true,
+        isEmailVerified: true,
+      });
+
+      await userRepository.save(tenantUser);
+      console.log('Tenant demo user created successfully!');
+      console.log('Tenant ID:', demoTenantId);
+      console.log('Username:', tenantUser.username);
+      console.log('Password: Admin@123');
+    }
+
     console.log('\n=== Seed completed successfully! ===');
     console.log('\nDefault accounts:');
-    console.log('1. admin@techres.vn / Admin@123 (Super Admin)');
-    console.log('2. support@techres.vn / Support@123 (Support)');
+    console.log('');
+    console.log('Web Admin (http://localhost:3001):');
+    console.log('  1. admin@techres.vn / Admin@123 (Super Admin)');
+    console.log('  2. support@techres.vn / Support@123 (Support)');
+    console.log('');
+    console.log('Web Dashboard (http://localhost:3000):');
+    console.log('  Tenant ID: DEMO');
+    console.log('  Username: admin');
+    console.log('  Password: Admin@123');
   } catch (error) {
     console.error('Seed failed:', error);
     process.exit(1);

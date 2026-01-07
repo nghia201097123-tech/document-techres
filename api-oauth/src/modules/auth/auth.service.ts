@@ -70,17 +70,36 @@ export class AuthService {
     loginDto: LoginDto,
     requestInfo: RequestInfo,
   ): Promise<LoginResponseDto> {
-    const { email, password, tenantId, twoFactorCode } = loginDto;
+    const { email, username, password, tenantId, twoFactorCode } = loginDto;
 
-    // Find user
-    const user = await this.userRepository.findOne({
-      where: tenantId
-        ? { email, tenantId }
-        : { email, userType: UserType.ADMIN },
-    });
+    // Validate: either email or username must be provided
+    if (!email && !username) {
+      throw new BadRequestException('Email or username is required');
+    }
+
+    // Find user by email or username
+    let user: User | null = null;
+
+    if (tenantId) {
+      // Tenant user: can login with email or username
+      if (username) {
+        user = await this.userRepository.findOne({
+          where: { username, tenantId },
+        });
+      } else if (email) {
+        user = await this.userRepository.findOne({
+          where: { email, tenantId },
+        });
+      }
+    } else {
+      // Admin user: login with email only
+      user = await this.userRepository.findOne({
+        where: { email, userType: UserType.ADMIN },
+      });
+    }
 
     if (!user) {
-      await this.logAudit(null, email, tenantId, AuditAction.LOGIN_FAILED, requestInfo, false, 'User not found');
+      await this.logAudit(null, email || username, tenantId, AuditAction.LOGIN_FAILED, requestInfo, false, 'User not found');
       throw new UnauthorizedException('Invalid credentials');
     }
 

@@ -40,6 +40,10 @@ export class User {
   @Index()
   email: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Index()
+  username: string;
+
   @Column({ type: 'varchar', length: 255 })
   @Exclude()
   passwordHash: string;
