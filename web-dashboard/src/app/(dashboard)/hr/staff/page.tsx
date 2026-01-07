@@ -235,6 +235,7 @@ export default function StaffPage() {
   const [importData, setImportData] = React.useState<Partial<BulkStaffItem>[]>([]);
   const [importErrors, setImportErrors] = React.useState<string[]>([]);
   const [importing, setImporting] = React.useState(false);
+  const [importProgress, setImportProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const [importSettings, setImportSettings] = React.useState<ImportSettings>(initialImportSettings);
 
   // Continue creating state
@@ -1321,7 +1322,17 @@ export default function StaffPage() {
 
     try {
       setImporting(true);
-      const result = await staffService.bulkImport(dataWithSettings as BulkStaffItem[]);
+      setImportProgress(null);
+
+      // Use batched import for large datasets to avoid timeout
+      const result = await staffService.bulkImportBatched(
+        dataWithSettings as BulkStaffItem[],
+        undefined,
+        {
+          batchSize: 100,
+          onProgress: (progress) => setImportProgress(progress),
+        }
+      );
 
       if (result.errors.length > 0) {
         toast({
@@ -1343,6 +1354,7 @@ export default function StaffPage() {
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi import", variant: "destructive" });
     } finally {
       setImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -2383,7 +2395,9 @@ export default function StaffPage() {
             </Button>
             <Button onClick={handleImport} disabled={importing || importData.length === 0}>
               {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Import {importData.length} dòng
+              {importing && importProgress
+                ? `Đang xử lý... ${importProgress.current}/${importProgress.total} (batch ${importProgress.batchNumber}/${importProgress.totalBatches})`
+                : `Import ${importData.length} dòng`}
             </Button>
           </DialogFooter>
         </DialogContent>

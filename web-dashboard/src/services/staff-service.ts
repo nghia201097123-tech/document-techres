@@ -102,6 +102,75 @@ export const staffService = {
     });
     return response.data;
   },
+
+  /**
+   * Bulk import with batch processing to avoid timeout errors
+   * Splits large datasets into smaller chunks and processes them sequentially
+   */
+  bulkImportBatched: async (
+    items: BulkStaffItem[],
+    usernamePrefix?: string,
+    options?: {
+      batchSize?: number;
+      onProgress?: (progress: { current: number; total: number; batchNumber: number; totalBatches: number }) => void;
+    }
+  ): Promise<BulkImportResult> => {
+    const batchSize = options?.batchSize || 100; // Default 100 items per batch
+    const totalBatches = Math.ceil(items.length / batchSize);
+
+    const aggregatedResult: BulkImportResult = {
+      created: 0,
+      updated: 0,
+      errors: [],
+    };
+
+    for (let i = 0; i < totalBatches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize, items.length);
+      const batch = items.slice(start, end);
+
+      // Report progress before processing
+      options?.onProgress?.({
+        current: start,
+        total: items.length,
+        batchNumber: i + 1,
+        totalBatches,
+      });
+
+      try {
+        const response = await api.post<BulkImportResult>("/staff/bulk-import", {
+          items: batch,
+          usernamePrefix,
+        });
+
+        aggregatedResult.created += response.data.created;
+        aggregatedResult.updated += response.data.updated;
+
+        // Adjust error row numbers to reflect actual position in full dataset
+        const adjustedErrors = response.data.errors.map((err) => ({
+          row: start + err.row,
+          message: err.message,
+        }));
+        aggregatedResult.errors.push(...adjustedErrors);
+      } catch (error: any) {
+        // If batch fails, add error for entire batch range
+        aggregatedResult.errors.push({
+          row: start + 1,
+          message: `Batch ${i + 1} failed: ${error.response?.data?.message || error.message || "Unknown error"}`,
+        });
+      }
+    }
+
+    // Final progress update
+    options?.onProgress?.({
+      current: items.length,
+      total: items.length,
+      batchNumber: totalBatches,
+      totalBatches,
+    });
+
+    return aggregatedResult;
+  },
 };
 
 export interface BulkStaffItem {
