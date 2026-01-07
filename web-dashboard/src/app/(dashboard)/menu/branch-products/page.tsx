@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw, DollarSign } from "lucide-react";
+import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw, DollarSign, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -700,67 +707,50 @@ export default function BranchProductsPage() {
           </div>
           {/* Bulk actions */}
           {selectedProductIds.size > 0 && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t flex-wrap">
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
               <span className="text-sm text-muted-foreground">
                 Đã chọn {selectedProductIds.size} món:
               </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkToggle(true)}
-                className="text-green-600 border-green-600 hover:bg-green-50"
-                disabled={processingBulkPrice}
-              >
-                <Check className="mr-1 h-4 w-4" />
-                Bật tất cả
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkToggle(false)}
-                className="text-red-600 border-red-600 hover:bg-red-50"
-                disabled={processingBulkPrice}
-              >
-                <X className="mr-1 h-4 w-4" />
-                Tắt tất cả
-              </Button>
-              <div className="h-4 w-px bg-border" />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleOpenBulkPriceDialog}
-                className="text-orange-600 border-orange-600 hover:bg-orange-50"
-                disabled={processingBulkPrice}
-              >
-                <DollarSign className="mr-1 h-4 w-4" />
-                Điều chỉnh giá
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkResetPrice}
-                disabled={processingBulkPrice}
-              >
-                {processingBulkPrice && bulkPriceProgress.total > 0 ? (
-                  <>
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    {bulkPriceProgress.current}/{bulkPriceProgress.total}
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="mr-1 h-4 w-4" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={processingBulkPrice}>
+                    {processingBulkPrice && bulkPriceProgress.total > 0 ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {bulkPriceProgress.current}/{bulkPriceProgress.total}
+                      </>
+                    ) : (
+                      <>
+                        Thao tác hàng loạt
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem onClick={() => handleBulkToggle(true)}>
+                    <Check className="mr-2 h-4 w-4 text-green-600" />
+                    Bật tất cả
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkToggle(false)}>
+                    <X className="mr-2 h-4 w-4 text-red-600" />
+                    Tắt tất cả
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleOpenBulkPriceDialog}>
+                    <DollarSign className="mr-2 h-4 w-4 text-orange-600" />
+                    Điều chỉnh giá
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleBulkResetPrice}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
                     Khôi phục giá gốc
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setSelectedProductIds(new Set())}
-                disabled={processingBulkPrice}
-              >
-                Bỏ chọn
-              </Button>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setSelectedProductIds(new Set())}>
+                    Bỏ chọn
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </CardHeader>
