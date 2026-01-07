@@ -66,7 +66,6 @@ interface StaffData {
   brand_id: string;
   department_id: string;
   name: string;
-  code: string;
   phone: string;
   email: string;
   avatar_url: string;
@@ -150,7 +149,7 @@ async function syncAllData() {
       // 5. Get staff
       const staff = await dataSource.query<StaffData[]>(`
         SELECT id, tenant_id, branch_id, company_id, brand_id, department_id,
-               name, code, phone, email, avatar_url, role, username, is_active
+               name, phone, email, avatar_url, role, username, is_active
         FROM staff
         WHERE tenant_id = $1 AND is_active = true
         LIMIT 1
@@ -211,7 +210,6 @@ async function syncAllData() {
           brandId: staff[0].brand_id,
           departmentId: staff[0].department_id,
           name: staff[0].name,
-          code: staff[0].code,
           phone: staff[0].phone,
           email: staff[0].email,
           avatarUrl: staff[0].avatar_url,

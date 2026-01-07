@@ -230,11 +230,6 @@ export class SyncStaffDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  code?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
   phone?: string;
 
   @ApiPropertyOptional()
