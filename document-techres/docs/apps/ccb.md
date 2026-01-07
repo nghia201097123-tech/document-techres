@@ -2,560 +2,960 @@
 sidebar_position: 3
 ---
 
-# CCB App (POS)
+# CCB App (POS) - Offline First
 
-CCB App là ứng dụng POS đa năng, hỗ trợ cả **Standalone** và **Client** mode, hoạt động ở vai trò **Thu ngân** hoặc **Bếp/Bar**.
+CCB (Cashier Counter Box) là ứng dụng POS dành cho thu ngân tại nhà hàng/quán ăn, hoạt động **hoàn toàn offline** và đồng bộ dữ liệu lên cloud sau.
 
 ## Tổng quan
 
 | Thông tin | Chi tiết |
 |-----------|----------|
-| **Nền tảng Android** | Kotlin (Native) |
-| **Nền tảng Windows** | .NET 8 (WPF/WinForms) |
-| **Database** | SQLite (Standalone) / Không có (Client) |
-| **Vai trò** | Thu ngân hoặc Bếp/Bar |
+| **Nền tảng** | Kotlin (Native Android) |
+| **Target Device** | Máy POS Android + Máy in nhiệt |
+| **Database** | Room (SQLite) - Offline First |
+| **Sync** | Background sync với WorkManager |
+| **Print** | ESC/POS Protocol |
 
-## Chế độ hoạt động
+## Mô hình hoạt động
 
-| Mô hình | Chế độ | Database | Kết nối |
-|---------|--------|----------|---------|
-| CCB Only | Standalone | SQLite local | Trực tiếp Cloud |
-| Full System | Client Thu ngân | Không có DB | Kết nối Local Server |
-| Full System | Client Bếp/Bar | Không có DB | Kết nối Local Server |
+Hệ thống TechRes chia thành 3 mô hình, tài liệu này tập trung vào **Mô hình CCB Offline**:
 
----
-
-## Standalone Mode (Mô hình CCB Only)
-
-### Khi nào sử dụng
-
-- Quán nhỏ có quầy thu ngân
-- 1-3 nhân viên
-- Không có Local Server
-
-### Kiến trúc
-
-```
-┌─────────────────────────────────────────┐
-│            CCB App (Standalone)         │
-│         Kotlin/Android hoặc .NET/Win    │
-├─────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────────┐   │
-│  │   SQLite    │  │  Cloud Sync     │   │
-│  │   Database  │  │   Service       │   │
-│  └─────────────┘  └─────────────────┘   │
-│                                         │
-│  ┌─────────────┐  ┌─────────────────┐   │
-│  │   Print     │  │  Bluetooth      │   │
-│  │   Service   │  │   Service       │   │
-│  └─────────────┘  └─────────────────┘   │
-└─────────────────────────────────────────┘
-```
-
-### Chức năng
-
-- ✅ Tự quản lý SQLite database
-- ✅ Tạo order và thanh toán
-- ✅ In bill qua USB/Bluetooth/LAN
-- ✅ In tem bếp/bar
-- ✅ Chốt ca, xem báo cáo
-- ✅ Sync trực tiếp lên Cloud
+| Mô hình | Mô tả | Database |
+|---------|-------|----------|
+| Order App Only | App order trên mobile | SQLite local |
+| **CCB Only** | **Máy POS + Máy in (Tài liệu này)** | **SQLite local** |
+| Order + CCB | Kết hợp cả hai | Sync qua Local Server |
 
 ---
 
-## Client Mode - Thu ngân (Mô hình Full System)
-
-### Khi nào sử dụng
-
-- Quán lớn với Local Server
-- Nhiều nhân viên và thiết bị
-- Cần quản lý tập trung
-
-### Kiến trúc
+## Kiến trúc hệ thống
 
 ```
-┌─────────────────────────────────────────┐
-│          LOCAL SERVER                   │
-│          (Source of Truth)              │
-└──────────────────┬──────────────────────┘
-                   │ SignalR + REST API
-                   ▼
-┌─────────────────────────────────────────┐
-│        CCB App (Client - Thu ngân)      │
-│         Kotlin/Android hoặc .NET/Win    │
-├─────────────────────────────────────────┤
-│  • Không có database local              │
-│  • Nhận data từ Local Server            │
-│  • Gửi actions về Server                │
-│  • In bill qua Server Print Queue       │
-└─────────────────────────────────────────┘
-```
-
-### Chức năng
-
-- ✅ Kết nối WebSocket (SignalR) đến Local Server
-- ✅ Nhận và quản lý order từ Order App
-- ✅ Thanh toán đơn hàng
-- ✅ Gửi lệnh in đến Server Print Queue
-- ✅ Chốt ca làm việc
-- ✅ Xem báo cáo doanh thu
-- ❌ Không có database local
-- ❌ Không sync trực tiếp lên Cloud
-
----
-
-## Client Mode - Bếp/Bar (Mô hình Full System)
-
-### Đặc điểm
-
-- **Không có database** - chỉ nhận data qua WebSocket
-- Kết nối đến Local Server trong mạng LAN
-- Hiển thị danh sách món cần làm
-
-### Chức năng
-
-- ✅ Hiển thị món cần làm theo thứ tự
-- ✅ Phát âm thanh khi có món mới
-- ✅ In tem bếp/bar từ Print Queue
-- ✅ Đánh dấu "Đang làm", "Hoàn thành"
-- ❌ Không có database
-- ❌ Không thanh toán
-
-### Giao diện
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    MÀN HÌNH BẾP                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │ BÀN 5       │  │ BÀN 12      │  │ BÀN 3       │              │
-│  │ 10:30 AM    │  │ 10:32 AM    │  │ 10:35 AM    │              │
-│  ├─────────────┤  ├─────────────┤  ├─────────────┤              │
-│  │ 2x Phở bò   │  │ 1x Cơm gà   │  │ 3x Bún chả  │              │
-│  │ 1x Nem      │  │ 2x Gỏi cuốn │  │             │              │
-│  │             │  │             │  │             │              │
-│  ├─────────────┤  ├─────────────┤  ├─────────────┤              │
-│  │ [ĐANG LÀM]  │  │  [BẮT ĐẦU]  │  │  [BẮT ĐẦU]  │              │
-│  │ [HOÀN THÀNH]│  │             │  │             │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-│                                                                 │
-│  Tổng: 5 đơn chờ | 2 đang làm | Hôm nay: 45 đơn hoàn thành     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Trạng thái món
-
-```
-PENDING → PREPARING → READY → SERVED
-   │          │         │        │
-   │          │         │        └── Nhân viên đã mang ra
-   │          │         └── Bếp làm xong
-   │          └── Bếp đang làm
-   └── Mới gọi, chờ bếp
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        CCB OFFLINE ARCHITECTURE                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                      ANDROID POS APP (Kotlin)                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │                    Presentation Layer                        ││   │
+│  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐           ││   │
+│  │  │  │  Login  │ │  Menu   │ │  Cart   │ │ Payment │           ││   │
+│  │  │  │ Screen  │ │ Screen  │ │ Screen  │ │ Screen  │           ││   │
+│  │  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘           ││   │
+│  │  │  Jetpack Compose + MVVM + StateFlow                         ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  │                              │                                   │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │                     Domain Layer                             ││   │
+│  │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            ││   │
+│  │  │  │  UseCases   │ │  Entities   │ │ Repositories│            ││   │
+│  │  │  │             │ │  (Domain)   │ │ (Interface) │            ││   │
+│  │  │  └─────────────┘ └─────────────┘ └─────────────┘            ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  │                              │                                   │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │                      Data Layer                              ││   │
+│  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       ││   │
+│  │  │  │    Room DB   │  │  Sync Engine │  │   Printer    │       ││   │
+│  │  │  │   (SQLite)   │  │  WorkManager │  │   Manager    │       ││   │
+│  │  │  └──────────────┘  └──────────────┘  └──────────────┘       ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                          │
+│                              ▼ (Khi có mạng)                           │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                         CLOUD API                                │   │
+│  │                    (api-dashboard / api-ccb)                     │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Giao diện Thu ngân
+## Tech Stack
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  THU NGÂN - Café ABC                            NV: Nguyễn A    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────────────────┐  ┌───────────────────────────┐ │
-│  │ DANH SÁCH ĐƠN CHỜ           │  │ CHI TIẾT ĐƠN - BÀN 5      │ │
-│  ├─────────────────────────────┤  ├───────────────────────────┤ │
-│  │ ● Bàn 5  - 350,000đ    ◀   │  │ 2x Cà phê sữa   58,000đ  │ │
-│  │ ○ Bàn 12 - 180,000đ        │  │ 1x Trà đào      35,000đ  │ │
-│  │ ○ Bàn 3  - 420,000đ        │  │ 2x Bánh mì      50,000đ  │ │
-│  │ ○ Bàn 8  - 95,000đ         │  │                           │ │
-│  │                             │  ├───────────────────────────┤ │
-│  │                             │  │ Tạm tính:       143,000đ │ │
-│  │                             │  │ Giảm giá:             0đ │ │
-│  │                             │  │ Tổng:           143,000đ │ │
-│  │                             │  ├───────────────────────────┤ │
-│  │                             │  │ [TIỀN MẶT] [CHUYỂN KHOẢN] │ │
-│  │                             │  │      [THANH TOÁN]         │ │
-│  └─────────────────────────────┘  └───────────────────────────┘ │
-│                                                                 │
-│  [Chốt ca]  [Báo cáo]  [Cài đặt]                   Ca: 08:00   │
-└─────────────────────────────────────────────────────────────────┘
-```
+| Component | Technology | Lý do |
+|-----------|------------|-------|
+| **Language** | Kotlin | Android native, performance |
+| **UI** | Jetpack Compose | Modern, declarative UI |
+| **Architecture** | Clean Architecture + MVVM | Maintainable, testable |
+| **DI** | Hilt (Dagger) | Official recommendation |
+| **Local DB** | Room | SQLite wrapper, offline-first |
+| **Async** | Coroutines + Flow | Reactive, lifecycle-aware |
+| **Network** | Retrofit + OkHttp | REST API sync |
+| **Sync** | WorkManager | Background sync |
+| **Print** | ESC/POS | Thermal printer protocol |
+| **Navigation** | Compose Navigation | Type-safe navigation |
 
 ---
 
-## CCB Android - Chi tiết Implementation
-
-### Cấu trúc Project
+## Cấu trúc Project
 
 ```
-ccb-android/
+app-ccb/
 ├── app/
-│   ├── build.gradle.kts
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── java/com/techres/ccb/
-│       │   ├── CCBApplication.kt           # Hilt Application
-│       │   ├── data/
-│       │   │   ├── local/
-│       │   │   │   ├── CCBDatabase.kt      # Room Database
-│       │   │   │   ├── dao/                # Data Access Objects
-│       │   │   │   │   ├── CategoryDao.kt
-│       │   │   │   │   ├── ProductDao.kt
-│       │   │   │   │   ├── OrderDao.kt
-│       │   │   │   │   ├── OrderItemDao.kt
-│       │   │   │   │   ├── ShiftDao.kt
-│       │   │   │   │   ├── StaffDao.kt
-│       │   │   │   │   ├── AreaDao.kt
-│       │   │   │   │   └── TableDao.kt
-│       │   │   │   └── entity/             # Room Entities
-│       │   │   │       ├── CategoryEntity.kt
-│       │   │   │       ├── ProductEntity.kt
-│       │   │   │       ├── OrderEntity.kt
-│       │   │   │       ├── OrderItemEntity.kt
-│       │   │   │       ├── ShiftEntity.kt
-│       │   │   │       ├── StaffEntity.kt
-│       │   │   │       ├── AreaEntity.kt
-│       │   │   │       └── TableEntity.kt
-│       │   │   ├── remote/
-│       │   │   │   ├── api/
-│       │   │   │   │   └── MasterDataApi.kt  # Retrofit API interface
-│       │   │   │   └── dto/
-│       │   │   │       └── SyncDto.kt        # DTOs for sync
-│       │   │   └── repository/
-│       │   │       ├── AuthRepository.kt
-│       │   │       ├── SyncRepository.kt
-│       │   │       ├── CategoryRepository.kt
-│       │   │       ├── ProductRepository.kt
-│       │   │       ├── OrderRepository.kt
-│       │   │       ├── ShiftRepository.kt
-│       │   │       ├── StaffRepository.kt
-│       │   │       └── TableRepository.kt
-│       │   ├── di/                         # Hilt DI Modules
-│       │   │   ├── DatabaseModule.kt
-│       │   │   ├── NetworkModule.kt
-│       │   │   └── RepositoryModule.kt
-│       │   └── presentation/
-│       │       ├── MainActivity.kt
-│       │       ├── navigation/
-│       │       │   └── CCBNavHost.kt       # Compose Navigation
-│       │       ├── screens/
-│       │       │   ├── splash/             # Splash screen
-│       │       │   ├── auth/               # Login & PIN screens
-│       │       │   ├── home/               # Home screen
-│       │       │   ├── menu/               # Product menu
-│       │       │   ├── order/              # Order detail
-│       │       │   ├── payment/            # Payment screen
-│       │       │   ├── shift/              # Shift management
-│       │       │   └── settings/           # Settings
-│       │       └── theme/
-│       │           └── Theme.kt            # Material3 Theme
-│       └── res/
-│           └── values/
-│               ├── strings.xml
-│               ├── colors.xml
-│               └── themes.xml
-├── build.gradle.kts
-├── settings.gradle.kts
-└── gradle/
-    └── libs.versions.toml                  # Version Catalog
+│   ├── src/main/
+│   │   ├── java/com/techres/ccb/
+│   │   │   │
+│   │   │   ├── App.kt                          # Application class
+│   │   │   │
+│   │   │   ├── di/                             # Dependency Injection
+│   │   │   │   ├── AppModule.kt
+│   │   │   │   ├── DatabaseModule.kt
+│   │   │   │   ├── NetworkModule.kt
+│   │   │   │   └── PrinterModule.kt
+│   │   │   │
+│   │   │   ├── data/                           # Data Layer
+│   │   │   │   ├── local/
+│   │   │   │   │   ├── database/
+│   │   │   │   │   │   ├── AppDatabase.kt
+│   │   │   │   │   │   ├── dao/
+│   │   │   │   │   │   │   ├── ProductDao.kt
+│   │   │   │   │   │   │   ├── CategoryDao.kt
+│   │   │   │   │   │   │   ├── OrderDao.kt
+│   │   │   │   │   │   │   ├── StaffDao.kt
+│   │   │   │   │   │   │   └── SyncQueueDao.kt
+│   │   │   │   │   │   └── entity/
+│   │   │   │   │   │       ├── ProductEntity.kt
+│   │   │   │   │   │       ├── CategoryEntity.kt
+│   │   │   │   │   │       ├── OrderEntity.kt
+│   │   │   │   │   │       ├── OrderItemEntity.kt
+│   │   │   │   │   │       ├── PaymentEntity.kt
+│   │   │   │   │   │       ├── ShiftEntity.kt
+│   │   │   │   │   │       └── SyncQueueEntity.kt
+│   │   │   │   │   └── preferences/
+│   │   │   │   │       └── AppPreferences.kt
+│   │   │   │   │
+│   │   │   │   ├── remote/
+│   │   │   │   │   ├── api/
+│   │   │   │   │   │   ├── AuthApi.kt
+│   │   │   │   │   │   ├── SyncApi.kt
+│   │   │   │   │   │   └── MasterDataApi.kt
+│   │   │   │   │   └── dto/
+│   │   │   │   │
+│   │   │   │   ├── repository/
+│   │   │   │   │   ├── ProductRepositoryImpl.kt
+│   │   │   │   │   ├── OrderRepositoryImpl.kt
+│   │   │   │   │   ├── AuthRepositoryImpl.kt
+│   │   │   │   │   └── SyncRepositoryImpl.kt
+│   │   │   │   │
+│   │   │   │   └── sync/
+│   │   │   │       ├── SyncManager.kt
+│   │   │   │       ├── SyncWorker.kt
+│   │   │   │       └── ConflictResolver.kt
+│   │   │   │
+│   │   │   ├── domain/                         # Domain Layer
+│   │   │   │   ├── model/
+│   │   │   │   │   ├── Product.kt
+│   │   │   │   │   ├── Category.kt
+│   │   │   │   │   ├── Order.kt
+│   │   │   │   │   ├── OrderItem.kt
+│   │   │   │   │   ├── Payment.kt
+│   │   │   │   │   ├── Staff.kt
+│   │   │   │   │   └── Shift.kt
+│   │   │   │   │
+│   │   │   │   ├── repository/
+│   │   │   │   │   ├── ProductRepository.kt
+│   │   │   │   │   ├── OrderRepository.kt
+│   │   │   │   │   └── SyncRepository.kt
+│   │   │   │   │
+│   │   │   │   └── usecase/
+│   │   │   │       ├── auth/
+│   │   │   │       │   └── LoginWithPinUseCase.kt
+│   │   │   │       ├── order/
+│   │   │   │       │   ├── CreateOrderUseCase.kt
+│   │   │   │       │   └── CheckoutOrderUseCase.kt
+│   │   │   │       └── shift/
+│   │   │   │           ├── OpenShiftUseCase.kt
+│   │   │   │           └── CloseShiftUseCase.kt
+│   │   │   │
+│   │   │   ├── presentation/                   # Presentation Layer
+│   │   │   │   ├── navigation/
+│   │   │   │   │   ├── NavGraph.kt
+│   │   │   │   │   └── Screen.kt
+│   │   │   │   │
+│   │   │   │   ├── theme/
+│   │   │   │   │   ├── Color.kt
+│   │   │   │   │   ├── Theme.kt
+│   │   │   │   │   └── Typography.kt
+│   │   │   │   │
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── ProductCard.kt
+│   │   │   │   │   ├── CartItem.kt
+│   │   │   │   │   ├── NumPad.kt
+│   │   │   │   │   └── PaymentMethodSelector.kt
+│   │   │   │   │
+│   │   │   │   └── screens/
+│   │   │   │       ├── auth/
+│   │   │   │       │   ├── LoginScreen.kt
+│   │   │   │       │   └── LoginViewModel.kt
+│   │   │   │       ├── menu/
+│   │   │   │       │   ├── MenuScreen.kt
+│   │   │   │       │   └── MenuViewModel.kt
+│   │   │   │       ├── payment/
+│   │   │   │       │   ├── PaymentScreen.kt
+│   │   │   │       │   └── PaymentViewModel.kt
+│   │   │   │       └── shift/
+│   │   │   │           ├── ShiftScreen.kt
+│   │   │   │           └── ShiftViewModel.kt
+│   │   │   │
+│   │   │   ├── printer/                        # Printer Module
+│   │   │   │   ├── PrinterManager.kt
+│   │   │   │   ├── EscPosCommands.kt
+│   │   │   │   ├── ReceiptBuilder.kt
+│   │   │   │   └── PrinterConnection.kt
+│   │   │   │
+│   │   │   └── util/
+│   │   │       ├── Extensions.kt
+│   │   │       └── Constants.kt
+│   │   │
+│   │   └── res/
+│   │
+│   └── build.gradle.kts
+│
+└── settings.gradle.kts
 ```
 
-### Công nghệ sử dụng
+---
 
-| Thành phần | Công nghệ |
-|------------|-----------|
-| **UI** | Jetpack Compose + Material3 |
-| **Architecture** | MVVM + Clean Architecture |
-| **DI** | Hilt |
-| **Database** | Room (SQLite) |
-| **Network** | Retrofit + OkHttp |
-| **State** | StateFlow + Compose State |
-| **Navigation** | Compose Navigation |
-| **Async** | Kotlin Coroutines + Flow |
+## Database Schema
 
-### Database Schema
-
-#### Entities
+### Enums
 
 ```kotlin
-// CategoryEntity
+enum class ProductType { SINGLE, COMBO, TOPPING }
+enum class OrderType { COUNTER, DINE_IN, TAKEAWAY, DELIVERY }
+enum class OrderStatus { PENDING, CONFIRMED, PREPARING, READY, COMPLETED, CANCELLED }
+enum class PaymentStatus { UNPAID, PARTIAL, PAID, REFUNDED }
+enum class PaymentMethod { CASH, BANK_TRANSFER, CREDIT_CARD, E_WALLET, QR_CODE }
+enum class ShiftStatus { OPEN, CLOSED }
+enum class SyncStatus { PENDING, SYNCING, SYNCED, FAILED }
+enum class SyncAction { CREATE, UPDATE, DELETE }
+```
+
+### Staff Entity
+
+```kotlin
+@Entity(tableName = "staff")
+data class StaffEntity(
+    @PrimaryKey
+    val id: String,
+    val tenantId: String,
+    val branchId: String,
+    val code: String?,
+    val name: String,
+    val phone: String?,
+    val pin: String?,           // PIN đăng nhập
+    val role: String,           // cashier, manager, admin
+    val avatarUrl: String?,
+    val isActive: Boolean = true,
+
+    // Sync fields
+    val syncStatus: SyncStatus = SyncStatus.SYNCED,
+    val lastSyncAt: Long? = null,
+    val localCreatedAt: Long = System.currentTimeMillis(),
+    val localUpdatedAt: Long = System.currentTimeMillis()
+)
+```
+
+### Category Entity
+
+```kotlin
 @Entity(tableName = "categories")
 data class CategoryEntity(
-    @PrimaryKey val id: String,
-    val branchId: String,
+    @PrimaryKey
+    val id: String,
+    val tenantId: String,
+    val brandId: String,
     val name: String,
-    val displayOrder: Int,
     val imageUrl: String?,
-    val isActive: Boolean,
-    val version: Int,
-    val syncStatus: String,
-    val syncedAt: String?
-)
+    val parentId: String?,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
 
-// ProductEntity
-@Entity(tableName = "products")
+    // Sync fields
+    val syncStatus: SyncStatus = SyncStatus.SYNCED,
+    val lastSyncAt: Long? = null
+)
+```
+
+### Product Entity
+
+```kotlin
+@Entity(
+    tableName = "products",
+    indices = [
+        Index("categoryId"),
+        Index("tenantId", "brandId")
+    ]
+)
 data class ProductEntity(
-    @PrimaryKey val id: String,
-    val branchId: String,
-    val categoryId: String,
-    val code: String,
+    @PrimaryKey
+    val id: String,
+    val tenantId: String,
+    val brandId: String,
+    val categoryId: String?,
+    val code: String?,
     val name: String,
     val description: String?,
-    val price: Double,
     val imageUrl: String?,
+    val price: Double,
+    val costPrice: Double = 0.0,
+    val vatRate: Double = 0.0,
     val unit: String?,
-    val vatRate: Double,
-    val isActive: Boolean,
-    val displayOrder: Int,
-    val version: Int,
-    val syncStatus: String,
-    val syncedAt: String?
-)
+    val productType: ProductType = ProductType.SINGLE,
+    val isAvailable: Boolean = true,
+    val isActive: Boolean = true,
+    val sortOrder: Int = 0,
 
-// OrderEntity
-@Entity(tableName = "orders")
+    // Offline fields
+    val syncStatus: SyncStatus = SyncStatus.SYNCED,
+    val lastSyncAt: Long? = null
+)
+```
+
+### Order Entity
+
+```kotlin
+@Entity(
+    tableName = "orders",
+    indices = [
+        Index("tenantId", "branchId"),
+        Index("orderNumber"),
+        Index("syncStatus")
+    ]
+)
 data class OrderEntity(
-    @PrimaryKey val id: String,
+    @PrimaryKey
+    val id: String,                           // UUID local
+    val serverId: String? = null,             // UUID từ server (sau khi sync)
+    val tenantId: String,
     val branchId: String,
-    val orderNumber: String,
-    val tableId: String?,
-    val tableName: String?,
+    val orderNumber: String,                  // DH-20260107-0001
+    val orderType: OrderType = OrderType.COUNTER,
+    val status: OrderStatus = OrderStatus.PENDING,
+
+    // Customer info (optional)
+    val customerId: String? = null,
+    val customerName: String? = null,
+    val customerPhone: String? = null,
+
+    // Staff
     val staffId: String,
     val staffName: String,
-    val status: String,           // pending, preparing, ready, completed, cancelled
-    val subtotal: Double,
-    val discountAmount: Double,
-    val discountPercent: Double,
-    val totalAmount: Double,
-    val paymentMethod: String?,   // cash, bank_transfer, card
-    val paidAmount: Double,
-    val changeAmount: Double,
-    val note: String?,
-    val shiftId: String?,
-    val createdAt: String,
-    val updatedAt: String,
-    val syncStatus: String,
-    val syncedAt: String?
+
+    // Amounts
+    val subtotal: Double = 0.0,
+    val discountAmount: Double = 0.0,
+    val discountPercent: Double = 0.0,
+    val surchargeAmount: Double = 0.0,
+    val taxAmount: Double = 0.0,
+    val total: Double = 0.0,
+
+    // Payment
+    val paymentStatus: PaymentStatus = PaymentStatus.UNPAID,
+    val paidAmount: Double = 0.0,
+
+    // Voucher/Coupon
+    val voucherId: String? = null,
+    val voucherCode: String? = null,
+    val couponId: String? = null,
+    val couponCode: String? = null,
+
+    val notes: String? = null,
+    val shiftId: String,
+
+    // Timestamps
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val completedAt: Long? = null,
+
+    // Sync fields
+    val syncStatus: SyncStatus = SyncStatus.PENDING,
+    val syncError: String? = null,
+    val lastSyncAttempt: Long? = null
+)
+```
+
+### Order Item Entity
+
+```kotlin
+@Entity(
+    tableName = "order_items",
+    foreignKeys = [
+        ForeignKey(
+            entity = OrderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["orderId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("orderId")]
+)
+data class OrderItemEntity(
+    @PrimaryKey
+    val id: String,
+    val orderId: String,
+    val productId: String,
+    val productCode: String?,
+    val productName: String,
+    val productImageUrl: String?,
+
+    val quantity: Int,
+    val unitPrice: Double,
+    val totalPrice: Double,
+
+    // Topping/Options as JSON
+    val toppings: String? = null,    // JSON: [{"id":"...", "name":"...", "price":5000}]
+    val notes: String? = null,
+
+    val status: OrderItemStatus = OrderItemStatus.PENDING,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
-// ShiftEntity
+enum class OrderItemStatus { PENDING, PREPARING, READY, SERVED, CANCELLED }
+```
+
+### Payment Entity
+
+```kotlin
+@Entity(
+    tableName = "payments",
+    foreignKeys = [
+        ForeignKey(
+            entity = OrderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["orderId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("orderId")]
+)
+data class PaymentEntity(
+    @PrimaryKey
+    val id: String,
+    val orderId: String,
+    val tenantId: String,
+    val branchId: String,
+
+    val amount: Double,
+    val paymentMethod: PaymentMethod,
+    val paymentMethodName: String,
+
+    // For cash
+    val receivedAmount: Double? = null,
+    val changeAmount: Double? = null,
+
+    // For bank/card
+    val referenceCode: String? = null,
+    val bankAccountId: String? = null,
+
+    val status: PaymentEntityStatus = PaymentEntityStatus.COMPLETED,
+    val paidAt: Long = System.currentTimeMillis(),
+
+    // Sync
+    val syncStatus: SyncStatus = SyncStatus.PENDING
+)
+
+enum class PaymentEntityStatus { PENDING, COMPLETED, FAILED, REFUNDED }
+```
+
+### Shift Entity
+
+```kotlin
 @Entity(tableName = "shifts")
 data class ShiftEntity(
-    @PrimaryKey val id: String,
+    @PrimaryKey
+    val id: String,
+    val tenantId: String,
     val branchId: String,
     val staffId: String,
     val staffName: String,
-    val startTime: String,
-    val endTime: String?,
-    val openingAmount: Double,
-    val closingAmount: Double?,
-    val expectedAmount: Double?,
-    val actualAmount: Double?,
-    val difference: Double?,
-    val totalOrders: Int,
-    val totalRevenue: Double,
-    val cashRevenue: Double,
-    val bankRevenue: Double,
-    val cardRevenue: Double,
-    val status: String,           // open, closed
-    val note: String?,
-    val syncStatus: String,
-    val syncedAt: String?
+
+    val startTime: Long,
+    val endTime: Long? = null,
+
+    val openingCash: Double,                  // Tiền đầu ca
+    val closingCash: Double? = null,          // Tiền cuối ca (thực tế)
+    val expectedClosingCash: Double? = null,  // Tiền cuối ca (lý thuyết)
+
+    // Summary
+    val totalCashSales: Double = 0.0,
+    val totalBankSales: Double = 0.0,
+    val totalOrders: Int = 0,
+    val totalCancelled: Int = 0,
+
+    val status: ShiftStatus = ShiftStatus.OPEN,
+    val notes: String? = null,
+
+    // Sync
+    val syncStatus: SyncStatus = SyncStatus.PENDING,
+    val serverId: String? = null
 )
 ```
 
-### Luồng xác thực
+### Sync Queue Entity
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     LUỒNG XÁC THỰC CCB                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. ĐĂNG NHẬP THIẾT BỊ (1 lần duy nhất)                        │
-│  ┌─────────────┐                        ┌─────────────────────┐ │
-│  │ Màn hình    │  POST /auth/login      │  API Master Data    │ │
-│  │ Login       │ ───────────────────────▶│                     │ │
-│  │             │  {storeCode, deviceId}  │  Trả về:            │ │
-│  │             │◀───────────────────────│  - accessToken      │ │
-│  │             │                        │  - branchId         │ │
-│  └─────────────┘                        │  - branchName       │ │
-│        │                                └─────────────────────┘ │
-│        │ Lưu token vào SharedPreferences                        │
-│        ▼                                                        │
-│  2. XÁC THỰC NHÂN VIÊN (Mỗi lần mở app)                        │
-│  ┌─────────────┐                        ┌─────────────────────┐ │
-│  │ Màn hình    │  POST /auth/verify-pin │  API Master Data    │ │
-│  │ PIN         │ ───────────────────────▶│                     │ │
-│  │             │  {pinCode}              │  Trả về:            │ │
-│  │  [1][2][3]  │◀───────────────────────│  - staffId          │ │
-│  │  [4][5][6]  │                        │  - staffName        │ │
-│  │  [7][8][9]  │                        │  - role             │ │
-│  │     [0]     │                        └─────────────────────┘ │
-│  └─────────────┘                                                │
-│        │                                                        │
-│        ▼                                                        │
-│  3. VÀO MÀN HÌNH CHÍNH                                         │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                      HOME SCREEN                            ││
-│  │  - Tạo đơn mới                                              ││
-│  │  - Xem đơn đang phục vụ                                     ││
-│  │  - Quản lý ca làm việc                                      ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+```kotlin
+@Entity(
+    tableName = "sync_queue",
+    indices = [Index("entityType"), Index("status"), Index("priority")]
+)
+data class SyncQueueEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
 
-### Luồng đồng bộ dữ liệu
+    val entityType: String,                   // order, payment, shift
+    val entityId: String,
+    val action: SyncAction,                   // CREATE, UPDATE, DELETE
+    val payload: String,                      // JSON data
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     SYNC MASTER DATA                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐     GET /sync/full      ┌─────────────────────┐│
-│  │ CCB App     │ ───────────────────────▶│ API Master Data     ││
-│  │             │                         │                     ││
-│  │             │◀───────────────────────│ Response:           ││
-│  │             │     FullSyncResponse    │ - categories[]      ││
-│  │             │                         │ - products[]        ││
-│  │             │                         │ - areas[]           ││
-│  │             │                         │ - tables[]          ││
-│  │             │                         │ - staff[]           ││
-│  │             │                         │ - syncedAt          ││
-│  └─────────────┘                         └─────────────────────┘│
-│        │                                                        │
-│        ▼                                                        │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                  ROOM DATABASE (SQLite)                     ││
-│  │  Transaction: Delete old → Insert new                       ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│  INCREMENTAL SYNC (sau lần đầu)                                 │
-│  ┌─────────────┐   GET /sync/incremental  ┌────────────────────┐│
-│  │ CCB App     │   ?since={lastSyncTime}  │ API Master Data    ││
-│  │             │ ────────────────────────▶│                    ││
-│  │             │◀────────────────────────│ Chỉ trả về records ││
-│  │             │                          │ thay đổi sau since ││
-│  └─────────────┘                          └────────────────────┘│
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+    val priority: Int = 0,                    // Higher = more urgent
+    val status: SyncQueueStatus = SyncQueueStatus.PENDING,
+    val attempts: Int = 0,
+    val maxAttempts: Int = 5,
+    val lastError: String? = null,
 
-### Màn hình ứng dụng
+    val createdAt: Long = System.currentTimeMillis(),
+    val lastAttemptAt: Long? = null
+)
 
-| Màn hình | Mô tả | Route |
-|----------|-------|-------|
-| **Splash** | Kiểm tra trạng thái đăng nhập | `/splash` |
-| **Login** | Đăng nhập bằng mã cửa hàng | `/login` |
-| **PIN** | Xác thực nhân viên bằng mã PIN | `/pin` |
-| **Home** | Trang chủ, danh sách đơn đang phục vụ | `/home` |
-| **Menu** | Thực đơn sản phẩm theo danh mục | `/menu` |
-| **Order** | Chi tiết đơn hàng, thêm/sửa/xóa món | `/order/{orderId}` |
-| **Payment** | Thanh toán (tiền mặt/chuyển khoản/thẻ) | `/payment/{orderId}` |
-| **Shift** | Mở/chốt ca làm việc | `/shift` |
-| **Settings** | Cài đặt, đồng bộ dữ liệu | `/settings` |
-
----
-
-## Windows (.NET)
-
-```
-CCB.Windows/
-├── Views/
-│   ├── CashierView.xaml
-│   ├── KitchenView.xaml
-│   └── SettingsView.xaml
-├── ViewModels/
-│   ├── CashierViewModel.cs
-│   └── KitchenViewModel.cs
-├── Models/
-├── Services/
-│   ├── DatabaseService/       # SQLite
-│   ├── PrinterService/        # USB/LAN printer
-│   ├── WebSocketService/      # SignalR client
-│   └── SyncService/           # Cloud sync
-├── Modes/
-│   ├── Standalone/
-│   ├── Client/
-│   └── Kitchen/
-└── CCB.Windows.csproj
+enum class SyncQueueStatus { PENDING, PROCESSING, COMPLETED, FAILED }
 ```
 
 ---
 
-## Discovery (Tìm Local Server)
+## Flow Chi tiết
 
-### UDP Broadcast
+### Flow Đăng nhập PIN
 
 ```
-Local Server khởi động
-     │
-     ▼
-Start UDP Broadcast (port 9999)
-Gửi mỗi 2 giây: { type: "LOCAL_SERVER", name: "Quán ABC", ip: "192.168.1.100", port: 8080 }
-     │
-     ▼
-CCB App mở → Listen port 9999 → Nhận broadcast → Hiển thị danh sách Server
-     │
-     ▼
-User chọn Server → Kết nối SignalR
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FLOW ĐĂNG NHẬP PIN                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐             │
+│  │  App Start  │ ---> │ Check Shift │ ---> │   Có ca     │ --> Main    │
+│  │             │      │   Status    │      │   đang mở?  │             │
+│  └─────────────┘      └─────────────┘      └──────┬──────┘             │
+│                                                   │ Không               │
+│                                                   ▼                     │
+│                       ┌─────────────────────────────────────────┐      │
+│                       │           MÀN HÌNH ĐĂNG NHẬP            │      │
+│                       │  ┌─────────────────────────────────┐    │      │
+│                       │  │         NHẬP MÃ PIN             │    │      │
+│                       │  │                                  │    │      │
+│                       │  │      ┌───┐ ┌───┐ ┌───┐ ┌───┐   │    │      │
+│                       │  │      │ * │ │ * │ │ * │ │ * │   │    │      │
+│                       │  │      └───┘ └───┘ └───┘ └───┘   │    │      │
+│                       │  │                                  │    │      │
+│                       │  │  ┌───┐ ┌───┐ ┌───┐             │    │      │
+│                       │  │  │ 1 │ │ 2 │ │ 3 │             │    │      │
+│                       │  │  ├───┤ ├───┤ ├───┤             │    │      │
+│                       │  │  │ 4 │ │ 5 │ │ 6 │             │    │      │
+│                       │  │  ├───┤ ├───┤ ├───┤             │    │      │
+│                       │  │  │ 7 │ │ 8 │ │ 9 │             │    │      │
+│                       │  │  ├───┤ ├───┤ ├───┤             │    │      │
+│                       │  │  │ C │ │ 0 │ │ ⌫ │             │    │      │
+│                       │  │  └───┘ └───┘ └───┘             │    │      │
+│                       │  └─────────────────────────────────┘    │      │
+│                       └─────────────────────────────────────────┘      │
+│                                          │                              │
+│                                          ▼                              │
+│                       ┌─────────────────────────────────────────┐      │
+│                       │    Verify PIN (Local Database)          │      │
+│                       │    SELECT * FROM staff WHERE pin = ?    │      │
+│                       └─────────────────────────────────────────┘      │
+│                                          │                              │
+│                              ┌───────────┴───────────┐                 │
+│                              ▼                       ▼                  │
+│                       ┌──────────────┐       ┌──────────────┐          │
+│                       │   Success    │       │    Failed    │          │
+│                       │  Save Staff  │       │  Show Error  │          │
+│                       │  to Session  │       │              │          │
+│                       └──────────────┘       └──────────────┘          │
+│                              │                                          │
+│                              ▼                                          │
+│                       ┌──────────────────────────────────────────┐     │
+│                       │            MỞ CA LÀM VIỆC                │     │
+│                       │  Nhập tiền đầu ca: [____________] VNĐ    │     │
+│                       │                                           │     │
+│                       │  [HỦY]                    [MỞ CA]        │     │
+│                       └──────────────────────────────────────────┘     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Phương án backup
+### Flow Order tại quầy
 
-- **QR Code:** Server hiển thị QR chứa IP, CCB App scan
-- **Nhập thủ công:** User nhập IP của Server
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       FLOW TẠO ORDER TẠI QUẦY                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    MÀN HÌNH CHÍNH (SPLIT VIEW)                   │   │
+│  │ ┌──────────────────────────────┬───────────────────────────────┐│   │
+│  │ │       MENU SẢN PHẨM          │         GIỎ HÀNG              ││   │
+│  │ │                              │                                ││   │
+│  │ │ [Tất cả] [Đồ uống] [Món chính] │  Order #: DH-20260107-0001  ││   │
+│  │ │                              │  ─────────────────────────     ││   │
+│  │ │ 🔍 Tìm kiếm...              │                                ││   │
+│  │ │                              │  • Cà phê sữa        x2  70k  ││   │
+│  │ │ ┌────┐ ┌────┐ ┌────┐ ┌────┐│    [+] [-] [🗑️]                ││   │
+│  │ │ │ Cà │ │ Trà │ │ Phở │ │ Cơm││  • Phở bò tái        x1  80k  ││   │
+│  │ │ │ phê │ │ sữa │ │ bò  │ │ gà ││    Thêm: Hành, Giá            ││   │
+│  │ │ │ 35k │ │ 30k │ │ 80k │ │ 65k││    [+] [-] [🗑️]                ││   │
+│  │ │ └────┘ └────┘ └────┘ └────┘│  • Bánh flan         x2  50k  ││   │
+│  │ │                              │    [+] [-] [🗑️]                ││   │
+│  │ │ ┌────┐ ┌────┐ ┌────┐ ┌────┐│                                ││   │
+│  │ │ │Bánh│ │Nước│ │Sinh│ │Kem ││  ─────────────────────────     ││   │
+│  │ │ │flan│ │ ép │ │ tố │ │    ││  Tạm tính:          200,000đ  ││   │
+│  │ │ │ 25k│ │ 45k│ │ 40k│ │ 30k││  Giảm giá:               0đ  ││   │
+│  │ │ └────┘ └────┘ └────┘ └────┘│  VAT (10%):          20,000đ  ││   │
+│  │ │                              │  ─────────────────────────     ││   │
+│  │ │                              │  TỔNG CỘNG:        220,000đ  ││   │
+│  │ │                              │                                ││   │
+│  │ │                              │  [Ghi chú] [Giảm giá] [THANH TOÁN]│
+│  │ └──────────────────────────────┴───────────────────────────────┘│   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  Flow chi tiết:                                                         │
+│  1. Chọn Category → Load Products theo category                        │
+│  2. Tap Product → Thêm vào Cart (quantity = 1)                         │
+│  3. Tap Product trong Cart → Dialog chỉnh sửa (topping, ghi chú)       │
+│  4. Tap [+] [-] → Tăng/giảm số lượng                                   │
+│  5. Tap [🗑️] → Xóa item                                                 │
+│  6. Tap [Giảm giá] → Dialog nhập % hoặc số tiền                        │
+│  7. Tap [THANH TOÁN] → Chuyển sang màn Payment                         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow Thanh toán
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FLOW THANH TOÁN                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    MÀN HÌNH THANH TOÁN                           │   │
+│  │                                                                   │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │  THÔNG TIN ĐƠN HÀNG                                         ││   │
+│  │  │  Order #: DH-20260107-0001                                  ││   │
+│  │  │  Nhân viên: Nguyễn Văn A                                    ││   │
+│  │  │  Số món: 5                                                  ││   │
+│  │  │  ─────────────────────────────────────────────────          ││   │
+│  │  │  Tạm tính:                              200,000đ            ││   │
+│  │  │  Giảm giá (Voucher GIAM10):             -20,000đ            ││   │
+│  │  │  VAT (10%):                              18,000đ            ││   │
+│  │  │  ─────────────────────────────────────────────────          ││   │
+│  │  │  TỔNG THANH TOÁN:                       198,000đ            ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  │                                                                   │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │  PHƯƠNG THỨC THANH TOÁN                                     ││   │
+│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       ││   │
+│  │  │  │  💵      │ │  🏦      │ │  💳      │ │  📱      │       ││   │
+│  │  │  │ Tiền mặt │ │ Chuyển   │ │ Thẻ      │ │ Ví       │       ││   │
+│  │  │  │  [✓]     │ │ khoản    │ │ ngân hàng│ │ điện tử  │       ││   │
+│  │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  │                                                                   │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │  TIỀN MẶT                                                   ││   │
+│  │  │  Cần thanh toán:  198,000đ                                  ││   │
+│  │  │  Khách đưa:       [200,000    ]                             ││   │
+│  │  │  Tiền thừa:       2,000đ                                    ││   │
+│  │  │                                                              ││   │
+│  │  │  [200k] [300k] [500k] [Đủ tiền]                             ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  │                                                                   │   │
+│  │  ┌──────────────────┐  ┌──────────────────────────────────────┐ │   │
+│  │  │      [HỦY]       │  │         [THANH TOÁN & IN HÓA ĐƠN]    │ │   │
+│  │  └──────────────────┘  └──────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  Flow xử lý (Offline):                                                  │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ 1. Validate payment amount                                       │   │
+│  │ 2. Create PaymentEntity (local)                                  │   │
+│  │ 3. Update OrderEntity status = COMPLETED                         │   │
+│  │ 4. Update ShiftEntity totals                                     │   │
+│  │ 5. Add to SyncQueue (priority = HIGH)                            │   │
+│  │ 6. Generate & Print Receipt                                      │   │
+│  │ 7. Open cash drawer (if cash payment)                            │   │
+│  │ 8. Return to Main Screen                                         │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow In hóa đơn
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FLOW IN HÓA ĐƠN                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────────┐    │
+│  │                     RECEIPT TEMPLATE (80mm)                     │    │
+│  │ ┌────────────────────────────────────────────────────────────┐ │    │
+│  │ │            ████████  TECHRES  ████████                     │ │    │
+│  │ │                                                             │ │    │
+│  │ │  Chi nhánh: Quận 1 - TP.HCM                                │ │    │
+│  │ │  Địa chỉ: 123 Nguyễn Huệ, P.Bến Nghé, Q.1                 │ │    │
+│  │ │  Hotline: 1900 1234                                        │ │    │
+│  │ │  ─────────────────────────────────────────                 │ │    │
+│  │ │  HÓA ĐƠN BÁN HÀNG                                          │ │    │
+│  │ │  Số: DH-20260107-0001                                      │ │    │
+│  │ │  Ngày: 07/01/2026 14:30:25                                 │ │    │
+│  │ │  Thu ngân: Nguyễn Văn A                                    │ │    │
+│  │ │  ─────────────────────────────────────────                 │ │    │
+│  │ │  Cà phê sữa           x2        70,000đ                    │ │    │
+│  │ │  Phở bò tái           x1        80,000đ                    │ │    │
+│  │ │    + Thêm hành                   5,000đ                    │ │    │
+│  │ │  Bánh flan            x2        50,000đ                    │ │    │
+│  │ │  ─────────────────────────────────────────                 │ │    │
+│  │ │  Tạm tính:                     205,000đ                    │ │    │
+│  │ │  Giảm giá (GIAM10):            -20,500đ                    │ │    │
+│  │ │  VAT (10%):                     18,450đ                    │ │    │
+│  │ │  ═════════════════════════════════════════                 │ │    │
+│  │ │  TỔNG CỘNG:                    202,950đ                    │ │    │
+│  │ │  ═════════════════════════════════════════                 │ │    │
+│  │ │  Tiền mặt:                     210,000đ                    │ │    │
+│  │ │  Tiền thừa:                      7,050đ                    │ │    │
+│  │ │  ─────────────────────────────────────────                 │ │    │
+│  │ │          Cảm ơn quý khách!                                 │ │    │
+│  │ │       Hẹn gặp lại lần sau!                                 │ │    │
+│  │ │                                                             │ │    │
+│  │ │  [QR Code - Review/Feedback]                               │ │    │
+│  │ └────────────────────────────────────────────────────────────┘ │    │
+│  └────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│  ESC/POS Commands Flow:                                                 │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ 1. Initialize printer    → ESC @                                │   │
+│  │ 2. Print logo           → GS v 0 (bitmap)                       │   │
+│  │ 3. Print header         → ESC a 1 (center align)                │   │
+│  │ 4. Print items          → ESC a 0 (left align)                  │   │
+│  │ 5. Print total          → ESC E 1 (bold on)                     │   │
+│  │ 6. Print QR code        → GS ( k                                │   │
+│  │ 7. Cut paper            → GS V 66 3                             │   │
+│  │ 8. Open drawer          → ESC p 0 50 50                         │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Sync Engine (Offline → Cloud)
+
+### Kiến trúc Sync
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SYNC ARCHITECTURE                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   LOCAL (Room DB)              SYNC ENGINE              CLOUD           │
+│  ┌─────────────┐            ┌─────────────┐        ┌──────────┐        │
+│  │   Orders    │ ────────── │  SyncQueue  │ ─────> │  API     │        │
+│  │  Payments   │            │  WorkManager│ <───── │  Server  │        │
+│  │   Shifts    │            │             │        │          │        │
+│  └─────────────┘            └─────────────┘        └──────────┘        │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Sync Strategy
+
+| Strategy | Direction | Data Type | Priority |
+|----------|-----------|-----------|----------|
+| **PUSH** | Local → Cloud | Orders, Payments, Shifts | High |
+| **PULL** | Cloud → Local | Products, Categories, Staff | Medium |
+| **Conflict** | Merge/Last-Write-Wins | Tùy loại data | - |
+
+### PUSH Flow (Local → Cloud)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ • Order created/updated locally                                  │
+│ • Payment processed locally                                      │
+│ • Shift opened/closed locally                                    │
+│                                                                   │
+│ Flow:                                                             │
+│ 1. Add to SyncQueue (status = PENDING)                           │
+│ 2. WorkManager picks up when online                              │
+│ 3. POST/PUT to API                                               │
+│ 4. On success: Update syncStatus = SYNCED                        │
+│ 5. On failure: Retry with exponential backoff                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### PULL Flow (Cloud → Local)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ • Master data (Products, Categories, Staff)                      │
+│ • Vouchers, Coupons                                              │
+│ • Settings, Configurations                                       │
+│                                                                   │
+│ Flow:                                                             │
+│ 1. Check lastSyncTimestamp                                       │
+│ 2. GET /sync/changes?since={timestamp}                           │
+│ 3. Apply changes to local DB                                     │
+│ 4. Update lastSyncTimestamp                                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Conflict Resolution
+
+| Entity | Strategy | Lý do |
+|--------|----------|-------|
+| Order | Server wins | Admin có thể sửa |
+| Product | Server wins | Master data |
+| Payment | Local wins | Đã xử lý tại POS |
+| Shift | Merge | Cộng dồn nếu conflict |
+
+### Sync Triggers
+
+- Network connectivity restored
+- Periodic (every 5 minutes when online)
+- Manual trigger (pull-to-refresh)
+- App foreground
+- Before shift close
+
+---
+
+## Implementation Phases
+
+### Phase 1: Project Setup (Tuần 1)
+
+| Task | Mô tả |
+|------|-------|
+| Khởi tạo Project | Android Studio, Compose Activity |
+| Setup Dependencies | Hilt, Room, Retrofit, WorkManager |
+| Clean Architecture | Package structure, DI modules |
+
+### Phase 2: Database & Core (Tuần 2)
+
+| Task | Mô tả |
+|------|-------|
+| Room Database | All Entity classes, DAOs |
+| Repository Layer | Product, Order, Auth repositories |
+| Use Cases | GetProducts, CreateOrder, Login |
+
+### Phase 3: Authentication (Tuần 3)
+
+| Task | Mô tả |
+|------|-------|
+| Login Screen | PIN input, NumPad component |
+| Auth Logic | Verify PIN, session management |
+| Shift Management | Open/Close shift screens |
+
+### Phase 4: Menu & Cart (Tuần 4-5)
+
+| Task | Mô tả |
+|------|-------|
+| Menu Screen | Category tabs, product grid, search |
+| Cart Screen | Item list, quantity, summary |
+| Order Logic | Cart state, price calculations |
+
+### Phase 5: Payment (Tuần 6)
+
+| Task | Mô tả |
+|------|-------|
+| Payment Screen | Order summary, method selector |
+| Payment Logic | Process payment, update order |
+| Voucher/Coupon | Validate and apply discount |
+
+### Phase 6: Printing (Tuần 7)
+
+| Task | Mô tả |
+|------|-------|
+| Printer Connection | Bluetooth, USB, Network |
+| ESC/POS Commands | Text formatting, QR code |
+| Receipt Builder | Template, print queue |
+
+### Phase 7: Sync Engine (Tuần 8)
+
+| Task | Mô tả |
+|------|-------|
+| API Setup | Retrofit, interceptors |
+| Sync Queue | Add/process queue, retry logic |
+| WorkManager | SyncWorker, periodic sync |
+
+### Phase 8: Polish & Testing (Tuần 9-10)
+
+| Task | Mô tả |
+|------|-------|
+| UI/UX Polish | Loading states, animations |
+| Testing | Unit tests, UI tests |
+| Performance | Query optimization, profiling |
 
 ---
 
 ## Yêu cầu phần cứng
 
-### Android
+### Android POS
 
 | Cấu hình | Tối thiểu | Khuyến nghị |
 |----------|-----------|-------------|
 | RAM | 2GB | 4GB |
 | Storage | 1GB trống | 2GB trống |
 | Android | 8.0+ (API 26) | 11+ (API 30) |
+| Screen | 7" | 10"+ |
+| Printer Port | USB/Bluetooth | USB + Ethernet |
 
-### Windows
+### Máy in nhiệt
 
 | Cấu hình | Tối thiểu | Khuyến nghị |
 |----------|-----------|-------------|
-| RAM | 4GB | 8GB |
-| Storage | 2GB trống | 5GB trống |
-| Windows | 10 | 11 |
-| .NET | 8.0 Runtime | 8.0 Runtime |
+| Paper Width | 58mm | 80mm |
+| Connection | Bluetooth | USB + Ethernet |
+| Speed | 100mm/s | 200mm/s |
+| Auto-cutter | Optional | Yes |
+| Cash Drawer | Optional | Yes |
 
 ---
 
 ## Xử lý lỗi
 
-### Mất kết nối Server (Client Mode)
+### Mất internet (Offline mode)
 
 ```
-Mất kết nối SignalR
-        │
-        ▼
-Hiển thị banner "Mất kết nối với Server"
-        │
-        ▼
-Auto reconnect mỗi 3 giây
-        │
-        ▼
-Kết nối lại thành công
-        │
-        ▼
-Nhận full state mới từ Server
+┌─────────────────────────────────────────────────────────────────┐
+│ • Mọi tính năng offline vẫn hoạt động                           │
+│ • Hiện indicator "Offline mode"                                 │
+│ • Queue sync data                                               │
+│ • Auto sync khi có mạng trở lại                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### CCB Standalone mất internet
+### Lỗi máy in
 
-- Mọi tính năng offline vẫn hoạt động
-- Hiện indicator "Offline mode"
-- Queue sync data
-- Tính năng cần online bị disable (dùng điểm)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ • Hiển thị thông báo lỗi                                        │
+│ • Cho phép bỏ qua (order vẫn hoàn thành)                       │
+│ • Queue để in lại sau                                           │
+│ • Hỗ trợ in từ thiết bị khác                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Sync failed
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ • Retry với exponential backoff                                 │
+│ • Max 5 attempts                                                │
+│ • Log error để debug                                            │
+│ • Notify admin nếu critical                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
