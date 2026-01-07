@@ -54,10 +54,10 @@ async function seedLocations() {
 
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '172.16.10.146',
     port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
+    username: process.env.DB_USERNAME || 'techres',
+    password: process.env.DB_PASSWORD || 'techres',
     database: process.env.DB_DATABASE || 'techres',
     synchronize: false,
     logging: false,

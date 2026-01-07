@@ -1,27 +1,27 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthModule } from './modules/auth/auth.module';
-import { StaffModule } from './modules/staff/staff.module';
-import { ProductsModule } from './modules/products/products.module';
-import { CategoriesModule } from './modules/categories/categories.module';
-import { KitchenModule } from './modules/kitchen/kitchen.module';
-import { DepartmentsModule } from './modules/departments/departments.module';
-import { BrandsModule } from './modules/brands/brands.module';
-import { BranchesModule } from './modules/branches/branches.module';
-import { LocationsModule } from './modules/locations/locations.module';
-import { AreasModule } from './modules/areas/areas.module';
-import { TablesModule } from './modules/tables/tables.module';
-import { UnitsModule } from './modules/units/units.module';
-import { PermissionsModule } from './modules/permissions/permissions.module';
-import { SurchargesModule } from './modules/surcharges/surcharges.module';
-import { SeasonalPricesModule } from './modules/seasonal-prices/seasonal-prices.module';
-import { GiftItemsModule } from './modules/gift-items/gift-items.module';
-import { VouchersModule } from './modules/vouchers/vouchers.module';
-import { CouponsModule } from './modules/coupons/coupons.module';
-import { BranchProductsModule } from './modules/branch-products/branch-products.module';
-import { SettingsModule } from './modules/settings/settings.module';
-import { DatabaseMigrationService } from './database/database-migration.service';
+import { Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { AuthModule } from "./modules/auth/auth.module";
+import { StaffModule } from "./modules/staff/staff.module";
+import { ProductsModule } from "./modules/products/products.module";
+import { CategoriesModule } from "./modules/categories/categories.module";
+import { KitchenModule } from "./modules/kitchen/kitchen.module";
+import { DepartmentsModule } from "./modules/departments/departments.module";
+import { BrandsModule } from "./modules/brands/brands.module";
+import { BranchesModule } from "./modules/branches/branches.module";
+import { LocationsModule } from "./modules/locations/locations.module";
+import { AreasModule } from "./modules/areas/areas.module";
+import { TablesModule } from "./modules/tables/tables.module";
+import { UnitsModule } from "./modules/units/units.module";
+import { PermissionsModule } from "./modules/permissions/permissions.module";
+import { SurchargesModule } from "./modules/surcharges/surcharges.module";
+import { SeasonalPricesModule } from "./modules/seasonal-prices/seasonal-prices.module";
+import { GiftItemsModule } from "./modules/gift-items/gift-items.module";
+import { VouchersModule } from "./modules/vouchers/vouchers.module";
+import { CouponsModule } from "./modules/coupons/coupons.module";
+import { BranchProductsModule } from "./modules/branch-products/branch-products.module";
+import { SettingsModule } from "./modules/settings/settings.module";
+import { DatabaseMigrationService } from "./database/database-migration.service";
 import {
   Company,
   Brand,
@@ -61,8 +61,8 @@ import {
   PaymentMethod,
   BankAccount,
   EInvoiceConfig,
-} from './database/entities';
-import { DashboardModule } from './modules/dashboard/dashboard.module';
+} from "./database/entities";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
 
 @Module({
   imports: [
@@ -72,12 +72,12 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD', 'postgres'),
-        database: configService.get('DB_DATABASE', 'techres'),
+        type: "postgres",
+        host: configService.get("DB_HOST", "172.16.10.146"),
+        port: configService.get("DB_PORT", 5432),
+        username: configService.get("DB_USERNAME", "techres"),
+        password: configService.get("DB_PASSWORD", "techres"),
+        database: configService.get("DB_DATABASE", "techres"),
         entities: [
           Company,
           Brand,
