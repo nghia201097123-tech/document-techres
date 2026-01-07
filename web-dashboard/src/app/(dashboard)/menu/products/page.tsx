@@ -53,7 +53,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { productService, bulkProductService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment, type ProductBulkOperationResult, type BulkAvatarUpdateResult } from "@/services/product-service";
+import { productService, bulkProductService, type Product, type CreateProductDto, type UpdateProductDto, ProductType, SellingType, type ToppingGroup, type ComboItem, type BulkProductItem, type ProductNote, type ProductNoteAssignment, type ProductBulkOperationResult, type BulkAvatarUpdateResult, type ProductBatchProgressInfo } from "@/services/product-service";
 import { uploadService } from "@/services/upload-service";
 import { exportToExcel, readExcelFile, downloadTemplateWithRealDropdowns, type TemplateColumnWithDropdown } from "@/lib/excel-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -317,6 +317,7 @@ export default function ProductsPage() {
   const [bulkSellingType, setBulkSellingType] = React.useState<SellingType>(SellingType.PORTION);
   const [bulkPreparationTime, setBulkPreparationTime] = React.useState<number>(0);
   const [processingBulk, setProcessingBulk] = React.useState(false);
+  const [bulkProgress, setBulkProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const [bulkResult, setBulkResult] = React.useState<ProductBulkOperationResult | null>(null);
 
   // Bulk avatar upload state
@@ -1583,6 +1584,10 @@ export default function ProductsPage() {
 
     const productIds = Array.from(selectedProductIds);
     setProcessingBulk(true);
+    setBulkProgress(null);
+
+    const progressCallback = (progress: ProductBatchProgressInfo) => setBulkProgress(progress);
+    const batchOptions = { batchSize: 50, onProgress: progressCallback };
 
     try {
       let result: ProductBulkOperationResult;
@@ -1594,19 +1599,19 @@ export default function ProductsPage() {
             setProcessingBulk(false);
             return;
           }
-          result = await bulkProductService.updateCategory(productIds, bulkCategoryId);
+          result = await bulkProductService.updateCategoryBatched(productIds, bulkCategoryId, batchOptions);
           break;
         case "activate":
-          result = await bulkProductService.toggleActive(productIds, true);
+          result = await bulkProductService.toggleActiveBatched(productIds, true, batchOptions);
           break;
         case "deactivate":
-          result = await bulkProductService.toggleActive(productIds, false);
+          result = await bulkProductService.toggleActiveBatched(productIds, false, batchOptions);
           break;
         case "delete":
-          result = await bulkProductService.delete(productIds);
+          result = await bulkProductService.deleteBatched(productIds, batchOptions);
           break;
         case "vat":
-          result = await bulkProductService.updateVatRate(productIds, bulkVatRate);
+          result = await bulkProductService.updateVatRateBatched(productIds, bulkVatRate, batchOptions);
           break;
         case "price":
           if (bulkPrice <= 0) {
@@ -1614,16 +1619,16 @@ export default function ProductsPage() {
             setProcessingBulk(false);
             return;
           }
-          result = await bulkProductService.updatePrice(productIds, bulkPrice);
+          result = await bulkProductService.updatePriceBatched(productIds, bulkPrice, batchOptions);
           break;
         case "print-label":
-          result = await bulkProductService.updatePrintLabel(productIds, bulkPrintValue);
+          result = await bulkProductService.updatePrintLabelBatched(productIds, bulkPrintValue, batchOptions);
           break;
         case "print-seafood":
-          result = await bulkProductService.updatePrintSeafood(productIds, bulkPrintValue);
+          result = await bulkProductService.updatePrintSeafoodBatched(productIds, bulkPrintValue, batchOptions);
           break;
         case "print-dish":
-          result = await bulkProductService.updatePrintDish(productIds, bulkPrintValue);
+          result = await bulkProductService.updatePrintDishBatched(productIds, bulkPrintValue, batchOptions);
           break;
         case "unit":
           if (!bulkUnit.trim()) {
@@ -1633,15 +1638,16 @@ export default function ProductsPage() {
           }
           // Get or create unit if it doesn't exist
           const unitName = await getOrCreateUnit(bulkUnit.trim());
-          result = await bulkProductService.updateUnit(productIds, unitName);
+          result = await bulkProductService.updateUnitBatched(productIds, unitName, batchOptions);
           break;
         case "selling-type":
-          result = await bulkProductService.updateSellingType(productIds, bulkSellingType);
+          result = await bulkProductService.updateSellingTypeBatched(productIds, bulkSellingType, batchOptions);
           break;
         case "preparation-time":
-          result = await bulkProductService.updatePreparationTime(productIds, bulkPreparationTime);
+          result = await bulkProductService.updatePreparationTimeBatched(productIds, bulkPreparationTime, batchOptions);
           break;
         default:
+          setProcessingBulk(false);
           return;
       }
 
@@ -1659,6 +1665,7 @@ export default function ProductsPage() {
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
     } finally {
       setProcessingBulk(false);
+      setBulkProgress(null);
     }
   };
 
@@ -2590,7 +2597,9 @@ export default function ProductsPage() {
               variant={bulkOperation === "delete" ? "destructive" : "default"}
             >
               {processingBulk && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Xác nhận
+              {processingBulk && bulkProgress
+                ? `Đang xử lý... ${bulkProgress.current}/${bulkProgress.total} (batch ${bulkProgress.batchNumber}/${bulkProgress.totalBatches})`
+                : "Xác nhận"}
             </Button>
           </DialogFooter>
         </DialogContent>

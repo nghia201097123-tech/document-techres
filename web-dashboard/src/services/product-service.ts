@@ -497,6 +497,65 @@ export interface ProductBulkOperationResult {
   errors: { productId: string; message: string }[];
 }
 
+export interface ProductBatchProgressInfo {
+  current: number;
+  total: number;
+  batchNumber: number;
+  totalBatches: number;
+}
+
+// Helper function to process product bulk operations in batches
+const processProductBulkInBatches = async (
+  items: string[],
+  batchSize: number,
+  processor: (batch: string[]) => Promise<ProductBulkOperationResult>,
+  onProgress?: (progress: ProductBatchProgressInfo) => void
+): Promise<ProductBulkOperationResult> => {
+  const totalBatches = Math.ceil(items.length / batchSize);
+  const aggregatedResult: ProductBulkOperationResult = {
+    success: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  for (let i = 0; i < totalBatches; i++) {
+    const start = i * batchSize;
+    const end = Math.min(start + batchSize, items.length);
+    const batch = items.slice(start, end);
+
+    onProgress?.({
+      current: start,
+      total: items.length,
+      batchNumber: i + 1,
+      totalBatches,
+    });
+
+    try {
+      const result = await processor(batch);
+      aggregatedResult.success += result.success;
+      aggregatedResult.failed += result.failed;
+      aggregatedResult.errors.push(...result.errors);
+    } catch (error: any) {
+      aggregatedResult.failed += batch.length;
+      batch.forEach(id => {
+        aggregatedResult.errors.push({
+          productId: id,
+          message: error.response?.data?.message || error.message || "Unknown error",
+        });
+      });
+    }
+  }
+
+  onProgress?.({
+    current: items.length,
+    total: items.length,
+    batchNumber: totalBatches,
+    totalBatches,
+  });
+
+  return aggregatedResult;
+};
+
 export const bulkProductService = {
   updateCategory: async (productIds: string[], categoryId: string): Promise<ProductBulkOperationResult> => {
     const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-category", {
@@ -504,6 +563,25 @@ export const bulkProductService = {
       categoryId,
     });
     return response.data;
+  },
+
+  updateCategoryBatched: async (
+    productIds: string[],
+    categoryId: string,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-category", {
+          productIds: batch,
+          categoryId,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   toggleActive: async (productIds: string[], isActive: boolean): Promise<ProductBulkOperationResult> => {
@@ -514,11 +592,47 @@ export const bulkProductService = {
     return response.data;
   },
 
+  toggleActiveBatched: async (
+    productIds: string[],
+    isActive: boolean,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/toggle-active", {
+          productIds: batch,
+          isActive,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   delete: async (productIds: string[]): Promise<ProductBulkOperationResult> => {
     const response = await api.post<ProductBulkOperationResult>("/products/bulk/delete", {
       productIds,
     });
     return response.data;
+  },
+
+  deleteBatched: async (
+    productIds: string[],
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/delete", {
+          productIds: batch,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   updateVatRate: async (productIds: string[], vatRate: number): Promise<ProductBulkOperationResult> => {
@@ -529,12 +643,50 @@ export const bulkProductService = {
     return response.data;
   },
 
+  updateVatRateBatched: async (
+    productIds: string[],
+    vatRate: number,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-vat-rate", {
+          productIds: batch,
+          vatRate,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   updatePrice: async (productIds: string[], price: number): Promise<ProductBulkOperationResult> => {
     const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-price", {
       productIds,
       price,
     });
     return response.data;
+  },
+
+  updatePriceBatched: async (
+    productIds: string[],
+    price: number,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-price", {
+          productIds: batch,
+          price,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   updatePrintLabel: async (productIds: string[], printLabel: boolean): Promise<ProductBulkOperationResult> => {
@@ -545,12 +697,50 @@ export const bulkProductService = {
     return response.data;
   },
 
+  updatePrintLabelBatched: async (
+    productIds: string[],
+    printLabel: boolean,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-label", {
+          productIds: batch,
+          printLabel,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   updatePrintSeafood: async (productIds: string[], printSeafood: boolean): Promise<ProductBulkOperationResult> => {
     const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-seafood", {
       productIds,
       printSeafood,
     });
     return response.data;
+  },
+
+  updatePrintSeafoodBatched: async (
+    productIds: string[],
+    printSeafood: boolean,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-seafood", {
+          productIds: batch,
+          printSeafood,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   updatePrintDish: async (productIds: string[], printDish: boolean): Promise<ProductBulkOperationResult> => {
@@ -561,12 +751,50 @@ export const bulkProductService = {
     return response.data;
   },
 
+  updatePrintDishBatched: async (
+    productIds: string[],
+    printDish: boolean,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-dish", {
+          productIds: batch,
+          printDish,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   updateUnit: async (productIds: string[], unit: string): Promise<ProductBulkOperationResult> => {
     const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-unit", {
       productIds,
       unit,
     });
     return response.data;
+  },
+
+  updateUnitBatched: async (
+    productIds: string[],
+    unit: string,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-unit", {
+          productIds: batch,
+          unit,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   updateSellingType: async (productIds: string[], sellingType: SellingType): Promise<ProductBulkOperationResult> => {
@@ -577,12 +805,50 @@ export const bulkProductService = {
     return response.data;
   },
 
+  updateSellingTypeBatched: async (
+    productIds: string[],
+    sellingType: SellingType,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-selling-type", {
+          productIds: batch,
+          sellingType,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   updatePreparationTime: async (productIds: string[], preparationTime: number): Promise<ProductBulkOperationResult> => {
     const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-preparation-time", {
       productIds,
       preparationTime,
     });
     return response.data;
+  },
+
+  updatePreparationTimeBatched: async (
+    productIds: string[],
+    preparationTime: number,
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-preparation-time", {
+          productIds: batch,
+          preparationTime,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   updateAvatars: async (items: { productCode: string; avatarUrl: string }[]): Promise<BulkAvatarUpdateResult> => {

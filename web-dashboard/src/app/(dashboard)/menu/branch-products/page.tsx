@@ -46,7 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { branchProductService, type BranchProduct, type BranchProductStats } from "@/services/branch-product-service";
+import { branchProductService, type BranchProduct, type BranchProductStats, type BranchProductBatchProgressInfo } from "@/services/branch-product-service";
 import { ProductType } from "@/services/product-service";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { cn } from "@/lib/utils";
@@ -149,7 +149,9 @@ export default function BranchProductsPage() {
   const [bulkPriceAdjustType, setBulkPriceAdjustType] = React.useState<"increase" | "decrease">("increase");
   const [bulkPriceAdjustMode, setBulkPriceAdjustMode] = React.useState<"amount" | "percent">("amount");
   const [processingBulkPrice, setProcessingBulkPrice] = React.useState(false);
-  const [bulkPriceProgress, setBulkPriceProgress] = React.useState({ current: 0, total: 0 });
+  const [bulkPriceProgress, setBulkPriceProgress] = React.useState({ current: 0, total: 0, batchNumber: 0, totalBatches: 0 });
+  const [processingBulkToggle, setProcessingBulkToggle] = React.useState(false);
+  const [bulkToggleProgress, setBulkToggleProgress] = React.useState<BranchProductBatchProgressInfo | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -519,11 +521,18 @@ export default function BranchProductsPage() {
     if (selectedProductIds.size === 0) return;
 
     const productIds = Array.from(selectedProductIds);
+    setProcessingBulkToggle(true);
+    setBulkToggleProgress(null);
+
     try {
-      await branchProductService.bulkToggleAvailability(filterBranchId, {
-        productIds,
-        isAvailable,
-      });
+      await branchProductService.bulkToggleAvailabilityBatched(
+        filterBranchId,
+        { productIds, isAvailable },
+        {
+          batchSize: 50,
+          onProgress: (progress) => setBulkToggleProgress(progress),
+        }
+      );
       setProducts(prev => prev.map(p =>
         selectedProductIds.has(p.id) ? { ...p, isAvailable } : p
       ));
@@ -538,6 +547,9 @@ export default function BranchProductsPage() {
     } catch (error) {
       console.error("Error bulk toggling:", error);
       toast({ title: "Lỗi", description: "Không thể cập nhật hàng loạt", variant: "destructive" });
+    } finally {
+      setProcessingBulkToggle(false);
+      setBulkToggleProgress(null);
     }
   };
 
@@ -721,11 +733,13 @@ export default function BranchProductsPage() {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={processingBulkPrice}>
-                    {processingBulkPrice && bulkPriceProgress.total > 0 ? (
+                  <Button variant="outline" size="sm" disabled={processingBulkPrice || processingBulkToggle}>
+                    {(processingBulkPrice && bulkPriceProgress.total > 0) || (processingBulkToggle && bulkToggleProgress) ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {bulkPriceProgress.current}/{bulkPriceProgress.total}
+                        {processingBulkToggle && bulkToggleProgress
+                          ? `Đang xử lý... ${bulkToggleProgress.current}/${bulkToggleProgress.total} (batch ${bulkToggleProgress.batchNumber}/${bulkToggleProgress.totalBatches})`
+                          : `${bulkPriceProgress.current}/${bulkPriceProgress.total} (batch ${bulkPriceProgress.batchNumber}/${bulkPriceProgress.totalBatches})`}
                       </>
                     ) : (
                       <>
@@ -736,11 +750,11 @@ export default function BranchProductsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => handleBulkToggle(true)}>
+                  <DropdownMenuItem onClick={() => handleBulkToggle(true)} disabled={processingBulkToggle}>
                     <Check className="mr-2 h-4 w-4 text-green-600" />
                     Bật tất cả
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleBulkToggle(false)}>
+                  <DropdownMenuItem onClick={() => handleBulkToggle(false)} disabled={processingBulkToggle}>
                     <X className="mr-2 h-4 w-4 text-red-600" />
                     Tắt tất cả
                   </DropdownMenuItem>

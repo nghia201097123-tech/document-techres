@@ -40,7 +40,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { staffService, bulkStaffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem, type BulkOperationResult } from "@/services/staff-service";
+import { staffService, bulkStaffService, type Staff, type CreateStaffDto, type UpdateStaffDto, type Gender, type BulkStaffItem, type BulkOperationResult, type BatchProgressInfo } from "@/services/staff-service";
 import { permissionService, type Permission } from "@/services/permission-service";
 import { locationService } from "@/services/location-service";
 import { exportToExcel, exportToExcelWithDropdowns, readExcelFile, downloadTemplateWithDependentDropdowns, type TemplateColumnWithDropdown, type DependentDropdownConfig, type DropdownOption, type ExportColumnWithDropdown } from "@/lib/excel-utils";
@@ -250,6 +250,7 @@ export default function StaffPage() {
   const [bulkDepartmentId, setBulkDepartmentId] = React.useState("");
   const [bulkBranchId, setBulkBranchId] = React.useState("");
   const [processingBulk, setProcessingBulk] = React.useState(false);
+  const [bulkProgress, setBulkProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const [bulkResult, setBulkResult] = React.useState<BulkOperationResult | null>(null);
   const [copiedPasswords, setCopiedPasswords] = React.useState<Set<string>>(new Set());
 
@@ -637,6 +638,9 @@ export default function StaffPage() {
 
     const staffIds = Array.from(selectedStaffIds);
     setProcessingBulk(true);
+    setBulkProgress(null);
+
+    const progressCallback = (progress: BatchProgressInfo) => setBulkProgress(progress);
 
     try {
       let result: BulkOperationResult;
@@ -645,28 +649,48 @@ export default function StaffPage() {
         case "department":
           if (!bulkDepartmentId) {
             toast({ title: "Lỗi", description: "Vui lòng chọn bộ phận", variant: "destructive" });
+            setProcessingBulk(false);
             return;
           }
-          result = await bulkStaffService.updateDepartment(staffIds, bulkDepartmentId);
+          result = await bulkStaffService.updateDepartmentBatched(staffIds, bulkDepartmentId, {
+            batchSize: 50,
+            onProgress: progressCallback,
+          });
           break;
         case "branch":
           if (!bulkBranchId) {
             toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
+            setProcessingBulk(false);
             return;
           }
-          result = await bulkStaffService.updateBranch(staffIds, bulkBranchId);
+          result = await bulkStaffService.updateBranchBatched(staffIds, bulkBranchId, {
+            batchSize: 50,
+            onProgress: progressCallback,
+          });
           break;
         case "activate":
-          result = await bulkStaffService.toggleActive(staffIds, true);
+          result = await bulkStaffService.toggleActiveBatched(staffIds, true, {
+            batchSize: 50,
+            onProgress: progressCallback,
+          });
           break;
         case "deactivate":
-          result = await bulkStaffService.toggleActive(staffIds, false);
+          result = await bulkStaffService.toggleActiveBatched(staffIds, false, {
+            batchSize: 50,
+            onProgress: progressCallback,
+          });
           break;
         case "reset-password":
-          result = await bulkStaffService.resetPassword(staffIds);
+          result = await bulkStaffService.resetPasswordBatched(staffIds, undefined, {
+            batchSize: 50,
+            onProgress: progressCallback,
+          });
           setBulkResult(result);
+          setProcessingBulk(false);
+          setBulkProgress(null);
           return; // Don't close dialog, show passwords
         default:
+          setProcessingBulk(false);
           return;
       }
 
@@ -688,6 +712,7 @@ export default function StaffPage() {
       });
     } finally {
       setProcessingBulk(false);
+      setBulkProgress(null);
     }
   };
 
@@ -2062,7 +2087,9 @@ export default function StaffPage() {
             {!bulkResult && (
               <Button onClick={handleBulkOperation} disabled={processingBulk}>
                 {processingBulk && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Xác nhận
+                {processingBulk && bulkProgress
+                  ? `Đang xử lý... ${bulkProgress.current}/${bulkProgress.total} (batch ${bulkProgress.batchNumber}/${bulkProgress.totalBatches})`
+                  : "Xác nhận"}
               </Button>
             )}
             {bulkResult && (

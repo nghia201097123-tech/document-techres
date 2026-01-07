@@ -26,6 +26,13 @@ export interface BulkToggleAvailabilityDto {
   isAvailable: boolean;
 }
 
+export interface BranchProductBatchProgressInfo {
+  current: number;
+  total: number;
+  batchNumber: number;
+  totalBatches: number;
+}
+
 export const branchProductService = {
   /**
    * Get all products for a branch with availability status
@@ -73,6 +80,54 @@ export const branchProductService = {
   async bulkToggleAvailability(branchId: string, dto: BulkToggleAvailabilityDto): Promise<{ updated: number }> {
     const response = await api.post(`/branch-products/branch/${branchId}/bulk-toggle`, dto);
     return response.data;
+  },
+
+  /**
+   * Bulk toggle availability with batch processing to avoid timeout
+   */
+  async bulkToggleAvailabilityBatched(
+    branchId: string,
+    dto: BulkToggleAvailabilityDto,
+    options?: {
+      batchSize?: number;
+      onProgress?: (progress: BranchProductBatchProgressInfo) => void;
+    }
+  ): Promise<{ updated: number }> {
+    const batchSize = options?.batchSize || 50;
+    const totalBatches = Math.ceil(dto.productIds.length / batchSize);
+    let totalUpdated = 0;
+
+    for (let i = 0; i < totalBatches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize, dto.productIds.length);
+      const batch = dto.productIds.slice(start, end);
+
+      options?.onProgress?.({
+        current: start,
+        total: dto.productIds.length,
+        batchNumber: i + 1,
+        totalBatches,
+      });
+
+      try {
+        const response = await api.post(`/branch-products/branch/${branchId}/bulk-toggle`, {
+          productIds: batch,
+          isAvailable: dto.isAvailable,
+        });
+        totalUpdated += response.data.updated;
+      } catch (error) {
+        console.error(`Batch ${i + 1} failed:`, error);
+      }
+    }
+
+    options?.onProgress?.({
+      current: dto.productIds.length,
+      total: dto.productIds.length,
+      batchNumber: totalBatches,
+      totalBatches,
+    });
+
+    return { updated: totalUpdated };
   },
 
   /**

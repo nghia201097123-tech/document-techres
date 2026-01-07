@@ -204,6 +204,69 @@ export interface BulkOperationResult {
   passwords?: { staffId: string; username: string; password: string }[];
 }
 
+export interface BatchProgressInfo {
+  current: number;
+  total: number;
+  batchNumber: number;
+  totalBatches: number;
+}
+
+// Helper function to process bulk operations in batches
+const processBulkInBatches = async <T>(
+  items: string[],
+  batchSize: number,
+  processor: (batch: string[]) => Promise<BulkOperationResult>,
+  onProgress?: (progress: BatchProgressInfo) => void
+): Promise<BulkOperationResult> => {
+  const totalBatches = Math.ceil(items.length / batchSize);
+  const aggregatedResult: BulkOperationResult = {
+    success: 0,
+    failed: 0,
+    errors: [],
+    passwords: [],
+  };
+
+  for (let i = 0; i < totalBatches; i++) {
+    const start = i * batchSize;
+    const end = Math.min(start + batchSize, items.length);
+    const batch = items.slice(start, end);
+
+    onProgress?.({
+      current: start,
+      total: items.length,
+      batchNumber: i + 1,
+      totalBatches,
+    });
+
+    try {
+      const result = await processor(batch);
+      aggregatedResult.success += result.success;
+      aggregatedResult.failed += result.failed;
+      aggregatedResult.errors.push(...result.errors);
+      if (result.passwords) {
+        aggregatedResult.passwords!.push(...result.passwords);
+      }
+    } catch (error: any) {
+      aggregatedResult.failed += batch.length;
+      batch.forEach(id => {
+        aggregatedResult.errors.push({
+          staffId: id,
+          message: error.response?.data?.message || error.message || "Unknown error",
+        });
+      });
+    }
+  }
+
+  onProgress?.({
+    current: items.length,
+    total: items.length,
+    batchNumber: totalBatches,
+    totalBatches,
+  });
+
+  return aggregatedResult;
+};
+
 export const bulkStaffService = {
   updateDepartment: async (staffIds: string[], departmentId: string): Promise<BulkOperationResult> => {
     const response = await api.post<BulkOperationResult>("/staff/bulk/update-department", {
@@ -211,6 +274,26 @@ export const bulkStaffService = {
       departmentId,
     });
     return response.data;
+  },
+
+  updateDepartmentBatched: async (
+    staffIds: string[],
+    departmentId: string,
+    options?: { batchSize?: number; onProgress?: (progress: BatchProgressInfo) => void }
+  ): Promise<BulkOperationResult> => {
+    const batchSize = options?.batchSize || 50;
+    return processBulkInBatches(
+      staffIds,
+      batchSize,
+      async (batch) => {
+        const response = await api.post<BulkOperationResult>("/staff/bulk/update-department", {
+          staffIds: batch,
+          departmentId,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 
   updateBranch: async (staffIds: string[], branchId: string): Promise<BulkOperationResult> => {
@@ -221,6 +304,26 @@ export const bulkStaffService = {
     return response.data;
   },
 
+  updateBranchBatched: async (
+    staffIds: string[],
+    branchId: string,
+    options?: { batchSize?: number; onProgress?: (progress: BatchProgressInfo) => void }
+  ): Promise<BulkOperationResult> => {
+    const batchSize = options?.batchSize || 50;
+    return processBulkInBatches(
+      staffIds,
+      batchSize,
+      async (batch) => {
+        const response = await api.post<BulkOperationResult>("/staff/bulk/update-branch", {
+          staffIds: batch,
+          branchId,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   toggleActive: async (staffIds: string[], isActive: boolean): Promise<BulkOperationResult> => {
     const response = await api.post<BulkOperationResult>("/staff/bulk/toggle-active", {
       staffIds,
@@ -229,11 +332,51 @@ export const bulkStaffService = {
     return response.data;
   },
 
+  toggleActiveBatched: async (
+    staffIds: string[],
+    isActive: boolean,
+    options?: { batchSize?: number; onProgress?: (progress: BatchProgressInfo) => void }
+  ): Promise<BulkOperationResult> => {
+    const batchSize = options?.batchSize || 50;
+    return processBulkInBatches(
+      staffIds,
+      batchSize,
+      async (batch) => {
+        const response = await api.post<BulkOperationResult>("/staff/bulk/toggle-active", {
+          staffIds: batch,
+          isActive,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
   resetPassword: async (staffIds: string[], newPassword?: string): Promise<BulkOperationResult> => {
     const response = await api.post<BulkOperationResult>("/staff/bulk/reset-password", {
       staffIds,
       newPassword,
     });
     return response.data;
+  },
+
+  resetPasswordBatched: async (
+    staffIds: string[],
+    newPassword?: string,
+    options?: { batchSize?: number; onProgress?: (progress: BatchProgressInfo) => void }
+  ): Promise<BulkOperationResult> => {
+    const batchSize = options?.batchSize || 50;
+    return processBulkInBatches(
+      staffIds,
+      batchSize,
+      async (batch) => {
+        const response = await api.post<BulkOperationResult>("/staff/bulk/reset-password", {
+          staffIds: batch,
+          newPassword,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
   },
 };
