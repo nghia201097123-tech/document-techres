@@ -7,6 +7,7 @@ import {
   TransactionCategory,
   PaymentMethod,
   BankAccount,
+  Staff,
 } from '../../database/entities';
 import { TransactionVouchersService } from './transaction-vouchers.service';
 import { TransactionVouchersController } from './transaction-vouchers.controller';
@@ -20,6 +21,7 @@ import { TransactionVouchersController } from './transaction-vouchers.controller
       TransactionCategory,
       PaymentMethod,
       BankAccount,
+      Staff,
     ]),
   ],
   controllers: [TransactionVouchersController],

@@ -12,6 +12,7 @@ import {
   TransactionType,
   Brand,
   Branch,
+  Staff,
 } from '../../database/entities';
 import { CreateTransactionVoucherDto, UpdateTransactionVoucherDto } from './dto';
 
@@ -24,6 +25,8 @@ export class TransactionVouchersService {
     private readonly brandRepository: Repository<Brand>,
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
+    @InjectRepository(Staff)
+    private readonly staffRepository: Repository<Staff>,
   ) {}
 
   /**
@@ -224,6 +227,15 @@ export class TransactionVouchersService {
       branchId = firstBranch.id;
     }
 
+    // Kiểm tra staff tồn tại (userId từ JWT có thể không tồn tại trong bảng staff local)
+    let createdById: string | null = null;
+    if (userId) {
+      const staff = await this.staffRepository.findOne({ where: { id: userId } });
+      if (staff) {
+        createdById = userId;
+      }
+    }
+
     // Tạo số phiếu
     const voucherDate = new Date(createDto.voucherDate);
     const voucherNumber = await this.generateVoucherNumber(
@@ -239,7 +251,7 @@ export class TransactionVouchersService {
       branchId,
       voucherNumber,
       voucherDate,
-      createdById: userId,
+      createdById,
       status: createDto.status || VoucherStatus.DRAFT,
     });
 
@@ -297,8 +309,17 @@ export class TransactionVouchersService {
       throw new BadRequestException('Không thể duyệt phiếu đã hủy');
     }
 
+    // Kiểm tra staff tồn tại
+    let approvedById: string | null = null;
+    if (approverId) {
+      const staff = await this.staffRepository.findOne({ where: { id: approverId } });
+      if (staff) {
+        approvedById = approverId;
+      }
+    }
+
     voucher.status = VoucherStatus.APPROVED;
-    voucher.approvedById = approverId;
+    voucher.approvedById = approvedById;
     voucher.approvedAt = new Date();
 
     return this.voucherRepository.save(voucher);
