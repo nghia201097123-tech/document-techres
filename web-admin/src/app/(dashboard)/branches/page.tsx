@@ -66,7 +66,7 @@ interface BranchFormData {
   brandId: string;
   name: string;
   code: string;
-  logo: string;
+  logoUrl: string;
   address: string;
   phone: string;
   email: string;
@@ -80,7 +80,7 @@ const initialFormData: BranchFormData = {
   brandId: "",
   name: "",
   code: "",
-  logo: "",
+  logoUrl: "",
   address: "",
   phone: "",
   email: "",
@@ -239,7 +239,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
-      logo: branch.logo || "",
+      logoUrl: branch.logoUrl || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -258,7 +258,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
-      logo: branch.logo || "",
+      logoUrl: branch.logoUrl || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -498,9 +498,9 @@ export default function BranchesPage() {
                 <TableRow key={branch.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      {branch.logo ? (
+                      {branch.logoUrl ? (
                         <img
-                          src={branch.logo}
+                          src={branch.logoUrl}
                           alt={branch.name}
                           className="h-10 w-10 rounded-lg object-cover"
                           onError={(e) => {
@@ -509,7 +509,7 @@ export default function BranchesPage() {
                           }}
                         />
                       ) : null}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 ${branch.logo ? 'hidden' : ''}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 ${branch.logoUrl ? 'hidden' : ''}`}>
                         <MapPin className="h-5 w-5 text-orange-500" />
                       </div>
                       <div>
@@ -740,8 +740,8 @@ export default function BranchesPage() {
                 </div>
               </div>
               <ImageUpload
-                value={formData.logo}
-                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                value={formData.logoUrl}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logoUrl: value }))}
                 disabled={isViewMode}
                 label="Logo chi nhánh"
                 folder="branches"

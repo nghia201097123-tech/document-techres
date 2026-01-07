@@ -77,7 +77,7 @@ interface BrandFormData {
   companyId: string;
   name: string;
   code: string;
-  logo: string;
+  logoUrl: string;
   businessModel: BusinessModel;
   description: string;
 }
@@ -86,7 +86,7 @@ const initialFormData: BrandFormData = {
   companyId: "",
   name: "",
   code: "",
-  logo: "",
+  logoUrl: "",
   businessModel: "full_system",
   description: "",
 };
@@ -242,7 +242,7 @@ export default function BrandsPage() {
       companyId: brand.companyId,
       name: brand.name,
       code: brand.code,
-      logo: brand.logo || "",
+      logoUrl: brand.logoUrl || "",
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -256,7 +256,7 @@ export default function BrandsPage() {
       companyId: brand.companyId,
       name: brand.name,
       code: brand.code,
-      logo: brand.logo || "",
+      logoUrl: brand.logoUrl || "",
       businessModel: brand.businessModel,
       description: brand.description || "",
     });
@@ -506,9 +506,9 @@ export default function BrandsPage() {
                 <TableRow key={brand.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      {brand.logo ? (
+                      {brand.logoUrl ? (
                         <img
-                          src={brand.logo}
+                          src={brand.logoUrl}
                           alt={brand.name}
                           className="h-10 w-10 rounded-lg object-cover"
                           onError={(e) => {
@@ -517,7 +517,7 @@ export default function BrandsPage() {
                           }}
                         />
                       ) : null}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 ${brand.logo ? 'hidden' : ''}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 ${brand.logoUrl ? 'hidden' : ''}`}>
                         <Store className="h-5 w-5 text-green-500" />
                       </div>
                       <div>
@@ -732,8 +732,8 @@ export default function BrandsPage() {
                 </div>
               </div>
               <ImageUpload
-                value={formData.logo}
-                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                value={formData.logoUrl}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logoUrl: value }))}
                 disabled={isViewMode}
                 label="Logo thương hiệu"
                 folder="brands"
