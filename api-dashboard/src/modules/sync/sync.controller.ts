@@ -4,7 +4,7 @@ import { SyncService } from './sync.service';
 import { SyncCompanyDataDto, SyncBrandDto, SyncBranchDto } from './dto/sync.dto';
 
 @ApiTags('Sync')
-@Controller('api/sync')
+@Controller('sync')
 export class SyncController {
   private readonly logger = new Logger(SyncController.name);
 
