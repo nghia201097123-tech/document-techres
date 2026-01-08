@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useBackgroundProgress, type BackgroundProgressInfo } from "@/components/ui/background-progress";
-import { bulkStaffService, type BulkOperationResult, type BatchProgressInfo } from "@/services/staff-service";
+import { bulkStaffService, staffService, type BulkOperationResult, type BatchProgressInfo, type BulkStaffItem, type BulkImportResult } from "@/services/staff-service";
 
 /**
  * Storage key for staff batch operations
@@ -12,7 +12,7 @@ const STAFF_BATCH_STORAGE_KEY = "staff-batch-operation";
 /**
  * Types of staff batch operations
  */
-export type StaffBatchOperationType = "department" | "branch" | "activate" | "deactivate" | "delete";
+export type StaffBatchOperationType = "department" | "branch" | "activate" | "deactivate" | "delete" | "import";
 
 /**
  * Stored batch operation data
@@ -21,15 +21,22 @@ export interface StoredStaffBatchOperation {
   id: string;
   type: StaffBatchOperationType;
   title: string;
-  // All staff IDs to process
+  // All staff IDs to process (for bulk operations)
   staffIds: string[];
   // Staff IDs that have been successfully processed
   processedIds: string[];
   // Failed items with errors
   failedItems: { staffId: string; error: string }[];
-  // Additional parameters
+  // Additional parameters for bulk operations
   departmentId?: string;
   branchId?: string;
+  // Import-specific fields
+  importItems?: BulkStaffItem[];
+  importProcessedIndex?: number; // Index of last processed item
+  importCreated?: number;
+  importUpdated?: number;
+  importErrors?: { row: number; message: string }[];
+  usernamePrefix?: string;
   // Timestamps
   createdAt: number;
   updatedAt: number;
@@ -92,6 +99,16 @@ interface StartBatchOptions {
 }
 
 /**
+ * Options for starting an import operation
+ */
+interface StartImportOptions {
+  items: BulkStaffItem[];
+  usernamePrefix?: string;
+  batchSize?: number;
+  onComplete?: (result: BulkImportResult) => void;
+}
+
+/**
  * Hook for managing persistent staff batch operations
  */
 export function useStaffBatch() {
@@ -115,6 +132,7 @@ export function useStaffBatch() {
       activate: "Bật nhân viên",
       deactivate: "Tắt nhân viên",
       delete: "Xóa nhân viên",
+      import: "Import nhân viên",
     };
     return titles[type] || "Xử lý nhân viên";
   };
@@ -263,6 +281,151 @@ export function useStaffBatch() {
     [updateProgress, completeProgress, errorProgress]
   );
 
+  // Process remaining items in an import operation
+  const processRemainingImportItems = React.useCallback(
+    async (
+      operation: StoredStaffBatchOperation,
+      onComplete?: (result: BulkImportResult) => void
+    ) => {
+      if (isProcessingRef.current) {
+        console.warn("Already processing an import operation");
+        return;
+      }
+
+      const { id, importItems, importProcessedIndex, importCreated, importUpdated, importErrors, usernamePrefix } = operation;
+
+      if (!importItems || importItems.length === 0) {
+        storage.clear();
+        return;
+      }
+
+      const batchSize = 100;
+      const startIndex = importProcessedIndex || 0;
+      const remainingItems = importItems.slice(startIndex);
+
+      if (remainingItems.length === 0) {
+        // Already completed
+        const result: BulkImportResult = {
+          created: importCreated || 0,
+          updated: importUpdated || 0,
+          errors: importErrors || [],
+        };
+        if ((importErrors?.length || 0) > 0) {
+          completeProgress(id, `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`);
+        } else {
+          completeProgress(id, `Tạo: ${result.created}, Cập nhật: ${result.updated}`);
+        }
+        storage.clear();
+        onComplete?.(result);
+        return;
+      }
+
+      isProcessingRef.current = true;
+      abortRef.current = false;
+
+      // Update progress to running
+      updateProgress(id, { status: "running", canResume: false });
+
+      let currentProcessedIndex = startIndex;
+      let currentCreated = importCreated || 0;
+      let currentUpdated = importUpdated || 0;
+      let currentErrors = [...(importErrors || [])];
+      const totalBatches = Math.ceil(remainingItems.length / batchSize);
+
+      try {
+        for (let i = 0; i < totalBatches; i++) {
+          // Check if aborted
+          if (abortRef.current) {
+            storage.update({
+              importProcessedIndex: currentProcessedIndex,
+              importCreated: currentCreated,
+              importUpdated: currentUpdated,
+              importErrors: currentErrors,
+            });
+            updateProgress(id, { status: "paused", canResume: true });
+            isProcessingRef.current = false;
+            return;
+          }
+
+          const batchStart = i * batchSize;
+          const batchEnd = Math.min(batchStart + batchSize, remainingItems.length);
+          const batch = remainingItems.slice(batchStart, batchEnd);
+
+          // Update progress
+          updateProgress(id, {
+            current: currentProcessedIndex,
+            batchNumber: i + 1,
+            totalBatches,
+          });
+
+          try {
+            const result = await staffService.bulkImport(batch, usernamePrefix);
+
+            currentCreated += result.created;
+            currentUpdated += result.updated;
+
+            // Adjust row numbers for errors (add startIndex offset)
+            result.errors.forEach((err) => {
+              currentErrors.push({
+                row: err.row + startIndex,
+                message: err.message,
+              });
+            });
+
+            currentProcessedIndex = startIndex + batchEnd;
+
+            // Save progress after each batch
+            storage.update({
+              importProcessedIndex: currentProcessedIndex,
+              importCreated: currentCreated,
+              importUpdated: currentUpdated,
+              importErrors: currentErrors,
+            });
+          } catch (error: any) {
+            // If entire batch fails, mark all items in batch as errors
+            const errorMsg = error?.response?.data?.message || error?.message || "Unknown error";
+            batch.forEach((_, idx) => {
+              currentErrors.push({
+                row: startIndex + batchStart + idx + 2, // +2 for Excel header
+                message: errorMsg,
+              });
+            });
+            currentProcessedIndex = startIndex + batchEnd;
+            storage.update({
+              importProcessedIndex: currentProcessedIndex,
+              importCreated: currentCreated,
+              importUpdated: currentUpdated,
+              importErrors: currentErrors,
+            });
+          }
+        }
+
+        // Completed
+        const finalResult: BulkImportResult = {
+          created: currentCreated,
+          updated: currentUpdated,
+          errors: currentErrors,
+        };
+
+        if (finalResult.errors.length > 0) {
+          completeProgress(id, `Tạo: ${finalResult.created}, Cập nhật: ${finalResult.updated}, Lỗi: ${finalResult.errors.length}`);
+        } else {
+          completeProgress(id, `Tạo: ${finalResult.created}, Cập nhật: ${finalResult.updated}`);
+        }
+
+        storage.clear();
+        onComplete?.(finalResult);
+      } catch (error: any) {
+        const errorMsg = error?.response?.data?.message || error?.message || "Có lỗi xảy ra";
+        errorProgress(id, errorMsg);
+        storage.clear();
+      } finally {
+        isProcessingRef.current = false;
+      }
+    },
+    [updateProgress, completeProgress, errorProgress]
+  );
+
   // Start a new batch operation
   const startBatch = React.useCallback(
     async (options: StartBatchOptions) => {
@@ -309,15 +472,69 @@ export function useStaffBatch() {
     [addProgress, processRemainingItems]
   );
 
+  // Start a new import operation
+  const startImport = React.useCallback(
+    async (options: StartImportOptions) => {
+      const { items, usernamePrefix, onComplete } = options;
+
+      if (items.length === 0) return;
+
+      const id = `staff-import-${Date.now()}`;
+      const title = getOperationTitle("import");
+      const total = items.length;
+      const batchSize = options.batchSize || 100;
+      const totalBatches = Math.ceil(total / batchSize);
+
+      // Create operation in storage
+      const operation: StoredStaffBatchOperation = {
+        id,
+        type: "import",
+        title,
+        staffIds: [], // Not used for import
+        processedIds: [],
+        failedItems: [],
+        importItems: items,
+        importProcessedIndex: 0,
+        importCreated: 0,
+        importUpdated: 0,
+        importErrors: [],
+        usernamePrefix,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      storage.save(operation);
+
+      // Add to progress UI
+      addProgress({
+        id,
+        title,
+        current: 0,
+        total,
+        batchNumber: 1,
+        totalBatches,
+        persistentType: "staff-import",
+        canResume: true,
+      });
+
+      // Process
+      await processRemainingImportItems(operation, onComplete);
+    },
+    [addProgress, processRemainingImportItems]
+  );
+
   // Resume handler for when user clicks resume button
   const handleResume = React.useCallback(
     (progressId: string) => {
       const operation = storage.get();
       if (operation && operation.id === progressId) {
-        processRemainingItems(operation);
+        if (operation.type === "import") {
+          processRemainingImportItems(operation);
+        } else {
+          processRemainingItems(operation);
+        }
       }
     },
-    [processRemainingItems]
+    [processRemainingItems, processRemainingImportItems]
   );
 
   // Check for pending operations on mount and setup resume handler
@@ -326,9 +543,18 @@ export function useStaffBatch() {
 
     const pendingOperation = storage.get();
     if (pendingOperation) {
-      const { id, title, staffIds, processedIds } = pendingOperation;
-      const total = staffIds.length;
-      const current = processedIds.length;
+      const { id, title, type, staffIds, processedIds, importItems, importProcessedIndex } = pendingOperation;
+
+      let total: number;
+      let current: number;
+
+      if (type === "import") {
+        total = importItems?.length || 0;
+        current = importProcessedIndex || 0;
+      } else {
+        total = staffIds.length;
+        current = processedIds.length;
+      }
 
       // Check if already shown in progresses
       const alreadyShown = progresses.some((p) => p.id === id);
@@ -340,7 +566,7 @@ export function useStaffBatch() {
           current,
           total,
           status: "resumable",
-          persistentType: `staff-${pendingOperation.type}`,
+          persistentType: type === "import" ? "staff-import" : `staff-${type}`,
           canResume: true,
         });
       }
@@ -360,6 +586,9 @@ export function useStaffBatch() {
   const hasPendingOperation = React.useCallback((): boolean => {
     const operation = storage.get();
     if (!operation) return false;
+    if (operation.type === "import") {
+      return (operation.importProcessedIndex || 0) < (operation.importItems?.length || 0);
+    }
     return operation.processedIds.length < operation.staffIds.length;
   }, []);
 
@@ -375,6 +604,7 @@ export function useStaffBatch() {
 
   return {
     startBatch,
+    startImport,
     abortBatch,
     hasPendingOperation,
     getPendingOperation,

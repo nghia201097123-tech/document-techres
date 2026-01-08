@@ -168,7 +168,7 @@ export default function ProductsPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
   const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
-  const { startBatch: startProductBatch } = useProductBatch();
+  const { startBatch: startProductBatch, startImport: startProductImport } = useProductBatch();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Column configuration hook
@@ -1302,53 +1302,29 @@ export default function ProductsPage() {
       return;
     }
 
-    // Close dialog immediately and run import in background
-    const totalItems = importData.length;
-    const progressId = `import-products-${Date.now()}`;
     const brandId = filterBrandId;
     const dataToImport = [...importData];
 
+    // Close dialog immediately
     handleCloseDialog();
 
-    // Add to background progress
-    addProgress({
-      id: progressId,
-      title: "Import món ăn",
-      current: 0,
-      total: totalItems,
-      batchNumber: 1,
-      totalBatches: Math.ceil(totalItems / 100),
-    });
+    // Use the persistent import hook - this allows resume after page reload
+    startProductImport({
+      items: dataToImport as BulkProductItem[],
+      brandId,
+      batchSize: 100,
+      onComplete: (result) => {
+        // Reload products list when completed
+        loadProducts(brandId);
 
-    try {
-      // Use batched import for large datasets to avoid timeout
-      const result = await productService.bulkImportBatched(
-        dataToImport as BulkProductItem[],
-        brandId,
-        {
-          batchSize: 100,
-          onProgress: (progress) => {
-            updateProgress(progressId, {
-              current: progress.current,
-              batchNumber: progress.batchNumber,
-              totalBatches: progress.totalBatches,
-            });
-          },
+        if (result.errors.length > 0) {
+          toast({
+            title: "Import hoàn thành",
+            description: `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`,
+          });
         }
-      );
-
-      // Reload products list
-      loadProducts(brandId);
-
-      if (result.errors.length > 0) {
-        completeProgress(progressId, `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`);
-      } else {
-        completeProgress(progressId, `Tạo: ${result.created}, Cập nhật: ${result.updated}`);
-      }
-    } catch (error: any) {
-      console.error("Error importing:", error);
-      errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra khi import");
-    }
+      },
+    });
   };
 
   // Handle product type change - reset category when type changes

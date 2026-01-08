@@ -195,7 +195,7 @@ export default function StaffPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
   const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
-  const { startBatch: startStaffBatch } = useStaffBatch();
+  const { startBatch: startStaffBatch, startImport: startStaffImport } = useStaffBatch();
   const tenantId = useAuthStore((state) => state.tenantId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -1356,51 +1356,25 @@ export default function StaffPage() {
       return item;
     });
 
-    // Close dialog immediately and run import in background
-    const totalItems = dataWithSettings.length;
-    const progressId = `import-staff-${Date.now()}`;
-
+    // Close dialog immediately
     handleCloseDialog();
 
-    // Add to background progress
-    addProgress({
-      id: progressId,
-      title: "Import nhân viên",
-      current: 0,
-      total: totalItems,
-      batchNumber: 1,
-      totalBatches: Math.ceil(totalItems / 100),
-    });
+    // Use the persistent import hook - this allows resume after page reload
+    startStaffImport({
+      items: dataWithSettings as BulkStaffItem[],
+      batchSize: 100,
+      onComplete: (result) => {
+        // Reload staff list when completed
+        loadStaff(filterBranchId, filterBrandId);
 
-    try {
-      // Use batched import for large datasets to avoid timeout
-      const result = await staffService.bulkImportBatched(
-        dataWithSettings as BulkStaffItem[],
-        undefined,
-        {
-          batchSize: 100,
-          onProgress: (progress) => {
-            updateProgress(progressId, {
-              current: progress.current,
-              batchNumber: progress.batchNumber,
-              totalBatches: progress.totalBatches,
-            });
-          },
+        if (result.errors.length > 0) {
+          toast({
+            title: "Import hoàn thành",
+            description: `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`,
+          });
         }
-      );
-
-      // Reload staff list
-      loadStaff(filterBranchId, filterBrandId);
-
-      if (result.errors.length > 0) {
-        completeProgress(progressId, `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`);
-      } else {
-        completeProgress(progressId, `Tạo: ${result.created}, Cập nhật: ${result.updated}`);
-      }
-    } catch (error: any) {
-      console.error("Error importing:", error);
-      errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra khi import");
-    }
+      },
+    });
   };
 
   // Format date for display

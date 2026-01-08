@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
-import { bulkProductService, type ProductBulkOperationResult } from "@/services/product-service";
+import { bulkProductService, productService, type ProductBulkOperationResult, type BulkProductItem, type ProductBulkImportResult } from "@/services/product-service";
 
 /**
  * Storage key for product batch operations
@@ -24,7 +24,8 @@ export type ProductBatchOperationType =
   | "print-dish"
   | "unit"
   | "selling-type"
-  | "preparation-time";
+  | "preparation-time"
+  | "import";
 
 /**
  * Stored batch operation data
@@ -33,19 +34,26 @@ export interface StoredProductBatchOperation {
   id: string;
   type: ProductBatchOperationType;
   title: string;
-  // All product IDs to process
+  // All product IDs to process (for bulk operations)
   productIds: string[];
   // Product IDs that have been successfully processed
   processedIds: string[];
   // Failed items with errors
   failedItems: { productId: string; error: string }[];
-  // Additional parameters
+  // Additional parameters for bulk operations
   categoryId?: string;
   vatRate?: number;
   price?: number;
   boolValue?: boolean;
   stringValue?: string;
   numberValue?: number;
+  // Import-specific fields
+  importItems?: BulkProductItem[];
+  importProcessedIndex?: number; // Index of last processed item
+  importCreated?: number;
+  importUpdated?: number;
+  importErrors?: { row: number; message: string }[];
+  brandId?: string;
   // Timestamps
   createdAt: number;
   updatedAt: number;
@@ -112,6 +120,16 @@ interface StartBatchOptions {
 }
 
 /**
+ * Options for starting an import operation
+ */
+interface StartImportOptions {
+  items: BulkProductItem[];
+  brandId: string;
+  batchSize?: number;
+  onComplete?: (result: ProductBulkImportResult) => void;
+}
+
+/**
  * Hook for managing persistent product batch operations
  */
 export function useProductBatch() {
@@ -142,6 +160,7 @@ export function useProductBatch() {
       unit: "Cập nhật đơn vị",
       "selling-type": "Cập nhật loại bán",
       "preparation-time": "Cập nhật thời gian chế biến",
+      import: "Import món ăn",
     };
     return titles[type] || "Xử lý sản phẩm";
   };
@@ -311,6 +330,153 @@ export function useProductBatch() {
     [updateProgress, completeProgress, errorProgress]
   );
 
+  // Process remaining items in an import operation
+  const processRemainingImportItems = React.useCallback(
+    async (
+      operation: StoredProductBatchOperation,
+      onComplete?: (result: ProductBulkImportResult) => void
+    ) => {
+      if (isProcessingRef.current) {
+        console.warn("Already processing an import operation");
+        return;
+      }
+
+      const { id, importItems, importProcessedIndex, importCreated, importUpdated, importErrors, brandId } = operation;
+
+      if (!importItems || importItems.length === 0 || !brandId) {
+        storage.clear();
+        return;
+      }
+
+      const batchSize = 100;
+      const startIndex = importProcessedIndex || 0;
+      const remainingItems = importItems.slice(startIndex);
+
+      if (remainingItems.length === 0) {
+        // Already completed
+        const result: ProductBulkImportResult = {
+          created: importCreated || 0,
+          updated: importUpdated || 0,
+          errors: importErrors || [],
+          products: [],
+        };
+        if ((importErrors?.length || 0) > 0) {
+          completeProgress(id, `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`);
+        } else {
+          completeProgress(id, `Tạo: ${result.created}, Cập nhật: ${result.updated}`);
+        }
+        storage.clear();
+        onComplete?.(result);
+        return;
+      }
+
+      isProcessingRef.current = true;
+      abortRef.current = false;
+
+      // Update progress to running
+      updateProgress(id, { status: "running", canResume: false });
+
+      let currentProcessedIndex = startIndex;
+      let currentCreated = importCreated || 0;
+      let currentUpdated = importUpdated || 0;
+      let currentErrors = [...(importErrors || [])];
+      const totalBatches = Math.ceil(remainingItems.length / batchSize);
+
+      try {
+        for (let i = 0; i < totalBatches; i++) {
+          // Check if aborted
+          if (abortRef.current) {
+            storage.update({
+              importProcessedIndex: currentProcessedIndex,
+              importCreated: currentCreated,
+              importUpdated: currentUpdated,
+              importErrors: currentErrors,
+            });
+            updateProgress(id, { status: "paused", canResume: true });
+            isProcessingRef.current = false;
+            return;
+          }
+
+          const batchStart = i * batchSize;
+          const batchEnd = Math.min(batchStart + batchSize, remainingItems.length);
+          const batch = remainingItems.slice(batchStart, batchEnd);
+
+          // Update progress
+          updateProgress(id, {
+            current: currentProcessedIndex,
+            batchNumber: i + 1,
+            totalBatches,
+          });
+
+          try {
+            const result = await productService.bulkImport(batch, brandId);
+
+            currentCreated += result.created;
+            currentUpdated += result.updated;
+
+            // Adjust row numbers for errors (add startIndex offset)
+            result.errors.forEach((err) => {
+              currentErrors.push({
+                row: err.row + startIndex,
+                message: err.message,
+              });
+            });
+
+            currentProcessedIndex = startIndex + batchEnd;
+
+            // Save progress after each batch
+            storage.update({
+              importProcessedIndex: currentProcessedIndex,
+              importCreated: currentCreated,
+              importUpdated: currentUpdated,
+              importErrors: currentErrors,
+            });
+          } catch (error: any) {
+            // If entire batch fails, mark all items in batch as errors
+            const errorMsg = error?.response?.data?.message || error?.message || "Unknown error";
+            batch.forEach((_, idx) => {
+              currentErrors.push({
+                row: startIndex + batchStart + idx + 2, // +2 for Excel header
+                message: errorMsg,
+              });
+            });
+            currentProcessedIndex = startIndex + batchEnd;
+            storage.update({
+              importProcessedIndex: currentProcessedIndex,
+              importCreated: currentCreated,
+              importUpdated: currentUpdated,
+              importErrors: currentErrors,
+            });
+          }
+        }
+
+        // Completed
+        const finalResult: ProductBulkImportResult = {
+          created: currentCreated,
+          updated: currentUpdated,
+          errors: currentErrors,
+          products: [],
+        };
+
+        if (finalResult.errors.length > 0) {
+          completeProgress(id, `Tạo: ${finalResult.created}, Cập nhật: ${finalResult.updated}, Lỗi: ${finalResult.errors.length}`);
+        } else {
+          completeProgress(id, `Tạo: ${finalResult.created}, Cập nhật: ${finalResult.updated}`);
+        }
+
+        storage.clear();
+        onComplete?.(finalResult);
+      } catch (error: any) {
+        const errorMsg = error?.response?.data?.message || error?.message || "Có lỗi xảy ra";
+        errorProgress(id, errorMsg);
+        storage.clear();
+      } finally {
+        isProcessingRef.current = false;
+      }
+    },
+    [updateProgress, completeProgress, errorProgress]
+  );
+
   // Start a new batch operation
   const startBatch = React.useCallback(
     async (options: StartBatchOptions) => {
@@ -361,15 +527,69 @@ export function useProductBatch() {
     [addProgress, processRemainingItems]
   );
 
+  // Start a new import operation
+  const startImport = React.useCallback(
+    async (options: StartImportOptions) => {
+      const { items, brandId, onComplete } = options;
+
+      if (items.length === 0) return;
+
+      const id = `product-import-${Date.now()}`;
+      const title = getOperationTitle("import");
+      const total = items.length;
+      const batchSize = options.batchSize || 100;
+      const totalBatches = Math.ceil(total / batchSize);
+
+      // Create operation in storage
+      const operation: StoredProductBatchOperation = {
+        id,
+        type: "import",
+        title,
+        productIds: [], // Not used for import
+        processedIds: [],
+        failedItems: [],
+        importItems: items,
+        importProcessedIndex: 0,
+        importCreated: 0,
+        importUpdated: 0,
+        importErrors: [],
+        brandId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      storage.save(operation);
+
+      // Add to progress UI
+      addProgress({
+        id,
+        title,
+        current: 0,
+        total,
+        batchNumber: 1,
+        totalBatches,
+        persistentType: "product-import",
+        canResume: true,
+      });
+
+      // Process
+      await processRemainingImportItems(operation, onComplete);
+    },
+    [addProgress, processRemainingImportItems]
+  );
+
   // Resume handler for when user clicks resume button
   const handleResume = React.useCallback(
     (progressId: string) => {
       const operation = storage.get();
       if (operation && operation.id === progressId) {
-        processRemainingItems(operation);
+        if (operation.type === "import") {
+          processRemainingImportItems(operation);
+        } else {
+          processRemainingItems(operation);
+        }
       }
     },
-    [processRemainingItems]
+    [processRemainingItems, processRemainingImportItems]
   );
 
   // Check for pending operations on mount and setup resume handler
@@ -378,9 +598,18 @@ export function useProductBatch() {
 
     const pendingOperation = storage.get();
     if (pendingOperation) {
-      const { id, title, productIds, processedIds } = pendingOperation;
-      const total = productIds.length;
-      const current = processedIds.length;
+      const { id, title, type, productIds, processedIds, importItems, importProcessedIndex } = pendingOperation;
+
+      let total: number;
+      let current: number;
+
+      if (type === "import") {
+        total = importItems?.length || 0;
+        current = importProcessedIndex || 0;
+      } else {
+        total = productIds.length;
+        current = processedIds.length;
+      }
 
       // Check if already shown in progresses
       const alreadyShown = progresses.some((p) => p.id === id);
@@ -392,7 +621,7 @@ export function useProductBatch() {
           current,
           total,
           status: "resumable",
-          persistentType: `product-${pendingOperation.type}`,
+          persistentType: type === "import" ? "product-import" : `product-${type}`,
           canResume: true,
         });
       }
@@ -412,6 +641,9 @@ export function useProductBatch() {
   const hasPendingOperation = React.useCallback((): boolean => {
     const operation = storage.get();
     if (!operation) return false;
+    if (operation.type === "import") {
+      return (operation.importProcessedIndex || 0) < (operation.importItems?.length || 0);
+    }
     return operation.processedIds.length < operation.productIds.length;
   }, []);
 
@@ -427,6 +659,7 @@ export function useProductBatch() {
 
   return {
     startBatch,
+    startImport,
     abortBatch,
     hasPendingOperation,
     getPendingOperation,
