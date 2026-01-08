@@ -207,13 +207,13 @@ fun DatabaseDebugScreen(
 @Composable
 fun CategoriesTable(categories: List<CategoryEntity>) {
     DataTable(
-        headers = listOf("ID", "Name", "Code", "Active"),
+        headers = listOf("ID", "Name", "Description", "Active"),
         data = categories,
         rowContent = { category ->
             listOf(
                 category.id.take(8) + "...",
                 category.name,
-                category.code ?: "-",
+                category.description ?: "-",
                 if (category.isActive) "✓" else "✗"
             )
         }
@@ -229,7 +229,7 @@ fun ProductsTable(products: List<ProductEntity>) {
             listOf(
                 product.id.take(8) + "...",
                 product.name,
-                product.code ?: "-",
+                product.code,
                 "%,.0f".format(product.price),
                 product.categoryId?.take(8) ?: "-",
                 if (product.isActive) "✓" else "✗"
@@ -241,13 +241,13 @@ fun ProductsTable(products: List<ProductEntity>) {
 @Composable
 fun AreasTable(areas: List<AreaEntity>) {
     DataTable(
-        headers = listOf("ID", "Name", "Code", "Active"),
+        headers = listOf("ID", "Name", "Description", "Active"),
         data = areas,
         rowContent = { area ->
             listOf(
                 area.id.take(8) + "...",
                 area.name,
-                area.code ?: "-",
+                area.description ?: "-",
                 if (area.isActive) "✓" else "✗"
             )
         }
@@ -257,13 +257,13 @@ fun AreasTable(areas: List<AreaEntity>) {
 @Composable
 fun TablesTable(tables: List<TableEntity>) {
     DataTable(
-        headers = listOf("ID", "Name", "Code", "Area", "Status", "Active"),
+        headers = listOf("ID", "Name", "Capacity", "Area", "Status", "Active"),
         data = tables,
         rowContent = { table ->
             listOf(
                 table.id.take(8) + "...",
                 table.name,
-                table.code ?: "-",
+                table.capacity.toString(),
                 table.areaId?.take(8) ?: "-",
                 table.status,
                 if (table.isActive) "✓" else "✗"
@@ -281,8 +281,8 @@ fun StaffTable(staff: List<StaffEntity>) {
             listOf(
                 s.id.take(8) + "...",
                 s.name,
-                s.code ?: "-",
-                s.role ?: "-",
+                s.code,
+                s.role,
                 if (s.isActive) "✓" else "✗"
             )
         }
