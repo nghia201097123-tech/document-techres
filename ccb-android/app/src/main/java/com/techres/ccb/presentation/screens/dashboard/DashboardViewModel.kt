@@ -218,7 +218,7 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
     fun updatePosOrderStatus(orderId: String, newStatus: PosOrderStatus) {
         viewModelScope.launch {
             _uiState.update { state ->
-                val updatedOrders = if (newStatus == PosOrderStatus.PAID) {
+                val updatedOrders = if (newStatus == PosOrderStatus.COMPLETED) {
                     state.posOrders.filter { it.id != orderId }
                 } else {
                     state.posOrders.map { order ->
