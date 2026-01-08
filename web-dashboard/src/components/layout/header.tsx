@@ -62,14 +62,14 @@ export function Header() {
       return;
     }
 
-    if (passwordForm.newPassword.length < 8) {
-      toast({ title: "Lỗi", description: "Mật khẩu mới phải có ít nhất 8 ký tự", variant: "destructive" });
+    if (passwordForm.newPassword.length < 6) {
+      toast({ title: "Lỗi", description: "Mật khẩu mới phải có ít nhất 6 ký tự", variant: "destructive" });
       return;
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*\d)/;
     if (!passwordRegex.test(passwordForm.newPassword)) {
-      toast({ title: "Lỗi", description: "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt", variant: "destructive" });
+      toast({ title: "Lỗi", description: "Mật khẩu phải có chữ thường và số", variant: "destructive" });
       return;
     }
 
@@ -191,11 +191,11 @@ export function Header() {
                 <Input
                   id="newPassword"
                   type="password"
-                  placeholder="Nhập mật khẩu mới (ít nhất 8 ký tự)"
+                  placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                   required
-                  minLength={8}
+                  minLength={6}
                 />
               </div>
               <div className="grid gap-2">
