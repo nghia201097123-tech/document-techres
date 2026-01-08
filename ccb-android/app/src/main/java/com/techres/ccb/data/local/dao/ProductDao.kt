@@ -38,7 +38,7 @@ interface ProductDao {
     suspend fun deleteAllByBranch(branchId: String)
 
     @Query("UPDATE products SET is_active = 0 WHERE id = :id")
-    suspend fun softDelete(id: String, deletedAt: Long)
+    suspend fun softDelete(id: String)
 
     @Query("SELECT COUNT(*) FROM products WHERE branch_id = :branchId AND is_active = 1 AND is_available = 1")
     suspend fun getCount(branchId: String): Int

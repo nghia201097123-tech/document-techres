@@ -29,7 +29,7 @@ interface CategoryDao {
     suspend fun deleteAllByBranch(branchId: String)
 
     @Query("UPDATE categories SET is_active = 0 WHERE id = :id")
-    suspend fun softDelete(id: String, deletedAt: Long)
+    suspend fun softDelete(id: String)
 
     @Query("SELECT COUNT(*) FROM categories WHERE branch_id = :branchId AND is_active = 1")
     suspend fun getCount(branchId: String): Int

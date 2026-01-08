@@ -133,7 +133,7 @@ class SyncManager @Inject constructor(
         data.categories?.forEach { item ->
             val entity = item.data.toEntity(branchId)
             if (item.action == "DELETE") {
-                categoryDao.softDelete(entity.id, System.currentTimeMillis())
+                categoryDao.softDelete(entity.id)
             } else {
                 categoryDao.insert(entity)
             }
@@ -143,7 +143,7 @@ class SyncManager @Inject constructor(
         data.products?.forEach { item ->
             val entity = item.data.toEntity(branchId)
             if (item.action == "DELETE") {
-                productDao.softDelete(entity.id, System.currentTimeMillis())
+                productDao.softDelete(entity.id)
             } else {
                 productDao.insert(entity)
             }
@@ -171,8 +171,8 @@ class SyncManager @Inject constructor(
 
         // Process deleted IDs
         data.deletedIds?.let { deleted ->
-            deleted.categoryIds?.forEach { categoryDao.softDelete(it, System.currentTimeMillis()) }
-            deleted.productIds?.forEach { productDao.softDelete(it, System.currentTimeMillis()) }
+            deleted.categoryIds?.forEach { categoryDao.softDelete(it) }
+            deleted.productIds?.forEach { productDao.softDelete(it) }
             deleted.staffIds?.forEach { staffDao.softDelete(it) }
             deleted.voucherIds?.forEach { voucherDao.softDelete(it, System.currentTimeMillis()) }
         }
