@@ -20,11 +20,13 @@ import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.foodorder.FoodOrderScreen
+import com.techres.ccb.presentation.screens.dashboard.DashboardScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Login : Screen("login")
     object Pin : Screen("pin")
+    object Dashboard : Screen("dashboard")  // Main dashboard screen
     object Home : Screen("home")
     object Sale : Screen("sale")  // New POS Sale Screen
     object FoodOrder : Screen("food_order")  // Food App Orders Screen
@@ -62,7 +64,7 @@ fun CCBNavHost() {
                     }
                 },
                 onNavigateToHome = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 }
@@ -72,8 +74,8 @@ fun CCBNavHost() {
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    // Skip PIN screen, go directly to Home
-                    navController.navigate(Screen.Home.route) {
+                    // Skip PIN screen, go directly to Dashboard
+                    navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
@@ -83,13 +85,35 @@ fun CCBNavHost() {
         composable(Screen.Pin.route) {
             PinScreen(
                 onPinVerified = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Pin.route) { inclusive = true }
                     }
                 },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Pin.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Dashboard.route) {
+            DashboardScreen(
+                onNavigateToSale = {
+                    navController.navigate(Screen.Sale.route)
+                },
+                onNavigateToFoodOrders = {
+                    navController.navigate(Screen.FoodOrder.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToShift = {
+                    navController.navigate(Screen.Shift.route)
+                },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
                     }
                 }
             )
@@ -116,7 +140,7 @@ fun CCBNavHost() {
                     navController.navigate(Screen.FoodOrder.route)
                 },
                 onLogout = {
-                    navController.navigate(Screen.Pin.route) {
+                    navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 }
@@ -151,7 +175,7 @@ fun CCBNavHost() {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToOrder = { id ->
                     navController.navigate(Screen.Order.createRoute(id)) {
-                        popUpTo(Screen.Home.route)
+                        popUpTo(Screen.Dashboard.route)
                     }
                 }
             )
@@ -187,8 +211,8 @@ fun CCBNavHost() {
                 orderId = orderId,
                 onNavigateBack = { navController.popBackStack() },
                 onPaymentComplete = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
                     }
                 }
             )
