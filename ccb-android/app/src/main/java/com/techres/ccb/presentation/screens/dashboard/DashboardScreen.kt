@@ -115,9 +115,8 @@ fun DashboardScreen(
                         items(uiState.posOrders, key = { it.id }) { order ->
                             PosOrderItem(
                                 order = order,
-                                onStatusChange = { newStatus ->
-                                    viewModel.updatePosOrderStatus(order.id, newStatus)
-                                }
+                                onConfirm = { viewModel.confirmPosOrder(order.id) },
+                                onPay = { viewModel.payPosOrder(order.id) }
                             )
                         }
                     }
@@ -489,7 +488,8 @@ fun EmptyState(
 @Composable
 fun PosOrderItem(
     order: PosOrder,
-    onStatusChange: (PosOrderStatus) -> Unit
+    onConfirm: () -> Unit,
+    onPay: () -> Unit
 ) {
     val statusColor = Color(order.status.color)
 
@@ -541,6 +541,15 @@ fun PosOrderItem(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     StatusChip(status = order.status.displayName, color = statusColor)
+                    if (order.isPrinted) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.Print,
+                            contentDescription = "Đã in",
+                            modifier = Modifier.size(14.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 order.customerName?.let {
@@ -558,38 +567,37 @@ fun PosOrderItem(
                 }
             }
 
-            // Action Button
-            ActionButton(
-                status = order.status,
-                onAction = {
-                    when (order.status) {
-                        PosOrderStatus.PENDING -> onStatusChange(PosOrderStatus.PREPARING)
-                        PosOrderStatus.PREPARING -> onStatusChange(PosOrderStatus.READY)
-                        PosOrderStatus.READY -> onStatusChange(PosOrderStatus.SERVED)
-                        else -> {}
+            // Action Button based on status
+            when (order.status) {
+                PosOrderStatus.DRAFT -> {
+                    // Xác nhận đơn (in bill + in món)
+                    Button(
+                        onClick = onConfirm,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Xác nhận", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
-            )
+                PosOrderStatus.CONFIRMED -> {
+                    // Thanh toán
+                    Button(
+                        onClick = onPay,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Payment, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Thu tiền", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+                else -> {}
+            }
         }
-    }
-}
-
-@Composable
-fun ActionButton(status: PosOrderStatus, onAction: () -> Unit) {
-    val (text, color) = when (status) {
-        PosOrderStatus.PENDING -> "Làm" to Color(0xFF2196F3)
-        PosOrderStatus.PREPARING -> "Xong" to Color(0xFF4CAF50)
-        PosOrderStatus.READY -> "Giao" to Color(0xFF9C27B0)
-        else -> return
-    }
-
-    Button(
-        onClick = onAction,
-        colors = ButtonDefaults.buttonColors(containerColor = color),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Text(text, fontWeight = FontWeight.Bold)
     }
 }
 

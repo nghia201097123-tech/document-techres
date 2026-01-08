@@ -23,14 +23,15 @@ data class PosOrder(
     val totalAmount: Long,
     val status: PosOrderStatus,
     val createdAt: Long,
-    val orderNumber: Int          // Số thứ tự đơn trong ngày
+    val orderNumber: Int,         // Số thứ tự đơn trong ngày
+    val isPrinted: Boolean = false  // Đã in bill chưa
 )
 
+// Quy trình: Order → Xác nhận (in bill, in món) → Thanh toán
 enum class PosOrderStatus(val displayName: String, val color: Long) {
-    PENDING("Chờ xử lý", 0xFFFF9800),
-    PREPARING("Đang làm", 0xFF2196F3),
-    READY("Sẵn sàng", 0xFF4CAF50),
-    SERVED("Đã phục vụ", 0xFF9E9E9E)
+    DRAFT("Đang order", 0xFFFF9800),        // Đang chọn món
+    CONFIRMED("Chờ thanh toán", 0xFF2196F3), // Đã xác nhận, đã in bill
+    PAID("Đã thanh toán", 0xFF4CAF50)        // Đã thanh toán xong
 }
 
 data class DashboardUiState(
@@ -40,8 +41,8 @@ data class DashboardUiState(
 
     // POS Orders (tại quầy)
     val posOrders: List<PosOrder> = emptyList(),
-    val pendingPosCount: Int = 0,
-    val preparingPosCount: Int = 0,
+    val draftPosCount: Int = 0,        // Đang order
+    val confirmedPosCount: Int = 0,    // Chờ thanh toán
 
     // Food App Orders
     val foodAppOrders: List<FoodAppOrder> = emptyList(),
@@ -86,8 +87,8 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
                 state.copy(
                     isLoading = false,
                     posOrders = posOrders,
-                    pendingPosCount = posOrders.count { it.status == PosOrderStatus.PENDING },
-                    preparingPosCount = posOrders.count { it.status == PosOrderStatus.PREPARING },
+                    draftPosCount = posOrders.count { it.status == PosOrderStatus.DRAFT },
+                    confirmedPosCount = posOrders.count { it.status == PosOrderStatus.CONFIRMED },
                     foodAppOrders = foodOrders,
                     newFoodOrderCount = foodOrders.count { it.status == FoodOrderStatus.NEW },
                     processingFoodOrderCount = foodOrders.count {
@@ -171,12 +172,43 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    // Update POS order status
+    // Xác nhận đơn POS (in bill, in món)
+    fun confirmPosOrder(orderId: String) {
+        viewModelScope.launch {
+            _uiState.update { state ->
+                state.copy(
+                    posOrders = state.posOrders.map { order ->
+                        if (order.id == orderId && order.status == PosOrderStatus.DRAFT) {
+                            order.copy(status = PosOrderStatus.CONFIRMED, isPrinted = true)
+                        } else order
+                    }
+                )
+            }
+            recalculateCounts()
+            // TODO: Gọi API in bill và in món cho bếp
+        }
+    }
+
+    // Thanh toán đơn POS
+    fun payPosOrder(orderId: String) {
+        viewModelScope.launch {
+            _uiState.update { state ->
+                state.copy(
+                    posOrders = state.posOrders.filter { it.id != orderId },
+                    todayRevenue = state.todayRevenue + (state.posOrders.find { it.id == orderId }?.totalAmount ?: 0),
+                    todayOrderCount = state.todayOrderCount + 1
+                )
+            }
+            recalculateCounts()
+            // TODO: Gọi API thanh toán
+        }
+    }
+
+    // Update POS order status (legacy - có thể dùng cho các trường hợp khác)
     fun updatePosOrderStatus(orderId: String, newStatus: PosOrderStatus) {
         viewModelScope.launch {
             _uiState.update { state ->
-                val updatedOrders = if (newStatus == PosOrderStatus.SERVED) {
-                    // Remove served orders from active list
+                val updatedOrders = if (newStatus == PosOrderStatus.PAID) {
                     state.posOrders.filter { it.id != orderId }
                 } else {
                     state.posOrders.map { order ->
@@ -192,8 +224,8 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
     private fun recalculateCounts() {
         _uiState.update { state ->
             state.copy(
-                pendingPosCount = state.posOrders.count { it.status == PosOrderStatus.PENDING },
-                preparingPosCount = state.posOrders.count { it.status == PosOrderStatus.PREPARING },
+                draftPosCount = state.posOrders.count { it.status == PosOrderStatus.DRAFT },
+                confirmedPosCount = state.posOrders.count { it.status == PosOrderStatus.CONFIRMED },
                 newFoodOrderCount = state.foodAppOrders.count { it.status == FoodOrderStatus.NEW },
                 processingFoodOrderCount = state.foodAppOrders.count {
                     it.status in listOf(FoodOrderStatus.ACCEPTED, FoodOrderStatus.PREPARING)
@@ -206,14 +238,15 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
     private fun getMockPosOrders(): List<PosOrder> {
         val now = System.currentTimeMillis()
         return listOf(
+            // Đơn đang order (chưa xác nhận)
             PosOrder(
                 id = "pos_001",
                 tableName = "Bàn 5",
                 customerName = null,
                 itemCount = 3,
                 totalAmount = 125_000,
-                status = PosOrderStatus.PREPARING,
-                createdAt = now - 15 * 60 * 1000,  // 15 phút trước
+                status = PosOrderStatus.DRAFT,
+                createdAt = now - 5 * 60 * 1000,
                 orderNumber = 12
             ),
             PosOrder(
@@ -222,19 +255,21 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
                 customerName = "Anh Minh",
                 itemCount = 5,
                 totalAmount = 285_000,
-                status = PosOrderStatus.PENDING,
-                createdAt = now - 5 * 60 * 1000,   // 5 phút trước
+                status = PosOrderStatus.DRAFT,
+                createdAt = now - 2 * 60 * 1000,
                 orderNumber = 13
             ),
+            // Đơn đã xác nhận (chờ thanh toán)
             PosOrder(
                 id = "pos_003",
                 tableName = null,  // Mang đi
                 customerName = "Chị Hương",
                 itemCount = 2,
                 totalAmount = 89_000,
-                status = PosOrderStatus.READY,
-                createdAt = now - 20 * 60 * 1000,  // 20 phút trước
-                orderNumber = 11
+                status = PosOrderStatus.CONFIRMED,
+                createdAt = now - 20 * 60 * 1000,
+                orderNumber = 11,
+                isPrinted = true
             ),
             PosOrder(
                 id = "pos_004",
@@ -242,9 +277,10 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
                 customerName = null,
                 itemCount = 4,
                 totalAmount = 175_000,
-                status = PosOrderStatus.PREPARING,
-                createdAt = now - 10 * 60 * 1000,  // 10 phút trước
-                orderNumber = 14
+                status = PosOrderStatus.CONFIRMED,
+                createdAt = now - 15 * 60 * 1000,
+                orderNumber = 10,
+                isPrinted = true
             ),
             PosOrder(
                 id = "pos_005",
@@ -252,9 +288,9 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
                 customerName = "Anh Tuấn",
                 itemCount = 6,
                 totalAmount = 320_000,
-                status = PosOrderStatus.PENDING,
-                createdAt = now - 2 * 60 * 1000,   // 2 phút trước
-                orderNumber = 15
+                status = PosOrderStatus.DRAFT,
+                createdAt = now - 1 * 60 * 1000,
+                orderNumber = 14
             )
         )
     }
