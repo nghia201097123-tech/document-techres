@@ -168,21 +168,21 @@ fun DashboardScreen(
                         )
                     } else {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            contentPadding = PaddingValues(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            columns = GridCells.Fixed(8),
+                            contentPadding = PaddingValues(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(uiState.posOrders, key = { it.id }) { order ->
-                                PosOrderGridItem(
+                                PosOrderCompactItem(
                                     order = order,
                                     onConfirm = { viewModel.confirmPosOrder(order.id) },
                                     onPay = { viewModel.payPosOrder(order.id) }
                                 )
                             }
                             // Bottom spacing for FAB
-                            item(span = { GridItemSpan(2) }) {
+                            item(span = { GridItemSpan(8) }) {
                                 Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
@@ -197,14 +197,14 @@ fun DashboardScreen(
                         )
                     } else {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            contentPadding = PaddingValues(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            columns = GridCells.Fixed(8),
+                            contentPadding = PaddingValues(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(uiState.foodAppOrders, key = { it.id }) { order ->
-                                FoodOrderGridItem(
+                                FoodOrderCompactItem(
                                     order = order,
                                     onAccept = { viewModel.acceptFoodOrder(order.id) },
                                     onStartPreparing = { viewModel.startPreparingFoodOrder(order.id) },
@@ -213,7 +213,7 @@ fun DashboardScreen(
                                 )
                             }
                             // Bottom spacing for FAB
-                            item(span = { GridItemSpan(2) }) {
+                            item(span = { GridItemSpan(8) }) {
                                 Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
@@ -342,8 +342,9 @@ fun EmptyState(icon: ImageVector, message: String, subMessage: String) {
     }
 }
 
+// Compact POS Order Item cho Grid 8 cột
 @Composable
-fun PosOrderGridItem(
+fun PosOrderCompactItem(
     order: PosOrder,
     onConfirm: () -> Unit,
     onPay: () -> Unit
@@ -354,137 +355,82 @@ fun PosOrderGridItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.9f),
+            .aspectRatio(0.85f)
+            .clickable { if (isDraft) onConfirm() else onPay() },
         colors = CardDefaults.cardColors(
-            containerColor = if (isDraft) Color.White else statusColor.copy(alpha = 0.05f)
+            containerColor = statusColor.copy(alpha = 0.12f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Order number badge
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(statusColor, RoundedCornerShape(4.dp))
+                    .padding(vertical = 2.dp),
+                contentAlignment = Alignment.Center
             ) {
-                // Order number
-                Box(
-                    modifier = Modifier
-                        .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        "#${order.orderNumber}",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = statusColor
-                    )
-                }
-                // Print icon if printed
-                if (order.isPrinted) {
-                    Icon(
-                        Icons.Default.Print,
-                        contentDescription = "Đã in",
-                        modifier = Modifier.size(16.dp),
-                        tint = Color(0xFF4CAF50)
-                    )
-                }
+                Text(
+                    "#${order.orderNumber}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
 
-            // Center content
+            // Icon + Table
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
             ) {
-                // Table/Takeaway Icon
                 Icon(
                     if (order.tableName != null) Icons.Default.TableBar else Icons.Default.TakeoutDining,
                     null,
                     tint = statusColor,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                // Table name
                 Text(
                     order.tableName ?: "Mang đi",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontSize = 9.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
                 )
-                // Customer name
-                order.customerName?.let {
-                    Text(
-                        it,
-                        fontSize = 11.sp,
-                        color = Color.Gray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
 
-            // Footer
-            Column {
-                // Items & Amount
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("${order.itemCount} món", fontSize = 11.sp, color = Color.Gray)
-                    Text(
-                        formatCurrency(order.totalAmount),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1976D2)
-                    )
-                }
+            // Amount
+            Text(
+                formatCompactCurrency(order.totalAmount),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1976D2),
+                maxLines = 1
+            )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Action Button
-                when (order.status) {
-                    PosOrderStatus.DRAFT -> {
-                        Button(
-                            onClick = onConfirm,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
-                            contentPadding = PaddingValues(vertical = 6.dp),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Icon(Icons.Default.Print, null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Xác nhận", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    PosOrderStatus.CONFIRMED -> {
-                        Button(
-                            onClick = onPay,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                            contentPadding = PaddingValues(vertical = 6.dp),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Icon(Icons.Default.Payment, null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Thu tiền", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    else -> {}
-                }
-            }
+            // Status text
+            Text(
+                if (isDraft) "Xác nhận" else "Thu tiền",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Medium,
+                color = statusColor
+            )
         }
     }
 }
 
+// Compact Food Order Item cho Grid 8 cột
 @Composable
-fun FoodOrderGridItem(
+fun FoodOrderCompactItem(
     order: FoodAppOrder,
     onAccept: () -> Unit,
     onStartPreparing: () -> Unit,
@@ -495,136 +441,98 @@ fun FoodOrderGridItem(
     val statusColor = Color(order.status.color)
     val isNew = order.status == FoodOrderStatus.NEW
 
+    val onClickAction = when (order.status) {
+        FoodOrderStatus.NEW -> onAccept
+        FoodOrderStatus.ACCEPTED -> onStartPreparing
+        FoodOrderStatus.PREPARING -> onMarkReady
+        FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> onComplete
+        else -> { {} }
+    }
+
+    val actionText = when (order.status) {
+        FoodOrderStatus.NEW -> "Nhận đơn"
+        FoodOrderStatus.ACCEPTED -> "Bắt đầu"
+        FoodOrderStatus.PREPARING -> "Sẵn sàng"
+        FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> "Xong"
+        else -> ""
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.9f)
+            .aspectRatio(0.85f)
+            .clickable(onClick = onClickAction)
             .then(
-                if (isNew) Modifier.border(2.dp, platformColor, RoundedCornerShape(12.dp))
+                if (isNew) Modifier.border(2.dp, platformColor, RoundedCornerShape(8.dp))
                 else Modifier
             ),
         colors = CardDefaults.cardColors(
-            containerColor = if (isNew) platformColor.copy(alpha = 0.08f) else Color.White
+            containerColor = platformColor.copy(alpha = 0.12f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isNew) 4.dp else 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Platform badge header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(platformColor, RoundedCornerShape(4.dp))
+                    .padding(vertical = 2.dp),
+                contentAlignment = Alignment.Center
             ) {
-                // Platform badge
-                Box(
-                    modifier = Modifier
-                        .background(platformColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(order.platform.icon, fontSize = 12.sp)
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            order.platform.shortName,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = platformColor
-                        )
-                    }
-                }
-                // Status
-                Box(
-                    modifier = Modifier
-                        .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        order.status.displayName,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = statusColor
-                    )
-                }
+                Text(
+                    "${order.platform.icon} ${order.platform.shortName}",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
 
-            // Center content
+            // Order code
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
             ) {
-                // Order code
                 Text(
                     order.orderCode,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                // Customer
-                Text(
-                    order.customerName,
-                    fontSize = 11.sp,
-                    color = Color.Gray,
+                    fontSize = 9.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "${order.items.size} món",
+                    fontSize = 8.sp,
+                    color = Color.Gray
                 )
             }
 
-            // Footer
-            Column {
-                // Items & Amount
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("${order.items.size} món", fontSize = 11.sp, color = Color.Gray)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            formatCurrency(order.totalAmount),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = platformColor
-                        )
-                        if (!order.isPaid) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(Color(0xFFFFF3E0), RoundedCornerShape(2.dp))
-                                    .padding(horizontal = 3.dp)
-                            ) {
-                                Text("COD", fontSize = 8.sp, color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
+            // Amount
+            Text(
+                formatCompactCurrency(order.totalAmount),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = platformColor,
+                maxLines = 1
+            )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Action Button
-                val (buttonText, buttonColor, buttonAction) = when (order.status) {
-                    FoodOrderStatus.NEW -> Triple("Nhận đơn", Color(0xFF4CAF50), onAccept)
-                    FoodOrderStatus.ACCEPTED -> Triple("Bắt đầu", Color(0xFF9C27B0), onStartPreparing)
-                    FoodOrderStatus.PREPARING -> Triple("Sẵn sàng", Color(0xFF2196F3), onMarkReady)
-                    FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> Triple("Hoàn thành", Color(0xFF4CAF50), onComplete)
-                    else -> Triple("", Color.Gray, {})
-                }
-
-                if (buttonText.isNotEmpty()) {
-                    Button(
-                        onClick = buttonAction,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
-                        contentPadding = PaddingValues(vertical = 6.dp),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(buttonText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+            // Action text
+            if (actionText.isNotEmpty()) {
+                Text(
+                    actionText,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = statusColor
+                )
             }
         }
     }
@@ -633,4 +541,13 @@ fun FoodOrderGridItem(
 // Helper
 private fun formatCurrency(amount: Long): String {
     return String.format("%,d đ", amount).replace(",", ".")
+}
+
+// Compact currency format (e.g., 150K, 1.2M)
+private fun formatCompactCurrency(amount: Long): String {
+    return when {
+        amount >= 1_000_000 -> String.format("%.1fM", amount / 1_000_000.0)
+        amount >= 1_000 -> "${amount / 1_000}K"
+        else -> "${amount}đ"
+    }
 }
