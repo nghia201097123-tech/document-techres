@@ -26,11 +26,11 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    fun login(tenantId: String, username: String, password: String, deviceId: String, deviceName: String?) {
+    fun login(tenantId: String, username: String, password: String) {
         viewModelScope.launch {
             _uiState.value = LoginUiState(isLoading = true)
 
-            val result = authRepository.login(tenantId, username, password, deviceId, deviceName ?: "Android Device")
+            val result = authRepository.login(tenantId, username, password)
             result.fold(
                 onSuccess = {
                     // Perform initial sync after login

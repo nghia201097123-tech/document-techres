@@ -1,6 +1,5 @@
 package com.techres.ccb.presentation.screens.auth
 
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -29,7 +27,6 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
     var tenantId by remember { mutableStateOf("") }
@@ -130,11 +127,7 @@ fun LoginScreen(
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                val deviceId = Settings.Secure.getString(
-                                    context.contentResolver,
-                                    Settings.Secure.ANDROID_ID
-                                )
-                                viewModel.login(tenantId, username, password, deviceId, android.os.Build.MODEL)
+                                viewModel.login(tenantId, username, password)
                             }
                         ),
                         trailingIcon = {
@@ -161,11 +154,7 @@ fun LoginScreen(
 
                     Button(
                         onClick = {
-                            val deviceId = Settings.Secure.getString(
-                                context.contentResolver,
-                                Settings.Secure.ANDROID_ID
-                            )
-                            viewModel.login(tenantId, username, password, deviceId, android.os.Build.MODEL)
+                            viewModel.login(tenantId, username, password)
                         },
                         modifier = Modifier
                             .fillMaxWidth()

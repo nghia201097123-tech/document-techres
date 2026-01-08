@@ -7,9 +7,7 @@ import com.google.gson.annotations.SerializedName
 data class LoginRequest(
     @SerializedName("tenantId") val tenantId: String,
     @SerializedName("username") val username: String,
-    @SerializedName("password") val password: String,
-    @SerializedName("deviceId") val deviceId: String? = null,
-    @SerializedName("deviceName") val deviceName: String? = null
+    @SerializedName("password") val password: String
 )
 
 /**

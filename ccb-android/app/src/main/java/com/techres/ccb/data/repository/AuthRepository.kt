@@ -40,18 +40,14 @@ class AuthRepository @Inject constructor(
     suspend fun login(
         tenantId: String,
         username: String,
-        password: String,
-        deviceId: String? = null,
-        deviceName: String? = null
+        password: String
     ): Result<LoginResponse> {
         return try {
             val response = api.login(
                 LoginRequest(
                     tenantId = tenantId,
                     username = username,
-                    password = password,
-                    deviceId = deviceId,
-                    deviceName = deviceName
+                    password = password
                 )
             )
             if (response.isSuccessful && response.body() != null) {
