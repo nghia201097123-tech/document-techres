@@ -32,6 +32,7 @@ fun HomeScreen(
     onNavigateToOrder: (String) -> Unit,
     onNavigateToShift: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToSale: () -> Unit,
     onLogout: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -76,11 +77,18 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Quick actions
+            // Quick actions - Row 1
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                QuickActionCard(
+                    icon = Icons.Default.PointOfSale,
+                    title = "Bán hàng",
+                    color = Color(0xFF4CAF50),  // Green
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToSale
+                )
                 QuickActionCard(
                     icon = Icons.Default.Add,
                     title = "Tạo đơn mới",
@@ -92,12 +100,28 @@ fun HomeScreen(
                         onNavigateToMenu(newOrderId)
                     }
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick actions - Row 2
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 QuickActionCard(
                     icon = Icons.Default.AccessTime,
                     title = "Ca làm việc",
                     color = Success,
                     modifier = Modifier.weight(1f),
                     onClick = onNavigateToShift
+                )
+                QuickActionCard(
+                    icon = Icons.Default.Settings,
+                    title = "Cài đặt",
+                    color = Color(0xFF607D8B),  // Blue Grey
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToSettings
                 )
             }
 

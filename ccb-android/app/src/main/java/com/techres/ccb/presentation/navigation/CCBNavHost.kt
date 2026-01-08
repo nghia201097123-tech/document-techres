@@ -15,6 +15,7 @@ import com.techres.ccb.presentation.screens.home.HomeScreen
 import com.techres.ccb.presentation.screens.menu.MenuScreen
 import com.techres.ccb.presentation.screens.order.OrderScreen
 import com.techres.ccb.presentation.screens.payment.PaymentScreen
+import com.techres.ccb.presentation.screens.sale.SaleScreen
 import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
@@ -24,6 +25,7 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Pin : Screen("pin")
     object Home : Screen("home")
+    object Sale : Screen("sale")  // New POS Sale Screen
     object Menu : Screen("menu?orderId={orderId}") {
         fun createRoute(orderId: String? = null) = if (orderId != null) "menu?orderId=$orderId" else "menu"
     }
@@ -105,11 +107,20 @@ fun CCBNavHost() {
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 },
+                onNavigateToSale = {
+                    navController.navigate(Screen.Sale.route)
+                },
                 onLogout = {
                     navController.navigate(Screen.Pin.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable(Screen.Sale.route) {
+            SaleScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
