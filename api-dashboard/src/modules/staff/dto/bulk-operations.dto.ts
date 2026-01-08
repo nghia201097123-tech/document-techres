@@ -34,6 +34,8 @@ export class BulkResetPasswordDto extends BulkStaffIdsDto {
   newPassword?: string;
 }
 
+export class BulkDeleteDto extends BulkStaffIdsDto {}
+
 export class BulkOperationResultDto {
   @ApiProperty({ description: 'Số lượng thành công' })
   success: number;

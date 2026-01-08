@@ -159,6 +159,12 @@ export class StaffService {
     return { temporaryPassword: tempPassword };
   }
 
+  async delete(tenantId: string, id: string) {
+    const staff = await this.findOne(tenantId, id);
+    await this.staffRepository.remove(staff);
+    return { message: 'Đã xóa nhân viên' };
+  }
+
   private async generateUsername(tenantId: string, prefix: string): Promise<string> {
     // Count existing staff in this tenant to get next number
     const count = await this.staffRepository.count({ where: { tenantId } });
@@ -424,6 +430,38 @@ export class StaffService {
         await this.staffRepository.save(staff);
 
         result.passwords.push({ staffId, username: staff.username, password });
+        result.success++;
+      } catch (error) {
+        result.errors.push({ staffId, message: error.message || 'Lỗi không xác định' });
+        result.failed++;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Bulk delete multiple staff
+   */
+  async bulkDelete(
+    tenantId: string,
+    staffIds: string[],
+  ): Promise<{ success: number; failed: number; errors: { staffId: string; message: string }[] }> {
+    const result = { success: 0, failed: 0, errors: [] as { staffId: string; message: string }[] };
+
+    for (const staffId of staffIds) {
+      try {
+        const staff = await this.staffRepository.findOne({
+          where: { tenantId, id: staffId },
+        });
+
+        if (!staff) {
+          result.errors.push({ staffId, message: 'Không tìm thấy nhân viên' });
+          result.failed++;
+          continue;
+        }
+
+        await this.staffRepository.remove(staff);
         result.success++;
       } catch (error) {
         result.errors.push({ staffId, message: error.message || 'Lỗi không xác định' });

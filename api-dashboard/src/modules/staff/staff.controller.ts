@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -10,6 +10,7 @@ import {
   BulkUpdateBranchDto,
   BulkToggleActiveDto,
   BulkResetPasswordDto,
+  BulkDeleteDto,
 } from './dto';
 
 @ApiTags('Staff')
@@ -89,6 +90,12 @@ export class StaffController {
     );
   }
 
+  @Post('bulk/delete')
+  @ApiOperation({ summary: 'Xóa nhiều nhân viên' })
+  bulkDelete(@Request() req, @Body() dto: BulkDeleteDto) {
+    return this.staffService.bulkDelete(req.user.tenantId, dto.staffIds);
+  }
+
   // === Individual Staff Operations (with :id parameter) ===
 
   @Get(':id')
@@ -113,5 +120,11 @@ export class StaffController {
   @ApiOperation({ summary: 'Reset mật khẩu nhân viên' })
   resetPassword(@Request() req, @Param('id') id: string) {
     return this.staffService.resetPassword(req.user.tenantId, id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Xóa nhân viên' })
+  delete(@Request() req, @Param('id') id: string) {
+    return this.staffService.delete(req.user.tenantId, id);
   }
 }
