@@ -53,6 +53,7 @@ import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
+import { useStaffBatch, type StaffBatchOperationType } from "@/hooks/use-staff-batch";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -194,6 +195,7 @@ export default function StaffPage() {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
   const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
+  const { startBatch: startStaffBatch } = useStaffBatch();
   const tenantId = useAuthStore((state) => state.tenantId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -639,11 +641,8 @@ export default function StaffPage() {
     if (selectedStaffIds.size === 0) return;
 
     const staffIds = Array.from(selectedStaffIds);
-    const total = staffIds.length;
-    const batchSize = 50;
-    const totalBatches = Math.ceil(total / batchSize);
 
-    // For reset-password, we need to show results in dialog, so don't use background progress
+    // For reset-password, we need to show results in dialog, so don't use persistent batch
     if (bulkOperation === "reset-password") {
       setProcessingBulk(true);
       setBulkProgress(null);
@@ -679,83 +678,22 @@ export default function StaffPage() {
       return;
     }
 
-    // Create progress title
-    const operationTitles: Record<string, string> = {
-      department: "Cập nhật bộ phận",
-      branch: "Cập nhật chi nhánh",
-      activate: "Bật nhân viên",
-      deactivate: "Tắt nhân viên",
-    };
-    const progressTitle = operationTitles[bulkOperation || ""] || "Xử lý nhân viên";
-    const progressId = `bulk-staff-${Date.now()}`;
-
     // Close dialog and clear selection immediately
     handleCloseBulkDialog();
     setSelectedStaffIds(new Set());
 
-    // Add to background progress
-    addProgress({
-      id: progressId,
-      title: progressTitle,
-      current: 0,
-      total,
-      batchNumber: 1,
-      totalBatches,
+    // Use persistent batch operation - survives page reload
+    await startStaffBatch({
+      staffIds,
+      type: bulkOperation as StaffBatchOperationType,
+      departmentId: bulkDepartmentId || undefined,
+      branchId: bulkBranchId || undefined,
+      batchSize: 50,
+      onComplete: () => {
+        // Reload staff list when operation completes
+        loadStaff(filterBranchId, filterBrandId);
+      },
     });
-
-    const progressCallback = (progress: BatchProgressInfo) => {
-      updateProgress(progressId, {
-        current: progress.current,
-        batchNumber: progress.batchNumber,
-        totalBatches: progress.totalBatches,
-      });
-    };
-
-    try {
-      let result: BulkOperationResult;
-
-      switch (bulkOperation) {
-        case "department":
-          result = await bulkStaffService.updateDepartmentBatched(staffIds, bulkDepartmentId, {
-            batchSize,
-            onProgress: progressCallback,
-          });
-          break;
-        case "branch":
-          result = await bulkStaffService.updateBranchBatched(staffIds, bulkBranchId, {
-            batchSize,
-            onProgress: progressCallback,
-          });
-          break;
-        case "activate":
-          result = await bulkStaffService.toggleActiveBatched(staffIds, true, {
-            batchSize,
-            onProgress: progressCallback,
-          });
-          break;
-        case "deactivate":
-          result = await bulkStaffService.toggleActiveBatched(staffIds, false, {
-            batchSize,
-            onProgress: progressCallback,
-          });
-          break;
-        default:
-          errorProgress(progressId, "Thao tác không hợp lệ");
-          return;
-      }
-
-      // Reload staff list
-      loadStaff(filterBranchId, filterBrandId);
-
-      if (result.failed > 0) {
-        completeProgress(progressId, `Thành công: ${result.success}, Thất bại: ${result.failed}`);
-      } else {
-        completeProgress(progressId, `Đã xử lý ${result.success} nhân viên`);
-      }
-    } catch (error: any) {
-      console.error("Bulk operation error:", error);
-      errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra");
-    }
   };
 
   const handleCopyPassword = (password: string, staffId: string) => {
