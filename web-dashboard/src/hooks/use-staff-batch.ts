@@ -539,7 +539,8 @@ export function useStaffBatch() {
 
   // Check for pending operations on mount and setup resume handler
   React.useEffect(() => {
-    setResumeHandler(handleResume);
+    // Register handler with type "staff" so it can be looked up by persistentType prefix
+    setResumeHandler(handleResume, "staff");
 
     const pendingOperation = storage.get();
     if (pendingOperation) {
@@ -573,7 +574,7 @@ export function useStaffBatch() {
     }
 
     return () => {
-      setResumeHandler(undefined);
+      setResumeHandler(undefined, "staff");
     };
   }, [setResumeHandler, handleResume, addProgress, progresses]);
 

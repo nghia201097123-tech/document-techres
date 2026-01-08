@@ -594,7 +594,8 @@ export function useProductBatch() {
 
   // Check for pending operations on mount and setup resume handler
   React.useEffect(() => {
-    setResumeHandler(handleResume);
+    // Register handler with type "product" so it can be looked up by persistentType prefix
+    setResumeHandler(handleResume, "product");
 
     const pendingOperation = storage.get();
     if (pendingOperation) {
@@ -628,7 +629,7 @@ export function useProductBatch() {
     }
 
     return () => {
-      setResumeHandler(undefined);
+      setResumeHandler(undefined, "product");
     };
   }, [setResumeHandler, handleResume, addProgress, progresses]);
 

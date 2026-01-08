@@ -18,10 +18,13 @@ export interface BackgroundProgressInfo {
   totalBatches?: number;
   status: "running" | "completed" | "error" | "paused" | "resumable";
   message?: string;
-  // For persistent operations
+  // For persistent operations - used to match resume handlers
   persistentType?: string;
   canResume?: boolean;
 }
+
+// Type for resume handler - can be keyed by persistentType prefix
+type ResumeHandlerMap = Map<string, (id: string) => void>;
 
 interface BackgroundProgressContextType {
   progresses: BackgroundProgressInfo[];
@@ -31,9 +34,9 @@ interface BackgroundProgressContextType {
   completeProgress: (id: string, message?: string) => void;
   errorProgress: (id: string, message: string) => void;
   pauseProgress: (id: string) => void;
-  // For resumable operations
-  onResume?: (id: string) => void;
-  setResumeHandler: (handler: ((id: string) => void) | undefined) => void;
+  // For resumable operations - now supports multiple handlers
+  onResume?: (id: string, persistentType?: string) => void;
+  setResumeHandler: (handler: ((id: string) => void) | undefined, type?: string) => void;
 }
 
 const BackgroundProgressContext = React.createContext<BackgroundProgressContextType | null>(null);
@@ -83,9 +86,21 @@ const progressStorage = {
   },
 };
 
+/**
+ * Get the handler type from persistentType
+ * e.g., "staff-delete" -> "staff", "product-import" -> "product"
+ */
+function getHandlerType(persistentType?: string): string {
+  if (!persistentType) return "default";
+  // Extract prefix: "staff-delete" -> "staff", "product-category" -> "product"
+  const parts = persistentType.split("-");
+  return parts[0] || "default";
+}
+
 export function BackgroundProgressProvider({ children }: { children: React.ReactNode }) {
   const [progresses, setProgresses] = React.useState<BackgroundProgressInfo[]>([]);
-  const [resumeHandler, setResumeHandler] = React.useState<((id: string) => void) | undefined>();
+  // Map of handler type -> handler function
+  const resumeHandlersRef = React.useRef<ResumeHandlerMap>(new Map());
 
   // Load persisted progress on mount
   React.useEffect(() => {
@@ -157,8 +172,25 @@ export function BackgroundProgressProvider({ children }: { children: React.React
     );
   }, []);
 
-  const handleSetResumeHandler = React.useCallback((handler: ((id: string) => void) | undefined) => {
-    setResumeHandler(() => handler);
+  // Set resume handler - now supports type-specific handlers
+  const handleSetResumeHandler = React.useCallback((handler: ((id: string) => void) | undefined, type?: string) => {
+    const handlerType = type || "default";
+    if (handler) {
+      resumeHandlersRef.current.set(handlerType, handler);
+    } else {
+      resumeHandlersRef.current.delete(handlerType);
+    }
+  }, []);
+
+  // Resume handler that looks up the correct handler by persistentType
+  const handleResume = React.useCallback((id: string, persistentType?: string) => {
+    const handlerType = getHandlerType(persistentType);
+    const handler = resumeHandlersRef.current.get(handlerType);
+    if (handler) {
+      handler(id);
+    } else {
+      console.warn(`No resume handler found for type: ${handlerType}`);
+    }
   }, []);
 
   return (
@@ -171,7 +203,7 @@ export function BackgroundProgressProvider({ children }: { children: React.React
         completeProgress,
         errorProgress,
         pauseProgress,
-        onResume: resumeHandler,
+        onResume: handleResume,
         setResumeHandler: handleSetResumeHandler,
       }}
     >
@@ -186,9 +218,9 @@ function BackgroundProgressDisplay() {
 
   if (progresses.length === 0) return null;
 
-  const handleResume = (id: string) => {
+  const handleResume = (id: string, persistentType?: string) => {
     if (onResume) {
-      onResume(id);
+      onResume(id, persistentType);
     }
   };
 
@@ -223,7 +255,7 @@ function BackgroundProgressDisplay() {
                 <div className="flex items-center gap-1">
                   {progress.canResume && onResume && (progress.status === "paused" || progress.status === "resumable") && (
                     <button
-                      onClick={() => handleResume(progress.id)}
+                      onClick={() => handleResume(progress.id, progress.persistentType)}
                       className="text-green-500 hover:text-green-600 p-1"
                       title="Tiếp tục"
                     >
