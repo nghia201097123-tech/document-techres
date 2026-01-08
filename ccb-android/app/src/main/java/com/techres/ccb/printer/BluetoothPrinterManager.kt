@@ -7,6 +7,9 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.os.Build
+import com.techres.ccb.printer.core.ConnectionType
+import com.techres.ccb.printer.core.PrinterDevice
+import com.techres.ccb.printer.core.PrinterResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,8 +20,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Bluetooth Printer Manager compatible với Android 6+
- * Sử dụng Classic Bluetooth API (không cần Companion Device API)
+ * Bluetooth Printer Manager compatible with Android 6+
+ * Uses Classic Bluetooth API (not Companion Device API)
  *
  * Supported protocols:
  * - ESC/POS (most thermal printers)
@@ -30,7 +33,7 @@ class BluetoothPrinterManager @Inject constructor(
     companion object {
         private const val TAG = "BluetoothPrinter"
 
-        // UUID cho Serial Port Profile (SPP) - standard cho máy in
+        // UUID for Serial Port Profile (SPP) - standard for printers
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
         // ESC/POS commands
@@ -98,9 +101,10 @@ class BluetoothPrinterManager @Inject constructor(
         return bluetoothAdapter?.bondedDevices
             ?.map { device ->
                 PrinterDevice(
+                    id = device.address.replace(":", ""),
                     name = device.name ?: "Unknown",
-                    address = device.address,
-                    type = device.bluetoothClass?.majorDeviceClass ?: 0
+                    connectionType = ConnectionType.BLUETOOTH,
+                    address = device.address
                 )
             }
             ?: emptyList()
@@ -273,7 +277,7 @@ class BluetoothPrinterManager @Inject constructor(
     /**
      * Print receipt
      */
-    suspend fun printReceipt(receipt: Receipt): PrinterResult = withContext(Dispatchers.IO) {
+    suspend fun printReceipt(receipt: BluetoothReceipt): PrinterResult = withContext(Dispatchers.IO) {
         if (!isConnected()) {
             return@withContext PrinterResult.Error("Not connected to printer")
         }
@@ -352,18 +356,9 @@ class BluetoothPrinterManager @Inject constructor(
 }
 
 /**
- * Printer device info
+ * Receipt data for Bluetooth printing
  */
-data class PrinterDevice(
-    val name: String,
-    val address: String,
-    val type: Int
-)
-
-/**
- * Receipt data
- */
-data class Receipt(
+data class BluetoothReceipt(
     val storeName: String,
     val storeAddress: String?,
     val storePhone: String?,
@@ -371,7 +366,7 @@ data class Receipt(
     val dateTime: String,
     val tableName: String?,
     val staffName: String?,
-    val items: List<ReceiptItem>,
+    val items: List<BluetoothReceiptItem>,
     val subtotal: Double,
     val discount: Double,
     val vat: Double,
@@ -382,19 +377,11 @@ data class Receipt(
 )
 
 /**
- * Receipt item
+ * Receipt item for Bluetooth printing
  */
-data class ReceiptItem(
+data class BluetoothReceiptItem(
     val name: String,
     val quantity: Int,
     val unitPrice: Double,
     val totalPrice: Double
 )
-
-/**
- * Printer result
- */
-sealed class PrinterResult {
-    object Success : PrinterResult()
-    data class Error(val message: String) : PrinterResult()
-}

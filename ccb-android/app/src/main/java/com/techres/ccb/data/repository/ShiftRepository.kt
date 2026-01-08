@@ -11,15 +11,19 @@ class ShiftRepository @Inject constructor(
     private val shiftDao: ShiftDao
 ) {
     fun getCurrentShift(branchId: String): Flow<ShiftEntity?> {
-        return shiftDao.getCurrentShift(branchId)
+        return shiftDao.observeCurrentOpenShift(branchId)
+    }
+
+    suspend fun getCurrentOpenShift(branchId: String): ShiftEntity? {
+        return shiftDao.getCurrentOpenShift(branchId)
+    }
+
+    fun getAllShiftsByBranch(branchId: String): Flow<List<ShiftEntity>> {
+        return shiftDao.getAllByBranch(branchId)
     }
 
     suspend fun getShiftById(id: String): ShiftEntity? {
-        return shiftDao.getShiftById(id)
-    }
-
-    suspend fun getShiftsByDateRange(branchId: String, startDate: String, endDate: String): List<ShiftEntity> {
-        return shiftDao.getShiftsByDateRange(branchId, startDate, endDate)
+        return shiftDao.getById(id)
     }
 
     suspend fun getPendingSyncShifts(): List<ShiftEntity> {
@@ -30,8 +34,38 @@ class ShiftRepository @Inject constructor(
         shiftDao.insert(shift)
     }
 
-    suspend fun closeShift(shift: ShiftEntity) {
-        shiftDao.update(shift)
+    suspend fun closeShift(
+        shiftId: String,
+        closingAmount: Double,
+        expectedAmount: Double,
+        differenceAmount: Double,
+        totalOrders: Int,
+        totalRevenue: Double,
+        cashRevenue: Double,
+        cardRevenue: Double,
+        transferRevenue: Double,
+        otherRevenue: Double,
+        totalDiscount: Double,
+        notes: String?,
+        closedAt: String,
+        updatedAt: String
+    ) {
+        shiftDao.closeShift(
+            shiftId = shiftId,
+            closingAmount = closingAmount,
+            expectedAmount = expectedAmount,
+            differenceAmount = differenceAmount,
+            totalOrders = totalOrders,
+            totalRevenue = totalRevenue,
+            cashRevenue = cashRevenue,
+            cardRevenue = cardRevenue,
+            transferRevenue = transferRevenue,
+            otherRevenue = otherRevenue,
+            totalDiscount = totalDiscount,
+            notes = notes,
+            closedAt = closedAt,
+            updatedAt = updatedAt
+        )
     }
 
     suspend fun updateShift(shift: ShiftEntity) {
@@ -39,6 +73,6 @@ class ShiftRepository @Inject constructor(
     }
 
     suspend fun markShiftAsSynced(shiftId: String) {
-        shiftDao.updateSyncStatus(shiftId, "synced", System.currentTimeMillis().toString())
+        shiftDao.updateSyncStatus(shiftId, "synced", System.currentTimeMillis().toString(), 0)
     }
 }

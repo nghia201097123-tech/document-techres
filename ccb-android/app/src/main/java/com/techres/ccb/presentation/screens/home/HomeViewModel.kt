@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.util.UUID
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -51,6 +52,7 @@ class HomeViewModel @Inject constructor(
     fun createNewOrder(orderId: String) {
         val branchId = authRepository.getBranchId() ?: return
         val staffId = authRepository.getCurrentStaffId() ?: return
+        val now = Instant.now().toString()
 
         viewModelScope.launch {
             val order = OrderEntity(
@@ -59,22 +61,41 @@ class HomeViewModel @Inject constructor(
                 orderNumber = generateOrderNumber(),
                 tableId = null,
                 tableName = null,
+                shiftId = null,
                 staffId = staffId,
-                staffName = authRepository.getCurrentStaffName() ?: "",
+                staffName = authRepository.getCurrentStaffName(),
+                customerName = null,
+                customerPhone = null,
                 status = "pending",
+                orderType = "dine_in",
                 subtotal = 0.0,
                 discountAmount = 0.0,
-                discountPercent = 0.0,
+                discountType = null,
+                discountValue = 0.0,
+                discountReason = null,
+                surchargeAmount = 0.0,
+                vatAmount = 0.0,
                 totalAmount = 0.0,
-                paymentMethod = null,
                 paidAmount = 0.0,
                 changeAmount = 0.0,
-                note = null,
-                shiftId = null,
-                createdAt = Instant.now().toString(),
-                updatedAt = Instant.now().toString(),
+                paymentMethod = null,
+                paymentStatus = "unpaid",
+                notes = null,
+                guestCount = 1,
+                isPrinted = false,
+                printedAt = null,
+                completedAt = null,
+                cancelledAt = null,
+                cancelReason = null,
+                createdAt = now,
+                updatedAt = now,
+                idempotencyKey = UUID.randomUUID().toString(),
+                serverId = null,
                 syncStatus = "pending",
-                syncedAt = null
+                syncedAt = null,
+                syncError = null,
+                retryCount = 0,
+                version = 1
             )
             orderRepository.createOrder(order, emptyList())
         }

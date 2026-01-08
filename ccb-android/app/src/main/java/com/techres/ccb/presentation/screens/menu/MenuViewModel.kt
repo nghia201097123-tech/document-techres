@@ -98,6 +98,7 @@ class MenuViewModel @Inject constructor(
 
     fun addProductToOrder(product: ProductEntity) {
         val orderId = currentOrderId ?: return
+        val now = Instant.now().toString()
 
         viewModelScope.launch {
             val orderItem = OrderItemEntity(
@@ -106,14 +107,28 @@ class MenuViewModel @Inject constructor(
                 productId = product.id,
                 productCode = product.code,
                 productName = product.name,
+                productImageUrl = product.imageUrl,
+                categoryName = null,
                 quantity = 1,
                 unitPrice = product.price,
+                discountAmount = 0.0,
                 totalPrice = product.price,
                 vatRate = product.vatRate,
-                note = null,
+                vatAmount = product.price * product.vatRate / 100,
+                notes = null,
                 status = "pending",
-                createdAt = Instant.now().toString(),
-                updatedAt = Instant.now().toString()
+                printToKitchen = product.printToKitchen,
+                printToBar = product.printToBar,
+                isPrinted = false,
+                printedAt = null,
+                preparingAt = null,
+                readyAt = null,
+                servedAt = null,
+                cancelledAt = null,
+                cancelReason = null,
+                createdAt = now,
+                updatedAt = now,
+                version = 1
             )
             orderRepository.addOrderItem(orderItem)
 
@@ -127,7 +142,7 @@ class MenuViewModel @Inject constructor(
                     order.copy(
                         subtotal = subtotal,
                         totalAmount = total,
-                        updatedAt = Instant.now().toString()
+                        updatedAt = now
                     )
                 )
             }

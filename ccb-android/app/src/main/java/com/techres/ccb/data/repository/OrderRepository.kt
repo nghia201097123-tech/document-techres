@@ -14,23 +14,31 @@ class OrderRepository @Inject constructor(
     private val orderItemDao: OrderItemDao
 ) {
     fun getActiveOrders(branchId: String): Flow<List<OrderEntity>> {
-        return orderDao.getActiveOrders(branchId)
+        return orderDao.getActiveOrdersByBranch(branchId)
     }
 
-    fun getOrdersByStatus(branchId: String, status: String): Flow<List<OrderEntity>> {
-        return orderDao.getOrdersByStatus(branchId, status)
+    fun getAllOrdersByBranch(branchId: String): Flow<List<OrderEntity>> {
+        return orderDao.getAllByBranch(branchId)
     }
 
-    fun getOrdersByTable(tableId: String): Flow<List<OrderEntity>> {
-        return orderDao.getOrdersByTable(tableId)
+    fun getOrdersByShift(branchId: String, shiftId: String): Flow<List<OrderEntity>> {
+        return orderDao.getByShift(branchId, shiftId)
+    }
+
+    suspend fun getActiveOrderByTable(tableId: String): OrderEntity? {
+        return orderDao.getActiveOrderByTable(tableId)
     }
 
     suspend fun getOrderById(id: String): OrderEntity? {
-        return orderDao.getOrderById(id)
+        return orderDao.getById(id)
     }
 
     fun getOrderItems(orderId: String): Flow<List<OrderItemEntity>> {
-        return orderItemDao.getOrderItems(orderId)
+        return orderItemDao.getByOrderId(orderId)
+    }
+
+    suspend fun getOrderItemsSync(orderId: String): List<OrderItemEntity> {
+        return orderItemDao.getByOrderIdSync(orderId)
     }
 
     suspend fun getPendingSyncOrders(): List<OrderEntity> {
@@ -46,6 +54,10 @@ class OrderRepository @Inject constructor(
         orderDao.update(order)
     }
 
+    suspend fun updateOrderStatus(orderId: String, status: String, updatedAt: String) {
+        orderDao.updateStatus(orderId, status, updatedAt)
+    }
+
     suspend fun addOrderItem(item: OrderItemEntity) {
         orderItemDao.insert(item)
     }
@@ -59,14 +71,14 @@ class OrderRepository @Inject constructor(
     }
 
     suspend fun markOrderAsSynced(orderId: String) {
-        orderDao.updateSyncStatus(orderId, "synced", System.currentTimeMillis().toString())
+        orderDao.updateSyncStatus(orderId, "synced", System.currentTimeMillis().toString(), 0)
     }
 
-    suspend fun getOrdersForShift(shiftId: String): List<OrderEntity> {
-        return orderDao.getOrdersForShift(shiftId)
+    suspend fun getCompletedOrderCountByShift(branchId: String, shiftId: String): Int {
+        return orderDao.getCompletedOrderCountByShift(branchId, shiftId)
     }
 
-    suspend fun getOrdersByDateRange(branchId: String, startDate: String, endDate: String): List<OrderEntity> {
-        return orderDao.getOrdersByDateRange(branchId, startDate, endDate)
+    suspend fun getTotalRevenueByShift(branchId: String, shiftId: String): Double {
+        return orderDao.getTotalRevenueByShift(branchId, shiftId)
     }
 }

@@ -11,19 +11,23 @@ class StaffRepository @Inject constructor(
     private val staffDao: StaffDao
 ) {
     fun getAllStaff(branchId: String): Flow<List<StaffEntity>> {
-        return staffDao.getAllStaff(branchId)
+        return staffDao.getAllByBranch(branchId)
     }
 
     fun getActiveStaff(branchId: String): Flow<List<StaffEntity>> {
-        return staffDao.getActiveStaff(branchId)
+        return staffDao.getAllByBranch(branchId)
     }
 
     suspend fun getStaffById(id: String): StaffEntity? {
-        return staffDao.getStaffById(id)
+        return staffDao.getById(id)
     }
 
-    suspend fun getStaffByPinCode(branchId: String, pinCode: String): StaffEntity? {
-        return staffDao.getStaffByPinCode(branchId, pinCode)
+    suspend fun getStaffByPinCode(pinCode: String): StaffEntity? {
+        return staffDao.getByPinCode(pinCode)
+    }
+
+    suspend fun getStaffByCode(code: String, branchId: String): StaffEntity? {
+        return staffDao.getByCode(code, branchId)
     }
 
     suspend fun syncStaff(branchId: String, staffList: List<StaffEntity>) {

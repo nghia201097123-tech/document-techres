@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
@@ -20,7 +21,7 @@ data class ShiftUiState(
     val totalOrders: Int = 0,
     val totalRevenue: Double = 0.0,
     val cashRevenue: Double = 0.0,
-    val bankRevenue: Double = 0.0,
+    val transferRevenue: Double = 0.0,
     val cardRevenue: Double = 0.0,
     val isLoading: Boolean = false
 )
@@ -47,26 +48,26 @@ class ShiftViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(currentShift = shift)
 
                 if (shift != null) {
-                    loadShiftSummary(shift.id)
+                    loadShiftSummary(branchId, shift.id)
                 }
             }
         }
     }
 
-    private suspend fun loadShiftSummary(shiftId: String) {
-        val orders = orderRepository.getOrdersForShift(shiftId)
+    private suspend fun loadShiftSummary(branchId: String, shiftId: String) {
+        val orders = orderRepository.getOrdersByShift(branchId, shiftId).first()
         val completedOrders = orders.filter { it.status == "completed" }
 
         val totalRevenue = completedOrders.sumOf { it.totalAmount }
         val cashRevenue = completedOrders.filter { it.paymentMethod == "cash" }.sumOf { it.totalAmount }
-        val bankRevenue = completedOrders.filter { it.paymentMethod == "bank_transfer" }.sumOf { it.totalAmount }
+        val transferRevenue = completedOrders.filter { it.paymentMethod == "transfer" }.sumOf { it.totalAmount }
         val cardRevenue = completedOrders.filter { it.paymentMethod == "card" }.sumOf { it.totalAmount }
 
         _uiState.value = _uiState.value.copy(
             totalOrders = completedOrders.size,
             totalRevenue = totalRevenue,
             cashRevenue = cashRevenue,
-            bankRevenue = bankRevenue,
+            transferRevenue = transferRevenue,
             cardRevenue = cardRevenue
         )
     }
@@ -75,6 +76,7 @@ class ShiftViewModel @Inject constructor(
         val branchId = authRepository.getBranchId() ?: return
         val staffId = authRepository.getCurrentStaffId() ?: return
         val staffName = authRepository.getCurrentStaffName() ?: ""
+        val now = Instant.now().toString()
 
         viewModelScope.launch {
             val shift = ShiftEntity(
@@ -82,49 +84,58 @@ class ShiftViewModel @Inject constructor(
                 branchId = branchId,
                 staffId = staffId,
                 staffName = staffName,
-                startTime = Instant.now().toString(),
-                endTime = null,
+                status = "open",
                 openingAmount = openingAmount,
-                closingAmount = null,
-                expectedAmount = null,
-                actualAmount = null,
-                difference = null,
+                closingAmount = 0.0,
+                expectedAmount = 0.0,
+                differenceAmount = 0.0,
                 totalOrders = 0,
                 totalRevenue = 0.0,
                 cashRevenue = 0.0,
-                bankRevenue = 0.0,
                 cardRevenue = 0.0,
-                status = "open",
-                note = null,
+                transferRevenue = 0.0,
+                otherRevenue = 0.0,
+                totalDiscount = 0.0,
+                totalRefund = 0.0,
+                totalCancelled = 0,
+                notes = null,
+                openedAt = now,
+                closedAt = null,
+                createdAt = now,
+                updatedAt = now,
                 syncStatus = "pending",
-                syncedAt = null
+                syncedAt = null,
+                retryCount = 0,
+                version = 1
             )
             shiftRepository.openShift(shift)
         }
     }
 
-    fun closeShift(closingAmount: Double) {
+    fun closeShift(closingAmount: Double, notes: String? = null) {
         val currentShift = _uiState.value.currentShift ?: return
+        val now = Instant.now().toString()
 
         viewModelScope.launch {
             val expectedAmount = currentShift.openingAmount + _uiState.value.cashRevenue
-            val difference = closingAmount - expectedAmount
+            val differenceAmount = closingAmount - expectedAmount
 
-            val closedShift = currentShift.copy(
-                endTime = Instant.now().toString(),
+            shiftRepository.closeShift(
+                shiftId = currentShift.id,
                 closingAmount = closingAmount,
                 expectedAmount = expectedAmount,
-                actualAmount = closingAmount,
-                difference = difference,
+                differenceAmount = differenceAmount,
                 totalOrders = _uiState.value.totalOrders,
                 totalRevenue = _uiState.value.totalRevenue,
                 cashRevenue = _uiState.value.cashRevenue,
-                bankRevenue = _uiState.value.bankRevenue,
                 cardRevenue = _uiState.value.cardRevenue,
-                status = "closed",
-                syncStatus = "pending"
+                transferRevenue = _uiState.value.transferRevenue,
+                otherRevenue = 0.0,
+                totalDiscount = 0.0,
+                notes = notes,
+                closedAt = now,
+                updatedAt = now
             )
-            shiftRepository.closeShift(closedShift)
         }
     }
 }

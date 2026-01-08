@@ -3,6 +3,7 @@ package com.techres.ccb.data.repository
 import com.techres.ccb.data.local.dao.ProductDao
 import com.techres.ccb.data.local.entity.ProductEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,23 +12,27 @@ class ProductRepository @Inject constructor(
     private val productDao: ProductDao
 ) {
     fun getAllProducts(branchId: String): Flow<List<ProductEntity>> {
-        return productDao.getAllProducts(branchId)
+        return productDao.getAllAvailableByBranch(branchId)
     }
 
     fun getActiveProducts(branchId: String): Flow<List<ProductEntity>> {
-        return productDao.getActiveProducts(branchId)
+        return productDao.getAllAvailableByBranch(branchId)
     }
 
-    fun getProductsByCategory(categoryId: String): Flow<List<ProductEntity>> {
-        return productDao.getProductsByCategory(categoryId)
+    fun getProductsByCategory(branchId: String, categoryId: String): Flow<List<ProductEntity>> {
+        return productDao.getByCategoryAndBranch(branchId, categoryId)
     }
 
     suspend fun getProductById(id: String): ProductEntity? {
-        return productDao.getProductById(id)
+        return productDao.getById(id)
+    }
+
+    fun searchProductsFlow(branchId: String, query: String): Flow<List<ProductEntity>> {
+        return productDao.searchProducts(branchId, query)
     }
 
     suspend fun searchProducts(branchId: String, query: String): List<ProductEntity> {
-        return productDao.searchProducts(branchId, query)
+        return productDao.searchProducts(branchId, query).first()
     }
 
     suspend fun syncProducts(branchId: String, products: List<ProductEntity>) {

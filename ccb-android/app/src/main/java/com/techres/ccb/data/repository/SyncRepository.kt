@@ -2,7 +2,7 @@ package com.techres.ccb.data.repository
 
 import com.techres.ccb.data.local.entity.*
 import com.techres.ccb.data.remote.api.MasterDataApi
-import com.techres.ccb.data.remote.dto.FullSyncResponse
+import com.techres.ccb.data.remote.dto.FullSyncData
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,9 +24,13 @@ class SyncRepository @Inject constructor(
 
             val response = api.getFullSyncData("Bearer $token", branchId)
             if (response.isSuccessful && response.body() != null) {
-                val syncData = response.body()!!
-                saveSyncData(branchId, syncData)
-                Result.success(Unit)
+                val syncResponse = response.body()!!
+                if (syncResponse.success && syncResponse.data != null) {
+                    saveSyncData(branchId, syncResponse.data, syncResponse.syncTime)
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception(syncResponse.message ?: "Sync failed"))
+                }
             } else {
                 Result.failure(Exception(response.message()))
             }
@@ -35,40 +39,21 @@ class SyncRepository @Inject constructor(
         }
     }
 
-    suspend fun performIncrementalSync(since: String): Result<Unit> {
-        return try {
-            val token = authRepository.getAccessToken()
-                ?: return Result.failure(Exception("No access token"))
-            val branchId = authRepository.getBranchId()
-                ?: return Result.failure(Exception("No branch ID"))
-
-            val response = api.getIncrementalSyncData("Bearer $token", branchId, since)
-            if (response.isSuccessful && response.body() != null) {
-                val syncData = response.body()!!
-                // Save incremental data (similar to full sync but merge instead of replace)
-                saveSyncData(branchId, syncData)
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception(response.message()))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    private suspend fun saveSyncData(branchId: String, syncData: FullSyncResponse) {
+    private suspend fun saveSyncData(branchId: String, syncData: FullSyncData, syncTime: String) {
         // Sync categories
         val categories = syncData.categories.map { dto ->
             CategoryEntity(
                 id = dto.id,
                 branchId = branchId,
                 name = dto.name,
-                displayOrder = dto.displayOrder,
+                description = dto.description,
                 imageUrl = dto.imageUrl,
+                sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
-                version = dto.version,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
                 syncStatus = "synced",
-                syncedAt = syncData.syncedAt
+                syncedAt = syncTime
             )
         }
         categoryRepository.syncCategories(branchId, categories)
@@ -82,15 +67,22 @@ class SyncRepository @Inject constructor(
                 code = dto.code,
                 name = dto.name,
                 description = dto.description,
-                price = dto.price,
                 imageUrl = dto.imageUrl,
-                unit = dto.unit,
+                price = dto.price,
+                costPrice = dto.costPrice,
                 vatRate = dto.vatRate,
+                unit = dto.unit,
+                type = dto.type,
+                isAvailable = dto.isAvailable,
                 isActive = dto.isActive,
-                displayOrder = dto.displayOrder,
-                version = dto.version,
+                sortOrder = dto.sortOrder,
+                preparationTime = dto.preparationTime,
+                printToKitchen = dto.printToKitchen,
+                printToBar = dto.printToBar,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
                 syncStatus = "synced",
-                syncedAt = syncData.syncedAt
+                syncedAt = syncTime
             )
         }
         productRepository.syncProducts(branchId, products)
@@ -101,11 +93,13 @@ class SyncRepository @Inject constructor(
                 id = dto.id,
                 branchId = branchId,
                 name = dto.name,
-                displayOrder = dto.displayOrder,
+                description = dto.description,
+                sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
-                version = dto.version,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
                 syncStatus = "synced",
-                syncedAt = syncData.syncedAt
+                syncedAt = syncTime
             )
         }
         tableRepository.syncAreas(branchId, areas)
@@ -118,12 +112,13 @@ class SyncRepository @Inject constructor(
                 areaId = dto.areaId,
                 name = dto.name,
                 capacity = dto.capacity,
-                status = dto.status,
-                displayOrder = dto.displayOrder,
+                status = "available",
+                sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
-                version = dto.version,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
                 syncStatus = "synced",
-                syncedAt = syncData.syncedAt
+                syncedAt = syncTime
             )
         }
         tableRepository.syncTables(branchId, tables)
@@ -136,13 +131,16 @@ class SyncRepository @Inject constructor(
                 code = dto.code,
                 name = dto.name,
                 phone = dto.phone,
+                email = dto.email,
+                avatarUrl = dto.avatarUrl,
                 pinCode = dto.pinCode,
                 role = dto.role,
-                avatarUrl = dto.avatarUrl,
+                permissions = dto.permissions,
                 isActive = dto.isActive,
-                version = dto.version,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
                 syncStatus = "synced",
-                syncedAt = syncData.syncedAt
+                syncedAt = syncTime
             )
         }
         staffRepository.syncStaff(branchId, staffList)

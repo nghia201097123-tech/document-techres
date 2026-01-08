@@ -24,21 +24,23 @@ class AuthRepository @Inject constructor(
         private const val KEY_STAFF_ROLE = "current_staff_role"
     }
 
-    suspend fun login(storeCode: String, deviceId: String, deviceName: String?): Result<LoginResponse> {
+    suspend fun login(branchCode: String, deviceId: String, deviceName: String): Result<LoginResponse> {
         return try {
             val response = api.login(
                 LoginRequest(
-                    storeCode = storeCode,
+                    branchCode = branchCode,
                     deviceId = deviceId,
-                    deviceName = deviceName,
-                    deviceType = "android",
-                    appVersion = "1.0.0"
+                    deviceName = deviceName
                 )
             )
             if (response.isSuccessful && response.body() != null) {
                 val loginResponse = response.body()!!
-                saveAuthData(loginResponse)
-                Result.success(loginResponse)
+                if (loginResponse.success && loginResponse.data != null) {
+                    saveAuthData(loginResponse)
+                    Result.success(loginResponse)
+                } else {
+                    Result.failure(Exception(loginResponse.message ?: "Login failed"))
+                }
             } else {
                 Result.failure(Exception(response.message()))
             }
@@ -49,12 +51,21 @@ class AuthRepository @Inject constructor(
 
     suspend fun verifyPin(pinCode: String): Result<VerifyPinResponse> {
         return try {
-            val token = getAccessToken() ?: return Result.failure(Exception("No access token"))
-            val response = api.verifyPin("Bearer $token", VerifyPinRequest(pinCode))
+            val branchId = getBranchId() ?: return Result.failure(Exception("No branch ID"))
+            val response = api.verifyPin(
+                VerifyPinRequest(
+                    branchId = branchId,
+                    pinCode = pinCode
+                )
+            )
             if (response.isSuccessful && response.body() != null) {
                 val pinResponse = response.body()!!
-                saveStaffData(pinResponse)
-                Result.success(pinResponse)
+                if (pinResponse.success && pinResponse.data != null) {
+                    saveStaffData(pinResponse)
+                    Result.success(pinResponse)
+                } else {
+                    Result.failure(Exception(pinResponse.message ?: "PIN verification failed"))
+                }
             } else {
                 Result.failure(Exception(response.message()))
             }
@@ -64,20 +75,21 @@ class AuthRepository @Inject constructor(
     }
 
     private fun saveAuthData(response: LoginResponse) {
+        val data = response.data ?: return
         sharedPreferences.edit().apply {
-            putString(KEY_ACCESS_TOKEN, response.accessToken)
-            putString(KEY_BRANCH_ID, response.branchId)
-            putString(KEY_BRANCH_NAME, response.branchName)
-            putString(KEY_DEVICE_ID, response.deviceId)
+            putString(KEY_ACCESS_TOKEN, data.token)
+            putString(KEY_BRANCH_ID, data.branchId)
+            putString(KEY_BRANCH_NAME, data.branchName)
             apply()
         }
     }
 
     private fun saveStaffData(response: VerifyPinResponse) {
+        val staff = response.data ?: return
         sharedPreferences.edit().apply {
-            putString(KEY_STAFF_ID, response.staffId)
-            putString(KEY_STAFF_NAME, response.staffName)
-            putString(KEY_STAFF_ROLE, response.role)
+            putString(KEY_STAFF_ID, staff.id)
+            putString(KEY_STAFF_NAME, staff.name)
+            putString(KEY_STAFF_ROLE, staff.role)
             apply()
         }
     }

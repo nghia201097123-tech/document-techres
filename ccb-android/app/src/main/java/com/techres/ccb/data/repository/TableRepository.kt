@@ -15,11 +15,15 @@ class TableRepository @Inject constructor(
 ) {
     // Areas
     fun getAllAreas(branchId: String): Flow<List<AreaEntity>> {
-        return areaDao.getAllAreas(branchId)
+        return areaDao.getAllByBranch(branchId)
     }
 
     fun getActiveAreas(branchId: String): Flow<List<AreaEntity>> {
-        return areaDao.getActiveAreas(branchId)
+        return areaDao.getAllByBranch(branchId)
+    }
+
+    suspend fun getAreaById(id: String): AreaEntity? {
+        return areaDao.getById(id)
     }
 
     suspend fun syncAreas(branchId: String, areas: List<AreaEntity>) {
@@ -28,26 +32,30 @@ class TableRepository @Inject constructor(
 
     // Tables
     fun getAllTables(branchId: String): Flow<List<TableEntity>> {
-        return tableDao.getAllTables(branchId)
+        return tableDao.getAllByBranch(branchId)
     }
 
     fun getActiveTables(branchId: String): Flow<List<TableEntity>> {
-        return tableDao.getActiveTables(branchId)
+        return tableDao.getAllByBranch(branchId)
     }
 
-    fun getTablesByArea(areaId: String): Flow<List<TableEntity>> {
-        return tableDao.getTablesByArea(areaId)
+    fun getTablesByArea(branchId: String, areaId: String): Flow<List<TableEntity>> {
+        return tableDao.getByAreaAndBranch(branchId, areaId)
+    }
+
+    fun getTablesByStatus(branchId: String, status: String): Flow<List<TableEntity>> {
+        return tableDao.getByStatus(branchId, status)
     }
 
     suspend fun getTableById(id: String): TableEntity? {
-        return tableDao.getTableById(id)
+        return tableDao.getById(id)
     }
 
     suspend fun syncTables(branchId: String, tables: List<TableEntity>) {
         tableDao.syncTables(branchId, tables)
     }
 
-    suspend fun updateTableStatus(tableId: String, status: String) {
-        tableDao.updateTableStatus(tableId, status)
+    suspend fun updateTableStatus(tableId: String, status: String, orderId: String?, updatedAt: String) {
+        tableDao.updateStatus(tableId, status, orderId, updatedAt)
     }
 }

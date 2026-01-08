@@ -11,15 +11,15 @@ class CategoryRepository @Inject constructor(
     private val categoryDao: CategoryDao
 ) {
     fun getAllCategories(branchId: String): Flow<List<CategoryEntity>> {
-        return categoryDao.getAllCategories(branchId)
+        return categoryDao.getAllByBranch(branchId)
     }
 
     fun getActiveCategories(branchId: String): Flow<List<CategoryEntity>> {
-        return categoryDao.getActiveCategories(branchId)
+        return categoryDao.getAllByBranch(branchId)
     }
 
     suspend fun getCategoryById(id: String): CategoryEntity? {
-        return categoryDao.getCategoryById(id)
+        return categoryDao.getById(id)
     }
 
     suspend fun syncCategories(branchId: String, categories: List<CategoryEntity>) {
