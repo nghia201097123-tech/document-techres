@@ -19,6 +19,7 @@ import com.techres.ccb.presentation.screens.sale.SaleScreen
 import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
+import com.techres.ccb.presentation.screens.foodorder.FoodOrderScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -26,6 +27,7 @@ sealed class Screen(val route: String) {
     object Pin : Screen("pin")
     object Home : Screen("home")
     object Sale : Screen("sale")  // New POS Sale Screen
+    object FoodOrder : Screen("food_order")  // Food App Orders Screen
     object Menu : Screen("menu?orderId={orderId}") {
         fun createRoute(orderId: String? = null) = if (orderId != null) "menu?orderId=$orderId" else "menu"
     }
@@ -110,6 +112,9 @@ fun CCBNavHost() {
                 onNavigateToSale = {
                     navController.navigate(Screen.Sale.route)
                 },
+                onNavigateToFoodOrder = {
+                    navController.navigate(Screen.FoodOrder.route)
+                },
                 onLogout = {
                     navController.navigate(Screen.Pin.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
@@ -121,6 +126,12 @@ fun CCBNavHost() {
         composable(Screen.Sale.route) {
             SaleScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.FoodOrder.route) {
+            FoodOrderScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

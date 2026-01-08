@@ -33,6 +33,7 @@ fun HomeScreen(
     onNavigateToShift: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToSale: () -> Unit,
+    onNavigateToFoodOrder: () -> Unit,
     onLogout: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -90,15 +91,11 @@ fun HomeScreen(
                     onClick = onNavigateToSale
                 )
                 QuickActionCard(
-                    icon = Icons.Default.Add,
-                    title = "Tạo đơn mới",
-                    color = MaterialTheme.colorScheme.primary,
+                    icon = Icons.Default.DeliveryDining,
+                    title = "Đơn App Food",
+                    color = Color(0xFFFF5722),  // Deep Orange
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        val newOrderId = UUID.randomUUID().toString()
-                        viewModel.createNewOrder(newOrderId)
-                        onNavigateToMenu(newOrderId)
-                    }
+                    onClick = onNavigateToFoodOrder
                 )
             }
 
@@ -110,12 +107,32 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 QuickActionCard(
+                    icon = Icons.Default.Add,
+                    title = "Tạo đơn mới",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        val newOrderId = UUID.randomUUID().toString()
+                        viewModel.createNewOrder(newOrderId)
+                        onNavigateToMenu(newOrderId)
+                    }
+                )
+                QuickActionCard(
                     icon = Icons.Default.AccessTime,
                     title = "Ca làm việc",
                     color = Success,
                     modifier = Modifier.weight(1f),
                     onClick = onNavigateToShift
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick actions - Row 3
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 QuickActionCard(
                     icon = Icons.Default.Settings,
                     title = "Cài đặt",
@@ -123,6 +140,8 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     onClick = onNavigateToSettings
                 )
+                // Placeholder for future feature
+                Spacer(modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
