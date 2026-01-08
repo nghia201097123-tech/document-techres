@@ -3216,3 +3216,402 @@ class SyncWorker {
 │ • Notify admin nếu critical                                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Hệ thống in ấn - Printer Module
+
+CCB hỗ trợ đầy đủ tất cả các loại máy in phổ biến trên thị trường:
+
+### Tổng quan các loại kết nối
+
+| Loại kết nối | Port/Protocol | Máy in phổ biến | Ưu điểm | Nhược điểm |
+|--------------|---------------|-----------------|---------|------------|
+| **Bluetooth** | SPP (UUID 00001101) | Epson TM-P20, Bixolon SPP-R310 | Di động, không cần dây | Range ngắn (~10m) |
+| **WiFi/LAN** | TCP/IP port 9100 | Epson TM-T88, Star TSP100 | Ổn định, range xa | Cần cấu hình mạng |
+| **USB** | USB Host | Epson TM-T82, Citizen CT-S310 | Nhanh, tin cậy | Cần cáp, cố định |
+| **Sunmi Built-in** | AIDL Service | Sunmi V2, T2, P2 | Tích hợp sẵn | Chỉ dùng trên Sunmi |
+| **Serial (RS232)** | /dev/ttyS* | Máy POS công nghiệp | Ổn định | Thiết bị cũ |
+
+### Kiến trúc Printer Module
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        PRINTER ARCHITECTURE                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                        PrinterManager                               │ │
+│  │  - Quản lý tất cả adapters                                          │ │
+│  │  - Lưu cấu hình máy in mặc định                                     │ │
+│  │  - Print queue với retry                                            │ │
+│  │  - Connection state management                                       │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                   │                                      │
+│         ┌─────────────────────────┼─────────────────────────┐           │
+│         ▼                         ▼                         ▼           │
+│  ┌──────────────┐    ┌───────────────────┐    ┌──────────────────┐     │
+│  │  Discovery   │    │  PrinterConnection │    │  ReceiptTemplate │     │
+│  │   Service    │    │    (Interface)     │    │     Builder      │     │
+│  └──────────────┘    └───────────────────┘    └──────────────────┘     │
+│         │                        │                     │                 │
+│         │            ┌───────────┼───────────┐         │                │
+│         ▼            ▼           ▼           ▼         ▼                │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                        Printer Adapters                           │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │   │
+│  │  │Bluetooth │ │ Network  │ │   USB    │ │  Sunmi   │ │ Serial │ │   │
+│  │  │ Adapter  │ │ Adapter  │ │ Adapter  │ │ Adapter  │ │Adapter │ │   │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘ │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                   │                                      │
+│                                   ▼                                      │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                        ESC/POS Commands                           │   │
+│  │  - Text formatting (bold, underline, size)                        │   │
+│  │  - Alignment (left, center, right)                                │   │
+│  │  - Barcode/QR Code                                                │   │
+│  │  - Image printing                                                 │   │
+│  │  - Paper cut, cash drawer                                         │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Các hãng máy in được hỗ trợ
+
+| Hãng | Models phổ biến | Kết nối | Ghi chú |
+|------|-----------------|---------|---------|
+| **Epson** | TM-T88, TM-T82, TM-P20, TM-U220 | All | Phổ biến nhất, ESC/POS chuẩn |
+| **Star Micronics** | TSP100, TSP654, SM-T300 | All | Chất lượng cao |
+| **Bixolon** | SRP-350, SPP-R310, SPP-R200 | All | Bluetooth tốt |
+| **Citizen** | CT-S310, CT-E651, CMP-30 | All | Bền bỉ |
+| **Sunmi** | V1, V2, V2 Pro, T2, P2, D2 | Built-in | Máy POS tích hợp |
+| **Xprinter** | XP-N160II, XP-58IIH, XP-80 | All | Giá rẻ, phổ biến VN |
+| **HPRT** | TP806L, TP808, TP585 | All | Giá rẻ |
+| **Rongta** | RP80, RP58, RP330 | All | Giá rẻ |
+| **Zjiang/ZJ** | ZJ-5890K, ZJ-8250 | All | Giá rẻ, OEM |
+| **Goojprt** | PT-210, MTP-II | Bluetooth | Di động |
+| **MUNBYN** | IMP001, IMP002 | All | Compact |
+
+### 1. Bluetooth Printer
+
+**Đặc điểm:**
+- Sử dụng SPP Profile (Serial Port Profile)
+- UUID: `00001101-0000-1000-8000-00805F9B34FB`
+- Phạm vi: ~10 mét
+- Tương thích Android 6+
+
+**Sử dụng:**
+
+```kotlin
+@Inject
+lateinit var printerManager: PrinterManager
+
+// Quét máy in Bluetooth đã ghép đôi
+val pairedDevices = printerManager.quickScan()
+    .filter { it.connectionType == ConnectionType.BLUETOOTH }
+
+// Kết nối
+printerManager.connect(pairedDevices.first())
+
+// In receipt
+printerManager.printReceipt(receipt)
+```
+
+**Cấu hình Manifest:**
+
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH"/>
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+```
+
+### 2. WiFi/LAN Printer (TCP/IP)
+
+**Đặc điểm:**
+- Kết nối qua TCP socket
+- Port mặc định: 9100 (RAW printing)
+- Hỗ trợ mDNS/Bonjour discovery
+- Phạm vi: toàn mạng LAN
+
+**Sử dụng:**
+
+```kotlin
+// Kết nối bằng IP
+printerManager.connectByAddress(
+    address = "192.168.1.100:9100",
+    connectionType = ConnectionType.LAN,
+    name = "Kitchen Printer"
+)
+
+// Hoặc auto-discovery
+printerManager.startDiscovery(setOf(ConnectionType.LAN))
+collectLatest(printerManager.discoveredDevices) { devices ->
+    // Hiển thị danh sách máy in
+}
+```
+
+**Network Ports:**
+
+| Port | Protocol | Mô tả |
+|------|----------|-------|
+| 9100 | RAW | Phổ biến nhất (HP JetDirect compatible) |
+| 515 | LPR/LPD | Một số máy cũ |
+| 631 | IPP | Internet Printing Protocol |
+
+### 3. USB Printer
+
+**Đặc điểm:**
+- USB Host Mode
+- USB Class Printer (0x07)
+- Nhanh và ổn định nhất
+- Cần cấp quyền USB permission
+
+**Sử dụng:**
+
+```kotlin
+// Lấy danh sách máy in USB đang kết nối
+val usbPrinters = usbAdapter.getConnectedPrinters()
+
+// Kết nối (sẽ yêu cầu permission)
+printerManager.connect(usbPrinters.first())
+```
+
+**Cấu hình Manifest:**
+
+```xml
+<uses-feature android:name="android.hardware.usb.host"/>
+
+<!-- Tự động khởi động khi cắm USB -->
+<intent-filter>
+    <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+</intent-filter>
+<meta-data
+    android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+    android:resource="@xml/usb_device_filter"/>
+```
+
+### 4. Sunmi Built-in Printer
+
+**Đặc điểm:**
+- Tích hợp sẵn trong máy Sunmi
+- Sử dụng AIDL service của Sunmi
+- Không cần cấu hình gì thêm
+- Auto-detect thiết bị Sunmi
+
+**Các thiết bị Sunmi:**
+
+| Model | Giấy | Cutter | Màn hình |
+|-------|------|--------|----------|
+| Sunmi V1 | 58mm | No | 5.5" |
+| Sunmi V2 | 58mm | No | 5.5" |
+| Sunmi V2 Pro | 58mm | No | 5.99" |
+| Sunmi T1 | 80mm | Yes | 15.6" |
+| Sunmi T2 | 80mm | Yes | 15.6" |
+| Sunmi P2 | 58mm | No | Handheld |
+| Sunmi D2 | 58mm | Optional | Countertop |
+
+**Sử dụng:**
+
+```kotlin
+// Auto-detect và connect
+if (sunmiAdapter.isSunmiDevice()) {
+    printerManager.connect(PrinterDevice.sunmiInner())
+}
+
+// Sunmi-specific functions
+sunmiAdapter.printQRCode("https://techres.vn", size = 8)
+sunmiAdapter.openCashDrawer()
+sunmiAdapter.cutPaper()
+```
+
+### 5. Serial Printer (RS232)
+
+**Đặc điểm:**
+- Cho máy POS công nghiệp
+- Cần USB-to-Serial adapter hoặc native serial port
+- Cấu hình baud rate, parity, stop bits
+
+**Serial Ports phổ biến:**
+
+```
+/dev/ttyS0, /dev/ttyS1       - Native serial
+/dev/ttyUSB0, /dev/ttyUSB1   - USB to Serial adapter
+/dev/ttyACM0                 - USB CDC devices
+```
+
+### ESC/POS Commands
+
+**Command Builder API:**
+
+```kotlin
+// Fluent API
+val receipt = EscPosBuilder()
+    .init()
+    .alignCenter()
+    .doubleSize()
+    .bold(true)
+    .line("TÊN CỬA HÀNG")
+    .normal()
+    .bold(false)
+    .line("123 Đường ABC, Quận XYZ")
+    .line("ĐT: 0901234567")
+    .separator()
+    .alignLeft()
+    .twoColumns("Cà phê sữa x2", "50,000", 32)
+    .twoColumns("Trà đào x1", "35,000", 32)
+    .separator()
+    .bold(true)
+    .twoColumns("TỔNG CỘNG", "135,000", 32)
+    .bold(false)
+    .alignCenter()
+    .qrCode("https://techres.vn/order/12345", size = 4)
+    .line("Cảm ơn quý khách!")
+    .feed(3)
+    .cut()
+    .build()
+
+printerManager.printRaw(receipt)
+```
+
+**ESC/POS Commands phổ biến:**
+
+| Command | Bytes | Mô tả |
+|---------|-------|-------|
+| Initialize | `1B 40` | Reset máy in |
+| Bold ON | `1B 45 01` | Bật in đậm |
+| Bold OFF | `1B 45 00` | Tắt in đậm |
+| Align Left | `1B 61 00` | Căn trái |
+| Align Center | `1B 61 01` | Căn giữa |
+| Align Right | `1B 61 02` | Căn phải |
+| Double Size | `1B 21 30` | Chữ gấp đôi |
+| Cut Paper | `1D 56 00` | Cắt giấy (full) |
+| Cut Partial | `1D 56 01` | Cắt giấy (partial) |
+| Cash Drawer | `1B 70 00 32 32` | Mở ngăn kéo |
+| Feed Lines | `1B 64 nn` | Feed nn dòng |
+
+### Receipt Templates
+
+**Template Builder:**
+
+```kotlin
+val receipt = ReceiptTemplate.create(paperWidth = 58)
+    .header(
+        storeName = "TECHRES COFFEE",
+        address = "123 Nguyễn Huệ, Q.1, TP.HCM",
+        phone = "0901234567",
+        taxCode = "0123456789"
+    )
+    .title("HÓA ĐƠN BÁN HÀNG")
+    .orderInfo(
+        orderNumber = "HD001234",
+        date = Date(),
+        tableName = "Bàn 5",
+        staffName = "Nguyễn Văn A"
+    )
+    .items(listOf(
+        ReceiptItem("Cà phê sữa", 2, 25000.0),
+        ReceiptItem("Trà đào", 1, 35000.0),
+        ReceiptItem("Bánh mì", 1, 20000.0)
+    ))
+    .totals(
+        subtotal = 105000.0,
+        discount = 10000.0,
+        vat = 9500.0,
+        total = 104500.0
+    )
+    .payment(
+        method = "Tiền mặt",
+        received = 110000.0,
+        change = 5500.0
+    )
+    .footer(
+        thankYou = "Cảm ơn quý khách!",
+        comeback = "Hẹn gặp lại!"
+    )
+    .feedAndCut()
+    .build()
+```
+
+**Kitchen Ticket:**
+
+```kotlin
+val kitchenTicket = KitchenTicket(
+    orderNumber = "HD001234",
+    tableName = "Bàn 5",
+    items = listOf(
+        KitchenItem("Cà phê sữa", 2, "Ít đường"),
+        KitchenItem("Trà đào", 1, null)
+    ),
+    isUrgent = true
+).toEscPos()
+
+printerManager.printRaw(kitchenTicket)
+```
+
+### Printer Discovery Flow
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        PRINTER DISCOVERY FLOW                           │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌─────────────────┐                                                  │
+│   │  Start Scan     │                                                  │
+│   └────────┬────────┘                                                  │
+│            │                                                            │
+│   ┌────────┴────────────────────────────────────────────────────┐      │
+│   │                    Parallel Discovery                        │      │
+│   │                                                              │      │
+│   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │      │
+│   │  │   Sunmi     │  │  Bluetooth  │  │     USB     │         │      │
+│   │  │  Built-in   │  │   Paired    │  │  Connected  │         │      │
+│   │  │   Check     │  │   Devices   │  │   Devices   │         │      │
+│   │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │      │
+│   │         │                │                │                 │      │
+│   │  ┌──────┴──────┐  ┌──────┴──────┐  ┌──────┴──────┐         │      │
+│   │  │   Serial    │  │  Bluetooth  │  │   Network   │         │      │
+│   │  │   Ports     │  │  Discovery  │  │  mDNS Scan  │         │      │
+│   │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │      │
+│   │         │                │                │                 │      │
+│   │         │                │         ┌──────┴──────┐         │      │
+│   │         │                │         │   Network   │         │      │
+│   │         │                │         │    Scan     │         │      │
+│   │         │                │         │ (Port 9100) │         │      │
+│   │         │                │         └──────┬──────┘         │      │
+│   └─────────┴────────────────┴────────────────┴─────────────────┘      │
+│                                      │                                  │
+│                           ┌──────────┴──────────┐                      │
+│                           │   Aggregate Results  │                      │
+│                           │   Sort by Priority   │                      │
+│                           └──────────┬──────────┘                      │
+│                                      │                                  │
+│                           ┌──────────┴──────────┐                      │
+│                           │   discoveredDevices  │                      │
+│                           │     StateFlow        │                      │
+│                           └─────────────────────┘                      │
+│                                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Xử lý lỗi máy in
+
+| Lỗi | Nguyên nhân | Giải pháp |
+|-----|-------------|-----------|
+| **Connection failed** | Máy in tắt/ngoài phạm vi | Kiểm tra nguồn, khoảng cách |
+| **Write failed** | Mất kết nối giữa chừng | Auto-reconnect, retry |
+| **Paper out** | Hết giấy | Thông báo người dùng |
+| **Cover open** | Nắp máy in mở | Đóng nắp |
+| **Overheated** | Máy in quá nóng | Đợi nguội |
+| **Permission denied** | Thiếu quyền Bluetooth/USB | Yêu cầu cấp quyền |
+
+### Best Practices
+
+1. **Auto-reconnect:** Tự động kết nối lại khi mất kết nối
+2. **Print queue:** Sử dụng queue để xử lý khi máy in bận
+3. **Status check:** Kiểm tra trạng thái trước khi in
+4. **Fallback:** Cho phép bỏ qua lỗi in (order vẫn hoàn thành)
+5. **Test print:** Cung cấp chức năng in thử
+6. **Default printer:** Lưu máy in mặc định để kết nối nhanh
