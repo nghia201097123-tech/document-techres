@@ -5,26 +5,61 @@ import com.google.gson.annotations.SerializedName
 // ============ Auth DTOs ============
 
 data class LoginRequest(
-    @SerializedName("branchCode") val branchCode: String,
-    @SerializedName("deviceId") val deviceId: String,
-    @SerializedName("deviceName") val deviceName: String
+    @SerializedName("tenantId") val tenantId: String,
+    @SerializedName("username") val username: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("deviceId") val deviceId: String? = null,
+    @SerializedName("deviceName") val deviceName: String? = null
 )
 
 data class LoginResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("data") val data: LoginData?,
-    @SerializedName("message") val message: String?
+    @SerializedName("message") val message: String?,
+    // Alternative structure for web-dashboard style response
+    @SerializedName("staff") val staff: LoginStaffDto?,
+    @SerializedName("company") val company: LoginCompanyDto?,
+    @SerializedName("token") val token: String?
 )
 
 data class LoginData(
     @SerializedName("token") val token: String,
-    @SerializedName("branchId") val branchId: String,
-    @SerializedName("branchName") val branchName: String,
-    @SerializedName("brandId") val brandId: String,
-    @SerializedName("brandName") val brandName: String,
-    @SerializedName("companyId") val companyId: String,
-    @SerializedName("companyName") val companyName: String,
-    @SerializedName("expiresAt") val expiresAt: String
+    @SerializedName("staff") val staff: LoginStaffDto?,
+    @SerializedName("company") val company: LoginCompanyDto?,
+    @SerializedName("branchId") val branchId: String?,
+    @SerializedName("branchName") val branchName: String?,
+    @SerializedName("brandId") val brandId: String?,
+    @SerializedName("brandName") val brandName: String?,
+    @SerializedName("companyId") val companyId: String?,
+    @SerializedName("companyName") val companyName: String?,
+    @SerializedName("expiresAt") val expiresAt: String?
+)
+
+data class LoginStaffDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String?,
+    @SerializedName("username") val username: String?,
+    @SerializedName("name") val name: String,
+    @SerializedName("phone") val phone: String?,
+    @SerializedName("email") val email: String?,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("role") val role: String?,
+    @SerializedName("isActive") val isActive: Boolean?,
+    @SerializedName("departmentId") val departmentId: String?,
+    @SerializedName("departmentName") val departmentName: String?,
+    @SerializedName("brandId") val brandId: String?,
+    @SerializedName("branchId") val branchId: String?
+)
+
+data class LoginCompanyDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("tenantId") val tenantId: String?,
+    @SerializedName("name") val name: String,
+    @SerializedName("logoUrl") val logoUrl: String?,
+    @SerializedName("brandId") val brandId: String?,
+    @SerializedName("branchId") val branchId: String?,
+    @SerializedName("brandName") val brandName: String?,
+    @SerializedName("branchName") val branchName: String?
 )
 
 data class VerifyPinRequest(

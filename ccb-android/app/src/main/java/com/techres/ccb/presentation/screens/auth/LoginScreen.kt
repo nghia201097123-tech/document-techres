@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +17,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -26,7 +32,10 @@ fun LoginScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    var storeCode by remember { mutableStateOf("") }
+    var tenantId by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
@@ -68,22 +77,55 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Đăng nhập thiết bị",
+                        text = "Đăng nhập",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    // Tenant ID field
                     OutlinedTextField(
-                        value = storeCode,
-                        onValueChange = { storeCode = it.uppercase() },
-                        label = { Text("Mã cửa hàng") },
-                        placeholder = { Text("VD: STORE001") },
+                        value = tenantId,
+                        onValueChange = { tenantId = it },
+                        label = { Text("Mã công ty") },
+                        placeholder = { Text("VD: techres") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Characters,
+                            imeAction = ImeAction.Next
+                        ),
+                        enabled = !uiState.isLoading
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Username field
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Tên đăng nhập") },
+                        placeholder = { Text("VD: admin") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        enabled = !uiState.isLoading
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Password field
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Mật khẩu") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
@@ -92,9 +134,17 @@ fun LoginScreen(
                                     context.contentResolver,
                                     Settings.Secure.ANDROID_ID
                                 )
-                                viewModel.login(storeCode, deviceId, android.os.Build.MODEL)
+                                viewModel.login(tenantId, username, password, deviceId, android.os.Build.MODEL)
                             }
                         ),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                    contentDescription = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                                )
+                            }
+                        },
                         enabled = !uiState.isLoading
                     )
 
@@ -115,12 +165,12 @@ fun LoginScreen(
                                 context.contentResolver,
                                 Settings.Secure.ANDROID_ID
                             )
-                            viewModel.login(storeCode, deviceId, android.os.Build.MODEL)
+                            viewModel.login(tenantId, username, password, deviceId, android.os.Build.MODEL)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
-                        enabled = storeCode.isNotBlank() && !uiState.isLoading,
+                        enabled = tenantId.isNotBlank() && username.isNotBlank() && password.isNotBlank() && !uiState.isLoading,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         if (uiState.isLoading) {
