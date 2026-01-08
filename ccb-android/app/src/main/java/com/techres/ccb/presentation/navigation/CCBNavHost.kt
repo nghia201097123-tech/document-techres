@@ -25,6 +25,7 @@ import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
+import com.techres.ccb.presentation.screens.initialsync.InitialSyncScreen
 import com.techres.ccb.presentation.screens.debug.DatabaseDebugScreen
 
 sealed class Screen(val route: String) {
@@ -33,6 +34,7 @@ sealed class Screen(val route: String) {
     object Pin : Screen("pin")
 
     // New flow screens
+    object InitialSync : Screen("initial_sync")  // Sync brands/branches after login
     object BranchSelection : Screen("branch_selection")
     object OpenShift : Screen("open_shift/{branchName}") {
         fun createRoute(branchName: String) = "open_shift/$branchName"
@@ -91,8 +93,8 @@ fun CCBNavHost() {
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    // After login -> Go to Branch Selection
-                    navController.navigate(Screen.BranchSelection.route) {
+                    // After login -> Go to Initial Sync (sync brands/branches)
+                    navController.navigate(Screen.InitialSync.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
@@ -102,13 +104,24 @@ fun CCBNavHost() {
         composable(Screen.Pin.route) {
             PinScreen(
                 onPinVerified = {
-                    navController.navigate(Screen.BranchSelection.route) {
+                    navController.navigate(Screen.InitialSync.route) {
                         popUpTo(Screen.Pin.route) { inclusive = true }
                     }
                 },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Pin.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Initial Sync Screen - Sync brands/branches after login
+        composable(Screen.InitialSync.route) {
+            InitialSyncScreen(
+                onSyncComplete = {
+                    navController.navigate(Screen.BranchSelection.route) {
+                        popUpTo(Screen.InitialSync.route) { inclusive = true }
                     }
                 }
             )
@@ -123,7 +136,7 @@ fun CCBNavHost() {
                     }
                 },
                 onBack = {
-                    navController.navigate(Screen.Login.route) {
+                    navController.navigate(Screen.InitialSync.route) {
                         popUpTo(Screen.BranchSelection.route) { inclusive = true }
                     }
                 }

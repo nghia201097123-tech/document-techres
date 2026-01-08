@@ -31,6 +31,18 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideBrandDao(database: CCBDatabase): BrandDao {
+        return database.brandDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBranchDao(database: CCBDatabase): BranchDao {
+        return database.branchDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideCategoryDao(database: CCBDatabase): CategoryDao {
         return database.categoryDao()
     }

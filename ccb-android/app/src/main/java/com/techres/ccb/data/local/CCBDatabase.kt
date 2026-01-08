@@ -7,38 +7,46 @@ import com.techres.ccb.data.local.entity.*
 
 @Database(
     entities = [
+        // Master data entities
+        BrandEntity::class,
+        BranchEntity::class,
         CategoryEntity::class,
         ProductEntity::class,
         AreaEntity::class,
         TableEntity::class,
         StaffEntity::class,
+        // Transaction entities
         OrderEntity::class,
         OrderItemEntity::class,
         ShiftEntity::class,
-        // New entities for sync and offline support
         PaymentEntity::class,
+        // Support entities
         VoucherEntity::class,
         SyncQueueEntity::class,
         SyncMetadataEntity::class,
         SyncConflictEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
 
-    // Existing DAOs
+    // Master data DAOs
+    abstract fun brandDao(): BrandDao
+    abstract fun branchDao(): BranchDao
     abstract fun categoryDao(): CategoryDao
     abstract fun productDao(): ProductDao
     abstract fun areaDao(): AreaDao
     abstract fun tableDao(): TableDao
     abstract fun staffDao(): StaffDao
+
+    // Transaction DAOs
     abstract fun orderDao(): OrderDao
     abstract fun orderItemDao(): OrderItemDao
     abstract fun shiftDao(): ShiftDao
-
-    // New DAOs for sync and offline support
     abstract fun paymentDao(): PaymentDao
+
+    // Support DAOs
     abstract fun voucherDao(): VoucherDao
     abstract fun syncQueueDao(): SyncQueueDao
     abstract fun syncMetadataDao(): SyncMetadataDao

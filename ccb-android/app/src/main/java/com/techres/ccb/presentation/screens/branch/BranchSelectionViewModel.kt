@@ -2,18 +2,19 @@ package com.techres.ccb.presentation.screens.branch
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techres.ccb.data.remote.dto.BrandDto
-import com.techres.ccb.data.remote.dto.BranchDto
+import com.techres.ccb.data.local.entity.BrandEntity
+import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.repository.BranchRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// UI models (mapped from DTOs)
+// UI models
 data class Brand(
     val id: String,
     val name: String,
@@ -44,62 +45,86 @@ class BranchSelectionViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(BranchSelectionUiState())
     val uiState: StateFlow<BranchSelectionUiState> = _uiState.asStateFlow()
 
-    // Keep original DTOs for saving
-    private var brandDtoMap: Map<String, BrandDto> = emptyMap()
-    private var branchDtoMap: Map<String, BranchDto> = emptyMap()
+    // Keep original entities for saving
+    private var brandEntityMap: Map<String, BrandEntity> = emptyMap()
+    private var branchEntityMap: Map<String, BranchEntity> = emptyMap()
 
     init {
-        loadBrands()
+        loadBrandsFromLocal()
     }
 
-    fun loadBrands() {
+    /**
+     * Load brands and branches from LOCAL database
+     */
+    fun loadBrandsFromLocal() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            val result = branchRepository.getBrands()
-            result.fold(
-                onSuccess = { brandDtos ->
-                    // Store original DTOs
-                    brandDtoMap = brandDtos.associateBy { it.id }
-                    branchDtoMap = brandDtos.flatMap { brand ->
-                        brand.branches?.map { it.id to it } ?: emptyList()
-                    }.toMap()
+            try {
+                // Get brands from local DB
+                val brandEntities = branchRepository.getAllBrandsLocal().first()
 
-                    // Map to UI models
-                    val brands = brandDtos.filter { it.isActive }.map { dto ->
-                        Brand(
-                            id = dto.id,
-                            name = dto.name,
-                            logo = dto.logo,
-                            branches = dto.branches?.filter { it.isActive }?.map { branchDto ->
-                                Branch(
-                                    id = branchDto.id,
-                                    name = branchDto.name,
-                                    address = branchDto.address ?: "",
-                                    brandId = branchDto.brandId
-                                )
-                            } ?: emptyList()
-                        )
-                    }
-
+                if (brandEntities.isEmpty()) {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            brands = brands,
-                            error = null
+                            brands = emptyList(),
+                            error = "Chưa có dữ liệu. Vui lòng đồng bộ dữ liệu trước."
                         )
                     }
-                },
-                onFailure = { e ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = e.message ?: "Không thể tải danh sách thương hiệu"
-                        )
-                    }
+                    return@launch
                 }
-            )
+
+                // Store original entities
+                brandEntityMap = brandEntities.associateBy { it.id }
+
+                // Get all branches and group by brand
+                val allBranches = branchRepository.getAllBranchesLocal().first()
+                branchEntityMap = allBranches.associateBy { it.id }
+                val branchesByBrand = allBranches.groupBy { it.brandId }
+
+                // Map to UI models
+                val brands = brandEntities.map { brandEntity ->
+                    val branches = branchesByBrand[brandEntity.id]?.map { branchEntity ->
+                        Branch(
+                            id = branchEntity.id,
+                            name = branchEntity.name,
+                            address = branchEntity.address ?: "",
+                            brandId = branchEntity.brandId
+                        )
+                    } ?: emptyList()
+
+                    Brand(
+                        id = brandEntity.id,
+                        name = brandEntity.name,
+                        logo = brandEntity.logo,
+                        branches = branches
+                    )
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        brands = brands,
+                        error = null
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Lỗi khi tải dữ liệu"
+                    )
+                }
+            }
         }
+    }
+
+    /**
+     * Reload brands - for retry button
+     */
+    fun loadBrands() {
+        loadBrandsFromLocal()
     }
 
     fun selectBrand(brand: Brand) {
@@ -127,11 +152,11 @@ class BranchSelectionViewModel @Inject constructor(
         val selectedBrand = _uiState.value.selectedBrand ?: return false
         val selectedBranch = _uiState.value.selectedBranch ?: return false
 
-        val brandDto = brandDtoMap[selectedBrand.id]
-        val branchDto = branchDtoMap[selectedBranch.id]
+        val brandEntity = brandEntityMap[selectedBrand.id]
+        val branchEntity = branchEntityMap[selectedBranch.id]
 
-        if (brandDto != null && branchDto != null) {
-            branchRepository.saveSelectedBranch(brandDto, branchDto)
+        if (brandEntity != null && branchEntity != null) {
+            branchRepository.saveSelectedBranch(brandEntity, branchEntity)
             return true
         }
 
