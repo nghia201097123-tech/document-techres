@@ -52,7 +52,10 @@ data class DashboardUiState(
     // Total stats
     val totalActiveOrders: Int = 0,
     val todayRevenue: Long = 0,
-    val todayOrderCount: Int = 0
+    val todayOrderCount: Int = 0,
+
+    // Grid settings
+    val gridColumns: Int = 8  // 4, 6, or 8
 )
 
 @HiltViewModel
@@ -104,6 +107,13 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
 
     fun refresh() {
         loadData()
+    }
+
+    // Change grid columns (4, 6, or 8)
+    fun setGridColumns(columns: Int) {
+        if (columns in listOf(4, 6, 8)) {
+            _uiState.update { it.copy(gridColumns = columns) }
+        }
     }
 
     // Accept food order

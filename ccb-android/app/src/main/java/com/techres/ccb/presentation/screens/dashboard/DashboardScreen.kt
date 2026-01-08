@@ -112,49 +112,84 @@ fun DashboardScreen(
                 onNavigateToShift = onNavigateToShift
             )
 
-            // Tab Selection
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.White,
-                contentColor = Color(0xFF1976D2)
+            // Tab Selection + Grid Column Selector
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Storefront, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tại quầy")
-                            if (uiState.posOrders.isNotEmpty()) {
+                // Tabs
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF1976D2),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Storefront, null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Badge(containerColor = Color(0xFF2196F3)) {
-                                    Text("${uiState.posOrders.size}")
+                                Text("Quầy", fontSize = 12.sp)
+                                if (uiState.posOrders.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Badge(containerColor = Color(0xFF2196F3)) {
+                                        Text("${uiState.posOrders.size}", fontSize = 10.sp)
+                                    }
                                 }
                             }
                         }
-                    }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DeliveryDining, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("App Food")
-                            if (uiState.foodAppOrders.isNotEmpty()) {
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DeliveryDining, null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Badge(
-                                    containerColor = if (uiState.newFoodOrderCount > 0)
-                                        Color(0xFFE91E63) else Color(0xFFFF5722)
-                                ) {
-                                    Text("${uiState.foodAppOrders.size}")
+                                Text("App", fontSize = 12.sp)
+                                if (uiState.foodAppOrders.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Badge(
+                                        containerColor = if (uiState.newFoodOrderCount > 0)
+                                            Color(0xFFE91E63) else Color(0xFFFF5722)
+                                    ) {
+                                        Text("${uiState.foodAppOrders.size}", fontSize = 10.sp)
+                                    }
                                 }
                             }
                         }
+                    )
+                }
+
+                // Grid Column Selector
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.GridView,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.Gray
+                    )
+                    listOf(4, 6, 8).forEach { cols ->
+                        FilterChip(
+                            selected = uiState.gridColumns == cols,
+                            onClick = { viewModel.setGridColumns(cols) },
+                            label = { Text("$cols", fontSize = 11.sp) },
+                            modifier = Modifier.height(28.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF1976D2),
+                                selectedLabelColor = Color.White
+                            )
+                        )
                     }
-                )
+                }
             }
 
             // Orders Grid
@@ -168,7 +203,7 @@ fun DashboardScreen(
                         )
                     } else {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(8),
+                            columns = GridCells.Fixed(uiState.gridColumns),
                             contentPadding = PaddingValues(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -182,7 +217,7 @@ fun DashboardScreen(
                                 )
                             }
                             // Bottom spacing for FAB
-                            item(span = { GridItemSpan(8) }) {
+                            item(span = { GridItemSpan(uiState.gridColumns) }) {
                                 Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
@@ -197,7 +232,7 @@ fun DashboardScreen(
                         )
                     } else {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(8),
+                            columns = GridCells.Fixed(uiState.gridColumns),
                             contentPadding = PaddingValues(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -213,7 +248,7 @@ fun DashboardScreen(
                                 )
                             }
                             // Bottom spacing for FAB
-                            item(span = { GridItemSpan(8) }) {
+                            item(span = { GridItemSpan(uiState.gridColumns) }) {
                                 Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
