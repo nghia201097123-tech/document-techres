@@ -23,6 +23,12 @@ export enum SellingType {
   WEIGHT = 'weight',   // Bán theo ký
 }
 
+// Transformer to convert decimal string to number
+const decimalTransformer = {
+  to: (value: number) => value,
+  from: (value: string | number) => (value === null || value === undefined) ? 0 : parseFloat(String(value)),
+};
+
 @Entity('products')
 @Index(['tenantId', 'brandId'])
 export class Product {
@@ -49,10 +55,10 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0, transformer: decimalTransformer })
   price: number;
 
-  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 10 })
+  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 10, transformer: decimalTransformer })
   vatRate: number;
 
   @Column({
@@ -73,7 +79,7 @@ export class Product {
   preparationTime: number;
 
   // Giá vốn
-  @Column({ name: 'cost_price', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  @Column({ name: 'cost_price', type: 'decimal', precision: 15, scale: 2, default: 0, transformer: decimalTransformer })
   costPrice: number;
 
   // Loại bán (theo phần hoặc theo ký)
