@@ -279,7 +279,7 @@ class SyncManager @Inject constructor(
             val order = orderDao.getById(item.entityId)
                 ?: return SyncResult.Error("Order not found: ${item.entityId}")
 
-            val orderItems = orderItemDao.getByOrderId(order.id)
+            val orderItems = orderItemDao.getByOrderIdSync(order.id)
             val payments = paymentDao.getByOrderId(order.id)
 
             val payload = OrderSyncPayload(
@@ -339,18 +339,18 @@ class SyncManager @Inject constructor(
                     when (entityType) {
                         "ORDER" -> {
                             orderDao.updateSyncStatus(
-                                id = entityId,
-                                status = "synced",
+                                orderId = entityId,
+                                syncStatus = "synced",
                                 syncedAt = body.syncedAt,
-                                serverId = body.serverId
+                                retryCount = 0
                             )
                         }
                         "SHIFT" -> {
                             shiftDao.updateSyncStatus(
-                                id = entityId,
-                                status = "synced",
+                                shiftId = entityId,
+                                syncStatus = "synced",
                                 syncedAt = body.syncedAt,
-                                serverId = body.serverId
+                                retryCount = 0
                             )
                         }
                     }
@@ -365,8 +365,8 @@ class SyncManager @Inject constructor(
                 if (body?.serverId != null) {
                     // Idempotency conflict - order already exists
                     when (entityType) {
-                        "ORDER" -> orderDao.updateSyncStatus(entityId, "synced", body.syncedAt, body.serverId)
-                        "SHIFT" -> shiftDao.updateSyncStatus(entityId, "synced", body.syncedAt, body.serverId)
+                        "ORDER" -> orderDao.updateSyncStatus(entityId, "synced", body.syncedAt, 0)
+                        "SHIFT" -> shiftDao.updateSyncStatus(entityId, "synced", body.syncedAt, 0)
                     }
                     Timber.d("$TAG: Idempotency conflict resolved for $entityType $entityId")
                     SyncResult.Success
@@ -432,7 +432,7 @@ class SyncManager @Inject constructor(
         val order = orderDao.getById(orderId)
             ?: throw IllegalArgumentException("Order not found: $orderId")
 
-        val orderItems = orderItemDao.getByOrderId(orderId)
+        val orderItems = orderItemDao.getByOrderIdSync(orderId)
         val payments = paymentDao.getByOrderId(orderId)
 
         val payload = OrderSyncPayload(

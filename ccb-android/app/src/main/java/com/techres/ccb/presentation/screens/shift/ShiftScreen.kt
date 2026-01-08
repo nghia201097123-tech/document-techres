@@ -117,7 +117,7 @@ fun ShiftScreen(
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Bắt đầu: ${uiState.currentShift?.startTime?.take(16)?.replace("T", " ") ?: ""}")
+                        Text("Bắt đầu: ${uiState.currentShift?.openedAt?.take(16)?.replace("T", " ") ?: ""}")
                         Text("Nhân viên: ${uiState.currentShift?.staffName ?: ""}")
                     }
                 }
@@ -147,7 +147,7 @@ fun ShiftScreen(
                         ShiftSummaryRow("Doanh thu", formatPrice(uiState.totalRevenue), isHighlighted = true)
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         ShiftSummaryRow("Tiền mặt", formatPrice(uiState.cashRevenue))
-                        ShiftSummaryRow("Chuyển khoản", formatPrice(uiState.bankRevenue))
+                        ShiftSummaryRow("Chuyển khoản", formatPrice(uiState.transferRevenue))
                         ShiftSummaryRow("Thẻ", formatPrice(uiState.cardRevenue))
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         ShiftSummaryRow(

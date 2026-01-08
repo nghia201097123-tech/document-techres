@@ -30,7 +30,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = LoginUiState(isLoading = true)
 
-            val result = authRepository.login(storeCode, deviceId, deviceName)
+            val result = authRepository.login(storeCode, deviceId, deviceName ?: "Android Device")
             result.fold(
                 onSuccess = {
                     // Perform initial sync after login
