@@ -68,7 +68,8 @@ fun CCBNavHost() {
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Screen.Pin.route) {
+                    // Skip PIN screen, go directly to Home
+                    navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
