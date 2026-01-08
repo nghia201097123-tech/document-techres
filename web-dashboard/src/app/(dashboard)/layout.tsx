@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { DashboardLayout } from "@/components/layout";
 import { BackgroundProgressProvider } from "@/components/ui/background-progress";
+import { GlobalBatchHandlers } from "@/components/global-batch-handlers";
 
 export default function DashboardRootLayout({
   children,
@@ -34,6 +35,7 @@ export default function DashboardRootLayout({
 
   return (
     <BackgroundProgressProvider>
+      <GlobalBatchHandlers />
       <DashboardLayout>{children}</DashboardLayout>
     </BackgroundProgressProvider>
   );
