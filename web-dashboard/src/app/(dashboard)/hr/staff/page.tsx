@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, ChevronLeft, ChevronRight, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, ChevronLeft, ChevronRight, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -189,7 +189,7 @@ const initialImportSettings: ImportSettings = {
 };
 
 type DialogMode = "create" | "edit" | "view" | "import" | null;
-type BulkOperation = "department" | "branch" | "activate" | "deactivate" | "reset-password" | null;
+type BulkOperation = "department" | "branch" | "activate" | "deactivate" | "reset-password" | "delete" | null;
 
 export default function StaffPage() {
   const dispatch = useAppDispatch();
@@ -247,6 +247,11 @@ export default function StaffPage() {
 
   // Reset password state
   const [resetPasswordResult, setResetPasswordResult] = React.useState<{ staff: Staff; temporaryPassword: string } | null>(null);
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   // Bulk operations state
   const [selectedStaffIds, setSelectedStaffIds] = React.useState<Set<string>>(new Set());
@@ -606,6 +611,32 @@ export default function StaffPage() {
     } catch (error: any) {
       console.error("Error resetting password:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi reset mật khẩu", variant: "destructive" });
+    }
+  };
+
+  // Handle delete single staff
+  const handleDeleteStaff = async () => {
+    if (!staffToDelete) return;
+
+    try {
+      setDeleting(true);
+      await staffService.delete(staffToDelete.id);
+      setStaffList((prev) => prev.filter((s) => s.id !== staffToDelete.id));
+      toast({
+        title: "Thành công",
+        description: `Đã xóa nhân viên "${staffToDelete.name}"`,
+      });
+      setDeleteDialogOpen(false);
+      setStaffToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting staff:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi xóa nhân viên",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1702,6 +1733,14 @@ export default function StaffPage() {
                         <KeyRound className="mr-2 h-4 w-4" />
                         Reset mật khẩu
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setBulkOperation("delete")}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Xóa tất cả đã chọn
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -1859,6 +1898,16 @@ export default function StaffPage() {
                             <Power className="mr-2 h-4 w-4" />
                             {staff.isActive ? "Tạm ngưng" : "Kích hoạt"}
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setStaffToDelete(staff);
+                              setDeleteDialogOpen(true);
+                            }}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Xóa
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -1942,9 +1991,15 @@ export default function StaffPage() {
               {bulkOperation === "activate" && "Kích hoạt nhân viên"}
               {bulkOperation === "deactivate" && "Tạm ngưng nhân viên"}
               {bulkOperation === "reset-password" && (bulkResult ? "Kết quả reset mật khẩu" : "Reset mật khẩu")}
+              {bulkOperation === "delete" && "Xóa nhân viên"}
             </DialogTitle>
             <DialogDescription>
-              {!bulkResult && `Thao tác sẽ áp dụng cho ${selectedStaffIds.size} nhân viên đã chọn`}
+              {!bulkResult && bulkOperation !== "delete" && `Thao tác sẽ áp dụng cho ${selectedStaffIds.size} nhân viên đã chọn`}
+              {!bulkResult && bulkOperation === "delete" && (
+                <span className="text-red-600">
+                  Hành động này sẽ xóa vĩnh viễn {selectedStaffIds.size} nhân viên đã chọn và không thể hoàn tác!
+                </span>
+              )}
               {bulkResult && `Đã reset thành công ${bulkResult.success}/${selectedStaffIds.size} mật khẩu`}
             </DialogDescription>
           </DialogHeader>
@@ -1996,6 +2051,17 @@ export default function StaffPage() {
             <div className="py-4">
               <p className="text-sm text-muted-foreground">
                 Bạn có chắc chắn muốn <strong>{bulkOperation === "activate" ? "kích hoạt" : "tạm ngưng"}</strong> {selectedStaffIds.size} nhân viên đã chọn?
+              </p>
+            </div>
+          )}
+
+          {/* Delete confirmation */}
+          {bulkOperation === "delete" && !bulkResult && (
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">
+                Bạn có chắc chắn muốn <strong className="text-red-600">xóa vĩnh viễn</strong> {selectedStaffIds.size} nhân viên đã chọn?
+                <br />
+                <span className="text-red-500 font-medium">⚠️ Hành động này không thể hoàn tác!</span>
               </p>
             </div>
           )}
@@ -2906,6 +2972,42 @@ export default function StaffPage() {
             <Button onClick={handleSavePermissions} disabled={savingPermissions}>
               {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu quyền
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Single Staff Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xóa nhân viên</DialogTitle>
+            <DialogDescription className="text-red-600">
+              Hành động này sẽ xóa vĩnh viễn nhân viên và không thể hoàn tác!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Bạn có chắc chắn muốn xóa nhân viên <strong>{staffToDelete?.name}</strong> ({staffToDelete?.username})?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setStaffToDelete(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteStaff}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xóa
             </Button>
           </DialogFooter>
         </DialogContent>

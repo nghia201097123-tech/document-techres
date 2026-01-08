@@ -12,7 +12,7 @@ const STAFF_BATCH_STORAGE_KEY = "staff-batch-operation";
 /**
  * Types of staff batch operations
  */
-export type StaffBatchOperationType = "department" | "branch" | "activate" | "deactivate";
+export type StaffBatchOperationType = "department" | "branch" | "activate" | "deactivate" | "delete";
 
 /**
  * Stored batch operation data
@@ -114,6 +114,7 @@ export function useStaffBatch() {
       branch: "Cập nhật chi nhánh",
       activate: "Bật nhân viên",
       deactivate: "Tắt nhân viên",
+      delete: "Xóa nhân viên",
     };
     return titles[type] || "Xử lý nhân viên";
   };
@@ -200,6 +201,9 @@ export function useStaffBatch() {
                 break;
               case "deactivate":
                 result = await bulkStaffService.toggleActive(batch, false);
+                break;
+              case "delete":
+                result = await bulkStaffService.delete(batch);
                 break;
               default:
                 throw new Error(`Unknown operation type: ${type}`);

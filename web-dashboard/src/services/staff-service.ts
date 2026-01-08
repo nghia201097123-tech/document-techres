@@ -92,6 +92,10 @@ export const staffService = {
     return response.data;
   },
 
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/staff/${id}`);
+  },
+
   bulkImport: async (
     items: BulkStaffItem[],
     usernamePrefix?: string
@@ -373,6 +377,31 @@ export const bulkStaffService = {
         const response = await api.post<BulkOperationResult>("/staff/bulk/reset-password", {
           staffIds: batch,
           newPassword,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
+
+  delete: async (staffIds: string[]): Promise<BulkOperationResult> => {
+    const response = await api.post<BulkOperationResult>("/staff/bulk/delete", {
+      staffIds,
+    });
+    return response.data;
+  },
+
+  deleteBatched: async (
+    staffIds: string[],
+    options?: { batchSize?: number; onProgress?: (progress: BatchProgressInfo) => void }
+  ): Promise<BulkOperationResult> => {
+    const batchSize = options?.batchSize || 50;
+    return processBulkInBatches(
+      staffIds,
+      batchSize,
+      async (batch) => {
+        const response = await api.post<BulkOperationResult>("/staff/bulk/delete", {
+          staffIds: batch,
         });
         return response.data;
       },
