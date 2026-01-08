@@ -72,7 +72,7 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
             val posOrders = getMockPosOrders()
 
             // Load mock Food App orders (only active ones)
-            val foodOrders = FoodOrderMockData.mockFoodOrders.filter { order ->
+            val foodOrders = FoodOrderMockData.foodOrders.filter { order ->
                 order.status in listOf(
                     FoodOrderStatus.NEW,
                     FoodOrderStatus.ACCEPTED,
