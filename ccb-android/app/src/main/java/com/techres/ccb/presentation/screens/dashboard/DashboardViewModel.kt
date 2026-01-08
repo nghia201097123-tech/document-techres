@@ -27,11 +27,11 @@ data class PosOrder(
     val isPrinted: Boolean = false  // Đã in bill chưa
 )
 
-// Quy trình: Order → Xác nhận (in bill, in món) → Thanh toán
+// Quy trình: Order → Xác nhận (in bill, in món) → Hoàn tất
 enum class PosOrderStatus(val displayName: String, val color: Long) {
     DRAFT("Đang order", 0xFFFF9800),        // Đang chọn món
-    CONFIRMED("Chờ thanh toán", 0xFF2196F3), // Đã xác nhận, đã in bill
-    PAID("Đã thanh toán", 0xFF4CAF50)        // Đã thanh toán xong
+    CONFIRMED("Đã in", 0xFF2196F3),         // Đã xác nhận, đã in bill
+    COMPLETED("Hoàn tất", 0xFF4CAF50)       // Đã hoàn tất đơn
 }
 
 data class DashboardUiState(
@@ -199,8 +199,8 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    // Thanh toán đơn POS
-    fun payPosOrder(orderId: String) {
+    // Hoàn tất đơn POS
+    fun completePosOrder(orderId: String) {
         viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
@@ -210,7 +210,7 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
                 )
             }
             recalculateCounts()
-            // TODO: Gọi API thanh toán
+            // TODO: Gọi API hoàn tất đơn
         }
     }
 

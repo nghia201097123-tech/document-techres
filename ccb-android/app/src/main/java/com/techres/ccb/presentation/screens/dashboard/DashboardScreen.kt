@@ -213,7 +213,7 @@ fun DashboardScreen(
                                 PosOrderCompactItem(
                                     order = order,
                                     onConfirm = { viewModel.confirmPosOrder(order.id) },
-                                    onPay = { viewModel.payPosOrder(order.id) }
+                                    onComplete = { viewModel.completePosOrder(order.id) }
                                 )
                             }
                             // Bottom spacing for FAB
@@ -377,12 +377,12 @@ fun EmptyState(icon: ImageVector, message: String, subMessage: String) {
     }
 }
 
-// Compact POS Order Item cho Grid 8 cột
+// Compact POS Order Item cho Grid
 @Composable
 fun PosOrderCompactItem(
     order: PosOrder,
     onConfirm: () -> Unit,
-    onPay: () -> Unit
+    onComplete: () -> Unit
 ) {
     val statusColor = Color(order.status.color)
     val isDraft = order.status == PosOrderStatus.DRAFT
@@ -391,7 +391,7 @@ fun PosOrderCompactItem(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.85f)
-            .clickable { if (isDraft) onConfirm() else onPay() },
+            .clickable { if (isDraft) onConfirm() else onComplete() },
         colors = CardDefaults.cardColors(
             containerColor = statusColor.copy(alpha = 0.12f)
         ),
@@ -454,7 +454,7 @@ fun PosOrderCompactItem(
 
             // Status text
             Text(
-                if (isDraft) "Xác nhận" else "Thu tiền",
+                if (isDraft) "Xác nhận" else "Hoàn tất",
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Medium,
                 color = statusColor
