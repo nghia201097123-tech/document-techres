@@ -28,6 +28,9 @@ interface AreaDao {
     @Query("DELETE FROM areas WHERE branch_id = :branchId")
     suspend fun deleteAllByBranch(branchId: String)
 
+    @Query("SELECT COUNT(*) FROM areas WHERE branch_id = :branchId AND is_active = 1")
+    suspend fun getCount(branchId: String): Int
+
     @Transaction
     suspend fun syncAreas(branchId: String, areas: List<AreaEntity>) {
         deleteAllByBranch(branchId)

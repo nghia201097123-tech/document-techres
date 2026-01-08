@@ -41,4 +41,8 @@ class StaffRepository @Inject constructor(
     suspend fun updateStaff(staff: StaffEntity) {
         staffDao.update(staff)
     }
+
+    suspend fun getStaffCount(branchId: String): Int {
+        return staffDao.getCount(branchId)
+    }
 }

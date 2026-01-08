@@ -37,4 +37,8 @@ class CategoryRepository @Inject constructor(
     suspend fun deleteCategory(category: CategoryEntity) {
         categoryDao.delete(category)
     }
+
+    suspend fun getCategoriesCount(branchId: String): Int {
+        return categoryDao.getCount(branchId)
+    }
 }

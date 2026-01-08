@@ -78,4 +78,31 @@ interface MasterDataApi {
         @Header("Authorization") token: String,
         @Path("branchId") branchId: String
     ): Response<BranchInfoResponse>
+
+    // ============ Brands & Branches ============
+
+    /**
+     * Get all brands with their branches for the current user
+     */
+    @GET("brands")
+    suspend fun getBrands(
+        @Header("Authorization") token: String
+    ): Response<BrandsResponse>
+
+    /**
+     * Get branches by brand ID
+     */
+    @GET("brands/{brandId}/branches")
+    suspend fun getBranchesByBrand(
+        @Header("Authorization") token: String,
+        @Path("brandId") brandId: String
+    ): Response<BranchesResponse>
+
+    /**
+     * Get all branches for current user
+     */
+    @GET("branches")
+    suspend fun getAllBranches(
+        @Header("Authorization") token: String
+    ): Response<BranchesResponse>
 }

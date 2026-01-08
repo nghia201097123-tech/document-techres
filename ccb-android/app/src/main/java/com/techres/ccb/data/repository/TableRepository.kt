@@ -58,4 +58,12 @@ class TableRepository @Inject constructor(
     suspend fun updateTableStatus(tableId: String, status: String, orderId: String?, updatedAt: String) {
         tableDao.updateStatus(tableId, status, orderId, updatedAt)
     }
+
+    suspend fun getAreasCount(branchId: String): Int {
+        return areaDao.getCount(branchId)
+    }
+
+    suspend fun getTablesCount(branchId: String): Int {
+        return tableDao.getCount(branchId)
+    }
 }

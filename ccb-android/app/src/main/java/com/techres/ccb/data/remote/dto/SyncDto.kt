@@ -426,3 +426,39 @@ data class PaymentMethodDto(
     @SerializedName("isActive") val isActive: Boolean,
     @SerializedName("sortOrder") val sortOrder: Int
 )
+
+// ============ Brands & Branches DTOs ============
+
+data class BrandsResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("data") val data: List<BrandDto>?,
+    @SerializedName("message") val message: String?
+)
+
+data class BrandDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("logo") val logo: String?,
+    @SerializedName("code") val code: String?,
+    @SerializedName("companyId") val companyId: String?,
+    @SerializedName("companyName") val companyName: String?,
+    @SerializedName("isActive") val isActive: Boolean,
+    @SerializedName("branches") val branches: List<BranchDto>?
+)
+
+data class BranchDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("code") val code: String?,
+    @SerializedName("address") val address: String?,
+    @SerializedName("phone") val phone: String?,
+    @SerializedName("brandId") val brandId: String,
+    @SerializedName("brandName") val brandName: String?,
+    @SerializedName("isActive") val isActive: Boolean
+)
+
+data class BranchesResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("data") val data: List<BranchDto>?,
+    @SerializedName("message") val message: String?
+)

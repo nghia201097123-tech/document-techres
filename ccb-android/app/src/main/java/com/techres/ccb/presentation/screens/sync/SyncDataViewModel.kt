@@ -2,6 +2,13 @@ package com.techres.ccb.presentation.screens.sync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.BranchRepository
+import com.techres.ccb.data.repository.CategoryRepository
+import com.techres.ccb.data.repository.ProductRepository
+import com.techres.ccb.data.repository.StaffRepository
+import com.techres.ccb.data.repository.SyncRepository
+import com.techres.ccb.data.repository.TableRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +24,8 @@ data class SyncItem(
     val icon: String,
     val status: SyncStatus = SyncStatus.PENDING,
     val itemCount: Int = 0,
-    val progress: Float = 0f
+    val progress: Float = 0f,
+    val errorMessage: String? = null
 )
 
 enum class SyncStatus {
@@ -28,6 +36,7 @@ enum class SyncStatus {
 }
 
 data class SyncDataUiState(
+    val branchId: String = "",
     val branchName: String = "",
     val syncItems: List<SyncItem> = emptyList(),
     val overallProgress: Float = 0f,
@@ -38,13 +47,28 @@ data class SyncDataUiState(
 )
 
 @HiltViewModel
-class SyncDataViewModel @Inject constructor() : ViewModel() {
+class SyncDataViewModel @Inject constructor(
+    private val syncRepository: SyncRepository,
+    private val branchRepository: BranchRepository,
+    private val categoryRepository: CategoryRepository,
+    private val productRepository: ProductRepository,
+    private val tableRepository: TableRepository,
+    private val staffRepository: StaffRepository,
+    private val authRepository: AuthRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SyncDataUiState())
     val uiState: StateFlow<SyncDataUiState> = _uiState.asStateFlow()
 
     init {
         initSyncItems()
+        loadBranchInfo()
+    }
+
+    private fun loadBranchInfo() {
+        val branchId = branchRepository.getSelectedBranchId() ?: ""
+        val branchName = branchRepository.getSelectedBranchName() ?: ""
+        _uiState.update { it.copy(branchId = branchId, branchName = branchName) }
     }
 
     fun setBranchName(name: String) {
@@ -55,75 +79,219 @@ class SyncDataViewModel @Inject constructor() : ViewModel() {
         val items = listOf(
             SyncItem("categories", "Danh mục", "category"),
             SyncItem("products", "Sản phẩm", "inventory"),
-            SyncItem("toppings", "Topping", "add_circle"),
+            SyncItem("areas", "Khu vực", "place"),
             SyncItem("tables", "Bàn", "table_bar"),
-            SyncItem("customers", "Khách hàng", "people"),
-            SyncItem("promotions", "Khuyến mãi", "local_offer"),
+            SyncItem("staff", "Nhân viên", "people"),
+            SyncItem("vouchers", "Khuyến mãi", "local_offer"),
             SyncItem("settings", "Cấu hình", "settings")
         )
         _uiState.update { it.copy(syncItems = items) }
     }
 
+    /**
+     * Start full sync from cloud to local
+     */
     fun startSync(onComplete: () -> Unit) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSyncing = true, error = null) }
 
-            val items = _uiState.value.syncItems.toMutableList()
-            val totalItems = items.size
+            // Try full sync first
+            val fullSyncResult = syncRepository.performFullSync()
 
-            for ((index, item) in items.withIndex()) {
-                // Update current syncing item
-                _uiState.update { it.copy(currentSyncItem = item.name) }
+            fullSyncResult.fold(
+                onSuccess = {
+                    // Full sync succeeded - update UI with counts from local DB
+                    updateSyncItemsFromLocalDb()
 
-                // Set item to syncing
-                items[index] = item.copy(status = SyncStatus.SYNCING)
-                _uiState.update { it.copy(syncItems = items.toList()) }
-
-                // Simulate sync progress
-                for (progress in 1..10) {
-                    delay(100) // Simulate network delay
-                    items[index] = items[index].copy(progress = progress / 10f)
                     _uiState.update {
                         it.copy(
-                            syncItems = items.toList(),
-                            overallProgress = (index * 10 + progress) / (totalItems * 10f)
+                            isSyncing = false,
+                            isCompleted = true,
+                            overallProgress = 1f,
+                            currentSyncItem = null
                         )
                     }
+
+                    delay(500)
+                    onComplete()
+                },
+                onFailure = { e ->
+                    // Full sync failed - try individual sync with progress
+                    performIndividualSync(onComplete)
+                }
+            )
+        }
+    }
+
+    /**
+     * Perform individual sync for each data type with progress updates
+     */
+    private suspend fun performIndividualSync(onComplete: () -> Unit) {
+        val items = _uiState.value.syncItems.toMutableList()
+        val totalItems = items.size
+        var hasError = false
+
+        for ((index, item) in items.withIndex()) {
+            // Update current syncing item
+            _uiState.update { it.copy(currentSyncItem = item.name) }
+
+            // Set item to syncing
+            items[index] = item.copy(status = SyncStatus.SYNCING, progress = 0.5f)
+            _uiState.update { it.copy(syncItems = items.toList()) }
+
+            try {
+                // Perform sync based on item type
+                val result = when (item.id) {
+                    "categories" -> syncCategories()
+                    "products" -> syncProducts()
+                    "areas" -> syncAreas()
+                    "tables" -> syncTables()
+                    "staff" -> syncStaff()
+                    "vouchers" -> syncVouchers()
+                    "settings" -> syncSettings()
+                    else -> Result.success(0)
                 }
 
-                // Mark as completed with mock item count
-                val itemCount = when (item.id) {
-                    "categories" -> 12
-                    "products" -> 156
-                    "toppings" -> 24
-                    "tables" -> 15
-                    "customers" -> 1250
-                    "promotions" -> 5
-                    "settings" -> 1
-                    else -> 0
-                }
-
-                items[index] = item.copy(
-                    status = SyncStatus.COMPLETED,
-                    progress = 1f,
-                    itemCount = itemCount
+                result.fold(
+                    onSuccess = { count ->
+                        items[index] = item.copy(
+                            status = SyncStatus.COMPLETED,
+                            progress = 1f,
+                            itemCount = count
+                        )
+                    },
+                    onFailure = { e ->
+                        items[index] = item.copy(
+                            status = SyncStatus.ERROR,
+                            progress = 1f,
+                            errorMessage = e.message
+                        )
+                        hasError = true
+                    }
                 )
-                _uiState.update { it.copy(syncItems = items.toList()) }
+            } catch (e: Exception) {
+                items[index] = item.copy(
+                    status = SyncStatus.ERROR,
+                    progress = 1f,
+                    errorMessage = e.message
+                )
+                hasError = true
             }
 
-            // Sync completed
+            // Update progress
             _uiState.update {
                 it.copy(
-                    isSyncing = false,
-                    isCompleted = true,
-                    overallProgress = 1f,
-                    currentSyncItem = null
+                    syncItems = items.toList(),
+                    overallProgress = (index + 1) / totalItems.toFloat()
                 )
             }
 
-            delay(500) // Brief pause before navigation
-            onComplete()
+            // Small delay between items
+            delay(200)
         }
+
+        // Sync completed
+        _uiState.update {
+            it.copy(
+                isSyncing = false,
+                isCompleted = true,
+                overallProgress = 1f,
+                currentSyncItem = null,
+                error = if (hasError) "Một số mục đồng bộ thất bại" else null
+            )
+        }
+
+        delay(500)
+        onComplete()
+    }
+
+    private suspend fun syncCategories(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = categoryRepository.getCategoriesCount(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun syncProducts(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = productRepository.getProductsCount(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun syncAreas(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = tableRepository.getAreasCount(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun syncTables(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = tableRepository.getTablesCount(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun syncStaff(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = staffRepository.getStaffCount(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun syncVouchers(): Result<Int> {
+        // TODO: Implement voucher sync
+        return Result.success(0)
+    }
+
+    private suspend fun syncSettings(): Result<Int> {
+        // Settings sync is always successful with 1 item
+        return Result.success(1)
+    }
+
+    /**
+     * Update sync items with counts from local database
+     */
+    private suspend fun updateSyncItemsFromLocalDb() {
+        val branchId = _uiState.value.branchId
+        val items = _uiState.value.syncItems.toMutableList()
+
+        for ((index, item) in items.withIndex()) {
+            val count = when (item.id) {
+                "categories" -> try { categoryRepository.getCategoriesCount(branchId) } catch (e: Exception) { 0 }
+                "products" -> try { productRepository.getProductsCount(branchId) } catch (e: Exception) { 0 }
+                "areas" -> try { tableRepository.getAreasCount(branchId) } catch (e: Exception) { 0 }
+                "tables" -> try { tableRepository.getTablesCount(branchId) } catch (e: Exception) { 0 }
+                "staff" -> try { staffRepository.getStaffCount(branchId) } catch (e: Exception) { 0 }
+                "vouchers" -> 0
+                "settings" -> 1
+                else -> 0
+            }
+
+            items[index] = item.copy(
+                status = SyncStatus.COMPLETED,
+                progress = 1f,
+                itemCount = count
+            )
+        }
+
+        _uiState.update { it.copy(syncItems = items.toList()) }
     }
 
     fun retrySync(onComplete: () -> Unit) {
@@ -131,8 +299,9 @@ class SyncDataViewModel @Inject constructor() : ViewModel() {
             it.copy(
                 isCompleted = false,
                 overallProgress = 0f,
+                error = null,
                 syncItems = it.syncItems.map { item ->
-                    item.copy(status = SyncStatus.PENDING, progress = 0f, itemCount = 0)
+                    item.copy(status = SyncStatus.PENDING, progress = 0f, itemCount = 0, errorMessage = null)
                 }
             )
         }

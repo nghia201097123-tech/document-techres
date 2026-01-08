@@ -37,6 +37,9 @@ interface StaffDao {
     @Query("UPDATE staff SET is_active = 0 WHERE id = :id")
     suspend fun softDelete(id: String)
 
+    @Query("SELECT COUNT(*) FROM staff WHERE branch_id = :branchId AND is_active = 1")
+    suspend fun getCount(branchId: String): Int
+
     @Transaction
     suspend fun syncStaff(branchId: String, staffList: List<StaffEntity>) {
         deleteAllByBranch(branchId)

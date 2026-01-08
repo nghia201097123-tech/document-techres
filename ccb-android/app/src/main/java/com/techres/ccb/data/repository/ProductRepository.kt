@@ -50,4 +50,8 @@ class ProductRepository @Inject constructor(
     suspend fun deleteProduct(product: ProductEntity) {
         productDao.delete(product)
     }
+
+    suspend fun getProductsCount(branchId: String): Int {
+        return productDao.getCount(branchId)
+    }
 }
