@@ -53,18 +53,14 @@ export class RegisterDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: 'Password123!' })
+  @ApiProperty({ example: 'abc123' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   @MaxLength(50)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    {
-      message:
-        'Password must contain at least 1 uppercase, 1 lowercase, 1 number and 1 special character',
-    },
-  )
+  @Matches(/^(?=.*[a-z])(?=.*\d)/, {
+    message: 'Mật khẩu phải có chữ thường và số',
+  })
   password: string;
 
   @ApiProperty({ example: 'Nguyen Van A' })
@@ -97,18 +93,14 @@ export class ChangePasswordDto {
   @IsNotEmpty()
   currentPassword: string;
 
-  @ApiProperty({ example: 'NewPassword123!' })
+  @ApiProperty({ example: 'abc123' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   @MaxLength(50)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    {
-      message:
-        'Password must contain at least 1 uppercase, 1 lowercase, 1 number and 1 special character',
-    },
-  )
+  @Matches(/^(?=.*[a-z])(?=.*\d)/, {
+    message: 'Mật khẩu phải có chữ thường và số',
+  })
   newPassword: string;
 }
 
@@ -130,18 +122,14 @@ export class ResetPasswordDto {
   @IsNotEmpty()
   token: string;
 
-  @ApiProperty({ example: 'NewPassword123!' })
+  @ApiProperty({ example: 'abc123' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   @MaxLength(50)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    {
-      message:
-        'Password must contain at least 1 uppercase, 1 lowercase, 1 number and 1 special character',
-    },
-  )
+  @Matches(/^(?=.*[a-z])(?=.*\d)/, {
+    message: 'Mật khẩu phải có chữ thường và số',
+  })
   newPassword: string;
 }
 
