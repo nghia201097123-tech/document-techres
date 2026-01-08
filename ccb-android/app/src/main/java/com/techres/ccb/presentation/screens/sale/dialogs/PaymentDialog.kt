@@ -28,6 +28,7 @@ import com.techres.ccb.domain.model.PaymentMethod
 import com.techres.ccb.domain.model.PaymentStatus
 import com.techres.ccb.presentation.screens.sale.formatCurrency
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PaymentDialog(
     totalAmount: Long,

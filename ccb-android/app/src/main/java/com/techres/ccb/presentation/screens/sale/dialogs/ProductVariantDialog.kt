@@ -22,6 +22,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.formatCurrency
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProductVariantDialog(
     product: Product,
@@ -263,6 +264,7 @@ fun ProductVariantDialog(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VariantGroupSection(
     group: ProductVariantGroup,
@@ -355,6 +357,7 @@ fun VariantOptionChip(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FlowRow(
     modifier: Modifier = Modifier,
@@ -362,8 +365,6 @@ fun FlowRow(
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     content: @Composable () -> Unit
 ) {
-    // Simple implementation using Column + Row
-    // For production, use accompanist-flowlayout or Compose 1.4+ FlowRow
     androidx.compose.foundation.layout.FlowRow(
         modifier = modifier,
         horizontalArrangement = horizontalArrangement,
