@@ -28,13 +28,13 @@ android {
         }
 
         // Build config fields
-        buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/master-data/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/api/tenant/\"")
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3006/\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/tenant/\"")
         }
         release {
             isMinifyEnabled = true

@@ -4,9 +4,7 @@ import android.content.SharedPreferences
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.dto.LoginRequest
 import com.techres.ccb.data.remote.dto.LoginResponse
-import com.techres.ccb.data.remote.dto.LoginStaffDto
-import com.techres.ccb.data.remote.dto.LoginCompanyDto
-import com.techres.ccb.data.remote.dto.LoginData
+import com.techres.ccb.data.remote.dto.LoginUserDto
 import com.techres.ccb.data.remote.dto.VerifyPinRequest
 import com.techres.ccb.data.remote.dto.VerifyPinResponse
 import javax.inject.Inject
@@ -37,6 +35,7 @@ class AuthRepository @Inject constructor(
 
     /**
      * Login using tenant ID, username and password (similar to web-dashboard)
+     * Calls OAuth API via api-gateway: POST /api/tenant/auth/login
      */
     suspend fun login(
         tenantId: String,
@@ -58,23 +57,26 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val loginResponse = response.body()!!
 
-                // Check both response formats
-                val token = loginResponse.token ?: loginResponse.data?.token
-                val staff = loginResponse.staff ?: loginResponse.data?.staff
-                val company = loginResponse.company ?: loginResponse.data?.company
-
-                if (token != null) {
-                    saveAuthData(tenantId, token, staff, company, loginResponse.data)
+                // Check if we got a valid access token
+                if (loginResponse.accessToken != null) {
+                    saveAuthData(tenantId, loginResponse.accessToken, loginResponse.user)
                     Result.success(loginResponse)
-                } else if (loginResponse.success && loginResponse.data != null) {
-                    saveAuthData(tenantId, loginResponse.data.token, staff, company, loginResponse.data)
-                    Result.success(loginResponse)
+                } else if (loginResponse.requiresTwoFactor == true) {
+                    Result.failure(Exception("Yêu cầu xác thực 2 yếu tố"))
                 } else {
-                    Result.failure(Exception(loginResponse.message ?: "Đăng nhập thất bại"))
+                    Result.failure(Exception(loginResponse.message ?: loginResponse.error ?: "Đăng nhập thất bại"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                Result.failure(Exception(errorBody ?: response.message() ?: "Đăng nhập thất bại"))
+                // Try to parse error message from JSON
+                val errorMessage = try {
+                    val gson = com.google.gson.Gson()
+                    val errorResponse = gson.fromJson(errorBody, LoginResponse::class.java)
+                    errorResponse.message ?: errorResponse.error ?: "Đăng nhập thất bại"
+                } catch (e: Exception) {
+                    errorBody ?: response.message() ?: "Đăng nhập thất bại"
+                }
+                Result.failure(Exception(errorMessage))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -109,44 +111,21 @@ class AuthRepository @Inject constructor(
     private fun saveAuthData(
         tenantId: String,
         token: String,
-        staff: LoginStaffDto?,
-        company: LoginCompanyDto?,
-        data: LoginData?
+        user: LoginUserDto?
     ) {
         sharedPreferences.edit().apply {
             putString(KEY_ACCESS_TOKEN, token)
             putString(KEY_TENANT_ID, tenantId)
 
-            // Save from staff
-            staff?.let {
+            // Save user info from OAuth response
+            user?.let {
                 putString(KEY_STAFF_ID, it.id)
                 putString(KEY_STAFF_NAME, it.name)
-                putString(KEY_STAFF_CODE, it.code)
                 putString(KEY_STAFF_USERNAME, it.username)
                 putString(KEY_STAFF_ROLE, it.role)
                 putString(KEY_STAFF_AVATAR, it.avatarUrl)
+                it.tenantId?.let { id -> putString(KEY_COMPANY_ID, id) }
                 it.branchId?.let { id -> putString(KEY_BRANCH_ID, id) }
-                it.brandId?.let { id -> putString(KEY_BRAND_ID, id) }
-            }
-
-            // Save from company
-            company?.let {
-                putString(KEY_COMPANY_ID, it.id)
-                putString(KEY_COMPANY_NAME, it.name)
-                it.branchId?.let { id -> putString(KEY_BRANCH_ID, id) }
-                it.branchName?.let { name -> putString(KEY_BRANCH_NAME, name) }
-                it.brandId?.let { id -> putString(KEY_BRAND_ID, id) }
-                it.brandName?.let { name -> putString(KEY_BRAND_NAME, name) }
-            }
-
-            // Save from legacy data structure
-            data?.let {
-                it.branchId?.let { id -> putString(KEY_BRANCH_ID, id) }
-                it.branchName?.let { name -> putString(KEY_BRANCH_NAME, name) }
-                it.brandId?.let { id -> putString(KEY_BRAND_ID, id) }
-                it.brandName?.let { name -> putString(KEY_BRAND_NAME, name) }
-                it.companyId?.let { id -> putString(KEY_COMPANY_ID, id) }
-                it.companyName?.let { name -> putString(KEY_COMPANY_NAME, name) }
             }
 
             apply()

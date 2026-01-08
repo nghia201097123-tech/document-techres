@@ -12,54 +12,39 @@ data class LoginRequest(
     @SerializedName("deviceName") val deviceName: String? = null
 )
 
+/**
+ * OAuth Login Response from api-oauth via api-gateway
+ * Endpoint: POST /api/tenant/auth/login
+ */
 data class LoginResponse(
-    @SerializedName("success") val success: Boolean,
-    @SerializedName("data") val data: LoginData?,
+    @SerializedName("accessToken") val accessToken: String?,
+    @SerializedName("refreshToken") val refreshToken: String?,
+    @SerializedName("expiresIn") val expiresIn: Int?,
+    @SerializedName("tokenType") val tokenType: String?,
+    @SerializedName("user") val user: LoginUserDto?,
+    @SerializedName("requiresTwoFactor") val requiresTwoFactor: Boolean?,
+    // Error fields
     @SerializedName("message") val message: String?,
-    // Alternative structure for web-dashboard style response
-    @SerializedName("staff") val staff: LoginStaffDto?,
-    @SerializedName("company") val company: LoginCompanyDto?,
-    @SerializedName("token") val token: String?
+    @SerializedName("error") val error: String?,
+    @SerializedName("statusCode") val statusCode: Int?
 )
 
-data class LoginData(
-    @SerializedName("token") val token: String,
-    @SerializedName("staff") val staff: LoginStaffDto?,
-    @SerializedName("company") val company: LoginCompanyDto?,
-    @SerializedName("branchId") val branchId: String?,
-    @SerializedName("branchName") val branchName: String?,
-    @SerializedName("brandId") val brandId: String?,
-    @SerializedName("brandName") val brandName: String?,
-    @SerializedName("companyId") val companyId: String?,
-    @SerializedName("companyName") val companyName: String?,
-    @SerializedName("expiresAt") val expiresAt: String?
-)
-
-data class LoginStaffDto(
+/**
+ * User info from OAuth response
+ */
+data class LoginUserDto(
     @SerializedName("id") val id: String,
-    @SerializedName("code") val code: String?,
-    @SerializedName("username") val username: String?,
+    @SerializedName("email") val email: String?,
     @SerializedName("name") val name: String,
     @SerializedName("phone") val phone: String?,
-    @SerializedName("email") val email: String?,
-    @SerializedName("avatarUrl") val avatarUrl: String?,
     @SerializedName("role") val role: String?,
-    @SerializedName("isActive") val isActive: Boolean?,
-    @SerializedName("departmentId") val departmentId: String?,
-    @SerializedName("departmentName") val departmentName: String?,
-    @SerializedName("brandId") val brandId: String?,
-    @SerializedName("branchId") val branchId: String?
-)
-
-data class LoginCompanyDto(
-    @SerializedName("id") val id: String,
+    @SerializedName("userType") val userType: String?,
     @SerializedName("tenantId") val tenantId: String?,
-    @SerializedName("name") val name: String,
-    @SerializedName("logoUrl") val logoUrl: String?,
-    @SerializedName("brandId") val brandId: String?,
     @SerializedName("branchId") val branchId: String?,
-    @SerializedName("brandName") val brandName: String?,
-    @SerializedName("branchName") val branchName: String?
+    @SerializedName("isTwoFactorEnabled") val isTwoFactorEnabled: Boolean?,
+    @SerializedName("isEmailVerified") val isEmailVerified: Boolean?,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("username") val username: String?
 )
 
 data class VerifyPinRequest(
