@@ -20,6 +20,7 @@ import com.techres.ccb.presentation.theme.Success
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToDebug: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -148,6 +149,26 @@ fun SettingsScreen(
                     title = "Hỗ trợ",
                     subtitle = "Liên hệ hỗ trợ kỹ thuật",
                     onClick = { /* TODO: Open support */ }
+                )
+            }
+
+            // Debug section (only in debug builds)
+            item {
+                Text(
+                    text = "Developer",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+            }
+
+            item {
+                SettingsCard(
+                    icon = Icons.Default.Storage,
+                    title = "Database Debug",
+                    subtitle = "Xem dữ liệu trong database",
+                    onClick = onNavigateToDebug
                 )
             }
         }

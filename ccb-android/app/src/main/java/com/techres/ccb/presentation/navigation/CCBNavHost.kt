@@ -25,6 +25,7 @@ import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
+import com.techres.ccb.presentation.screens.debug.DatabaseDebugScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -56,6 +57,7 @@ sealed class Screen(val route: String) {
     }
     object Shift : Screen("shift")
     object Settings : Screen("settings")
+    object DatabaseDebug : Screen("database_debug")
 }
 
 @Composable
@@ -316,7 +318,14 @@ fun CCBNavHost() {
 
         composable(Screen.Settings.route) {
             SettingsScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDebug = { navController.navigate(Screen.DatabaseDebug.route) }
+            )
+        }
+
+        composable(Screen.DatabaseDebug.route) {
+            DatabaseDebugScreen(
+                onBack = { navController.popBackStack() }
             )
         }
     }
