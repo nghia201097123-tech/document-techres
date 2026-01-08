@@ -24,11 +24,8 @@ android {
 
         // Room schema export
         ksp {
-            arg("room.schemaLocation", "$projectDir/schemas")
+            arg("room.schemaLocation", "${projectDir}/schemas")
         }
-
-        // Build config fields
-        buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/api/tenant/\"")
     }
 
     buildTypes {
@@ -38,6 +35,7 @@ android {
         }
         release {
             isMinifyEnabled = true
+            buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/api/tenant/\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
