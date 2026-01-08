@@ -1356,41 +1356,50 @@ export default function StaffPage() {
       return item;
     });
 
-    try {
-      setImporting(true);
-      setImportProgress(null);
+    // Close dialog immediately and run import in background
+    const totalItems = dataWithSettings.length;
+    const progressId = `import-staff-${Date.now()}`;
 
+    handleCloseDialog();
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: "Import nhân viên",
+      current: 0,
+      total: totalItems,
+      batchNumber: 1,
+      totalBatches: Math.ceil(totalItems / 100),
+    });
+
+    try {
       // Use batched import for large datasets to avoid timeout
       const result = await staffService.bulkImportBatched(
         dataWithSettings as BulkStaffItem[],
         undefined,
         {
           batchSize: 100,
-          onProgress: (progress) => setImportProgress(progress),
+          onProgress: (progress) => {
+            updateProgress(progressId, {
+              current: progress.current,
+              batchNumber: progress.batchNumber,
+              totalBatches: progress.totalBatches,
+            });
+          },
         }
       );
 
+      // Reload staff list
+      loadStaff(filterBranchId, filterBrandId);
+
       if (result.errors.length > 0) {
-        toast({
-          title: "Hoàn thành với lỗi",
-          description: `Tạo mới: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`,
-          variant: "destructive",
-        });
-        setImportErrors(result.errors.map((e) => `Dòng ${e.row}: ${e.message}`));
+        completeProgress(progressId, `Tạo: ${result.created}, Cập nhật: ${result.updated}, Lỗi: ${result.errors.length}`);
       } else {
-        toast({
-          title: "Thành công",
-          description: `Đã tạo mới ${result.created} và cập nhật ${result.updated} nhân viên`,
-        });
-        handleCloseDialog();
-        loadStaff(filterBranchId, filterBrandId);
+        completeProgress(progressId, `Tạo: ${result.created}, Cập nhật: ${result.updated}`);
       }
     } catch (error: any) {
       console.error("Error importing:", error);
-      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi import", variant: "destructive" });
-    } finally {
-      setImporting(false);
-      setImportProgress(null);
+      errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra khi import");
     }
   };
 
