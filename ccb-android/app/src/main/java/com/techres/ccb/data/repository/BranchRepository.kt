@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import android.content.SharedPreferences
+import android.util.Log
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.dto.BrandDto
 import com.techres.ccb.data.remote.dto.BranchDto
@@ -14,6 +15,7 @@ class BranchRepository @Inject constructor(
     private val sharedPreferences: SharedPreferences
 ) {
     companion object {
+        private const val TAG = "BranchRepository"
         private const val KEY_SELECTED_BRAND_ID = "selected_brand_id"
         private const val KEY_SELECTED_BRAND_NAME = "selected_brand_name"
         private const val KEY_SELECTED_BRANCH_ID = "selected_branch_id"
@@ -27,20 +29,37 @@ class BranchRepository @Inject constructor(
     suspend fun getBrands(): Result<List<BrandDto>> {
         return try {
             val token = authRepository.getAccessToken()
-                ?: return Result.failure(Exception("Chưa đăng nhập"))
+            Log.d(TAG, "getBrands - Token: ${token?.take(20)}...")
 
+            if (token == null) {
+                Log.e(TAG, "getBrands - No token available")
+                return Result.failure(Exception("Chưa đăng nhập"))
+            }
+
+            Log.d(TAG, "getBrands - Calling API...")
             val response = api.getBrands("Bearer $token")
+            Log.d(TAG, "getBrands - Response code: ${response.code()}")
+
             if (response.isSuccessful && response.body() != null) {
                 val brandsResponse = response.body()!!
+                Log.d(TAG, "getBrands - Success: ${brandsResponse.success}, Data count: ${brandsResponse.data?.size ?: 0}")
+
                 if (brandsResponse.success && brandsResponse.data != null) {
+                    Log.d(TAG, "getBrands - Brands loaded: ${brandsResponse.data.map { it.name }}")
                     Result.success(brandsResponse.data)
                 } else {
-                    Result.failure(Exception(brandsResponse.message ?: "Không thể tải danh sách thương hiệu"))
+                    val errorMsg = brandsResponse.message ?: "Không thể tải danh sách thương hiệu"
+                    Log.e(TAG, "getBrands - API error: $errorMsg")
+                    Result.failure(Exception(errorMsg))
                 }
             } else {
-                Result.failure(Exception(response.message() ?: "Lỗi kết nối"))
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "getBrands - HTTP error: ${response.code()} - ${response.message()}")
+                Log.e(TAG, "getBrands - Error body: $errorBody")
+                Result.failure(Exception("Lỗi ${response.code()}: ${response.message()}"))
             }
         } catch (e: Exception) {
+            Log.e(TAG, "getBrands - Exception: ${e.message}", e)
             Result.failure(e)
         }
     }
