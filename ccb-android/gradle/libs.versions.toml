@@ -22,6 +22,7 @@ junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 workManager = "2.9.0"
 hiltWork = "1.2.0"
+material = "1.12.0"
 
 [libraries]
 # AndroidX Core
@@ -79,6 +80,9 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# Material Design
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
