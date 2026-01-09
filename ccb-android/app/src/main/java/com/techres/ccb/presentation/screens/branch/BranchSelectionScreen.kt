@@ -119,6 +119,7 @@ fun BranchSelectionScreen(
                 BranchSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
                 BranchSyncItem("areas", "Khu vực", Icons.Default.Map),
                 BranchSyncItem("tables", "Bàn", Icons.Default.TableBar),
+                BranchSyncItem("kitchens", "Bếp", Icons.Default.Countertops),
                 BranchSyncItem("staff", "Nhân viên", Icons.Default.People)
             )
         )
@@ -361,7 +362,7 @@ fun BranchSelectionScreen(
                         SyncState.SYNCING -> {
                             // Mock sync animation
                             LaunchedEffect(Unit) {
-                                val mockCounts = listOf(12, 48, 4, 20, 8)
+                                val mockCounts = listOf(12, 48, 4, 20, 3, 8)
 
                                 for (i in syncItems.indices) {
                                     syncItems = syncItems.toMutableList().apply {
