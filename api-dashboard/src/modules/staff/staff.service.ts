@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Staff, Province, Ward, Department } from '../../database/entities';
 import { CreateStaffDto, UpdateStaffDto, BulkImportStaffDto, BulkImportResultDto, BulkStaffItemDto } from './dto';
 import * as bcrypt from 'bcrypt';
+
+// Pattern for initial owner username (e.g., tr000001, ab000001)
+const INITIAL_OWNER_USERNAME_PATTERN = /^[a-z]{2}000001$/;
 
 @Injectable()
 export class StaffService {
@@ -147,6 +150,12 @@ export class StaffService {
 
   async toggleActive(tenantId: string, id: string) {
     const staff = await this.findOne(tenantId, id);
+
+    // Protect initial owner account from deactivation
+    if (staff.isActive && this.isInitialOwnerAccount(staff)) {
+      throw new ForbiddenException('Không thể tắt hoạt động tài khoản chủ nhà hàng');
+    }
+
     staff.isActive = !staff.isActive;
     return this.staffRepository.save(staff);
   }
@@ -161,6 +170,12 @@ export class StaffService {
 
   async delete(tenantId: string, id: string) {
     const staff = await this.findOne(tenantId, id);
+
+    // Protect initial owner account from deletion
+    if (this.isInitialOwnerAccount(staff)) {
+      throw new ForbiddenException('Không thể xóa tài khoản chủ nhà hàng');
+    }
+
     await this.staffRepository.remove(staff);
     return { message: 'Đã xóa nhân viên' };
   }
@@ -194,6 +209,14 @@ export class StaffService {
 
   private generateTempPassword(): string {
     return Math.random().toString(36).substring(2, 10);
+  }
+
+  /**
+   * Check if staff is the initial owner account (e.g., tr000001, ab000001)
+   * Initial owner accounts cannot be deleted or deactivated
+   */
+  private isInitialOwnerAccount(staff: Staff): boolean {
+    return INITIAL_OWNER_USERNAME_PATTERN.test(staff.username);
   }
 
   async bulkImport(
@@ -397,6 +420,13 @@ export class StaffService {
           continue;
         }
 
+        // Protect initial owner account from deactivation
+        if (!isActive && this.isInitialOwnerAccount(staff)) {
+          result.errors.push({ staffId, message: 'Không thể tắt hoạt động tài khoản chủ nhà hàng' });
+          result.failed++;
+          continue;
+        }
+
         staff.isActive = isActive;
         await this.staffRepository.save(staff);
         result.success++;
@@ -475,6 +505,13 @@ export class StaffService {
 
         if (!staff) {
           result.errors.push({ staffId, message: 'Không tìm thấy nhân viên' });
+          result.failed++;
+          continue;
+        }
+
+        // Protect initial owner account from deletion
+        if (this.isInitialOwnerAccount(staff)) {
+          result.errors.push({ staffId, message: 'Không thể xóa tài khoản chủ nhà hàng' });
           result.failed++;
           continue;
         }
