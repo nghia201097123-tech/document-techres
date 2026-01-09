@@ -20,7 +20,7 @@ export class ProxyService {
     const apiAdminUrl = this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
     const apiDashboardUrl = this.configService.get<string>('API_DASHBOARD_URL') || 'http://localhost:4002';
     const apiOAuthUrl = this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
-    const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3003';
+    const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3004';
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
