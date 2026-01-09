@@ -49,7 +49,9 @@ fun SyncDataScreen(
                 MockSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
                 MockSyncItem("areas", "Khu vực", Icons.Default.Map),
                 MockSyncItem("tables", "Bàn", Icons.Default.TableBar),
-                MockSyncItem("staff", "Nhân viên", Icons.Default.People)
+                MockSyncItem("staff", "Nhân viên", Icons.Default.People),
+                MockSyncItem("seasonal_prices", "Giá thời vụ", Icons.Default.Event),
+                MockSyncItem("coupons", "Coupon", Icons.Default.Discount)
             )
         )
     }
@@ -62,7 +64,7 @@ fun SyncDataScreen(
         delay(300) // Initial delay
 
         // Mock counts for each item
-        val mockCounts = listOf(12, 48, 4, 20, 8)
+        val mockCounts = listOf(12, 48, 4, 20, 8, 3, 5)
 
         for (i in syncItems.indices) {
             // Update current item to syncing
@@ -295,7 +297,7 @@ fun SyncDataScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Tải danh mục, sản phẩm, bàn và nhân viên",
+                        text = "Tải danh mục, sản phẩm, bàn, nhân viên, giá thời vụ và coupon",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )

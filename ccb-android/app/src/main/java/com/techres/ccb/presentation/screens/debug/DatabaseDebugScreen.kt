@@ -27,6 +27,10 @@ import com.techres.ccb.data.local.entity.TableEntity
 import com.techres.ccb.data.local.entity.StaffEntity
 import com.techres.ccb.data.local.entity.BrandEntity
 import com.techres.ccb.data.local.entity.BranchEntity
+import com.techres.ccb.data.local.entity.SeasonalPriceEntity
+import com.techres.ccb.data.local.entity.CouponEntity
+import com.techres.ccb.data.local.dao.SeasonalPriceDao
+import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -40,7 +44,9 @@ enum class DebugTab(val title: String) {
     PRODUCTS("Sản phẩm"),
     AREAS("Khu vực"),
     TABLES("Bàn"),
-    STAFF("Nhân viên")
+    STAFF("Nhân viên"),
+    SEASONAL_PRICES("Giá thời vụ"),
+    COUPONS("Coupon")
 }
 
 data class DebugUiState(
@@ -53,6 +59,8 @@ data class DebugUiState(
     val areas: List<AreaEntity> = emptyList(),
     val tables: List<TableEntity> = emptyList(),
     val staff: List<StaffEntity> = emptyList(),
+    val seasonalPrices: List<SeasonalPriceEntity> = emptyList(),
+    val coupons: List<CouponEntity> = emptyList(),
     val isLoading: Boolean = false
 )
 
@@ -63,7 +71,9 @@ class DatabaseDebugViewModel @Inject constructor(
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
     private val branchRepository: BranchRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val seasonalPriceDao: SeasonalPriceDao,
+    private val couponDao: CouponDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebugUiState())
@@ -151,6 +161,22 @@ class DatabaseDebugViewModel @Inject constructor(
                     _uiState.update { it.copy(staff = staff) }
                 }
         }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
+            seasonalPriceDao.getActiveSeasonalPrices(branchId)
+                .collect { seasonalPrices ->
+                    _uiState.update { it.copy(seasonalPrices = seasonalPrices) }
+                }
+        }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
+            couponDao.getActiveCoupons(branchId)
+                .collect { coupons ->
+                    _uiState.update { it.copy(coupons = coupons) }
+                }
+        }
     }
 }
 
@@ -206,6 +232,8 @@ fun DatabaseDebugScreen(
                         DebugTab.AREAS -> uiState.areas.size
                         DebugTab.TABLES -> uiState.tables.size
                         DebugTab.STAFF -> uiState.staff.size
+                        DebugTab.SEASONAL_PRICES -> uiState.seasonalPrices.size
+                        DebugTab.COUPONS -> uiState.coupons.size
                     }
                     Tab(
                         selected = uiState.selectedTab == tab,
@@ -232,6 +260,8 @@ fun DatabaseDebugScreen(
                     DebugTab.AREAS -> AreasTable(uiState.areas)
                     DebugTab.TABLES -> TablesTable(uiState.tables)
                     DebugTab.STAFF -> StaffTable(uiState.staff)
+                    DebugTab.SEASONAL_PRICES -> SeasonalPricesTable(uiState.seasonalPrices)
+                    DebugTab.COUPONS -> CouponsTable(uiState.coupons)
                 }
             }
         }
@@ -353,6 +383,55 @@ fun StaffTable(staff: List<StaffEntity>) {
                 s.code,
                 s.role,
                 if (s.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun SeasonalPricesTable(seasonalPrices: List<SeasonalPriceEntity>) {
+    DataTable(
+        headers = listOf("ID", "Tên", "Loại", "Giá trị", "Bắt đầu", "Kết thúc", "Active"),
+        data = seasonalPrices,
+        rowContent = { sp ->
+            val adjustmentText = if (sp.adjustmentType == "percentage") {
+                "${sp.adjustmentValue.toInt()}%"
+            } else {
+                "%,.0f".format(sp.adjustmentValue)
+            }
+            listOf(
+                sp.id.take(8) + "...",
+                sp.name,
+                if (sp.adjustmentType == "percentage") "%" else "Cố định",
+                adjustmentText,
+                sp.startDate,
+                sp.endDate,
+                if (sp.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun CouponsTable(coupons: List<CouponEntity>) {
+    DataTable(
+        headers = listOf("ID", "Mã", "Tên", "Loại", "Giá trị", "Giới hạn", "Đã dùng", "Active"),
+        data = coupons,
+        rowContent = { c ->
+            val discountText = if (c.couponType == "percentage") {
+                "${c.discountValue.toInt()}%"
+            } else {
+                "%,.0f".format(c.discountValue)
+            }
+            listOf(
+                c.id.take(8) + "...",
+                c.code,
+                c.name,
+                if (c.couponType == "percentage") "%" else "Cố định",
+                discountText,
+                c.usageLimit?.toString() ?: "∞",
+                c.usageCount.toString(),
+                if (c.isActive) "✓" else "✗"
             )
         }
     )
