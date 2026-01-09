@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.entity.BrandEntity
 import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.repository.BranchRepository
+import com.techres.ccb.data.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,12 +49,18 @@ data class BranchSelectionUiState(
     val selectedBranch: Branch? = null,
     val error: String? = null,
     val syncedBrandsCount: Int = 0,
-    val syncedBranchesCount: Int = 0
+    val syncedBranchesCount: Int = 0,
+    // Branch data sync state
+    val isSyncingBranchData: Boolean = false,
+    val branchDataSyncState: SyncState = SyncState.NOT_STARTED,
+    val branchDataSyncProgress: Float = 0f,
+    val branchDataSyncComplete: Boolean = false
 )
 
 @HiltViewModel
 class BranchSelectionViewModel @Inject constructor(
-    private val branchRepository: BranchRepository
+    private val branchRepository: BranchRepository,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BranchSelectionUiState())
@@ -175,6 +182,95 @@ class BranchSelectionViewModel @Inject constructor(
         }
 
         return false
+    }
+
+    /**
+     * Save selected branch and sync all branch data (categories, products, areas, tables, staff)
+     */
+    fun confirmSelectionAndSync() {
+        val selectedBrand = _uiState.value.selectedBrand ?: return
+        val selectedBranch = _uiState.value.selectedBranch ?: return
+
+        val brandEntity = brandEntityMap[selectedBrand.id]
+        val branchEntity = branchEntityMap[selectedBranch.id]
+
+        if (brandEntity == null || branchEntity == null) {
+            _uiState.update { it.copy(error = "Không tìm thấy thông tin chi nhánh") }
+            return
+        }
+
+        viewModelScope.launch {
+            Log.d(TAG, "confirmSelectionAndSync - Starting...")
+            _uiState.update {
+                it.copy(
+                    isSyncingBranchData = true,
+                    branchDataSyncState = SyncState.SYNCING,
+                    branchDataSyncProgress = 0f,
+                    error = null
+                )
+            }
+
+            try {
+                // Save selected branch first
+                branchRepository.saveSelectedBranch(brandEntity, branchEntity)
+                Log.d(TAG, "confirmSelectionAndSync - Branch saved: ${branchEntity.name}")
+                _uiState.update { it.copy(branchDataSyncProgress = 0.2f) }
+
+                // Perform full sync for branch data
+                val result = syncRepository.performFullSync()
+                _uiState.update { it.copy(branchDataSyncProgress = 0.9f) }
+
+                result.fold(
+                    onSuccess = {
+                        Log.d(TAG, "confirmSelectionAndSync - Sync completed successfully")
+                        _uiState.update {
+                            it.copy(
+                                isSyncingBranchData = false,
+                                branchDataSyncState = SyncState.COMPLETED,
+                                branchDataSyncProgress = 1f,
+                                branchDataSyncComplete = true,
+                                error = null
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "confirmSelectionAndSync - Sync failed: ${error.message}", error)
+                        _uiState.update {
+                            it.copy(
+                                isSyncingBranchData = false,
+                                branchDataSyncState = SyncState.ERROR,
+                                branchDataSyncProgress = 0f,
+                                error = error.message ?: "Lỗi đồng bộ dữ liệu chi nhánh"
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "confirmSelectionAndSync - Exception: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isSyncingBranchData = false,
+                        branchDataSyncState = SyncState.ERROR,
+                        branchDataSyncProgress = 0f,
+                        error = e.message ?: "Lỗi đồng bộ dữ liệu chi nhánh"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Reset branch data sync state
+     */
+    fun resetBranchDataSyncState() {
+        _uiState.update {
+            it.copy(
+                branchDataSyncState = SyncState.NOT_STARTED,
+                branchDataSyncProgress = 0f,
+                branchDataSyncComplete = false,
+                error = null
+            )
+        }
     }
 
     fun clearError() {

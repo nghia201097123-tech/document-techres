@@ -36,6 +36,7 @@ fun BranchSelectionScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     var showShiftDialog by remember { mutableStateOf(false) }
+    var showSyncingDialog by remember { mutableStateOf(false) }
 
     // Mock: check if shift exists (for demo, randomly true/false based on branch id)
     val hasExistingShift = remember(uiState.selectedBranch) {
@@ -48,6 +49,38 @@ fun BranchSelectionScreen(
             // Automatically start sync if no data
             viewModel.syncBranchPermissions()
         }
+    }
+
+    // Watch for branch data sync completion
+    LaunchedEffect(uiState.branchDataSyncComplete) {
+        if (uiState.branchDataSyncComplete) {
+            showSyncingDialog = false
+            viewModel.resetBranchDataSyncState()
+            // Navigate after sync completes
+            uiState.selectedBranch?.let { branch ->
+                if (hasExistingShift) {
+                    showShiftDialog = true
+                } else {
+                    onContinueToOpenShift(branch.name)
+                }
+            }
+        }
+    }
+
+    // Watch for branch data sync error
+    LaunchedEffect(uiState.branchDataSyncState) {
+        if (uiState.branchDataSyncState == SyncState.ERROR) {
+            showSyncingDialog = false
+        }
+    }
+
+    // Syncing dialog
+    if (showSyncingDialog || uiState.isSyncingBranchData) {
+        SyncingBranchDataDialog(
+            branchName = uiState.selectedBranch?.name ?: "",
+            progress = uiState.branchDataSyncProgress,
+            onDismiss = { /* Cannot dismiss while syncing */ }
+        )
     }
 
     // Shift dialog
@@ -353,18 +386,14 @@ fun BranchSelectionScreen(
                     // Action button - show "Tiếp tục" when branch is selected
                     Button(
                         onClick = {
-                            if (viewModel.confirmSelection()) {
-                                if (hasExistingShift) {
-                                    showShiftDialog = true
-                                } else {
-                                    uiState.selectedBranch?.let { onContinueToOpenShift(it.name) }
-                                }
-                            }
+                            // Start syncing branch data (categories, products, areas, tables, staff)
+                            showSyncingDialog = true
+                            viewModel.confirmSelectionAndSync()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        enabled = uiState.selectedBranch != null,
+                        enabled = uiState.selectedBranch != null && !uiState.isSyncingBranchData,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50),
@@ -503,6 +532,81 @@ private fun ShiftExistsDialog(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncingBranchDataDialog(
+    branchName: String,
+    progress: Float,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(320.dp)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Progress indicator
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(64.dp),
+                    strokeWidth = 4.dp,
+                    color = Color(0xFF4CAF50)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Đang đồng bộ dữ liệu",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Chi nhánh: $branchName",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Danh mục, sản phẩm, khu vực, bàn, nhân viên...",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFF4CAF50),
+                    trackColor = Color(0xFFE8F5E9)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF4CAF50)
+                )
             }
         }
     }
