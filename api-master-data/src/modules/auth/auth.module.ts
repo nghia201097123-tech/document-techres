@@ -14,10 +14,10 @@ import { Branch, Device, Staff, Brand } from '../../entities';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET') || 'your-secret-key',
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production'),
         signOptions: {
-          expiresIn: configService.get('JWT_EXPIRES_IN') || '7d',
+          expiresIn: configService.get('JWT_EXPIRES_IN', '7d'),
         },
       }),
       inject: [ConfigService],
