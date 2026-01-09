@@ -6,6 +6,7 @@ export enum BackendService {
   ADMIN = 'admin',
   DASHBOARD = 'dashboard',
   OAUTH = 'oauth',
+  MASTER_DATA = 'master-data',
 }
 
 @Injectable()
@@ -13,11 +14,13 @@ export class ProxyService {
   private readonly apiAdminClient: AxiosInstance;
   private readonly apiDashboardClient: AxiosInstance;
   private readonly apiOAuthClient: AxiosInstance;
+  private readonly apiMasterDataClient: AxiosInstance;
 
   constructor(private readonly configService: ConfigService) {
     const apiAdminUrl = this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
     const apiDashboardUrl = this.configService.get<string>('API_DASHBOARD_URL') || 'http://localhost:4002';
     const apiOAuthUrl = this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
+    const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3003';
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
@@ -37,6 +40,13 @@ export class ProxyService {
       baseURL: apiOAuthUrl,
       timeout: 30000, // 30 seconds for auth operations
     });
+
+    this.apiMasterDataClient = axios.create({
+      baseURL: apiMasterDataUrl,
+      timeout: 60000, // 1 minute for sync operations
+      maxBodyLength: 10 * 1024 * 1024, // 10MB
+      maxContentLength: 10 * 1024 * 1024, // 10MB
+    });
   }
 
   private getClient(service: BackendService): AxiosInstance {
@@ -45,6 +55,8 @@ export class ProxyService {
         return this.apiDashboardClient;
       case BackendService.OAUTH:
         return this.apiOAuthClient;
+      case BackendService.MASTER_DATA:
+        return this.apiMasterDataClient;
       default:
         return this.apiAdminClient;
     }
@@ -120,6 +132,13 @@ export class ProxyService {
     if (path.startsWith('/tenant/') || path.startsWith('/api/tenant/')) {
       const adjustedPath = path.replace(/^\/api\/tenant/, '/api').replace(/^\/tenant/, '/api');
       return { service: BackendService.DASHBOARD, adjustedPath };
+    }
+
+    // Routes for POS/CCB app (api-master-data)
+    // /pos/* -> api-master-data /api/v1/*
+    if (path.startsWith('/pos/') || path.startsWith('/api/pos/')) {
+      const adjustedPath = path.replace(/^\/api\/pos/, '/api/v1').replace(/^\/pos/, '/api/v1');
+      return { service: BackendService.MASTER_DATA, adjustedPath };
     }
 
     // Routes for admin (api-admin) - default
