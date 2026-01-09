@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
-import { SyncCompanyDataDto, SyncBrandDto, SyncBranchDto } from './dto/sync.dto';
+import { SyncCompanyDataDto, SyncCompanyDto, SyncBrandDto, SyncBranchDto, SyncTransactionCategoryDto } from './dto/sync.dto';
 
 @ApiTags('Sync')
 @Controller('sync')
@@ -10,13 +10,22 @@ export class SyncController {
 
   constructor(private readonly syncService: SyncService) {}
 
-  @Post('company')
+  @Post('company-data')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Sync company data from api-admin' })
+  @ApiOperation({ summary: 'Sync full company data from api-admin' })
   @ApiResponse({ status: 200, description: 'Company data synced successfully' })
   async syncCompanyData(@Body() dto: SyncCompanyDataDto) {
     this.logger.log(`Received sync request for company: ${dto.company.code}`);
     return this.syncService.syncCompanyData(dto);
+  }
+
+  @Post('company')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sync single company from api-admin' })
+  @ApiResponse({ status: 200, description: 'Company synced successfully' })
+  async syncCompany(@Body() dto: SyncCompanyDto) {
+    this.logger.log(`Received sync request for company: ${dto.name}`);
+    return this.syncService.syncSingleCompany(dto);
   }
 
   @Post('brand')
@@ -35,5 +44,14 @@ export class SyncController {
   async syncBranch(@Body() dto: SyncBranchDto) {
     this.logger.log(`Received sync request for branch: ${dto.name}`);
     return this.syncService.syncSingleBranch(dto);
+  }
+
+  @Post('transaction-category')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sync single transaction category from api-admin' })
+  @ApiResponse({ status: 200, description: 'Transaction category synced successfully' })
+  async syncTransactionCategory(@Body() dto: SyncTransactionCategoryDto) {
+    this.logger.log(`Received sync request for transaction category: ${dto.name}`);
+    return this.syncService.syncSingleTransactionCategory(dto);
   }
 }

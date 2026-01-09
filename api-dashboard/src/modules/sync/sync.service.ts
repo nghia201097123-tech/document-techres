@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Company, Brand, Branch, Department, Staff } from '../../database/entities';
+import { Company, Brand, Branch, Department, Staff, TransactionCategory } from '../../database/entities';
 import {
   SyncCompanyDataDto,
   SyncCompanyDto,
@@ -9,6 +9,7 @@ import {
   SyncBranchDto,
   SyncDepartmentDto,
   SyncStaffDto,
+  SyncTransactionCategoryDto,
 } from './dto/sync.dto';
 
 @Injectable()
@@ -26,6 +27,8 @@ export class SyncService {
     private readonly departmentRepository: Repository<Department>,
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
+    @InjectRepository(TransactionCategory)
+    private readonly transactionCategoryRepository: Repository<TransactionCategory>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -341,6 +344,68 @@ export class SyncService {
         openTime: dto.openTime,
         closeTime: dto.closeTime,
         businessModel: dto.businessModel as any,
+        isActive: dto.isActive ?? true,
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Sync a single company
+   */
+  async syncSingleCompany(dto: SyncCompanyDto): Promise<{ success: boolean }> {
+    const existing = await this.companyRepository.findOne({
+      where: { id: dto.id },
+    });
+
+    if (existing) {
+      await this.companyRepository.update(dto.id, {
+        code: dto.code,
+        name: dto.name,
+        logoUrl: dto.logoUrl,
+        isActive: dto.isActive ?? true,
+      });
+    } else {
+      await this.companyRepository.insert({
+        id: dto.id,
+        code: dto.code,
+        name: dto.name,
+        logoUrl: dto.logoUrl,
+        isActive: dto.isActive ?? true,
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Sync a single transaction category
+   */
+  async syncSingleTransactionCategory(dto: SyncTransactionCategoryDto): Promise<{ success: boolean }> {
+    const existing = await this.transactionCategoryRepository.findOne({
+      where: { id: dto.id },
+    });
+
+    if (existing) {
+      await this.transactionCategoryRepository.update(dto.id, {
+        tenantId: dto.tenantId,
+        name: dto.name,
+        code: dto.code,
+        type: dto.type as any,
+        description: dto.description,
+        isSystem: dto.isSystem ?? false,
+        isActive: dto.isActive ?? true,
+      });
+    } else {
+      await this.transactionCategoryRepository.insert({
+        id: dto.id,
+        tenantId: dto.tenantId,
+        name: dto.name,
+        code: dto.code,
+        type: dto.type as any,
+        description: dto.description,
+        isSystem: dto.isSystem ?? false,
         isActive: dto.isActive ?? true,
       });
     }

@@ -258,6 +258,47 @@ export class SyncStaffDto {
   isActive?: boolean;
 }
 
+export class SyncTransactionCategoryDto {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  tenantId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  type: string; // 'income' | 'expense'
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isSystem?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class SyncCompanyDataDto {
   @ApiProperty({ type: SyncCompanyDto })
   @ValidateNested()

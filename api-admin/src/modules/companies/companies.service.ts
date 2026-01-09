@@ -13,6 +13,7 @@ import {
   CreateCompanyWizardResponseDto,
 } from './dto/create-company-wizard.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { DashboardSyncService } from '../../common/services/dashboard-sync.service';
 
 @Injectable()
 export class CompaniesService {
@@ -34,11 +35,29 @@ export class CompaniesService {
     private readonly dataSource: DataSource,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly dashboardSyncService: DashboardSyncService,
   ) {
     // URL của api-oauth service
     this.oauthApiUrl = this.configService.get('OAUTH_API_URL') || 'http://localhost:3005';
     // URL của api-dashboard service
     this.dashboardApiUrl = this.configService.get('DASHBOARD_API_URL') || 'http://localhost:4002';
+  }
+
+  /**
+   * Sync single company to dashboard API (non-blocking)
+   */
+  private async syncCompanyToDashboard(company: Company): Promise<void> {
+    try {
+      await this.dashboardSyncService.syncCompany({
+        id: company.id,
+        code: company.code,
+        name: company.name,
+        logoUrl: company.logoUrl,
+        isActive: company.isActive,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to sync company ${company.code}: ${error}`);
+    }
   }
 
   async create(createCompanyDto: CreateCompanyDto): Promise<any> {
@@ -59,6 +78,10 @@ export class CompaniesService {
 
     const company = this.companyRepository.create(companyData);
     const saved = await this.companyRepository.save(company);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncCompanyToDashboard(saved);
+
     return this.transformCompany(saved);
   }
 
@@ -630,6 +653,10 @@ export class CompaniesService {
     }
     Object.assign(company, restDto);
     const saved = await this.companyRepository.save(company);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncCompanyToDashboard(saved);
+
     return this.transformCompany(saved);
   }
 
@@ -656,6 +683,10 @@ export class CompaniesService {
 
     company.isActive = !company.isActive;
     const saved = await this.companyRepository.save(company);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncCompanyToDashboard(saved);
+
     return this.transformCompany(saved);
   }
 
