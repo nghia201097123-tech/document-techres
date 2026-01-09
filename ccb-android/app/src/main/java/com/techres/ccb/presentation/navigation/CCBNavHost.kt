@@ -163,7 +163,8 @@ fun CCBNavHost() {
             OpenShiftScreen(
                 branchName = branchName,
                 onShiftOpened = {
-                    navController.navigate(Screen.SyncData.createRoute(branchName)) {
+                    // Go directly to Dashboard (sync was already done at branch selection)
+                    navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.OpenShift.route) { inclusive = true }
                     }
                 },
