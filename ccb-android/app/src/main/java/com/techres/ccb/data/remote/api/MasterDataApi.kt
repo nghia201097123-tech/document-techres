@@ -21,16 +21,7 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/**
- * Master Data API interface for api-master-data
- * Routes through /api/pos/* -> api-master-data
- *
- * Note: Authentication endpoints are in AuthApi (routes through /api/tenant/auth/* -> api-oauth)
- */
 interface MasterDataApi {
-
-    // ============ Master Data Sync ============
-
     @GET("sync/full")
     suspend fun getFullSyncData(
         @Header("Authorization") token: String,
@@ -72,8 +63,6 @@ interface MasterDataApi {
         @Query("since") since: String? = null
     ): Response<SyncResponse<StaffDto>>
 
-    // ============ Transaction Data Upload ============
-
     @POST("sync/orders")
     suspend fun uploadOrders(
         @Header("Authorization") token: String,
@@ -86,15 +75,11 @@ interface MasterDataApi {
         @Body shifts: List<ShiftUploadDto>
     ): Response<UploadResponse>
 
-    // ============ Branch Info ============
-
     @GET("branch/{branchId}")
     suspend fun getBranchInfo(
         @Header("Authorization") token: String,
         @Path("branchId") branchId: String
     ): Response<BranchInfoResponse>
-
-    // ============ Brands & Branches ============
 
     @GET("brands")
     suspend fun getBrands(
