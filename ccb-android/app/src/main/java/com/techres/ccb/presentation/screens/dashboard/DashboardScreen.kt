@@ -3,17 +3,16 @@ package com.techres.ccb.presentation.screens.dashboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,232 +26,151 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.FoodAppOrder
 import com.techres.ccb.domain.model.FoodOrderStatus
+import java.text.SimpleDateFormat
+import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Mock data for UI preview
+data class MockPosOrder(
+    val id: String,
+    val orderNumber: String,
+    val tableName: String?,
+    val totalAmount: Long,
+    val itemCount: Int,
+    val status: MockPosStatus,
+    val createdAt: String
+)
+
+enum class MockPosStatus(val label: String, val color: Long) {
+    DRAFT("Chờ xác nhận", 0xFFFF9800),
+    CONFIRMED("Đã xác nhận", 0xFF2196F3),
+    COMPLETED("Hoàn tất", 0xFF4CAF50)
+}
+
 @Composable
 fun DashboardScreen(
-    viewModel: DashboardViewModel = hiltViewModel(),
-    onNavigateToSale: () -> Unit,
-    onNavigateToFoodOrders: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToShift: () -> Unit,
-    onLogout: () -> Unit
+    onNavigateToSale: () -> Unit = {},
+    onNavigateToFoodOrders: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToShift: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    var selectedTab by remember { mutableIntStateOf(0) }
+    // Mock data
+    val mockOrders = remember {
+        listOf(
+            MockPosOrder("1", "001", "Bàn 1", 250000, 3, MockPosStatus.DRAFT, "10:30"),
+            MockPosOrder("2", "002", "Bàn 3", 180000, 2, MockPosStatus.CONFIRMED, "10:35"),
+            MockPosOrder("3", "003", null, 95000, 1, MockPosStatus.DRAFT, "10:40"),
+            MockPosOrder("4", "004", "Bàn 5", 420000, 5, MockPosStatus.CONFIRMED, "10:42"),
+            MockPosOrder("5", "005", "Bàn 2", 150000, 2, MockPosStatus.DRAFT, "10:45"),
+            MockPosOrder("6", "006", "Bàn 7", 320000, 4, MockPosStatus.CONFIRMED, "10:48")
+        )
+    }
 
-    Scaffold(
-        topBar = {
-            // Compact Header
-            Surface(
-                color = Color(0xFF1976D2),
-                shadowElevation = 4.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            uiState.branchName,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "${uiState.staffName} • ${formatCurrency(uiState.todayRevenue)}",
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 12.sp
-                        )
-                    }
-                    Row {
-                        IconButton(onClick = { viewModel.refresh() }, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Default.Refresh, null, tint = Color.White)
-                        }
-                        IconButton(onClick = onNavigateToSettings, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Default.Settings, null, tint = Color.White)
-                        }
-                        IconButton(onClick = onLogout, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Default.Logout, null, tint = Color.White)
-                        }
-                    }
-                }
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToSale,
-                containerColor = Color(0xFF4CAF50),
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Tạo đơn mới")
-            }
-        }
-    ) { paddingValues ->
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var gridColumns by remember { mutableIntStateOf(4) }
+    val currentTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
+    val currentDate = remember { SimpleDateFormat("EEEE, dd/MM", Locale("vi")).format(Date()) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8F9FA))
+    ) {
+        // Left Sidebar
+        DashboardSidebar(
+            branchName = "Chi nhánh Quận 1",
+            staffName = "Nguyễn Văn A",
+            onNavigateToSale = onNavigateToSale,
+            onNavigateToFoodOrders = onNavigateToFoodOrders,
+            onNavigateToShift = onNavigateToShift,
+            onNavigateToSettings = onNavigateToSettings,
+            onLogout = onLogout
+        )
+
+        // Main Content
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color(0xFFF5F5F5))
+                .weight(1f)
+                .fillMaxHeight()
         ) {
-            // Compact Quick Actions + Stats
-            QuickStatsBar(
-                totalActive = uiState.totalActiveOrders,
-                draftCount = uiState.draftPosCount,
-                confirmedCount = uiState.confirmedPosCount,
-                newFoodCount = uiState.newFoodOrderCount,
-                onNavigateToSale = onNavigateToSale,
-                onNavigateToFoodOrders = onNavigateToFoodOrders,
-                onNavigateToShift = onNavigateToShift
+            // Top Header
+            DashboardHeader(
+                currentTime = currentTime,
+                currentDate = currentDate,
+                todayRevenue = 12500000,
+                totalOrders = 45,
+                pendingOrders = mockOrders.count { it.status == MockPosStatus.DRAFT }
             )
 
-            // Tab Selection + Grid Column Selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Tabs
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color.White,
-                    contentColor = Color(0xFF1976D2),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Storefront, null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Quầy", fontSize = 12.sp)
-                                if (uiState.posOrders.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Badge(containerColor = Color(0xFF2196F3)) {
-                                        Text("${uiState.posOrders.size}", fontSize = 10.sp)
-                                    }
-                                }
-                            }
-                        }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.DeliveryDining, null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("App", fontSize = 12.sp)
-                                if (uiState.foodAppOrders.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Badge(
-                                        containerColor = if (uiState.newFoodOrderCount > 0)
-                                            Color(0xFFE91E63) else Color(0xFFFF5722)
-                                    ) {
-                                        Text("${uiState.foodAppOrders.size}", fontSize = 10.sp)
-                                    }
-                                }
-                            }
-                        }
-                    )
-                }
+            // Stats Cards
+            StatsCardsRow(
+                draftCount = mockOrders.count { it.status == MockPosStatus.DRAFT },
+                confirmedCount = mockOrders.count { it.status == MockPosStatus.CONFIRMED },
+                completedCount = 39,
+                foodAppCount = 8
+            )
 
-                // Grid Column Selector
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.GridView,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.Gray
-                    )
-                    listOf(4, 6, 8).forEach { cols ->
-                        FilterChip(
-                            selected = uiState.gridColumns == cols,
-                            onClick = { viewModel.setGridColumns(cols) },
-                            label = { Text("$cols", fontSize = 11.sp) },
-                            modifier = Modifier.height(28.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF1976D2),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
-            }
+            // Tab Bar & Grid Controls
+            OrdersTabBar(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it },
+                posCount = mockOrders.size,
+                appCount = 8,
+                gridColumns = gridColumns,
+                onGridColumnsChanged = { gridColumns = it }
+            )
 
             // Orders Grid
-            when (selectedTab) {
-                0 -> {
-                    if (uiState.posOrders.isEmpty()) {
-                        EmptyState(
-                            icon = Icons.Default.Storefront,
-                            message = "Chưa có đơn tại quầy",
-                            subMessage = "Nhấn + để tạo đơn mới"
-                        )
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(uiState.gridColumns),
-                            contentPadding = PaddingValues(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(uiState.posOrders, key = { it.id }) { order ->
-                                PosOrderCompactItem(
-                                    order = order,
-                                    onConfirm = { viewModel.confirmPosOrder(order.id) },
-                                    onComplete = { viewModel.completePosOrder(order.id) }
-                                )
-                            }
-                            // Bottom spacing for FAB
-                            item(span = { GridItemSpan(uiState.gridColumns) }) {
-                                Spacer(modifier = Modifier.height(80.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                when (selectedTab) {
+                    0 -> {
+                        if (mockOrders.isEmpty()) {
+                            EmptyOrdersState()
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(gridColumns),
+                                contentPadding = PaddingValues(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(mockOrders, key = { it.id }) { order ->
+                                    OrderCard(order = order)
+                                }
+                                // Bottom spacing
+                                item(span = { GridItemSpan(gridColumns) }) {
+                                    Spacer(modifier = Modifier.height(80.dp))
+                                }
                             }
                         }
+                    }
+                    1 -> {
+                        EmptyOrdersState(
+                            icon = Icons.Default.DeliveryDining,
+                            message = "Đơn từ App",
+                            subMessage = "Hiện có 8 đơn đang xử lý"
+                        )
                     }
                 }
-                1 -> {
-                    if (uiState.foodAppOrders.isEmpty()) {
-                        EmptyState(
-                            icon = Icons.Default.DeliveryDining,
-                            message = "Chưa có đơn từ app",
-                            subMessage = "Đơn mới sẽ hiển thị ở đây"
-                        )
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(uiState.gridColumns),
-                            contentPadding = PaddingValues(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(uiState.foodAppOrders, key = { it.id }) { order ->
-                                FoodOrderCompactItem(
-                                    order = order,
-                                    onAccept = { viewModel.acceptFoodOrder(order.id) },
-                                    onStartPreparing = { viewModel.startPreparingFoodOrder(order.id) },
-                                    onMarkReady = { viewModel.markFoodOrderReady(order.id) },
-                                    onComplete = { viewModel.completeFoodOrder(order.id) }
-                                )
-                            }
-                            // Bottom spacing for FAB
-                            item(span = { GridItemSpan(uiState.gridColumns) }) {
-                                Spacer(modifier = Modifier.height(80.dp))
-                            }
-                        }
-                    }
+
+                // FAB
+                FloatingActionButton(
+                    onClick = onNavigateToSale,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(24.dp)
+                        .size(64.dp),
+                    containerColor = Color(0xFF4CAF50),
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Tạo đơn mới",
+                        modifier = Modifier.size(32.dp)
+                    )
                 }
             }
         }
@@ -260,325 +178,588 @@ fun DashboardScreen(
 }
 
 @Composable
-fun QuickStatsBar(
-    totalActive: Int,
-    draftCount: Int,
-    confirmedCount: Int,
-    newFoodCount: Int,
+private fun DashboardSidebar(
+    branchName: String,
+    staffName: String,
     onNavigateToSale: () -> Unit,
     onNavigateToFoodOrders: () -> Unit,
-    onNavigateToShift: () -> Unit
+    onNavigateToShift: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onLogout: () -> Unit
 ) {
-    Card(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .width(80.dp)
+            .fillMaxHeight()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1976D2),
+                        Color(0xFF1565C0)
+                    )
+                )
+            )
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Logo
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Restaurant,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = Color.White
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Navigation Items
+        SidebarNavItem(
+            icon = Icons.Default.PointOfSale,
+            label = "Bán hàng",
+            isActive = true,
+            onClick = onNavigateToSale
+        )
+
+        SidebarNavItem(
+            icon = Icons.Default.DeliveryDining,
+            label = "Đơn App",
+            badge = 3,
+            onClick = onNavigateToFoodOrders
+        )
+
+        SidebarNavItem(
+            icon = Icons.Default.TableBar,
+            label = "Bàn",
+            onClick = {}
+        )
+
+        SidebarNavItem(
+            icon = Icons.Default.Schedule,
+            label = "Ca làm",
+            onClick = onNavigateToShift
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Bottom Items
+        SidebarNavItem(
+            icon = Icons.Default.Settings,
+            label = "Cài đặt",
+            onClick = onNavigateToSettings
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Staff Avatar
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.2f))
+                .clickable(onClick = onLogout),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = "Đăng xuất",
+                modifier = Modifier.size(24.dp),
+                tint = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun SidebarNavItem(
+    icon: ImageVector,
+    label: String,
+    isActive: Boolean = false,
+    badge: Int? = null,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .size(56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isActive) Color.White.copy(alpha = 0.2f)
+                else Color.Transparent
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(22.dp),
+                    tint = Color.White
+                )
+                if (badge != null) {
+                    Badge(
+                        containerColor = Color(0xFFE91E63),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 6.dp, y = (-4).dp)
+                    ) {
+                        Text(badge.toString(), fontSize = 9.sp)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                fontSize = 9.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardHeader(
+    currentTime: String,
+    currentDate: String,
+    todayRevenue: Long,
+    totalOrders: Int,
+    pendingOrders: Int
+) {
+    Surface(
+        color = Color.White,
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Bán hàng
-            QuickStatItem(
-                icon = Icons.Default.PointOfSale,
-                label = "Bán hàng",
-                color = Color(0xFF4CAF50),
-                onClick = onNavigateToSale
-            )
-
-            VerticalDivider(modifier = Modifier.height(40.dp))
-
-            // Đơn App
-            QuickStatItem(
-                icon = Icons.Default.DeliveryDining,
-                label = "Đơn App",
-                color = Color(0xFFFF5722),
-                badge = if (newFoodCount > 0) newFoodCount else null,
-                onClick = onNavigateToFoodOrders
-            )
-
-            VerticalDivider(modifier = Modifier.height(40.dp))
-
-            // Ca làm
-            QuickStatItem(
-                icon = Icons.Default.Schedule,
-                label = "Ca làm",
-                color = Color(0xFF9C27B0),
-                onClick = onNavigateToShift
-            )
-
-            VerticalDivider(modifier = Modifier.height(40.dp))
-
-            // Tổng đơn
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            // Left: Time & Date
+            Column {
                 Text(
-                    totalActive.toString(),
-                    fontSize = 20.sp,
+                    text = currentTime,
+                    fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1976D2)
                 )
-                Text("Đang xử lý", fontSize = 10.sp, color = Color.Gray)
-            }
-        }
-    }
-}
-
-@Composable
-fun QuickStatItem(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    badge: Int? = null,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box {
-            Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
-            if (badge != null) {
-                Badge(
-                    containerColor = Color(0xFFE91E63),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 6.dp, y = (-4).dp)
-                ) {
-                    Text(badge.toString(), fontSize = 9.sp)
-                }
-            }
-        }
-        Text(label, fontSize = 10.sp, color = Color.Gray)
-    }
-}
-
-@Composable
-fun EmptyState(icon: ImageVector, message: String, subMessage: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(message, fontSize = 16.sp, color = Color.Gray)
-            Text(subMessage, fontSize = 14.sp, color = Color.LightGray)
-        }
-    }
-}
-
-// Compact POS Order Item cho Grid
-@Composable
-fun PosOrderCompactItem(
-    order: PosOrder,
-    onConfirm: () -> Unit,
-    onComplete: () -> Unit
-) {
-    val statusColor = Color(order.status.color)
-    val isDraft = order.status == PosOrderStatus.DRAFT
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(0.85f)
-            .clickable { if (isDraft) onConfirm() else onComplete() },
-        colors = CardDefaults.cardColors(
-            containerColor = statusColor.copy(alpha = 0.12f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Order number badge
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(statusColor, RoundedCornerShape(4.dp))
-                    .padding(vertical = 2.dp),
-                contentAlignment = Alignment.Center
-            ) {
                 Text(
-                    "#${order.orderNumber}",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            // Icon + Table
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    if (order.tableName != null) Icons.Default.TableBar else Icons.Default.TakeoutDining,
-                    null,
-                    tint = statusColor,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    order.tableName ?: "Mang đi",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // Amount
-            Text(
-                formatCompactCurrency(order.totalAmount),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1976D2),
-                maxLines = 1
-            )
-
-            // Status text
-            Text(
-                if (isDraft) "Xác nhận" else "Hoàn tất",
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Medium,
-                color = statusColor
-            )
-        }
-    }
-}
-
-// Compact Food Order Item cho Grid 8 cột
-@Composable
-fun FoodOrderCompactItem(
-    order: FoodAppOrder,
-    onAccept: () -> Unit,
-    onStartPreparing: () -> Unit,
-    onMarkReady: () -> Unit,
-    onComplete: () -> Unit
-) {
-    val platformColor = Color(order.platform.color)
-    val statusColor = Color(order.status.color)
-    val isNew = order.status == FoodOrderStatus.NEW
-
-    val onClickAction = when (order.status) {
-        FoodOrderStatus.NEW -> onAccept
-        FoodOrderStatus.ACCEPTED -> onStartPreparing
-        FoodOrderStatus.PREPARING -> onMarkReady
-        FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> onComplete
-        else -> { {} }
-    }
-
-    val actionText = when (order.status) {
-        FoodOrderStatus.NEW -> "Nhận đơn"
-        FoodOrderStatus.ACCEPTED -> "Bắt đầu"
-        FoodOrderStatus.PREPARING -> "Sẵn sàng"
-        FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> "Xong"
-        else -> ""
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(0.85f)
-            .clickable(onClick = onClickAction)
-            .then(
-                if (isNew) Modifier.border(2.dp, platformColor, RoundedCornerShape(8.dp))
-                else Modifier
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = platformColor.copy(alpha = 0.12f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isNew) 4.dp else 2.dp),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Platform badge header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(platformColor, RoundedCornerShape(4.dp))
-                    .padding(vertical = 2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "${order.platform.icon} ${order.platform.shortName}",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            // Order code
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    order.orderCode,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    "${order.items.size} món",
-                    fontSize = 8.sp,
+                    text = currentDate,
+                    fontSize = 14.sp,
                     color = Color.Gray
                 )
             }
 
-            // Amount
-            Text(
-                formatCompactCurrency(order.totalAmount),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = platformColor,
-                maxLines = 1
-            )
-
-            // Action text
-            if (actionText.isNotEmpty()) {
-                Text(
-                    actionText,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = statusColor
+            // Right: Stats
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(32.dp)
+            ) {
+                HeaderStat(
+                    label = "Doanh thu hôm nay",
+                    value = formatCurrency(todayRevenue),
+                    color = Color(0xFF4CAF50)
+                )
+                HeaderStat(
+                    label = "Tổng đơn",
+                    value = totalOrders.toString(),
+                    color = Color(0xFF2196F3)
+                )
+                HeaderStat(
+                    label = "Đang chờ",
+                    value = pendingOrders.toString(),
+                    color = Color(0xFFFF9800)
                 )
             }
         }
     }
 }
 
-// Helper
+@Composable
+private fun HeaderStat(
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(horizontalAlignment = Alignment.End) {
+        Text(
+            text = value,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
+    }
+}
+
+@Composable
+private fun StatsCardsRow(
+    draftCount: Int,
+    confirmedCount: Int,
+    completedCount: Int,
+    foodAppCount: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        StatCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Edit,
+            label = "Chờ xác nhận",
+            count = draftCount,
+            color = Color(0xFFFF9800)
+        )
+        StatCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.CheckCircle,
+            label = "Đã xác nhận",
+            count = confirmedCount,
+            color = Color(0xFF2196F3)
+        )
+        StatCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Done,
+            label = "Hoàn tất",
+            count = completedCount,
+            color = Color(0xFF4CAF50)
+        )
+        StatCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.DeliveryDining,
+            label = "Đơn App",
+            count = foodAppCount,
+            color = Color(0xFFE91E63)
+        )
+    }
+}
+
+@Composable
+private fun StatCard(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    count: Int,
+    color: Color
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = color
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = count.toString(),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+                Text(
+                    text = label,
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrdersTabBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    posCount: Int,
+    appCount: Int,
+    gridColumns: Int,
+    onGridColumnsChanged: (Int) -> Unit
+) {
+    Surface(color = Color.White) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Tabs
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TabChip(
+                    label = "Đơn Quầy",
+                    count = posCount,
+                    isSelected = selectedTab == 0,
+                    color = Color(0xFF1976D2),
+                    onClick = { onTabSelected(0) }
+                )
+                TabChip(
+                    label = "Đơn App",
+                    count = appCount,
+                    isSelected = selectedTab == 1,
+                    color = Color(0xFFE91E63),
+                    onClick = { onTabSelected(1) }
+                )
+            }
+
+            // Grid Column Selector
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.GridView,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color.Gray
+                )
+                listOf(3, 4, 5, 6).forEach { cols ->
+                    FilterChip(
+                        selected = gridColumns == cols,
+                        onClick = { onGridColumnsChanged(cols) },
+                        label = { Text("$cols", fontSize = 12.sp) },
+                        modifier = Modifier.height(32.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF1976D2),
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabChip(
+    label: String,
+    count: Int,
+    isSelected: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (isSelected) color else Color.Transparent,
+        border = if (!isSelected) ButtonDefaults.outlinedButtonBorder else null
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) Color.White else Color.Gray
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Badge(
+                containerColor = if (isSelected) Color.White.copy(alpha = 0.2f) else color.copy(alpha = 0.1f)
+            ) {
+                Text(
+                    text = count.toString(),
+                    fontSize = 11.sp,
+                    color = if (isSelected) Color.White else color
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderCard(order: MockPosOrder) {
+    val statusColor = Color(order.status.color)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clickable { },
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Order number
+                Box(
+                    modifier = Modifier
+                        .background(statusColor, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "#${order.orderNumber}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+                // Time
+                Text(
+                    text = order.createdAt,
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+            }
+
+            // Center: Table info
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = if (order.tableName != null) Icons.Default.TableBar else Icons.Default.TakeoutDining,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = statusColor
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = order.tableName ?: "Mang đi",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "${order.itemCount} món",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+
+            // Footer
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatCompactCurrency(order.totalAmount),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1976D2)
+                )
+                // Action button
+                Surface(
+                    onClick = { },
+                    shape = RoundedCornerShape(6.dp),
+                    color = statusColor.copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = if (order.status == MockPosStatus.DRAFT) "Xác nhận" else "Hoàn tất",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = statusColor
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyOrdersState(
+    icon: ImageVector = Icons.Default.Storefront,
+    message: String = "Chưa có đơn hàng",
+    subMessage: String = "Nhấn + để tạo đơn mới"
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE3F2FD)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = Color(0xFF1976D2)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = message,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF424242)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subMessage,
+                fontSize = 14.sp,
+                color = Color.Gray
+            )
+        }
+    }
+}
+
 private fun formatCurrency(amount: Long): String {
     return String.format("%,d đ", amount).replace(",", ".")
 }
 
-// Compact currency format (e.g., 150K, 1.2M)
 private fun formatCompactCurrency(amount: Long): String {
     return when {
         amount >= 1_000_000 -> String.format("%.1fM", amount / 1_000_000.0)
