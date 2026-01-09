@@ -26,7 +26,7 @@ import com.techres.ccb.data.local.entity.*
         SyncMetadataEntity::class,
         SyncConflictEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {

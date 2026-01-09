@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
     tableName = "staff",
     indices = [
         Index(value = ["branch_id"]),
-        Index(value = ["pin_code"], unique = true),
+        Index(value = ["pin_code"]),
         Index(value = ["is_active"])
     ]
 )
