@@ -18,11 +18,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 
-// Sync item data class
+// Sync item data class for UI display
 data class SyncItemData(
     val id: String,
     val title: String,
@@ -37,51 +39,55 @@ enum class SyncItemStatus {
 
 @Composable
 fun InitialSyncScreen(
-    onSyncComplete: () -> Unit
+    onSyncComplete: () -> Unit,
+    viewModel: InitialSyncViewModel = hiltViewModel()
 ) {
-    // Only sync brands and branches after login
-    var syncItems by remember {
-        mutableStateOf(
-            listOf(
-                SyncItemData("brands", "Thương hiệu", Icons.Default.Business),
-                SyncItemData("branches", "Chi nhánh", Icons.Default.Store)
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Build sync items based on UI state
+    val syncItems = remember(uiState) {
+        listOf(
+            SyncItemData(
+                id = "brands",
+                title = "Thương hiệu",
+                icon = Icons.Default.Business,
+                status = when {
+                    uiState.brandsSynced -> SyncItemStatus.COMPLETED
+                    uiState.status == InitialSyncStatus.SYNCING && !uiState.brandsSynced -> SyncItemStatus.SYNCING
+                    uiState.status == InitialSyncStatus.ERROR -> SyncItemStatus.ERROR
+                    else -> SyncItemStatus.PENDING
+                },
+                count = uiState.brandsCount
+            ),
+            SyncItemData(
+                id = "branches",
+                title = "Chi nhánh",
+                icon = Icons.Default.Store,
+                status = when {
+                    uiState.branchesSynced -> SyncItemStatus.COMPLETED
+                    uiState.status == InitialSyncStatus.SYNCING && uiState.brandsSynced -> SyncItemStatus.SYNCING
+                    uiState.status == InitialSyncStatus.ERROR -> SyncItemStatus.ERROR
+                    else -> SyncItemStatus.PENDING
+                },
+                count = uiState.branchesCount
             )
         )
     }
 
-    var overallProgress by remember { mutableFloatStateOf(0f) }
-    var isCompleted by remember { mutableStateOf(false) }
+    val isCompleted = uiState.status == InitialSyncStatus.COMPLETED
+    val hasError = uiState.status == InitialSyncStatus.ERROR
 
-    // Mock sync animation
+    // Start sync when screen loads
     LaunchedEffect(Unit) {
-        delay(500) // Initial delay
+        viewModel.startSync()
+    }
 
-        // Mock counts for brands and branches
-        val mockCounts = listOf(3, 8)
-
-        for (i in syncItems.indices) {
-            // Update current item to syncing
-            syncItems = syncItems.toMutableList().apply {
-                this[i] = this[i].copy(status = SyncItemStatus.SYNCING)
-            }
-
-            // Simulate sync delay
+    // Navigate when sync completes
+    LaunchedEffect(isCompleted) {
+        if (isCompleted) {
             delay(800)
-
-            // Update current item to completed
-            syncItems = syncItems.toMutableList().apply {
-                this[i] = this[i].copy(
-                    status = SyncItemStatus.COMPLETED,
-                    count = mockCounts[i]
-                )
-            }
-
-            overallProgress = (i + 1).toFloat() / syncItems.size
+            onSyncComplete()
         }
-
-        isCompleted = true
-        delay(800)
-        onSyncComplete()
     }
 
     Row(
@@ -156,28 +162,43 @@ fun InitialSyncScreen(
                     label = "rotation"
                 )
 
-                if (!isCompleted) {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .graphicsLayer { rotationZ = rotation },
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = Color(0xFF4CAF50)
-                    )
+                when {
+                    hasError -> {
+                        Icon(
+                            imageVector = Icons.Default.Error,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = Color(0xFFE91E63)
+                        )
+                    }
+                    isCompleted -> {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .graphicsLayer { rotationZ = rotation },
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = if (isCompleted) "Sẵn sàng!" else "Đang tải dữ liệu...",
+                    text = when {
+                        hasError -> "Đã xảy ra lỗi"
+                        isCompleted -> "Sẵn sàng!"
+                        else -> "Đang tải dữ liệu..."
+                    },
                     fontSize = 18.sp,
                     color = Color.White.copy(alpha = 0.9f)
                 )
@@ -238,19 +259,22 @@ fun InitialSyncScreen(
 
                     // Overall progress
                     LinearProgressIndicator(
-                        progress = { overallProgress },
+                        progress = { uiState.progress },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = when {
+                            hasError -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.primary
+                        },
                         trackColor = MaterialTheme.colorScheme.primaryContainer
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "${(overallProgress * 100).toInt()}% hoàn tất",
+                        text = "${(uiState.progress * 100).toInt()}% hoàn tất",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.align(Alignment.End)
@@ -263,6 +287,53 @@ fun InitialSyncScreen(
                         SyncItemRow(item = item)
                         if (item != syncItems.last()) {
                             Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
+
+                    // Error message
+                    if (hasError && uiState.error != null) {
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFFFEBEE)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Error,
+                                        contentDescription = null,
+                                        tint = Color(0xFFE91E63),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = uiState.error ?: "Đã xảy ra lỗi",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFFC62828)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = { viewModel.retry() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFE91E63)
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Thử lại")
+                                }
+                            }
                         }
                     }
 
@@ -319,6 +390,7 @@ private fun SyncItemRow(item: SyncItemData) {
                 color = when (item.status) {
                     SyncItemStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                     SyncItemStatus.COMPLETED -> Color(0xFFE8F5E9)
+                    SyncItemStatus.ERROR -> Color(0xFFFFEBEE)
                     else -> Color.Transparent
                 },
                 shape = RoundedCornerShape(12.dp)
@@ -362,18 +434,29 @@ private fun SyncItemRow(item: SyncItemData) {
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            if (item.status == SyncItemStatus.COMPLETED && item.count > 0) {
-                Text(
-                    text = "${item.count} mục",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            } else if (item.status == SyncItemStatus.SYNCING) {
-                Text(
-                    text = "Đang tải...",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            when (item.status) {
+                SyncItemStatus.COMPLETED -> {
+                    Text(
+                        text = "${item.count} mục",
+                        fontSize = 14.sp,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+                SyncItemStatus.SYNCING -> {
+                    Text(
+                        text = "Đang tải...",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                SyncItemStatus.ERROR -> {
+                    Text(
+                        text = "Lỗi",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> {}
             }
         }
 
