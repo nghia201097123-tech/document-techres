@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Request, Param } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request, Param, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { SyncService } from './sync.service';
@@ -31,29 +31,51 @@ export class SyncController {
 
   @Get('full')
   @ApiOperation({ summary: 'Lấy toàn bộ master data (full sync)' })
+  @ApiQuery({ name: 'branchId', required: true, description: 'ID chi nhánh' })
   @ApiResponse({ status: 200, type: FullSyncResponseDto })
-  async getFullSync(@Request() req): Promise<FullSyncResponseDto> {
-    const result = await this.syncService.getFullSync(req.user.branchId);
+  async getFullSync(
+    @Request() req,
+    @Query('branchId') branchId: string,
+  ): Promise<FullSyncResponseDto> {
+    // Use branchId from query param (required for mobile app sync)
+    const targetBranchId = branchId || req.user?.branchId;
+    if (!targetBranchId) {
+      throw new BadRequestException('branchId is required');
+    }
 
-    // Update device sync time
-    await this.syncService.updateDeviceSyncTime(req.user.deviceId);
+    const result = await this.syncService.getFullSync(targetBranchId);
+
+    // Update device sync time if available
+    if (req.user?.deviceId) {
+      await this.syncService.updateDeviceSyncTime(req.user.deviceId);
+    }
 
     return result;
   }
 
   @Get('incremental')
   @ApiOperation({ summary: 'Lấy dữ liệu thay đổi từ thời điểm nhất định (incremental sync)' })
+  @ApiQuery({ name: 'branchId', required: true, description: 'ID chi nhánh' })
   @ApiQuery({ name: 'since', required: true, description: 'ISO date string' })
   @ApiResponse({ status: 200, type: IncrementalSyncResponseDto })
   async getIncrementalSync(
     @Request() req,
+    @Query('branchId') branchId: string,
     @Query() query: SyncQueryDto,
   ): Promise<IncrementalSyncResponseDto> {
-    const since = new Date(query.since);
-    const result = await this.syncService.getIncrementalSync(req.user.branchId, since);
+    // Use branchId from query param (required for mobile app sync)
+    const targetBranchId = branchId || req.user?.branchId;
+    if (!targetBranchId) {
+      throw new BadRequestException('branchId is required');
+    }
 
-    // Update device sync time
-    await this.syncService.updateDeviceSyncTime(req.user.deviceId);
+    const since = new Date(query.since);
+    const result = await this.syncService.getIncrementalSync(targetBranchId, since);
+
+    // Update device sync time if available
+    if (req.user?.deviceId) {
+      await this.syncService.updateDeviceSyncTime(req.user.deviceId);
+    }
 
     return result;
   }

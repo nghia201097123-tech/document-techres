@@ -29,6 +29,9 @@ export class Product {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   price: number;
 
+  @Column({ name: 'cost_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  costPrice: number;
+
   @Column({ name: 'image_url', type: 'text', nullable: true })
   imageUrl: string;
 
@@ -38,11 +41,26 @@ export class Product {
   @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 10 })
   vatRate: number;
 
+  @Column({ length: 50, default: 'food' })
+  type: string;
+
+  @Column({ name: 'is_available', type: 'boolean', default: true })
+  isAvailable: boolean;
+
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
+
+  @Column({ name: 'preparation_time', type: 'int', default: 0 })
+  preparationTime: number;
+
+  @Column({ name: 'print_to_kitchen', type: 'boolean', default: true })
+  printToKitchen: boolean;
+
+  @Column({ name: 'print_to_bar', type: 'boolean', default: false })
+  printToBar: boolean;
 
   @Column({ type: 'int', default: 1 })
   version: number;

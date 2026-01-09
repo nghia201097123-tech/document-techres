@@ -238,38 +238,51 @@ export class SyncService {
   }
 
   async getFullSync(branchId: string): Promise<FullSyncResponseDto> {
-    const [categories, products, areas, tables, staff] = await Promise.all([
-      this.categoryRepository.find({
-        where: { branchId },
-        order: { displayOrder: 'ASC' },
-      }),
-      this.productRepository.find({
-        where: { branchId },
-        order: { displayOrder: 'ASC' },
-      }),
-      this.areaRepository.find({
-        where: { branchId },
-        order: { displayOrder: 'ASC' },
-      }),
-      this.tableRepository.find({
-        where: { branchId },
-        order: { displayOrder: 'ASC' },
-      }),
-      this.staffRepository.find({
-        where: { branchId },
-      }),
-    ]);
+    try {
+      const [categories, products, areas, tables, staff] = await Promise.all([
+        this.categoryRepository.find({
+          where: { branchId },
+          order: { displayOrder: 'ASC' },
+        }),
+        this.productRepository.find({
+          where: { branchId },
+          order: { displayOrder: 'ASC' },
+        }),
+        this.areaRepository.find({
+          where: { branchId },
+          order: { displayOrder: 'ASC' },
+        }),
+        this.tableRepository.find({
+          where: { branchId },
+          order: { displayOrder: 'ASC' },
+        }),
+        this.staffRepository.find({
+          where: { branchId },
+        }),
+      ]);
 
-    const syncedAt = new Date().toISOString();
+      const syncTime = new Date().toISOString();
 
-    return {
-      categories: categories.map(this.mapCategory),
-      products: products.map(this.mapProduct),
-      areas: areas.map(this.mapArea),
-      tables: tables.map(this.mapTable),
-      staff: staff.map(this.mapStaff),
-      syncedAt,
-    };
+      return {
+        success: true,
+        data: {
+          categories: categories.map(this.mapCategory),
+          products: products.map(this.mapProduct),
+          areas: areas.map(this.mapArea),
+          tables: tables.map(this.mapTable),
+          staff: staff.map(this.mapStaff),
+        },
+        syncTime,
+        message: null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: null,
+        syncTime: new Date().toISOString(),
+        message: error.message || 'Sync failed',
+      };
+    }
   }
 
   async getIncrementalSync(
@@ -332,10 +345,11 @@ export class SyncService {
     return {
       id: category.id,
       name: category.name,
-      displayOrder: category.displayOrder,
-      imageUrl: category.imageUrl || '',
+      description: category.description || null,
+      imageUrl: category.imageUrl || null,
+      sortOrder: category.displayOrder,
       isActive: category.isActive,
-      version: category.version,
+      createdAt: category.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: category.updatedAt.toISOString(),
     };
   }
@@ -343,17 +357,23 @@ export class SyncService {
   private mapProduct(product: Product): ProductDto {
     return {
       id: product.id,
-      categoryId: product.categoryId,
+      categoryId: product.categoryId || null,
       code: product.code,
       name: product.name,
-      description: product.description || '',
+      description: product.description || null,
+      imageUrl: product.imageUrl || null,
       price: Number(product.price),
-      imageUrl: product.imageUrl || '',
-      unit: product.unit || '',
+      costPrice: Number(product.costPrice || 0),
       vatRate: Number(product.vatRate),
+      unit: product.unit || null,
+      type: product.type || 'food',
+      isAvailable: product.isAvailable ?? true,
       isActive: product.isActive,
-      displayOrder: product.displayOrder,
-      version: product.version,
+      sortOrder: product.displayOrder,
+      preparationTime: product.preparationTime || 0,
+      printToKitchen: product.printToKitchen ?? true,
+      printToBar: product.printToBar ?? false,
+      createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: product.updatedAt.toISOString(),
     };
   }
@@ -362,9 +382,10 @@ export class SyncService {
     return {
       id: area.id,
       name: area.name,
-      displayOrder: area.displayOrder,
+      description: area.description || null,
+      sortOrder: area.displayOrder,
       isActive: area.isActive,
-      version: area.version,
+      createdAt: area.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: area.updatedAt.toISOString(),
     };
   }
@@ -372,13 +393,12 @@ export class SyncService {
   private mapTable(table: Table): TableDto {
     return {
       id: table.id,
-      areaId: table.areaId,
+      areaId: table.areaId || null,
       name: table.name,
       capacity: table.capacity,
-      status: table.status,
-      displayOrder: table.displayOrder,
+      sortOrder: table.displayOrder,
       isActive: table.isActive,
-      version: table.version,
+      createdAt: table.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: table.updatedAt.toISOString(),
     };
   }
@@ -388,12 +408,14 @@ export class SyncService {
       id: staff.id,
       code: staff.code,
       name: staff.name,
-      phone: staff.phone || '',
-      pinCode: staff.pinCode,
+      phone: staff.phone || null,
+      email: staff.email || null,
+      avatarUrl: staff.avatarUrl || null,
+      pinCode: staff.pinCode || '',
       role: staff.role,
-      avatarUrl: staff.avatarUrl || '',
+      permissions: staff.permissions || null,
       isActive: staff.isActive,
-      version: staff.version,
+      createdAt: staff.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: staff.updatedAt.toISOString(),
     };
   }

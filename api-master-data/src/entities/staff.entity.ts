@@ -31,11 +31,17 @@ export class Staff {
   @Column({ length: 20, nullable: true })
   phone: string;
 
+  @Column({ length: 255, nullable: true })
+  email: string;
+
   @Column({ name: 'pin_code', length: 10 })
   pinCode: string;
 
   @Column({ length: 50 })
   role: string;
+
+  @Column({ type: 'text', nullable: true })
+  permissions: string;
 
   @Column({ name: 'avatar_url', type: 'text', nullable: true })
   avatarUrl: string;

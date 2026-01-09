@@ -17,6 +17,9 @@ export class Category {
   @Column({ length: 255 })
   name: string;
 
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
 

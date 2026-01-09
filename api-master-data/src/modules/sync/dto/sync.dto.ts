@@ -15,17 +15,20 @@ export class CategoryDto {
   @ApiProperty()
   name: string;
 
-  @ApiProperty()
-  displayOrder: number;
+  @ApiProperty({ nullable: true })
+  description: string | null;
+
+  @ApiProperty({ nullable: true })
+  imageUrl: string | null;
 
   @ApiProperty()
-  imageUrl: string;
+  sortOrder: number;
 
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty()
-  version: number;
+  createdAt: string;
 
   @ApiProperty()
   updatedAt: string;
@@ -35,8 +38,8 @@ export class ProductDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty()
-  categoryId: string;
+  @ApiProperty({ nullable: true })
+  categoryId: string | null;
 
   @ApiProperty()
   code: string;
@@ -44,29 +47,47 @@ export class ProductDto {
   @ApiProperty()
   name: string;
 
-  @ApiProperty()
-  description: string;
+  @ApiProperty({ nullable: true })
+  description: string | null;
+
+  @ApiProperty({ nullable: true })
+  imageUrl: string | null;
 
   @ApiProperty()
   price: number;
 
   @ApiProperty()
-  imageUrl: string;
-
-  @ApiProperty()
-  unit: string;
+  costPrice: number;
 
   @ApiProperty()
   vatRate: number;
+
+  @ApiProperty({ nullable: true })
+  unit: string | null;
+
+  @ApiProperty()
+  type: string;
+
+  @ApiProperty()
+  isAvailable: boolean;
 
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty()
-  displayOrder: number;
+  sortOrder: number;
 
   @ApiProperty()
-  version: number;
+  preparationTime: number;
+
+  @ApiProperty()
+  printToKitchen: boolean;
+
+  @ApiProperty()
+  printToBar: boolean;
+
+  @ApiProperty()
+  createdAt: string;
 
   @ApiProperty()
   updatedAt: string;
@@ -79,14 +100,17 @@ export class AreaDto {
   @ApiProperty()
   name: string;
 
+  @ApiProperty({ nullable: true })
+  description: string | null;
+
   @ApiProperty()
-  displayOrder: number;
+  sortOrder: number;
 
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty()
-  version: number;
+  createdAt: string;
 
   @ApiProperty()
   updatedAt: string;
@@ -96,8 +120,8 @@ export class TableDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty()
-  areaId: string;
+  @ApiProperty({ nullable: true })
+  areaId: string | null;
 
   @ApiProperty()
   name: string;
@@ -106,16 +130,13 @@ export class TableDto {
   capacity: number;
 
   @ApiProperty()
-  status: string;
-
-  @ApiProperty()
-  displayOrder: number;
+  sortOrder: number;
 
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty()
-  version: number;
+  createdAt: string;
 
   @ApiProperty()
   updatedAt: string;
@@ -131,8 +152,14 @@ export class StaffDto {
   @ApiProperty()
   name: string;
 
-  @ApiProperty()
-  phone: string;
+  @ApiProperty({ nullable: true })
+  phone: string | null;
+
+  @ApiProperty({ nullable: true })
+  email: string | null;
+
+  @ApiProperty({ nullable: true })
+  avatarUrl: string | null;
 
   @ApiProperty()
   pinCode: string;
@@ -140,14 +167,14 @@ export class StaffDto {
   @ApiProperty()
   role: string;
 
-  @ApiProperty()
-  avatarUrl: string;
+  @ApiProperty({ nullable: true })
+  permissions: string | null;
 
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty()
-  version: number;
+  createdAt: string;
 
   @ApiProperty()
   updatedAt: string;
@@ -215,7 +242,7 @@ export class StaffBranchPermissionsSyncDto {
   syncedAt: string;
 }
 
-export class FullSyncResponseDto {
+export class FullSyncDataDto {
   @ApiProperty({ type: [CategoryDto] })
   categories: CategoryDto[];
 
@@ -230,9 +257,20 @@ export class FullSyncResponseDto {
 
   @ApiProperty({ type: [StaffDto] })
   staff: StaffDto[];
+}
+
+export class FullSyncResponseDto {
+  @ApiProperty()
+  success: boolean;
+
+  @ApiProperty({ type: FullSyncDataDto, nullable: true })
+  data: FullSyncDataDto | null;
 
   @ApiProperty()
-  syncedAt: string;
+  syncTime: string;
+
+  @ApiProperty({ nullable: true })
+  message: string | null;
 }
 
 export class IncrementalSyncResponseDto {
