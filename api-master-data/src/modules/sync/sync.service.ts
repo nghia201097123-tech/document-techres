@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In } from 'typeorm';
-import { Category, Product, Area, Table, Staff, Device, Brand, Branch, StaffBranch } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -21,6 +21,8 @@ export class SyncService {
     private categoryRepository: Repository<Category>,
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
+    @InjectRepository(BranchProduct)
+    private branchProductRepository: Repository<BranchProduct>,
     @InjectRepository(Area)
     private areaRepository: Repository<Area>,
     @InjectRepository(Table)
@@ -239,7 +241,6 @@ export class SyncService {
 
   async getFullSync(branchId: string): Promise<FullSyncResponseDto> {
     try {
-      // First, get the branch to find the brand_id
       const branch = await this.branchRepository.findOne({
         where: { id: branchId },
       });
@@ -256,13 +257,14 @@ export class SyncService {
       const brandId = branch.brandId;
       console.log(`[SyncService.getFullSync] branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, products, areas, tables, staff] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
         }),
-        this.productRepository.find({
-          where: { brandId, isActive: true },
+        this.branchProductRepository.find({
+          where: { branchId, isAvailable: true },
+          relations: ['product'],
           order: { sortOrder: 'ASC' },
         }),
         this.areaRepository.find({
@@ -278,6 +280,10 @@ export class SyncService {
         }),
       ]);
 
+      const products = branchProducts
+        .filter(bp => bp.product && bp.product.isActive)
+        .map(bp => this.mapBranchProduct(bp));
+
       console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}`);
 
       const syncTime = new Date().toISOString();
@@ -286,7 +292,7 @@ export class SyncService {
         success: true,
         data: {
           categories: categories.map(this.mapCategory),
-          products: products.map(this.mapProduct),
+          products,
           areas: areas.map(this.mapArea),
           tables: tables.map(this.mapTable),
           staff: staff.map(this.mapStaff),
@@ -314,15 +320,16 @@ export class SyncService {
     });
     const brandId = branch?.brandId;
 
-    const [categories, products, areas, tables, staff] = await Promise.all([
+    const [categories, branchProducts, areas, tables, staff] = await Promise.all([
       brandId ? this.categoryRepository.find({
         where: { brandId, updatedAt: MoreThan(since) },
         order: { sortOrder: 'ASC' },
       }) : Promise.resolve([]),
-      brandId ? this.productRepository.find({
-        where: { brandId, updatedAt: MoreThan(since) },
+      this.branchProductRepository.find({
+        where: { branchId, isAvailable: true, updatedAt: MoreThan(since) },
+        relations: ['product'],
         order: { sortOrder: 'ASC' },
-      }) : Promise.resolve([]),
+      }),
       this.areaRepository.find({
         where: { branchId, updatedAt: MoreThan(since) },
         order: { sortOrder: 'ASC' },
@@ -336,10 +343,12 @@ export class SyncService {
       }),
     ]);
 
+    const products = branchProducts
+      .filter(bp => bp.product && bp.product.isActive)
+      .map(bp => this.mapBranchProduct(bp));
+
     const syncedAt = new Date().toISOString();
 
-    // TODO: Implement deleted records tracking
-    // For now, return empty arrays for deleted IDs
     const deletedIds = {
       categories: [],
       products: [],
@@ -350,7 +359,7 @@ export class SyncService {
 
     return {
       categories: categories.map(this.mapCategory),
-      products: products.map(this.mapProduct),
+      products,
       areas: areas.map(this.mapArea),
       tables: tables.map(this.mapTable),
       staff: staff.map(this.mapStaff),
@@ -400,6 +409,32 @@ export class SyncService {
       printToBar: product.printLabel ?? false,
       createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: product.updatedAt.toISOString(),
+    };
+  }
+
+  private mapBranchProduct(bp: BranchProduct): ProductDto {
+    const product = bp.product;
+    const price = bp.customPrice !== null ? Number(bp.customPrice) : Number(product.price);
+    return {
+      id: product.id,
+      categoryId: product.categoryId || null,
+      code: product.code,
+      name: product.name,
+      description: product.description || null,
+      imageUrl: product.imageUrl || null,
+      price,
+      costPrice: Number(product.costPrice || 0),
+      vatRate: Number(product.vatRate || 0),
+      unit: product.unit || null,
+      type: product.productType || 'food',
+      isAvailable: bp.isAvailable,
+      isActive: product.isActive,
+      sortOrder: bp.sortOrder || product.sortOrder || 0,
+      preparationTime: product.preparationTime || 0,
+      printToKitchen: product.printDish ?? true,
+      printToBar: product.printLabel ?? false,
+      createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: bp.updatedAt?.toISOString() || product.updatedAt.toISOString(),
     };
   }
 
