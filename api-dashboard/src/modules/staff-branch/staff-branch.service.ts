@@ -19,11 +19,14 @@ export class StaffBranchService {
 
   // Get all branches assigned to a staff member
   async getByStaffId(tenantId: string, staffId: string): Promise<StaffBranchResponseDto[]> {
+    console.log(`[StaffBranchService.getByStaffId] tenantId=${tenantId}, staffId=${staffId}`);
+
     const staff = await this.staffRepository.findOne({
       where: { id: staffId, tenantId },
     });
 
     if (!staff) {
+      console.log(`[StaffBranchService.getByStaffId] Staff not found: ${staffId}`);
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
@@ -32,6 +35,8 @@ export class StaffBranchService {
       relations: ['branch', 'brand'],
       order: { isDefault: 'DESC', assignedAt: 'ASC' },
     });
+
+    console.log(`[StaffBranchService.getByStaffId] Found ${assignments.length} assignments for staff ${staffId}`);
 
     return assignments.map(a => ({
       id: a.id,
@@ -149,16 +154,20 @@ export class StaffBranchService {
     branchIds: string[],
     defaultBranchId?: string,
   ): Promise<StaffBranchResponseDto[]> {
+    console.log(`[StaffBranchService.bulkAssign] tenantId=${tenantId}, staffId=${staffId}, branchIds=${JSON.stringify(branchIds)}, defaultBranchId=${defaultBranchId}`);
+
     const staff = await this.staffRepository.findOne({
       where: { id: staffId, tenantId },
     });
 
     if (!staff) {
+      console.log(`[StaffBranchService.bulkAssign] Staff not found: ${staffId}`);
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
     if (branchIds.length === 0) {
       // Remove all assignments
+      console.log(`[StaffBranchService.bulkAssign] Removing all assignments for staff ${staffId}`);
       await this.staffBranchRepository.delete({ staffId, tenantId });
       return [];
     }
@@ -169,7 +178,12 @@ export class StaffBranchService {
       relations: ['brand'],
     });
 
+    console.log(`[StaffBranchService.bulkAssign] Found ${branches.length} branches out of ${branchIds.length} requested`);
+
     if (branches.length !== branchIds.length) {
+      const foundIds = branches.map(b => b.id);
+      const missingIds = branchIds.filter(id => !foundIds.includes(id));
+      console.log(`[StaffBranchService.bulkAssign] Missing branches: ${JSON.stringify(missingIds)}`);
       throw new BadRequestException('Một số chi nhánh không tồn tại');
     }
 
@@ -182,7 +196,8 @@ export class StaffBranchService {
     const actualDefaultBranchId = defaultBranchId || branchIds[0];
 
     // Delete all existing assignments
-    await this.staffBranchRepository.delete({ staffId, tenantId });
+    const deleteResult = await this.staffBranchRepository.delete({ staffId, tenantId });
+    console.log(`[StaffBranchService.bulkAssign] Deleted ${deleteResult.affected} existing assignments`);
 
     // Create new assignments
     const assignments = branches.map(branch =>
@@ -196,6 +211,7 @@ export class StaffBranchService {
     );
 
     const saved = await this.staffBranchRepository.save(assignments);
+    console.log(`[StaffBranchService.bulkAssign] Saved ${saved.length} new assignments:`, saved.map(s => ({ id: s.id, branchId: s.branchId })));
 
     // Map to response with branch names
     return saved.map(a => {

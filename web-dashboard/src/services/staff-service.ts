@@ -56,6 +56,8 @@ export interface UpdateStaffDto {
   provinceCode?: string;
   wardCode?: string;
   departmentId?: string;
+  brandId?: string;
+  branchId?: string;
 }
 
 export const staffService = {

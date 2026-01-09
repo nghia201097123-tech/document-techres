@@ -611,6 +611,8 @@ export default function StaffPage() {
         wardCode: formData.wardCode || undefined,
         departmentId: formData.departmentId || undefined,
         avatarUrl: formData.avatarUrl || undefined,
+        brandId: formData.brandId || undefined,
+        branchId: formData.branchId || undefined,
       };
 
       try {
@@ -2973,49 +2975,47 @@ export default function StaffPage() {
                   />
                 </div>
 
-                {/* Row 5: Brand and Branch - only for create mode */}
-                {dialogMode === "create" && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="brandId">Thương hiệu *</Label>
-                      <Select
-                        value={formData.brandId}
-                        onValueChange={handleBrandChange}
-                        disabled={loadingBrands}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn thương hiệu" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {brands.map((brand) => (
-                            <SelectItem key={brand.id} value={brand.id}>
-                              {brand.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="branchId">Chi nhánh *</Label>
-                      <Select
-                        value={formData.branchId}
-                        onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                        disabled={!formData.brandId || loadingBranches || branches.length === 0}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn chi nhánh" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {branches.map((branch) => (
-                            <SelectItem key={branch.id} value={branch.id}>
-                              {branch.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                {/* Row 5: Brand and Branch */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="brandId">Thương hiệu *</Label>
+                    <Select
+                      value={formData.brandId}
+                      onValueChange={handleBrandChange}
+                      disabled={loadingBrands}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn thương hiệu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.id}>
+                            {brand.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+                  <div className="grid gap-2">
+                    <Label htmlFor="branchId">Chi nhánh chính *</Label>
+                    <Select
+                      value={formData.branchId}
+                      onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                      disabled={!formData.brandId || loadingBranches || branches.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn chi nhánh" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                 {/* Row 6: Department */}
                 <div className="grid gap-2">
