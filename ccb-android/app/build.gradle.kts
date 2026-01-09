@@ -21,11 +21,6 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        // Room schema export
-        ksp {
-            arg("room.schemaLocation", "${projectDir}/schemas")
-        }
     }
 
     buildTypes {
@@ -64,6 +59,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+// Room schema export - placed at project level to access projectDir correctly
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
