@@ -17,8 +17,9 @@ export class SyncController {
   @ApiResponse({ status: 200, type: StaffBranchPermissionsSyncDto })
   async getStaffBranchPermissions(
     @Param('staffId') staffId: string,
+    @Request() req,
   ): Promise<StaffBranchPermissionsSyncDto> {
-    return this.syncService.getStaffBranchPermissions(staffId);
+    return this.syncService.getStaffBranchPermissions(staffId, req.user?.tenantId);
   }
 
   @Get('full')

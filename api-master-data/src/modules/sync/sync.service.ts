@@ -40,16 +40,30 @@ export class SyncService {
   /**
    * Sync brands and branches based on staff's permissions
    * Returns only brands/branches that the staff has access to
+   * If no explicit permissions, fallback to all branches for the tenant
    */
-  async getStaffBranchPermissions(staffId: string): Promise<StaffBranchPermissionsSyncDto> {
+  async getStaffBranchPermissions(staffId: string, tenantId?: string): Promise<StaffBranchPermissionsSyncDto> {
     // Get all branch assignments for this staff
     const staffBranches = await this.staffBranchRepository.find({
       where: { staffId },
       relations: ['branch', 'brand'],
     });
 
-    if (staffBranches.length === 0) {
-      // Staff has no branch permissions, return empty
+    // If staff has explicit permissions, use them
+    if (staffBranches.length > 0) {
+      return this.buildPermissionsFromStaffBranches(staffBranches);
+    }
+
+    // Fallback: Get all brands and branches for the tenant
+    console.log(`[SyncService] No staff_branches for staffId=${staffId}, using fallback for tenantId=${tenantId}`);
+
+    // Get all brands with their branches
+    const brands = await this.brandRepository.find({
+      relations: ['branches'],
+    });
+
+    if (brands.length === 0) {
+      console.log('[SyncService] No brands found, returning empty');
       return {
         data: [],
         defaultBranchId: '',
@@ -57,7 +71,54 @@ export class SyncService {
       };
     }
 
-    // Group branches by brand
+    // Build response from all brands/branches
+    const brandMap = new Map<string, BrandWithBranchesDto>();
+    let defaultBranchId = '';
+
+    for (const brand of brands) {
+      if (!brand.branches || brand.branches.length === 0) continue;
+
+      brandMap.set(brand.id, {
+        brand: {
+          id: brand.id,
+          name: brand.name || '',
+          code: brand.code || '',
+          logoUrl: brand.logoUrl || '',
+          isActive: brand.isActive ?? true,
+        },
+        branches: brand.branches.map((branch, index) => {
+          // First branch of first brand is default
+          const isDefault = !defaultBranchId && index === 0;
+          if (isDefault) {
+            defaultBranchId = branch.id;
+          }
+          return {
+            id: branch.id,
+            brandId: brand.id,
+            name: branch.name || '',
+            storeCode: '',
+            address: branch.address || '',
+            phone: branch.phone || '',
+            isDefault,
+            status: 'active',
+          };
+        }),
+      });
+    }
+
+    console.log(`[SyncService] Fallback returned ${brandMap.size} brands, defaultBranchId=${defaultBranchId}`);
+
+    return {
+      data: Array.from(brandMap.values()),
+      defaultBranchId,
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Build permissions response from staff_branches records
+   */
+  private async buildPermissionsFromStaffBranches(staffBranches: StaffBranch[]): Promise<StaffBranchPermissionsSyncDto> {
     const brandMap = new Map<string, BrandWithBranchesDto>();
     let defaultBranchId = '';
 
@@ -91,6 +152,15 @@ export class SyncService {
         isDefault: sb.isDefault,
         status: 'active',
       });
+    }
+
+    // If no default was set, use first branch
+    if (!defaultBranchId && brandMap.size > 0) {
+      const firstBrand = brandMap.values().next().value;
+      if (firstBrand && firstBrand.branches.length > 0) {
+        defaultBranchId = firstBrand.branches[0].id;
+        firstBrand.branches[0].isDefault = true;
+      }
     }
 
     return {
