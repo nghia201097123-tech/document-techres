@@ -4,6 +4,16 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
 import { SyncModule } from "./modules/sync/sync.module";
 
+console.log('AppModule', process.env.JWT_SECRET);
+console.log('AppModule', process.env.JWT_EXPIRES_IN);
+console.log('AppModule', process.env.DB_HOST);
+console.log('AppModule', process.env.DB_PORT);
+console.log('AppModule', process.env.DB_USERNAME);
+console.log('AppModule', process.env.DB_PASSWORD);
+console.log('AppModule', process.env.DB_DATABASE);
+console.log('AppModule', process.env.NODE_ENV);
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({
