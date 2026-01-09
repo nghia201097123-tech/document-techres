@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
+import com.techres.ccb.data.printer.PrinterService
+import com.techres.ccb.data.printer.PrinterResult
 
 // Mock data for kitchens
 data class MockKitchen(
@@ -562,14 +564,57 @@ private fun TestPrintDialog(
     onDismiss: () -> Unit
 ) {
     var printState by remember { mutableStateOf<PrintState>(PrintState.Idle) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Simulate print process
+    // Real print process using PrinterService
     LaunchedEffect(Unit) {
+        if (kitchen.printerIp.isNullOrBlank()) {
+            printState = PrintState.Error
+            errorMessage = "Chưa cấu hình địa chỉ IP"
+            return@LaunchedEffect
+        }
+
+        // Step 1: Connecting
         printState = PrintState.Connecting
-        delay(1000)
+        delay(300) // Small delay for UI feedback
+
+        // Step 2: Test connection first
+        val connectionResult = PrinterService.testConnection(
+            ip = kitchen.printerIp!!,
+            port = kitchen.printerPort
+        )
+
+        when (connectionResult) {
+            is PrinterResult.Error -> {
+                printState = PrintState.Error
+                errorMessage = connectionResult.message
+                return@LaunchedEffect
+            }
+            is PrinterResult.Success -> {
+                // Connection OK, proceed to print
+            }
+        }
+
+        // Step 3: Sending print data
         printState = PrintState.Sending
-        delay(1500)
-        printState = PrintState.Success
+
+        val printResult = PrinterService.printTestPage(
+            ip = kitchen.printerIp!!,
+            port = kitchen.printerPort,
+            kitchenName = kitchen.name,
+            printerName = kitchen.printerName
+        )
+
+        // Step 4: Handle result
+        when (printResult) {
+            is PrinterResult.Success -> {
+                printState = PrintState.Success
+            }
+            is PrinterResult.Error -> {
+                printState = PrintState.Error
+                errorMessage = printResult.message
+            }
+        }
     }
 
     Dialog(onDismissRequest = { if (printState != PrintState.Connecting && printState != PrintState.Sending) onDismiss() }) {
@@ -646,8 +691,8 @@ private fun TestPrintDialog(
                 Text(
                     text = when (printState) {
                         PrintState.Success -> "Kiểm tra máy in ${kitchen.name}\n(${kitchen.printerIp})"
-                        PrintState.Error -> "Không thể kết nối đến ${kitchen.printerIp}"
-                        else -> "${kitchen.printerName}\n${kitchen.printerIp}:${kitchen.printerPort}"
+                        PrintState.Error -> errorMessage ?: "Không thể kết nối đến ${kitchen.printerIp}"
+                        else -> "${kitchen.printerName ?: "Máy in"}\n${kitchen.printerIp ?: "Chưa cấu hình"}:${kitchen.printerPort}"
                     },
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
