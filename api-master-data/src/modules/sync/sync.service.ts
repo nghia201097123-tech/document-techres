@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
-import { Category, Product, Area, Table, Staff, Device } from '../../entities';
+import { Repository, MoreThan, In } from 'typeorm';
+import { Category, Product, Area, Table, Staff, Device, Brand, Branch, StaffBranch } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -10,6 +10,8 @@ import {
   AreaDto,
   TableDto,
   StaffDto,
+  StaffBranchPermissionsSyncDto,
+  BrandWithBranchesDto,
 } from './dto/sync.dto';
 
 @Injectable()
@@ -27,7 +29,76 @@ export class SyncService {
     private staffRepository: Repository<Staff>,
     @InjectRepository(Device)
     private deviceRepository: Repository<Device>,
+    @InjectRepository(Brand)
+    private brandRepository: Repository<Brand>,
+    @InjectRepository(Branch)
+    private branchRepository: Repository<Branch>,
+    @InjectRepository(StaffBranch)
+    private staffBranchRepository: Repository<StaffBranch>,
   ) {}
+
+  /**
+   * Sync brands and branches based on staff's permissions
+   * Returns only brands/branches that the staff has access to
+   */
+  async getStaffBranchPermissions(staffId: string): Promise<StaffBranchPermissionsSyncDto> {
+    // Get all branch assignments for this staff
+    const staffBranches = await this.staffBranchRepository.find({
+      where: { staffId },
+      relations: ['branch', 'brand'],
+    });
+
+    if (staffBranches.length === 0) {
+      // Staff has no branch permissions, return empty
+      return {
+        data: [],
+        defaultBranchId: '',
+        syncedAt: new Date().toISOString(),
+      };
+    }
+
+    // Group branches by brand
+    const brandMap = new Map<string, BrandWithBranchesDto>();
+    let defaultBranchId = '';
+
+    for (const sb of staffBranches) {
+      if (sb.isDefault) {
+        defaultBranchId = sb.branchId;
+      }
+
+      if (!brandMap.has(sb.brandId)) {
+        const brand = sb.brand || await this.brandRepository.findOne({ where: { id: sb.brandId } });
+        brandMap.set(sb.brandId, {
+          brand: {
+            id: brand?.id || sb.brandId,
+            name: brand?.name || '',
+            code: brand?.code || '',
+            logoUrl: brand?.logoUrl || '',
+            isActive: brand?.isActive ?? true,
+          },
+          branches: [],
+        });
+      }
+
+      const branch = sb.branch || await this.branchRepository.findOne({ where: { id: sb.branchId } });
+      brandMap.get(sb.brandId)!.branches.push({
+        id: branch?.id || sb.branchId,
+        brandId: sb.brandId,
+        name: branch?.name || '',
+        storeCode: branch?.storeCode || '',
+        address: branch?.address || '',
+        phone: branch?.phone || '',
+        isDefault: sb.isDefault,
+        status: branch?.status || 'active',
+      });
+    }
+
+    return {
+      data: Array.from(brandMap.values()),
+      defaultBranchId,
+      syncedAt: new Date().toISOString(),
+    };
+  }
 
   async getFullSync(branchId: string): Promise<FullSyncResponseDto> {
     const [categories, products, areas, tables, staff] = await Promise.all([

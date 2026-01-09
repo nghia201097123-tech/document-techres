@@ -39,7 +39,13 @@ export class LoginResponseDto {
   branchName: string;
 
   @ApiProperty()
+  brandId: string;
+
+  @ApiProperty()
   brandName: string;
+
+  @ApiProperty()
+  brandLogoUrl: string;
 
   @ApiProperty()
   deviceId: string;

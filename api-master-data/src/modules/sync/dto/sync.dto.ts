@@ -153,6 +153,68 @@ export class StaffDto {
   updatedAt: string;
 }
 
+export class BrandDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  logoUrl: string;
+
+  @ApiProperty()
+  isActive: boolean;
+}
+
+export class BranchDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  brandId: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  storeCode: string;
+
+  @ApiProperty()
+  address: string;
+
+  @ApiProperty()
+  phone: string;
+
+  @ApiProperty()
+  isDefault: boolean;
+
+  @ApiProperty()
+  status: string;
+}
+
+export class BrandWithBranchesDto {
+  @ApiProperty()
+  brand: BrandDto;
+
+  @ApiProperty({ type: [BranchDto] })
+  branches: BranchDto[];
+}
+
+export class StaffBranchPermissionsSyncDto {
+  @ApiProperty({ type: [BrandWithBranchesDto] })
+  data: BrandWithBranchesDto[];
+
+  @ApiProperty({ description: 'Chi nhánh mặc định của nhân viên' })
+  defaultBranchId: string;
+
+  @ApiProperty()
+  syncedAt: string;
+}
+
 export class FullSyncResponseDto {
   @ApiProperty({ type: [CategoryDto] })
   categories: CategoryDto[];

@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Branch, Device, Staff } from '../../entities';
+import { Branch, Device, Staff, Brand } from '../../entities';
 import { LoginDto, LoginResponseDto, VerifyPinDto, VerifyPinResponseDto } from './dto/auth.dto';
 
 @Injectable()
@@ -14,18 +14,26 @@ export class AuthService {
     private deviceRepository: Repository<Device>,
     @InjectRepository(Staff)
     private staffRepository: Repository<Staff>,
+    @InjectRepository(Brand)
+    private brandRepository: Repository<Brand>,
     private jwtService: JwtService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    // Find branch by store code
+    // Find branch by store code with brand relation
     const branch = await this.branchRepository.findOne({
       where: { storeCode: loginDto.storeCode, status: 'active' },
+      relations: ['brand'],
     });
 
     if (!branch) {
       throw new NotFoundException('Không tìm thấy cửa hàng với mã này');
     }
+
+    // Get brand info
+    const brand = branch.brand || await this.brandRepository.findOne({
+      where: { id: branch.brandId },
+    });
 
     // Register or update device
     let device = await this.deviceRepository.findOne({
@@ -56,6 +64,7 @@ export class AuthService {
     // Generate JWT token
     const payload = {
       branchId: branch.id,
+      brandId: branch.brandId,
       deviceId: loginDto.deviceId,
       storeCode: branch.storeCode,
     };
@@ -66,7 +75,9 @@ export class AuthService {
       accessToken,
       branchId: branch.id,
       branchName: branch.name,
-      brandName: '', // TODO: Join with brand table
+      brandId: branch.brandId,
+      brandName: brand?.name || '',
+      brandLogoUrl: brand?.logoUrl || '',
       deviceId: loginDto.deviceId,
     };
   }
@@ -104,6 +115,7 @@ export class AuthService {
 
     return {
       branchId: branch.id,
+      brandId: branch.brandId,
       storeCode: branch.storeCode,
       deviceId: payload.deviceId,
     };
