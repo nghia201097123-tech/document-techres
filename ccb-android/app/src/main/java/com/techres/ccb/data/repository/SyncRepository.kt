@@ -1,5 +1,8 @@
 package com.techres.ccb.data.repository
 
+import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.SeasonalPriceDao
+import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
 import com.techres.ccb.data.local.entity.*
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.dto.FullSyncData
@@ -16,12 +19,14 @@ data class SyncStepProgress(
 )
 
 enum class SyncStep {
-    FETCHING,      // Đang tải dữ liệu
-    CATEGORIES,    // Danh mục
-    PRODUCTS,      // Sản phẩm
-    AREAS,         // Khu vực
-    TABLES,        // Bàn
-    STAFF          // Nhân viên
+    FETCHING,         // Đang tải dữ liệu
+    CATEGORIES,       // Danh mục
+    PRODUCTS,         // Sản phẩm
+    AREAS,            // Khu vực
+    TABLES,           // Bàn
+    STAFF,            // Nhân viên
+    SEASONAL_PRICES,  // Giá thời vụ
+    COUPONS           // Mã giảm giá
 }
 
 enum class SyncStepStatus {
@@ -38,7 +43,10 @@ class SyncRepository @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
-    private val staffRepository: StaffRepository
+    private val staffRepository: StaffRepository,
+    private val seasonalPriceDao: SeasonalPriceDao,
+    private val seasonalPriceProductDao: SeasonalPriceProductDao,
+    private val couponDao: CouponDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -199,5 +207,72 @@ class SyncRepository @Inject constructor(
         }
         staffRepository.syncStaff(branchId, staffList)
         onProgress?.invoke(SyncStepProgress(SyncStep.STAFF, SyncStepStatus.COMPLETED, staffList.size))
+
+        // Sync seasonal prices
+        onProgress?.invoke(SyncStepProgress(SyncStep.SEASONAL_PRICES, SyncStepStatus.IN_PROGRESS))
+        val seasonalPricesList = syncData.seasonalPrices?.map { dto ->
+            SeasonalPriceEntity(
+                id = dto.id,
+                branchId = branchId,
+                name = dto.name ?: "",
+                description = dto.description,
+                adjustmentType = dto.adjustmentType,
+                adjustmentValue = dto.adjustmentValue,
+                startDate = dto.startDate,
+                endDate = dto.endDate,
+                sortOrder = dto.sortOrder,
+                isActive = dto.isActive,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+
+        val seasonalPriceProductsList = syncData.seasonalPrices?.flatMap { dto ->
+            dto.products.map { productDto ->
+                SeasonalPriceProductEntity(
+                    seasonalPriceId = dto.id,
+                    productId = productDto.productId
+                )
+            }
+        } ?: emptyList()
+
+        seasonalPriceDao.syncSeasonalPrices(branchId, seasonalPricesList)
+        seasonalPriceProductDao.syncSeasonalPriceProducts(branchId, seasonalPriceProductsList)
+        onProgress?.invoke(SyncStepProgress(SyncStep.SEASONAL_PRICES, SyncStepStatus.COMPLETED, seasonalPricesList.size))
+
+        // Sync coupons
+        onProgress?.invoke(SyncStepProgress(SyncStep.COUPONS, SyncStepStatus.IN_PROGRESS))
+        val couponsList = syncData.coupons?.map { dto ->
+            CouponEntity(
+                id = dto.id,
+                branchId = branchId,
+                code = dto.code ?: "",
+                name = dto.name ?: "",
+                description = dto.description,
+                couponType = dto.couponType,
+                discountValue = dto.discountValue,
+                maxDiscount = dto.maxDiscount,
+                minOrderAmount = dto.minOrderAmount,
+                usageLimit = dto.usageLimit,
+                usageCount = dto.usageCount,
+                dailyLimit = dto.dailyLimit,
+                dailyUsageCount = dto.dailyUsageCount,
+                requiresApproval = dto.requiresApproval,
+                approvalThreshold = dto.approvalThreshold,
+                startDate = dto.startDate,
+                endDate = dto.endDate,
+                sortOrder = dto.sortOrder,
+                isActive = dto.isActive,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+
+        couponDao.syncCoupons(branchId, couponsList)
+        onProgress?.invoke(SyncStepProgress(SyncStep.COUPONS, SyncStepStatus.COMPLETED, couponsList.size))
     }
 }

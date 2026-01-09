@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, In } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch } from '../../entities';
+import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -10,6 +10,8 @@ import {
   AreaDto,
   TableDto,
   StaffDto,
+  SeasonalPriceDto,
+  CouponDto,
   StaffBranchPermissionsSyncDto,
   BrandWithBranchesDto,
 } from './dto/sync.dto';
@@ -37,6 +39,12 @@ export class SyncService {
     private branchRepository: Repository<Branch>,
     @InjectRepository(StaffBranch)
     private staffBranchRepository: Repository<StaffBranch>,
+    @InjectRepository(SeasonalPrice)
+    private seasonalPriceRepository: Repository<SeasonalPrice>,
+    @InjectRepository(SeasonalPriceProduct)
+    private seasonalPriceProductRepository: Repository<SeasonalPriceProduct>,
+    @InjectRepository(Coupon)
+    private couponRepository: Repository<Coupon>,
   ) {}
 
   /**
@@ -257,7 +265,8 @@ export class SyncService {
       const brandId = branch.brandId;
       console.log(`[SyncService.getFullSync] branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, branchProducts, areas, tables, staff] = await Promise.all([
+      const today = new Date();
+      const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -278,13 +287,28 @@ export class SyncService {
         this.staffRepository.find({
           where: { branchId, isActive: true },
         }),
+        this.seasonalPriceRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
+        this.couponRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
       ]);
 
       const products = branchProducts
         .filter(bp => bp.product && bp.product.isActive)
         .map(bp => this.mapBranchProduct(bp));
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}`);
+      const seasonalPriceIds = seasonalPrices.map(sp => sp.id);
+      const seasonalPriceProducts = seasonalPriceIds.length > 0
+        ? await this.seasonalPriceProductRepository.find({
+            where: { seasonalPriceId: In(seasonalPriceIds) },
+          })
+        : [];
+
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -296,6 +320,8 @@ export class SyncService {
           areas: areas.map(this.mapArea),
           tables: tables.map(this.mapTable),
           staff: staff.map(this.mapStaff),
+          seasonalPrices: seasonalPrices.map(sp => this.mapSeasonalPrice(sp, seasonalPriceProducts)),
+          coupons: coupons.map(c => this.mapCoupon(c)),
         },
         syncTime,
         message: null,
@@ -320,7 +346,7 @@ export class SyncService {
     });
     const brandId = branch?.brandId;
 
-    const [categories, branchProducts, areas, tables, staff] = await Promise.all([
+    const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons] = await Promise.all([
       brandId ? this.categoryRepository.find({
         where: { brandId, updatedAt: MoreThan(since) },
         order: { sortOrder: 'ASC' },
@@ -341,11 +367,26 @@ export class SyncService {
       this.staffRepository.find({
         where: { branchId, updatedAt: MoreThan(since) },
       }),
+      this.seasonalPriceRepository.find({
+        where: { branchId, updatedAt: MoreThan(since) },
+        order: { sortOrder: 'ASC' },
+      }),
+      this.couponRepository.find({
+        where: { branchId, updatedAt: MoreThan(since) },
+        order: { sortOrder: 'ASC' },
+      }),
     ]);
 
     const products = branchProducts
       .filter(bp => bp.product && bp.product.isActive)
       .map(bp => this.mapBranchProduct(bp));
+
+    const seasonalPriceIds = seasonalPrices.map(sp => sp.id);
+    const seasonalPriceProducts = seasonalPriceIds.length > 0
+      ? await this.seasonalPriceProductRepository.find({
+          where: { seasonalPriceId: In(seasonalPriceIds) },
+        })
+      : [];
 
     const syncedAt = new Date().toISOString();
 
@@ -355,6 +396,8 @@ export class SyncService {
       areas: [],
       tables: [],
       staff: [],
+      seasonalPrices: [],
+      coupons: [],
     };
 
     return {
@@ -363,6 +406,8 @@ export class SyncService {
       areas: areas.map(this.mapArea),
       tables: tables.map(this.mapTable),
       staff: staff.map(this.mapStaff),
+      seasonalPrices: seasonalPrices.map(sp => this.mapSeasonalPrice(sp, seasonalPriceProducts)),
+      coupons: coupons.map(c => this.mapCoupon(c)),
       deletedIds,
       syncedAt,
     };
@@ -477,6 +522,52 @@ export class SyncService {
       isActive: staff.isActive,
       createdAt: staff.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: staff.updatedAt.toISOString(),
+    };
+  }
+
+  private mapSeasonalPrice(sp: SeasonalPrice, allProducts: SeasonalPriceProduct[]): SeasonalPriceDto {
+    const products = allProducts
+      .filter(p => p.seasonalPriceId === sp.id)
+      .map(p => ({ productId: p.productId }));
+
+    return {
+      id: sp.id,
+      name: sp.name,
+      description: sp.description || null,
+      adjustmentType: sp.adjustmentType,
+      adjustmentValue: Number(sp.adjustmentValue),
+      startDate: sp.startDate instanceof Date ? sp.startDate.toISOString().split('T')[0] : String(sp.startDate),
+      endDate: sp.endDate instanceof Date ? sp.endDate.toISOString().split('T')[0] : String(sp.endDate),
+      sortOrder: sp.sortOrder || 0,
+      isActive: sp.isActive,
+      products,
+      createdAt: sp.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: sp.updatedAt.toISOString(),
+    };
+  }
+
+  private mapCoupon(c: Coupon): CouponDto {
+    return {
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      description: c.description || null,
+      couponType: c.couponType,
+      discountValue: Number(c.discountValue),
+      maxDiscount: c.maxDiscount ? Number(c.maxDiscount) : null,
+      minOrderAmount: Number(c.minOrderAmount || 0),
+      usageLimit: c.usageLimit || null,
+      usageCount: c.usageCount || 0,
+      dailyLimit: c.dailyLimit || null,
+      dailyUsageCount: c.dailyUsageCount || 0,
+      requiresApproval: c.requiresApproval || false,
+      approvalThreshold: c.approvalThreshold ? Number(c.approvalThreshold) : null,
+      startDate: c.startDate instanceof Date ? c.startDate.toISOString().split('T')[0] : (c.startDate ? String(c.startDate) : null),
+      endDate: c.endDate instanceof Date ? c.endDate.toISOString().split('T')[0] : (c.endDate ? String(c.endDate) : null),
+      sortOrder: c.sortOrder || 0,
+      isActive: c.isActive,
+      createdAt: c.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
     };
   }
 }

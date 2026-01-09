@@ -231,6 +231,111 @@ export class BrandWithBranchesDto {
   branches: BranchDto[];
 }
 
+export class SeasonalPriceProductDto {
+  @ApiProperty()
+  productId: string;
+}
+
+export class SeasonalPriceDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ nullable: true })
+  description: string | null;
+
+  @ApiProperty()
+  adjustmentType: string;
+
+  @ApiProperty()
+  adjustmentValue: number;
+
+  @ApiProperty()
+  startDate: string;
+
+  @ApiProperty()
+  endDate: string;
+
+  @ApiProperty()
+  sortOrder: number;
+
+  @ApiProperty()
+  isActive: boolean;
+
+  @ApiProperty({ type: [SeasonalPriceProductDto] })
+  products: SeasonalPriceProductDto[];
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
+export class CouponDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ nullable: true })
+  description: string | null;
+
+  @ApiProperty()
+  couponType: string;
+
+  @ApiProperty()
+  discountValue: number;
+
+  @ApiProperty({ nullable: true })
+  maxDiscount: number | null;
+
+  @ApiProperty()
+  minOrderAmount: number;
+
+  @ApiProperty({ nullable: true })
+  usageLimit: number | null;
+
+  @ApiProperty()
+  usageCount: number;
+
+  @ApiProperty({ nullable: true })
+  dailyLimit: number | null;
+
+  @ApiProperty()
+  dailyUsageCount: number;
+
+  @ApiProperty()
+  requiresApproval: boolean;
+
+  @ApiProperty({ nullable: true })
+  approvalThreshold: number | null;
+
+  @ApiProperty({ nullable: true })
+  startDate: string | null;
+
+  @ApiProperty({ nullable: true })
+  endDate: string | null;
+
+  @ApiProperty()
+  sortOrder: number;
+
+  @ApiProperty()
+  isActive: boolean;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 export class StaffBranchPermissionsSyncDto {
   @ApiProperty({ type: [BrandWithBranchesDto] })
   data: BrandWithBranchesDto[];
@@ -257,6 +362,12 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [StaffDto] })
   staff: StaffDto[];
+
+  @ApiProperty({ type: [SeasonalPriceDto] })
+  seasonalPrices: SeasonalPriceDto[];
+
+  @ApiProperty({ type: [CouponDto] })
+  coupons: CouponDto[];
 }
 
 export class FullSyncResponseDto {
@@ -289,6 +400,12 @@ export class IncrementalSyncResponseDto {
   @ApiProperty({ type: [StaffDto] })
   staff: StaffDto[];
 
+  @ApiProperty({ type: [SeasonalPriceDto] })
+  seasonalPrices: SeasonalPriceDto[];
+
+  @ApiProperty({ type: [CouponDto] })
+  coupons: CouponDto[];
+
   @ApiProperty({ description: 'IDs của các bản ghi đã bị xóa' })
   deletedIds: {
     categories: string[];
@@ -296,6 +413,8 @@ export class IncrementalSyncResponseDto {
     areas: string[];
     tables: string[];
     staff: string[];
+    seasonalPrices: string[];
+    coupons: string[];
   };
 
   @ApiProperty()

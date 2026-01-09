@@ -79,7 +79,9 @@ data class FullSyncData(
     @SerializedName("areas") val areas: List<AreaDto>,
     @SerializedName("tables") val tables: List<TableDto>,
     @SerializedName("staff") val staff: List<StaffDto>,
-    @SerializedName("branchInfo") val branchInfo: BranchInfoDto?
+    @SerializedName("branchInfo") val branchInfo: BranchInfoDto?,
+    @SerializedName("seasonalPrices") val seasonalPrices: List<SeasonalPriceDto>?,
+    @SerializedName("coupons") val coupons: List<CouponDto>?
 )
 
 // ============ Master Data DTOs ============
@@ -510,4 +512,50 @@ data class SyncBranchDto(
     @SerializedName("phone") val phone: String?,
     @SerializedName("isDefault") val isDefault: Boolean,
     @SerializedName("status") val status: String?
+)
+
+// ============ Seasonal Price DTOs ============
+
+data class SeasonalPriceProductDto(
+    @SerializedName("productId") val productId: String
+)
+
+data class SeasonalPriceDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("adjustmentType") val adjustmentType: String,
+    @SerializedName("adjustmentValue") val adjustmentValue: Double,
+    @SerializedName("startDate") val startDate: String,
+    @SerializedName("endDate") val endDate: String,
+    @SerializedName("sortOrder") val sortOrder: Int,
+    @SerializedName("isActive") val isActive: Boolean,
+    @SerializedName("products") val products: List<SeasonalPriceProductDto>,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+// ============ Coupon DTOs ============
+
+data class CouponDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("couponType") val couponType: String,
+    @SerializedName("discountValue") val discountValue: Double,
+    @SerializedName("maxDiscount") val maxDiscount: Double?,
+    @SerializedName("minOrderAmount") val minOrderAmount: Double,
+    @SerializedName("usageLimit") val usageLimit: Int?,
+    @SerializedName("usageCount") val usageCount: Int,
+    @SerializedName("dailyLimit") val dailyLimit: Int?,
+    @SerializedName("dailyUsageCount") val dailyUsageCount: Int,
+    @SerializedName("requiresApproval") val requiresApproval: Boolean,
+    @SerializedName("approvalThreshold") val approvalThreshold: Double?,
+    @SerializedName("startDate") val startDate: String?,
+    @SerializedName("endDate") val endDate: String?,
+    @SerializedName("sortOrder") val sortOrder: Int,
+    @SerializedName("isActive") val isActive: Boolean,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
 )

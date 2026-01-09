@@ -8,3 +8,6 @@ export * from './table.entity';
 export * from './staff.entity';
 export * from './staff-branch.entity';
 export * from './device.entity';
+export * from './seasonal-price.entity';
+export * from './seasonal-price-product.entity';
+export * from './coupon.entity';

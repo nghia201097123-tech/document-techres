@@ -119,4 +119,23 @@ object DatabaseModule {
     fun provideSyncConflictDao(database: CCBDatabase): SyncConflictDao {
         return database.syncConflictDao()
     }
+
+    // Pricing DAOs
+    @Provides
+    @Singleton
+    fun provideSeasonalPriceDao(database: CCBDatabase): SeasonalPriceDao {
+        return database.seasonalPriceDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSeasonalPriceProductDao(database: CCBDatabase): SeasonalPriceProductDao {
+        return database.seasonalPriceProductDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCouponDao(database: CCBDatabase): CouponDao {
+        return database.couponDao()
+    }
 }

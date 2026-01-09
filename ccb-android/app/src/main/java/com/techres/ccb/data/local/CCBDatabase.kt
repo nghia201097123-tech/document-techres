@@ -24,9 +24,13 @@ import com.techres.ccb.data.local.entity.*
         VoucherEntity::class,
         SyncQueueEntity::class,
         SyncMetadataEntity::class,
-        SyncConflictEntity::class
+        SyncConflictEntity::class,
+        // Pricing entities
+        SeasonalPriceEntity::class,
+        SeasonalPriceProductEntity::class,
+        CouponEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -51,6 +55,11 @@ abstract class CCBDatabase : RoomDatabase() {
     abstract fun syncQueueDao(): SyncQueueDao
     abstract fun syncMetadataDao(): SyncMetadataDao
     abstract fun syncConflictDao(): SyncConflictDao
+
+    // Pricing DAOs
+    abstract fun seasonalPriceDao(): SeasonalPriceDao
+    abstract fun seasonalPriceProductDao(): SeasonalPriceProductDao
+    abstract fun couponDao(): CouponDao
 
     companion object {
         const val DATABASE_NAME = "ccb_database"
