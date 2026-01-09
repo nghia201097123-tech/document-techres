@@ -71,6 +71,7 @@ const defaultStaffColumns: ColumnConfig[] = [
   { key: "address", label: "Địa chỉ", visible: false },
   { key: "brandName", label: "Thương hiệu", visible: false },
   { key: "branchName", label: "Chi nhánh", visible: true },
+  { key: "branchPermissions", label: "Quyền chi nhánh", visible: true },
   { key: "departmentName", label: "Bộ phận", visible: false },
   { key: "isActive", label: "Trạng thái", visible: true },
 ];
@@ -92,6 +93,7 @@ const defaultDetailFields: DetailFieldConfig[] = [
   { key: "idNumber", label: "CCCD", visible: true },
   { key: "address", label: "Địa chỉ", visible: true },
   { key: "branchName", label: "Chi nhánh", visible: true },
+  { key: "branchPermissions", label: "Quyền chi nhánh", visible: true },
   { key: "departmentName", label: "Bộ phận", visible: true },
   { key: "isActive", label: "Trạng thái", visible: true },
   { key: "createdAt", label: "Ngày tạo", visible: true },
@@ -283,6 +285,9 @@ export default function StaffPage() {
   const [savingBranchAssignment, setSavingBranchAssignment] = React.useState(false);
   const [refreshingBranches, setRefreshingBranches] = React.useState(false);
 
+  // Branch permissions per staff (for display in list and detail view)
+  const [staffBranchPermissions, setStaffBranchPermissions] = React.useState<Map<string, StaffBranch[]>>(new Map());
+
   // Detail view field configuration state
   const [detailFields, setDetailFields] = React.useState<DetailFieldConfig[]>(() => {
     if (typeof window !== "undefined") {
@@ -408,12 +413,44 @@ export default function StaffPage() {
     }
   }, [toast]);
 
+  // Load branch permissions for a single staff member
+  const loadStaffBranchPermissions = React.useCallback(async (staffId: string) => {
+    try {
+      const branchPermissions = await staffBranchService.getByStaffId(staffId);
+      setStaffBranchPermissions((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(staffId, branchPermissions);
+        return newMap;
+      });
+    } catch (error) {
+      console.error("Error loading branch permissions for staff:", staffId, error);
+    }
+  }, []);
+
+  // Load branch permissions for all staff in the list
+  const loadAllStaffBranchPermissions = React.useCallback(async (staffIds: string[]) => {
+    // Load in batches to avoid too many concurrent requests
+    const batchSize = 10;
+    for (let i = 0; i < staffIds.length; i += batchSize) {
+      const batch = staffIds.slice(i, i + batchSize);
+      await Promise.all(batch.map((id) => loadStaffBranchPermissions(id)));
+    }
+  }, [loadStaffBranchPermissions]);
+
   React.useEffect(() => {
     // Normalize "all" values to empty string
     const branchId = filterBranchId === "all" ? "" : filterBranchId;
     const brandId = filterBrandId === "all" ? "" : filterBrandId;
     loadStaff(branchId, brandId);
   }, [filterBranchId, filterBrandId, loadStaff]);
+
+  // Load branch permissions when staff list changes
+  React.useEffect(() => {
+    if (staffList.length > 0) {
+      const staffIds = staffList.map((s) => s.id);
+      loadAllStaffBranchPermissions(staffIds);
+    }
+  }, [staffList, loadAllStaffBranchPermissions]);
 
   // Load branches when brand changes (using Redux)
   React.useEffect(() => {
@@ -870,11 +907,17 @@ export default function StaffPage() {
 
     try {
       setSavingBranchAssignment(true);
-      await staffBranchService.bulkAssign(
+      const result = await staffBranchService.bulkAssign(
         branchAssignStaff.id,
         Array.from(assignedBranchIds),
         defaultBranchId
       );
+      // Update local branch permissions state immediately
+      setStaffBranchPermissions((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(branchAssignStaff.id, result);
+        return newMap;
+      });
       toast({
         title: "Thành công",
         description: `Đã cập nhật chi nhánh cho nhân viên "${branchAssignStaff.name}"`
@@ -1540,6 +1583,17 @@ export default function StaffPage() {
     return dept?.name || "-";
   };
 
+  // Get branch permissions display for a staff member
+  const getBranchPermissionsDisplay = (staffId: string) => {
+    const permissions = staffBranchPermissions.get(staffId);
+    if (!permissions || permissions.length === 0) return null;
+
+    const defaultBranch = permissions.find((p) => p.isDefault);
+    const otherBranches = permissions.filter((p) => !p.isDefault);
+
+    return { defaultBranch, otherBranches, total: permissions.length };
+  };
+
   // Filter and sort staff
   const filteredStaff = React.useMemo(() => {
     // First filter
@@ -1933,6 +1987,9 @@ export default function StaffPage() {
                         <div className="flex items-center">Chi nhánh{getSortIcon("branchName")}</div>
                       </TableHead>
                     )}
+                    {isColumnVisible("branchPermissions") && (
+                      <TableHead>Quyền chi nhánh</TableHead>
+                    )}
                     {isColumnVisible("departmentName") && (
                       <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("departmentName")}>
                         <div className="flex items-center">Bộ phận{getSortIcon("departmentName")}</div>
@@ -1991,6 +2048,29 @@ export default function StaffPage() {
                     {isColumnVisible("address") && <TableCell className="max-w-[200px] truncate">{staff.address || "-"}</TableCell>}
                     {isColumnVisible("brandName") && <TableCell>{staff.brandName || "-"}</TableCell>}
                     {isColumnVisible("branchName") && <TableCell>{staff.branchName || "-"}</TableCell>}
+                    {isColumnVisible("branchPermissions") && (
+                      <TableCell>
+                        {(() => {
+                          const permDisplay = getBranchPermissionsDisplay(staff.id);
+                          if (!permDisplay) return <span className="text-muted-foreground">-</span>;
+
+                          return (
+                            <div className="flex items-center gap-1 flex-wrap max-w-[200px]">
+                              {permDisplay.defaultBranch && (
+                                <Badge variant="default" className="text-xs">
+                                  {permDisplay.defaultBranch.branchName}
+                                </Badge>
+                              )}
+                              {permDisplay.otherBranches.length > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{permDisplay.otherBranches.length}
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                    )}
                     {isColumnVisible("departmentName") && <TableCell>{staff.departmentName || "-"}</TableCell>}
                     {isColumnVisible("isActive") && (
                       <TableCell>
@@ -2497,6 +2577,32 @@ export default function StaffPage() {
                   )}
                 </div>
               )}
+              {isDetailFieldVisible("branchPermissions") && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Quyền chi nhánh</Label>
+                  {(() => {
+                    const permDisplay = getBranchPermissionsDisplay(selectedStaff.id);
+                    if (!permDisplay) return <p className="text-muted-foreground">Chưa gán chi nhánh</p>;
+
+                    return (
+                      <div className="mt-1 space-y-1">
+                        {permDisplay.defaultBranch && (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="default" className="text-xs">Mặc định</Badge>
+                            <span className="text-sm">{permDisplay.defaultBranch.branchName}</span>
+                          </div>
+                        )}
+                        {permDisplay.otherBranches.map((branch) => (
+                          <div key={branch.branchId} className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">Chi nhánh</Badge>
+                            <span className="text-sm">{branch.branchName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
               {(isDetailFieldVisible("isActive") || isDetailFieldVisible("createdAt")) && (
                 <div className="grid grid-cols-2 gap-4">
                   {isDetailFieldVisible("isActive") && (
@@ -2931,6 +3037,48 @@ export default function StaffPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Row 6.5: Branch Permissions (only in edit mode) */}
+                {dialogMode === "edit" && selectedStaff && (
+                  <div className="grid gap-2">
+                    <Label>Quyền chi nhánh</Label>
+                    <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
+                      {(() => {
+                        const permDisplay = getBranchPermissionsDisplay(selectedStaff.id);
+                        if (!permDisplay) {
+                          return (
+                            <span className="text-sm text-muted-foreground">
+                              Chưa gán quyền chi nhánh
+                            </span>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-2 flex-wrap flex-1">
+                            {permDisplay.defaultBranch && (
+                              <Badge variant="default" className="text-xs">
+                                {permDisplay.defaultBranch.branchName}
+                              </Badge>
+                            )}
+                            {permDisplay.otherBranches.length > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{permDisplay.otherBranches.length} chi nhánh khác
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenBranchAssignment(selectedStaff)}
+                      >
+                        <Building2 className="h-4 w-4 mr-1" />
+                        Quản lý
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Row 7: ID Number and Email */}
                 <div className="grid grid-cols-2 gap-4">
