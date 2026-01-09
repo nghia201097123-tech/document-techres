@@ -506,7 +506,7 @@ export class CompaniesService {
       isActive: boolean;
     };
   }): Promise<void> {
-    const url = `${this.dashboardApiUrl}/api/sync/company`;
+    const url = `${this.dashboardApiUrl}/api/sync/company-data`;
     this.logger.log(`Syncing company data to Dashboard: ${url}`);
     this.logger.log(`Company: ${data.company.code}`);
 
