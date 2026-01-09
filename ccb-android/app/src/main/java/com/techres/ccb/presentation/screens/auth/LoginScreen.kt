@@ -196,7 +196,7 @@ fun LoginScreen(
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next
                         ),
-                        enabled = !uiState.isLoading
+                        enabled = !uiState.isLoading && !uiState.isSyncingBranches
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -213,7 +213,7 @@ fun LoginScreen(
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next
                         ),
-                        enabled = !uiState.isLoading
+                        enabled = !uiState.isLoading && !uiState.isSyncingBranches
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -253,7 +253,7 @@ fun LoginScreen(
                                 )
                             }
                         },
-                        enabled = !uiState.isLoading
+                        enabled = !uiState.isLoading && !uiState.isSyncingBranches
                     )
 
                     // Error message
@@ -287,17 +287,27 @@ fun LoginScreen(
                         enabled = tenantId.isNotBlank() &&
                                   username.isNotBlank() &&
                                   password.isNotBlank() &&
-                                  !uiState.isLoading,
+                                  !uiState.isLoading &&
+                                  !uiState.isSyncingBranches,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        if (uiState.isLoading) {
+                        if (uiState.isLoading || uiState.isSyncingBranches) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = if (uiState.isSyncingBranches)
+                                    "Đang đồng bộ chi nhánh..."
+                                else
+                                    "Đang đăng nhập...",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                         } else {
                             Text(

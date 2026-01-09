@@ -462,3 +462,52 @@ data class BranchesResponse(
     @SerializedName("data") val data: List<BranchDto>?,
     @SerializedName("message") val message: String?
 )
+
+// ============ Staff Branch Permissions DTOs ============
+
+/**
+ * Response for GET /sync/branches-brands/{staffId}
+ * Contains brands and branches that the staff has permission to access
+ */
+data class StaffBranchPermissionsResponse(
+    @SerializedName("data") val data: List<BrandWithBranchesDto>?,
+    @SerializedName("defaultBranchId") val defaultBranchId: String?,
+    @SerializedName("syncedAt") val syncedAt: String?,
+    // Error fields
+    @SerializedName("message") val message: String?,
+    @SerializedName("error") val error: String?,
+    @SerializedName("statusCode") val statusCode: Int?
+)
+
+/**
+ * Brand with its branches for staff permission sync
+ */
+data class BrandWithBranchesDto(
+    @SerializedName("brand") val brand: SyncBrandDto,
+    @SerializedName("branches") val branches: List<SyncBranchDto>
+)
+
+/**
+ * Brand info in sync response
+ */
+data class SyncBrandDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("code") val code: String?,
+    @SerializedName("logoUrl") val logoUrl: String?,
+    @SerializedName("isActive") val isActive: Boolean
+)
+
+/**
+ * Branch info in sync response
+ */
+data class SyncBranchDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("brandId") val brandId: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("storeCode") val storeCode: String?,
+    @SerializedName("address") val address: String?,
+    @SerializedName("phone") val phone: String?,
+    @SerializedName("isDefault") val isDefault: Boolean,
+    @SerializedName("status") val status: String?
+)

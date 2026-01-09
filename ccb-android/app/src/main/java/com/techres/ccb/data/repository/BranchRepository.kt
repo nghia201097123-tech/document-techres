@@ -9,6 +9,7 @@ import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.dto.BrandDto
 import com.techres.ccb.data.remote.dto.BranchDto
+import com.techres.ccb.data.remote.dto.StaffBranchPermissionsResponse
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import javax.inject.Inject
@@ -192,6 +193,110 @@ class BranchRepository @Inject constructor(
             Result.failure(e)
         }
     }
+
+    /**
+     * Sync brands and branches based on staff permissions
+     * Only syncs the brands/branches that the logged-in staff has access to
+     * @return Result containing count of synced items and default branch ID
+     */
+    suspend fun syncStaffBranchPermissions(): Result<SyncBranchResult> {
+        return try {
+            val token = authRepository.getAccessToken()
+            val staffId = authRepository.getCurrentStaffId()
+
+            Log.d(TAG, "syncStaffBranchPermissions - Token: ${token?.take(20)}..., StaffId: $staffId")
+
+            if (token == null) {
+                Log.e(TAG, "syncStaffBranchPermissions - No token available")
+                return Result.failure(Exception("Chưa đăng nhập"))
+            }
+
+            if (staffId == null) {
+                Log.e(TAG, "syncStaffBranchPermissions - No staff ID available")
+                return Result.failure(Exception("Chưa có thông tin nhân viên"))
+            }
+
+            Log.d(TAG, "syncStaffBranchPermissions - Calling API...")
+            val response = api.getStaffBranchPermissions("Bearer $token", staffId)
+            Log.d(TAG, "syncStaffBranchPermissions - Response code: ${response.code()}")
+
+            if (response.isSuccessful && response.body() != null) {
+                val permissionsResponse = response.body()!!
+                Log.d(TAG, "syncStaffBranchPermissions - Data count: ${permissionsResponse.data?.size ?: 0}")
+
+                if (permissionsResponse.data != null) {
+                    val brandWithBranches = permissionsResponse.data
+                    val now = Instant.now().toString()
+
+                    // Convert and save brands
+                    val brandEntities = brandWithBranches.map { item ->
+                        BrandEntity(
+                            id = item.brand.id,
+                            name = item.brand.name,
+                            code = item.brand.code,
+                            logo = item.brand.logoUrl,
+                            companyId = null,
+                            companyName = null,
+                            isActive = item.brand.isActive,
+                            syncedAt = now
+                        )
+                    }
+                    brandDao.syncBrands(brandEntities)
+                    Log.d(TAG, "syncStaffBranchPermissions - Saved ${brandEntities.size} brands")
+
+                    // Convert and save branches
+                    val branchEntities = brandWithBranches.flatMap { item ->
+                        item.branches.map { branch ->
+                            BranchEntity(
+                                id = branch.id,
+                                brandId = branch.brandId,
+                                brandName = item.brand.name,
+                                name = branch.name,
+                                code = branch.storeCode,
+                                address = branch.address,
+                                phone = branch.phone,
+                                isActive = branch.status != "inactive",
+                                syncedAt = now
+                            )
+                        }
+                    }
+                    branchDao.syncBranches(branchEntities)
+                    Log.d(TAG, "syncStaffBranchPermissions - Saved ${branchEntities.size} branches")
+
+                    val result = SyncBranchResult(
+                        brandsCount = brandEntities.size,
+                        branchesCount = branchEntities.size,
+                        defaultBranchId = permissionsResponse.defaultBranchId,
+                        syncedAt = permissionsResponse.syncedAt
+                    )
+
+                    Result.success(result)
+                } else {
+                    val errorMsg = permissionsResponse.message ?: "Không có dữ liệu chi nhánh"
+                    Log.e(TAG, "syncStaffBranchPermissions - API error: $errorMsg")
+                    Result.failure(Exception(errorMsg))
+                }
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "syncStaffBranchPermissions - HTTP error: ${response.code()} - ${response.message()}")
+                Log.e(TAG, "syncStaffBranchPermissions - Error body: $errorBody")
+                Result.failure(Exception("Lỗi ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "syncStaffBranchPermissions - Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Result of branch sync operation
+     */
+    data class SyncBranchResult(
+        val brandsCount: Int,
+        val branchesCount: Int,
+        val defaultBranchId: String?,
+        val syncedAt: String?
+    )
 
     // ============ SELECTED BRANCH OPERATIONS ============
 

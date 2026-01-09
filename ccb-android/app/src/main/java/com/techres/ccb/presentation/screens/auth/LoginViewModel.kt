@@ -1,8 +1,10 @@
 package com.techres.ccb.presentation.screens.auth
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.BranchRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,14 +17,22 @@ data class LoginUiState(
     val username: String = "",
     val password: String = "",
     val isLoading: Boolean = false,
+    val isSyncingBranches: Boolean = false,
     val isSuccess: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val syncedBrandsCount: Int = 0,
+    val syncedBranchesCount: Int = 0
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val branchRepository: BranchRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "LoginViewModel"
+    }
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -67,14 +77,53 @@ class LoginViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = {
-                    // Login success -> Navigate to Branch Selection
-                    // Sync will happen after branch selection and shift open
-                    _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+                    // Login success -> Sync branches based on staff permissions
+                    Log.d(TAG, "Login success, syncing staff branch permissions...")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSyncingBranches = true
+                    )
+
+                    // Sync brands/branches that staff has permission to
+                    syncStaffBranchPermissions()
                 },
                 onFailure = { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = e.message ?: "Đăng nhập thất bại"
+                    )
+                }
+            )
+        }
+    }
+
+    /**
+     * Sync brands and branches based on staff permissions
+     * Called after successful login
+     */
+    private fun syncStaffBranchPermissions() {
+        viewModelScope.launch {
+            Log.d(TAG, "syncStaffBranchPermissions starting...")
+
+            val syncResult = branchRepository.syncStaffBranchPermissions()
+
+            syncResult.fold(
+                onSuccess = { result ->
+                    Log.d(TAG, "Sync success: ${result.brandsCount} brands, ${result.branchesCount} branches")
+                    _uiState.value = _uiState.value.copy(
+                        isSyncingBranches = false,
+                        isSuccess = true,
+                        syncedBrandsCount = result.brandsCount,
+                        syncedBranchesCount = result.branchesCount
+                    )
+                },
+                onFailure = { e ->
+                    Log.e(TAG, "Sync failed: ${e.message}", e)
+                    // Still allow navigation but show warning
+                    _uiState.value = _uiState.value.copy(
+                        isSyncingBranches = false,
+                        isSuccess = true, // Still allow to proceed
+                        error = "Đồng bộ chi nhánh thất bại: ${e.message}"
                     )
                 }
             )

@@ -105,4 +105,16 @@ interface MasterDataApi {
     suspend fun getAllBranches(
         @Header("Authorization") token: String
     ): Response<BranchesResponse>
+
+    // ============ Staff Branch Permissions Sync ============
+
+    /**
+     * Get brands and branches that staff has permission to access
+     * This is used to sync only the branches that the logged-in staff member can work with
+     */
+    @GET("sync/branches-brands/{staffId}")
+    suspend fun getStaffBranchPermissions(
+        @Header("Authorization") token: String,
+        @Path("staffId") staffId: String
+    ): Response<StaffBranchPermissionsResponse>
 }
