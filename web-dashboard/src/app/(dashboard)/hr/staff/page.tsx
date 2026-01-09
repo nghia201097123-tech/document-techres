@@ -2025,7 +2025,7 @@ export default function StaffPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleOpenBranchAssignment(staff)}>
                             <Building2 className="mr-2 h-4 w-4" />
-                            Gán chi nhánh
+                            Gán quyền chi nhánh
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleToggleActive(staff)}>
