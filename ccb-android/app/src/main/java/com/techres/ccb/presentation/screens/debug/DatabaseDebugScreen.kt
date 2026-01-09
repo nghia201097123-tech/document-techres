@@ -62,7 +62,8 @@ class DatabaseDebugViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
-    private val branchRepository: BranchRepository
+    private val branchRepository: BranchRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebugUiState())
@@ -74,7 +75,7 @@ class DatabaseDebugViewModel @Inject constructor(
     }
 
     private fun loadBranchId() {
-        val branchId = branchRepository.getSelectedBranchId() ?: ""
+        val branchId = authRepository.getBranchId() ?: ""
         _uiState.update { it.copy(branchId = branchId) }
     }
 
