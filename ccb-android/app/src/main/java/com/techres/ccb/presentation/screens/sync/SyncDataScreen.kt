@@ -22,17 +22,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-// Data classes for sync items
-data class SyncItem(
+// Mock data classes for UI preview (avoid conflict with ViewModel classes)
+private data class MockSyncItem(
     val id: String,
     val name: String,
     val icon: ImageVector,
-    val status: SyncStatus = SyncStatus.PENDING,
-    val itemCount: Int = 0,
-    val progress: Float = 0f
+    val status: MockSyncStatus = MockSyncStatus.PENDING,
+    val itemCount: Int = 0
 )
 
-enum class SyncStatus {
+private enum class MockSyncStatus {
     PENDING, SYNCING, COMPLETED, ERROR
 }
 
@@ -46,11 +45,11 @@ fun SyncDataScreen(
     var syncItems by remember {
         mutableStateOf(
             listOf(
-                SyncItem("categories", "Danh mục", Icons.Default.Category),
-                SyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
-                SyncItem("areas", "Khu vực", Icons.Default.Map),
-                SyncItem("tables", "Bàn", Icons.Default.TableBar),
-                SyncItem("staff", "Nhân viên", Icons.Default.People)
+                MockSyncItem("categories", "Danh mục", Icons.Default.Category),
+                MockSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
+                MockSyncItem("areas", "Khu vực", Icons.Default.Map),
+                MockSyncItem("tables", "Bàn", Icons.Default.TableBar),
+                MockSyncItem("staff", "Nhân viên", Icons.Default.People)
             )
         )
     }
@@ -68,7 +67,7 @@ fun SyncDataScreen(
         for (i in syncItems.indices) {
             // Update current item to syncing
             syncItems = syncItems.toMutableList().apply {
-                this[i] = this[i].copy(status = SyncStatus.SYNCING)
+                this[i] = this[i].copy(status = MockSyncStatus.SYNCING)
             }
 
             // Simulate sync delay
@@ -77,7 +76,7 @@ fun SyncDataScreen(
             // Update current item to completed
             syncItems = syncItems.toMutableList().apply {
                 this[i] = this[i].copy(
-                    status = SyncStatus.COMPLETED,
+                    status = MockSyncStatus.COMPLETED,
                     itemCount = mockCounts[i]
                 )
             }
@@ -378,14 +377,14 @@ fun SyncDataScreen(
 }
 
 @Composable
-private fun SyncItemRow(item: SyncItem) {
+private fun SyncItemRow(item: MockSyncItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 color = when (item.status) {
-                    SyncStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    SyncStatus.COMPLETED -> Color(0xFFE8F5E9)
+                    MockSyncStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    MockSyncStatus.COMPLETED -> Color(0xFFE8F5E9)
                     else -> Color.Transparent
                 },
                 shape = RoundedCornerShape(12.dp)
@@ -400,9 +399,9 @@ private fun SyncItemRow(item: SyncItem) {
                 .clip(CircleShape)
                 .background(
                     when (item.status) {
-                        SyncStatus.COMPLETED -> Color(0xFF4CAF50)
-                        SyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
-                        SyncStatus.ERROR -> MaterialTheme.colorScheme.error
+                        MockSyncStatus.COMPLETED -> Color(0xFF4CAF50)
+                        MockSyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
+                        MockSyncStatus.ERROR -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.surfaceVariant
                     }
                 ),
@@ -413,7 +412,7 @@ private fun SyncItemRow(item: SyncItem) {
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = when (item.status) {
-                    SyncStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
+                    MockSyncStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> Color.White
                 }
             )
@@ -429,13 +428,13 @@ private fun SyncItemRow(item: SyncItem) {
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            if (item.status == SyncStatus.COMPLETED && item.itemCount > 0) {
+            if (item.status == MockSyncStatus.COMPLETED && item.itemCount > 0) {
                 Text(
                     text = "${item.itemCount} mục",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
-            } else if (item.status == SyncStatus.SYNCING) {
+            } else if (item.status == MockSyncStatus.SYNCING) {
                 Text(
                     text = "Đang tải...",
                     fontSize = 12.sp,
@@ -446,7 +445,7 @@ private fun SyncItemRow(item: SyncItem) {
 
         // Status icon
         when (item.status) {
-            SyncStatus.PENDING -> {
+            MockSyncStatus.PENDING -> {
                 Icon(
                     imageVector = Icons.Default.Schedule,
                     contentDescription = null,
@@ -454,14 +453,14 @@ private fun SyncItemRow(item: SyncItem) {
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
-            SyncStatus.SYNCING -> {
+            MockSyncStatus.SYNCING -> {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            SyncStatus.COMPLETED -> {
+            MockSyncStatus.COMPLETED -> {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
@@ -469,7 +468,7 @@ private fun SyncItemRow(item: SyncItem) {
                     tint = Color(0xFF4CAF50)
                 )
             }
-            SyncStatus.ERROR -> {
+            MockSyncStatus.ERROR -> {
                 Icon(
                     imageVector = Icons.Default.Error,
                     contentDescription = null,
