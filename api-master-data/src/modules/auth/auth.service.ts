@@ -22,7 +22,7 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
     // Find branch by store code with brand relation
     const branch = await this.branchRepository.findOne({
-      where: { storeCode: loginDto.storeCode, status: 'active' },
+      where: { code: loginDto.storeCode, status: 'active' },
       relations: ['brand'],
     });
 
@@ -66,7 +66,7 @@ export class AuthService {
       branchId: branch.id,
       brandId: branch.brandId,
       deviceId: loginDto.deviceId,
-      storeCode: branch.storeCode,
+      storeCode: branch.code,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -116,7 +116,7 @@ export class AuthService {
     return {
       branchId: branch.id,
       brandId: branch.brandId,
-      storeCode: branch.storeCode,
+      storeCode: branch.code,
       deviceId: payload.deviceId,
     };
   }
