@@ -11,23 +11,23 @@ export class Area {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'tenant_id', length: 50 })
+  tenantId: string;
+
   @Column({ name: 'branch_id', type: 'uuid' })
   branchId: string;
 
-  @Column({ length: 255 })
+  @Column({ length: 100 })
   name: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ name: 'display_order', type: 'int', default: 0 })
-  displayOrder: number;
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
-
-  @Column({ type: 'int', default: 1 })
-  version: number;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

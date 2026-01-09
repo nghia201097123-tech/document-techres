@@ -239,27 +239,63 @@ export class SyncService {
 
   async getFullSync(branchId: string): Promise<FullSyncResponseDto> {
     try {
+      // First, get the branch to find the brand_id
+      const branch = await this.branchRepository.findOne({
+        where: { id: branchId },
+      });
+
+      if (!branch) {
+        return {
+          success: false,
+          data: null,
+          syncTime: new Date().toISOString(),
+          message: 'Branch not found',
+        };
+      }
+
+      const brandId = branch.brandId;
+      console.log(`[SyncService.getFullSync] branchId=${branchId}, brandId=${brandId}`);
+
+      // Query products/categories by brand_id (they belong to brand)
+      // Query areas/tables/staff by branch_id (they are branch-specific)
       const [categories, products, areas, tables, staff] = await Promise.all([
-        this.categoryRepository.find({
-          where: { branchId },
-          order: { displayOrder: 'ASC' },
-        }),
-        this.productRepository.find({
-          where: { branchId },
-          order: { displayOrder: 'ASC' },
-        }),
-        this.areaRepository.find({
-          where: { branchId },
-          order: { displayOrder: 'ASC' },
-        }),
-        this.tableRepository.find({
-          where: { branchId },
-          order: { displayOrder: 'ASC' },
-        }),
-        this.staffRepository.find({
-          where: { branchId },
-        }),
+        // Categories belong to brand - query by brand_id
+        this.categoryRepository
+          .createQueryBuilder('c')
+          .where('c.brand_id = :brandId', { brandId })
+          .andWhere('c.is_active = true')
+          .orderBy('c.sort_order', 'ASC')
+          .getMany(),
+        // Products belong to brand - query by brand_id
+        this.productRepository
+          .createQueryBuilder('p')
+          .where('p.brand_id = :brandId', { brandId })
+          .andWhere('p.is_active = true')
+          .orderBy('p.sort_order', 'ASC')
+          .getMany(),
+        // Areas are branch-specific
+        this.areaRepository
+          .createQueryBuilder('a')
+          .where('a.branch_id = :branchId', { branchId })
+          .andWhere('a.is_active = true')
+          .orderBy('a.sort_order', 'ASC')
+          .getMany(),
+        // Tables are branch-specific
+        this.tableRepository
+          .createQueryBuilder('t')
+          .where('t.branch_id = :branchId', { branchId })
+          .andWhere('t.is_active = true')
+          .orderBy('t.sort_order', 'ASC')
+          .getMany(),
+        // Staff is branch-specific
+        this.staffRepository
+          .createQueryBuilder('s')
+          .where('s.branch_id = :branchId', { branchId })
+          .andWhere('s.is_active = true')
+          .getMany(),
       ]);
+
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -276,6 +312,7 @@ export class SyncService {
         message: null,
       };
     } catch (error) {
+      console.error(`[SyncService.getFullSync] Error:`, error);
       return {
         success: false,
         data: null,
@@ -347,7 +384,7 @@ export class SyncService {
       name: category.name,
       description: category.description || null,
       imageUrl: category.imageUrl || null,
-      sortOrder: category.displayOrder,
+      sortOrder: category.sortOrder || 0,
       isActive: category.isActive,
       createdAt: category.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: category.updatedAt.toISOString(),
@@ -364,15 +401,15 @@ export class SyncService {
       imageUrl: product.imageUrl || null,
       price: Number(product.price),
       costPrice: Number(product.costPrice || 0),
-      vatRate: Number(product.vatRate),
+      vatRate: Number(product.vatRate || 0),
       unit: product.unit || null,
-      type: product.type || 'food',
+      type: product.productType || 'food',
       isAvailable: product.isAvailable ?? true,
       isActive: product.isActive,
-      sortOrder: product.displayOrder,
+      sortOrder: product.sortOrder || 0,
       preparationTime: product.preparationTime || 0,
-      printToKitchen: product.printToKitchen ?? true,
-      printToBar: product.printToBar ?? false,
+      printToKitchen: product.printDish ?? true,
+      printToBar: product.printLabel ?? false,
       createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: product.updatedAt.toISOString(),
     };
@@ -383,7 +420,7 @@ export class SyncService {
       id: area.id,
       name: area.name,
       description: area.description || null,
-      sortOrder: area.displayOrder,
+      sortOrder: area.sortOrder || 0,
       isActive: area.isActive,
       createdAt: area.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: area.updatedAt.toISOString(),
@@ -396,7 +433,7 @@ export class SyncService {
       areaId: table.areaId || null,
       name: table.name,
       capacity: table.capacity,
-      sortOrder: table.displayOrder,
+      sortOrder: table.sortOrder || 0,
       isActive: table.isActive,
       createdAt: table.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: table.updatedAt.toISOString(),

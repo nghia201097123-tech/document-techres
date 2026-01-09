@@ -11,13 +11,16 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'branch_id', type: 'uuid' })
-  branchId: string;
+  @Column({ name: 'tenant_id', length: 50, nullable: true })
+  tenantId: string;
 
-  @Column({ name: 'category_id', type: 'uuid' })
+  @Column({ name: 'brand_id', type: 'uuid', nullable: true })
+  brandId: string;
+
+  @Column({ name: 'category_id', type: 'uuid', nullable: true })
   categoryId: string;
 
-  @Column({ length: 50 })
+  @Column({ length: 50, nullable: true })
   code: string;
 
   @Column({ length: 255 })
@@ -26,44 +29,41 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   price: number;
 
-  @Column({ name: 'cost_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  @Column({ name: 'cost_price', type: 'decimal', precision: 15, scale: 2, default: 0, nullable: true })
   costPrice: number;
 
   @Column({ name: 'image_url', type: 'text', nullable: true })
   imageUrl: string;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ length: 50, nullable: true })
   unit: string;
 
-  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 10 })
+  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 0, nullable: true })
   vatRate: number;
 
-  @Column({ length: 50, default: 'food' })
-  type: string;
+  @Column({ name: 'product_type', length: 50, default: 'single', nullable: true })
+  productType: string;
 
-  @Column({ name: 'is_available', type: 'boolean', default: true })
+  @Column({ name: 'is_available', type: 'boolean', default: true, nullable: true })
   isAvailable: boolean;
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
-  @Column({ name: 'display_order', type: 'int', default: 0 })
-  displayOrder: number;
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
 
-  @Column({ name: 'preparation_time', type: 'int', default: 0 })
+  @Column({ name: 'preparation_time', type: 'int', default: 0, nullable: true })
   preparationTime: number;
 
-  @Column({ name: 'print_to_kitchen', type: 'boolean', default: true })
-  printToKitchen: boolean;
+  @Column({ name: 'print_dish', type: 'boolean', default: true, nullable: true })
+  printDish: boolean;
 
-  @Column({ name: 'print_to_bar', type: 'boolean', default: false })
-  printToBar: boolean;
-
-  @Column({ type: 'int', default: 1 })
-  version: number;
+  @Column({ name: 'print_label', type: 'boolean', default: false, nullable: true })
+  printLabel: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
