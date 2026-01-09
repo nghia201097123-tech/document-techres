@@ -35,6 +35,7 @@ export class ProxyController {
       // /api/tenant/* -> api-dashboard
       // /api/admin/* or other -> api-admin
       const { service, adjustedPath } = this.proxyService.determineService(path);
+      console.log(`[Gateway] ${req.method} ${req.originalUrl} -> ${service} ${adjustedPath}`);
 
       // Forward authorization header if present
       const headers: Record<string, string> = {};
