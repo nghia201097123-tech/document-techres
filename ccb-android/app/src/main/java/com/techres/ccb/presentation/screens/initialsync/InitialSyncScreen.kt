@@ -39,42 +39,34 @@ enum class SyncItemStatus {
 fun InitialSyncScreen(
     onSyncComplete: () -> Unit
 ) {
-    // Mock sync items
+    // Only sync brands and branches after login
     var syncItems by remember {
         mutableStateOf(
             listOf(
                 SyncItemData("brands", "Thương hiệu", Icons.Default.Business),
-                SyncItemData("branches", "Chi nhánh", Icons.Default.Store),
-                SyncItemData("categories", "Danh mục", Icons.Default.Category),
-                SyncItemData("products", "Sản phẩm", Icons.Default.Fastfood),
-                SyncItemData("areas", "Khu vực", Icons.Default.Map),
-                SyncItemData("tables", "Bàn", Icons.Default.TableBar),
-                SyncItemData("staff", "Nhân viên", Icons.Default.People)
+                SyncItemData("branches", "Chi nhánh", Icons.Default.Store)
             )
         )
     }
 
     var overallProgress by remember { mutableFloatStateOf(0f) }
-    var currentItemIndex by remember { mutableIntStateOf(-1) }
     var isCompleted by remember { mutableStateOf(false) }
 
     // Mock sync animation
     LaunchedEffect(Unit) {
         delay(500) // Initial delay
 
-        for (i in syncItems.indices) {
-            currentItemIndex = i
+        // Mock counts for brands and branches
+        val mockCounts = listOf(3, 8)
 
+        for (i in syncItems.indices) {
             // Update current item to syncing
             syncItems = syncItems.toMutableList().apply {
                 this[i] = this[i].copy(status = SyncItemStatus.SYNCING)
             }
 
             // Simulate sync delay
-            delay(600)
-
-            // Mock counts
-            val mockCounts = listOf(3, 5, 12, 48, 4, 20, 8)
+            delay(800)
 
             // Update current item to completed
             syncItems = syncItems.toMutableList().apply {
@@ -88,7 +80,7 @@ fun InitialSyncScreen(
         }
 
         isCompleted = true
-        delay(1000)
+        delay(800)
         onSyncComplete()
     }
 
@@ -185,7 +177,7 @@ fun InitialSyncScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = if (isCompleted) "Sẵn sàng!" else "Đang đồng bộ...",
+                    text = if (isCompleted) "Sẵn sàng!" else "Đang tải dữ liệu...",
                     fontSize = 18.sp,
                     color = Color.White.copy(alpha = 0.9f)
                 )
@@ -227,7 +219,7 @@ fun InitialSyncScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Đồng bộ dữ liệu",
+                            text = "Tải thông tin",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -237,12 +229,12 @@ fun InitialSyncScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Đang tải dữ liệu cần thiết để hoạt động offline",
+                        text = "Đang tải danh sách thương hiệu và chi nhánh bạn có quyền truy cập",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     // Overall progress
                     LinearProgressIndicator(
@@ -264,19 +256,19 @@ fun InitialSyncScreen(
                         modifier = Modifier.align(Alignment.End)
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     // Sync items list
                     syncItems.forEach { item ->
                         SyncItemRow(item = item)
                         if (item != syncItems.last()) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
 
                     // Summary when completed
                     if (isCompleted) {
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(32.dp))
 
                         Card(
                             colors = CardDefaults.cardColors(
@@ -299,12 +291,12 @@ fun InitialSyncScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "Đồng bộ hoàn tất!",
+                                        text = "Hoàn tất!",
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color(0xFF2E7D32)
                                     )
                                     Text(
-                                        text = "Tổng cộng ${syncItems.sumOf { it.count }} mục đã được tải về",
+                                        text = "Vui lòng chọn chi nhánh làm việc",
                                         fontSize = 12.sp,
                                         color = Color(0xFF4CAF50)
                                     )
@@ -329,15 +321,15 @@ private fun SyncItemRow(item: SyncItemData) {
                     SyncItemStatus.COMPLETED -> Color(0xFFE8F5E9)
                     else -> Color.Transparent
                 },
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(12.dp)
             )
-            .padding(12.dp),
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Icon
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(
                     when (item.status) {
@@ -352,7 +344,7 @@ private fun SyncItemRow(item: SyncItemData) {
             Icon(
                 imageVector = item.icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(24.dp),
                 tint = when (item.status) {
                     SyncItemStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> Color.White
@@ -360,21 +352,27 @@ private fun SyncItemRow(item: SyncItemData) {
             )
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
         // Title and count
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.title,
-                fontSize = 14.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (item.status == SyncItemStatus.COMPLETED && item.count > 0) {
                 Text(
                     text = "${item.count} mục",
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            } else if (item.status == SyncItemStatus.SYNCING) {
+                Text(
+                    text = "Đang tải...",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -385,13 +383,13 @@ private fun SyncItemRow(item: SyncItemData) {
                 Icon(
                     imageVector = Icons.Default.Schedule,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
             SyncItemStatus.SYNCING -> {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -400,7 +398,7 @@ private fun SyncItemRow(item: SyncItemData) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = Color(0xFF4CAF50)
                 )
             }
@@ -408,7 +406,7 @@ private fun SyncItemRow(item: SyncItemData) {
                 Icon(
                     imageVector = Icons.Default.Error,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.error
                 )
             }
