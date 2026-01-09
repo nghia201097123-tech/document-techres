@@ -134,13 +134,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideMasterDataApi(@TenantRetrofit retrofit: Retrofit): MasterDataApi {
+    fun provideMasterDataApi(@PosRetrofit retrofit: Retrofit): MasterDataApi {
         return retrofit.create(MasterDataApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun provideSyncApi(@TenantRetrofit retrofit: Retrofit): SyncApi {
+    fun provideSyncApi(@PosRetrofit retrofit: Retrofit): SyncApi {
         return retrofit.create(SyncApi::class.java)
     }
 
