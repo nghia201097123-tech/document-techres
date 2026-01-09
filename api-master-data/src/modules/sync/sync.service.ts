@@ -85,7 +85,7 @@ export class SyncService {
         id: branch?.id || sb.branchId,
         brandId: sb.brandId,
         name: branch?.name || '',
-        storeCode: branch?.storeCode || '',
+        storeCode: branch?.code || '',
         address: branch?.address || '',
         phone: branch?.phone || '',
         isDefault: sb.isDefault,

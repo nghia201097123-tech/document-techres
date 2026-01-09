@@ -17,7 +17,7 @@ export class Branch {
   @Column({ name: 'tenant_id', length: 50, nullable: true })
   tenantId: string;
 
-  @Column({ name: 'brand_id', type: 'uuid' })
+  @Column({ name: 'brand_id', type: 'uuid', nullable: true })
   brandId: string;
 
   @ManyToOne(() => Brand, (brand) => brand.branches)
@@ -27,8 +27,8 @@ export class Branch {
   @Column({ length: 255 })
   name: string;
 
-  @Column({ name: 'store_code', length: 20, unique: true })
-  storeCode: string;
+  @Column({ length: 50, nullable: true })
+  code: string;
 
   @Column({ type: 'text', nullable: true })
   address: string;
@@ -36,16 +36,7 @@ export class Branch {
   @Column({ length: 20, nullable: true })
   phone: string;
 
-  @Column({ name: 'opening_hours', type: 'jsonb', nullable: true })
-  openingHours: any;
-
-  @Column({ name: 'model_type', length: 20, nullable: true })
-  modelType: string;
-
-  @Column({ name: 'package_id', type: 'uuid', nullable: true })
-  packageId: string;
-
-  @Column({ length: 20, default: 'active' })
+  @Column({ length: 20, default: 'active', nullable: true })
   status: string;
 
   @CreateDateColumn({ name: 'created_at' })
