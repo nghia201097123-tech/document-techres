@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, ChevronLeft, ChevronRight, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trash2 } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, MoreHorizontal, Eye, Pencil, Power, Download, Upload, FileSpreadsheet, KeyRound, Shield, Settings2, ChevronDown, ChevronLeft, ChevronRight, Building2, UserCog, Copy, Check, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,7 +102,7 @@ const DETAIL_FIELDS_STORAGE_KEY = "staff-detail-fields-config";
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchBrands } from "@/store/slices/brandsSlice";
-import { fetchBranchesByBrand } from "@/store/slices/branchesSlice";
+import { fetchBranchesByBrand, invalidateBranchCache } from "@/store/slices/branchesSlice";
 import { fetchDepartments } from "@/store/slices/departmentsSlice";
 import { fetchProvinces, fetchWardsByProvince } from "@/store/slices/locationsSlice";
 
@@ -279,6 +279,7 @@ export default function StaffPage() {
   const [assignedBranchIds, setAssignedBranchIds] = React.useState<Set<string>>(new Set());
   const [defaultBranchId, setDefaultBranchId] = React.useState<string>("");
   const [savingBranchAssignment, setSavingBranchAssignment] = React.useState(false);
+  const [refreshingBranches, setRefreshingBranches] = React.useState(false);
 
   // Detail view field configuration state
   const [detailFields, setDetailFields] = React.useState<DetailFieldConfig[]>(() => {
@@ -855,6 +856,31 @@ export default function StaffPage() {
       });
     } finally {
       setSavingBranchAssignment(false);
+    }
+  };
+
+  // Refresh branches (force reload from server)
+  const handleRefreshBranches = async () => {
+    if (!branchAssignStaff?.brandId) return;
+
+    setRefreshingBranches(true);
+    try {
+      // Invalidate cache first
+      dispatch(invalidateBranchCache(branchAssignStaff.brandId));
+      // Then fetch fresh data
+      await dispatch(fetchBranchesByBrand(branchAssignStaff.brandId));
+      toast({
+        title: "Đã tải lại",
+        description: "Danh sách chi nhánh đã được cập nhật",
+      });
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải lại danh sách chi nhánh",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshingBranches(false);
     }
   };
 
@@ -3048,10 +3074,22 @@ export default function StaffPage() {
       <Dialog open={branchAssignDialogOpen} onOpenChange={setBranchAssignDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Gán chi nhánh làm việc
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Gán chi nhánh làm việc
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefreshBranches}
+                disabled={refreshingBranches}
+                title="Tải lại danh sách chi nhánh từ server"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshingBranches ? 'animate-spin' : ''}`} />
+                <span className="ml-1 text-xs">Tải lại</span>
+              </Button>
+            </div>
             <DialogDescription>
               Chọn các chi nhánh mà nhân viên &quot;{branchAssignStaff?.name}&quot; được phép làm việc.
               <span className="block mt-1 text-amber-600">
