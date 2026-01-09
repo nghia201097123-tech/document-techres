@@ -4,15 +4,23 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('staff')
+@Index('idx_staff_username_tenant', ['tenantId', 'username'])
 export class Staff {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'tenant_id', length: 50 })
+  tenantId: string;
+
   @Column({ name: 'branch_id', type: 'uuid' })
   branchId: string;
+
+  @Column({ length: 50, nullable: true })
+  username: string;
 
   @Column({ length: 50 })
   code: string;

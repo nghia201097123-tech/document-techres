@@ -41,21 +41,46 @@ export class SyncService {
    * Sync brands and branches based on staff's permissions
    * Returns ONLY brands/branches that the staff has explicit access to
    * If no permissions assigned, returns empty array
+   *
+   * Note: The staffId param may be OAuth user ID (from JWT sub), not the actual staff.id
+   * We use the email from JWT to find the real staff by username
    */
-  async getStaffBranchPermissions(staffId: string, tenantId?: string): Promise<StaffBranchPermissionsSyncDto> {
-    console.log(`[SyncService.getStaffBranchPermissions] staffId=${staffId}, tenantId=${tenantId}`);
+  async getStaffBranchPermissions(staffId: string, tenantId?: string, email?: string): Promise<StaffBranchPermissionsSyncDto> {
+    console.log(`[SyncService.getStaffBranchPermissions] staffId=${staffId}, tenantId=${tenantId}, email=${email}`);
+
+    // First, try to find the real staff by username from email
+    // Email format: tr000001@tenant-NHC.local -> username = tr000001
+    let realStaffId = staffId;
+
+    if (email && tenantId) {
+      const username = this.extractUsernameFromEmail(email);
+      console.log(`[SyncService.getStaffBranchPermissions] Extracted username: ${username}`);
+
+      if (username) {
+        const staff = await this.staffRepository.findOne({
+          where: { username, tenantId },
+        });
+
+        if (staff) {
+          realStaffId = staff.id;
+          console.log(`[SyncService.getStaffBranchPermissions] Found staff by username: ${staff.id} (${staff.name})`);
+        } else {
+          console.log(`[SyncService.getStaffBranchPermissions] No staff found with username=${username}, tenantId=${tenantId}`);
+        }
+      }
+    }
 
     // Get all branch assignments for this staff
     const staffBranches = await this.staffBranchRepository.find({
-      where: { staffId },
+      where: { staffId: realStaffId },
       relations: ['branch', 'brand'],
     });
 
-    console.log(`[SyncService.getStaffBranchPermissions] Found ${staffBranches.length} branch permissions for staff ${staffId}`);
+    console.log(`[SyncService.getStaffBranchPermissions] Found ${staffBranches.length} branch permissions for staff ${realStaffId}`);
 
     // Only return data that staff has explicit permissions for
     if (staffBranches.length === 0) {
-      console.log(`[SyncService.getStaffBranchPermissions] No permissions found for staff ${staffId}, returning empty`);
+      console.log(`[SyncService.getStaffBranchPermissions] No permissions found for staff ${realStaffId}, returning empty`);
       return {
         data: [],
         defaultBranchId: '',
@@ -64,6 +89,17 @@ export class SyncService {
     }
 
     return this.buildPermissionsFromStaffBranches(staffBranches);
+  }
+
+  /**
+   * Extract username from email
+   * Email format: tr000001@tenant-NHC.local -> username = tr000001
+   */
+  private extractUsernameFromEmail(email: string): string | null {
+    if (!email) return null;
+    const atIndex = email.indexOf('@');
+    if (atIndex === -1) return null;
+    return email.substring(0, atIndex);
   }
 
   /**

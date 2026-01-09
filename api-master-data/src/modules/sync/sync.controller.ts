@@ -13,13 +13,14 @@ export class SyncController {
 
   @Get('branches-brands/:staffId')
   @ApiOperation({ summary: 'Lấy danh sách thương hiệu và chi nhánh theo quyền nhân viên' })
-  @ApiParam({ name: 'staffId', description: 'ID nhân viên' })
+  @ApiParam({ name: 'staffId', description: 'ID nhân viên (hoặc OAuth user ID)' })
   @ApiResponse({ status: 200, type: StaffBranchPermissionsSyncDto })
   async getStaffBranchPermissions(
     @Param('staffId') staffId: string,
     @Request() req,
   ): Promise<StaffBranchPermissionsSyncDto> {
-    return this.syncService.getStaffBranchPermissions(staffId, req.user?.tenantId);
+    // Pass email from JWT to find staff by username
+    return this.syncService.getStaffBranchPermissions(staffId, req.user?.tenantId, req.user?.email);
   }
 
   @Get('full')
