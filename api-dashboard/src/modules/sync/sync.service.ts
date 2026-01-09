@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Company, Brand, Branch, Department, Staff, TransactionCategory } from '../../database/entities';
+import { StaffRole } from '../../database/entities/enums';
 import {
   SyncCompanyDataDto,
   SyncCompanyDto,
@@ -370,7 +371,7 @@ export class SyncService {
         phone: dto.phone,
         email: dto.email,
         avatarUrl: dto.avatarUrl,
-        role: dto.role,
+        role: dto.role as StaffRole,
         username: dto.username,
         isActive: dto.isActive ?? true,
       });
@@ -386,7 +387,7 @@ export class SyncService {
         phone: dto.phone,
         email: dto.email,
         avatarUrl: dto.avatarUrl,
-        role: dto.role,
+        role: dto.role as StaffRole,
         username: dto.username,
         isActive: dto.isActive ?? true,
       });
