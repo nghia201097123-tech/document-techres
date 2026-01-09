@@ -6,6 +6,31 @@ import com.techres.ccb.data.remote.dto.FullSyncData
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Represents progress of each sync step
+ */
+data class SyncStepProgress(
+    val step: SyncStep,
+    val status: SyncStepStatus,
+    val count: Int = 0
+)
+
+enum class SyncStep {
+    FETCHING,      // Đang tải dữ liệu
+    CATEGORIES,    // Danh mục
+    PRODUCTS,      // Sản phẩm
+    AREAS,         // Khu vực
+    TABLES,        // Bàn
+    STAFF          // Nhân viên
+}
+
+enum class SyncStepStatus {
+    PENDING,
+    IN_PROGRESS,
+    COMPLETED,
+    ERROR
+}
+
 @Singleton
 class SyncRepository @Inject constructor(
     private val api: MasterDataApi,
@@ -16,22 +41,37 @@ class SyncRepository @Inject constructor(
     private val staffRepository: StaffRepository
 ) {
     suspend fun performFullSync(): Result<Unit> {
+        return performFullSyncWithProgress(null)
+    }
+
+    /**
+     * Perform full sync with progress callback for each step
+     */
+    suspend fun performFullSyncWithProgress(
+        onProgress: ((SyncStepProgress) -> Unit)?
+    ): Result<Unit> {
         return try {
             val token = authRepository.getAccessToken()
                 ?: return Result.failure(Exception("No access token"))
             val branchId = authRepository.getBranchId()
                 ?: return Result.failure(Exception("No branch ID"))
 
+            // Step: Fetching data
+            onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.IN_PROGRESS))
+
             val response = api.getFullSyncData("Bearer $token", branchId)
             if (response.isSuccessful && response.body() != null) {
                 val syncResponse = response.body()!!
                 if (syncResponse.success && syncResponse.data != null) {
-                    saveSyncData(branchId, syncResponse.data, syncResponse.syncTime)
+                    onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.COMPLETED))
+                    saveSyncDataWithProgress(branchId, syncResponse.data, syncResponse.syncTime, onProgress)
                     Result.success(Unit)
                 } else {
+                    onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.ERROR))
                     Result.failure(Exception(syncResponse.message ?: "Sync failed"))
                 }
             } else {
+                onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.ERROR))
                 Result.failure(Exception(response.message()))
             }
         } catch (e: Exception) {
@@ -39,8 +79,14 @@ class SyncRepository @Inject constructor(
         }
     }
 
-    private suspend fun saveSyncData(branchId: String, syncData: FullSyncData, syncTime: String) {
+    private suspend fun saveSyncDataWithProgress(
+        branchId: String,
+        syncData: FullSyncData,
+        syncTime: String,
+        onProgress: ((SyncStepProgress) -> Unit)?
+    ) {
         // Sync categories
+        onProgress?.invoke(SyncStepProgress(SyncStep.CATEGORIES, SyncStepStatus.IN_PROGRESS))
         val categories = syncData.categories.map { dto ->
             CategoryEntity(
                 id = dto.id,
@@ -57,8 +103,10 @@ class SyncRepository @Inject constructor(
             )
         }
         categoryRepository.syncCategories(branchId, categories)
+        onProgress?.invoke(SyncStepProgress(SyncStep.CATEGORIES, SyncStepStatus.COMPLETED, categories.size))
 
         // Sync products
+        onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCTS, SyncStepStatus.IN_PROGRESS))
         val products = syncData.products.map { dto ->
             ProductEntity(
                 id = dto.id,
@@ -86,8 +134,10 @@ class SyncRepository @Inject constructor(
             )
         }
         productRepository.syncProducts(branchId, products)
+        onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCTS, SyncStepStatus.COMPLETED, products.size))
 
         // Sync areas
+        onProgress?.invoke(SyncStepProgress(SyncStep.AREAS, SyncStepStatus.IN_PROGRESS))
         val areas = syncData.areas.map { dto ->
             AreaEntity(
                 id = dto.id,
@@ -103,8 +153,10 @@ class SyncRepository @Inject constructor(
             )
         }
         tableRepository.syncAreas(branchId, areas)
+        onProgress?.invoke(SyncStepProgress(SyncStep.AREAS, SyncStepStatus.COMPLETED, areas.size))
 
         // Sync tables
+        onProgress?.invoke(SyncStepProgress(SyncStep.TABLES, SyncStepStatus.IN_PROGRESS))
         val tables = syncData.tables.map { dto ->
             TableEntity(
                 id = dto.id,
@@ -122,8 +174,10 @@ class SyncRepository @Inject constructor(
             )
         }
         tableRepository.syncTables(branchId, tables)
+        onProgress?.invoke(SyncStepProgress(SyncStep.TABLES, SyncStepStatus.COMPLETED, tables.size))
 
         // Sync staff
+        onProgress?.invoke(SyncStepProgress(SyncStep.STAFF, SyncStepStatus.IN_PROGRESS))
         val staffList = syncData.staff.map { dto ->
             StaffEntity(
                 id = dto.id,
@@ -144,5 +198,6 @@ class SyncRepository @Inject constructor(
             )
         }
         staffRepository.syncStaff(branchId, staffList)
+        onProgress?.invoke(SyncStepProgress(SyncStep.STAFF, SyncStepStatus.COMPLETED, staffList.size))
     }
 }

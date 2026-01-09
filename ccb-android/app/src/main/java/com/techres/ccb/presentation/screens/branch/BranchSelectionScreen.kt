@@ -72,6 +72,7 @@ fun BranchSelectionScreen(
         SyncingBranchDataDialog(
             branchName = uiState.selectedBranch?.name ?: "",
             progress = uiState.branchDataSyncProgress,
+            syncSteps = uiState.syncSteps,
             onDismiss = { /* Cannot dismiss while syncing */ }
         )
     }
@@ -569,6 +570,7 @@ private fun ShiftExistsDialog(
 private fun SyncingBranchDataDialog(
     branchName: String,
     progress: Float,
+    syncSteps: Map<com.techres.ccb.data.repository.SyncStep, SyncStepUiState>,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -579,20 +581,10 @@ private fun SyncingBranchDataDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .width(320.dp)
+                    .width(360.dp)
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Progress indicator
-                CircularProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.size(64.dp),
-                    strokeWidth = 4.dp,
-                    color = Color(0xFF4CAF50)
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
                 Text(
                     text = "Đang đồng bộ dữ liệu",
                     fontSize = 18.sp,
@@ -600,7 +592,7 @@ private fun SyncingBranchDataDialog(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = "Chi nhánh: $branchName",
@@ -609,16 +601,19 @@ private fun SyncingBranchDataDialog(
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Danh mục, sản phẩm, khu vực, bàn, nhân viên...",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    textAlign = TextAlign.Center
-                )
-
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Individual sync steps
+                syncSteps.forEach { (step, stepState) ->
+                    SyncStepRow(
+                        name = stepState.name,
+                        status = stepState.status,
+                        count = stepState.count
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 LinearProgressIndicator(
                     progress = { progress },
@@ -636,6 +631,84 @@ private fun SyncingBranchDataDialog(
                     color = Color(0xFF4CAF50)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SyncStepRow(
+    name: String,
+    status: com.techres.ccb.data.repository.SyncStepStatus,
+    count: Int
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Status icon
+        when (status) {
+            com.techres.ccb.data.repository.SyncStepStatus.PENDING -> {
+                Icon(
+                    imageVector = Icons.Default.RadioButtonUnchecked,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+            }
+            com.techres.ccb.data.repository.SyncStepStatus.IN_PROGRESS -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = Color(0xFF2196F3)
+                )
+            }
+            com.techres.ccb.data.repository.SyncStepStatus.COMPLETED -> {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = Color(0xFF4CAF50)
+                )
+            }
+            com.techres.ccb.data.repository.SyncStepStatus.ERROR -> {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = Color(0xFFE91E63)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Step name
+        Text(
+            text = name,
+            fontSize = 14.sp,
+            color = when (status) {
+                com.techres.ccb.data.repository.SyncStepStatus.PENDING ->
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                com.techres.ccb.data.repository.SyncStepStatus.IN_PROGRESS ->
+                    Color(0xFF2196F3)
+                com.techres.ccb.data.repository.SyncStepStatus.COMPLETED ->
+                    Color(0xFF4CAF50)
+                com.techres.ccb.data.repository.SyncStepStatus.ERROR ->
+                    Color(0xFFE91E63)
+            },
+            fontWeight = if (status == com.techres.ccb.data.repository.SyncStepStatus.IN_PROGRESS)
+                FontWeight.Medium else FontWeight.Normal,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Count (only show if completed and count > 0)
+        if (status == com.techres.ccb.data.repository.SyncStepStatus.COMPLETED && count > 0) {
+            Text(
+                text = "$count",
+                fontSize = 12.sp,
+                color = Color(0xFF4CAF50),
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

@@ -7,6 +7,8 @@ import com.techres.ccb.data.local.entity.BrandEntity
 import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.repository.BranchRepository
 import com.techres.ccb.data.repository.SyncRepository
+import com.techres.ccb.data.repository.SyncStep
+import com.techres.ccb.data.repository.SyncStepStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +41,15 @@ enum class SyncState {
     ERROR
 }
 
+/**
+ * Represents progress of a single sync step in UI
+ */
+data class SyncStepUiState(
+    val name: String,
+    val status: SyncStepStatus = SyncStepStatus.PENDING,
+    val count: Int = 0
+)
+
 data class BranchSelectionUiState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
@@ -54,7 +65,16 @@ data class BranchSelectionUiState(
     val isSyncingBranchData: Boolean = false,
     val branchDataSyncState: SyncState = SyncState.NOT_STARTED,
     val branchDataSyncProgress: Float = 0f,
-    val branchDataSyncComplete: Boolean = false
+    val branchDataSyncComplete: Boolean = false,
+    // Individual sync steps progress
+    val syncSteps: Map<SyncStep, SyncStepUiState> = mapOf(
+        SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
+        SyncStep.CATEGORIES to SyncStepUiState("Danh mục"),
+        SyncStep.PRODUCTS to SyncStepUiState("Sản phẩm"),
+        SyncStep.AREAS to SyncStepUiState("Khu vực"),
+        SyncStep.TABLES to SyncStepUiState("Bàn"),
+        SyncStep.STAFF to SyncStepUiState("Nhân viên")
+    )
 )
 
 @HiltViewModel
@@ -201,11 +221,23 @@ class BranchSelectionViewModel @Inject constructor(
 
         viewModelScope.launch {
             Log.d(TAG, "confirmSelectionAndSync - Starting...")
+
+            // Reset sync steps to pending
+            val initialSyncSteps = mapOf(
+                SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
+                SyncStep.CATEGORIES to SyncStepUiState("Danh mục"),
+                SyncStep.PRODUCTS to SyncStepUiState("Sản phẩm"),
+                SyncStep.AREAS to SyncStepUiState("Khu vực"),
+                SyncStep.TABLES to SyncStepUiState("Bàn"),
+                SyncStep.STAFF to SyncStepUiState("Nhân viên")
+            )
+
             _uiState.update {
                 it.copy(
                     isSyncingBranchData = true,
                     branchDataSyncState = SyncState.SYNCING,
                     branchDataSyncProgress = 0f,
+                    syncSteps = initialSyncSteps,
                     error = null
                 )
             }
@@ -214,11 +246,33 @@ class BranchSelectionViewModel @Inject constructor(
                 // Save selected branch first
                 branchRepository.saveSelectedBranch(brandEntity, branchEntity)
                 Log.d(TAG, "confirmSelectionAndSync - Branch saved: ${branchEntity.name}")
-                _uiState.update { it.copy(branchDataSyncProgress = 0.2f) }
 
-                // Perform full sync for branch data
-                val result = syncRepository.performFullSync()
-                _uiState.update { it.copy(branchDataSyncProgress = 0.9f) }
+                // Perform full sync with progress callback
+                val result = syncRepository.performFullSyncWithProgress { progress ->
+                    Log.d(TAG, "Sync progress: ${progress.step} - ${progress.status} (${progress.count})")
+
+                    // Update the specific sync step
+                    _uiState.update { currentState ->
+                        val updatedSteps = currentState.syncSteps.toMutableMap()
+                        val currentStep = updatedSteps[progress.step]
+                        if (currentStep != null) {
+                            updatedSteps[progress.step] = currentStep.copy(
+                                status = progress.status,
+                                count = progress.count
+                            )
+                        }
+
+                        // Calculate overall progress based on completed steps
+                        val completedSteps = updatedSteps.values.count { it.status == SyncStepStatus.COMPLETED }
+                        val totalSteps = updatedSteps.size
+                        val overallProgress = completedSteps.toFloat() / totalSteps
+
+                        currentState.copy(
+                            syncSteps = updatedSteps,
+                            branchDataSyncProgress = overallProgress
+                        )
+                    }
+                }
 
                 result.fold(
                     onSuccess = {
@@ -263,11 +317,20 @@ class BranchSelectionViewModel @Inject constructor(
      * Reset branch data sync state
      */
     fun resetBranchDataSyncState() {
+        val initialSyncSteps = mapOf(
+            SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
+            SyncStep.CATEGORIES to SyncStepUiState("Danh mục"),
+            SyncStep.PRODUCTS to SyncStepUiState("Sản phẩm"),
+            SyncStep.AREAS to SyncStepUiState("Khu vực"),
+            SyncStep.TABLES to SyncStepUiState("Bàn"),
+            SyncStep.STAFF to SyncStepUiState("Nhân viên")
+        )
         _uiState.update {
             it.copy(
                 branchDataSyncState = SyncState.NOT_STARTED,
                 branchDataSyncProgress = 0f,
                 branchDataSyncComplete = false,
+                syncSteps = initialSyncSteps,
                 error = null
             )
         }
