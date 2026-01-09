@@ -2,12 +2,17 @@ package com.techres.ccb.presentation.screens.sync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.BranchRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.StaffRepository
 import com.techres.ccb.data.repository.SyncRepository
+import com.techres.ccb.data.repository.SyncStep
+import com.techres.ccb.data.repository.SyncStepProgress
+import com.techres.ccb.data.repository.SyncStepStatus
 import com.techres.ccb.data.repository.TableRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -54,7 +59,9 @@ class SyncDataViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val seasonalPriceDao: SeasonalPriceDao,
+    private val couponDao: CouponDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SyncDataUiState())
@@ -82,7 +89,8 @@ class SyncDataViewModel @Inject constructor(
             SyncItem("areas", "Khu vực", "place"),
             SyncItem("tables", "Bàn", "table_bar"),
             SyncItem("staff", "Nhân viên", "people"),
-            SyncItem("vouchers", "Khuyến mãi", "local_offer"),
+            SyncItem("seasonal_prices", "Giá thời vụ", "event"),
+            SyncItem("coupons", "Coupon", "discount"),
             SyncItem("settings", "Cấu hình", "settings")
         )
         _uiState.update { it.copy(syncItems = items) }
@@ -95,8 +103,10 @@ class SyncDataViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSyncing = true, error = null) }
 
-            // Try full sync first
-            val fullSyncResult = syncRepository.performFullSync()
+            // Use full sync with progress callback
+            val fullSyncResult = syncRepository.performFullSyncWithProgress { progress ->
+                handleSyncProgress(progress)
+            }
 
             fullSyncResult.fold(
                 onSuccess = {
@@ -116,10 +126,59 @@ class SyncDataViewModel @Inject constructor(
                     onComplete()
                 },
                 onFailure = { e ->
-                    // Full sync failed - try individual sync with progress
-                    performIndividualSync(onComplete)
+                    _uiState.update {
+                        it.copy(
+                            isSyncing = false,
+                            error = e.message ?: "Đồng bộ thất bại"
+                        )
+                    }
                 }
             )
+        }
+    }
+
+    /**
+     * Handle sync progress from SyncRepository
+     */
+    private fun handleSyncProgress(progress: SyncStepProgress) {
+        val itemId = when (progress.step) {
+            SyncStep.FETCHING -> null
+            SyncStep.CATEGORIES -> "categories"
+            SyncStep.PRODUCTS -> "products"
+            SyncStep.AREAS -> "areas"
+            SyncStep.TABLES -> "tables"
+            SyncStep.STAFF -> "staff"
+            SyncStep.SEASONAL_PRICES -> "seasonal_prices"
+            SyncStep.COUPONS -> "coupons"
+        }
+
+        if (itemId != null) {
+            val items = _uiState.value.syncItems.toMutableList()
+            val index = items.indexOfFirst { it.id == itemId }
+            if (index >= 0) {
+                val status = when (progress.status) {
+                    SyncStepStatus.PENDING -> SyncStatus.PENDING
+                    SyncStepStatus.IN_PROGRESS -> SyncStatus.SYNCING
+                    SyncStepStatus.COMPLETED -> SyncStatus.COMPLETED
+                    SyncStepStatus.ERROR -> SyncStatus.ERROR
+                }
+                items[index] = items[index].copy(
+                    status = status,
+                    itemCount = progress.count,
+                    progress = if (status == SyncStatus.COMPLETED) 1f else 0.5f
+                )
+
+                val completedCount = items.count { it.status == SyncStatus.COMPLETED }
+                val totalCount = items.size
+
+                _uiState.update {
+                    it.copy(
+                        syncItems = items.toList(),
+                        currentSyncItem = if (status == SyncStatus.SYNCING) items[index].name else it.currentSyncItem,
+                        overallProgress = completedCount.toFloat() / totalCount
+                    )
+                }
+            }
         }
     }
 
@@ -147,7 +206,8 @@ class SyncDataViewModel @Inject constructor(
                     "areas" -> syncAreas()
                     "tables" -> syncTables()
                     "staff" -> syncStaff()
-                    "vouchers" -> syncVouchers()
+                    "seasonal_prices" -> syncSeasonalPrices()
+                    "coupons" -> syncCoupons()
                     "settings" -> syncSettings()
                     else -> Result.success(0)
                 }
@@ -255,9 +315,24 @@ class SyncDataViewModel @Inject constructor(
         }
     }
 
-    private suspend fun syncVouchers(): Result<Int> {
-        // TODO: Implement voucher sync
-        return Result.success(0)
+    private suspend fun syncSeasonalPrices(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = seasonalPriceDao.countActive(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun syncCoupons(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = couponDao.countActive(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private suspend fun syncSettings(): Result<Int> {
@@ -279,7 +354,8 @@ class SyncDataViewModel @Inject constructor(
                 "areas" -> try { tableRepository.getAreasCount(branchId) } catch (e: Exception) { 0 }
                 "tables" -> try { tableRepository.getTablesCount(branchId) } catch (e: Exception) { 0 }
                 "staff" -> try { staffRepository.getStaffCount(branchId) } catch (e: Exception) { 0 }
-                "vouchers" -> 0
+                "seasonal_prices" -> try { seasonalPriceDao.countActive(branchId) } catch (e: Exception) { 0 }
+                "coupons" -> try { couponDao.countActive(branchId) } catch (e: Exception) { 0 }
                 "settings" -> 1
                 else -> 0
             }
