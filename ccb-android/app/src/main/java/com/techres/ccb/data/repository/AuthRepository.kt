@@ -1,7 +1,7 @@
 package com.techres.ccb.data.repository
 
 import android.content.SharedPreferences
-import com.techres.ccb.data.remote.api.MasterDataApi
+import com.techres.ccb.data.remote.api.AuthApi
 import com.techres.ccb.data.remote.dto.LoginRequest
 import com.techres.ccb.data.remote.dto.LoginResponse
 import com.techres.ccb.data.remote.dto.LoginUserDto
@@ -12,7 +12,7 @@ import javax.inject.Singleton
 
 @Singleton
 class AuthRepository @Inject constructor(
-    private val api: MasterDataApi,
+    private val authApi: AuthApi,
     private val sharedPreferences: SharedPreferences
 ) {
     companion object {
@@ -43,7 +43,7 @@ class AuthRepository @Inject constructor(
         password: String
     ): Result<LoginResponse> {
         return try {
-            val response = api.login(
+            val response = authApi.login(
                 LoginRequest(
                     tenantId = tenantId,
                     username = username,
@@ -82,7 +82,7 @@ class AuthRepository @Inject constructor(
     suspend fun verifyPin(pinCode: String): Result<VerifyPinResponse> {
         return try {
             val branchId = getBranchId() ?: return Result.failure(Exception("Chưa có thông tin chi nhánh"))
-            val response = api.verifyPin(
+            val response = authApi.verifyPin(
                 VerifyPinRequest(
                     branchId = branchId,
                     pinCode = pinCode

@@ -3,6 +3,7 @@ package com.techres.ccb.di
 import android.os.Build
 import android.util.Log
 import com.techres.ccb.BuildConfig
+import com.techres.ccb.data.remote.api.AuthApi
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.api.PosApi
 import com.techres.ccb.data.remote.api.SyncApi
@@ -130,6 +131,12 @@ object NetworkModule {
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthApi(@TenantRetrofit retrofit: Retrofit): AuthApi {
+        return retrofit.create(AuthApi::class.java)
     }
 
     @Provides

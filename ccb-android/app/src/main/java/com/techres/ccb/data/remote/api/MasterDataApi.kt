@@ -4,15 +4,13 @@ import com.techres.ccb.data.remote.dto.*
 import retrofit2.Response
 import retrofit2.http.*
 
+/**
+ * Master Data API interface for api-master-data
+ * Routes through /api/pos/* -> api-master-data
+ *
+ * Note: Authentication endpoints are in AuthApi (routes through /api/tenant/auth/* -> api-oauth)
+ */
 interface MasterDataApi {
-
-    // ============ Authentication ============
-
-    @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
-
-    @POST("auth/verify-pin")
-    suspend fun verifyPin(@Body request: VerifyPinRequest): Response<VerifyPinResponse>
 
     // ============ Master Data Sync ============
 
