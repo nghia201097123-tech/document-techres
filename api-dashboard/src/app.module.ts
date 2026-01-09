@@ -24,6 +24,7 @@ import { SettingsModule } from "./modules/settings/settings.module";
 import { SyncModule } from "./modules/sync/sync.module";
 import { TransactionCategoriesModule } from "./modules/transaction-categories/transaction-categories.module";
 import { TransactionVouchersModule } from "./modules/transaction-vouchers/transaction-vouchers.module";
+import { StaffBranchModule } from "./modules/staff-branch/staff-branch.module";
 import { DatabaseMigrationService } from "./database/database-migration.service";
 import {
   Company,
@@ -53,6 +54,7 @@ import {
   ProductKitchen,
   DepartmentPermission,
   StaffPermission,
+  StaffBranch,
   ComboItem,
   Surcharge,
   SeasonalPrice,
@@ -110,6 +112,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
           ProductKitchen,
           DepartmentPermission,
           StaffPermission,
+          StaffBranch,
           ComboItem,
           Surcharge,
           SeasonalPrice,
@@ -151,6 +154,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     SyncModule,
     TransactionCategoriesModule,
     TransactionVouchersModule,
+    StaffBranchModule,
   ],
   providers: [DatabaseMigrationService],
 })
