@@ -199,6 +199,7 @@ class BranchRepository @Inject constructor(
     /**
      * Sync brands and branches based on staff permissions
      * Only syncs the brands/branches that the logged-in staff has access to
+     * IMPORTANT: Clears ALL old brand/branch data before saving new data
      * @return Result containing count of synced items and default branch ID
      */
     suspend fun syncStaffBranchPermissions(): Result<SyncBranchResult> {
@@ -219,7 +220,6 @@ class BranchRepository @Inject constructor(
             }
 
             Log.d(TAG, "syncStaffBranchPermissions - Calling POS API: sync/branches-brands/$staffId")
-            Log.d(TAG, "syncStaffBranchPermissions - Using token: Bearer ${token.take(20)}...")
             val response = posApi.getStaffBranchPermissions("Bearer $token", staffId)
             Log.d(TAG, "syncStaffBranchPermissions - Response code: ${response.code()}, message: ${response.message()}")
 
@@ -227,58 +227,63 @@ class BranchRepository @Inject constructor(
                 val permissionsResponse = response.body()!!
                 Log.d(TAG, "syncStaffBranchPermissions - Data count: ${permissionsResponse.data?.size ?: 0}")
 
-                if (permissionsResponse.data != null) {
-                    val brandWithBranches = permissionsResponse.data
-                    val now = Instant.now().toString()
+                // Always process the data, even if empty (to clear old data)
+                val brandWithBranches = permissionsResponse.data ?: emptyList()
+                val now = Instant.now().toString()
 
-                    // Convert and save brands
-                    val brandEntities = brandWithBranches.map { item ->
-                        BrandEntity(
-                            id = item.brand.id,
-                            name = item.brand.name,
-                            code = item.brand.code,
-                            logo = item.brand.logoUrl,
-                            companyId = null,
-                            companyName = null,
-                            isActive = item.brand.isActive,
+                // Clear old selection if we're about to clear all data
+                if (brandWithBranches.isEmpty()) {
+                    Log.w(TAG, "syncStaffBranchPermissions - No branch permissions for this staff, clearing all data")
+                    clearSelectedBranch()
+                }
+
+                // Convert brands (will be empty list if no permissions)
+                val brandEntities = brandWithBranches.map { item ->
+                    BrandEntity(
+                        id = item.brand.id,
+                        name = item.brand.name,
+                        code = item.brand.code,
+                        logo = item.brand.logoUrl,
+                        companyId = null,
+                        companyName = null,
+                        isActive = item.brand.isActive,
+                        syncedAt = now
+                    )
+                }
+
+                // syncBrands will DELETE ALL old brands then insert new ones
+                brandDao.syncBrands(brandEntities)
+                Log.d(TAG, "syncStaffBranchPermissions - Cleared old brands and saved ${brandEntities.size} new brands")
+
+                // Convert branches (will be empty list if no permissions)
+                val branchEntities = brandWithBranches.flatMap { item ->
+                    item.branches.map { branch ->
+                        BranchEntity(
+                            id = branch.id,
+                            brandId = branch.brandId,
+                            brandName = item.brand.name,
+                            name = branch.name,
+                            code = branch.storeCode,
+                            address = branch.address,
+                            phone = branch.phone,
+                            isActive = branch.status != "inactive",
                             syncedAt = now
                         )
                     }
-                    brandDao.syncBrands(brandEntities)
-                    Log.d(TAG, "syncStaffBranchPermissions - Saved ${brandEntities.size} brands")
-
-                    // Convert and save branches
-                    val branchEntities = brandWithBranches.flatMap { item ->
-                        item.branches.map { branch ->
-                            BranchEntity(
-                                id = branch.id,
-                                brandId = branch.brandId,
-                                brandName = item.brand.name,
-                                name = branch.name,
-                                code = branch.storeCode,
-                                address = branch.address,
-                                phone = branch.phone,
-                                isActive = branch.status != "inactive",
-                                syncedAt = now
-                            )
-                        }
-                    }
-                    branchDao.syncBranches(branchEntities)
-                    Log.d(TAG, "syncStaffBranchPermissions - Saved ${branchEntities.size} branches")
-
-                    val result = SyncBranchResult(
-                        brandsCount = brandEntities.size,
-                        branchesCount = branchEntities.size,
-                        defaultBranchId = permissionsResponse.defaultBranchId,
-                        syncedAt = permissionsResponse.syncedAt
-                    )
-
-                    Result.success(result)
-                } else {
-                    val errorMsg = permissionsResponse.message ?: "Không có dữ liệu chi nhánh"
-                    Log.e(TAG, "syncStaffBranchPermissions - API error: $errorMsg")
-                    Result.failure(Exception(errorMsg))
                 }
+
+                // syncBranches will DELETE ALL old branches then insert new ones
+                branchDao.syncBranches(branchEntities)
+                Log.d(TAG, "syncStaffBranchPermissions - Cleared old branches and saved ${branchEntities.size} new branches")
+
+                val result = SyncBranchResult(
+                    brandsCount = brandEntities.size,
+                    branchesCount = branchEntities.size,
+                    defaultBranchId = permissionsResponse.defaultBranchId,
+                    syncedAt = permissionsResponse.syncedAt
+                )
+
+                Result.success(result)
             } else {
                 val errorBody = response.errorBody()?.string()
                 Log.e(TAG, "syncStaffBranchPermissions - HTTP error: ${response.code()} - ${response.message()}")

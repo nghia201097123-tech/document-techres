@@ -39,31 +39,23 @@ export class SyncService {
 
   /**
    * Sync brands and branches based on staff's permissions
-   * Returns only brands/branches that the staff has access to
-   * If no explicit permissions, fallback to all branches for the tenant
+   * Returns ONLY brands/branches that the staff has explicit access to
+   * If no permissions assigned, returns empty array
    */
   async getStaffBranchPermissions(staffId: string, tenantId?: string): Promise<StaffBranchPermissionsSyncDto> {
+    console.log(`[SyncService.getStaffBranchPermissions] staffId=${staffId}, tenantId=${tenantId}`);
+
     // Get all branch assignments for this staff
     const staffBranches = await this.staffBranchRepository.find({
       where: { staffId },
       relations: ['branch', 'brand'],
     });
 
-    // If staff has explicit permissions, use them
-    if (staffBranches.length > 0) {
-      return this.buildPermissionsFromStaffBranches(staffBranches);
-    }
+    console.log(`[SyncService.getStaffBranchPermissions] Found ${staffBranches.length} branch permissions for staff ${staffId}`);
 
-    // Fallback: Get all brands and branches for the tenant
-    console.log(`[SyncService] No staff_branches for staffId=${staffId}, using fallback for tenantId=${tenantId}`);
-
-    // Get all brands with their branches
-    const brands = await this.brandRepository.find({
-      relations: ['branches'],
-    });
-
-    if (brands.length === 0) {
-      console.log('[SyncService] No brands found, returning empty');
+    // Only return data that staff has explicit permissions for
+    if (staffBranches.length === 0) {
+      console.log(`[SyncService.getStaffBranchPermissions] No permissions found for staff ${staffId}, returning empty`);
       return {
         data: [],
         defaultBranchId: '',
@@ -71,48 +63,7 @@ export class SyncService {
       };
     }
 
-    // Build response from all brands/branches
-    const brandMap = new Map<string, BrandWithBranchesDto>();
-    let defaultBranchId = '';
-
-    for (const brand of brands) {
-      if (!brand.branches || brand.branches.length === 0) continue;
-
-      brandMap.set(brand.id, {
-        brand: {
-          id: brand.id,
-          name: brand.name || '',
-          code: brand.code || '',
-          logoUrl: brand.logoUrl || '',
-          isActive: brand.isActive ?? true,
-        },
-        branches: brand.branches.map((branch, index) => {
-          // First branch of first brand is default
-          const isDefault = !defaultBranchId && index === 0;
-          if (isDefault) {
-            defaultBranchId = branch.id;
-          }
-          return {
-            id: branch.id,
-            brandId: brand.id,
-            name: branch.name || '',
-            storeCode: '',
-            address: branch.address || '',
-            phone: branch.phone || '',
-            isDefault,
-            status: 'active',
-          };
-        }),
-      });
-    }
-
-    console.log(`[SyncService] Fallback returned ${brandMap.size} brands, defaultBranchId=${defaultBranchId}`);
-
-    return {
-      data: Array.from(brandMap.values()),
-      defaultBranchId,
-      syncedAt: new Date().toISOString(),
-    };
+    return this.buildPermissionsFromStaffBranches(staffBranches);
   }
 
   /**
