@@ -21,6 +21,7 @@ import com.techres.ccb.presentation.theme.Success
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDebug: () -> Unit = {},
+    onNavigateToKitchenPrinter: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -91,9 +92,9 @@ fun SettingsScreen(
             item {
                 SettingsCard(
                     icon = Icons.Default.Print,
-                    title = "Cài đặt máy in",
-                    subtitle = "Kết nối máy in bill, máy in tem",
-                    onClick = { /* TODO: Navigate to printer settings */ }
+                    title = "Quản lý Bếp & Máy in",
+                    subtitle = "Gán máy in cho từng bếp",
+                    onClick = onNavigateToKitchenPrinter
                 )
             }
 

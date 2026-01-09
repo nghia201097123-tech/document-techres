@@ -22,6 +22,7 @@ import com.techres.ccb.presentation.screens.order.OrderScreen
 import com.techres.ccb.presentation.screens.payment.PaymentScreen
 import com.techres.ccb.presentation.screens.sale.SaleScreen
 import com.techres.ccb.presentation.screens.settings.SettingsScreen
+import com.techres.ccb.presentation.screens.settings.KitchenPrinterScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
@@ -59,6 +60,7 @@ sealed class Screen(val route: String) {
     }
     object Shift : Screen("shift")
     object Settings : Screen("settings")
+    object KitchenPrinter : Screen("kitchen_printer")
     object DatabaseDebug : Screen("database_debug")
 }
 
@@ -342,7 +344,14 @@ fun CCBNavHost() {
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToDebug = { navController.navigate(Screen.DatabaseDebug.route) }
+                onNavigateToDebug = { navController.navigate(Screen.DatabaseDebug.route) },
+                onNavigateToKitchenPrinter = { navController.navigate(Screen.KitchenPrinter.route) }
+            )
+        }
+
+        composable(Screen.KitchenPrinter.route) {
+            KitchenPrinterScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
