@@ -1,19 +1,52 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Branch, Brand } from '../../database/entities';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { BranchListDto } from './dto/branch-list.dto';
+import { DashboardSyncService } from '../../common/services/dashboard-sync.service';
 
 @Injectable()
 export class BranchesService {
+  private readonly logger = new Logger(BranchesService.name);
+
   constructor(
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
     @InjectRepository(Brand)
     private readonly brandRepository: Repository<Brand>,
+    private readonly dashboardSyncService: DashboardSyncService,
   ) {}
+
+  /**
+   * Sync branch to dashboard API (non-blocking)
+   */
+  private async syncBranchToDashboard(branch: Branch): Promise<void> {
+    try {
+      await this.dashboardSyncService.syncBranch({
+        id: branch.id,
+        tenantId: branch.tenantId,
+        brandId: branch.brandId,
+        name: branch.name,
+        code: branch.code,
+        logoUrl: branch.logoUrl,
+        addressDetail: branch.addressDetail,
+        provinceCode: branch.provinceCode,
+        wardCode: branch.wardCode,
+        phone: branch.phone,
+        email: branch.email,
+        manager: branch.manager,
+        openTime: branch.openTime,
+        closeTime: branch.closeTime,
+        businessModel: branch.businessModel,
+        isActive: branch.isActive,
+      });
+    } catch (error) {
+      // Log but don't throw - sync failure shouldn't block main operation
+      this.logger.error(`Failed to sync branch ${branch.code}: ${error}`);
+    }
+  }
 
   /**
    * Transform branch entity to response (map logoUrl to logo)
@@ -53,6 +86,10 @@ export class BranchesService {
 
     const branch = this.branchRepository.create(branchData);
     const saved = await this.branchRepository.save(branch);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBranchToDashboard(saved);
+
     return this.transformBranch(saved);
   }
 
@@ -128,6 +165,10 @@ export class BranchesService {
     }
     Object.assign(branch, restDto);
     const saved = await this.branchRepository.save(branch);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBranchToDashboard(saved);
+
     return this.transformBranch(saved);
   }
 
@@ -154,6 +195,10 @@ export class BranchesService {
 
     branch.isActive = !branch.isActive;
     const saved = await this.branchRepository.save(branch);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBranchToDashboard(saved);
+
     return this.transformBranch(saved);
   }
 }

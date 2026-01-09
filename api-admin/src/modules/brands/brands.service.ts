@@ -1,19 +1,44 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Brand, Company } from '../../database/entities';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
 import { BrandListDto } from './dto/brand-list.dto';
+import { DashboardSyncService } from '../../common/services/dashboard-sync.service';
 
 @Injectable()
 export class BrandsService {
+  private readonly logger = new Logger(BrandsService.name);
+
   constructor(
     @InjectRepository(Brand)
     private readonly brandRepository: Repository<Brand>,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
+    private readonly dashboardSyncService: DashboardSyncService,
   ) {}
+
+  /**
+   * Sync brand to dashboard API (non-blocking)
+   */
+  private async syncBrandToDashboard(brand: Brand): Promise<void> {
+    try {
+      await this.dashboardSyncService.syncBrand({
+        id: brand.id,
+        tenantId: brand.tenantId,
+        companyId: brand.companyId,
+        name: brand.name,
+        code: brand.code,
+        logoUrl: brand.logoUrl,
+        description: brand.description,
+        businessModel: brand.businessModel,
+        isActive: brand.isActive,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to sync brand ${brand.code}: ${error}`);
+    }
+  }
 
   /**
    * Transform brand entity to response (map logoUrl to logo)
@@ -53,6 +78,10 @@ export class BrandsService {
 
     const brand = this.brandRepository.create(brandData);
     const saved = await this.brandRepository.save(brand);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBrandToDashboard(saved);
+
     return this.transformBrand(saved);
   }
 
@@ -120,6 +149,10 @@ export class BrandsService {
     }
     Object.assign(brand, restDto);
     const saved = await this.brandRepository.save(brand);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBrandToDashboard(saved);
+
     return this.transformBrand(saved);
   }
 
@@ -146,6 +179,10 @@ export class BrandsService {
 
     brand.isActive = !brand.isActive;
     const saved = await this.brandRepository.save(brand);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBrandToDashboard(saved);
+
     return this.transformBrand(saved);
   }
 }

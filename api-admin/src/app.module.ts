@@ -4,6 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
+// Common module
+import { CommonModule } from './common/common.module';
+
 // Entities
 import {
   Company,
@@ -69,6 +72,9 @@ import { TransactionCategoriesModule } from './modules/transaction-categories/tr
       }),
       inject: [ConfigService],
     }),
+
+    // Common module (global)
+    CommonModule,
 
     // Feature modules
     AuthModule,
