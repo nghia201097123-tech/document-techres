@@ -1,6 +1,5 @@
 package com.techres.ccb.presentation.screens.branch
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,119 +18,45 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.delay
-
-// Mock data classes
-data class MockBrand(
-    val id: String,
-    val name: String,
-    val logo: String? = null,
-    val branches: List<MockBranch> = emptyList()
-)
-
-data class MockBranch(
-    val id: String,
-    val name: String,
-    val address: String,
-    val phone: String? = null
-)
-
-// Sync states
-enum class SyncState {
-    NOT_STARTED,
-    SYNCING,
-    COMPLETED
-}
-
-// Mock sync item
-private data class BranchSyncItem(
-    val id: String,
-    val name: String,
-    val icon: ImageVector,
-    val status: BranchSyncStatus = BranchSyncStatus.PENDING,
-    val count: Int = 0
-)
-
-private enum class BranchSyncStatus {
-    PENDING, SYNCING, COMPLETED, ERROR
-}
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun BranchSelectionScreen(
     onContinueToOpenShift: (branchName: String) -> Unit,
     onContinueToExistingShift: (branchName: String) -> Unit,
     onCloseShift: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: BranchSelectionViewModel = hiltViewModel()
 ) {
-    // Mock data
-    val mockBrands = remember {
-        listOf(
-            MockBrand(
-                id = "1",
-                name = "Gà Rán TechRes",
-                branches = listOf(
-                    MockBranch("1", "Chi nhánh Quận 1", "123 Nguyễn Huệ, Q.1"),
-                    MockBranch("2", "Chi nhánh Quận 3", "456 Võ Văn Tần, Q.3"),
-                    MockBranch("3", "Chi nhánh Quận 7", "789 Nguyễn Văn Linh, Q.7")
-                )
-            ),
-            MockBrand(
-                id = "2",
-                name = "Coffee House",
-                branches = listOf(
-                    MockBranch("4", "Landmark 81", "Vinhomes Central Park"),
-                    MockBranch("5", "Phú Mỹ Hưng", "SC Vivo City, Q.7")
-                )
-            ),
-            MockBrand(
-                id = "3",
-                name = "Phở Việt",
-                branches = listOf(
-                    MockBranch("6", "Chi nhánh Thủ Đức", "200 Võ Văn Ngân, Thủ Đức")
-                )
-            )
-        )
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
-    var selectedBrand by remember { mutableStateOf<MockBrand?>(null) }
-    var selectedBranch by remember { mutableStateOf<MockBranch?>(null) }
-    var syncState by remember { mutableStateOf(SyncState.NOT_STARTED) }
-    var syncProgress by remember { mutableFloatStateOf(0f) }
     var showShiftDialog by remember { mutableStateOf(false) }
 
     // Mock: check if shift exists (for demo, randomly true/false based on branch id)
-    val hasExistingShift = remember(selectedBranch) {
-        selectedBranch?.id?.toIntOrNull()?.rem(2) == 0 // Even branch IDs have existing shift
+    val hasExistingShift = remember(uiState.selectedBranch) {
+        uiState.selectedBranch?.id?.toIntOrNull()?.rem(2) == 0 // Even branch IDs have existing shift
     }
 
-    // Sync items state
-    var syncItems by remember {
-        mutableStateOf(
-            listOf(
-                BranchSyncItem("categories", "Danh mục", Icons.Default.Category),
-                BranchSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
-                BranchSyncItem("areas", "Khu vực", Icons.Default.Map),
-                BranchSyncItem("tables", "Bàn", Icons.Default.TableBar),
-                BranchSyncItem("kitchens", "Bếp", Icons.Default.Countertops),
-                BranchSyncItem("staff", "Nhân viên", Icons.Default.People)
-            )
-        )
+    // Auto-sync when no data exists
+    LaunchedEffect(uiState.brands.isEmpty() && !uiState.isLoading && uiState.syncState == SyncState.NOT_STARTED) {
+        if (uiState.brands.isEmpty() && !uiState.isLoading && uiState.syncState == SyncState.NOT_STARTED) {
+            // Automatically start sync if no data
+            viewModel.syncBranchPermissions()
+        }
     }
 
     // Shift dialog
     if (showShiftDialog) {
         ShiftExistsDialog(
-            branchName = selectedBranch?.name ?: "",
+            branchName = uiState.selectedBranch?.name ?: "",
             onContinue = {
                 showShiftDialog = false
-                selectedBranch?.let { onContinueToExistingShift(it.name) }
+                uiState.selectedBranch?.let { onContinueToExistingShift(it.name) }
             },
             onCloseShift = {
                 showShiftDialog = false
@@ -199,24 +124,105 @@ fun BranchSelectionScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Brand list
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(mockBrands) { brand ->
-                        BrandSelectionCard(
-                            brand = brand,
-                            isSelected = selectedBrand?.id == brand.id,
-                            onClick = {
-                                selectedBrand = brand
-                                selectedBranch = null
-                                syncState = SyncState.NOT_STARTED
-                                syncProgress = 0f
-                                // Reset sync items
-                                syncItems = syncItems.map { it.copy(status = BranchSyncStatus.PENDING, count = 0) }
-                            }
+                // Loading state
+                if (uiState.isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                } else if (uiState.brands.isEmpty() && uiState.error != null) {
+                    // Error state
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = Color.White.copy(alpha = 0.6f)
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = uiState.error ?: "Đã xảy ra lỗi",
+                            color = Color.White.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.syncBranchPermissions() },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Thử lại")
+                        }
+                    }
+                } else if (uiState.brands.isEmpty()) {
+                    // No data - prompt to sync
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = Color.White.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Chưa có dữ liệu thương hiệu",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Bấm nút bên dưới để đồng bộ",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.syncBranchPermissions() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Đồng bộ dữ liệu")
+                        }
+                    }
+                } else {
+                    // Brand list
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(uiState.brands) { brand ->
+                            BrandSelectionCard(
+                                brand = brand,
+                                isSelected = uiState.selectedBrand?.id == brand.id,
+                                onClick = {
+                                    viewModel.selectBrand(brand)
+                                    viewModel.resetSyncState()
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -251,7 +257,7 @@ fun BranchSelectionScreen(
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface)
         ) {
-            if (selectedBrand == null) {
+            if (uiState.selectedBrand == null) {
                 // Empty state
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -289,377 +295,101 @@ fun BranchSelectionScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = selectedBrand!!.name,
+                        text = uiState.selectedBrand?.name ?: "",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Text(
-                        text = "${selectedBrand!!.branches.size} chi nhánh",
+                        text = "${uiState.selectedBrand?.branches?.size ?: 0} chi nhánh",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Branch list (only show when not syncing)
-                    if (syncState == SyncState.NOT_STARTED) {
+                    // Branch list
+                    val branches = uiState.selectedBrand?.branches ?: emptyList()
+                    if (branches.isEmpty()) {
+                        // No branches for this brand
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Store,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Không có chi nhánh nào",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    } else {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            items(selectedBrand!!.branches) { branch ->
+                            items(branches) { branch ->
                                 BranchSelectionCard(
                                     branch = branch,
-                                    isSelected = selectedBranch?.id == branch.id,
-                                    onClick = { selectedBranch = branch }
+                                    isSelected = uiState.selectedBranch?.id == branch.id,
+                                    onClick = { viewModel.selectBranch(branch) }
                                 )
                             }
                         }
-                    } else {
-                        // Show sync progress
-                        SyncProgressPanel(
-                            branchName = selectedBranch?.name ?: "",
-                            syncItems = syncItems,
-                            syncProgress = syncProgress,
-                            isCompleted = syncState == SyncState.COMPLETED,
-                            modifier = Modifier.weight(1f)
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Action buttons based on state
-                    when (syncState) {
-                        SyncState.NOT_STARTED -> {
-                            // Sync button (only show when branch is selected)
-                            Button(
-                                onClick = {
-                                    syncState = SyncState.SYNCING
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                enabled = selectedBranch != null,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2196F3)
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CloudDownload,
-                                    contentDescription = null
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Đồng bộ dữ liệu",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        SyncState.SYNCING -> {
-                            // Mock sync animation
-                            LaunchedEffect(Unit) {
-                                val mockCounts = listOf(12, 48, 4, 20, 3, 8)
-
-                                for (i in syncItems.indices) {
-                                    syncItems = syncItems.toMutableList().apply {
-                                        this[i] = this[i].copy(status = BranchSyncStatus.SYNCING)
-                                    }
-
-                                    delay(500)
-
-                                    syncItems = syncItems.toMutableList().apply {
-                                        this[i] = this[i].copy(
-                                            status = BranchSyncStatus.COMPLETED,
-                                            count = mockCounts[i]
-                                        )
-                                    }
-
-                                    syncProgress = (i + 1).toFloat() / syncItems.size
+                    // Action button - show "Tiếp tục" when branch is selected
+                    Button(
+                        onClick = {
+                            if (viewModel.confirmSelection()) {
+                                if (hasExistingShift) {
+                                    showShiftDialog = true
+                                } else {
+                                    uiState.selectedBranch?.let { onContinueToOpenShift(it.name) }
                                 }
-
-                                syncState = SyncState.COMPLETED
                             }
-
-                            // Syncing indicator button (disabled)
-                            Button(
-                                onClick = { },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                enabled = false,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2196F3),
-                                    disabledContainerColor = Color(0xFF2196F3).copy(alpha = 0.7f)
-                                )
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "Đang đồng bộ...",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                        SyncState.COMPLETED -> {
-                            // Continue button
-                            Button(
-                                onClick = {
-                                    if (hasExistingShift) {
-                                        showShiftDialog = true
-                                    } else {
-                                        selectedBranch?.let { onContinueToOpenShift(it.name) }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF4CAF50)
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Tiếp tục",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.Default.ArrowForward, contentDescription = null)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SyncProgressPanel(
-    branchName: String,
-    syncItems: List<BranchSyncItem>,
-    syncProgress: Float,
-    isCompleted: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp)
-        ) {
-            // Header
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!isCompleted) {
-                    val infiniteTransition = rememberInfiniteTransition(label = "sync")
-                    val rotation by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1500, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "rotation"
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .graphicsLayer { rotationZ = rotation },
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = Color(0xFF4CAF50)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = if (isCompleted) "Đồng bộ hoàn tất!" else "Đang đồng bộ...",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = branchName,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Progress bar
-            LinearProgressIndicator(
-                progress = { syncProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = if (isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "${(syncProgress * 100).toInt()}%",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.End)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Sync items
-            syncItems.forEach { item ->
-                SyncItemRowCompact(item = item)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            if (isCompleted) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFE8F5E9)
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Row(
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(56.dp),
+                        enabled = uiState.selectedBranch != null,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50),
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(20.dp)
+                            imageVector = if (uiState.selectedBranch != null)
+                                Icons.Default.CheckCircle
+                            else
+                                Icons.Default.Store,
+                            contentDescription = null
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Tổng cộng ${syncItems.sumOf { it.count }} mục đã tải về",
-                            fontSize = 13.sp,
-                            color = Color(0xFF2E7D32)
+                            text = if (uiState.selectedBranch != null) "Tiếp tục" else "Chọn chi nhánh",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
+                        if (uiState.selectedBranch != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Default.ArrowForward, contentDescription = null)
+                        }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SyncItemRowCompact(item: BranchSyncItem) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = when (item.status) {
-                    BranchSyncStatus.COMPLETED -> Color(0xFFE8F5E9)
-                    BranchSyncStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    else -> Color.Transparent
-                },
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    when (item.status) {
-                        BranchSyncStatus.COMPLETED -> Color(0xFF4CAF50)
-                        BranchSyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = item.icon,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = if (item.status == BranchSyncStatus.PENDING)
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                else
-                    Color.White
-            )
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Text(
-            text = item.name,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        when (item.status) {
-            BranchSyncStatus.COMPLETED -> {
-                Text(
-                    text = "${item.count}",
-                    fontSize = 12.sp,
-                    color = Color(0xFF4CAF50),
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = Color(0xFF4CAF50)
-                )
-            }
-            BranchSyncStatus.SYNCING -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            else -> {
-                Icon(
-                    imageVector = Icons.Default.Schedule,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
             }
         }
     }
@@ -780,7 +510,7 @@ private fun ShiftExistsDialog(
 
 @Composable
 private fun BrandSelectionCard(
-    brand: MockBrand,
+    brand: Brand,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -861,7 +591,7 @@ private fun BrandSelectionCard(
 
 @Composable
 private fun BranchSelectionCard(
-    branch: MockBranch,
+    branch: Branch,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {

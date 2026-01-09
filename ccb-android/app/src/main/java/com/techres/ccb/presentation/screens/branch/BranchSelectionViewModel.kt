@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.branch
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.entity.BrandEntity
@@ -29,12 +30,25 @@ data class Branch(
     val brandId: String
 )
 
+// Sync state enum
+enum class SyncState {
+    NOT_STARTED,
+    SYNCING,
+    COMPLETED,
+    ERROR
+}
+
 data class BranchSelectionUiState(
     val isLoading: Boolean = false,
+    val isSyncing: Boolean = false,
+    val syncState: SyncState = SyncState.NOT_STARTED,
+    val syncProgress: Float = 0f,
     val brands: List<Brand> = emptyList(),
     val selectedBrand: Brand? = null,
     val selectedBranch: Branch? = null,
-    val error: String? = null
+    val error: String? = null,
+    val syncedBrandsCount: Int = 0,
+    val syncedBranchesCount: Int = 0
 )
 
 @HiltViewModel
@@ -165,5 +179,88 @@ class BranchSelectionViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    /**
+     * Sync brands and branches from API based on staff permissions
+     */
+    fun syncBranchPermissions() {
+        viewModelScope.launch {
+            Log.d(TAG, "syncBranchPermissions - Starting sync...")
+            _uiState.update {
+                it.copy(
+                    isSyncing = true,
+                    syncState = SyncState.SYNCING,
+                    syncProgress = 0f,
+                    error = null
+                )
+            }
+
+            try {
+                // Simulate progress for better UX
+                _uiState.update { it.copy(syncProgress = 0.2f) }
+
+                val result = branchRepository.syncStaffBranchPermissions()
+                Log.d(TAG, "syncBranchPermissions - Result: $result")
+
+                _uiState.update { it.copy(syncProgress = 0.8f) }
+
+                result.fold(
+                    onSuccess = { syncResult ->
+                        Log.d(TAG, "syncBranchPermissions - Success: ${syncResult.brandsCount} brands, ${syncResult.branchesCount} branches")
+                        _uiState.update {
+                            it.copy(
+                                isSyncing = false,
+                                syncState = SyncState.COMPLETED,
+                                syncProgress = 1f,
+                                syncedBrandsCount = syncResult.brandsCount,
+                                syncedBranchesCount = syncResult.branchesCount,
+                                error = null
+                            )
+                        }
+                        // Reload data from local DB
+                        loadBrandsFromLocal()
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "syncBranchPermissions - Error: ${error.message}", error)
+                        _uiState.update {
+                            it.copy(
+                                isSyncing = false,
+                                syncState = SyncState.ERROR,
+                                syncProgress = 0f,
+                                error = error.message ?: "Lỗi đồng bộ dữ liệu"
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "syncBranchPermissions - Exception: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncState = SyncState.ERROR,
+                        syncProgress = 0f,
+                        error = e.message ?: "Lỗi đồng bộ dữ liệu"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Reset sync state to allow re-syncing
+     */
+    fun resetSyncState() {
+        _uiState.update {
+            it.copy(
+                syncState = SyncState.NOT_STARTED,
+                syncProgress = 0f,
+                error = null
+            )
+        }
+    }
+
+    companion object {
+        private const val TAG = "BranchSelectionVM"
     }
 }
