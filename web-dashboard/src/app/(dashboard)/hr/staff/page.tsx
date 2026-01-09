@@ -45,6 +45,7 @@ import { permissionService, type Permission } from "@/services/permission-servic
 import { locationService } from "@/services/location-service";
 import { exportToExcel, exportToExcelWithDropdowns, readExcelFile, downloadTemplateWithDependentDropdowns, type TemplateColumnWithDropdown, type DependentDropdownConfig, type DropdownOption, type ExportColumnWithDropdown } from "@/lib/excel-utils";
 import { branchService, type Branch } from "@/services/branch-service";
+import { staffBranchService, type StaffBranch } from "@/services/staff-branch-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
@@ -271,6 +272,13 @@ export default function StaffPage() {
   const [departmentPermissionIds, setDepartmentPermissionIds] = React.useState<Set<string>>(new Set());
   const [loadingPermissions, setLoadingPermissions] = React.useState(false);
   const [savingPermissions, setSavingPermissions] = React.useState(false);
+
+  // Branch assignment states
+  const [branchAssignDialogOpen, setBranchAssignDialogOpen] = React.useState(false);
+  const [branchAssignStaff, setBranchAssignStaff] = React.useState<Staff | null>(null);
+  const [assignedBranchIds, setAssignedBranchIds] = React.useState<Set<string>>(new Set());
+  const [defaultBranchId, setDefaultBranchId] = React.useState<string>("");
+  const [savingBranchAssignment, setSavingBranchAssignment] = React.useState(false);
 
   // Detail view field configuration state
   const [detailFields, setDetailFields] = React.useState<DetailFieldConfig[]>(() => {
@@ -793,6 +801,78 @@ export default function StaffPage() {
     } finally {
       setSavingPermissions(false);
     }
+  };
+
+  // Open branch assignment dialog
+  const handleOpenBranchAssignment = async (staff: Staff) => {
+    setBranchAssignStaff(staff);
+    setBranchAssignDialogOpen(true);
+
+    // Load all branches for the staff's brand
+    if (staff.brandId) {
+      dispatch(fetchBranchesByBrand(staff.brandId));
+    }
+
+    try {
+      // Load currently assigned branches
+      const assignedBranches = await staffBranchService.getByStaffId(staff.id);
+      setAssignedBranchIds(new Set(assignedBranches.map(b => b.branchId)));
+      const defaultBranch = assignedBranches.find(b => b.isDefault);
+      setDefaultBranchId(defaultBranch?.branchId || staff.branchId || "");
+    } catch (error) {
+      // If API not available, use current branch as default
+      setAssignedBranchIds(new Set(staff.branchId ? [staff.branchId] : []));
+      setDefaultBranchId(staff.branchId || "");
+    }
+  };
+
+  // Save branch assignments
+  const handleSaveBranchAssignment = async () => {
+    if (!branchAssignStaff) return;
+
+    try {
+      setSavingBranchAssignment(true);
+      await staffBranchService.bulkAssign(
+        branchAssignStaff.id,
+        Array.from(assignedBranchIds),
+        defaultBranchId
+      );
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật chi nhánh cho nhân viên "${branchAssignStaff.name}"`
+      });
+      setBranchAssignDialogOpen(false);
+      // Reload staff list to reflect changes
+      const branchId = filterBranchId === "all" ? "" : filterBranchId;
+      const brandId = filterBrandId === "all" ? "" : filterBrandId;
+      loadStaff(branchId, brandId);
+    } catch (error: any) {
+      console.error("Error saving branch assignments:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi lưu chi nhánh",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingBranchAssignment(false);
+    }
+  };
+
+  // Toggle branch assignment
+  const toggleBranchAssignment = (branchId: string) => {
+    setAssignedBranchIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(branchId)) {
+        newSet.delete(branchId);
+        // If removing the default branch, clear it
+        if (defaultBranchId === branchId) {
+          setDefaultBranchId("");
+        }
+      } else {
+        newSet.add(branchId);
+      }
+      return newSet;
+    });
   };
 
   // Toggle permission selection
@@ -1876,6 +1956,10 @@ export default function StaffPage() {
                             <Shield className="mr-2 h-4 w-4" />
                             Phân quyền
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenBranchAssignment(staff)}>
+                            <Building2 className="mr-2 h-4 w-4" />
+                            Gán chi nhánh
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleToggleActive(staff)}>
                             <Power className="mr-2 h-4 w-4" />
@@ -2956,6 +3040,121 @@ export default function StaffPage() {
               {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu quyền
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Branch Assignment Dialog */}
+      <Dialog open={branchAssignDialogOpen} onOpenChange={setBranchAssignDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Gán chi nhánh làm việc
+            </DialogTitle>
+            <DialogDescription>
+              Chọn các chi nhánh mà nhân viên &quot;{branchAssignStaff?.name}&quot; được phép làm việc.
+              <span className="block mt-1 text-amber-600">
+                Chi nhánh mặc định sẽ được hiển thị khi nhân viên đăng nhập.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-4">
+              {/* Current brand branches */}
+              {branchAssignStaff?.brandId && branchesByBrand[branchAssignStaff.brandId] && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Building2 className="h-4 w-4" />
+                    {branchAssignStaff.brandName || "Thương hiệu"}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {branchesByBrand[branchAssignStaff.brandId].map((branch) => {
+                      const isAssigned = assignedBranchIds.has(branch.id);
+                      const isDefault = defaultBranchId === branch.id;
+
+                      return (
+                        <Card
+                          key={branch.id}
+                          className={`cursor-pointer transition-all ${
+                            isAssigned
+                              ? isDefault
+                                ? "border-primary bg-primary/5"
+                                : "border-blue-500 bg-blue-50"
+                              : "hover:border-gray-300"
+                          }`}
+                          onClick={() => toggleBranchAssignment(branch.id)}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={isAssigned}
+                                onCheckedChange={() => toggleBranchAssignment(branch.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium truncate">{branch.name}</span>
+                                  {isDefault && (
+                                    <Badge variant="default" className="text-xs">Mặc định</Badge>
+                                  )}
+                                </div>
+                                {branch.address && (
+                                  <p className="text-xs text-muted-foreground truncate mt-1">
+                                    {branch.address}
+                                  </p>
+                                )}
+                              </div>
+                              {isAssigned && !isDefault && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs h-7"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDefaultBranchId(branch.id);
+                                  }}
+                                >
+                                  Đặt mặc định
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {(!branchAssignStaff?.brandId || !branchesByBrand[branchAssignStaff.brandId] || branchesByBrand[branchAssignStaff.brandId].length === 0) && (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Building2 className="h-10 w-10 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Không có chi nhánh nào trong thương hiệu này</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="flex items-center justify-between border-t pt-4">
+            <div className="text-sm text-muted-foreground">
+              Đã chọn: <strong>{assignedBranchIds.size}</strong> chi nhánh
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setBranchAssignDialogOpen(false)}>
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSaveBranchAssignment}
+                disabled={savingBranchAssignment || assignedBranchIds.size === 0}
+              >
+                {savingBranchAssignment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lưu chi nhánh
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
