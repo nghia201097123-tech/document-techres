@@ -256,43 +256,26 @@ export class SyncService {
       const brandId = branch.brandId;
       console.log(`[SyncService.getFullSync] branchId=${branchId}, brandId=${brandId}`);
 
-      // Query products/categories by brand_id (they belong to brand)
-      // Query areas/tables/staff by branch_id (they are branch-specific)
       const [categories, products, areas, tables, staff] = await Promise.all([
-        // Categories belong to brand - query by brand_id
-        this.categoryRepository
-          .createQueryBuilder('c')
-          .where('c.brand_id = :brandId', { brandId })
-          .andWhere('c.is_active = true')
-          .orderBy('c.sort_order', 'ASC')
-          .getMany(),
-        // Products belong to brand - query by brand_id
-        this.productRepository
-          .createQueryBuilder('p')
-          .where('p.brand_id = :brandId', { brandId })
-          .andWhere('p.is_active = true')
-          .orderBy('p.sort_order', 'ASC')
-          .getMany(),
-        // Areas are branch-specific
-        this.areaRepository
-          .createQueryBuilder('a')
-          .where('a.branch_id = :branchId', { branchId })
-          .andWhere('a.is_active = true')
-          .orderBy('a.sort_order', 'ASC')
-          .getMany(),
-        // Tables are branch-specific
-        this.tableRepository
-          .createQueryBuilder('t')
-          .where('t.branch_id = :branchId', { branchId })
-          .andWhere('t.is_active = true')
-          .orderBy('t.sort_order', 'ASC')
-          .getMany(),
-        // Staff is branch-specific
-        this.staffRepository
-          .createQueryBuilder('s')
-          .where('s.branch_id = :branchId', { branchId })
-          .andWhere('s.is_active = true')
-          .getMany(),
+        this.categoryRepository.find({
+          where: { brandId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
+        this.productRepository.find({
+          where: { brandId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
+        this.areaRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
+        this.tableRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
+        this.staffRepository.find({
+          where: { branchId, isActive: true },
+        }),
       ]);
 
       console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}`);
