@@ -4,16 +4,19 @@ import android.os.Build
 import android.util.Log
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.remote.api.MasterDataApi
+import com.techres.ccb.data.remote.api.PosApi
 import com.techres.ccb.data.remote.api.SyncApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Qualifier
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.TlsVersion
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+
 import retrofit2.converter.gson.GsonConverterFactory
 import java.net.InetAddress
 import java.net.Socket
@@ -25,6 +28,15 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+
+// Qualifiers for different Retrofit instances
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class TenantRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class PosRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -98,6 +110,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @TenantRetrofit
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
         Log.d(TAG, "API Base URL: ${BuildConfig.API_BASE_URL}")
         return Retrofit.Builder()
@@ -109,14 +122,32 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideMasterDataApi(retrofit: Retrofit): MasterDataApi {
+    @PosRetrofit
+    fun providePosRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        Log.d(TAG, "API POS Base URL: ${BuildConfig.API_POS_BASE_URL}")
+        return Retrofit.Builder()
+            .baseUrl(BuildConfig.API_POS_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideMasterDataApi(@TenantRetrofit retrofit: Retrofit): MasterDataApi {
         return retrofit.create(MasterDataApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun provideSyncApi(retrofit: Retrofit): SyncApi {
+    fun provideSyncApi(@TenantRetrofit retrofit: Retrofit): SyncApi {
         return retrofit.create(SyncApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun providePosApi(@PosRetrofit retrofit: Retrofit): PosApi {
+        return retrofit.create(PosApi::class.java)
     }
 }
 

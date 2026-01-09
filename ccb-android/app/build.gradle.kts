@@ -32,10 +32,12 @@ android {
         debug {
             isMinifyEnabled = false
             buildConfigField("String", "API_BASE_URL", "\"http://172.16.5.103:4000/api/tenant/\"")
+            buildConfigField("String", "API_POS_BASE_URL", "\"http://172.16.5.103:4000/api/pos/\"")
         }
         release {
             isMinifyEnabled = true
             buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/api/tenant/\"")
+            buildConfigField("String", "API_POS_BASE_URL", "\"https://api.techres.vn/api/pos/\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

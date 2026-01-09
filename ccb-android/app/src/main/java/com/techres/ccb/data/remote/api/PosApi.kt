@@ -4,15 +4,31 @@ import com.techres.ccb.data.remote.dto.*
 import retrofit2.Response
 import retrofit2.http.*
 
-interface MasterDataApi {
+/**
+ * POS API interface for api-master-data endpoints
+ * Base URL: /api/pos/ -> routes to api-master-data via api-gateway
+ */
+interface PosApi {
 
     // ============ Authentication ============
 
     @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+    suspend fun login(@Body request: PosLoginRequest): Response<PosLoginResponse>
 
     @POST("auth/verify-pin")
     suspend fun verifyPin(@Body request: VerifyPinRequest): Response<VerifyPinResponse>
+
+    // ============ Staff Branch Permissions Sync ============
+
+    /**
+     * Get brands and branches that staff has permission to access
+     * Only syncs the branches that the logged-in staff member can work with
+     */
+    @GET("sync/branches-brands/{staffId}")
+    suspend fun getStaffBranchPermissions(
+        @Header("Authorization") token: String,
+        @Path("staffId") staffId: String
+    ): Response<StaffBranchPermissionsResponse>
 
     // ============ Master Data Sync ============
 
@@ -56,53 +72,26 @@ interface MasterDataApi {
         @Query("branchId") branchId: String,
         @Query("since") since: String? = null
     ): Response<SyncResponse<StaffDto>>
-
-    // ============ Transaction Data Upload ============
-
-    @POST("sync/orders")
-    suspend fun uploadOrders(
-        @Header("Authorization") token: String,
-        @Body orders: List<OrderUploadDto>
-    ): Response<UploadResponse>
-
-    @POST("sync/shifts")
-    suspend fun uploadShifts(
-        @Header("Authorization") token: String,
-        @Body shifts: List<ShiftUploadDto>
-    ): Response<UploadResponse>
-
-    // ============ Branch Info ============
-
-    @GET("branch/{branchId}")
-    suspend fun getBranchInfo(
-        @Header("Authorization") token: String,
-        @Path("branchId") branchId: String
-    ): Response<BranchInfoResponse>
-
-    // ============ Brands & Branches ============
-
-    /**
-     * Get all brands with their branches for the current user
-     */
-    @GET("brands")
-    suspend fun getBrands(
-        @Header("Authorization") token: String
-    ): Response<BrandsResponse>
-
-    /**
-     * Get branches by brand ID
-     */
-    @GET("brands/{brandId}/branches")
-    suspend fun getBranchesByBrand(
-        @Header("Authorization") token: String,
-        @Path("brandId") brandId: String
-    ): Response<BranchesResponse>
-
-    /**
-     * Get all branches for current user
-     */
-    @GET("branches")
-    suspend fun getAllBranches(
-        @Header("Authorization") token: String
-    ): Response<BranchesResponse>
 }
+
+// ============ POS-specific DTOs ============
+
+data class PosLoginRequest(
+    val branchId: String,
+    val deviceId: String,
+    val pinCode: String
+)
+
+data class PosLoginResponse(
+    val accessToken: String?,
+    val branchId: String?,
+    val branchName: String?,
+    val brandId: String?,
+    val brandName: String?,
+    val brandLogoUrl: String?,
+    val deviceId: String?,
+    // Error fields
+    val message: String?,
+    val error: String?,
+    val statusCode: Int?
+)

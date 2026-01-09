@@ -7,6 +7,7 @@ import com.techres.ccb.data.local.dao.BranchDao
 import com.techres.ccb.data.local.entity.BrandEntity
 import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.remote.api.MasterDataApi
+import com.techres.ccb.data.remote.api.PosApi
 import com.techres.ccb.data.remote.dto.BrandDto
 import com.techres.ccb.data.remote.dto.BranchDto
 import com.techres.ccb.data.remote.dto.StaffBranchPermissionsResponse
@@ -18,6 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class BranchRepository @Inject constructor(
     private val api: MasterDataApi,
+    private val posApi: PosApi,
     private val authRepository: AuthRepository,
     private val brandDao: BrandDao,
     private val branchDao: BranchDao,
@@ -216,8 +218,8 @@ class BranchRepository @Inject constructor(
                 return Result.failure(Exception("Chưa có thông tin nhân viên"))
             }
 
-            Log.d(TAG, "syncStaffBranchPermissions - Calling API...")
-            val response = api.getStaffBranchPermissions("Bearer $token", staffId)
+            Log.d(TAG, "syncStaffBranchPermissions - Calling POS API...")
+            val response = posApi.getStaffBranchPermissions("Bearer $token", staffId)
             Log.d(TAG, "syncStaffBranchPermissions - Response code: ${response.code()}")
 
             if (response.isSuccessful && response.body() != null) {
