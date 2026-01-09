@@ -309,22 +309,27 @@ export class SyncService {
     branchId: string,
     since: Date,
   ): Promise<IncrementalSyncResponseDto> {
+    const branch = await this.branchRepository.findOne({
+      where: { id: branchId },
+    });
+    const brandId = branch?.brandId;
+
     const [categories, products, areas, tables, staff] = await Promise.all([
-      this.categoryRepository.find({
-        where: { branchId, updatedAt: MoreThan(since) },
-        order: { displayOrder: 'ASC' },
-      }),
-      this.productRepository.find({
-        where: { branchId, updatedAt: MoreThan(since) },
-        order: { displayOrder: 'ASC' },
-      }),
+      brandId ? this.categoryRepository.find({
+        where: { brandId, updatedAt: MoreThan(since) },
+        order: { sortOrder: 'ASC' },
+      }) : Promise.resolve([]),
+      brandId ? this.productRepository.find({
+        where: { brandId, updatedAt: MoreThan(since) },
+        order: { sortOrder: 'ASC' },
+      }) : Promise.resolve([]),
       this.areaRepository.find({
         where: { branchId, updatedAt: MoreThan(since) },
-        order: { displayOrder: 'ASC' },
+        order: { sortOrder: 'ASC' },
       }),
       this.tableRepository.find({
         where: { branchId, updatedAt: MoreThan(since) },
-        order: { displayOrder: 'ASC' },
+        order: { sortOrder: 'ASC' },
       }),
       this.staffRepository.find({
         where: { branchId, updatedAt: MoreThan(since) },
