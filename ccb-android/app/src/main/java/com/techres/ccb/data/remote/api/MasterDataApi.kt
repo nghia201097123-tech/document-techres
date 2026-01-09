@@ -1,8 +1,25 @@
 package com.techres.ccb.data.remote.api
 
-import com.techres.ccb.data.remote.dto.*
+import com.techres.ccb.data.remote.dto.BranchInfoResponse
+import com.techres.ccb.data.remote.dto.BranchesResponse
+import com.techres.ccb.data.remote.dto.BrandsResponse
+import com.techres.ccb.data.remote.dto.CategoryDto
+import com.techres.ccb.data.remote.dto.FullSyncResponse
+import com.techres.ccb.data.remote.dto.OrderUploadDto
+import com.techres.ccb.data.remote.dto.ProductDto
+import com.techres.ccb.data.remote.dto.AreaDto
+import com.techres.ccb.data.remote.dto.TableDto
+import com.techres.ccb.data.remote.dto.StaffDto
+import com.techres.ccb.data.remote.dto.ShiftUploadDto
+import com.techres.ccb.data.remote.dto.SyncResponse
+import com.techres.ccb.data.remote.dto.UploadResponse
 import retrofit2.Response
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Master Data API interface for api-master-data
@@ -79,26 +96,17 @@ interface MasterDataApi {
 
     // ============ Brands & Branches ============
 
-    /**
-     * Get all brands with their branches for the current user
-     */
     @GET("brands")
     suspend fun getBrands(
         @Header("Authorization") token: String
     ): Response<BrandsResponse>
 
-    /**
-     * Get branches by brand ID
-     */
     @GET("brands/{brandId}/branches")
     suspend fun getBranchesByBrand(
         @Header("Authorization") token: String,
         @Path("brandId") brandId: String
     ): Response<BranchesResponse>
 
-    /**
-     * Get all branches for current user
-     */
     @GET("branches")
     suspend fun getAllBranches(
         @Header("Authorization") token: String
