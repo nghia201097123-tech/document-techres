@@ -15,9 +15,9 @@ import { Branch, Device, Staff, Brand } from '../../entities';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET', 'techres-secret-key'),
+        secret: configService.get('JWT_SECRET') || 'your-secret-key',
         signOptions: {
-          expiresIn: configService.get('JWT_EXPIRES_IN', '7d'),
+          expiresIn: configService.get('JWT_EXPIRES_IN') || '7d',
         },
       }),
       inject: [ConfigService],
