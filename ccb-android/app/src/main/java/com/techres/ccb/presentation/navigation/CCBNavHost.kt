@@ -130,10 +130,19 @@ fun CCBNavHost() {
         // Branch Selection Screen
         composable(Screen.BranchSelection.route) {
             BranchSelectionScreen(
-                onBranchSelected = { brandId, branchId, branchName ->
+                onContinueToOpenShift = { branchName ->
                     navController.navigate(Screen.OpenShift.createRoute(branchName)) {
                         popUpTo(Screen.BranchSelection.route) { inclusive = true }
                     }
+                },
+                onContinueToExistingShift = { branchName ->
+                    // If shift exists, go directly to Dashboard
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.BranchSelection.route) { inclusive = true }
+                    }
+                },
+                onCloseShift = {
+                    navController.navigate(Screen.CloseShift.route)
                 },
                 onBack = {
                     navController.navigate(Screen.InitialSync.route) {
