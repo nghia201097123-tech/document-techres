@@ -2,10 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ example: 'STORE001', description: 'Mã cửa hàng (store code)' })
+  @ApiProperty({ example: 'branch-uuid', description: 'ID chi nhánh' })
   @IsNotEmpty()
   @IsString()
-  storeCode: string;
+  branchId: string;
 
   @ApiProperty({ example: 'device-uuid-123', description: 'ID thiết bị' })
   @IsNotEmpty()

@@ -85,11 +85,11 @@ export class SyncService {
         id: branch?.id || sb.branchId,
         brandId: sb.brandId,
         name: branch?.name || '',
-        storeCode: branch?.code || '',
+        storeCode: '',
         address: branch?.address || '',
         phone: branch?.phone || '',
         isDefault: sb.isDefault,
-        status: branch?.status || 'active',
+        status: 'active',
       });
     }
 

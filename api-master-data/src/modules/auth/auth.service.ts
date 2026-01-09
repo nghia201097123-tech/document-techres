@@ -20,14 +20,14 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    // Find branch by store code with brand relation
+    // Find branch by id with brand relation
     const branch = await this.branchRepository.findOne({
-      where: { code: loginDto.storeCode, status: 'active' },
+      where: { id: loginDto.branchId },
       relations: ['brand'],
     });
 
     if (!branch) {
-      throw new NotFoundException('Không tìm thấy cửa hàng với mã này');
+      throw new NotFoundException('Không tìm thấy chi nhánh');
     }
 
     // Get brand info
@@ -66,7 +66,6 @@ export class AuthService {
       branchId: branch.id,
       brandId: branch.brandId,
       deviceId: loginDto.deviceId,
-      storeCode: branch.code,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -106,7 +105,7 @@ export class AuthService {
 
   async validateToken(payload: any): Promise<any> {
     const branch = await this.branchRepository.findOne({
-      where: { id: payload.branchId, status: 'active' },
+      where: { id: payload.branchId },
     });
 
     if (!branch) {
@@ -116,7 +115,6 @@ export class AuthService {
     return {
       branchId: branch.id,
       brandId: branch.brandId,
-      storeCode: branch.code,
       deviceId: payload.deviceId,
     };
   }
