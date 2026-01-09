@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.branch
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,10 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.delay
 
 // Mock data classes
 data class MockBrand(
@@ -38,9 +43,31 @@ data class MockBranch(
     val phone: String? = null
 )
 
+// Sync states
+enum class SyncState {
+    NOT_STARTED,
+    SYNCING,
+    COMPLETED
+}
+
+// Mock sync item
+private data class BranchSyncItem(
+    val id: String,
+    val name: String,
+    val icon: ImageVector,
+    val status: BranchSyncStatus = BranchSyncStatus.PENDING,
+    val count: Int = 0
+)
+
+private enum class BranchSyncStatus {
+    PENDING, SYNCING, COMPLETED, ERROR
+}
+
 @Composable
 fun BranchSelectionScreen(
-    onBranchSelected: (brandId: String, branchId: String, branchName: String) -> Unit,
+    onContinueToOpenShift: (branchName: String) -> Unit,
+    onContinueToExistingShift: (branchName: String) -> Unit,
+    onCloseShift: () -> Unit,
     onBack: () -> Unit
 ) {
     // Mock data
@@ -75,6 +102,43 @@ fun BranchSelectionScreen(
 
     var selectedBrand by remember { mutableStateOf<MockBrand?>(null) }
     var selectedBranch by remember { mutableStateOf<MockBranch?>(null) }
+    var syncState by remember { mutableStateOf(SyncState.NOT_STARTED) }
+    var syncProgress by remember { mutableFloatStateOf(0f) }
+    var showShiftDialog by remember { mutableStateOf(false) }
+
+    // Mock: check if shift exists (for demo, randomly true/false based on branch id)
+    val hasExistingShift = remember(selectedBranch) {
+        selectedBranch?.id?.toIntOrNull()?.rem(2) == 0 // Even branch IDs have existing shift
+    }
+
+    // Sync items state
+    var syncItems by remember {
+        mutableStateOf(
+            listOf(
+                BranchSyncItem("categories", "Danh mục", Icons.Default.Category),
+                BranchSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
+                BranchSyncItem("areas", "Khu vực", Icons.Default.Map),
+                BranchSyncItem("tables", "Bàn", Icons.Default.TableBar),
+                BranchSyncItem("staff", "Nhân viên", Icons.Default.People)
+            )
+        )
+    }
+
+    // Shift dialog
+    if (showShiftDialog) {
+        ShiftExistsDialog(
+            branchName = selectedBranch?.name ?: "",
+            onContinue = {
+                showShiftDialog = false
+                selectedBranch?.let { onContinueToExistingShift(it.name) }
+            },
+            onCloseShift = {
+                showShiftDialog = false
+                onCloseShift()
+            },
+            onDismiss = { showShiftDialog = false }
+        )
+    }
 
     Row(
         modifier = Modifier
@@ -146,6 +210,10 @@ fun BranchSelectionScreen(
                             onClick = {
                                 selectedBrand = brand
                                 selectedBranch = null
+                                syncState = SyncState.NOT_STARTED
+                                syncProgress = 0f
+                                // Reset sync items
+                                syncItems = syncItems.map { it.copy(status = BranchSyncStatus.PENDING, count = 0) }
                             }
                         )
                     }
@@ -175,7 +243,7 @@ fun BranchSelectionScreen(
             }
         }
 
-        // Right Panel - Branch Selection
+        // Right Panel - Branch Selection & Sync
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -234,47 +302,474 @@ fun BranchSelectionScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Branch list
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(selectedBrand!!.branches) { branch ->
-                            BranchSelectionCard(
-                                branch = branch,
-                                isSelected = selectedBranch?.id == branch.id,
-                                onClick = { selectedBranch = branch }
-                            )
+                    // Branch list (only show when not syncing)
+                    if (syncState == SyncState.NOT_STARTED) {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(selectedBrand!!.branches) { branch ->
+                                BranchSelectionCard(
+                                    branch = branch,
+                                    isSelected = selectedBranch?.id == branch.id,
+                                    onClick = { selectedBranch = branch }
+                                )
+                            }
                         }
+                    } else {
+                        // Show sync progress
+                        SyncProgressPanel(
+                            branchName = selectedBranch?.name ?: "",
+                            syncItems = syncItems,
+                            syncProgress = syncProgress,
+                            isCompleted = syncState == SyncState.COMPLETED,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Continue button
-                    Button(
-                        onClick = {
-                            selectedBranch?.let { branch ->
-                                selectedBrand?.let { brand ->
-                                    onBranchSelected(brand.id, branch.id, branch.name)
-                                }
+                    // Action buttons based on state
+                    when (syncState) {
+                        SyncState.NOT_STARTED -> {
+                            // Sync button (only show when branch is selected)
+                            Button(
+                                onClick = {
+                                    syncState = SyncState.SYNCING
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                enabled = selectedBranch != null,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2196F3)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Đồng bộ dữ liệu",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                        },
+                        }
+                        SyncState.SYNCING -> {
+                            // Mock sync animation
+                            LaunchedEffect(Unit) {
+                                val mockCounts = listOf(12, 48, 4, 20, 8)
+
+                                for (i in syncItems.indices) {
+                                    syncItems = syncItems.toMutableList().apply {
+                                        this[i] = this[i].copy(status = BranchSyncStatus.SYNCING)
+                                    }
+
+                                    delay(500)
+
+                                    syncItems = syncItems.toMutableList().apply {
+                                        this[i] = this[i].copy(
+                                            status = BranchSyncStatus.COMPLETED,
+                                            count = mockCounts[i]
+                                        )
+                                    }
+
+                                    syncProgress = (i + 1).toFloat() / syncItems.size
+                                }
+
+                                syncState = SyncState.COMPLETED
+                            }
+
+                            // Syncing indicator button (disabled)
+                            Button(
+                                onClick = { },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                enabled = false,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2196F3),
+                                    disabledContainerColor = Color(0xFF2196F3).copy(alpha = 0.7f)
+                                )
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Đang đồng bộ...",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                        SyncState.COMPLETED -> {
+                            // Continue button
+                            Button(
+                                onClick = {
+                                    if (hasExistingShift) {
+                                        showShiftDialog = true
+                                    } else {
+                                        selectedBranch?.let { onContinueToOpenShift(it.name) }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF4CAF50)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Tiếp tục",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncProgressPanel(
+    branchName: String,
+    syncItems: List<BranchSyncItem>,
+    syncProgress: Float,
+    isCompleted: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp)
+        ) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!isCompleted) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "sync")
+                    val rotation by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "rotation"
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .graphicsLayer { rotationZ = rotation },
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = Color(0xFF4CAF50)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = if (isCompleted) "Đồng bộ hoàn tất!" else "Đang đồng bộ...",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = branchName,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Progress bar
+            LinearProgressIndicator(
+                progress = { syncProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = if (isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "${(syncProgress * 100).toInt()}%",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.End)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Sync items
+            syncItems.forEach { item ->
+                SyncItemRowCompact(item = item)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (isCompleted) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFE8F5E9)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
-                        enabled = selectedBranch != null,
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Tổng cộng ${syncItems.sumOf { it.count }} mục đã tải về",
+                            fontSize = 13.sp,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncItemRowCompact(item: BranchSyncItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = when (item.status) {
+                    BranchSyncStatus.COMPLETED -> Color(0xFFE8F5E9)
+                    BranchSyncStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else -> Color.Transparent
+                },
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(
+                    when (item.status) {
+                        BranchSyncStatus.COMPLETED -> Color(0xFF4CAF50)
+                        BranchSyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (item.status == BranchSyncStatus.PENDING)
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                else
+                    Color.White
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = item.name,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        when (item.status) {
+            BranchSyncStatus.COMPLETED -> {
+                Text(
+                    text = "${item.count}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF4CAF50),
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = Color(0xFF4CAF50)
+                )
+            }
+            BranchSyncStatus.SYNCING -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            else -> {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShiftExistsDialog(
+    branchName: String,
+    onContinue: () -> Unit,
+    onCloseShift: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(360.dp)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFF3E0)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = Color(0xFFFF9800)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Ca làm việc đang mở",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Chi nhánh \"$branchName\" đang có ca làm việc. Bạn muốn tiếp tục ca hiện tại hay đóng ca?",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Close shift button
+                    OutlinedButton(
+                        onClick = onCloseShift,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFE91E63)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Đóng ca",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Continue button
+                    Button(
+                        onClick = onContinue,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50)
                         )
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Tiếp tục",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.Default.ArrowForward, contentDescription = null)
                     }
                 }
             }
@@ -309,7 +804,6 @@ private fun BrandSelectionCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Brand icon
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -326,10 +820,7 @@ private fun BrandSelectionCard(
                     imageVector = Icons.Default.Storefront,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = if (isSelected)
-                        Color.White
-                    else
-                        Color.White
+                    tint = Color.White
                 )
             }
 
@@ -400,7 +891,6 @@ private fun BranchSelectionCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Branch icon
             Box(
                 modifier = Modifier
                     .size(48.dp)
