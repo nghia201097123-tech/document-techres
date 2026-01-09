@@ -51,19 +51,12 @@ fun BranchSelectionScreen(
         }
     }
 
-    // Watch for branch data sync completion
+    // Watch for branch data sync completion - just close dialog, don't auto-navigate
     LaunchedEffect(uiState.branchDataSyncComplete) {
         if (uiState.branchDataSyncComplete) {
             showSyncingDialog = false
-            viewModel.resetBranchDataSyncState()
-            // Navigate after sync completes
-            uiState.selectedBranch?.let { branch ->
-                if (hasExistingShift) {
-                    showShiftDialog = true
-                } else {
-                    onContinueToOpenShift(branch.name)
-                }
-            }
+            // Don't reset sync state - keep COMPLETED so "Tiếp tục" button shows
+            // User will manually tap "Tiếp tục" to navigate
         }
     }
 
@@ -375,7 +368,11 @@ fun BranchSelectionScreen(
                                 BranchSelectionCard(
                                     branch = branch,
                                     isSelected = uiState.selectedBranch?.id == branch.id,
-                                    onClick = { viewModel.selectBranch(branch) }
+                                    onClick = {
+                                        viewModel.selectBranch(branch)
+                                        // Reset sync state when changing branch selection
+                                        viewModel.resetBranchDataSyncState()
+                                    }
                                 )
                             }
                         }
@@ -383,39 +380,70 @@ fun BranchSelectionScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Action button - show "Tiếp tục" when branch is selected
-                    Button(
-                        onClick = {
-                            // Start syncing branch data (categories, products, areas, tables, staff)
-                            showSyncingDialog = true
-                            viewModel.confirmSelectionAndSync()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        enabled = uiState.selectedBranch != null && !uiState.isSyncingBranchData,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50),
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.selectedBranch != null)
-                                Icons.Default.CheckCircle
-                            else
-                                Icons.Default.Store,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (uiState.selectedBranch != null) "Tiếp tục" else "Chọn chi nhánh",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        if (uiState.selectedBranch != null) {
+                    // Two-step flow: Sync first, then Continue
+                    if (uiState.branchDataSyncState == SyncState.COMPLETED) {
+                        // Show "Tiếp tục" button after sync completes
+                        Button(
+                            onClick = {
+                                uiState.selectedBranch?.let { branch ->
+                                    if (hasExistingShift) {
+                                        showShiftDialog = true
+                                    } else {
+                                        onContinueToOpenShift(branch.name)
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF4CAF50)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Tiếp tục",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(Icons.Default.ArrowForward, contentDescription = null)
+                        }
+                    } else {
+                        // Show "Đồng bộ dữ liệu" button before sync
+                        Button(
+                            onClick = {
+                                showSyncingDialog = true
+                                viewModel.confirmSelectionAndSync()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            enabled = uiState.selectedBranch != null && !uiState.isSyncingBranchData,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.selectedBranch != null)
+                                    Icons.Default.CloudDownload
+                                else
+                                    Icons.Default.Store,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (uiState.selectedBranch != null) "Đồng bộ dữ liệu" else "Chọn chi nhánh",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
