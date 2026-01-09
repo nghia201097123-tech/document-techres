@@ -39,18 +39,25 @@ export class SyncService {
 
   /**
    * Sync brands and branches based on staff's permissions
-   * Returns ONLY brands/branches that the staff has explicit access to
-   * If no permissions assigned, returns empty array
+   * - If staff is OWNER: Return ALL brands/branches for the tenant
+   * - Otherwise: Return only brands/branches that staff has explicit access to
    *
    * Note: The staffId param may be OAuth user ID (from JWT sub), not the actual staff.id
    * We use the email from JWT to find the real staff by username
    */
-  async getStaffBranchPermissions(staffId: string, tenantId?: string, email?: string): Promise<StaffBranchPermissionsSyncDto> {
-    console.log(`[SyncService.getStaffBranchPermissions] staffId=${staffId}, tenantId=${tenantId}, email=${email}`);
+  async getStaffBranchPermissions(staffId: string, tenantId?: string, email?: string, role?: string): Promise<StaffBranchPermissionsSyncDto> {
+    console.log(`[SyncService.getStaffBranchPermissions] staffId=${staffId}, tenantId=${tenantId}, email=${email}, role=${role}`);
+
+    // If user is OWNER, return all brands and branches for the tenant
+    if (role === 'owner' && tenantId) {
+      console.log(`[SyncService.getStaffBranchPermissions] User is OWNER, returning all brands/branches for tenant ${tenantId}`);
+      return this.getAllBrandsAndBranches(tenantId);
+    }
 
     // First, try to find the real staff by username from email
     // Email format: tr000001@tenant-NHC.local -> username = tr000001
     let realStaffId = staffId;
+    let staffRole = role;
 
     if (email && tenantId) {
       const username = this.extractUsernameFromEmail(email);
@@ -63,7 +70,14 @@ export class SyncService {
 
         if (staff) {
           realStaffId = staff.id;
-          console.log(`[SyncService.getStaffBranchPermissions] Found staff by username: ${staff.id} (${staff.name})`);
+          staffRole = staff.role;
+          console.log(`[SyncService.getStaffBranchPermissions] Found staff by username: ${staff.id} (${staff.name}), role: ${staff.role}`);
+
+          // Check again if staff is owner
+          if (staff.role === 'owner') {
+            console.log(`[SyncService.getStaffBranchPermissions] Staff is OWNER, returning all brands/branches`);
+            return this.getAllBrandsAndBranches(tenantId);
+          }
         } else {
           console.log(`[SyncService.getStaffBranchPermissions] No staff found with username=${username}, tenantId=${tenantId}`);
         }
@@ -89,6 +103,72 @@ export class SyncService {
     }
 
     return this.buildPermissionsFromStaffBranches(staffBranches);
+  }
+
+  /**
+   * Get ALL brands and branches for a tenant (for OWNER role)
+   */
+  private async getAllBrandsAndBranches(tenantId: string): Promise<StaffBranchPermissionsSyncDto> {
+    const brands = await this.brandRepository.find({
+      where: { tenantId, isActive: true },
+    });
+
+    if (brands.length === 0) {
+      console.log(`[SyncService.getAllBrandsAndBranches] No brands found for tenant ${tenantId}`);
+      return {
+        data: [],
+        defaultBranchId: '',
+        syncedAt: new Date().toISOString(),
+      };
+    }
+
+    const brandIds = brands.map(b => b.id);
+    const branches = await this.branchRepository.find({
+      where: { brandId: In(brandIds), isActive: true },
+    });
+
+    console.log(`[SyncService.getAllBrandsAndBranches] Found ${brands.length} brands, ${branches.length} branches for tenant ${tenantId}`);
+
+    const brandMap = new Map<string, BrandWithBranchesDto>();
+    let defaultBranchId = '';
+
+    for (const brand of brands) {
+      brandMap.set(brand.id, {
+        brand: {
+          id: brand.id,
+          name: brand.name,
+          code: brand.code || '',
+          logoUrl: brand.logoUrl || '',
+          isActive: brand.isActive,
+        },
+        branches: [],
+      });
+    }
+
+    for (const branch of branches) {
+      if (brandMap.has(branch.brandId)) {
+        const isDefault = !defaultBranchId; // First branch is default
+        if (isDefault) {
+          defaultBranchId = branch.id;
+        }
+        brandMap.get(branch.brandId)!.branches.push({
+          id: branch.id,
+          brandId: branch.brandId,
+          name: branch.name,
+          storeCode: branch.code || '',
+          address: branch.address || '',
+          phone: branch.phone || '',
+          isDefault,
+          status: 'active',
+        });
+      }
+    }
+
+    return {
+      data: Array.from(brandMap.values()),
+      defaultBranchId,
+      syncedAt: new Date().toISOString(),
+    };
   }
 
   /**

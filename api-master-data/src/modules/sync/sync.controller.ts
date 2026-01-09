@@ -19,8 +19,14 @@ export class SyncController {
     @Param('staffId') staffId: string,
     @Request() req,
   ): Promise<StaffBranchPermissionsSyncDto> {
-    // Pass email from JWT to find staff by username
-    return this.syncService.getStaffBranchPermissions(staffId, req.user?.tenantId, req.user?.email);
+    // Pass email and role from JWT
+    // If role is 'owner', returns all brands/branches for the tenant
+    return this.syncService.getStaffBranchPermissions(
+      staffId,
+      req.user?.tenantId,
+      req.user?.email,
+      req.user?.role,
+    );
   }
 
   @Get('full')
