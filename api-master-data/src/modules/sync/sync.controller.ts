@@ -1,8 +1,8 @@
-import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards, Request, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { SyncService } from './sync.service';
-import { SyncQueryDto, FullSyncResponseDto, IncrementalSyncResponseDto } from './dto/sync.dto';
+import { SyncQueryDto, FullSyncResponseDto, IncrementalSyncResponseDto, StaffBranchPermissionsSyncDto } from './dto/sync.dto';
 
 @ApiTags('Sync')
 @Controller('sync')
@@ -10,6 +10,16 @@ import { SyncQueryDto, FullSyncResponseDto, IncrementalSyncResponseDto } from '.
 @ApiBearerAuth()
 export class SyncController {
   constructor(private syncService: SyncService) {}
+
+  @Get('branches-brands/:staffId')
+  @ApiOperation({ summary: 'Lấy danh sách thương hiệu và chi nhánh theo quyền nhân viên' })
+  @ApiParam({ name: 'staffId', description: 'ID nhân viên' })
+  @ApiResponse({ status: 200, type: StaffBranchPermissionsSyncDto })
+  async getStaffBranchPermissions(
+    @Param('staffId') staffId: string,
+  ): Promise<StaffBranchPermissionsSyncDto> {
+    return this.syncService.getStaffBranchPermissions(staffId);
+  }
 
   @Get('full')
   @ApiOperation({ summary: 'Lấy toàn bộ master data (full sync)' })

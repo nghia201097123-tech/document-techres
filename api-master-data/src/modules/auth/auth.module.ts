@@ -6,11 +6,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
-import { Branch, Device, Staff } from '../../entities';
+import { Branch, Device, Staff, Brand } from '../../entities';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Branch, Device, Staff]),
+    TypeOrmModule.forFeature([Branch, Device, Staff, Brand]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
