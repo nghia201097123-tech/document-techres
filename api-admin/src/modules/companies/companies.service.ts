@@ -554,11 +554,27 @@ export class CompaniesService {
     tenantId: string,
     prefix: string,
   ): Promise<string> {
-    // Đếm số nhân viên hiện có trong tenant để lấy số tiếp theo
-    const count = await queryRunner.manager.count(Staff, {
-      where: { tenantId },
-    });
-    const nextNumber = count + 1;
+    // Find the highest existing username number with this prefix in this tenant
+    // This prevents collisions even if some staff were deleted or sync failed
+    const existingStaff = await queryRunner.manager
+      .createQueryBuilder(Staff, 'staff')
+      .where('staff.tenantId = :tenantId', { tenantId })
+      .andWhere('staff.username LIKE :prefix', { prefix: `${prefix}%` })
+      .select('staff.username')
+      .orderBy('staff.username', 'DESC')
+      .limit(1)
+      .getOne();
+
+    let nextNumber = 1;
+    if (existingStaff?.username) {
+      // Extract number from username (e.g., tr000005 -> 5)
+      const numPart = existingStaff.username.substring(prefix.length);
+      const currentMax = parseInt(numPart, 10);
+      if (!isNaN(currentMax)) {
+        nextNumber = currentMax + 1;
+      }
+    }
+
     // Format: prefix (2 chars) + 6-digit padded number
     return `${prefix}${String(nextNumber).padStart(6, '0')}`;
   }
