@@ -25,6 +25,8 @@ import com.techres.ccb.data.local.entity.ProductEntity
 import com.techres.ccb.data.local.entity.AreaEntity
 import com.techres.ccb.data.local.entity.TableEntity
 import com.techres.ccb.data.local.entity.StaffEntity
+import com.techres.ccb.data.local.entity.BrandEntity
+import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -32,6 +34,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 enum class DebugTab(val title: String) {
+    BRANDS("Thương hiệu"),
+    BRANCHES("Chi nhánh"),
     CATEGORIES("Danh mục"),
     PRODUCTS("Sản phẩm"),
     AREAS("Khu vực"),
@@ -40,8 +44,10 @@ enum class DebugTab(val title: String) {
 }
 
 data class DebugUiState(
-    val selectedTab: DebugTab = DebugTab.CATEGORIES,
+    val selectedTab: DebugTab = DebugTab.BRANDS,
     val branchId: String = "",
+    val brands: List<BrandEntity> = emptyList(),
+    val branches: List<BranchEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val products: List<ProductEntity> = emptyList(),
     val areas: List<AreaEntity> = emptyList(),
@@ -77,12 +83,35 @@ class DatabaseDebugViewModel @Inject constructor(
     }
 
     fun loadAllData() {
-        val branchId = _uiState.value.branchId
-        if (branchId.isEmpty()) return
-
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
+        }
 
+        // Load brands (not branch-specific)
+        viewModelScope.launch {
+            branchRepository.getAllBrandsLocal()
+                .collect { brands ->
+                    _uiState.update { it.copy(brands = brands) }
+                }
+        }
+
+        // Load branches (not branch-specific)
+        viewModelScope.launch {
+            branchRepository.getAllBranchesLocal()
+                .collect { branches ->
+                    _uiState.update { it.copy(branches = branches) }
+                }
+        }
+
+        val branchId = _uiState.value.branchId
+        if (branchId.isEmpty()) {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+            return
+        }
+
+        viewModelScope.launch {
             // Load categories
             categoryRepository.getAllCategories(branchId)
                 .collect { categories ->
@@ -169,6 +198,8 @@ fun DatabaseDebugScreen(
             ) {
                 DebugTab.entries.forEach { tab ->
                     val count = when (tab) {
+                        DebugTab.BRANDS -> uiState.brands.size
+                        DebugTab.BRANCHES -> uiState.branches.size
                         DebugTab.CATEGORIES -> uiState.categories.size
                         DebugTab.PRODUCTS -> uiState.products.size
                         DebugTab.AREAS -> uiState.areas.size
@@ -193,6 +224,8 @@ fun DatabaseDebugScreen(
                 }
             } else {
                 when (uiState.selectedTab) {
+                    DebugTab.BRANDS -> BrandsTable(uiState.brands)
+                    DebugTab.BRANCHES -> BranchesTable(uiState.branches)
                     DebugTab.CATEGORIES -> CategoriesTable(uiState.categories)
                     DebugTab.PRODUCTS -> ProductsTable(uiState.products)
                     DebugTab.AREAS -> AreasTable(uiState.areas)
@@ -202,6 +235,41 @@ fun DatabaseDebugScreen(
             }
         }
     }
+}
+
+@Composable
+fun BrandsTable(brands: List<BrandEntity>) {
+    DataTable(
+        headers = listOf("ID", "Name", "Code", "Company", "Active"),
+        data = brands,
+        rowContent = { brand ->
+            listOf(
+                brand.id.take(8) + "...",
+                brand.name,
+                brand.code ?: "-",
+                brand.companyName ?: "-",
+                if (brand.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun BranchesTable(branches: List<BranchEntity>) {
+    DataTable(
+        headers = listOf("ID", "Name", "Code", "Brand", "Address", "Active"),
+        data = branches,
+        rowContent = { branch ->
+            listOf(
+                branch.id.take(8) + "...",
+                branch.name,
+                branch.code ?: "-",
+                branch.brandName ?: "-",
+                branch.address ?: "-",
+                if (branch.isActive) "✓" else "✗"
+            )
+        }
+    )
 }
 
 @Composable
