@@ -51,6 +51,22 @@ export interface SyncTransactionCategoryDto {
   isActive: boolean;
 }
 
+export interface SyncStaffDto {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  companyId?: string;
+  brandId?: string;
+  departmentId?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  avatarUrl?: string;
+  role?: string;
+  username?: string;
+  isActive: boolean;
+}
+
 @Injectable()
 export class DashboardSyncService {
   private readonly logger = new Logger(DashboardSyncService.name);
@@ -176,6 +192,35 @@ export class DashboardSyncService {
       }
     } catch (error: any) {
       this.logger.error(`❌ Transaction category sync error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Sync a staff to dashboard API
+   */
+  async syncStaff(staff: SyncStaffDto): Promise<boolean> {
+    try {
+      this.logger.log(`Syncing staff: ${staff.name} (${staff.username})`);
+
+      const response = await fetch(`${this.dashboardApiUrl}/api/sync/staff`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(staff),
+      });
+
+      if (response.ok) {
+        this.logger.log(`✅ Staff synced successfully: ${staff.username}`);
+        return true;
+      } else {
+        const error = await response.text();
+        this.logger.error(`❌ Staff sync failed: ${response.status} - ${error}`);
+        return false;
+      }
+    } catch (error: any) {
+      this.logger.error(`❌ Staff sync error: ${error.message}`);
       return false;
     }
   }

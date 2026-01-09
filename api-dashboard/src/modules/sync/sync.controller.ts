@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
-import { SyncCompanyDataDto, SyncCompanyDto, SyncBrandDto, SyncBranchDto, SyncTransactionCategoryDto } from './dto/sync.dto';
+import { SyncCompanyDataDto, SyncCompanyDto, SyncBrandDto, SyncBranchDto, SyncStaffDto, SyncTransactionCategoryDto } from './dto/sync.dto';
 
 @ApiTags('Sync')
 @Controller('sync')
@@ -44,6 +44,15 @@ export class SyncController {
   async syncBranch(@Body() dto: SyncBranchDto) {
     this.logger.log(`Received sync request for branch: ${dto.name}`);
     return this.syncService.syncSingleBranch(dto);
+  }
+
+  @Post('staff')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sync single staff from api-admin' })
+  @ApiResponse({ status: 200, description: 'Staff synced successfully' })
+  async syncStaff(@Body() dto: SyncStaffDto) {
+    this.logger.log(`Received sync request for staff: ${dto.name}`);
+    return this.syncService.syncSingleStaff(dto);
   }
 
   @Post('transaction-category')

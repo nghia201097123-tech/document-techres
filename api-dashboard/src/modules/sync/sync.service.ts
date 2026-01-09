@@ -352,6 +352,50 @@ export class SyncService {
   }
 
   /**
+   * Sync a single staff
+   */
+  async syncSingleStaff(dto: SyncStaffDto): Promise<{ success: boolean }> {
+    const existing = await this.staffRepository.findOne({
+      where: { id: dto.id },
+    });
+
+    if (existing) {
+      await this.staffRepository.update(dto.id, {
+        tenantId: dto.tenantId,
+        branchId: dto.branchId,
+        companyId: dto.companyId,
+        brandId: dto.brandId,
+        departmentId: dto.departmentId,
+        name: dto.name,
+        phone: dto.phone,
+        email: dto.email,
+        avatarUrl: dto.avatarUrl,
+        role: dto.role,
+        username: dto.username,
+        isActive: dto.isActive ?? true,
+      });
+    } else {
+      await this.staffRepository.insert({
+        id: dto.id,
+        tenantId: dto.tenantId,
+        branchId: dto.branchId,
+        companyId: dto.companyId,
+        brandId: dto.brandId,
+        departmentId: dto.departmentId,
+        name: dto.name,
+        phone: dto.phone,
+        email: dto.email,
+        avatarUrl: dto.avatarUrl,
+        role: dto.role,
+        username: dto.username,
+        isActive: dto.isActive ?? true,
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
    * Sync a single company
    */
   async syncSingleCompany(dto: SyncCompanyDto): Promise<{ success: boolean }> {
