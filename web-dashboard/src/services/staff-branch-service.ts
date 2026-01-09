@@ -139,5 +139,61 @@ export const staffBranchService = {
     } catch (error) {
       return [];
     }
+  },
+
+  // Bulk assign branches to multiple staff members
+  bulkAssignToMultipleStaff: async (
+    staffIds: string[],
+    branchIds: string[],
+    defaultBranchId?: string
+  ): Promise<{ success: number; failed: number; results: Array<{ staffId: string; success: boolean; error?: string }> }> => {
+    try {
+      const response = await api.post<{
+        success: number;
+        failed: number;
+        results: Array<{ staffId: string; success: boolean; error?: string }>;
+      }>(`/staff/bulk-branch-assign`, {
+        staffIds,
+        branchIds,
+        defaultBranchId
+      });
+      return response.data;
+    } catch (error) {
+      // Mock: process each staff member
+      const results: Array<{ staffId: string; success: boolean; error?: string }> = [];
+
+      for (const staffId of staffIds) {
+        try {
+          // Remove old assignments
+          const oldIndexes = mockStaffBranches
+            .map((sb, i) => sb.staffId === staffId ? i : -1)
+            .filter(i => i > -1)
+            .reverse();
+          oldIndexes.forEach(i => mockStaffBranches.splice(i, 1));
+
+          // Add new assignments
+          const newAssignments: StaffBranch[] = branchIds.map(branchId => ({
+            id: `sb_${Date.now()}_${staffId}_${branchId}`,
+            staffId,
+            branchId,
+            branchName: "Chi nhánh",
+            brandId: "",
+            brandName: "",
+            isDefault: branchId === defaultBranchId,
+            assignedAt: new Date().toISOString()
+          }));
+          mockStaffBranches.push(...newAssignments);
+          results.push({ staffId, success: true });
+        } catch (e: any) {
+          results.push({ staffId, success: false, error: e.message });
+        }
+      }
+
+      return {
+        success: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length,
+        results
+      };
+    }
   }
 };

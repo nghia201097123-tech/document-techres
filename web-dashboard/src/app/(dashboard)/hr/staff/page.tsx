@@ -190,7 +190,7 @@ const initialImportSettings: ImportSettings = {
 };
 
 type DialogMode = "create" | "edit" | "view" | "import" | null;
-type BulkOperation = "department" | "branch" | "activate" | "deactivate" | "reset-password" | "delete" | null;
+type BulkOperation = "department" | "branch" | "branch-permission" | "activate" | "deactivate" | "reset-password" | "delete" | null;
 
 export default function StaffPage() {
   const dispatch = useAppDispatch();
@@ -259,6 +259,8 @@ export default function StaffPage() {
   const [bulkOperation, setBulkOperation] = React.useState<BulkOperation>(null);
   const [bulkDepartmentId, setBulkDepartmentId] = React.useState("");
   const [bulkBranchId, setBulkBranchId] = React.useState("");
+  const [bulkBranchPermissionIds, setBulkBranchPermissionIds] = React.useState<Set<string>>(new Set());
+  const [bulkDefaultBranchId, setBulkDefaultBranchId] = React.useState("");
   const [processingBulk, setProcessingBulk] = React.useState(false);
   const [bulkProgress, setBulkProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const [bulkResult, setBulkResult] = React.useState<BulkOperationResult | null>(null);
@@ -448,7 +450,7 @@ export default function StaffPage() {
   React.useEffect(() => {
     if (bulkOperation === "department") {
       dispatch(fetchDepartments());
-    } else if (bulkOperation === "branch") {
+    } else if (bulkOperation === "branch" || bulkOperation === "branch-permission") {
       dispatch(fetchBrands());
       // Load branches for current filter brand
       if (filterBrandId && filterBrandId !== "" && filterBrandId !== "all") {
@@ -673,6 +675,8 @@ export default function StaffPage() {
     setBulkOperation(null);
     setBulkDepartmentId("");
     setBulkBranchId("");
+    setBulkBranchPermissionIds(new Set());
+    setBulkDefaultBranchId("");
     setBulkResult(null);
     setCopiedPasswords(new Set());
   };
@@ -716,6 +720,39 @@ export default function StaffPage() {
     if (bulkOperation === "branch" && !bulkBranchId) {
       toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
       return;
+    }
+    if (bulkOperation === "branch-permission" && bulkBranchPermissionIds.size === 0) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn ít nhất một chi nhánh", variant: "destructive" });
+      return;
+    }
+
+    // Handle branch-permission separately (uses different service)
+    if (bulkOperation === "branch-permission") {
+      setProcessingBulk(true);
+      try {
+        const result = await staffBranchService.bulkAssignToMultipleStaff(
+          staffIds,
+          Array.from(bulkBranchPermissionIds),
+          bulkDefaultBranchId || undefined
+        );
+        toast({
+          title: "Thành công",
+          description: `Đã gán quyền chi nhánh cho ${result.success} nhân viên${result.failed > 0 ? `, thất bại ${result.failed}` : ""}`,
+        });
+        handleCloseBulkDialog();
+        setSelectedStaffIds(new Set());
+        setProcessingBulk(false);
+        return;
+      } catch (error: any) {
+        console.error("Bulk branch permission error:", error);
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Có lỗi xảy ra khi gán quyền chi nhánh",
+          variant: "destructive",
+        });
+        setProcessingBulk(false);
+        return;
+      }
     }
 
     // Close dialog and clear selection immediately
@@ -1808,6 +1845,10 @@ export default function StaffPage() {
                         <Building2 className="mr-2 h-4 w-4" />
                         Chuyển chi nhánh
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("branch-permission")}>
+                        <Shield className="mr-2 h-4 w-4 text-blue-600" />
+                        Gán quyền chi nhánh
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBulkOperation("activate")}>
                         <Power className="mr-2 h-4 w-4 text-green-600" />
@@ -2081,6 +2122,7 @@ export default function StaffPage() {
             <DialogTitle>
               {bulkOperation === "department" && "Chuyển bộ phận"}
               {bulkOperation === "branch" && "Chuyển chi nhánh"}
+              {bulkOperation === "branch-permission" && "Gán quyền chi nhánh hoạt động"}
               {bulkOperation === "activate" && "Kích hoạt nhân viên"}
               {bulkOperation === "deactivate" && "Tạm ngưng nhân viên"}
               {bulkOperation === "reset-password" && (bulkResult ? "Kết quả reset mật khẩu" : "Reset mật khẩu")}
@@ -2136,6 +2178,76 @@ export default function StaffPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          )}
+
+          {/* Branch permission selection (multiple branches) */}
+          {bulkOperation === "branch-permission" && !bulkResult && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn các chi nhánh nhân viên được phép hoạt động</Label>
+                <p className="text-xs text-muted-foreground">
+                  Chọn một hoặc nhiều chi nhánh. Nhân viên sẽ có quyền làm việc tại các chi nhánh được chọn.
+                </p>
+                <ScrollArea className="h-[200px] border rounded-md p-2">
+                  <div className="space-y-2">
+                    {(filterBrandId && branchesByBrand[filterBrandId] || []).map((branch) => (
+                      <div key={branch.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`bulk-branch-${branch.id}`}
+                          checked={bulkBranchPermissionIds.has(branch.id)}
+                          onCheckedChange={(checked) => {
+                            const newSet = new Set(bulkBranchPermissionIds);
+                            if (checked) {
+                              newSet.add(branch.id);
+                            } else {
+                              newSet.delete(branch.id);
+                              // Clear default if it was this branch
+                              if (bulkDefaultBranchId === branch.id) {
+                                setBulkDefaultBranchId("");
+                              }
+                            }
+                            setBulkBranchPermissionIds(newSet);
+                          }}
+                        />
+                        <label
+                          htmlFor={`bulk-branch-${branch.id}`}
+                          className="text-sm cursor-pointer flex-1"
+                        >
+                          {branch.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+                <p className="text-xs text-muted-foreground">
+                  Đã chọn: {bulkBranchPermissionIds.size} chi nhánh
+                </p>
+              </div>
+
+              {bulkBranchPermissionIds.size > 0 && (
+                <div className="grid gap-2">
+                  <Label>Chi nhánh mặc định</Label>
+                  <Select value={bulkDefaultBranchId} onValueChange={setBulkDefaultBranchId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn chi nhánh mặc định..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from(bulkBranchPermissionIds).map((branchId) => {
+                        const branch = (filterBrandId && branchesByBrand[filterBrandId] || []).find(b => b.id === branchId);
+                        return branch ? (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ) : null;
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-amber-600">
+                    Chi nhánh mặc định sẽ được hiển thị khi nhân viên đăng nhập.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
