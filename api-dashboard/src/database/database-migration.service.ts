@@ -476,6 +476,34 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Staff permissions table created successfully');
       }
 
+      // 22.5. Check if staff_branches table exists
+      const staffBranchesExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'staff_branches'
+        );
+      `);
+
+      if (!staffBranchesExists[0].exists) {
+        this.logger.log('Creating staff_branches table...');
+        await queryRunner.query(`
+          CREATE TABLE staff_branches (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+            branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            is_default BOOLEAN DEFAULT FALSE,
+            assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(staff_id, branch_id)
+          );
+          CREATE INDEX idx_staff_branches_tenant ON staff_branches(tenant_id);
+          CREATE INDEX idx_staff_branches_staff ON staff_branches(staff_id);
+          CREATE INDEX idx_staff_branches_branch ON staff_branches(branch_id);
+        `);
+        this.logger.log('Staff branches table created successfully');
+      }
+
       // 23. Seed F&B permissions
       await this.seedFnBPermissions(queryRunner);
 
