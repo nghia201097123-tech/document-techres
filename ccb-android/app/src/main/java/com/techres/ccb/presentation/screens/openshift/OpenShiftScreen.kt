@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -28,18 +29,28 @@ import java.util.*
 fun OpenShiftScreen(
     branchName: String,
     onShiftOpened: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: OpenShiftViewModel = hiltViewModel()
 ) {
-    // Mock data
-    var initialCash by remember { mutableLongStateOf(0L) }
-    var initialCashText by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Show error if any
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            // Error will be shown in UI
+        }
+    }
+
+    // Navigate when shift is opened successfully
+    LaunchedEffect(uiState.isShiftOpen) {
+        if (uiState.isShiftOpen) {
+            onShiftOpened()
+        }
+    }
 
     val currentDateTime = remember {
         SimpleDateFormat("EEEE, dd/MM/yyyy - HH:mm", Locale("vi")).format(Date())
     }
-    val staffName = "Nguyễn Văn A" // Mock staff name
 
     Row(
         modifier = Modifier
@@ -156,7 +167,7 @@ fun OpenShiftScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = staffName,
+                                text = uiState.staffName,
                                 fontSize = 14.sp,
                                 color = Color.White.copy(alpha = 0.9f)
                             )
@@ -243,11 +254,10 @@ fun OpenShiftScreen(
 
                     // Cash input
                     OutlinedTextField(
-                        value = if (initialCash > 0) formatCurrency(initialCash) else initialCashText,
+                        value = if (uiState.initialCash > 0) formatCurrency(uiState.initialCash) else uiState.initialCashText,
                         onValueChange = { input ->
                             val cleanInput = input.replace(".", "").replace(" đ", "").replace(",", "")
-                            initialCashText = cleanInput
-                            initialCash = cleanInput.toLongOrNull() ?: 0L
+                            viewModel.updateInitialCash(cleanInput)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("0 đ") },
@@ -281,11 +291,8 @@ fun OpenShiftScreen(
                         listOf(500_000L, 1_000_000L, 2_000_000L, 5_000_000L).forEach { amount ->
                             QuickAmountChip(
                                 amount = amount,
-                                isSelected = initialCash == amount,
-                                onClick = {
-                                    initialCash = amount
-                                    initialCashText = amount.toString()
-                                },
+                                isSelected = uiState.initialCash == amount,
+                                onClick = { viewModel.selectQuickAmount(amount) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -304,8 +311,8 @@ fun OpenShiftScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it },
+                        value = uiState.note,
+                        onValueChange = { viewModel.updateNote(it) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Nhập ghi chú...") },
                         minLines = 2,
@@ -313,25 +320,33 @@ fun OpenShiftScreen(
                         shape = RoundedCornerShape(12.dp)
                     )
 
+                    // Show error if any
+                    uiState.error?.let { error ->
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 14.sp
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(32.dp))
 
                     // Open shift button
                     Button(
                         onClick = {
-                            isLoading = true
-                            // Mock delay then navigate
-                            onShiftOpened()
+                            viewModel.openShift { /* onSuccess handled by LaunchedEffect */ }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        enabled = !isLoading,
+                        enabled = !uiState.isLoading,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50)
                         )
                     ) {
-                        if (isLoading) {
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 color = Color.White,
