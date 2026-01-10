@@ -286,7 +286,7 @@ export class SyncService {
           order: { sortOrder: 'ASC' },
         }),
         this.branchProductRepository.find({
-          where: { branchId, isAvailable: true },
+          where: { branchId, tenantId, isAvailable: true },
           relations: ['product'],
           order: { sortOrder: 'ASC' },
         }),
@@ -320,7 +320,7 @@ export class SyncService {
       ]);
 
       const products = branchProducts
-        .filter(bp => bp.product && bp.product.isActive)
+        .filter(bp => bp.product && bp.product.isActive && bp.product.tenantId === tenantId)
         .map(bp => this.mapBranchProduct(bp));
 
       // Log product types distribution for debugging
@@ -412,11 +412,11 @@ export class SyncService {
         where: { brandId, tenantId, updatedAt: MoreThan(since) },
         order: { sortOrder: 'ASC' },
       }) : Promise.resolve([]),
-      this.branchProductRepository.find({
-        where: { branchId, isAvailable: true, updatedAt: MoreThan(since) },
+      (branchId && tenantId) ? this.branchProductRepository.find({
+        where: { branchId, tenantId, isAvailable: true, updatedAt: MoreThan(since) },
         relations: ['product'],
         order: { sortOrder: 'ASC' },
-      }),
+      }) : Promise.resolve([]),
       this.areaRepository.find({
         where: { branchId, updatedAt: MoreThan(since) },
         order: { sortOrder: 'ASC' },
@@ -439,7 +439,7 @@ export class SyncService {
     ]);
 
     const products = branchProducts
-      .filter(bp => bp.product && bp.product.isActive)
+      .filter(bp => bp.product && bp.product.isActive && bp.product.tenantId === tenantId)
       .map(bp => this.mapBranchProduct(bp));
 
     const seasonalPriceIds = seasonalPrices.map(sp => sp.id);
