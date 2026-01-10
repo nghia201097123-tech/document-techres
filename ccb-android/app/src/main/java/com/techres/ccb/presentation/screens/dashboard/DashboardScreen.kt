@@ -1325,7 +1325,10 @@ private fun OrderDetailDialog(
 
                 HorizontalDivider()
 
-                // Order Items
+                // Order Items - filter out combo children (they're shown under their parent)
+                val parentItems = orderItems.filter { !it.isComboChild }
+                val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
+
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -1334,14 +1337,15 @@ private fun OrderDetailDialog(
                 ) {
                     item {
                         Text(
-                            text = "Danh sách món (${orderItems.size})",
+                            text = "Danh sách món (${parentItems.size})",
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(vertical = 12.dp)
                         )
                     }
 
-                    items(orderItems) { item ->
-                        OrderItemRow(item)
+                    items(parentItems) { item ->
+                        val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
+                        OrderItemRow(item, comboChildren)
                         HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                     }
 
@@ -1443,9 +1447,12 @@ private fun OrderDetailDialog(
  *             [Base Price]
  *               • Topping 1         +10.000đ
  *               • Topping 2         +20.000đ
+ *             [Combo] Bao gồm:
+ *               • Child 1           x2
+ *               • Child 2           x1
  */
 @Composable
-private fun OrderItemRow(item: OrderItemEntity) {
+private fun OrderItemRow(item: OrderItemEntity, comboChildren: List<OrderItemEntity> = emptyList()) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1564,6 +1571,61 @@ private fun OrderItemRow(item: OrderItemEntity) {
                     fontStyle = FontStyle.Italic,
                     modifier = Modifier.padding(start = 36.dp, top = 4.dp)
                 )
+            }
+        }
+
+        // Show combo children if this is a combo parent
+        if (comboChildren.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 36.dp, top = 8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFFFF3E0).copy(alpha = 0.5f))
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = "Bao gồm:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFE65100),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                comboChildren.forEach { child ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "•",
+                                fontSize = 14.sp,
+                                color = Color(0xFFFF9800),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = child.productName,
+                                fontSize = 13.sp,
+                                color = Color(0xFF424242)
+                            )
+                        }
+                        Badge(
+                            containerColor = Color(0xFFFF9800).copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "x${child.quantity}",
+                                fontSize = 11.sp,
+                                color = Color(0xFFE65100)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

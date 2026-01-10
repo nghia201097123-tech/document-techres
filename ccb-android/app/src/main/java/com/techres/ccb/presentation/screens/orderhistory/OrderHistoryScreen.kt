@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cancel
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -548,9 +550,12 @@ private fun OrderDetailDialog(
                 Divider()
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Items List
+                // Items List - filter out combo children (they're shown under their parent)
+                val parentItems = orderItems.filter { !it.isComboChild }
+                val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
+
                 Text(
-                    text = "Danh sách món (${orderItems.size})",
+                    text = "Danh sách món (${parentItems.size})",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
@@ -560,7 +565,8 @@ private fun OrderDetailDialog(
                     modifier = Modifier.height(250.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(orderItems) { item ->
+                    items(parentItems) { item ->
+                        val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
                         // Grab-style order item display
                         Column(modifier = Modifier.fillMaxWidth()) {
                             // Row 1: Quantity badge + Product name + Total price
@@ -675,6 +681,61 @@ private fun OrderDetailDialog(
                                         color = Color(0xFF666666),
                                         modifier = Modifier.padding(start = 32.dp, top = 4.dp)
                                     )
+                                }
+                            }
+
+                            // Show combo children if this is a combo parent
+                            if (comboChildren.isNotEmpty()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 32.dp, top = 8.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFFFF3E0).copy(alpha = 0.5f))
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Bao gồm:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFFE65100),
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                    comboChildren.forEach { child ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(
+                                                    text = "•",
+                                                    fontSize = 14.sp,
+                                                    color = Color(0xFFFF9800),
+                                                    modifier = Modifier.padding(end = 8.dp)
+                                                )
+                                                Text(
+                                                    text = child.productName,
+                                                    fontSize = 13.sp,
+                                                    color = Color(0xFF424242)
+                                                )
+                                            }
+                                            Badge(
+                                                containerColor = Color(0xFFFF9800).copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "x${child.quantity}",
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFFE65100)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
