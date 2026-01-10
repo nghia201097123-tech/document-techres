@@ -57,6 +57,8 @@ fun DashboardScreen(
     var selectedOrder by remember { mutableStateOf<PosOrder?>(null) }
     var orderItems by remember { mutableStateOf<List<OrderItemEntity>>(emptyList()) }
     var showCancelConfirmDialog by remember { mutableStateOf(false) }
+    var showQuickPaymentDialog by remember { mutableStateOf(false) }
+    var orderForPayment by remember { mutableStateOf<PosOrder?>(null) }
 
     Row(
         modifier = Modifier
@@ -140,7 +142,10 @@ fun DashboardScreen(
                                             }
                                         },
                                         onConfirm = { viewModel.confirmPosOrder(order.id) },
-                                        onComplete = { viewModel.completePosOrder(order.id) }
+                                        onComplete = {
+                                            orderForPayment = order
+                                            showQuickPaymentDialog = true
+                                        }
                                     )
                                 }
                                 // Bottom spacing
@@ -191,9 +196,8 @@ fun DashboardScreen(
                 orderItems = emptyList()
             },
             onComplete = {
-                viewModel.completePosOrder(selectedOrder!!.id)
-                showOrderDetailDialog = false
-                selectedOrder = null
+                orderForPayment = selectedOrder
+                showQuickPaymentDialog = true
             },
             onCancel = {
                 showCancelConfirmDialog = true
@@ -229,6 +233,27 @@ fun DashboardScreen(
             dismissButton = {
                 OutlinedButton(onClick = { showCancelConfirmDialog = false }) {
                     Text("Quay lại")
+                }
+            }
+        )
+    }
+
+    // Quick Payment Dialog
+    if (showQuickPaymentDialog && orderForPayment != null) {
+        QuickPaymentDialog(
+            order = orderForPayment!!,
+            onDismiss = {
+                showQuickPaymentDialog = false
+                orderForPayment = null
+            },
+            onPaymentComplete = { paymentMethod ->
+                viewModel.completePosOrder(orderForPayment!!.id)
+                showQuickPaymentDialog = false
+                orderForPayment = null
+                // Also close detail dialog if open
+                if (showOrderDetailDialog) {
+                    showOrderDetailDialog = false
+                    selectedOrder = null
                 }
             }
         )
@@ -673,103 +698,175 @@ private fun OrderCard(
 ) {
     val statusColor = Color(order.status.color)
 
+    // Calculate wait time
+    val waitMinutes = remember(order.createdAt) {
+        ((System.currentTimeMillis() - order.createdAt) / 60000).toInt()
+    }
+    val isUrgent = waitMinutes > 15
+    val borderColor = if (isUrgent) Color(0xFFF44336) else statusColor
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .aspectRatio(0.9f)
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        border = if (isUrgent) androidx.compose.foundation.BorderStroke(2.dp, borderColor) else null
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Status bar at top
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(statusColor)
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Order number
-                Box(
-                    modifier = Modifier
-                        .background(statusColor, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                // Header: Order number + Wait time
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Order number badge
+                    Box(
+                        modifier = Modifier
+                            .background(statusColor, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "#${order.orderNumber.toString().padStart(3, '0')}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    // Wait time indicator
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(
+                                if (isUrgent) Color(0xFFFFEBEE) else Color(0xFFF5F5F5),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = if (isUrgent) Color(0xFFF44336) else Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "${waitMinutes}p",
+                            fontSize = 11.sp,
+                            fontWeight = if (isUrgent) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isUrgent) Color(0xFFF44336) else Color.Gray
+                        )
+                    }
+                }
+
+                // Center: Table + Items + Total
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Table name - Large
                     Text(
-                        text = "#${order.orderNumber.toString().padStart(3, '0')}",
-                        fontSize = 12.sp,
+                        text = order.tableName ?: "Mang đi",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        textAlign = TextAlign.Center,
+                        color = Color(0xFF212121)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Items count
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Restaurant,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${order.itemCount} món",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    // Total amount - Prominent
+                    Text(
+                        text = formatCurrency(order.totalAmount),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1976D2)
                     )
                 }
-                // Time
-                Text(
-                    text = formatTime(order.createdAt),
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-            }
 
-            // Center: Table info
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = if (order.tableName != null) Icons.Default.TableBar else Icons.Default.TakeoutDining,
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = statusColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = order.tableName ?: "Mang đi",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "${order.itemCount} món",
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-            }
-
-            // Footer
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formatCompactCurrency(order.totalAmount),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2)
-                )
-                // Action button
-                Surface(
-                    onClick = {
-                        if (order.status == PosOrderStatus.DRAFT) onConfirm() else onComplete()
-                    },
-                    shape = RoundedCornerShape(6.dp),
-                    color = statusColor.copy(alpha = 0.1f)
+                // Footer: Quick action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = if (order.status == PosOrderStatus.DRAFT) "Xác nhận" else "Hoàn tất",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = statusColor
-                    )
+                    if (order.status == PosOrderStatus.DRAFT) {
+                        // Draft order: Show confirm button
+                        Button(
+                            onClick = onConfirm,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFF9800)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Xác nhận", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    } else {
+                        // Confirmed order: Show complete button (payment)
+                        Button(
+                            onClick = onComplete,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF4CAF50)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Payment,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Thanh toán", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
         }
@@ -815,6 +912,169 @@ private fun EmptyOrdersState(
                 text = subMessage,
                 fontSize = 14.sp,
                 color = Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickPaymentDialog(
+    order: PosOrder,
+    onDismiss: () -> Unit,
+    onPaymentComplete: (paymentMethod: String) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Icon(
+                    imageVector = Icons.Default.Payment,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = Color(0xFF4CAF50)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Thanh toán",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Đơn #${order.orderNumber.toString().padStart(3, '0')} • ${order.tableName ?: "Mang đi"}",
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Total amount - Large
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFE8F5E9), RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Tổng tiền",
+                            fontSize = 14.sp,
+                            color = Color(0xFF388E3C)
+                        )
+                        Text(
+                            text = formatCurrency(order.totalAmount),
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Payment method buttons - Large touch targets
+                Text(
+                    text = "Chọn phương thức thanh toán",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Cash payment
+                    PaymentMethodButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Money,
+                        label = "Tiền mặt",
+                        color = Color(0xFF4CAF50),
+                        onClick = { onPaymentComplete("cash") }
+                    )
+
+                    // Card payment
+                    PaymentMethodButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.CreditCard,
+                        label = "Thẻ",
+                        color = Color(0xFF2196F3),
+                        onClick = { onPaymentComplete("card") }
+                    )
+
+                    // Transfer payment
+                    PaymentMethodButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.QrCode,
+                        label = "Chuyển khoản",
+                        color = Color(0xFF9C27B0),
+                        onClick = { onPaymentComplete("transfer") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Cancel button
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Huỷ", color = Color.Gray)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentMethodButton(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .aspectRatio(0.85f)
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(32.dp),
+                tint = color
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = color,
+                textAlign = TextAlign.Center
             )
         }
     }
