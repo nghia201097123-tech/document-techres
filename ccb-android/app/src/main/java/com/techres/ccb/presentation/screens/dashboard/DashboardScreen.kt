@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -1397,8 +1398,8 @@ private fun OrderDetailDialog(
  * Layout:
  * [Qty Badge] [Product Name]        [Price]
  *             [Base Price]
- *               • Topping 1
- *               • Topping 2
+ *               • Topping 1         +10.000đ
+ *               • Topping 2         +20.000đ
  */
 @Composable
 private fun OrderItemRow(item: OrderItemEntity) {
@@ -1454,9 +1455,15 @@ private fun OrderItemRow(item: OrderItemEntity) {
             modifier = Modifier.padding(start = 36.dp, top = 2.dp)
         )
 
-        // Row 3: Variants/Toppings - Grab style
+        // Row 3: Variants/Toppings - Grab style with prices
         if (!item.notes.isNullOrBlank()) {
-            val variants = item.notes.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            // Split by " | " to separate variants from user note
+            val parts = item.notes.split(" | ")
+            val variantsPart = parts.firstOrNull() ?: ""
+            val userNote = parts.getOrNull(1)
+
+            // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
+            val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
             if (variants.isNotEmpty()) {
                 Column(
                     modifier = Modifier
@@ -1464,26 +1471,56 @@ private fun OrderItemRow(item: OrderItemEntity) {
                         .padding(start = 36.dp, top = 6.dp)
                 ) {
                     variants.forEach { variant ->
+                        // Parse "Name:Price" format
+                        val colonIndex = variant.lastIndexOf(":")
+                        val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
+                        val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 3.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "•",
-                                fontSize = 14.sp,
-                                color = Color.Gray,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                            Text(
-                                text = variant,
-                                fontSize = 14.sp,
-                                color = Color(0xFF424242)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "•",
+                                    fontSize = 14.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    text = name,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF424242)
+                                )
+                            }
+                            if (price > 0) {
+                                Text(
+                                    text = "+${formatCurrency(price)}",
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF1976D2),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
+            }
+
+            // Show user note if exists
+            if (userNote != null && userNote.isNotEmpty()) {
+                Text(
+                    text = userNote,
+                    fontSize = 13.sp,
+                    color = Color(0xFF1976D2),
+                    fontStyle = FontStyle.Italic,
+                    modifier = Modifier.padding(start = 36.dp, top = 4.dp)
+                )
             }
         }
     }

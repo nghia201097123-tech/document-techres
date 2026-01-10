@@ -801,10 +801,19 @@ class SaleViewModel @Inject constructor(
 
                 // Create order items
                 val orderItems = state.cartItems.mapIndexed { index, cartItem ->
+                    // Build variants string with prices: "Kiwi:10000, Size S:10000"
+                    val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
+                        if (variant.price > 0) {
+                            "${variant.name}:${variant.price}"
+                        } else {
+                            variant.name
+                        }
+                    }
+
                     // Combine variants and user note into notes field
                     val variantsAndNote = buildString {
-                        if (cartItem.variantText.isNotEmpty()) {
-                            append(cartItem.variantText)
+                        if (variantsWithPrices.isNotEmpty()) {
+                            append(variantsWithPrices)
                         }
                         if (!cartItem.note.isNullOrEmpty()) {
                             if (isNotEmpty()) append(" | ")
@@ -878,10 +887,19 @@ class SaleViewModel @Inject constructor(
 
                 // Create new order items
                 val newItems = state.cartItems.map { cartItem ->
+                    // Build variants string with prices: "Kiwi:10000, Size S:10000"
+                    val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
+                        if (variant.price > 0) {
+                            "${variant.name}:${variant.price}"
+                        } else {
+                            variant.name
+                        }
+                    }
+
                     // Combine variants and user note into notes field
                     val variantsAndNote = buildString {
-                        if (cartItem.variantText.isNotEmpty()) {
-                            append(cartItem.variantText)
+                        if (variantsWithPrices.isNotEmpty()) {
+                            append(variantsWithPrices)
                         }
                         if (!cartItem.note.isNullOrEmpty()) {
                             if (isNotEmpty()) append(" | ")

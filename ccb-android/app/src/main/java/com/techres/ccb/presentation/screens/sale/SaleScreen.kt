@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.techres.ccb.data.local.entity.OrderEntity
@@ -1140,12 +1141,12 @@ fun VariantLineItem(variant: SelectedVariant) {
 }
 
 /**
- * Order item row (for existing orders) - Grab style layout
+ * Order item row (for existing orders) - Grab style layout with prices
  * Layout:
  * [Product Name]               [x1] [Price]
  * [Base Price]
- *   • Topping 1
- *   • Topping 2
+ *   • Topping 1                +10.000đ
+ *   • Topping 2                +20.000đ
  */
 @Composable
 fun OrderItemRow(item: OrderItemEntity) {
@@ -1203,9 +1204,15 @@ fun OrderItemRow(item: OrderItemEntity) {
                 color = Color.Gray
             )
 
-            // Row 3: Variants/Toppings - Grab style
+            // Row 3: Variants/Toppings - Grab style with prices
             if (!item.notes.isNullOrEmpty()) {
-                val variants = item.notes.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                // Split by " | " to separate variants from user note
+                val parts = item.notes.split(" | ")
+                val variantsPart = parts.firstOrNull() ?: ""
+                val userNote = parts.getOrNull(1)
+
+                // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
+                val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
                 if (variants.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Column(
@@ -1214,26 +1221,56 @@ fun OrderItemRow(item: OrderItemEntity) {
                             .padding(start = 4.dp)
                     ) {
                         variants.forEach { variant ->
+                            // Parse "Name:Price" format
+                            val colonIndex = variant.lastIndexOf(":")
+                            val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
+                            val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "•",
-                                    fontSize = 14.sp,
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                                Text(
-                                    text = variant,
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF424242)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "•",
+                                        fontSize = 14.sp,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Text(
+                                        text = name,
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF424242)
+                                    )
+                                }
+                                if (price > 0) {
+                                    Text(
+                                        text = "+${formatCurrency(price)}",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF1976D2),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
+                }
+
+                // Show user note if exists
+                if (userNote != null && userNote.isNotEmpty()) {
+                    Text(
+                        text = userNote,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontStyle = FontStyle.Italic,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
                 }
             }
         }
