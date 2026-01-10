@@ -149,7 +149,32 @@ class SyncRepository @Inject constructor(
 
         // Sync product toppings
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_TOPPINGS, SyncStepStatus.IN_PROGRESS))
-        val productToppings = syncData.products.flatMap { dto ->
+
+        // Build product toppings from toppingGroups (new structure from TechRes Dashboard)
+        val productToppingsFromGroups = syncData.toppingGroups?.flatMap { group ->
+            val productIds = group.productIds ?: emptyList()
+            productIds.flatMap { productId ->
+                group.toppings.map { topping ->
+                    ProductToppingEntity(
+                        productId = productId,
+                        toppingId = topping.id,
+                        branchId = branchId,
+                        groupName = group.name,
+                        groupType = group.groupType,
+                        isRequired = group.isRequired,
+                        isMultiple = group.isMultiple,
+                        extraPrice = topping.price,
+                        isDefault = topping.isDefault,
+                        sortOrder = topping.sortOrder,
+                        createdAt = group.createdAt,
+                        updatedAt = group.updatedAt
+                    )
+                }
+            }
+        } ?: emptyList()
+
+        // Fall back to old structure: products[].toppings
+        val productToppingsFromProducts = syncData.products.flatMap { dto ->
             dto.toppings?.map { toppingDto ->
                 ProductToppingEntity(
                     productId = dto.id,
@@ -167,6 +192,14 @@ class SyncRepository @Inject constructor(
                 )
             } ?: emptyList()
         }
+
+        // Combine both sources (prefer toppingGroups if available)
+        val productToppings = if (productToppingsFromGroups.isNotEmpty()) {
+            productToppingsFromGroups
+        } else {
+            productToppingsFromProducts
+        }
+
         // Clear existing toppings for this branch and insert new ones
         productToppingDao.deleteAllByBranch(branchId)
         if (productToppings.isNotEmpty()) {

@@ -81,7 +81,9 @@ data class FullSyncData(
     @SerializedName("staff") val staff: List<StaffDto>,
     @SerializedName("branchInfo") val branchInfo: BranchInfoDto?,
     @SerializedName("seasonalPrices") val seasonalPrices: List<SeasonalPriceDto>?,
-    @SerializedName("coupons") val coupons: List<CouponDto>?
+    @SerializedName("coupons") val coupons: List<CouponDto>?,
+    // Topping groups với danh sách toppings và gán vào món
+    @SerializedName("toppingGroups") val toppingGroups: List<ToppingGroupDto>?
 )
 
 // ============ Master Data DTOs ============
@@ -574,4 +576,40 @@ data class CouponDto(
     @SerializedName("isActive") val isActive: Boolean,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String
+)
+
+// ============ Topping Group DTOs ============
+
+/**
+ * Nhóm topping (ví dụ: SIZE, ĐƯỜNG, ĐÁ, TOPPING)
+ * Mỗi nhóm có danh sách topping items và danh sách sản phẩm được gán
+ */
+data class ToppingGroupDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,                          // SIZE, ĐƯỜNG, ĐÁ, TOPPING
+    @SerializedName("groupType") val groupType: String = "topping",    // size, sugar, ice, topping, other
+    @SerializedName("isRequired") val isRequired: Boolean = false,     // Bắt buộc chọn?
+    @SerializedName("isMultiple") val isMultiple: Boolean = true,      // Chọn nhiều?
+    @SerializedName("minSelect") val minSelect: Int = 0,               // Số tối thiểu cần chọn
+    @SerializedName("maxSelect") val maxSelect: Int = 99,              // Số tối đa được chọn
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("isActive") val isActive: Boolean = true,
+    @SerializedName("toppings") val toppings: List<ToppingItemDto>,    // Danh sách topping trong nhóm
+    @SerializedName("productIds") val productIds: List<String>?,       // Danh sách sản phẩm được gán nhóm này
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+/**
+ * Topping item trong nhóm (ví dụ: Size S, Size M)
+ */
+data class ToppingItemDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String?,                         // TOP2962
+    @SerializedName("name") val name: String,                          // Size S
+    @SerializedName("price") val price: Double = 0.0,                  // Giá thêm (+5,000đ)
+    @SerializedName("isDefault") val isDefault: Boolean = false,       // Mặc định?
+    @SerializedName("maxQuantity") val maxQuantity: Int = 5,           // Tối đa: 5
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("isActive") val isActive: Boolean = true
 )
