@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.techres.ccb.data.local.entity.OrderEntity
+import com.techres.ccb.data.local.entity.OrderItemEntity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,6 +97,8 @@ fun SaleScreen(
                 discountAmount = uiState.discountAmount,
                 taxAmount = uiState.taxAmount,
                 totalAmount = uiState.totalAmount,
+                currentOrder = uiState.currentOrder,
+                currentOrderItems = uiState.currentOrderItems,
                 onOrderTypeChanged = viewModel::setOrderType,
                 onTableClicked = { viewModel.showTableDialog() },
                 onCustomerClicked = { viewModel.showCustomerDialog() },
@@ -102,7 +106,10 @@ fun SaleScreen(
                 onDecreaseQuantity = viewModel::decreaseQuantity,
                 onRemoveItem = viewModel::removeFromCart,
                 onClearCart = viewModel::clearCart,
-                onCheckout = { viewModel.showPaymentDialog() }
+                onPlaceOrder = viewModel::placeOrder,
+                onAddItemsToOrder = viewModel::addItemsToOrder,
+                onCheckout = { viewModel.showPaymentDialog() },
+                onCancelOrder = { viewModel.cancelOrder() }
             )
         }
 
@@ -156,8 +163,14 @@ fun SaleScreen(
         }
 
         if (uiState.showPaymentDialog) {
+            // Use order total when there's an active order
+            val paymentTotal = if (uiState.currentOrder != null) {
+                uiState.currentOrder.totalAmount.toLong() + uiState.totalAmount
+            } else {
+                uiState.totalAmount
+            }
             PaymentDialog(
-                totalAmount = uiState.totalAmount,
+                totalAmount = paymentTotal,
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)
@@ -415,6 +428,8 @@ fun CartPanel(
     discountAmount: Long,
     taxAmount: Long,
     totalAmount: Long,
+    currentOrder: OrderEntity? = null,
+    currentOrderItems: List<OrderItemEntity> = emptyList(),
     onOrderTypeChanged: (OrderType) -> Unit,
     onTableClicked: () -> Unit,
     onCustomerClicked: () -> Unit,
@@ -422,8 +437,12 @@ fun CartPanel(
     onDecreaseQuantity: (String) -> Unit,
     onRemoveItem: (String) -> Unit,
     onClearCart: () -> Unit,
-    onCheckout: () -> Unit
+    onPlaceOrder: () -> Unit = {},
+    onAddItemsToOrder: () -> Unit = {},
+    onCheckout: () -> Unit,
+    onCancelOrder: () -> Unit = {}
 ) {
+    val hasActiveOrder = currentOrder != null
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
@@ -432,24 +451,39 @@ fun CartPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
+                .background(if (hasActiveOrder) Color(0xFF2196F3) else MaterialTheme.colorScheme.primary)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Default.ShoppingCart,
+                imageVector = if (hasActiveOrder) Icons.Default.Receipt else Icons.Default.ShoppingCart,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary
+                tint = Color.White
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Đơn hàng",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.weight(1f)
-            )
-            if (cartItems.isNotEmpty()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (hasActiveOrder) currentOrder?.orderNumber ?: "Đơn hàng" else "Đơn hàng mới",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                if (hasActiveOrder) {
+                    Text(
+                        text = "Đang chờ thanh toán",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+            }
+            if (hasActiveOrder) {
+                Badge(containerColor = Color(0xFF4CAF50)) {
+                    Text(
+                        text = "${currentOrderItems.size} món",
+                        color = Color.White
+                    )
+                }
+            } else if (cartItems.isNotEmpty()) {
                 Badge(containerColor = MaterialTheme.colorScheme.error) {
                     Text(
                         text = cartItems.sumOf { it.quantity }.toString(),
@@ -522,8 +556,8 @@ fun CartPanel(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // Cart Items
-        if (cartItems.isEmpty()) {
+        // Order Items (current order + cart)
+        if (cartItems.isEmpty() && currentOrderItems.isEmpty()) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -552,6 +586,33 @@ fun CartPanel(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp)
             ) {
+                // Display current order items (read-only)
+                if (currentOrderItems.isNotEmpty()) {
+                    Text(
+                        text = "Đã order:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    currentOrderItems.forEach { item ->
+                        OrderItemRow(item = item)
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (cartItems.isNotEmpty()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        Text(
+                            text = "Thêm mới:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF2196F3),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
+                // Display new cart items (editable)
                 cartItems.forEach { item ->
                     CartItemRow(
                         item = item,
@@ -565,6 +626,9 @@ fun CartPanel(
         }
 
         // Cart Summary
+        val orderSubtotal = (currentOrder?.subtotal?.toLong() ?: 0L) + subtotal
+        val orderTotal = (currentOrder?.totalAmount?.toLong() ?: 0L) + totalAmount
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -575,13 +639,34 @@ fun CartPanel(
             )
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                // Subtotal
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
-                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
+                // Current order amount (if exists)
+                if (hasActiveOrder && currentOrder != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Đã order:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                        Text(formatCurrency(currentOrder.totalAmount.toLong()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                    }
+                    if (subtotal > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Thêm mới:", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF2196F3))
+                            Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, color = Color(0xFF2196F3))
+                        }
+                    }
+                } else {
+                    // Subtotal for new order
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
+                        Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
 
                 // Discount
@@ -621,7 +706,7 @@ fun CartPanel(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        formatCurrency(totalAmount),
+                        formatCurrency(if (hasActiveOrder) orderTotal else totalAmount),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -631,36 +716,94 @@ fun CartPanel(
         }
 
         // Action Buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Clear Cart button
-            OutlinedButton(
-                onClick = onClearCart,
-                modifier = Modifier.weight(0.3f),
-                enabled = cartItems.isNotEmpty(),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
+        if (hasActiveOrder) {
+            // Active order buttons
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
+                // Add more items button (if cart has items)
+                if (cartItems.isNotEmpty()) {
+                    Button(
+                        onClick = onAddItemsToOrder,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2196F3)
+                        )
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("THÊM ${cartItems.size} MÓN", fontWeight = FontWeight.Bold)
+                    }
+                }
 
-            // Checkout button
-            Button(
-                onClick = onCheckout,
-                modifier = Modifier.weight(0.7f),
-                enabled = cartItems.isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50)
-                )
+                // Payment and Cancel buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = onCancelOrder,
+                        modifier = Modifier.weight(0.35f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("HUỶ", fontWeight = FontWeight.Bold)
+                    }
+
+                    // Checkout button
+                    Button(
+                        onClick = onCheckout,
+                        modifier = Modifier.weight(0.65f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50)
+                        )
+                    ) {
+                        Icon(Icons.Default.Payment, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("THANH TOÁN", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        } else {
+            // New order buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Payment, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("THANH TOÁN", fontWeight = FontWeight.Bold)
+                // Clear Cart button
+                OutlinedButton(
+                    onClick = onClearCart,
+                    modifier = Modifier.weight(0.25f),
+                    enabled = cartItems.isNotEmpty(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+
+                // Place Order button
+                Button(
+                    onClick = onPlaceOrder,
+                    modifier = Modifier.weight(0.75f),
+                    enabled = cartItems.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2196F3)
+                    )
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("ĐẶT MÓN", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -780,6 +923,64 @@ fun CartItemRow(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderItemRow(item: OrderItemEntity) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Product info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.productName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!item.notes.isNullOrEmpty()) {
+                    Text(
+                        text = "📝 ${item.notes}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Quantity and Price
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Badge(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text = "x${item.quantity}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = formatCurrency(item.totalPrice.toLong()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

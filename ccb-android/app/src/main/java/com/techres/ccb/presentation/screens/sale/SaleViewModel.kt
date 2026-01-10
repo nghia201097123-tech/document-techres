@@ -4,10 +4,13 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.dao.ProductToppingDao
+import com.techres.ccb.data.local.entity.OrderEntity
+import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.ProductEntity
 import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
+import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.domain.model.*
@@ -20,6 +23,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 
@@ -33,11 +39,15 @@ data class SaleUiState(
     // Tables
     val tables: List<Table> = emptyList(),
 
-    // Cart
+    // Cart (for new items to add)
     val cartItems: List<CartItem> = emptyList(),
     val orderType: OrderType = OrderType.DINE_IN,
     val selectedTable: Table? = null,
     val selectedCustomer: Customer? = null,
+
+    // Current active order for selected table
+    val currentOrder: OrderEntity? = null,
+    val currentOrderItems: List<OrderItemEntity> = emptyList(),
 
     // Discount
     val discountAmount: Long = 0,
@@ -71,8 +81,21 @@ data class SaleUiState(
     val cartItemCount: Int
         get() = cartItems.sumOf { it.quantity }
 
-    val canCheckout: Boolean
+    val canPlaceOrder: Boolean
         get() = cartItems.isNotEmpty()
+
+    val canCheckout: Boolean
+        get() = currentOrder != null
+
+    val hasActiveOrder: Boolean
+        get() = currentOrder != null
+
+    // Total from current order + new cart items
+    val orderSubtotal: Long
+        get() = (currentOrder?.subtotal?.toLong() ?: 0L) + subtotal
+
+    val orderTotal: Long
+        get() = (currentOrder?.totalAmount?.toLong() ?: 0L) + totalAmount
 }
 
 @HiltViewModel
@@ -81,6 +104,7 @@ class SaleViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
+    private val orderRepository: OrderRepository,
     private val productToppingDao: ProductToppingDao
 ) : ViewModel() {
 
@@ -480,11 +504,32 @@ class SaleViewModel @Inject constructor(
     }
 
     fun selectTable(table: Table) {
-        _uiState.update { state ->
-            state.copy(
-                selectedTable = table,
-                showTableDialog = false
-            )
+        viewModelScope.launch {
+            // Load active order for this table
+            val activeOrder = withContext(Dispatchers.IO) {
+                orderRepository.getActiveOrderByTable(table.id)
+            }
+
+            val orderItems = if (activeOrder != null) {
+                withContext(Dispatchers.IO) {
+                    orderRepository.getOrderItemsSync(activeOrder.id)
+                }
+            } else {
+                emptyList()
+            }
+
+            Log.d(TAG, "selectTable - table: ${table.name}, activeOrder: ${activeOrder?.orderNumber}, items: ${orderItems.size}")
+
+            _uiState.update { state ->
+                state.copy(
+                    selectedTable = table,
+                    showTableDialog = false,
+                    currentOrder = activeOrder,
+                    currentOrderItems = orderItems,
+                    // Clear cart when switching tables with active order
+                    cartItems = if (activeOrder != null) emptyList() else state.cartItems
+                )
+            }
         }
     }
 
@@ -574,10 +619,276 @@ class SaleViewModel @Inject constructor(
         }
     }
 
-    // ===== PAYMENT =====
+    // ===== ORDER MANAGEMENT =====
+
+    private fun getCurrentTimestamp(): String {
+        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).format(Date())
+    }
+
+    /**
+     * Đặt món - Tạo order mới với status pending
+     * Table status sẽ chuyển sang occupied
+     */
+    fun placeOrder() {
+        val state = _uiState.value
+        if (state.cartItems.isEmpty()) return
+        if (state.orderType == OrderType.DINE_IN && state.selectedTable == null) {
+            _uiState.update { it.copy(errorMessage = "Vui lòng chọn bàn trước khi đặt món") }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val staffId = authRepository.getCurrentStaffId() ?: "unknown"
+                val staffName = authRepository.getCurrentStaffName() ?: "Nhân viên"
+                val shiftId = authRepository.getCurrentShiftId()
+                val now = getCurrentTimestamp()
+
+                val orderId = UUID.randomUUID().toString()
+                val orderNumber = generateOrderNumber()
+
+                // Create order entity
+                val orderEntity = OrderEntity(
+                    id = orderId,
+                    branchId = branchId,
+                    tableId = state.selectedTable?.id,
+                    tableName = state.selectedTable?.name,
+                    shiftId = shiftId,
+                    staffId = staffId,
+                    staffName = staffName,
+                    customerName = state.selectedCustomer?.name,
+                    customerPhone = state.selectedCustomer?.phone,
+                    orderNumber = orderNumber,
+                    status = "pending",
+                    orderType = state.orderType.name.lowercase(),
+                    subtotal = state.subtotal.toDouble(),
+                    discountAmount = state.discountAmount.toDouble(),
+                    discountReason = state.discountReason,
+                    totalAmount = state.totalAmount.toDouble(),
+                    paymentStatus = "unpaid",
+                    createdAt = now,
+                    updatedAt = now,
+                    idempotencyKey = UUID.randomUUID().toString()
+                )
+
+                // Create order items
+                val orderItems = state.cartItems.mapIndexed { index, cartItem ->
+                    OrderItemEntity(
+                        id = UUID.randomUUID().toString(),
+                        orderId = orderId,
+                        productId = cartItem.product.id,
+                        productCode = cartItem.product.code,
+                        productName = cartItem.product.name + if (cartItem.variantText.isNotEmpty()) " (${cartItem.variantText})" else "",
+                        productImageUrl = cartItem.product.imageUrl,
+                        quantity = cartItem.quantity,
+                        unitPrice = cartItem.unitPrice.toDouble(),
+                        totalPrice = cartItem.totalPrice.toDouble(),
+                        notes = cartItem.note,
+                        status = "pending",
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                }
+
+                // Save to database
+                withContext(Dispatchers.IO) {
+                    orderRepository.createOrder(orderEntity, orderItems)
+
+                    // Update table status to occupied
+                    state.selectedTable?.let { table ->
+                        tableRepository.updateTableStatus(table.id, "occupied", orderId, now)
+                    }
+                }
+
+                Log.d(TAG, "placeOrder - Created order: $orderNumber with ${orderItems.size} items")
+
+                // Update UI state
+                _uiState.update { s ->
+                    s.copy(
+                        cartItems = emptyList(),
+                        currentOrder = orderEntity,
+                        currentOrderItems = orderItems,
+                        successMessage = "Đặt món thành công! $orderNumber"
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "placeOrder - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi đặt món: ${e.message}") }
+            }
+        }
+    }
+
+    /**
+     * Thêm món vào order hiện tại
+     */
+    fun addItemsToOrder() {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+        if (state.cartItems.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                val now = getCurrentTimestamp()
+
+                // Create new order items
+                val newItems = state.cartItems.map { cartItem ->
+                    OrderItemEntity(
+                        id = UUID.randomUUID().toString(),
+                        orderId = currentOrder.id,
+                        productId = cartItem.product.id,
+                        productCode = cartItem.product.code,
+                        productName = cartItem.product.name + if (cartItem.variantText.isNotEmpty()) " (${cartItem.variantText})" else "",
+                        productImageUrl = cartItem.product.imageUrl,
+                        quantity = cartItem.quantity,
+                        unitPrice = cartItem.unitPrice.toDouble(),
+                        totalPrice = cartItem.totalPrice.toDouble(),
+                        notes = cartItem.note,
+                        status = "pending",
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                }
+
+                // Calculate new totals
+                val newSubtotal = currentOrder.subtotal + state.subtotal
+                val newTotal = currentOrder.totalAmount + state.totalAmount
+
+                // Update order in database
+                withContext(Dispatchers.IO) {
+                    newItems.forEach { orderRepository.addOrderItem(it) }
+
+                    val updatedOrder = currentOrder.copy(
+                        subtotal = newSubtotal,
+                        totalAmount = newTotal,
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrder(updatedOrder)
+                }
+
+                // Reload order items
+                val allItems = withContext(Dispatchers.IO) {
+                    orderRepository.getOrderItemsSync(currentOrder.id)
+                }
+
+                Log.d(TAG, "addItemsToOrder - Added ${newItems.size} items to order ${currentOrder.orderNumber}")
+
+                _uiState.update { s ->
+                    s.copy(
+                        cartItems = emptyList(),
+                        currentOrder = currentOrder.copy(subtotal = newSubtotal, totalAmount = newTotal, updatedAt = now),
+                        currentOrderItems = allItems,
+                        successMessage = "Đã thêm ${newItems.size} món"
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "addItemsToOrder - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi thêm món: ${e.message}") }
+            }
+        }
+    }
+
+    /**
+     * Thanh toán và hoàn tất order
+     */
+    fun completeOrder(paymentMethod: String = "cash") {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+
+        viewModelScope.launch {
+            try {
+                val now = getCurrentTimestamp()
+
+                withContext(Dispatchers.IO) {
+                    // Update order status to completed
+                    val completedOrder = currentOrder.copy(
+                        status = "completed",
+                        paymentStatus = "paid",
+                        paymentMethod = paymentMethod,
+                        paidAmount = currentOrder.totalAmount,
+                        completedAt = now,
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrder(completedOrder)
+
+                    // Update table status back to available
+                    state.selectedTable?.let { table ->
+                        tableRepository.updateTableStatus(table.id, "available", null, now)
+                    }
+                }
+
+                Log.d(TAG, "completeOrder - Completed order: ${currentOrder.orderNumber}")
+
+                _uiState.update { s ->
+                    s.copy(
+                        cartItems = emptyList(),
+                        currentOrder = null,
+                        currentOrderItems = emptyList(),
+                        selectedTable = null,
+                        selectedCustomer = null,
+                        successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "completeOrder - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi thanh toán: ${e.message}") }
+            }
+        }
+    }
+
+    /**
+     * Huỷ order
+     */
+    fun cancelOrder(reason: String = "") {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+
+        viewModelScope.launch {
+            try {
+                val now = getCurrentTimestamp()
+
+                withContext(Dispatchers.IO) {
+                    // Update order status to cancelled
+                    val cancelledOrder = currentOrder.copy(
+                        status = "cancelled",
+                        cancelReason = reason,
+                        cancelledAt = now,
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrder(cancelledOrder)
+
+                    // Update table status back to available
+                    state.selectedTable?.let { table ->
+                        tableRepository.updateTableStatus(table.id, "available", null, now)
+                    }
+                }
+
+                Log.d(TAG, "cancelOrder - Cancelled order: ${currentOrder.orderNumber}")
+
+                _uiState.update { s ->
+                    s.copy(
+                        cartItems = emptyList(),
+                        currentOrder = null,
+                        currentOrderItems = emptyList(),
+                        selectedTable = null,
+                        selectedCustomer = null,
+                        successMessage = "Đã huỷ đơn hàng ${currentOrder.orderNumber}"
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "cancelOrder - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi huỷ đơn: ${e.message}") }
+            }
+        }
+    }
+
+    // ===== PAYMENT DIALOG =====
 
     fun showPaymentDialog() {
-        if (_uiState.value.canCheckout) {
+        if (_uiState.value.currentOrder != null) {
             _uiState.update { state ->
                 state.copy(showPaymentDialog = true)
             }
@@ -590,47 +901,11 @@ class SaleViewModel @Inject constructor(
         }
     }
 
-    fun processPayment(payments: List<Payment>): Order {
-        val state = _uiState.value
-        val staffId = authRepository.getCurrentStaffId() ?: "unknown"
-        val staffName = authRepository.getCurrentStaffName() ?: "Nhân viên"
-
-        val order = Order(
-            orderNumber = generateOrderNumber(),
-            orderType = state.orderType,
-            tableId = state.selectedTable?.id,
-            tableName = state.selectedTable?.name,
-            customerId = state.selectedCustomer?.id,
-            customerName = state.selectedCustomer?.name,
-            customerPhone = state.selectedCustomer?.phone,
-            staffId = staffId,
-            staffName = staffName,
-            items = state.cartItems,
-            subtotal = state.subtotal,
-            discountAmount = state.discountAmount,
-            discountReason = state.discountReason,
-            taxRate = state.taxRate,
-            taxAmount = state.taxAmount,
-            totalAmount = state.totalAmount,
-            payments = payments,
-            status = OrderStatus.COMPLETED,
-            completedAt = System.currentTimeMillis()
-        )
-
-        // Clear cart after successful payment
-        _uiState.update { s ->
-            s.copy(
-                cartItems = emptyList(),
-                discountAmount = 0,
-                discountReason = null,
-                selectedTable = null,
-                selectedCustomer = null,
-                showPaymentDialog = false,
-                successMessage = "Thanh toán thành công! ${order.orderNumber}"
-            )
-        }
-
-        return order
+    fun processPayment(payments: List<Payment>) {
+        hidePaymentDialog()
+        // Use first payment method
+        val method = payments.firstOrNull()?.method?.name?.lowercase() ?: "cash"
+        completeOrder(method)
     }
 
     // ===== MESSAGES =====
