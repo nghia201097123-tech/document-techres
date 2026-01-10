@@ -36,7 +36,7 @@ import com.techres.ccb.data.local.entity.*
         ProductNoteEntity::class,
         ProductNoteAssignmentEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
