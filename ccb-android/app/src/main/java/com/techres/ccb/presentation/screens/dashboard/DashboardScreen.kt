@@ -3,10 +3,12 @@ package com.techres.ccb.presentation.screens.dashboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,7 +26,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.techres.ccb.data.local.entity.OrderItemEntity
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,17 +38,25 @@ import java.util.*
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
     onNavigateToSale: () -> Unit = {},
+    onNavigateToSaleWithOrder: (orderId: String) -> Unit = {},
     onNavigateToFoodOrders: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToShift: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var gridColumns by remember { mutableIntStateOf(4) }
     val currentTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
     val currentDate = remember { SimpleDateFormat("EEEE, dd/MM", Locale("vi")).format(Date()) }
+
+    // Order detail dialog state
+    var showOrderDetailDialog by remember { mutableStateOf(false) }
+    var selectedOrder by remember { mutableStateOf<PosOrder?>(null) }
+    var orderItems by remember { mutableStateOf<List<OrderItemEntity>>(emptyList()) }
+    var showCancelConfirmDialog by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -116,7 +130,18 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 items(uiState.posOrders, key = { it.id }) { order ->
-                                    OrderCard(order = order)
+                                    OrderCard(
+                                        order = order,
+                                        onClick = {
+                                            selectedOrder = order
+                                            coroutineScope.launch {
+                                                orderItems = viewModel.getOrderItems(order.id)
+                                                showOrderDetailDialog = true
+                                            }
+                                        },
+                                        onConfirm = { viewModel.confirmPosOrder(order.id) },
+                                        onComplete = { viewModel.completePosOrder(order.id) }
+                                    )
                                 }
                                 // Bottom spacing
                                 item(span = { GridItemSpan(gridColumns) }) {
@@ -153,6 +178,60 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    // Order Detail Dialog
+    if (showOrderDetailDialog && selectedOrder != null) {
+        OrderDetailDialog(
+            order = selectedOrder!!,
+            orderItems = orderItems,
+            onDismiss = {
+                showOrderDetailDialog = false
+                selectedOrder = null
+                orderItems = emptyList()
+            },
+            onComplete = {
+                viewModel.completePosOrder(selectedOrder!!.id)
+                showOrderDetailDialog = false
+                selectedOrder = null
+            },
+            onCancel = {
+                showCancelConfirmDialog = true
+            },
+            onAddItems = {
+                onNavigateToSaleWithOrder(selectedOrder!!.id)
+                showOrderDetailDialog = false
+                selectedOrder = null
+            }
+        )
+    }
+
+    // Cancel Confirm Dialog
+    if (showCancelConfirmDialog && selectedOrder != null) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirmDialog = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF44336)) },
+            title = { Text("Xác nhận huỷ đơn") },
+            text = { Text("Bạn có chắc chắn muốn huỷ đơn #${selectedOrder!!.orderNumber.toString().padStart(3, '0')}?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.cancelPosOrder(selectedOrder!!.id)
+                        showCancelConfirmDialog = false
+                        showOrderDetailDialog = false
+                        selectedOrder = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+                ) {
+                    Text("Huỷ đơn")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showCancelConfirmDialog = false }) {
+                    Text("Quay lại")
+                }
+            }
+        )
     }
 }
 
@@ -586,14 +665,19 @@ private fun TabChip(
 }
 
 @Composable
-private fun OrderCard(order: PosOrder) {
+private fun OrderCard(
+    order: PosOrder,
+    onClick: () -> Unit = {},
+    onConfirm: () -> Unit = {},
+    onComplete: () -> Unit = {}
+) {
     val statusColor = Color(order.status.color)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clickable { },
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
@@ -673,7 +757,9 @@ private fun OrderCard(order: PosOrder) {
                 )
                 // Action button
                 Surface(
-                    onClick = { },
+                    onClick = {
+                        if (order.status == PosOrderStatus.DRAFT) onConfirm() else onComplete()
+                    },
                     shape = RoundedCornerShape(6.dp),
                     color = statusColor.copy(alpha = 0.1f)
                 ) {
@@ -731,6 +817,256 @@ private fun EmptyOrdersState(
                 color = Color.Gray
             )
         }
+    }
+}
+
+@Composable
+private fun OrderDetailDialog(
+    order: PosOrder,
+    orderItems: List<OrderItemEntity>,
+    onDismiss: () -> Unit,
+    onComplete: () -> Unit,
+    onCancel: () -> Unit,
+    onAddItems: () -> Unit
+) {
+    val statusColor = Color(order.status.color)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .fillMaxHeight(0.8f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(statusColor)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Đơn #${order.orderNumber.toString().padStart(3, '0')}",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = order.tableName ?: "Mang đi",
+                            fontSize = 14.sp,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Đóng",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                // Order Status
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = when (order.status) {
+                                PosOrderStatus.DRAFT -> Icons.Default.Edit
+                                PosOrderStatus.CONFIRMED -> Icons.Default.CheckCircle
+                                PosOrderStatus.COMPLETED -> Icons.Default.Done
+                            },
+                            contentDescription = null,
+                            tint = statusColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = order.status.displayName,
+                            fontWeight = FontWeight.Medium,
+                            color = statusColor
+                        )
+                    }
+                    Text(
+                        text = formatTime(order.createdAt),
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                HorizontalDivider()
+
+                // Order Items
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "Danh sách món (${orderItems.size})",
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+
+                    items(orderItems) { item ->
+                        OrderItemRow(item)
+                        HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                    }
+
+                    if (orderItems.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Chưa có món",
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Total
+                HorizontalDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Tổng cộng:",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = formatCurrency(order.totalAmount),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1976D2)
+                    )
+                }
+
+                // Actions
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5))
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFF44336)
+                        )
+                    ) {
+                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Huỷ đơn")
+                    }
+
+                    // Add items button
+                    OutlinedButton(
+                        onClick = onAddItems,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF2196F3)
+                        )
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Thêm món")
+                    }
+
+                    // Complete button
+                    Button(
+                        onClick = onComplete,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50)
+                        )
+                    ) {
+                        Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Hoàn tất")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderItemRow(item: OrderItemEntity) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Quantity badge
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(Color(0xFFE3F2FD), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = item.quantity.toString(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1976D2)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = item.productName,
+                    fontWeight = FontWeight.Medium
+                )
+                if (!item.notes.isNullOrBlank()) {
+                    Text(
+                        text = item.notes,
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+        }
+        Text(
+            text = formatCurrency(item.totalPrice.toLong()),
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF1976D2)
+        )
     }
 }
 

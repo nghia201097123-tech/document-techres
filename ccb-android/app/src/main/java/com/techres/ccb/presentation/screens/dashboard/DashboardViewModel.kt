@@ -3,9 +3,11 @@ package com.techres.ccb.presentation.screens.dashboard
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ShiftRepository
+import com.techres.ccb.data.repository.TableRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,7 +66,8 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val orderRepository: OrderRepository,
-    private val shiftRepository: ShiftRepository
+    private val shiftRepository: ShiftRepository,
+    private val tableRepository: TableRepository
 ) : ViewModel() {
 
     companion object {
@@ -278,6 +281,53 @@ class DashboardViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    /**
+     * Cancel an order
+     */
+    fun cancelPosOrder(orderId: String, reason: String = "") {
+        viewModelScope.launch {
+            try {
+                val now = java.time.Instant.now().toString()
+                orderRepository.updateOrderStatus(orderId, "cancelled", now)
+
+                // Get order to find table
+                val order = _uiState.value.posOrders.find { it.id == orderId }
+
+                // Update table status back to available if order had a table
+                if (order?.tableName != null) {
+                    // Need to get table ID from order
+                    val orderEntity = orderRepository.getOrderById(orderId)
+                    orderEntity?.tableId?.let { tableId ->
+                        tableRepository.updateTableStatus(tableId, "available", null, now)
+                    }
+                }
+
+                _uiState.update { state ->
+                    state.copy(
+                        posOrders = state.posOrders.filter { it.id != orderId }
+                    )
+                }
+                recalculateCounts()
+
+                Log.d(TAG, "cancelPosOrder - Cancelled order: $orderId")
+            } catch (e: Exception) {
+                Log.e(TAG, "cancelPosOrder - Error: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Get order items for a specific order
+     */
+    suspend fun getOrderItems(orderId: String): List<OrderItemEntity> {
+        return try {
+            orderRepository.getOrderItemsSync(orderId)
+        } catch (e: Exception) {
+            Log.e(TAG, "getOrderItems - Error: ${e.message}", e)
+            emptyList()
+        }
     }
 
     private fun recalculateCounts() {
