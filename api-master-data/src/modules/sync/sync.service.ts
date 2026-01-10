@@ -398,7 +398,7 @@ export class SyncService {
         // Fetch combo items for combo products
         tenantId
           ? this.comboItemRepository.find({
-              where: { tenantId, isActive: true },
+              where: { tenantId },
               relations: ['product'],
               order: { sortOrder: 'ASC' },
             })
@@ -744,9 +744,7 @@ export class SyncService {
       productCode: ci.product?.code || '',
       quantity: ci.quantity,
       sortOrder: ci.sortOrder,
-      isActive: ci.isActive,
-      createdAt: ci.createdAt?.toISOString() || new Date().toISOString(),
-      updatedAt: ci.updatedAt?.toISOString() || new Date().toISOString(),
+      isActive: true,  // Always active since table doesn't have isActive column
     };
   }
 }

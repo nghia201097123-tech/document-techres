@@ -62,11 +62,5 @@ data class ComboItemEntity(
     val sortOrder: Int = 0,
 
     @ColumnInfo(name = "is_active")
-    val isActive: Boolean = true,
-
-    @ColumnInfo(name = "created_at")
-    val createdAt: String,
-
-    @ColumnInfo(name = "updated_at")
-    val updatedAt: String
+    val isActive: Boolean = true
 )

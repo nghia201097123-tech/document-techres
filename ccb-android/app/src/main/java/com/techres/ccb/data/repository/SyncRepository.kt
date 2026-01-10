@@ -221,12 +221,10 @@ class SyncRepository @Inject constructor(
                 comboId = dto.comboId,
                 productId = dto.productId,
                 productName = dto.productName,
-                productCode = dto.productCode,
+                productCode = dto.productCode ?: "",
                 quantity = dto.quantity,
                 sortOrder = dto.sortOrder,
-                isActive = dto.isActive,
-                createdAt = syncTime,
-                updatedAt = syncTime
+                isActive = dto.isActive
             )
         } ?: emptyList()
 

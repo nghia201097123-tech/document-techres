@@ -6,7 +6,6 @@ import {
   JoinColumn,
   Index,
   CreateDateColumn,
-  UpdateDateColumn,
 } from 'typeorm';
 import { Product } from './product.entity';
 
@@ -41,12 +40,6 @@ export class ComboItem {
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 
-  @Column({ name: 'is_active', type: 'boolean', default: true })
-  isActive: boolean;
-
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }
