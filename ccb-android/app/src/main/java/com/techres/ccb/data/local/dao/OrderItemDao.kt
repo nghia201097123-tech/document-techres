@@ -7,6 +7,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface OrderItemDao {
 
+    @Query("""
+        SELECT oi.* FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        WHERE o.branch_id = :branchId
+        ORDER BY oi.created_at DESC
+    """)
+    fun getAllByBranch(branchId: String): Flow<List<OrderItemEntity>>
+
     @Query("SELECT * FROM order_items WHERE order_id = :orderId ORDER BY created_at ASC")
     fun getByOrderId(orderId: String): Flow<List<OrderItemEntity>>
 

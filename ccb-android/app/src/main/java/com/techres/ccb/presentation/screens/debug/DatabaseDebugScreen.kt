@@ -31,9 +31,13 @@ import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceEntity
 import com.techres.ccb.data.local.entity.CouponEntity
 import com.techres.ccb.data.local.entity.ShiftEntity
+import com.techres.ccb.data.local.entity.OrderEntity
+import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.OrderDao
+import com.techres.ccb.data.local.dao.OrderItemDao
 import com.techres.ccb.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -50,6 +54,8 @@ enum class DebugTab(val title: String) {
     TABLES("Bàn"),
     STAFF("Nhân viên"),
     SHIFTS("Ca làm việc"),
+    ORDERS("Đơn hàng"),
+    ORDER_ITEMS("Chi tiết đơn"),
     SEASONAL_PRICES("Giá thời vụ"),
     COUPONS("Coupon")
 }
@@ -66,6 +72,8 @@ data class DebugUiState(
     val tables: List<TableEntity> = emptyList(),
     val staff: List<StaffEntity> = emptyList(),
     val shifts: List<ShiftEntity> = emptyList(),
+    val orders: List<OrderEntity> = emptyList(),
+    val orderItems: List<OrderItemEntity> = emptyList(),
     val seasonalPrices: List<SeasonalPriceEntity> = emptyList(),
     val coupons: List<CouponEntity> = emptyList(),
     val isLoading: Boolean = false
@@ -82,7 +90,9 @@ class DatabaseDebugViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val productToppingDao: ProductToppingDao,
     private val seasonalPriceDao: SeasonalPriceDao,
-    private val couponDao: CouponDao
+    private val couponDao: CouponDao,
+    private val orderDao: OrderDao,
+    private val orderItemDao: OrderItemDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebugUiState())
@@ -202,6 +212,22 @@ class DatabaseDebugViewModel @Inject constructor(
                     _uiState.update { it.copy(productToppings = toppings) }
                 }
         }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
+            orderDao.getAllByBranch(branchId)
+                .collect { orders ->
+                    _uiState.update { it.copy(orders = orders) }
+                }
+        }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
+            orderItemDao.getAllByBranch(branchId)
+                .collect { orderItems ->
+                    _uiState.update { it.copy(orderItems = orderItems) }
+                }
+        }
     }
 }
 
@@ -259,6 +285,8 @@ fun DatabaseDebugScreen(
                         DebugTab.TABLES -> uiState.tables.size
                         DebugTab.STAFF -> uiState.staff.size
                         DebugTab.SHIFTS -> uiState.shifts.size
+                        DebugTab.ORDERS -> uiState.orders.size
+                        DebugTab.ORDER_ITEMS -> uiState.orderItems.size
                         DebugTab.SEASONAL_PRICES -> uiState.seasonalPrices.size
                         DebugTab.COUPONS -> uiState.coupons.size
                     }
@@ -289,6 +317,8 @@ fun DatabaseDebugScreen(
                     DebugTab.TABLES -> TablesTable(uiState.tables)
                     DebugTab.STAFF -> StaffTable(uiState.staff)
                     DebugTab.SHIFTS -> ShiftsTable(uiState.shifts)
+                    DebugTab.ORDERS -> OrdersTable(uiState.orders)
+                    DebugTab.ORDER_ITEMS -> OrderItemsTable(uiState.orderItems)
                     DebugTab.SEASONAL_PRICES -> SeasonalPricesTable(uiState.seasonalPrices)
                     DebugTab.COUPONS -> CouponsTable(uiState.coupons)
                 }
@@ -452,6 +482,76 @@ fun ShiftsTable(shifts: List<ShiftEntity>) {
                 "%,.0f".format(shift.totalRevenue),
                 shift.openedAt.take(19).replace("T", " "),
                 shift.closedAt?.take(19)?.replace("T", " ") ?: "-"
+            )
+        }
+    )
+}
+
+@Composable
+fun OrdersTable(orders: List<OrderEntity>) {
+    DataTable(
+        headers = listOf("ID", "Số đơn", "Bàn", "Trạng thái", "Thanh toán", "Tổng tiền", "Tạo lúc", "Sync"),
+        data = orders,
+        rowContent = { order ->
+            val statusText = when (order.status) {
+                "pending" -> "⏳ Chờ"
+                "confirmed" -> "✅ Xác nhận"
+                "preparing" -> "👨‍🍳 Đang làm"
+                "ready" -> "🍽️ Sẵn sàng"
+                "completed" -> "✅ Hoàn tất"
+                "cancelled" -> "❌ Hủy"
+                else -> order.status
+            }
+            val paymentText = when (order.paymentStatus) {
+                "unpaid" -> "⏳ Chưa TT"
+                "partial" -> "⚠️ TT một phần"
+                "paid" -> "✅ Đã TT"
+                else -> order.paymentStatus
+            }
+            val syncText = when (order.syncStatus) {
+                "pending" -> "⏳"
+                "syncing" -> "🔄"
+                "synced" -> "✅"
+                "failed" -> "❌"
+                else -> order.syncStatus
+            }
+            listOf(
+                order.id.take(8) + "...",
+                order.orderNumber,
+                order.tableName ?: "-",
+                statusText,
+                paymentText,
+                "%,.0f".format(order.totalAmount),
+                order.createdAt.take(19).replace("T", " "),
+                syncText
+            )
+        }
+    )
+}
+
+@Composable
+fun OrderItemsTable(orderItems: List<OrderItemEntity>) {
+    DataTable(
+        headers = listOf("ID", "Order ID", "Sản phẩm", "SL", "Đơn giá", "Tổng", "Trạng thái", "Ghi chú"),
+        data = orderItems,
+        rowContent = { item ->
+            val statusText = when (item.status) {
+                "pending" -> "⏳ Chờ"
+                "preparing" -> "👨‍🍳 Đang làm"
+                "ready" -> "🍽️ Sẵn sàng"
+                "served" -> "✅ Đã phục vụ"
+                "cancelled" -> "❌ Hủy"
+                else -> item.status
+            }
+            listOf(
+                item.id.take(8) + "...",
+                item.orderId.take(8) + "...",
+                item.productName,
+                item.quantity.toString(),
+                "%,.0f".format(item.unitPrice),
+                "%,.0f".format(item.totalPrice),
+                statusText,
+                item.notes ?: "-"
             )
         }
     )
