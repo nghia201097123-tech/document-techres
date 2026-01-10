@@ -837,9 +837,10 @@ class SaleViewModel @Inject constructor(
             )
         } else {
             // This is a combo - create combo parent item
+            val parentItemId = UUID.randomUUID().toString()
             orderItems.add(
                 OrderItemEntity(
-                    id = UUID.randomUUID().toString(),
+                    id = parentItemId,
                     orderId = orderId,
                     productId = cartItem.product.id,
                     productCode = cartItem.product.code,
@@ -872,7 +873,7 @@ class SaleViewModel @Inject constructor(
                         notes = "[Combo: ${cartItem.product.name}]",  // Mark as part of combo
                         status = "pending",
                         isComboChild = true,
-                        comboParentId = cartItem.product.id,
+                        comboParentId = parentItemId,  // Use parent's ORDER ITEM ID
                         createdAt = now,
                         updatedAt = now
                     )
