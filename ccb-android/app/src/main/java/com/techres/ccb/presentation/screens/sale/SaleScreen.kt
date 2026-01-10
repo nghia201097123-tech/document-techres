@@ -906,6 +906,17 @@ fun CartPanel(
     }
 }
 
+/**
+ * Cart item row - Grab style layout
+ * Layout:
+ * [Product Name]                    [X]
+ * [Base Price]
+ *   • Topping 1                +5.000đ
+ *   • Topping 2                +8.000đ
+ *   • Size M                   +5.000đ
+ * [Note if exists]
+ * [-] [qty] [+]              [Total Price]
+ */
 @Composable
 fun CartItemRow(
     item: CartItem,
@@ -922,28 +933,20 @@ fun CartItemRow(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Header: Product name + Remove button
+            // Row 1: Product name + Remove button
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Product name + base price
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.product.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = formatCurrency(item.product.price),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-
-                // Remove button
+                Text(
+                    text = item.product.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
                 IconButton(
                     onClick = onRemove,
                     modifier = Modifier.size(24.dp)
@@ -957,61 +960,90 @@ fun CartItemRow(
                 }
             }
 
-            // Variants section - Grab style (each variant on its own line)
+            // Row 2: Base price
+            Text(
+                text = formatCurrency(item.product.price),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+
+            // Row 3: Variants/Toppings - Grab style
             if (item.selectedVariants.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 8.dp, top = 6.dp)
+                        .padding(start = 4.dp)
                 ) {
                     item.selectedVariants.forEach { variant ->
-                        VariantLineItem(variant = variant)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "•",
+                                    fontSize = 14.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    text = variant.name,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF424242)
+                                )
+                            }
+                            if (variant.price > 0) {
+                                Text(
+                                    text = "+${formatCurrency(variant.price)}",
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF1976D2),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // Note section - clickable to edit
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        if (item.note.isNullOrEmpty())
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        else
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            // Row 4: Note (if exists)
+            if (!item.note.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                        .clickable { onEditNote() }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Ghi chu",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
-                    .clickable { onEditNote() }
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = if (item.note.isNullOrEmpty()) Icons.Default.NoteAdd else Icons.Default.Edit,
-                    contentDescription = "Ghi chu",
-                    modifier = Modifier.size(14.dp),
-                    tint = if (item.note.isNullOrEmpty())
-                        MaterialTheme.colorScheme.outline
-                    else
-                        MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (item.note.isNullOrEmpty()) "Them ghi chu..." else item.note!!,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (item.note.isNullOrEmpty())
-                        MaterialTheme.colorScheme.outline
-                    else
-                        MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = item.note!!,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Bottom: Quantity controls + Price
+            // Row 5: Quantity controls + Total Price
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1034,22 +1066,17 @@ fun CartItemRow(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-
                     Text(
                         text = item.quantity.toString(),
                         modifier = Modifier.padding(horizontal = 8.dp),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold
                     )
-
                     IconButton(
                         onClick = onIncrease,
                         modifier = Modifier
                             .size(32.dp)
-                            .background(
-                                MaterialTheme.colorScheme.primary,
-                                CircleShape
-                            )
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
                     ) {
                         Icon(
                             Icons.Default.Add,
@@ -1060,7 +1087,7 @@ fun CartItemRow(
                     }
                 }
 
-                // Price
+                // Total Price
                 Text(
                     text = formatCurrency(item.totalPrice),
                     style = MaterialTheme.typography.titleMedium,
@@ -1112,6 +1139,14 @@ fun VariantLineItem(variant: SelectedVariant) {
     }
 }
 
+/**
+ * Order item row (for existing orders) - Grab style layout
+ * Layout:
+ * [Product Name]               [x1] [Price]
+ * [Base Price]
+ *   • Topping 1
+ *   • Topping 2
+ */
 @Composable
 fun OrderItemRow(item: OrderItemEntity) {
     Card(
@@ -1123,31 +1158,22 @@ fun OrderItemRow(item: OrderItemEntity) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
+                .padding(10.dp)
         ) {
-            // Header: Product name + Quantity + Price
+            // Row 1: Product name + Quantity badge + Price
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Product info
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.productName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = formatCurrency(item.unitPrice.toLong()),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-
-                // Quantity and Price
+                Text(
+                    text = item.productName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1170,32 +1196,40 @@ fun OrderItemRow(item: OrderItemEntity) {
                 }
             }
 
-            // Variants/Toppings - Grab style (each on its own line)
+            // Row 2: Base price
+            Text(
+                text = formatCurrency(item.unitPrice.toLong()),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+
+            // Row 3: Variants/Toppings - Grab style
             if (!item.notes.isNullOrEmpty()) {
                 val variants = item.notes.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 if (variants.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 8.dp, top = 6.dp)
+                            .padding(start = 4.dp)
                     ) {
                         variants.forEach { variant ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 1.dp),
+                                    .padding(vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "•",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.padding(end = 6.dp)
+                                    fontSize = 14.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(end = 8.dp)
                                 )
                                 Text(
                                     text = variant,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF424242)
                                 )
                             }
                         }

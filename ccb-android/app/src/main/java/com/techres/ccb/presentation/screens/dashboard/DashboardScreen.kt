@@ -1392,6 +1392,14 @@ private fun OrderDetailDialog(
     }
 }
 
+/**
+ * Order item row - Grab style layout
+ * Layout:
+ * [Qty Badge] [Product Name]        [Price]
+ *             [Base Price]
+ *               • Topping 1
+ *               • Topping 2
+ */
 @Composable
 private fun OrderItemRow(item: OrderItemEntity) {
     Column(
@@ -1399,7 +1407,7 @@ private fun OrderItemRow(item: OrderItemEntity) {
             .fillMaxWidth()
             .padding(vertical = 12.dp)
     ) {
-        // Header: Quantity + Product name + Price
+        // Row 1: Quantity badge + Product name + Total Price
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1424,27 +1432,29 @@ private fun OrderItemRow(item: OrderItemEntity) {
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = item.productName,
-                        fontWeight = FontWeight.Medium
-                    )
-                    // Unit price
-                    Text(
-                        text = formatCurrency(item.unitPrice.toLong()),
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                }
+                // Product name only
+                Text(
+                    text = item.productName,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
             }
             Text(
                 text = formatCurrency(item.totalPrice.toLong()),
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Bold,
                 color = Color(0xFF1976D2)
             )
         }
 
-        // Variants/Toppings - Grab style (each on its own line)
+        // Row 2: Base price (indented under product name)
+        Text(
+            text = formatCurrency(item.unitPrice.toLong()),
+            fontSize = 13.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(start = 36.dp, top = 2.dp)
+        )
+
+        // Row 3: Variants/Toppings - Grab style
         if (!item.notes.isNullOrBlank()) {
             val variants = item.notes.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             if (variants.isNotEmpty()) {
@@ -1457,19 +1467,19 @@ private fun OrderItemRow(item: OrderItemEntity) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp),
+                                .padding(vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "•",
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                                 color = Color.Gray,
-                                modifier = Modifier.padding(end = 6.dp)
+                                modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
                                 text = variant,
-                                fontSize = 12.sp,
-                                color = Color(0xFF616161)
+                                fontSize = 14.sp,
+                                color = Color(0xFF424242)
                             )
                         }
                     }
