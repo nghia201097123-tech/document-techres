@@ -54,6 +54,7 @@ data class OrderHistoryItem(
 data class OrderHistoryUiState(
     val isLoading: Boolean = false,
     val orders: List<OrderHistoryItem> = emptyList(),
+    val allOrders: List<OrderHistoryItem> = emptyList(),  // All orders before pagination
     val statusFilter: OrderHistoryFilter = OrderHistoryFilter.ALL,
     val dateFilter: DateFilter = DateFilter.TODAY,
     val totalCount: Int = 0,
@@ -63,7 +64,11 @@ data class OrderHistoryUiState(
     val selectedOrder: OrderEntity? = null,
     val selectedOrderItems: List<OrderItemEntity> = emptyList(),
     val showOrderDetail: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    // Pagination
+    val currentPage: Int = 1,
+    val pageSize: Int = 10,
+    val totalPages: Int = 1
 )
 
 @HiltViewModel
@@ -177,14 +182,25 @@ class OrderHistoryViewModel @Inject constructor(
                         .filter { it.status == "completed" }
                         .sumOf { it.totalAmount }
 
+                    // Calculate pagination
+                    val pageSize = _uiState.value.pageSize
+                    val totalPages = if (historyItems.isEmpty()) 1 else (historyItems.size + pageSize - 1) / pageSize
+                    val currentPage = minOf(_uiState.value.currentPage, totalPages)
+                    val startIndex = (currentPage - 1) * pageSize
+                    val endIndex = minOf(startIndex + pageSize, historyItems.size)
+                    val pagedOrders = if (historyItems.isNotEmpty()) historyItems.subList(startIndex, endIndex) else emptyList()
+
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            orders = historyItems,
+                            orders = pagedOrders,
+                            allOrders = historyItems,
                             totalCount = historyItems.size,
                             completedCount = completedCount,
                             cancelledCount = cancelledCount,
                             totalRevenue = totalRevenue,
+                            currentPage = currentPage,
+                            totalPages = totalPages,
                             error = null
                         )
                     }
@@ -242,6 +258,45 @@ class OrderHistoryViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun setPage(page: Int) {
+        val state = _uiState.value
+        val newPage = page.coerceIn(1, state.totalPages)
+        if (newPage != state.currentPage) {
+            val startIndex = (newPage - 1) * state.pageSize
+            val endIndex = minOf(startIndex + state.pageSize, state.allOrders.size)
+            val pagedOrders = if (state.allOrders.isNotEmpty()) state.allOrders.subList(startIndex, endIndex) else emptyList()
+            _uiState.update { it.copy(currentPage = newPage, orders = pagedOrders) }
+        }
+    }
+
+    fun nextPage() {
+        setPage(_uiState.value.currentPage + 1)
+    }
+
+    fun previousPage() {
+        setPage(_uiState.value.currentPage - 1)
+    }
+
+    fun setPageSize(size: Int) {
+        val state = _uiState.value
+        val newSize = size.coerceIn(5, 50)
+        if (newSize != state.pageSize) {
+            val totalPages = if (state.allOrders.isEmpty()) 1 else (state.allOrders.size + newSize - 1) / newSize
+            val currentPage = 1  // Reset to first page when changing page size
+            val startIndex = 0
+            val endIndex = minOf(newSize, state.allOrders.size)
+            val pagedOrders = if (state.allOrders.isNotEmpty()) state.allOrders.subList(startIndex, endIndex) else emptyList()
+            _uiState.update {
+                it.copy(
+                    pageSize = newSize,
+                    currentPage = currentPage,
+                    totalPages = totalPages,
+                    orders = pagedOrders
+                )
+            }
+        }
     }
 
     private fun getDateRange(dateFilter: DateFilter): Pair<String?, String?> {

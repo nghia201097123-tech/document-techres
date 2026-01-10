@@ -1,6 +1,7 @@
 package com.techres.ccb.presentation.screens.orderhistory
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,14 +23,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -46,12 +47,14 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,22 +79,28 @@ fun OrderHistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Lịch sử đơn hàng")
-                    }
-                },
+                title = { Text("Lịch sử đơn hàng", fontSize = 16.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
+                    }
+                },
+                actions = {
+                    // Compact stats in top bar
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        CompactStat(uiState.completedCount.toString(), Color(0xFF4CAF50))
+                        Text("/", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                        CompactStat(uiState.cancelledCount.toString(), Color(0xFFf44336))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formatCurrencyShort(uiState.totalRevenue),
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -107,15 +116,8 @@ fun OrderHistoryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Stats Summary
-            OrderStatsSummary(
-                completedCount = uiState.completedCount,
-                cancelledCount = uiState.cancelledCount,
-                totalRevenue = uiState.totalRevenue
-            )
-
-            // Filters Section
-            FiltersSection(
+            // Compact Filters Row
+            CompactFiltersRow(
                 statusFilter = uiState.statusFilter,
                 dateFilter = uiState.dateFilter,
                 onStatusFilterChange = { viewModel.setStatusFilter(it) },
@@ -125,47 +127,59 @@ fun OrderHistoryScreen(
             // Orders List
             if (uiState.isLoading) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Đang tải...")
                 }
             } else if (uiState.orders.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Default.Receipt,
                             contentDescription = null,
-                            modifier = Modifier.size(64.dp),
+                            modifier = Modifier.size(48.dp),
                             tint = Color.Gray
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "Không có đơn hàng nào",
-                            color = Color.Gray,
-                            fontSize = 16.sp
-                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Không có đơn hàng nào", color = Color.Gray, fontSize = 14.sp)
                     }
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(uiState.orders) { order ->
-                        OrderHistoryCard(
+                        CompactOrderCard(
                             order = order,
                             onClick = { viewModel.showOrderDetail(order.id) }
                         )
                     }
                 }
             }
+
+            // Pagination Controls
+            PaginationControls(
+                currentPage = uiState.currentPage,
+                totalPages = uiState.totalPages,
+                pageSize = uiState.pageSize,
+                totalCount = uiState.totalCount,
+                onPageChange = { viewModel.setPage(it) },
+                onNextPage = { viewModel.nextPage() },
+                onPreviousPage = { viewModel.previousPage() },
+                onPageSizeChange = { viewModel.setPageSize(it) }
+            )
         }
 
         // Order Detail Dialog
@@ -180,289 +194,259 @@ fun OrderHistoryScreen(
 }
 
 @Composable
-private fun OrderStatsSummary(
-    completedCount: Int,
-    cancelledCount: Int,
-    totalRevenue: Long
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatItem(
-                label = "Hoàn tất",
-                value = completedCount.toString(),
-                color = Color(0xFF4CAF50)
-            )
-            StatItem(
-                label = "Đã hủy",
-                value = cancelledCount.toString(),
-                color = Color(0xFFf44336)
-            )
-            StatItem(
-                label = "Doanh thu",
-                value = formatCurrency(totalRevenue),
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatItem(
-    label: String,
-    value: String,
-    color: Color
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color.Gray
-        )
-    }
+private fun CompactStat(value: String, color: Color) {
+    Text(
+        text = value,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = color
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FiltersSection(
+private fun CompactFiltersRow(
     statusFilter: OrderHistoryFilter,
     dateFilter: DateFilter,
     onStatusFilterChange: (OrderHistoryFilter) -> Unit,
     onDateFilterChange: (DateFilter) -> Unit
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(Color(0xFFF5F5F5))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Status Filter
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.FilterList,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = Color.Gray
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "Trạng thái:",
-                fontSize = 14.sp,
-                color = Color.Gray
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(OrderHistoryFilter.entries.toList()) { filter ->
-                FilterChip(
-                    selected = statusFilter == filter,
-                    onClick = { onStatusFilterChange(filter) },
-                    label = { Text(filter.displayName, fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                    )
+        // Status filters
+        OrderHistoryFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = statusFilter == filter,
+                onClick = { onStatusFilterChange(filter) },
+                label = { Text(filter.displayName, fontSize = 11.sp) },
+                modifier = Modifier.height(28.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                 )
-            }
+            )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
-        // Date Filter
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.History,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = Color.Gray
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "Thời gian:",
-                fontSize = 14.sp,
-                color = Color.Gray
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(DateFilter.entries.toList()) { filter ->
-                FilterChip(
-                    selected = dateFilter == filter,
-                    onClick = { onDateFilterChange(filter) },
-                    label = { Text(filter.displayName, fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondary
-                    )
+        // Date filter dropdown
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            FilterChip(
+                selected = true,
+                onClick = { expanded = true },
+                label = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(dateFilter.displayName, fontSize = 11.sp)
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                },
+                modifier = Modifier.height(28.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary
                 )
+            )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DateFilter.entries.forEach { filter ->
+                    DropdownMenuItem(
+                        text = { Text(filter.displayName, fontSize = 13.sp) },
+                        onClick = {
+                            onDateFilterChange(filter)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
-    Divider(modifier = Modifier.padding(horizontal = 16.dp))
 }
 
 @Composable
-private fun OrderHistoryCard(
+private fun CompactOrderCard(
     order: OrderHistoryItem,
     onClick: () -> Unit
 ) {
     val isCompleted = order.status == "completed"
     val statusColor = if (isCompleted) Color(0xFF4CAF50) else Color(0xFFf44336)
-    val statusIcon = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Cancel
-    val statusText = if (isCompleted) "Hoàn tất" else "Đã hủy"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Receipt,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+            // Status indicator
+            Icon(
+                imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = statusColor
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Order info
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
                         text = "#${order.orderNumber}",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontSize = 14.sp
                     )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .background(
-                            color = statusColor.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Icon(
-                        imageVector = statusIcon,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = statusColor
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = statusText,
-                        fontSize = 12.sp,
-                        color = statusColor,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Info Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Left: Table/Customer info
-                Column {
-                    if (!order.tableName.isNullOrEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.TableRestaurant,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color.Gray
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = order.tableName,
-                                fontSize = 13.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-                    if (!order.customerName.isNullOrEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color.Gray
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = order.customerName,
-                                fontSize = 13.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-                    Text(
-                        text = "${order.itemCount} món",
-                        fontSize = 13.sp,
-                        color = Color.Gray
-                    )
-                }
-
-                // Right: Amount and time
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
                     Text(
                         text = formatCurrency(order.totalAmount),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = buildString {
+                            order.tableName?.let { append(it) }
+                            if (!order.tableName.isNullOrEmpty() && order.itemCount > 0) append(" • ")
+                            append("${order.itemCount} món")
+                        },
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = formatTime(order.createdAt),
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = Color.Gray
                     )
-                    if (!isCompleted && !order.cancelReason.isNullOrEmpty()) {
-                        Text(
-                            text = order.cancelReason,
-                            fontSize = 11.sp,
-                            color = Color(0xFFf44336),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaginationControls(
+    currentPage: Int,
+    totalPages: Int,
+    pageSize: Int,
+    totalCount: Int,
+    onPageChange: (Int) -> Unit,
+    onNextPage: () -> Unit,
+    onPreviousPage: () -> Unit,
+    onPageSizeChange: (Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 4.dp,
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Page size selector
+            var expanded by remember { mutableStateOf(false) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Hiển thị:", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.width(4.dp))
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .clickable { expanded = true }
+                            .border(1.dp, Color.LightGray, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(pageSize.toString(), fontSize = 12.sp)
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf(5, 10, 20, 30, 50).forEach { size ->
+                            DropdownMenuItem(
+                                text = { Text("$size đơn", fontSize = 13.sp) },
+                                onClick = {
+                                    onPageSizeChange(size)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Page info
+            Text(
+                text = "Tổng: $totalCount đơn",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+
+            // Page navigation
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onPreviousPage,
+                    enabled = currentPage > 1,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ChevronLeft,
+                        contentDescription = "Trang trước",
+                        tint = if (currentPage > 1) MaterialTheme.colorScheme.primary else Color.LightGray
+                    )
+                }
+
+                Text(
+                    text = "$currentPage/$totalPages",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+
+                IconButton(
+                    onClick = onNextPage,
+                    enabled = currentPage < totalPages,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Trang sau",
+                        tint = if (currentPage < totalPages) MaterialTheme.colorScheme.primary else Color.LightGray
+                    )
                 }
             }
         }
@@ -778,6 +762,15 @@ private fun InfoRow(
 private fun formatCurrency(amount: Long): String {
     val formatter = NumberFormat.getNumberInstance(Locale("vi", "VN"))
     return "${formatter.format(amount)}đ"
+}
+
+private fun formatCurrencyShort(amount: Long): String {
+    return when {
+        amount >= 1_000_000_000 -> "${amount / 1_000_000_000}B"
+        amount >= 1_000_000 -> "${amount / 1_000_000}M"
+        amount >= 1_000 -> "${amount / 1_000}K"
+        else -> "${amount}đ"
+    }
 }
 
 private fun formatTime(timestamp: Long): String {
