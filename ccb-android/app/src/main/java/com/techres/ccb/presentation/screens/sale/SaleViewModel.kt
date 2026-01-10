@@ -382,7 +382,12 @@ class SaleViewModel @Inject constructor(
 
     fun selectCategory(categoryId: String) {
         // OPTIMIZATION: Use pre-computed cache - NO database query, INSTANT switching
-        val products = productsByCategoryCache[categoryId] ?: allProductsCache
+        // Only show all products for "all" category, otherwise return empty list if category has no products
+        val products = if (categoryId == "all") {
+            allProductsCache
+        } else {
+            productsByCategoryCache[categoryId] ?: emptyList()
+        }
 
         _uiState.update { state ->
             state.copy(
@@ -397,7 +402,12 @@ class SaleViewModel @Inject constructor(
         // OPTIMIZATION: Search from cache - NO database query
         val categoryId = _uiState.value.selectedCategoryId
         val baseProducts = if (query.isBlank()) {
-            productsByCategoryCache[categoryId] ?: allProductsCache
+            // Return products for selected category, or empty if category has no products
+            if (categoryId == "all") {
+                allProductsCache
+            } else {
+                productsByCategoryCache[categoryId] ?: emptyList()
+            }
         } else {
             // Search in all products cache
             val lowerQuery = query.lowercase()
