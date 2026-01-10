@@ -284,19 +284,19 @@ fun DashboardScreen(
             },
             title = {
                 Text(
-                    "Dang xuat",
+                    "Đăng xuất",
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 val activeOrdersCount = uiState.totalActiveOrders
                 Column {
-                    Text("Ban co chac chan muon dang xuat khoi thiet bi?")
+                    Text("Bạn có chắc chắn muốn đăng xuất khỏi thiết bị?")
                     Spacer(modifier = Modifier.height(8.dp))
 
                     if (activeOrdersCount > 0) {
                         Surface(
-                            color = Color(0xFFFFF3E0),
+                            color = Color(0xFFE3F2FD),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -305,23 +305,23 @@ fun DashboardScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Default.Warning,
+                                    Icons.Default.Info,
                                     contentDescription = null,
-                                    tint = Color(0xFFFF9800),
+                                    tint = Color(0xFF1976D2),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        "Co $activeOrdersCount don hang dang hoat dong!",
+                                        "Có $activeOrdersCount đơn hàng đang hoạt động",
                                         fontWeight = FontWeight.Medium,
-                                        color = Color(0xFFE65100),
+                                        color = Color(0xFF1565C0),
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        "Cac don nay se bi HUY khi dang xuat.",
+                                        "Các đơn này sẽ được BÀN GIAO cho ca sau.",
                                         fontSize = 12.sp,
-                                        color = Color(0xFFE65100)
+                                        color = Color(0xFF1976D2)
                                     )
                                 }
                             }
@@ -330,21 +330,21 @@ fun DashboardScreen(
                     }
 
                     Text(
-                        "Luu y: Du lieu danh muc, san pham, ban, nhan vien se bi xoa. " +
-                        "Lich su don hang duoc giu lai. Khi dang nhap lai, he thong se dong bo lai tu dau.",
+                        "Lưu ý: Dữ liệu danh mục, sản phẩm, bàn, nhân viên sẽ bị xóa. " +
+                        "Đơn hàng đang hoạt động và lịch sử đơn hàng được giữ lại. " +
+                        "Khi đăng nhập lại, hệ thống sẽ đồng bộ lại từ đầu.",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
                 }
             },
             confirmButton = {
-                val activeOrdersCount = uiState.totalActiveOrders
                 Button(
                     onClick = {
                         isLoggingOut = true
                         coroutineScope.launch {
-                            // Cancel active orders if any, then logout
-                            val success = viewModel.performFullLogout(cancelActiveOrders = activeOrdersCount > 0)
+                            // Do NOT cancel active orders - handover to next shift
+                            val success = viewModel.performFullLogout(cancelActiveOrders = false)
                             if (success) {
                                 showLogoutConfirmDialog = false
                                 isLoggingOut = false
@@ -364,7 +364,7 @@ fun DashboardScreen(
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Dang xoa du lieu...")
+                        Text("Đang xóa dữ liệu...")
                     } else {
                         Icon(
                             Icons.Default.Logout,
@@ -372,18 +372,14 @@ fun DashboardScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        if (activeOrdersCount > 0) {
-                            Text("Huy don & Dang xuat")
-                        } else {
-                            Text("Dang xuat")
-                        }
+                        Text("Đăng xuất")
                     }
                 }
             },
             dismissButton = {
                 if (!isLoggingOut) {
                     OutlinedButton(onClick = { showLogoutConfirmDialog = false }) {
-                        Text("Huy")
+                        Text("Hủy")
                     }
                 }
             }
