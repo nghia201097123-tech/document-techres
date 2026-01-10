@@ -336,6 +336,34 @@ export class CouponDto {
   updatedAt: string;
 }
 
+// ============ Product Note DTOs ============
+
+export class ProductNoteDto {
+  @ApiProperty({ description: 'ID của ghi chú' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên ghi chú' })
+  name: string;
+
+  @ApiProperty({ description: 'Mô tả', nullable: true })
+  description: string | null;
+
+  @ApiProperty({ description: 'Thứ tự sắp xếp' })
+  sortOrder: number;
+
+  @ApiProperty({ description: 'Còn hoạt động không' })
+  isActive: boolean;
+
+  @ApiProperty({ description: 'Danh sách product ID được gán ghi chú này', type: [String] })
+  productIds: string[];
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 // ============ Topping Group DTOs ============
 
 export class ToppingItemDto {
@@ -440,6 +468,9 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [ToppingGroupDto], description: 'Danh sách nhóm topping với các product được gán' })
   toppingGroups: ToppingGroupDto[];
+
+  @ApiProperty({ type: [ProductNoteDto], description: 'Danh sách ghi chú món ăn' })
+  productNotes: ProductNoteDto[];
 }
 
 export class FullSyncResponseDto {

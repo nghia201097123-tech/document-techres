@@ -29,9 +29,12 @@ import com.techres.ccb.data.local.entity.*
         // Pricing entities
         SeasonalPriceEntity::class,
         SeasonalPriceProductEntity::class,
-        CouponEntity::class
+        CouponEntity::class,
+        // Product notes
+        ProductNoteEntity::class,
+        ProductNoteAssignmentEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -62,6 +65,9 @@ abstract class CCBDatabase : RoomDatabase() {
     abstract fun seasonalPriceDao(): SeasonalPriceDao
     abstract fun seasonalPriceProductDao(): SeasonalPriceProductDao
     abstract fun couponDao(): CouponDao
+
+    // Product notes DAOs
+    abstract fun productNoteDao(): ProductNoteDao
 
     companion object {
         const val DATABASE_NAME = "ccb_database"

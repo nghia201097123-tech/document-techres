@@ -144,4 +144,11 @@ object DatabaseModule {
     fun provideCouponDao(database: CCBDatabase): CouponDao {
         return database.couponDao()
     }
+
+    // Product notes DAO
+    @Provides
+    @Singleton
+    fun provideProductNoteDao(database: CCBDatabase): ProductNoteDao {
+        return database.productNoteDao()
+    }
 }

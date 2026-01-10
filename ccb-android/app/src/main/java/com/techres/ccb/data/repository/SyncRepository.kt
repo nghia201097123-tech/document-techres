@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
@@ -28,7 +29,8 @@ enum class SyncStep {
     TABLES,           // Bàn
     STAFF,            // Nhân viên
     SEASONAL_PRICES,  // Giá thời vụ
-    COUPONS           // Mã giảm giá
+    COUPONS,          // Mã giảm giá
+    PRODUCT_NOTES     // Ghi chú món ăn
 }
 
 enum class SyncStepStatus {
@@ -49,7 +51,8 @@ class SyncRepository @Inject constructor(
     private val productToppingDao: ProductToppingDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val seasonalPriceProductDao: SeasonalPriceProductDao,
-    private val couponDao: CouponDao
+    private val couponDao: CouponDao,
+    private val productNoteDao: ProductNoteDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -337,6 +340,38 @@ class SyncRepository @Inject constructor(
 
         couponDao.syncCoupons(branchId, couponsList)
         onProgress?.invoke(SyncStepProgress(SyncStep.COUPONS, SyncStepStatus.COMPLETED, couponsList.size))
+
+        // Sync product notes
+        onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_NOTES, SyncStepStatus.IN_PROGRESS))
+        val productNotesList = syncData.productNotes?.map { dto ->
+            ProductNoteEntity(
+                id = dto.id,
+                branchId = branchId,
+                name = dto.name,
+                description = dto.description,
+                sortOrder = dto.sortOrder,
+                isActive = dto.isActive,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+
+        val productNoteAssignmentsList = syncData.productNotes?.flatMap { dto ->
+            dto.productIds?.map { productId ->
+                ProductNoteAssignmentEntity(
+                    productId = productId,
+                    noteId = dto.id,
+                    branchId = branchId,
+                    sortOrder = 0
+                )
+            } ?: emptyList()
+        } ?: emptyList()
+
+        productNoteDao.syncProductNotes(branchId, productNotesList)
+        productNoteDao.syncProductNoteAssignments(branchId, productNoteAssignmentsList)
+        onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_NOTES, SyncStepStatus.COMPLETED, productNotesList.size))
     }
 
     /**
@@ -348,6 +383,8 @@ class SyncRepository @Inject constructor(
         // Clear synced master data only - keep shifts, orders, etc.
         categoryRepository.clearByBranch(branchId)
         productToppingDao.deleteAllByBranch(branchId) // Delete toppings before products
+        productNoteDao.deleteAllAssignmentsByBranch(branchId) // Delete note assignments before notes
+        productNoteDao.deleteAllByBranch(branchId)
         productRepository.clearByBranch(branchId)
         tableRepository.clearByBranch(branchId)
         staffRepository.clearByBranch(branchId)

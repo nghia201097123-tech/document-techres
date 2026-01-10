@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -14,6 +14,7 @@ import {
   CouponDto,
   ToppingGroupDto,
   ToppingItemDto,
+  ProductNoteDto,
   StaffBranchPermissionsSyncDto,
   BrandWithBranchesDto,
 } from './dto/sync.dto';
@@ -53,6 +54,10 @@ export class SyncService {
     private toppingGroupItemRepository: Repository<ToppingGroupItem>,
     @InjectRepository(ProductToppingGroup)
     private productToppingGroupRepository: Repository<ProductToppingGroup>,
+    @InjectRepository(ProductNote)
+    private productNoteRepository: Repository<ProductNote>,
+    @InjectRepository(ProductNoteAssignment)
+    private productNoteAssignmentRepository: Repository<ProductNoteAssignment>,
   ) {}
 
   /**
@@ -275,7 +280,7 @@ export class SyncService {
 
       const today = new Date();
       const tenantId = branch.tenantId;
-      const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons, toppingGroups] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons, toppingGroups, productNotes] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -308,6 +313,10 @@ export class SyncService {
           where: { tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
         }) : Promise.resolve([]),
+        tenantId ? this.productNoteRepository.find({
+          where: { tenantId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }) : Promise.resolve([]),
       ]);
 
       const products = branchProducts
@@ -336,7 +345,8 @@ export class SyncService {
 
       // Fetch topping group items and product mappings
       const toppingGroupIds = toppingGroups.map(tg => tg.id);
-      const [toppingGroupItems, productToppingGroups] = await Promise.all([
+      const productNoteIds = productNotes.map(pn => pn.id);
+      const [toppingGroupItems, productToppingGroups, productNoteAssignments] = await Promise.all([
         toppingGroupIds.length > 0
           ? this.toppingGroupItemRepository.find({
               where: { groupId: In(toppingGroupIds) },
@@ -349,9 +359,14 @@ export class SyncService {
               where: { groupId: In(toppingGroupIds) },
             })
           : Promise.resolve([]),
+        productNoteIds.length > 0
+          ? this.productNoteAssignmentRepository.find({
+              where: { noteId: In(productNoteIds) },
+            })
+          : Promise.resolve([]),
       ]);
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}`);
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -366,6 +381,7 @@ export class SyncService {
           seasonalPrices: seasonalPrices.map(sp => this.mapSeasonalPrice(sp, seasonalPriceProducts)),
           coupons: coupons.map(c => this.mapCoupon(c)),
           toppingGroups: toppingGroups.map(tg => this.mapToppingGroup(tg, toppingGroupItems, productToppingGroups)),
+          productNotes: productNotes.map(pn => this.mapProductNote(pn, productNoteAssignments)),
         },
         syncTime,
         message: null,
@@ -655,6 +671,26 @@ export class SyncService {
       maxQuantity: item.maxQuantity || 5,
       sortOrder: item.sortOrder || 0,
       isActive: topping?.isActive ?? true,
+    };
+  }
+
+  private mapProductNote(
+    note: ProductNote,
+    allAssignments: ProductNoteAssignment[],
+  ): ProductNoteDto {
+    // Filter product IDs assigned to this note
+    const noteAssignments = allAssignments.filter(a => a.noteId === note.id);
+    const productIds = noteAssignments.map(a => a.productId);
+
+    return {
+      id: note.id,
+      name: note.name,
+      description: note.description,
+      sortOrder: note.sortOrder,
+      isActive: note.isActive,
+      productIds: productIds,
+      createdAt: note.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: note.updatedAt.toISOString(),
     };
   }
 }
