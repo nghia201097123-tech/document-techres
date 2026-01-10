@@ -164,8 +164,9 @@ fun SaleScreen(
 
         if (uiState.showPaymentDialog) {
             // Use order total when there's an active order
-            val paymentTotal = if (uiState.currentOrder != null) {
-                uiState.currentOrder.totalAmount.toLong() + uiState.totalAmount
+            val currentOrder = uiState.currentOrder
+            val paymentTotal = if (currentOrder != null) {
+                currentOrder.totalAmount.toLong() + uiState.totalAmount
             } else {
                 uiState.totalAmount
             }

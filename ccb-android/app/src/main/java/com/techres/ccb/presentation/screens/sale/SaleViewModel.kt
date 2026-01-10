@@ -12,6 +12,7 @@ import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ProductRepository
+import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -105,6 +106,7 @@ class SaleViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
     private val orderRepository: OrderRepository,
+    private val shiftRepository: ShiftRepository,
     private val productToppingDao: ProductToppingDao
 ) : ViewModel() {
 
@@ -641,7 +643,10 @@ class SaleViewModel @Inject constructor(
             try {
                 val staffId = authRepository.getCurrentStaffId() ?: "unknown"
                 val staffName = authRepository.getCurrentStaffName() ?: "Nhân viên"
-                val shiftId = authRepository.getCurrentShiftId()
+                val currentShift = withContext(Dispatchers.IO) {
+                    shiftRepository.getCurrentOpenShift(branchId)
+                }
+                val shiftId = currentShift?.id
                 val now = getCurrentTimestamp()
 
                 val orderId = UUID.randomUUID().toString()
