@@ -685,7 +685,7 @@ private fun BranchDataSyncProgress(
                         status = stepState.status,
                         count = stepState.count
                     )
-                    if (step != com.techres.ccb.data.repository.SyncStep.STAFF) {
+                    if (step != com.techres.ccb.data.repository.SyncStep.PRODUCT_NOTES) {
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }

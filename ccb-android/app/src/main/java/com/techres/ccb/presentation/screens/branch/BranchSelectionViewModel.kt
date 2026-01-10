@@ -75,9 +75,13 @@ data class BranchSelectionUiState(
         SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
         SyncStep.CATEGORIES to SyncStepUiState("Danh mục"),
         SyncStep.PRODUCTS to SyncStepUiState("Sản phẩm"),
+        SyncStep.PRODUCT_TOPPINGS to SyncStepUiState("Topping sản phẩm"),
         SyncStep.AREAS to SyncStepUiState("Khu vực"),
         SyncStep.TABLES to SyncStepUiState("Bàn"),
-        SyncStep.STAFF to SyncStepUiState("Nhân viên")
+        SyncStep.STAFF to SyncStepUiState("Nhân viên"),
+        SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
+        SyncStep.COUPONS to SyncStepUiState("Coupon"),
+        SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
     )
 )
 
@@ -240,9 +244,13 @@ class BranchSelectionViewModel @Inject constructor(
                 SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
                 SyncStep.CATEGORIES to SyncStepUiState("Danh mục"),
                 SyncStep.PRODUCTS to SyncStepUiState("Sản phẩm"),
+                SyncStep.PRODUCT_TOPPINGS to SyncStepUiState("Topping sản phẩm"),
                 SyncStep.AREAS to SyncStepUiState("Khu vực"),
                 SyncStep.TABLES to SyncStepUiState("Bàn"),
-                SyncStep.STAFF to SyncStepUiState("Nhân viên")
+                SyncStep.STAFF to SyncStepUiState("Nhân viên"),
+                SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
+                SyncStep.COUPONS to SyncStepUiState("Coupon"),
+                SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
             )
 
             _uiState.update {
@@ -341,9 +349,13 @@ class BranchSelectionViewModel @Inject constructor(
             SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
             SyncStep.CATEGORIES to SyncStepUiState("Danh mục"),
             SyncStep.PRODUCTS to SyncStepUiState("Sản phẩm"),
+            SyncStep.PRODUCT_TOPPINGS to SyncStepUiState("Topping sản phẩm"),
             SyncStep.AREAS to SyncStepUiState("Khu vực"),
             SyncStep.TABLES to SyncStepUiState("Bàn"),
-            SyncStep.STAFF to SyncStepUiState("Nhân viên")
+            SyncStep.STAFF to SyncStepUiState("Nhân viên"),
+            SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
+            SyncStep.COUPONS to SyncStepUiState("Coupon"),
+            SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
         )
         _uiState.update {
             it.copy(
