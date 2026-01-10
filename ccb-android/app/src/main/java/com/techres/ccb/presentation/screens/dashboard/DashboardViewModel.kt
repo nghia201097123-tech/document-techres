@@ -397,4 +397,26 @@ class DashboardViewModel @Inject constructor(
             0
         }
     }
+
+    /**
+     * Full logout - Clear all database and preferences
+     * Returns true when logout is complete
+     */
+    suspend fun performFullLogout(): Boolean {
+        return try {
+            Log.d(TAG, "performFullLogout - Starting full logout...")
+
+            // Cancel any active observers
+            ordersObserverJob?.cancel()
+
+            // Clear all database tables and preferences
+            authRepository.fullLogout()
+
+            Log.d(TAG, "performFullLogout - Logout complete, all data cleared")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "performFullLogout - Error: ${e.message}", e)
+            false
+        }
+    }
 }

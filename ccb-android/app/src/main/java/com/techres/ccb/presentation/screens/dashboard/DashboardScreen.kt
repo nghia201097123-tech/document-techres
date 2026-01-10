@@ -62,6 +62,10 @@ fun DashboardScreen(
     var showQuickPaymentDialog by remember { mutableStateOf(false) }
     var orderForPayment by remember { mutableStateOf<PosOrder?>(null) }
 
+    // Logout dialog state
+    var showLogoutConfirmDialog by remember { mutableStateOf(false) }
+    var isLoggingOut by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -77,7 +81,7 @@ fun DashboardScreen(
             onNavigateToOrderHistory = onNavigateToOrderHistory,
             onNavigateToSettings = onNavigateToSettings,
             onSwitchStaff = onSwitchStaff,
-            onLogout = onLogout
+            onLogout = { showLogoutConfirmDialog = true }
         )
 
         // Main Content
@@ -262,6 +266,85 @@ fun DashboardScreen(
             }
         )
     }
+
+    // Logout Confirmation Dialog
+    if (showLogoutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isLoggingOut) showLogoutConfirmDialog = false
+            },
+            icon = {
+                Icon(
+                    Icons.Default.Logout,
+                    contentDescription = null,
+                    tint = Color(0xFFF44336),
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Dang xuat",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text("Ban co chac chan muon dang xuat khoi thiet bi?")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Luu y: Tat ca du lieu (danh muc, san pham, ban, nhan vien...) se bi xoa. " +
+                        "Khi dang nhap lai, he thong se dong bo lai tu dau.",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isLoggingOut = true
+                        coroutineScope.launch {
+                            val success = viewModel.performFullLogout()
+                            if (success) {
+                                showLogoutConfirmDialog = false
+                                isLoggingOut = false
+                                onLogout()
+                            } else {
+                                isLoggingOut = false
+                            }
+                        }
+                    },
+                    enabled = !isLoggingOut,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+                ) {
+                    if (isLoggingOut) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Dang xoa du lieu...")
+                    } else {
+                        Icon(
+                            Icons.Default.Logout,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Dang xuat")
+                    }
+                }
+            },
+            dismissButton = {
+                if (!isLoggingOut) {
+                    OutlinedButton(onClick = { showLogoutConfirmDialog = false }) {
+                        Text("Huy")
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -357,6 +440,13 @@ private fun DashboardSidebar(
             onClick = onSwitchStaff
         )
 
+        // Logout Button
+        SidebarNavItem(
+            icon = Icons.Default.Logout,
+            label = "Thoat",
+            onClick = onLogout
+        )
+
         Spacer(modifier = Modifier.height(8.dp))
 
         // Staff Avatar with name initial
@@ -364,8 +454,7 @@ private fun DashboardSidebar(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.2f))
-                .clickable(onClick = onLogout),
+                .background(Color.White.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center
         ) {
             // Show staff initial

@@ -1,19 +1,23 @@
 package com.techres.ccb.data.repository
 
 import android.content.SharedPreferences
+import com.techres.ccb.data.local.CCBDatabase
 import com.techres.ccb.data.remote.api.AuthApi
 import com.techres.ccb.data.remote.dto.LoginRequest
 import com.techres.ccb.data.remote.dto.LoginResponse
 import com.techres.ccb.data.remote.dto.LoginUserDto
 import com.techres.ccb.data.remote.dto.VerifyPinRequest
 import com.techres.ccb.data.remote.dto.VerifyPinResponse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val database: CCBDatabase
 ) {
     companion object {
         private const val KEY_ACCESS_TOKEN = "access_token"
@@ -274,6 +278,20 @@ class AuthRepository @Inject constructor(
             remove(KEY_STAFF_ROLE)
             remove(KEY_STAFF_AVATAR)
             apply()
+        }
+    }
+
+    /**
+     * Full logout: Clear all SharedPreferences AND all database tables
+     * This ensures fresh data sync on next login
+     */
+    suspend fun fullLogout() {
+        withContext(Dispatchers.IO) {
+            // 1. Clear all database tables (master data)
+            database.clearAllTables()
+
+            // 2. Clear all SharedPreferences
+            sharedPreferences.edit().clear().apply()
         }
     }
 }
