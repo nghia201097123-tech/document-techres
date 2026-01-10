@@ -122,6 +122,9 @@ class SaleViewModel @Inject constructor(
     // Cache product entities để load topping info
     private var productEntityMap: Map<String, ProductEntity> = emptyMap()
 
+    // Cache topping category IDs to filter out topping products
+    private var toppingCategoryIds: Set<String> = emptySet()
+
     init {
         loadInitialData()
     }
@@ -143,20 +146,31 @@ class SaleViewModel @Inject constructor(
                 val (categories, products, tables) = withContext(Dispatchers.IO) {
                     // Load categories from database
                     val categoryEntities = categoryRepository.getAllCategories(branchId).first()
+
+                    // Find topping category ID to exclude those products - save to class property
+                    toppingCategoryIds = categoryEntities
+                        .filter { it.name.lowercase().contains("topping") }
+                        .map { it.id }
+                        .toSet()
+
                     val categoryList = mutableListOf(
                         Category(id = "all", name = "Tất cả", icon = "🍽️")
                     )
-                    categoryList.addAll(categoryEntities.map { entity ->
-                        Category(
-                            id = entity.id,
-                            name = entity.name,
-                            icon = entity.imageUrl
-                        )
-                    })
+                    // Exclude Topping category from display
+                    categoryList.addAll(categoryEntities
+                        .filter { !it.name.lowercase().contains("topping") }
+                        .map { entity ->
+                            Category(
+                                id = entity.id,
+                                name = entity.name,
+                                icon = entity.imageUrl
+                            )
+                        })
 
-                    // Load all products
+                    // Load all products - filter out toppings by type AND by category
                     val productEntities = productRepository.getAllProducts(branchId).first()
-                        .filter { it.type != "topping" } // Lọc bỏ topping khỏi danh sách sản phẩm chính
+                        .filter { it.type != "topping" } // Filter by type
+                        .filter { it.categoryId !in toppingCategoryIds } // Filter by topping category
 
                     // Cache product entities
                     val allProducts = productRepository.getAllProducts(branchId).first()
@@ -279,7 +293,8 @@ class SaleViewModel @Inject constructor(
         viewModelScope.launch {
             val products = withContext(Dispatchers.IO) {
                 val allProducts = productRepository.getAllProducts(branchId).first()
-                    .filter { it.type != "topping" } // Lọc bỏ topping
+                    .filter { it.type != "topping" } // Filter by type
+                    .filter { it.categoryId !in toppingCategoryIds } // Filter by topping category
 
                 val filteredProducts = if (categoryId == "all") {
                     allProducts
@@ -306,11 +321,13 @@ class SaleViewModel @Inject constructor(
                 val productEntities = if (query.isBlank()) {
                     val allProducts = productRepository.getAllProducts(branchId).first()
                         .filter { it.type != "topping" }
+                        .filter { it.categoryId !in toppingCategoryIds }
                     val categoryId = _uiState.value.selectedCategoryId
                     if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
                 } else {
                     productRepository.searchProducts(branchId, query)
                         .filter { it.type != "topping" }
+                        .filter { it.categoryId !in toppingCategoryIds }
                 }
 
                 buildProductsWithVariants(productEntities)
