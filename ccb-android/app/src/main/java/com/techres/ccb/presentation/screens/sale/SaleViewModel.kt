@@ -829,7 +829,7 @@ class SaleViewModel @Inject constructor(
                         productName = cartItem.product.name,
                         productImageUrl = cartItem.product.imageUrl,
                         quantity = cartItem.quantity,
-                        unitPrice = cartItem.unitPrice.toDouble(),
+                        unitPrice = cartItem.product.price.toDouble(),  // Base price only (without toppings)
                         totalPrice = cartItem.totalPrice.toDouble(),
                         notes = variantsAndNote,
                         status = "pending",
@@ -915,7 +915,7 @@ class SaleViewModel @Inject constructor(
                         productName = cartItem.product.name,
                         productImageUrl = cartItem.product.imageUrl,
                         quantity = cartItem.quantity,
-                        unitPrice = cartItem.unitPrice.toDouble(),
+                        unitPrice = cartItem.product.price.toDouble(),  // Base price only (without toppings)
                         totalPrice = cartItem.totalPrice.toDouble(),
                         notes = variantsAndNote,
                         status = "pending",
