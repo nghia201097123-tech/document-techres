@@ -272,6 +272,11 @@ class SyncRepository @Inject constructor(
         val orderTableMap = activeOrdersWithTables.associate { it.id to (it.tableId to it.tableName) }
         Log.d("SyncRepository", "Saved ${orderTableMap.size} active orders' table relationships before sync")
 
+        // Also get orders that have table_name but NULL table_id (lost from previous sync without fix)
+        val ordersWithTableNameOnly = orderDao.getAllActiveOrdersWithTableName()
+            .filter { it.tableId == null && it.tableName != null }
+        Log.d("SyncRepository", "Found ${ordersWithTableNameOnly.size} orders with table_name but NULL table_id")
+
         val tables = syncData.tables.map { dto ->
             TableEntity(
                 id = dto.id,
@@ -290,12 +295,14 @@ class SyncRepository @Inject constructor(
         }
         tableRepository.syncTables(branchId, tables)
 
-        // Restore table relationships to orders that lost them due to foreign key constraint
+        // Create lookup maps for restoring table relationships
         val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
             .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
             .format(java.util.Date())
         val syncedTableIds = tables.map { it.id }.toSet()
+        val syncedTablesByName = tables.associateBy { it.name.lowercase().trim() }
 
+        // Restore table relationships to orders that lost them due to foreign key constraint
         for ((orderId, tableInfo) in orderTableMap) {
             val (tableId, tableName) = tableInfo
             if (tableId != null && tableId in syncedTableIds) {
@@ -304,6 +311,19 @@ class SyncRepository @Inject constructor(
                 Log.d("SyncRepository", "Restored table $tableId ($tableName) to order $orderId")
             } else {
                 Log.w("SyncRepository", "Table $tableId not found in synced tables for order $orderId")
+            }
+        }
+
+        // Restore table relationships for orders that have table_name but lost table_id
+        // This handles orders from previous sessions where the fix wasn't applied
+        for (order in ordersWithTableNameOnly) {
+            val tableName = order.tableName ?: continue
+            val matchedTable = syncedTablesByName[tableName.lowercase().trim()]
+            if (matchedTable != null) {
+                orderDao.updateTableId(order.id, matchedTable.id, tableName, now)
+                Log.d("SyncRepository", "Restored table by name: ${matchedTable.id} ($tableName) to order ${order.orderNumber}")
+            } else {
+                Log.w("SyncRepository", "Could not find table by name '$tableName' for order ${order.orderNumber}")
             }
         }
 

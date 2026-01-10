@@ -16,11 +16,24 @@ interface OrderDao {
     @Query("SELECT * FROM orders WHERE status NOT IN ('completed', 'cancelled') AND table_id IS NOT NULL ORDER BY created_at DESC")
     suspend fun getAllActiveOrdersWithTable(): List<OrderEntity>
 
+    /**
+     * Get active orders that have table_name set (even if table_id is NULL)
+     * This is used to restore table relationships after sync when table_id was lost
+     */
+    @Query("SELECT * FROM orders WHERE status NOT IN ('completed', 'cancelled') AND table_name IS NOT NULL ORDER BY created_at DESC")
+    suspend fun getAllActiveOrdersWithTableName(): List<OrderEntity>
+
     @Query("SELECT * FROM orders WHERE branch_id = :branchId AND shift_id = :shiftId ORDER BY created_at DESC")
     fun getByShift(branchId: String, shiftId: String): Flow<List<OrderEntity>>
 
     @Query("SELECT * FROM orders WHERE table_id = :tableId AND status NOT IN ('completed', 'cancelled') LIMIT 1")
     suspend fun getActiveOrderByTable(tableId: String): OrderEntity?
+
+    /**
+     * Get active order by table name (fallback when table_id is NULL)
+     */
+    @Query("SELECT * FROM orders WHERE table_name = :tableName AND status NOT IN ('completed', 'cancelled') LIMIT 1")
+    suspend fun getActiveOrderByTableName(tableName: String): OrderEntity?
 
     @Query("SELECT * FROM orders WHERE id = :id")
     suspend fun getById(id: String): OrderEntity?

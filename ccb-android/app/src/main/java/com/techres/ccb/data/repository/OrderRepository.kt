@@ -29,6 +29,13 @@ class OrderRepository @Inject constructor(
         return orderDao.getActiveOrderByTable(tableId)
     }
 
+    /**
+     * Get active order by table name (fallback when table_id is NULL)
+     */
+    suspend fun getActiveOrderByTableName(tableName: String): OrderEntity? {
+        return orderDao.getActiveOrderByTableName(tableName)
+    }
+
     suspend fun getOrderById(id: String): OrderEntity? {
         return orderDao.getById(id)
     }
@@ -56,6 +63,14 @@ class OrderRepository @Inject constructor(
 
     suspend fun updateOrderStatus(orderId: String, status: String, updatedAt: String) {
         orderDao.updateStatus(orderId, status, updatedAt)
+    }
+
+    /**
+     * Update table relationship for an order
+     * Used to restore table_id when it was lost during sync
+     */
+    suspend fun updateTableId(orderId: String, tableId: String?, tableName: String?, updatedAt: String) {
+        orderDao.updateTableId(orderId, tableId, tableName, updatedAt)
     }
 
     /**
