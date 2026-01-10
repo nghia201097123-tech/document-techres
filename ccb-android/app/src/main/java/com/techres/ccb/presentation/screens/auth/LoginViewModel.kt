@@ -13,9 +13,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class LoginUiState(
-    val tenantId: String = "",
-    val username: String = "",
-    val password: String = "",
+    val tenantId: String = "CTSG",
+    val username: String = "tr000001",
+    val password: String = "abc123",
     val isLoading: Boolean = false,
     val isSyncingBranches: Boolean = false,
     val isSuccess: Boolean = false,
