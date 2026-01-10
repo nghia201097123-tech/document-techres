@@ -282,13 +282,14 @@ class AuthRepository @Inject constructor(
     }
 
     /**
-     * Full logout: Clear all SharedPreferences AND all database tables
-     * This ensures fresh data sync on next login
+     * Full logout: Clear all SharedPreferences AND master data tables
+     * Preserves transaction data (orders, shifts, payments) for history
+     * This ensures fresh master data sync on next login
      */
     suspend fun fullLogout() {
         withContext(Dispatchers.IO) {
-            // 1. Clear all database tables (master data)
-            database.clearAllTables()
+            // 1. Clear only master data tables (preserve orders, shifts, payments)
+            database.clearMasterData()
 
             // 2. Clear all SharedPreferences
             sharedPreferences.edit().clear().apply()

@@ -2,6 +2,7 @@ package com.techres.ccb.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.techres.ccb.data.local.dao.*
 import com.techres.ccb.data.local.entity.*
 
@@ -68,6 +69,47 @@ abstract class CCBDatabase : RoomDatabase() {
 
     // Product notes DAOs
     abstract fun productNoteDao(): ProductNoteDao
+
+    /**
+     * Clear only master data tables, preserving transaction data (orders, shifts, payments)
+     * Master data: brands, branches, categories, products, toppings, areas, tables, staff,
+     *              vouchers, seasonal prices, coupons, product notes, sync metadata
+     * Preserved: orders, order_items, shifts, payments
+     */
+    fun clearMasterData() {
+        val db: SupportSQLiteDatabase = openHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            // Clear master data tables
+            db.execSQL("DELETE FROM brands")
+            db.execSQL("DELETE FROM branches")
+            db.execSQL("DELETE FROM categories")
+            db.execSQL("DELETE FROM products")
+            db.execSQL("DELETE FROM product_toppings")
+            db.execSQL("DELETE FROM areas")
+            db.execSQL("DELETE FROM tables")
+            db.execSQL("DELETE FROM staff")
+
+            // Clear support tables
+            db.execSQL("DELETE FROM vouchers")
+            db.execSQL("DELETE FROM sync_queue")
+            db.execSQL("DELETE FROM sync_metadata")
+            db.execSQL("DELETE FROM sync_conflicts")
+
+            // Clear pricing tables
+            db.execSQL("DELETE FROM seasonal_prices")
+            db.execSQL("DELETE FROM seasonal_price_products")
+            db.execSQL("DELETE FROM coupons")
+
+            // Clear product notes
+            db.execSQL("DELETE FROM product_notes")
+            db.execSQL("DELETE FROM product_note_assignments")
+
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
 
     companion object {
         const val DATABASE_NAME = "ccb_database"
