@@ -479,24 +479,10 @@ class SaleViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             // Load combo items if this product is a combo
-            Log.d(TAG, "addItemToCart - Looking for combo items for product ${product.id} (${product.name})")
             val comboItems = withContext(Dispatchers.IO) {
-                // Debug: Check total combo items in database
-                val allComboItems = comboItemDao.getAllDebug()
-                Log.d(TAG, "addItemToCart - Total combo items in database: ${allComboItems.size}")
-                allComboItems.take(10).forEach { item ->
-                    Log.d(TAG, "  DB ComboItem: id=${item.id}, comboId=${item.comboId}, productName=${item.productName}")
-                }
-
-                // Debug: Check without JOIN
-                val debugEntities = comboItemDao.getItemsByComboSyncDebug(product.id)
-                Log.d(TAG, "addItemToCart - Debug query (no join) found ${debugEntities.size} items for comboId=${product.id}")
-
-                // Real query with JOIN
                 val entities = comboItemDao.getItemsByComboSync(product.id)
-                Log.d(TAG, "addItemToCart - Real query (with join) found ${entities.size} items for comboId=${product.id}")
-                entities.forEach { entity ->
-                    Log.d(TAG, "  - ComboItem: ${entity.productName} (${entity.productId}) x${entity.quantity}")
+                if (entities.isNotEmpty()) {
+                    Log.d(TAG, "addItemToCart - Found ${entities.size} combo items for ${product.name}")
                 }
                 entities.map { entity ->
                     ComboChildItem(

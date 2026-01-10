@@ -18,38 +18,28 @@ interface ComboItemDao {
 
     /**
      * Lấy tất cả các món con của một combo
-     */
-    @Query("""
-        SELECT ci.* FROM combo_items ci
-        INNER JOIN products p ON ci.product_id = p.id AND p.is_active = 1
-        WHERE ci.combo_id = :comboId AND ci.is_active = 1
-        ORDER BY ci.sort_order
-    """)
-    fun getItemsByCombo(comboId: String): Flow<List<ComboItemEntity>>
-
-    /**
-     * Lấy tất cả các món con của một combo (sync version)
-     */
-    @Query("""
-        SELECT ci.* FROM combo_items ci
-        INNER JOIN products p ON ci.product_id = p.id AND p.is_active = 1
-        WHERE ci.combo_id = :comboId AND ci.is_active = 1
-        ORDER BY ci.sort_order
-    """)
-    fun getItemsByComboSync(comboId: String): List<ComboItemEntity>
-
-    /**
-     * Debug: Lấy tất cả các món con của một combo (không cần products tồn tại)
+     * Note: Không cần JOIN với products vì ComboItemEntity đã có productName
      */
     @Query("""
         SELECT * FROM combo_items
         WHERE combo_id = :comboId AND is_active = 1
         ORDER BY sort_order
     """)
-    fun getItemsByComboSyncDebug(comboId: String): List<ComboItemEntity>
+    fun getItemsByCombo(comboId: String): Flow<List<ComboItemEntity>>
 
     /**
-     * Debug: Lấy tất cả combo items (không filter)
+     * Lấy tất cả các món con của một combo (sync version)
+     * Note: Không cần JOIN với products vì ComboItemEntity đã có productName
+     */
+    @Query("""
+        SELECT * FROM combo_items
+        WHERE combo_id = :comboId AND is_active = 1
+        ORDER BY sort_order
+    """)
+    fun getItemsByComboSync(comboId: String): List<ComboItemEntity>
+
+    /**
+     * Lấy tất cả combo items (debug)
      */
     @Query("SELECT * FROM combo_items")
     fun getAllDebug(): List<ComboItemEntity>
@@ -58,10 +48,9 @@ interface ComboItemDao {
      * Lấy tất cả các món con của nhiều combo
      */
     @Query("""
-        SELECT ci.* FROM combo_items ci
-        INNER JOIN products p ON ci.product_id = p.id AND p.is_active = 1
-        WHERE ci.combo_id IN (:comboIds) AND ci.is_active = 1
-        ORDER BY ci.combo_id, ci.sort_order
+        SELECT * FROM combo_items
+        WHERE combo_id IN (:comboIds) AND is_active = 1
+        ORDER BY combo_id, sort_order
     """)
     fun getItemsByComboIds(comboIds: List<String>): Flow<List<ComboItemEntity>>
 
@@ -69,10 +58,9 @@ interface ComboItemDao {
      * Lấy tất cả các món con của nhiều combo (sync version)
      */
     @Query("""
-        SELECT ci.* FROM combo_items ci
-        INNER JOIN products p ON ci.product_id = p.id AND p.is_active = 1
-        WHERE ci.combo_id IN (:comboIds) AND ci.is_active = 1
-        ORDER BY ci.combo_id, ci.sort_order
+        SELECT * FROM combo_items
+        WHERE combo_id IN (:comboIds) AND is_active = 1
+        ORDER BY combo_id, sort_order
     """)
     fun getItemsByComboIdsSync(comboIds: List<String>): List<ComboItemEntity>
 

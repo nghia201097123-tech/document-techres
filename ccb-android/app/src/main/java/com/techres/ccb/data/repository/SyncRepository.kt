@@ -216,10 +216,7 @@ class SyncRepository @Inject constructor(
 
         // Sync combo items
         onProgress?.invoke(SyncStepProgress(SyncStep.COMBO_ITEMS, SyncStepStatus.IN_PROGRESS))
-        Log.d("SyncRepository", "Combo items from API: ${syncData.comboItems?.size ?: 0}")
-        syncData.comboItems?.forEach { dto ->
-            Log.d("SyncRepository", "  ComboItem: id=${dto.id}, comboId=${dto.comboId}, productId=${dto.productId}, productName=${dto.productName}")
-        }
+        Log.d("SyncRepository", "Syncing combo items: ${syncData.comboItems?.size ?: 0} from API")
         val comboItemsList = syncData.comboItems?.map { dto ->
             ComboItemEntity(
                 id = dto.id,
@@ -238,7 +235,9 @@ class SyncRepository @Inject constructor(
         if (comboItemsList.isNotEmpty()) {
             comboItemDao.insertAll(comboItemsList)
         }
-        Log.d("SyncRepository", "Saved ${comboItemsList.size} combo items to database")
+        if (comboItemsList.isNotEmpty()) {
+            Log.d("SyncRepository", "Saved ${comboItemsList.size} combo items to database")
+        }
         onProgress?.invoke(SyncStepProgress(SyncStep.COMBO_ITEMS, SyncStepStatus.COMPLETED, comboItemsList.size))
 
         // Sync areas
