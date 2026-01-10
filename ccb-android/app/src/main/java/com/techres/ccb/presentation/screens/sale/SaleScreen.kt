@@ -30,12 +30,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
+import com.techres.ccb.data.local.entity.ProductNoteEntity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
+import com.techres.ccb.presentation.screens.sale.dialogs.NoteDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.ProductVariantDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.TableSelectionDialog
@@ -114,6 +116,7 @@ fun SaleScreen(
                 onIncreaseQuantity = viewModel::increaseQuantity,
                 onDecreaseQuantity = viewModel::decreaseQuantity,
                 onRemoveItem = viewModel::removeFromCart,
+                onEditNote = viewModel::showNoteDialog,
                 onClearCart = viewModel::clearCart,
                 onPlaceOrder = viewModel::placeOrder,
                 onAddItemsToOrder = viewModel::addItemsToOrder,
@@ -235,6 +238,24 @@ fun SaleScreen(
                 onDismiss = { viewModel.hideCustomerDialog() },
                 onCustomerSelected = { viewModel.selectCustomer(it) }
             )
+        }
+
+        // Note Dialog
+        if (uiState.showNoteDialog && uiState.selectedCartItemForNote != null) {
+            val selectedItem = uiState.cartItems.find { it.id == uiState.selectedCartItemForNote }
+            if (selectedItem != null) {
+                NoteDialog(
+                    currentNote = selectedItem.note,
+                    availableNotes = uiState.availableNotes,
+                    onDismiss = { viewModel.hideNoteDialog() },
+                    onConfirm = { note ->
+                        viewModel.applyNoteToCartItem(
+                            uiState.selectedCartItemForNote!!,
+                            note
+                        )
+                    }
+                )
+            }
         }
     }
 }
@@ -480,6 +501,7 @@ fun CartPanel(
     onIncreaseQuantity: (String) -> Unit,
     onDecreaseQuantity: (String) -> Unit,
     onRemoveItem: (String) -> Unit,
+    onEditNote: (String) -> Unit = {},
     onClearCart: () -> Unit,
     onPlaceOrder: () -> Unit = {},
     onAddItemsToOrder: () -> Unit = {},
@@ -692,7 +714,8 @@ fun CartPanel(
                         item = item,
                         onIncrease = { onIncreaseQuantity(item.id) },
                         onDecrease = { onDecreaseQuantity(item.id) },
-                        onRemove = { onRemoveItem(item.id) }
+                        onRemove = { onRemoveItem(item.id) },
+                        onEditNote = { onEditNote(item.id) }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -888,15 +911,18 @@ fun CartItemRow(
     item: CartItem,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onEditNote: () -> Unit = {}
 ) {
     Card(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header: Product name + Remove button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
@@ -906,23 +932,28 @@ fun CartItemRow(
                     Text(
                         text = item.product.name,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (item.variantText.isNotEmpty()) {
-                        Text(
-                            text = item.variantText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                    if (!item.note.isNullOrEmpty()) {
-                        Text(
-                            text = "📝 ${item.note}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = item.variantText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
 
@@ -933,15 +964,55 @@ fun CartItemRow(
                 ) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Xóa",
+                        contentDescription = "Xoa",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            // Note section - clickable to edit
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (item.note.isNullOrEmpty())
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        else
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    )
+                    .clickable { onEditNote() }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (item.note.isNullOrEmpty()) Icons.Default.NoteAdd else Icons.Default.Edit,
+                    contentDescription = "Ghi chu",
+                    modifier = Modifier.size(14.dp),
+                    tint = if (item.note.isNullOrEmpty())
+                        MaterialTheme.colorScheme.outline
+                    else
+                        MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (item.note.isNullOrEmpty()) "Them ghi chu..." else item.note!!,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (item.note.isNullOrEmpty())
+                        MaterialTheme.colorScheme.outline
+                    else
+                        MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Bottom: Quantity controls + Price
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -949,27 +1020,25 @@ fun CartItemRow(
             ) {
                 // Quantity controls
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     IconButton(
                         onClick = onDecrease,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                CircleShape
-                            )
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             Icons.Default.Remove,
-                            contentDescription = "Giảm",
-                            modifier = Modifier.size(16.dp)
+                            contentDescription = "Giam",
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
                     Text(
                         text = item.quantity.toString(),
-                        modifier = Modifier.padding(horizontal = 12.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -977,16 +1046,17 @@ fun CartItemRow(
                     IconButton(
                         onClick = onIncrease,
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(32.dp)
                             .background(
-                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.primary,
                                 CircleShape
                             )
                     ) {
                         Icon(
                             Icons.Default.Add,
-                            contentDescription = "Tăng",
-                            modifier = Modifier.size(16.dp)
+                            contentDescription = "Tang",
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.White
                         )
                     }
                 }
@@ -994,7 +1064,7 @@ fun CartItemRow(
                 // Price
                 Text(
                     text = formatCurrency(item.totalPrice),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )

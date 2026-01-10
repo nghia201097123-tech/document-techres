@@ -38,6 +38,8 @@ import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.OrderDao
 import com.techres.ccb.data.local.dao.OrderItemDao
+import com.techres.ccb.data.local.dao.ProductNoteDao
+import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -50,6 +52,7 @@ enum class DebugTab(val title: String) {
     CATEGORIES("Danh mục"),
     PRODUCTS("Sản phẩm"),
     PRODUCT_TOPPINGS("Topping"),
+    PRODUCT_NOTES("Ghi chú"),
     AREAS("Khu vực"),
     TABLES("Bàn"),
     STAFF("Nhân viên"),
@@ -68,6 +71,7 @@ data class DebugUiState(
     val categories: List<CategoryEntity> = emptyList(),
     val products: List<ProductEntity> = emptyList(),
     val productToppings: List<ProductToppingEntity> = emptyList(),
+    val productNotes: List<ProductNoteEntity> = emptyList(),
     val areas: List<AreaEntity> = emptyList(),
     val tables: List<TableEntity> = emptyList(),
     val staff: List<StaffEntity> = emptyList(),
@@ -89,6 +93,7 @@ class DatabaseDebugViewModel @Inject constructor(
     private val branchRepository: BranchRepository,
     private val authRepository: AuthRepository,
     private val productToppingDao: ProductToppingDao,
+    private val productNoteDao: ProductNoteDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val couponDao: CouponDao,
     private val orderDao: OrderDao,
@@ -215,6 +220,14 @@ class DatabaseDebugViewModel @Inject constructor(
 
         viewModelScope.launch {
             val branchId = _uiState.value.branchId
+            productNoteDao.getAllNotes(branchId)
+                .collect { notes ->
+                    _uiState.update { it.copy(productNotes = notes) }
+                }
+        }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
             orderDao.getAllByBranch(branchId)
                 .collect { orders ->
                     _uiState.update { it.copy(orders = orders) }
@@ -281,6 +294,7 @@ fun DatabaseDebugScreen(
                         DebugTab.CATEGORIES -> uiState.categories.size
                         DebugTab.PRODUCTS -> uiState.products.size
                         DebugTab.PRODUCT_TOPPINGS -> uiState.productToppings.size
+                        DebugTab.PRODUCT_NOTES -> uiState.productNotes.size
                         DebugTab.AREAS -> uiState.areas.size
                         DebugTab.TABLES -> uiState.tables.size
                         DebugTab.STAFF -> uiState.staff.size
@@ -313,6 +327,7 @@ fun DatabaseDebugScreen(
                     DebugTab.CATEGORIES -> CategoriesTable(uiState.categories)
                     DebugTab.PRODUCTS -> ProductsTable(uiState.products)
                     DebugTab.PRODUCT_TOPPINGS -> ProductToppingsTable(uiState.productToppings)
+                    DebugTab.PRODUCT_NOTES -> ProductNotesTable(uiState.productNotes)
                     DebugTab.AREAS -> AreasTable(uiState.areas)
                     DebugTab.TABLES -> TablesTable(uiState.tables)
                     DebugTab.STAFF -> StaffTable(uiState.staff)
@@ -412,6 +427,25 @@ fun ProductToppingsTable(toppings: List<ProductToppingEntity>) {
                 if (topping.isMultiple) "✓" else "✗",
                 "%,.0f".format(topping.extraPrice),
                 if (topping.isDefault) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun ProductNotesTable(notes: List<ProductNoteEntity>) {
+    DataTable(
+        headers = listOf("ID", "Tên ghi chú", "Mô tả", "Thứ tự", "Active", "Sync", "Cập nhật"),
+        data = notes,
+        rowContent = { note ->
+            listOf(
+                note.id.take(8) + "...",
+                note.name,
+                note.description ?: "-",
+                note.sortOrder.toString(),
+                if (note.isActive) "✓" else "✗",
+                note.syncStatus,
+                note.updatedAt.take(19).replace("T", " ")
             )
         }
     )

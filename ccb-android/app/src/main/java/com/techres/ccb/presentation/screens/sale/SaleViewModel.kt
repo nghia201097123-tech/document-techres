@@ -4,10 +4,12 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.dao.ProductToppingDao
+import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.ProductEntity
 import com.techres.ccb.data.local.entity.ProductToppingEntity
+import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.OrderRepository
@@ -50,6 +52,9 @@ data class SaleUiState(
     val currentOrder: OrderEntity? = null,
     val currentOrderItems: List<OrderItemEntity> = emptyList(),
 
+    // Available notes for quick selection
+    val availableNotes: List<ProductNoteEntity> = emptyList(),
+
     // Discount
     val discountAmount: Long = 0,
     val discountReason: String? = null,
@@ -64,6 +69,8 @@ data class SaleUiState(
     val showPaymentDialog: Boolean = false,
     val showTableDialog: Boolean = false,
     val showCustomerDialog: Boolean = false,
+    val showNoteDialog: Boolean = false,
+    val selectedCartItemForNote: String? = null,
 
     // Messages
     val successMessage: String? = null,
@@ -107,7 +114,8 @@ class SaleViewModel @Inject constructor(
     private val tableRepository: TableRepository,
     private val orderRepository: OrderRepository,
     private val shiftRepository: ShiftRepository,
-    private val productToppingDao: ProductToppingDao
+    private val productToppingDao: ProductToppingDao,
+    private val productNoteDao: ProductNoteDao
 ) : ViewModel() {
 
     companion object {
@@ -227,11 +235,17 @@ class SaleViewModel @Inject constructor(
                     Triple(categoryList.toList(), productList, tableList)
                 }
 
+                // Load available notes
+                val notes = withContext(Dispatchers.IO) {
+                    productNoteDao.getActiveNotes(branchId).first()
+                }
+
                 _uiState.update { state ->
                     state.copy(
                         categories = categories,
                         products = products,
                         tables = tables,
+                        availableNotes = notes,
                         isLoading = false
                     )
                 }
@@ -676,6 +690,31 @@ class SaleViewModel @Inject constructor(
                 selectedProductForVariant = null
             )
         }
+    }
+
+    // ===== NOTE DIALOG =====
+
+    fun showNoteDialog(cartItemId: String) {
+        _uiState.update { state ->
+            state.copy(
+                showNoteDialog = true,
+                selectedCartItemForNote = cartItemId
+            )
+        }
+    }
+
+    fun hideNoteDialog() {
+        _uiState.update { state ->
+            state.copy(
+                showNoteDialog = false,
+                selectedCartItemForNote = null
+            )
+        }
+    }
+
+    fun applyNoteToCartItem(cartItemId: String, note: String?) {
+        updateCartItemNote(cartItemId, note?.takeIf { it.isNotBlank() })
+        hideNoteDialog()
     }
 
     // ===== ORDER MANAGEMENT =====
