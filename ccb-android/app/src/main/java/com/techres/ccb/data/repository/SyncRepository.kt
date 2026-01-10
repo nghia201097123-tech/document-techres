@@ -3,10 +3,12 @@ package com.techres.ccb.data.repository
 import android.util.Log
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.OrderDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
+import com.techres.ccb.data.local.dao.TableDao
 import com.techres.ccb.data.local.entity.*
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.dto.FullSyncData
@@ -56,7 +58,9 @@ class SyncRepository @Inject constructor(
     private val seasonalPriceDao: SeasonalPriceDao,
     private val seasonalPriceProductDao: SeasonalPriceProductDao,
     private val couponDao: CouponDao,
-    private val productNoteDao: ProductNoteDao
+    private val productNoteDao: ProductNoteDao,
+    private val orderDao: OrderDao,
+    private val tableDao: TableDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -278,6 +282,12 @@ class SyncRepository @Inject constructor(
             )
         }
         tableRepository.syncTables(branchId, tables)
+
+        // Restore table statuses based on active orders (important for shift handover)
+        val restoredCount = restoreTableStatusesFromOrders(tables)
+        if (restoredCount > 0) {
+            Log.d("SyncRepository", "Restored $restoredCount table statuses from active orders")
+        }
         onProgress?.invoke(SyncStepProgress(SyncStep.TABLES, SyncStepStatus.COMPLETED, tables.size))
 
         // Sync staff
@@ -402,6 +412,31 @@ class SyncRepository @Inject constructor(
         productNoteDao.syncProductNotes(branchId, productNotesList)
         productNoteDao.syncProductNoteAssignments(branchId, productNoteAssignmentsList)
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_NOTES, SyncStepStatus.COMPLETED, productNotesList.size))
+    }
+
+    /**
+     * Restore table statuses based on active orders.
+     * This is important for shift handover - when syncing after login,
+     * tables with active orders should show as "occupied" instead of "available".
+     *
+     * @return Number of tables that were restored to "occupied" status
+     */
+    private suspend fun restoreTableStatusesFromOrders(tables: List<TableEntity>): Int {
+        var restoredCount = 0
+        val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            .format(java.util.Date())
+
+        for (table in tables) {
+            val activeOrder = orderDao.getActiveOrderByTable(table.id)
+            if (activeOrder != null) {
+                // Table has an active order - mark as occupied
+                tableDao.updateStatus(table.id, "occupied", activeOrder.id, now)
+                restoredCount++
+                Log.d("SyncRepository", "Restored table ${table.name} (${table.id}) to occupied - order: ${activeOrder.orderNumber}")
+            }
+        }
+        return restoredCount
     }
 
     /**
