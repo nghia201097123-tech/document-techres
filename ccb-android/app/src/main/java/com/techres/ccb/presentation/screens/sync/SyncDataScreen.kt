@@ -47,6 +47,7 @@ fun SyncDataScreen(
             listOf(
                 MockSyncItem("categories", "Danh mục", Icons.Default.Category),
                 MockSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
+                MockSyncItem("product_toppings", "Topping sản phẩm", Icons.Default.AddCircle),
                 MockSyncItem("areas", "Khu vực", Icons.Default.Map),
                 MockSyncItem("tables", "Bàn", Icons.Default.TableBar),
                 MockSyncItem("staff", "Nhân viên", Icons.Default.People),
@@ -64,7 +65,7 @@ fun SyncDataScreen(
         delay(300) // Initial delay
 
         // Mock counts for each item
-        val mockCounts = listOf(12, 48, 4, 20, 8, 3, 5)
+        val mockCounts = listOf(12, 48, 0, 4, 20, 8, 3, 5)
 
         for (i in syncItems.indices) {
             // Update current item to syncing

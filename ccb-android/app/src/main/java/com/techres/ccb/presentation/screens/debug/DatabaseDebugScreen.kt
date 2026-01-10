@@ -22,6 +22,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.entity.CategoryEntity
 import com.techres.ccb.data.local.entity.ProductEntity
+import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.local.entity.AreaEntity
 import com.techres.ccb.data.local.entity.TableEntity
 import com.techres.ccb.data.local.entity.StaffEntity
@@ -30,6 +31,7 @@ import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceEntity
 import com.techres.ccb.data.local.entity.CouponEntity
 import com.techres.ccb.data.local.entity.ShiftEntity
+import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.repository.*
@@ -43,6 +45,7 @@ enum class DebugTab(val title: String) {
     BRANCHES("Chi nhánh"),
     CATEGORIES("Danh mục"),
     PRODUCTS("Sản phẩm"),
+    PRODUCT_TOPPINGS("Topping"),
     AREAS("Khu vực"),
     TABLES("Bàn"),
     STAFF("Nhân viên"),
@@ -58,6 +61,7 @@ data class DebugUiState(
     val branches: List<BranchEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val products: List<ProductEntity> = emptyList(),
+    val productToppings: List<ProductToppingEntity> = emptyList(),
     val areas: List<AreaEntity> = emptyList(),
     val tables: List<TableEntity> = emptyList(),
     val staff: List<StaffEntity> = emptyList(),
@@ -76,6 +80,7 @@ class DatabaseDebugViewModel @Inject constructor(
     private val shiftRepository: ShiftRepository,
     private val branchRepository: BranchRepository,
     private val authRepository: AuthRepository,
+    private val productToppingDao: ProductToppingDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val couponDao: CouponDao
 ) : ViewModel() {
@@ -189,6 +194,14 @@ class DatabaseDebugViewModel @Inject constructor(
                     _uiState.update { it.copy(coupons = coupons) }
                 }
         }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
+            productToppingDao.getAllByBranch(branchId)
+                .collect { toppings ->
+                    _uiState.update { it.copy(productToppings = toppings) }
+                }
+        }
     }
 }
 
@@ -241,6 +254,7 @@ fun DatabaseDebugScreen(
                         DebugTab.BRANCHES -> uiState.branches.size
                         DebugTab.CATEGORIES -> uiState.categories.size
                         DebugTab.PRODUCTS -> uiState.products.size
+                        DebugTab.PRODUCT_TOPPINGS -> uiState.productToppings.size
                         DebugTab.AREAS -> uiState.areas.size
                         DebugTab.TABLES -> uiState.tables.size
                         DebugTab.STAFF -> uiState.staff.size
@@ -270,6 +284,7 @@ fun DatabaseDebugScreen(
                     DebugTab.BRANCHES -> BranchesTable(uiState.branches)
                     DebugTab.CATEGORIES -> CategoriesTable(uiState.categories)
                     DebugTab.PRODUCTS -> ProductsTable(uiState.products)
+                    DebugTab.PRODUCT_TOPPINGS -> ProductToppingsTable(uiState.productToppings)
                     DebugTab.AREAS -> AreasTable(uiState.areas)
                     DebugTab.TABLES -> TablesTable(uiState.tables)
                     DebugTab.STAFF -> StaffTable(uiState.staff)
@@ -336,7 +351,7 @@ fun CategoriesTable(categories: List<CategoryEntity>) {
 @Composable
 fun ProductsTable(products: List<ProductEntity>) {
     DataTable(
-        headers = listOf("ID", "Name", "Code", "Price", "Category", "Active"),
+        headers = listOf("ID", "Name", "Code", "Price", "Type", "Category", "Active"),
         data = products,
         rowContent = { product ->
             listOf(
@@ -344,8 +359,29 @@ fun ProductsTable(products: List<ProductEntity>) {
                 product.name,
                 product.code,
                 "%,.0f".format(product.price),
+                product.type,
                 product.categoryId?.take(8) ?: "-",
                 if (product.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun ProductToppingsTable(toppings: List<ProductToppingEntity>) {
+    DataTable(
+        headers = listOf("Product ID", "Topping ID", "Nhóm", "Loại", "Bắt buộc", "Nhiều", "Giá thêm", "Mặc định"),
+        data = toppings,
+        rowContent = { topping ->
+            listOf(
+                topping.productId.take(8) + "...",
+                topping.toppingId.take(8) + "...",
+                topping.groupName,
+                topping.groupType,
+                if (topping.isRequired) "✓" else "✗",
+                if (topping.isMultiple) "✓" else "✗",
+                "%,.0f".format(topping.extraPrice),
+                if (topping.isDefault) "✓" else "✗"
             )
         }
     )
