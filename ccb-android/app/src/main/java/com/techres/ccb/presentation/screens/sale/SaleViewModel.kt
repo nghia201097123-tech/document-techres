@@ -801,17 +801,28 @@ class SaleViewModel @Inject constructor(
 
                 // Create order items
                 val orderItems = state.cartItems.mapIndexed { index, cartItem ->
+                    // Combine variants and user note into notes field
+                    val variantsAndNote = buildString {
+                        if (cartItem.variantText.isNotEmpty()) {
+                            append(cartItem.variantText)
+                        }
+                        if (!cartItem.note.isNullOrEmpty()) {
+                            if (isNotEmpty()) append(" | ")
+                            append("Ghi chú: ${cartItem.note}")
+                        }
+                    }.ifEmpty { null }
+
                     OrderItemEntity(
                         id = UUID.randomUUID().toString(),
                         orderId = orderId,
                         productId = cartItem.product.id,
                         productCode = cartItem.product.code,
-                        productName = cartItem.product.name + if (cartItem.variantText.isNotEmpty()) " (${cartItem.variantText})" else "",
+                        productName = cartItem.product.name,
                         productImageUrl = cartItem.product.imageUrl,
                         quantity = cartItem.quantity,
                         unitPrice = cartItem.unitPrice.toDouble(),
                         totalPrice = cartItem.totalPrice.toDouble(),
-                        notes = cartItem.note,
+                        notes = variantsAndNote,
                         status = "pending",
                         createdAt = now,
                         updatedAt = now
@@ -867,17 +878,28 @@ class SaleViewModel @Inject constructor(
 
                 // Create new order items
                 val newItems = state.cartItems.map { cartItem ->
+                    // Combine variants and user note into notes field
+                    val variantsAndNote = buildString {
+                        if (cartItem.variantText.isNotEmpty()) {
+                            append(cartItem.variantText)
+                        }
+                        if (!cartItem.note.isNullOrEmpty()) {
+                            if (isNotEmpty()) append(" | ")
+                            append("Ghi chú: ${cartItem.note}")
+                        }
+                    }.ifEmpty { null }
+
                     OrderItemEntity(
                         id = UUID.randomUUID().toString(),
                         orderId = currentOrder.id,
                         productId = cartItem.product.id,
                         productCode = cartItem.product.code,
-                        productName = cartItem.product.name + if (cartItem.variantText.isNotEmpty()) " (${cartItem.variantText})" else "",
+                        productName = cartItem.product.name,
                         productImageUrl = cartItem.product.imageUrl,
                         quantity = cartItem.quantity,
                         unitPrice = cartItem.unitPrice.toDouble(),
                         totalPrice = cartItem.totalPrice.toDouble(),
-                        notes = cartItem.note,
+                        notes = variantsAndNote,
                         status = "pending",
                         createdAt = now,
                         updatedAt = now
