@@ -45,4 +45,8 @@ class StaffRepository @Inject constructor(
     suspend fun getStaffCount(branchId: String): Int {
         return staffDao.getCount(branchId)
     }
+
+    suspend fun clearByBranch(branchId: String) {
+        staffDao.deleteAllByBranch(branchId)
+    }
 }

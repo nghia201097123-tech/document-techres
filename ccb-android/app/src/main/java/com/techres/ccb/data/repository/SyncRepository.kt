@@ -275,4 +275,20 @@ class SyncRepository @Inject constructor(
         couponDao.syncCoupons(branchId, couponsList)
         onProgress?.invoke(SyncStepProgress(SyncStep.COUPONS, SyncStepStatus.COMPLETED, couponsList.size))
     }
+
+    /**
+     * Clear all master data that was synced from server.
+     * This does NOT clear app-created data like shifts and orders.
+     * Called when user logs out.
+     */
+    suspend fun clearMasterData(branchId: String) {
+        // Clear synced master data only - keep shifts, orders, etc.
+        categoryRepository.clearByBranch(branchId)
+        productRepository.clearByBranch(branchId)
+        tableRepository.clearByBranch(branchId)
+        staffRepository.clearByBranch(branchId)
+        seasonalPriceDao.deleteAllByBranch(branchId)
+        seasonalPriceProductDao.deleteAllByBranch(branchId)
+        couponDao.deleteAllByBranch(branchId)
+    }
 }

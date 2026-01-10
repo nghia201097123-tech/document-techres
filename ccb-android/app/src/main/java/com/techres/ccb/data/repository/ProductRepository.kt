@@ -54,4 +54,8 @@ class ProductRepository @Inject constructor(
     suspend fun getProductsCount(branchId: String): Int {
         return productDao.getCount(branchId)
     }
+
+    suspend fun clearByBranch(branchId: String) {
+        productDao.deleteAllByBranch(branchId)
+    }
 }

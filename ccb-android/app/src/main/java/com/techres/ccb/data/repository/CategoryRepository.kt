@@ -41,4 +41,8 @@ class CategoryRepository @Inject constructor(
     suspend fun getCategoriesCount(branchId: String): Int {
         return categoryDao.getCount(branchId)
     }
+
+    suspend fun clearByBranch(branchId: String) {
+        categoryDao.deleteAllByBranch(branchId)
+    }
 }

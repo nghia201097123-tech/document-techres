@@ -3,6 +3,8 @@ package com.techres.ccb.presentation.screens.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.BranchRepository
+import com.techres.ccb.data.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +20,9 @@ data class PinUiState(
 
 @HiltViewModel
 class PinViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val branchRepository: BranchRepository,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PinUiState())
@@ -42,7 +46,24 @@ class PinViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Logout user and clear synced master data.
+     * App-created data (shifts, orders) is preserved.
+     */
     fun logout() {
-        authRepository.logout()
+        viewModelScope.launch {
+            val branchId = authRepository.getBranchId()
+
+            // Clear synced master data (keep shifts, orders)
+            if (branchId != null) {
+                syncRepository.clearMasterData(branchId)
+            }
+
+            // Clear branch selection
+            branchRepository.clearSelectedBranch()
+
+            // Clear auth data
+            authRepository.logout()
+        }
     }
 }

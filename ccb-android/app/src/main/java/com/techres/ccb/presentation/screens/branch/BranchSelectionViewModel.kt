@@ -67,6 +67,9 @@ data class BranchSelectionUiState(
     val branchDataSyncState: SyncState = SyncState.NOT_STARTED,
     val branchDataSyncProgress: Float = 0f,
     val branchDataSyncComplete: Boolean = false,
+    // Existing shift state
+    val hasExistingShift: Boolean = false,
+    val isCheckingShift: Boolean = false,
     // Individual sync steps progress
     val syncSteps: Map<SyncStep, SyncStepUiState> = mapOf(
         SyncStep.FETCHING to SyncStepUiState("Tải dữ liệu"),
@@ -82,7 +85,8 @@ data class BranchSelectionUiState(
 class BranchSelectionViewModel @Inject constructor(
     private val branchRepository: BranchRepository,
     private val syncRepository: SyncRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val shiftRepository: com.techres.ccb.data.repository.ShiftRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BranchSelectionUiState())
@@ -432,6 +436,38 @@ class BranchSelectionViewModel @Inject constructor(
                 syncProgress = 0f,
                 error = null
             )
+        }
+    }
+
+    /**
+     * Check if there's an existing open shift for the selected branch.
+     * Should be called after sync completes.
+     */
+    fun checkExistingShift() {
+        val branchId = _uiState.value.selectedBranch?.id ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingShift = true) }
+
+            try {
+                val existingShift = shiftRepository.getCurrentOpenShift(branchId)
+                Log.d(TAG, "checkExistingShift - Branch: $branchId, hasShift: ${existingShift != null}")
+
+                _uiState.update {
+                    it.copy(
+                        isCheckingShift = false,
+                        hasExistingShift = existingShift != null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "checkExistingShift - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isCheckingShift = false,
+                        hasExistingShift = false
+                    )
+                }
+            }
         }
     }
 

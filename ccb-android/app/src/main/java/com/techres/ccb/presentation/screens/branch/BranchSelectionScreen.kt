@@ -37,16 +37,18 @@ fun BranchSelectionScreen(
 
     var showShiftDialog by remember { mutableStateOf(false) }
 
-    // Mock: check if shift exists (for demo, randomly true/false based on branch id)
-    val hasExistingShift = remember(uiState.selectedBranch) {
-        uiState.selectedBranch?.id?.toIntOrNull()?.rem(2) == 0 // Even branch IDs have existing shift
-    }
-
     // Auto-sync when no data exists
     LaunchedEffect(uiState.brands.isEmpty() && !uiState.isLoading && uiState.syncState == SyncState.NOT_STARTED) {
         if (uiState.brands.isEmpty() && !uiState.isLoading && uiState.syncState == SyncState.NOT_STARTED) {
             // Automatically start sync if no data
             viewModel.syncBranchPermissions()
+        }
+    }
+
+    // Check for existing shift when sync completes
+    LaunchedEffect(uiState.branchDataSyncState) {
+        if (uiState.branchDataSyncState == SyncState.COMPLETED) {
+            viewModel.checkExistingShift()
         }
     }
 
@@ -370,12 +372,12 @@ fun BranchSelectionScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Two-step flow: Sync first, then Continue
-                    if (uiState.branchDataSyncState == SyncState.COMPLETED) {
-                        // Show "Tiếp tục" button after sync completes
+                    if (uiState.branchDataSyncState == SyncState.COMPLETED && !uiState.isCheckingShift) {
+                        // Show "Tiếp tục" button after sync completes and shift check is done
                         Button(
                             onClick = {
                                 uiState.selectedBranch?.let { branch ->
-                                    if (hasExistingShift) {
+                                    if (uiState.hasExistingShift) {
                                         showShiftDialog = true
                                     } else {
                                         onContinueToOpenShift(branch.name)
@@ -396,12 +398,37 @@ fun BranchSelectionScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Tiếp tục",
+                                text = if (uiState.hasExistingShift) "Tiếp tục ca làm việc" else "Mở ca làm việc",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(Icons.Default.ArrowForward, contentDescription = null)
+                        }
+                    } else if (uiState.isCheckingShift) {
+                        // Show loading while checking shift
+                        Button(
+                            onClick = { },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang kiểm tra ca...",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     } else if (uiState.isSyncingBranchData) {
                         // Disabled button while syncing

@@ -66,4 +66,9 @@ class TableRepository @Inject constructor(
     suspend fun getTablesCount(branchId: String): Int {
         return tableDao.getCount(branchId)
     }
+
+    suspend fun clearByBranch(branchId: String) {
+        areaDao.deleteAllByBranch(branchId)
+        tableDao.deleteAllByBranch(branchId)
+    }
 }
