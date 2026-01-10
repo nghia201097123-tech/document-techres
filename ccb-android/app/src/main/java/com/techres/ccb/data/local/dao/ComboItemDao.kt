@@ -39,6 +39,22 @@ interface ComboItemDao {
     fun getItemsByComboSync(comboId: String): List<ComboItemEntity>
 
     /**
+     * Debug: Lấy tất cả các món con của một combo (không cần products tồn tại)
+     */
+    @Query("""
+        SELECT * FROM combo_items
+        WHERE combo_id = :comboId AND is_active = 1
+        ORDER BY sort_order
+    """)
+    fun getItemsByComboSyncDebug(comboId: String): List<ComboItemEntity>
+
+    /**
+     * Debug: Lấy tất cả combo items (không filter)
+     */
+    @Query("SELECT * FROM combo_items")
+    fun getAllDebug(): List<ComboItemEntity>
+
+    /**
      * Lấy tất cả các món con của nhiều combo
      */
     @Query("""

@@ -1,5 +1,6 @@
 package com.techres.ccb.data.repository
 
+import android.util.Log
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
@@ -215,6 +216,10 @@ class SyncRepository @Inject constructor(
 
         // Sync combo items
         onProgress?.invoke(SyncStepProgress(SyncStep.COMBO_ITEMS, SyncStepStatus.IN_PROGRESS))
+        Log.d("SyncRepository", "Combo items from API: ${syncData.comboItems?.size ?: 0}")
+        syncData.comboItems?.forEach { dto ->
+            Log.d("SyncRepository", "  ComboItem: id=${dto.id}, comboId=${dto.comboId}, productId=${dto.productId}, productName=${dto.productName}")
+        }
         val comboItemsList = syncData.comboItems?.map { dto ->
             ComboItemEntity(
                 id = dto.id,
@@ -233,6 +238,7 @@ class SyncRepository @Inject constructor(
         if (comboItemsList.isNotEmpty()) {
             comboItemDao.insertAll(comboItemsList)
         }
+        Log.d("SyncRepository", "Saved ${comboItemsList.size} combo items to database")
         onProgress?.invoke(SyncStepProgress(SyncStep.COMBO_ITEMS, SyncStepStatus.COMPLETED, comboItemsList.size))
 
         // Sync areas
