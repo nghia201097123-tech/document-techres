@@ -1394,51 +1394,88 @@ private fun OrderDetailDialog(
 
 @Composable
 private fun OrderItemRow(item: OrderItemEntity) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+            .padding(vertical = 12.dp)
     ) {
+        // Header: Quantity + Product name + Price
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            // Quantity badge
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(Color(0xFFE3F2FD), CircleShape),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = item.quantity.toString(),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = item.productName,
-                    fontWeight = FontWeight.Medium
-                )
-                if (!item.notes.isNullOrBlank()) {
+                // Quantity badge
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(Color(0xFFE3F2FD), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = item.notes,
+                        text = item.quantity.toString(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1976D2)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = item.productName,
+                        fontWeight = FontWeight.Medium
+                    )
+                    // Unit price
+                    Text(
+                        text = formatCurrency(item.unitPrice.toLong()),
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
                 }
             }
+            Text(
+                text = formatCurrency(item.totalPrice.toLong()),
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF1976D2)
+            )
         }
-        Text(
-            text = formatCurrency(item.totalPrice.toLong()),
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF1976D2)
-        )
+
+        // Variants/Toppings - Grab style (each on its own line)
+        if (!item.notes.isNullOrBlank()) {
+            val variants = item.notes.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            if (variants.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 36.dp, top = 6.dp)
+                ) {
+                    variants.forEach { variant ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "•",
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(end = 6.dp)
+                            )
+                            Text(
+                                text = variant,
+                                fontSize = 12.sp,
+                                color = Color(0xFF616161)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
