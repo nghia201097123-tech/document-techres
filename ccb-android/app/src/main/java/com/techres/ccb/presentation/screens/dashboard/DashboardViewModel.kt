@@ -109,16 +109,18 @@ class DashboardViewModel @Inject constructor(
                 val posOrders = orderEntities
                     .filter { it.status != "completed" && it.status != "cancelled" }
                     .map { entity ->
+                        // Get item count for this order
+                        val itemCount = orderRepository.getOrderItemsSync(entity.id).size
                         PosOrder(
                             id = entity.id,
                             tableName = entity.tableName,
                             customerName = entity.customerName,
-                            itemCount = entity.totalItems,
+                            itemCount = itemCount,
                             totalAmount = entity.totalAmount.toLong(),
                             status = mapOrderStatus(entity.status),
                             createdAt = parseTimestamp(entity.createdAt),
                             orderNumber = parseOrderNumber(entity.orderNumber),
-                            isPrinted = entity.status == "confirmed"
+                            isPrinted = entity.isPrinted
                         )
                     }
 
