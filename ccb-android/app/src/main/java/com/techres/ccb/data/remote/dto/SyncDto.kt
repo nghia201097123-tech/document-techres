@@ -116,7 +116,23 @@ data class ProductDto(
     @SerializedName("printToKitchen") val printToKitchen: Boolean,
     @SerializedName("printToBar") val printToBar: Boolean,
     @SerializedName("createdAt") val createdAt: String,
-    @SerializedName("updatedAt") val updatedAt: String
+    @SerializedName("updatedAt") val updatedAt: String,
+    // Topping/Variant information
+    @SerializedName("toppings") val toppings: List<ProductToppingDto>? = null
+)
+
+/**
+ * DTO cho thông tin topping của sản phẩm
+ */
+data class ProductToppingDto(
+    @SerializedName("toppingId") val toppingId: String,
+    @SerializedName("groupName") val groupName: String = "TOPPING", // SIZE, ĐƯỜNG, ĐÁ, TOPPING
+    @SerializedName("groupType") val groupType: String = "topping", // size, sugar, ice, topping, other
+    @SerializedName("isRequired") val isRequired: Boolean = false,
+    @SerializedName("isMultiple") val isMultiple: Boolean = true,
+    @SerializedName("extraPrice") val extraPrice: Double = 0.0,
+    @SerializedName("isDefault") val isDefault: Boolean = false,
+    @SerializedName("sortOrder") val sortOrder: Int = 0
 )
 
 data class AreaDto(

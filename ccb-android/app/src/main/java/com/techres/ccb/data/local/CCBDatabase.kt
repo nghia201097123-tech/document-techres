@@ -12,6 +12,7 @@ import com.techres.ccb.data.local.entity.*
         BranchEntity::class,
         CategoryEntity::class,
         ProductEntity::class,
+        ProductToppingEntity::class,
         AreaEntity::class,
         TableEntity::class,
         StaffEntity::class,
@@ -30,7 +31,7 @@ import com.techres.ccb.data.local.entity.*
         SeasonalPriceProductEntity::class,
         CouponEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -40,6 +41,7 @@ abstract class CCBDatabase : RoomDatabase() {
     abstract fun branchDao(): BranchDao
     abstract fun categoryDao(): CategoryDao
     abstract fun productDao(): ProductDao
+    abstract fun productToppingDao(): ProductToppingDao
     abstract fun areaDao(): AreaDao
     abstract fun tableDao(): TableDao
     abstract fun staffDao(): StaffDao

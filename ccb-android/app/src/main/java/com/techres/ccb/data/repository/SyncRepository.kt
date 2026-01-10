@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
 import com.techres.ccb.data.local.entity.*
@@ -22,6 +23,7 @@ enum class SyncStep {
     FETCHING,         // Đang tải dữ liệu
     CATEGORIES,       // Danh mục
     PRODUCTS,         // Sản phẩm
+    PRODUCT_TOPPINGS, // Topping sản phẩm
     AREAS,            // Khu vực
     TABLES,           // Bàn
     STAFF,            // Nhân viên
@@ -44,6 +46,7 @@ class SyncRepository @Inject constructor(
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
+    private val productToppingDao: ProductToppingDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val seasonalPriceProductDao: SeasonalPriceProductDao,
     private val couponDao: CouponDao
@@ -143,6 +146,33 @@ class SyncRepository @Inject constructor(
         }
         productRepository.syncProducts(branchId, products)
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCTS, SyncStepStatus.COMPLETED, products.size))
+
+        // Sync product toppings
+        onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_TOPPINGS, SyncStepStatus.IN_PROGRESS))
+        val productToppings = syncData.products.flatMap { dto ->
+            dto.toppings?.map { toppingDto ->
+                ProductToppingEntity(
+                    productId = dto.id,
+                    toppingId = toppingDto.toppingId,
+                    branchId = branchId,
+                    groupName = toppingDto.groupName,
+                    groupType = toppingDto.groupType,
+                    isRequired = toppingDto.isRequired,
+                    isMultiple = toppingDto.isMultiple,
+                    extraPrice = toppingDto.extraPrice,
+                    isDefault = toppingDto.isDefault,
+                    sortOrder = toppingDto.sortOrder,
+                    createdAt = dto.createdAt,
+                    updatedAt = dto.updatedAt
+                )
+            } ?: emptyList()
+        }
+        // Clear existing toppings for this branch and insert new ones
+        productToppingDao.deleteAllByBranch(branchId)
+        if (productToppings.isNotEmpty()) {
+            productToppingDao.insertAll(productToppings)
+        }
+        onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_TOPPINGS, SyncStepStatus.COMPLETED, productToppings.size))
 
         // Sync areas
         onProgress?.invoke(SyncStepProgress(SyncStep.AREAS, SyncStepStatus.IN_PROGRESS))
@@ -284,6 +314,7 @@ class SyncRepository @Inject constructor(
     suspend fun clearMasterData(branchId: String) {
         // Clear synced master data only - keep shifts, orders, etc.
         categoryRepository.clearByBranch(branchId)
+        productToppingDao.deleteAllByBranch(branchId) // Delete toppings before products
         productRepository.clearByBranch(branchId)
         tableRepository.clearByBranch(branchId)
         staffRepository.clearByBranch(branchId)

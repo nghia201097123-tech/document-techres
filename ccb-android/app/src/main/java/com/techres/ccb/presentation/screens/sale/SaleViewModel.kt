@@ -3,6 +3,9 @@ package com.techres.ccb.presentation.screens.sale
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.ProductToppingDao
+import com.techres.ccb.data.local.entity.ProductEntity
+import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.ProductRepository
@@ -70,7 +73,8 @@ data class SaleUiState(
 class SaleViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val categoryRepository: CategoryRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val productToppingDao: ProductToppingDao
 ) : ViewModel() {
 
     companion object {
@@ -81,6 +85,9 @@ class SaleViewModel @Inject constructor(
     val uiState: StateFlow<SaleUiState> = _uiState.asStateFlow()
 
     private var branchId: String = ""
+
+    // Cache product entities để load topping info
+    private var productEntityMap: Map<String, ProductEntity> = emptyMap()
 
     init {
         loadInitialData()
@@ -108,13 +115,28 @@ class SaleViewModel @Inject constructor(
                     Category(
                         id = entity.id,
                         name = entity.name,
-                        icon = entity.imageUrl // Use imageUrl as icon
+                        icon = entity.imageUrl
                     )
                 })
 
                 // Load all products
                 val productEntities = productRepository.getAllProducts(branchId).first()
+                    .filter { it.type != "topping" } // Lọc bỏ topping khỏi danh sách sản phẩm chính
+
+                // Cache product entities
+                val allProducts = productRepository.getAllProducts(branchId).first()
+                productEntityMap = allProducts.associateBy { it.id }
+
+                // Load topping mappings
+                val productIds = productEntities.map { it.id }
+                val allToppings = productToppingDao.getToppingsForProductsSync(productIds)
+                val toppingsByProduct = allToppings.groupBy { it.productId }
+
+                // Build products with variants
                 val products = productEntities.map { entity ->
+                    val productToppings = toppingsByProduct[entity.id] ?: emptyList()
+                    val variantGroups = buildVariantGroups(productToppings)
+
                     Product(
                         id = entity.id,
                         code = entity.code,
@@ -124,12 +146,12 @@ class SaleViewModel @Inject constructor(
                         imageUrl = entity.imageUrl,
                         description = entity.description,
                         isActive = entity.isActive,
-                        hasVariants = false, // TODO: implement variants
-                        variants = emptyList()
+                        hasVariants = variantGroups.isNotEmpty(),
+                        variants = variantGroups
                     )
                 }
 
-                Log.d(TAG, "loadInitialData - Loaded ${categories.size} categories, ${products.size} products")
+                Log.d(TAG, "loadInitialData - Loaded ${categories.size} categories, ${products.size} products, ${allToppings.size} topping mappings")
 
                 _uiState.update { state ->
                     state.copy(
@@ -147,31 +169,63 @@ class SaleViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Build variant groups từ topping entities
+     */
+    private fun buildVariantGroups(toppings: List<ProductToppingEntity>): List<ProductVariantGroup> {
+        if (toppings.isEmpty()) return emptyList()
+
+        // Group by group name
+        val groupedByName = toppings.groupBy { it.groupName }
+
+        return groupedByName.map { (groupName, groupToppings) ->
+            val firstTopping = groupToppings.first()
+
+            ProductVariantGroup(
+                id = "${groupName}_${UUID.randomUUID()}",
+                name = groupName,
+                type = mapGroupType(firstTopping.groupType),
+                isRequired = firstTopping.isRequired,
+                isMultiple = firstTopping.isMultiple,
+                options = groupToppings.mapNotNull { topping ->
+                    val toppingProduct = productEntityMap[topping.toppingId]
+                    if (toppingProduct != null) {
+                        ProductVariantOption(
+                            id = topping.toppingId,
+                            name = toppingProduct.name,
+                            price = if (topping.extraPrice > 0) topping.extraPrice.toLong() else toppingProduct.price.toLong(),
+                            isDefault = topping.isDefault
+                        )
+                    } else null
+                }.sortedBy { it.name }
+            )
+        }.sortedBy { it.name }
+    }
+
+    private fun mapGroupType(type: String): VariantType {
+        return when (type.lowercase()) {
+            "size" -> VariantType.SIZE
+            "sugar" -> VariantType.SUGAR
+            "ice" -> VariantType.ICE
+            "topping" -> VariantType.TOPPING
+            else -> VariantType.OTHER
+        }
+    }
+
     // ===== CATEGORY & SEARCH =====
 
     fun selectCategory(categoryId: String) {
         viewModelScope.launch {
             val allProducts = productRepository.getAllProducts(branchId).first()
+                .filter { it.type != "topping" } // Lọc bỏ topping
+
             val filteredProducts = if (categoryId == "all") {
                 allProducts
             } else {
                 allProducts.filter { it.categoryId == categoryId }
             }
 
-            val products = filteredProducts.map { entity ->
-                Product(
-                    id = entity.id,
-                    code = entity.code,
-                    name = entity.name,
-                    categoryId = entity.categoryId ?: "",
-                    price = entity.price.toLong(),
-                    imageUrl = entity.imageUrl,
-                    description = entity.description,
-                    isActive = entity.isActive,
-                    hasVariants = false,
-                    variants = emptyList()
-                )
-            }
+            val products = buildProductsWithVariants(filteredProducts)
 
             _uiState.update { state ->
                 state.copy(
@@ -185,41 +239,17 @@ class SaleViewModel @Inject constructor(
 
     fun searchProducts(query: String) {
         viewModelScope.launch {
-            val products = if (query.isBlank()) {
+            val productEntities = if (query.isBlank()) {
                 val allProducts = productRepository.getAllProducts(branchId).first()
+                    .filter { it.type != "topping" }
                 val categoryId = _uiState.value.selectedCategoryId
-                val filtered = if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
-                filtered.map { entity ->
-                    Product(
-                        id = entity.id,
-                        code = entity.code,
-                        name = entity.name,
-                        categoryId = entity.categoryId ?: "",
-                        price = entity.price.toLong(),
-                        imageUrl = entity.imageUrl,
-                        description = entity.description,
-                        isActive = entity.isActive,
-                        hasVariants = false,
-                        variants = emptyList()
-                    )
-                }
+                if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
             } else {
-                val searchResults = productRepository.searchProducts(branchId, query)
-                searchResults.map { entity ->
-                    Product(
-                        id = entity.id,
-                        code = entity.code,
-                        name = entity.name,
-                        categoryId = entity.categoryId ?: "",
-                        price = entity.price.toLong(),
-                        imageUrl = entity.imageUrl,
-                        description = entity.description,
-                        isActive = entity.isActive,
-                        hasVariants = false,
-                        variants = emptyList()
-                    )
-                }
+                productRepository.searchProducts(branchId, query)
+                    .filter { it.type != "topping" }
             }
+
+            val products = buildProductsWithVariants(productEntities)
 
             _uiState.update { state ->
                 state.copy(
@@ -227,6 +257,33 @@ class SaleViewModel @Inject constructor(
                     products = products
                 )
             }
+        }
+    }
+
+    /**
+     * Build products with variants from entity list
+     */
+    private fun buildProductsWithVariants(entities: List<ProductEntity>): List<Product> {
+        val productIds = entities.map { it.id }
+        val allToppings = productToppingDao.getToppingsForProductsSync(productIds)
+        val toppingsByProduct = allToppings.groupBy { it.productId }
+
+        return entities.map { entity ->
+            val productToppings = toppingsByProduct[entity.id] ?: emptyList()
+            val variantGroups = buildVariantGroups(productToppings)
+
+            Product(
+                id = entity.id,
+                code = entity.code,
+                name = entity.name,
+                categoryId = entity.categoryId ?: "",
+                price = entity.price.toLong(),
+                imageUrl = entity.imageUrl,
+                description = entity.description,
+                isActive = entity.isActive,
+                hasVariants = variantGroups.isNotEmpty(),
+                variants = variantGroups
+            )
         }
     }
 

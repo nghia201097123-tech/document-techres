@@ -55,6 +55,12 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideProductToppingDao(database: CCBDatabase): ProductToppingDao {
+        return database.productToppingDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideAreaDao(database: CCBDatabase): AreaDao {
         return database.areaDao()
     }
