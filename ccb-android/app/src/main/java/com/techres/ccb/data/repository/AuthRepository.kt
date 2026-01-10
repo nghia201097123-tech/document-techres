@@ -31,6 +31,12 @@ class AuthRepository @Inject constructor(
         private const val KEY_STAFF_USERNAME = "current_staff_username"
         private const val KEY_STAFF_ROLE = "current_staff_role"
         private const val KEY_STAFF_AVATAR = "current_staff_avatar"
+
+        // Fallback keys from BranchRepository for backward compatibility
+        private const val KEY_SELECTED_BRANCH_ID = "selected_branch_id"
+        private const val KEY_SELECTED_BRANCH_NAME = "selected_branch_name"
+        private const val KEY_SELECTED_BRAND_ID = "selected_brand_id"
+        private const val KEY_SELECTED_BRAND_NAME = "selected_brand_name"
     }
 
     /**
@@ -148,19 +154,24 @@ class AuthRepository @Inject constructor(
     }
 
     fun getBranchId(): String? {
+        // Check AuthRepository key first, then fallback to BranchRepository key
         return sharedPreferences.getString(KEY_BRANCH_ID, null)
+            ?: sharedPreferences.getString(KEY_SELECTED_BRANCH_ID, null)
     }
 
     fun getBranchName(): String? {
         return sharedPreferences.getString(KEY_BRANCH_NAME, null)
+            ?: sharedPreferences.getString(KEY_SELECTED_BRANCH_NAME, null)
     }
 
     fun getBrandId(): String? {
         return sharedPreferences.getString(KEY_BRAND_ID, null)
+            ?: sharedPreferences.getString(KEY_SELECTED_BRAND_ID, null)
     }
 
     fun getBrandName(): String? {
         return sharedPreferences.getString(KEY_BRAND_NAME, null)
+            ?: sharedPreferences.getString(KEY_SELECTED_BRAND_NAME, null)
     }
 
     fun getCompanyId(): String? {

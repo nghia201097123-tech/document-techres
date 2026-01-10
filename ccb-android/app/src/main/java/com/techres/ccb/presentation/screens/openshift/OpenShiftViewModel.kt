@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.openshift
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.entity.ShiftEntity
@@ -34,6 +35,10 @@ class OpenShiftViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val shiftRepository: ShiftRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "OpenShiftViewModel"
+    }
 
     private val _uiState = MutableStateFlow(OpenShiftUiState())
     val uiState: StateFlow<OpenShiftUiState> = _uiState.asStateFlow()
@@ -105,7 +110,10 @@ class OpenShiftViewModel @Inject constructor(
                 val staffId = authRepository.getCurrentStaffId()
                 val staffName = authRepository.getCurrentStaffName()
 
+                Log.d(TAG, "openShift - branchId: $branchId, staffId: $staffId, staffName: $staffName")
+
                 if (branchId == null || staffId == null) {
+                    Log.e(TAG, "openShift - Missing branchId or staffId")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -158,7 +166,9 @@ class OpenShiftViewModel @Inject constructor(
                     version = 1
                 )
 
+                Log.d(TAG, "openShift - Creating shift with id: ${shift.id}")
                 shiftRepository.openShift(shift)
+                Log.d(TAG, "openShift - Shift saved successfully!")
 
                 _uiState.update {
                     it.copy(
@@ -169,6 +179,7 @@ class OpenShiftViewModel @Inject constructor(
 
                 onSuccess()
             } catch (e: Exception) {
+                Log.e(TAG, "openShift - Error: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
