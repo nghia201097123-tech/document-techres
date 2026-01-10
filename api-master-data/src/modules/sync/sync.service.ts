@@ -401,8 +401,21 @@ export class SyncService {
               where: { tenantId },
               relations: ['product'],
               order: { sortOrder: 'ASC' },
+            }).then(items => {
+              console.log(`[SyncService.getFullSync] Combo items query: tenantId=${tenantId}, found=${items.length}`);
+              if (items.length === 0) {
+                console.log(`[SyncService.getFullSync] No combo items found for tenantId=${tenantId}. Check combo_items table.`);
+              } else {
+                items.forEach(item => {
+                  console.log(`[SyncService.getFullSync]   ComboItem: id=${item.id}, comboId=${item.comboId}, productId=${item.productId}, productName=${item.product?.name}`);
+                });
+              }
+              return items;
             })
-          : Promise.resolve([]),
+          : Promise.resolve([]).then(items => {
+              console.log(`[SyncService.getFullSync] tenantId is null, skipping combo items sync`);
+              return items;
+            }),
       ]);
 
       console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}`);
