@@ -106,7 +106,8 @@ fun ProductVariantDialog(
                             group = group,
                             selectedIds = selectedOptions[group.id] ?: emptyList(),
                             onOptionSelected = { optionId ->
-                                val currentSelected = selectedOptions[group.id] ?: mutableListOf()
+                                // Create a new list to trigger recomposition
+                                val currentSelected = (selectedOptions[group.id] ?: emptyList()).toMutableList()
                                 if (group.isMultiple) {
                                     // Toggle selection for multiple choice
                                     if (optionId in currentSelected) {
@@ -119,6 +120,7 @@ fun ProductVariantDialog(
                                     currentSelected.clear()
                                     currentSelected.add(optionId)
                                 }
+                                // Assign new list to trigger state update
                                 selectedOptions[group.id] = currentSelected
                             }
                         )
