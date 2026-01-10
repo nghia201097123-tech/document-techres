@@ -280,13 +280,20 @@ export class SyncService {
 
       const today = new Date();
       const tenantId = branch.tenantId;
+      console.log(`[SyncService.getFullSync] tenantId=${tenantId}, branchId=${branchId}, brandId=${brandId}`);
+
       const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons, toppingGroups, productNotes] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
         }),
-        this.branchProductRepository.find({
+        // Only filter by tenantId if it's not null/undefined
+        tenantId ? this.branchProductRepository.find({
           where: { branchId, tenantId, isAvailable: true },
+          relations: ['product'],
+          order: { sortOrder: 'ASC' },
+        }) : this.branchProductRepository.find({
+          where: { branchId, isAvailable: true },
           relations: ['product'],
           order: { sortOrder: 'ASC' },
         }),
@@ -319,9 +326,30 @@ export class SyncService {
         }) : Promise.resolve([]),
       ]);
 
+      // Log branchProducts info for debugging
+      console.log(`[SyncService.getFullSync] branchProducts count: ${branchProducts.length}`);
+      if (branchProducts.length > 0) {
+        const sampleProducts = branchProducts.slice(0, 5).map(bp => ({
+          bpTenantId: bp.tenantId,
+          productTenantId: bp.product?.tenantId,
+          productName: bp.product?.name,
+          categoryId: bp.product?.categoryId,
+        }));
+        console.log(`[SyncService.getFullSync] Sample branchProducts:`, JSON.stringify(sampleProducts));
+      }
+
       const products = branchProducts
-        .filter(bp => bp.product && bp.product.isActive && bp.product.tenantId === tenantId)
+        .filter(bp => {
+          if (!bp.product || !bp.product.isActive) return false;
+          // If tenantId is set, filter by it
+          if (tenantId) {
+            return bp.product.tenantId === tenantId;
+          }
+          return true;
+        })
         .map(bp => this.mapBranchProduct(bp));
+
+      console.log(`[SyncService.getFullSync] Filtered products count: ${products.length}`);
 
       // Log product types distribution for debugging
       const productTypeCount = products.reduce((acc, p) => {
