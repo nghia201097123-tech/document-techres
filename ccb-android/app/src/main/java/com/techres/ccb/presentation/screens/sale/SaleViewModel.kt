@@ -245,6 +245,46 @@ class SaleViewModel @Inject constructor(
     }
 
     /**
+     * Refresh tables from database to get latest status
+     */
+    private fun refreshTables() {
+        viewModelScope.launch {
+            try {
+                val branchId = authRepository.getBranchId() ?: return@launch
+
+                withContext(Dispatchers.IO) {
+                    val areas = tableRepository.getAllAreas(branchId).first()
+                    val tableEntities = tableRepository.getAllTables(branchId).first()
+                    val areaMap = areas.associateBy { it.id }
+
+                    val tableList = tableEntities.map { entity ->
+                        Table(
+                            id = entity.id,
+                            name = entity.name,
+                            areaId = entity.areaId ?: "",
+                            areaName = entity.areaId?.let { areaMap[it]?.name } ?: "Khu vực chung",
+                            capacity = entity.capacity,
+                            status = when (entity.status.lowercase()) {
+                                "occupied" -> TableStatus.OCCUPIED
+                                "reserved" -> TableStatus.RESERVED
+                                "cleaning" -> TableStatus.CLEANING
+                                else -> TableStatus.AVAILABLE
+                            },
+                            currentOrderId = entity.currentOrderId
+                        )
+                    }
+
+                    _uiState.update { it.copy(tables = tableList) }
+                }
+
+                Log.d(TAG, "refreshTables - Tables refreshed")
+            } catch (e: Exception) {
+                Log.e(TAG, "refreshTables - Error: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
      * Build variant groups từ topping entities
      */
     private fun buildVariantGroups(toppings: List<ProductToppingEntity>): List<ProductVariantGroup> {
@@ -745,6 +785,9 @@ class SaleViewModel @Inject constructor(
                     )
                 }
 
+                // Refresh tables to show updated status
+                refreshTables()
+
             } catch (e: Exception) {
                 Log.e(TAG, "placeOrder - Error: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi đặt món: ${e.message}") }
@@ -864,6 +907,9 @@ class SaleViewModel @Inject constructor(
                     )
                 }
 
+                // Refresh tables to show updated status
+                refreshTables()
+
             } catch (e: Exception) {
                 Log.e(TAG, "completeOrder - Error: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi thanh toán: ${e.message}") }
@@ -910,6 +956,9 @@ class SaleViewModel @Inject constructor(
                         successMessage = "Đã huỷ đơn hàng ${currentOrder.orderNumber}"
                     )
                 }
+
+                // Refresh tables to show updated status
+                refreshTables()
 
             } catch (e: Exception) {
                 Log.e(TAG, "cancelOrder - Error: ${e.message}", e)

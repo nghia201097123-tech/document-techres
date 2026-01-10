@@ -7,9 +7,11 @@ import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -73,6 +75,7 @@ class DashboardViewModel @Inject constructor(
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     private var branchId: String = ""
+    private var ordersObserverJob: Job? = null
 
     init {
         loadData()
@@ -96,59 +99,92 @@ class DashboardViewModel @Inject constructor(
 
                 Log.d(TAG, "loadData - branchId: $branchId")
 
-                // Get current shift
-                val currentShift = shiftRepository.getCurrentOpenShift(branchId)
-
-                // Load orders from database
-                val orderEntities = if (currentShift != null) {
-                    orderRepository.getOrdersByShift(branchId, currentShift.id).first()
-                } else {
-                    orderRepository.getActiveOrders(branchId).first()
+                _uiState.update {
+                    it.copy(
+                        branchName = branchName,
+                        staffName = staffName
+                    )
                 }
 
-                val posOrders = orderEntities
-                    .filter { it.status != "completed" && it.status != "cancelled" }
-                    .map { entity ->
-                        // Get item count for this order
-                        val itemCount = orderRepository.getOrderItemsSync(entity.id).size
-                        PosOrder(
-                            id = entity.id,
-                            tableName = entity.tableName,
-                            customerName = entity.customerName,
-                            itemCount = itemCount,
-                            totalAmount = entity.totalAmount.toLong(),
-                            status = mapOrderStatus(entity.status),
-                            createdAt = parseTimestamp(entity.createdAt),
-                            orderNumber = parseOrderNumber(entity.orderNumber),
-                            isPrinted = entity.isPrinted
-                        )
-                    }
+                // Start observing orders continuously
+                startOrdersObserver()
 
-                // Calculate stats
-                val draftPosCount = posOrders.count { it.status == PosOrderStatus.DRAFT }
-                val confirmedPosCount = posOrders.count { it.status == PosOrderStatus.CONFIRMED }
-                val todayRevenue = currentShift?.totalRevenue?.toLong() ?: 0L
-                val todayOrderCount = currentShift?.totalOrders ?: orderEntities.size
-
-                Log.d(TAG, "loadData - Loaded ${posOrders.size} active orders")
-
+            } catch (e: Exception) {
+                Log.e(TAG, "loadData - Error: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        branchName = branchName,
-                        staffName = staffName,
-                        posOrders = posOrders,
-                        draftPosCount = draftPosCount,
-                        confirmedPosCount = confirmedPosCount,
-                        foodAppOrderCount = 0, // Not implemented
-                        totalActiveOrders = posOrders.size,
-                        todayRevenue = todayRevenue,
-                        todayOrderCount = todayOrderCount,
-                        error = null
+                        error = "Lỗi tải dữ liệu: ${e.message}"
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Observe orders continuously from database
+     */
+    private fun startOrdersObserver() {
+        // Cancel any existing observer
+        ordersObserverJob?.cancel()
+
+        ordersObserverJob = viewModelScope.launch {
+            try {
+                // Get current shift
+                val currentShift = shiftRepository.getCurrentOpenShift(branchId)
+
+                // Observe orders flow - will emit whenever orders change
+                val ordersFlow = if (currentShift != null) {
+                    orderRepository.getOrdersByShift(branchId, currentShift.id)
+                } else {
+                    orderRepository.getActiveOrders(branchId)
+                }
+
+                ordersFlow.collectLatest { orderEntities ->
+                    Log.d(TAG, "Orders updated: ${orderEntities.size} orders")
+
+                    val posOrders = orderEntities
+                        .filter { it.status != "completed" && it.status != "cancelled" }
+                        .map { entity ->
+                            // Get item count for this order
+                            val itemCount = orderRepository.getOrderItemsSync(entity.id).size
+                            PosOrder(
+                                id = entity.id,
+                                tableName = entity.tableName,
+                                customerName = entity.customerName,
+                                itemCount = itemCount,
+                                totalAmount = entity.totalAmount.toLong(),
+                                status = mapOrderStatus(entity.status),
+                                createdAt = parseTimestamp(entity.createdAt),
+                                orderNumber = parseOrderNumber(entity.orderNumber),
+                                isPrinted = entity.isPrinted
+                            )
+                        }
+
+                    // Calculate stats
+                    val draftPosCount = posOrders.count { it.status == PosOrderStatus.DRAFT }
+                    val confirmedPosCount = posOrders.count { it.status == PosOrderStatus.CONFIRMED }
+                    val todayRevenue = currentShift?.totalRevenue?.toLong() ?: 0L
+                    val todayOrderCount = currentShift?.totalOrders ?: orderEntities.size
+
+                    Log.d(TAG, "loadData - Loaded ${posOrders.size} active orders")
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            posOrders = posOrders,
+                            draftPosCount = draftPosCount,
+                            confirmedPosCount = confirmedPosCount,
+                            foodAppOrderCount = 0, // Not implemented
+                            totalActiveOrders = posOrders.size,
+                            todayRevenue = todayRevenue,
+                            todayOrderCount = todayOrderCount,
+                            error = null
+                        )
+                    }
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "loadData - Error: ${e.message}", e)
+                Log.e(TAG, "startOrdersObserver - Error: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
