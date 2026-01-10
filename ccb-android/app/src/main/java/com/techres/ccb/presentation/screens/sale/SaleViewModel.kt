@@ -1,13 +1,17 @@
 package com.techres.ccb.presentation.screens.sale
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techres.ccb.data.mock.MockData
+import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.CategoryRepository
+import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -63,10 +67,20 @@ data class SaleUiState(
 }
 
 @HiltViewModel
-class SaleViewModel @Inject constructor() : ViewModel() {
+class SaleViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val categoryRepository: CategoryRepository,
+    private val productRepository: ProductRepository
+) : ViewModel() {
+
+    companion object {
+        private const val TAG = "SaleViewModel"
+    }
 
     private val _uiState = MutableStateFlow(SaleUiState())
     val uiState: StateFlow<SaleUiState> = _uiState.asStateFlow()
+
+    private var branchId: String = ""
 
     init {
         loadInitialData()
@@ -74,12 +88,60 @@ class SaleViewModel @Inject constructor() : ViewModel() {
 
     private fun loadInitialData() {
         viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(
-                    categories = MockData.categories,
-                    products = MockData.getProductsByCategory("all"),
-                    isLoading = false
+            _uiState.update { it.copy(isLoading = true) }
+
+            try {
+                branchId = authRepository.getBranchId() ?: ""
+                Log.d(TAG, "loadInitialData - branchId: $branchId")
+
+                if (branchId.isEmpty()) {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = "Không tìm thấy chi nhánh") }
+                    return@launch
+                }
+
+                // Load categories from database
+                val categoryEntities = categoryRepository.getAllCategories(branchId).first()
+                val categories = mutableListOf(
+                    Category(id = "all", name = "Tất cả", icon = "🍽️")
                 )
+                categories.addAll(categoryEntities.map { entity ->
+                    Category(
+                        id = entity.id,
+                        name = entity.name,
+                        icon = entity.icon ?: "📦"
+                    )
+                })
+
+                // Load all products
+                val productEntities = productRepository.getAllProducts(branchId).first()
+                val products = productEntities.map { entity ->
+                    Product(
+                        id = entity.id,
+                        name = entity.name,
+                        price = entity.price.toLong(),
+                        imageUrl = entity.imageUrl,
+                        categoryId = entity.categoryId,
+                        description = entity.description,
+                        isAvailable = entity.isAvailable,
+                        hasVariants = false, // TODO: implement variants
+                        variants = emptyList()
+                    )
+                }
+
+                Log.d(TAG, "loadInitialData - Loaded ${categories.size} categories, ${products.size} products")
+
+                _uiState.update { state ->
+                    state.copy(
+                        categories = categories,
+                        products = products,
+                        isLoading = false
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "loadInitialData - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(isLoading = false, errorMessage = "Lỗi tải dữ liệu: ${e.message}")
+                }
             }
         }
     }
@@ -87,26 +149,80 @@ class SaleViewModel @Inject constructor() : ViewModel() {
     // ===== CATEGORY & SEARCH =====
 
     fun selectCategory(categoryId: String) {
-        _uiState.update { state ->
-            state.copy(
-                selectedCategoryId = categoryId,
-                products = MockData.getProductsByCategory(categoryId),
-                searchQuery = ""
-            )
+        viewModelScope.launch {
+            val allProducts = productRepository.getAllProducts(branchId).first()
+            val filteredProducts = if (categoryId == "all") {
+                allProducts
+            } else {
+                allProducts.filter { it.categoryId == categoryId }
+            }
+
+            val products = filteredProducts.map { entity ->
+                Product(
+                    id = entity.id,
+                    name = entity.name,
+                    price = entity.price.toLong(),
+                    imageUrl = entity.imageUrl,
+                    categoryId = entity.categoryId,
+                    description = entity.description,
+                    isAvailable = entity.isAvailable,
+                    hasVariants = false,
+                    variants = emptyList()
+                )
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    selectedCategoryId = categoryId,
+                    products = products,
+                    searchQuery = ""
+                )
+            }
         }
     }
 
     fun searchProducts(query: String) {
-        _uiState.update { state ->
+        viewModelScope.launch {
             val products = if (query.isBlank()) {
-                MockData.getProductsByCategory(state.selectedCategoryId)
+                val allProducts = productRepository.getAllProducts(branchId).first()
+                val categoryId = _uiState.value.selectedCategoryId
+                val filtered = if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
+                filtered.map { entity ->
+                    Product(
+                        id = entity.id,
+                        name = entity.name,
+                        price = entity.price.toLong(),
+                        imageUrl = entity.imageUrl,
+                        categoryId = entity.categoryId,
+                        description = entity.description,
+                        isAvailable = entity.isAvailable,
+                        hasVariants = false,
+                        variants = emptyList()
+                    )
+                }
             } else {
-                MockData.searchProducts(query)
+                val searchResults = productRepository.searchProducts(branchId, query)
+                searchResults.map { entity ->
+                    Product(
+                        id = entity.id,
+                        name = entity.name,
+                        price = entity.price.toLong(),
+                        imageUrl = entity.imageUrl,
+                        categoryId = entity.categoryId,
+                        description = entity.description,
+                        isAvailable = entity.isAvailable,
+                        hasVariants = false,
+                        variants = emptyList()
+                    )
+                }
             }
-            state.copy(
-                searchQuery = query,
-                products = products
-            )
+
+            _uiState.update { state ->
+                state.copy(
+                    searchQuery = query,
+                    products = products
+                )
+            }
         }
     }
 
@@ -376,16 +492,19 @@ class SaleViewModel @Inject constructor() : ViewModel() {
 
     fun processPayment(payments: List<Payment>): Order {
         val state = _uiState.value
+        val staffId = authRepository.getCurrentStaffId() ?: "unknown"
+        val staffName = authRepository.getCurrentStaffName() ?: "Nhân viên"
+
         val order = Order(
-            orderNumber = MockData.generateOrderNumber(),
+            orderNumber = generateOrderNumber(),
             orderType = state.orderType,
             tableId = state.selectedTable?.id,
             tableName = state.selectedTable?.name,
             customerId = state.selectedCustomer?.id,
             customerName = state.selectedCustomer?.name,
             customerPhone = state.selectedCustomer?.phone,
-            staffId = "staff_001",  // TODO: Get from session
-            staffName = "Nhân viên",
+            staffId = staffId,
+            staffName = staffName,
             items = state.cartItems,
             subtotal = state.subtotal,
             discountAmount = state.discountAmount,
@@ -426,5 +545,11 @@ class SaleViewModel @Inject constructor() : ViewModel() {
         _uiState.update { state ->
             state.copy(errorMessage = null)
         }
+    }
+
+    private fun generateOrderNumber(): String {
+        val timestamp = System.currentTimeMillis()
+        val random = (1000..9999).random()
+        return "HD${timestamp % 1000000}$random"
     }
 }

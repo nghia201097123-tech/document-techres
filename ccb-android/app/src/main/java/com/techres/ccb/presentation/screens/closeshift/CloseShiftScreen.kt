@@ -89,6 +89,60 @@ fun CloseShiftScreen(
             ) {
                 CircularProgressIndicator()
             }
+        } else if (uiState.noShiftFound) {
+            // No open shift found
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.EventBusy,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Không có ca làm việc đang mở",
+                        fontSize = 18.sp,
+                        color = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(onClick = onBack) {
+                        Text("Quay lại")
+                    }
+                }
+            }
+        } else if (uiState.error != null && uiState.summary.shiftId.isEmpty()) {
+            // Error state (only show if we don't have shift data)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.Error,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = Color.Red
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        uiState.error ?: "Đã xảy ra lỗi",
+                        fontSize = 16.sp,
+                        color = Color.Red
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(onClick = onBack) {
+                        Text("Quay lại")
+                    }
+                }
+            }
         } else {
             Column(
                 modifier = Modifier
