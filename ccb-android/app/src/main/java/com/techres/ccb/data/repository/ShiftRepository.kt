@@ -75,4 +75,24 @@ class ShiftRepository @Inject constructor(
     suspend fun markShiftAsSynced(shiftId: String) {
         shiftDao.updateSyncStatus(shiftId, "synced", System.currentTimeMillis().toString(), 0)
     }
+
+    /**
+     * Add completed order revenue to shift statistics
+     */
+    suspend fun addOrderRevenue(
+        shiftId: String,
+        orderTotal: Double,
+        discountAmount: Double,
+        paymentMethod: String,
+        updatedAt: String
+    ) {
+        shiftDao.addOrderRevenue(shiftId, orderTotal, discountAmount, paymentMethod, updatedAt)
+    }
+
+    /**
+     * Increment cancelled order count
+     */
+    suspend fun incrementCancelledCount(shiftId: String, updatedAt: String) {
+        shiftDao.incrementCancelledCount(shiftId, updatedAt)
+    }
 }

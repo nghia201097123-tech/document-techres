@@ -67,6 +67,40 @@ interface ShiftDao {
     @Query("UPDATE shifts SET sync_status = :syncStatus, synced_at = :syncedAt, retry_count = :retryCount WHERE id = :shiftId")
     suspend fun updateSyncStatus(shiftId: String, syncStatus: String, syncedAt: String?, retryCount: Int)
 
+    /**
+     * Add order revenue to shift when order is completed
+     */
+    @Query("""
+        UPDATE shifts SET
+            total_orders = total_orders + 1,
+            total_revenue = total_revenue + :orderTotal,
+            cash_revenue = cash_revenue + CASE WHEN :paymentMethod = 'cash' THEN :orderTotal ELSE 0 END,
+            card_revenue = card_revenue + CASE WHEN :paymentMethod = 'card' THEN :orderTotal ELSE 0 END,
+            transfer_revenue = transfer_revenue + CASE WHEN :paymentMethod = 'transfer' THEN :orderTotal ELSE 0 END,
+            other_revenue = other_revenue + CASE WHEN :paymentMethod NOT IN ('cash', 'card', 'transfer') THEN :orderTotal ELSE 0 END,
+            total_discount = total_discount + :discountAmount,
+            updated_at = :updatedAt
+        WHERE id = :shiftId
+    """)
+    suspend fun addOrderRevenue(
+        shiftId: String,
+        orderTotal: Double,
+        discountAmount: Double,
+        paymentMethod: String,
+        updatedAt: String
+    )
+
+    /**
+     * Increment cancelled order count when order is cancelled
+     */
+    @Query("""
+        UPDATE shifts SET
+            total_cancelled = total_cancelled + 1,
+            updated_at = :updatedAt
+        WHERE id = :shiftId
+    """)
+    suspend fun incrementCancelledCount(shiftId: String, updatedAt: String)
+
     @Delete
     suspend fun delete(shift: ShiftEntity)
 }

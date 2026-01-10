@@ -867,6 +867,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Thanh toán và hoàn tất order
+     * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics
      */
     fun completeOrder(paymentMethod: String = "cash") {
         val state = _uiState.value
@@ -877,7 +878,7 @@ class SaleViewModel @Inject constructor(
                 val now = getCurrentTimestamp()
 
                 withContext(Dispatchers.IO) {
-                    // Update order status to completed
+                    // 1. Update order status to completed
                     val completedOrder = currentOrder.copy(
                         status = "completed",
                         paymentStatus = "paid",
@@ -888,13 +889,27 @@ class SaleViewModel @Inject constructor(
                     )
                     orderRepository.updateOrder(completedOrder)
 
-                    // Update table status back to available
+                    // 2. Update all order items status to completed
+                    orderRepository.updateAllItemsStatus(currentOrder.id, "completed", now)
+
+                    // 3. Update table status back to available
                     state.selectedTable?.let { table ->
                         tableRepository.updateTableStatus(table.id, "available", null, now)
                     }
+
+                    // 4. Update shift statistics
+                    currentOrder.shiftId?.let { shiftId ->
+                        shiftRepository.addOrderRevenue(
+                            shiftId = shiftId,
+                            orderTotal = currentOrder.totalAmount,
+                            discountAmount = currentOrder.discountAmount,
+                            paymentMethod = paymentMethod,
+                            updatedAt = now
+                        )
+                    }
                 }
 
-                Log.d(TAG, "completeOrder - Completed order: ${currentOrder.orderNumber}")
+                Log.d(TAG, "completeOrder - Completed order with full sync: ${currentOrder.orderNumber}")
 
                 _uiState.update { s ->
                     s.copy(
@@ -919,6 +934,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Huỷ order
+     * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics
      */
     fun cancelOrder(reason: String = "") {
         val state = _uiState.value
@@ -929,7 +945,7 @@ class SaleViewModel @Inject constructor(
                 val now = getCurrentTimestamp()
 
                 withContext(Dispatchers.IO) {
-                    // Update order status to cancelled
+                    // 1. Update order status to cancelled
                     val cancelledOrder = currentOrder.copy(
                         status = "cancelled",
                         cancelReason = reason,
@@ -938,13 +954,21 @@ class SaleViewModel @Inject constructor(
                     )
                     orderRepository.updateOrder(cancelledOrder)
 
-                    // Update table status back to available
+                    // 2. Update all order items status to cancelled
+                    orderRepository.updateAllItemsStatus(currentOrder.id, "cancelled", now)
+
+                    // 3. Update table status back to available
                     state.selectedTable?.let { table ->
                         tableRepository.updateTableStatus(table.id, "available", null, now)
                     }
+
+                    // 4. Update shift cancelled count
+                    currentOrder.shiftId?.let { shiftId ->
+                        shiftRepository.incrementCancelledCount(shiftId, now)
+                    }
                 }
 
-                Log.d(TAG, "cancelOrder - Cancelled order: ${currentOrder.orderNumber}")
+                Log.d(TAG, "cancelOrder - Cancelled order with full sync: ${currentOrder.orderNumber}")
 
                 _uiState.update { s ->
                     s.copy(

@@ -58,6 +58,13 @@ class OrderRepository @Inject constructor(
         orderDao.updateStatus(orderId, status, updatedAt)
     }
 
+    /**
+     * Update all items status for an order (when order completes/cancels)
+     */
+    suspend fun updateAllItemsStatus(orderId: String, status: String, updatedAt: String) {
+        orderItemDao.updateAllItemsStatus(orderId, status, updatedAt)
+    }
+
     suspend fun addOrderItem(item: OrderItemEntity) {
         orderItemDao.insert(item)
     }

@@ -230,11 +230,37 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun completePosOrder(orderId: String) {
+    /**
+     * Complete order with full data sync
+     * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics
+     */
+    fun completePosOrder(orderId: String, paymentMethod: String = "cash") {
         viewModelScope.launch {
             try {
                 val now = java.time.Instant.now().toString()
+                val orderEntity = orderRepository.getOrderById(orderId) ?: return@launch
+
+                // 1. Update order status to completed
                 orderRepository.updateOrderStatus(orderId, "completed", now)
+
+                // 2. Update all order items status to completed
+                orderRepository.updateAllItemsStatus(orderId, "completed", now)
+
+                // 3. Update table status to available
+                orderEntity.tableId?.let { tableId ->
+                    tableRepository.updateTableStatus(tableId, "available", null, now)
+                }
+
+                // 4. Update shift statistics
+                orderEntity.shiftId?.let { shiftId ->
+                    shiftRepository.addOrderRevenue(
+                        shiftId = shiftId,
+                        orderTotal = orderEntity.totalAmount,
+                        discountAmount = orderEntity.discountAmount,
+                        paymentMethod = paymentMethod,
+                        updatedAt = now
+                    )
+                }
 
                 _uiState.update { state ->
                     val completedOrder = state.posOrders.find { it.id == orderId }
@@ -245,6 +271,8 @@ class DashboardViewModel @Inject constructor(
                     )
                 }
                 recalculateCounts()
+
+                Log.d(TAG, "completePosOrder - Completed with full sync: $orderId")
             } catch (e: Exception) {
                 Log.e(TAG, "completePosOrder - Error: ${e.message}", e)
             }
@@ -284,24 +312,29 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
-     * Cancel an order
+     * Cancel order with full data sync
+     * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics
      */
     fun cancelPosOrder(orderId: String, reason: String = "") {
         viewModelScope.launch {
             try {
                 val now = java.time.Instant.now().toString()
+                val orderEntity = orderRepository.getOrderById(orderId) ?: return@launch
+
+                // 1. Update order status to cancelled
                 orderRepository.updateOrderStatus(orderId, "cancelled", now)
 
-                // Get order to find table
-                val order = _uiState.value.posOrders.find { it.id == orderId }
+                // 2. Update all order items status to cancelled
+                orderRepository.updateAllItemsStatus(orderId, "cancelled", now)
 
-                // Update table status back to available if order had a table
-                if (order?.tableName != null) {
-                    // Need to get table ID from order
-                    val orderEntity = orderRepository.getOrderById(orderId)
-                    orderEntity?.tableId?.let { tableId ->
-                        tableRepository.updateTableStatus(tableId, "available", null, now)
-                    }
+                // 3. Update table status to available
+                orderEntity.tableId?.let { tableId ->
+                    tableRepository.updateTableStatus(tableId, "available", null, now)
+                }
+
+                // 4. Update shift cancelled count
+                orderEntity.shiftId?.let { shiftId ->
+                    shiftRepository.incrementCancelledCount(shiftId, now)
                 }
 
                 _uiState.update { state ->
@@ -311,7 +344,7 @@ class DashboardViewModel @Inject constructor(
                 }
                 recalculateCounts()
 
-                Log.d(TAG, "cancelPosOrder - Cancelled order: $orderId")
+                Log.d(TAG, "cancelPosOrder - Cancelled with full sync: $orderId")
             } catch (e: Exception) {
                 Log.e(TAG, "cancelPosOrder - Error: ${e.message}", e)
             }
