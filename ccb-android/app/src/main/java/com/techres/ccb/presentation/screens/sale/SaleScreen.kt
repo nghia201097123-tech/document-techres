@@ -59,6 +59,15 @@ fun SaleScreen(
         }
     }
 
+    // Show error snackbar
+    LaunchedEffect(uiState.errorMessage) {
+        if (uiState.errorMessage != null) {
+            // Auto clear after showing
+            kotlinx.coroutines.delay(4000)
+            viewModel.clearErrorMessage()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxSize()) {
             // Left Panel - Products (70%)
@@ -140,6 +149,40 @@ fun SaleScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = uiState.successMessage ?: "",
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // Error message
+        AnimatedVisibility(
+            visible = uiState.errorMessage != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF44336)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = uiState.errorMessage ?: "",
                         color = Color.White,
                         fontWeight = FontWeight.Medium
                     )

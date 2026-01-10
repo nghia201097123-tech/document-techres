@@ -633,8 +633,14 @@ class SaleViewModel @Inject constructor(
      */
     fun placeOrder() {
         val state = _uiState.value
-        if (state.cartItems.isEmpty()) return
+        Log.d(TAG, "placeOrder - Starting: cartItems=${state.cartItems.size}, orderType=${state.orderType}, table=${state.selectedTable?.name}")
+
+        if (state.cartItems.isEmpty()) {
+            Log.w(TAG, "placeOrder - Cart is empty, returning")
+            return
+        }
         if (state.orderType == OrderType.DINE_IN && state.selectedTable == null) {
+            Log.w(TAG, "placeOrder - Dine-in requires table selection")
             _uiState.update { it.copy(errorMessage = "Vui lòng chọn bàn trước khi đặt món") }
             return
         }
@@ -648,6 +654,8 @@ class SaleViewModel @Inject constructor(
                 }
                 val shiftId = currentShift?.id
                 val now = getCurrentTimestamp()
+
+                Log.d(TAG, "placeOrder - staffId=$staffId, shiftId=$shiftId, branchId=$branchId")
 
                 val orderId = UUID.randomUUID().toString()
                 val orderNumber = generateOrderNumber()
@@ -696,11 +704,14 @@ class SaleViewModel @Inject constructor(
                 }
 
                 // Save to database
+                Log.d(TAG, "placeOrder - Saving order to database: orderId=$orderId, tableId=${orderEntity.tableId}, shiftId=${orderEntity.shiftId}")
                 withContext(Dispatchers.IO) {
                     orderRepository.createOrder(orderEntity, orderItems)
+                    Log.d(TAG, "placeOrder - Order saved successfully")
 
                     // Update table status to occupied
                     state.selectedTable?.let { table ->
+                        Log.d(TAG, "placeOrder - Updating table status: tableId=${table.id}")
                         tableRepository.updateTableStatus(table.id, "occupied", orderId, now)
                     }
                 }
