@@ -314,6 +314,19 @@ export class SyncService {
         .filter(bp => bp.product && bp.product.isActive)
         .map(bp => this.mapBranchProduct(bp));
 
+      // Log product types distribution for debugging
+      const productTypeCount = products.reduce((acc, p) => {
+        acc[p.type] = (acc[p.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log(`[SyncService.getFullSync] Product types distribution:`, productTypeCount);
+
+      // Log topping products specifically
+      const toppingProducts = products.filter(p => p.type === 'topping');
+      if (toppingProducts.length > 0) {
+        console.log(`[SyncService.getFullSync] Topping products:`, toppingProducts.map(p => ({ id: p.id, name: p.name, type: p.type })));
+      }
+
       const seasonalPriceIds = seasonalPrices.map(sp => sp.id);
       const seasonalPriceProducts = seasonalPriceIds.length > 0
         ? await this.seasonalPriceProductRepository.find({
@@ -476,7 +489,7 @@ export class SyncService {
       costPrice: Number(product.costPrice || 0),
       vatRate: Number(product.vatRate || 0),
       unit: product.unit || null,
-      type: product.productType || 'food',
+      type: product.type || 'food',
       isAvailable: product.isAvailable ?? true,
       isActive: product.isActive,
       sortOrder: product.sortOrder || 0,
@@ -502,7 +515,7 @@ export class SyncService {
       costPrice: Number(product.costPrice || 0),
       vatRate: Number(product.vatRate || 0),
       unit: product.unit || null,
-      type: product.productType || 'food',
+      type: product.type || 'food',
       isAvailable: bp.isAvailable,
       isActive: product.isActive,
       sortOrder: bp.sortOrder || product.sortOrder || 0,
