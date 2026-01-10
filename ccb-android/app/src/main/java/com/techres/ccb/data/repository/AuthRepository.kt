@@ -199,6 +199,19 @@ class AuthRepository @Inject constructor(
         return sharedPreferences.getString(KEY_STAFF_AVATAR, null)
     }
 
+    /**
+     * Save branch info when user selects a branch
+     */
+    fun saveBranchInfo(branchId: String, branchName: String, brandId: String? = null, brandName: String? = null) {
+        sharedPreferences.edit().apply {
+            putString(KEY_BRANCH_ID, branchId)
+            putString(KEY_BRANCH_NAME, branchName)
+            brandId?.let { putString(KEY_BRAND_ID, it) }
+            brandName?.let { putString(KEY_BRAND_NAME, it) }
+            apply()
+        }
+    }
+
     fun isLoggedIn(): Boolean {
         return getAccessToken() != null
     }

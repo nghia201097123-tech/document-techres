@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.entity.BrandEntity
 import com.techres.ccb.data.local.entity.BranchEntity
+import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.BranchRepository
 import com.techres.ccb.data.repository.SyncRepository
 import com.techres.ccb.data.repository.SyncStep
@@ -80,7 +81,8 @@ data class BranchSelectionUiState(
 @HiltViewModel
 class BranchSelectionViewModel @Inject constructor(
     private val branchRepository: BranchRepository,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BranchSelectionUiState())
@@ -198,6 +200,13 @@ class BranchSelectionViewModel @Inject constructor(
 
         if (brandEntity != null && branchEntity != null) {
             branchRepository.saveSelectedBranch(brandEntity, branchEntity)
+            // Also save to AuthRepository for consistent access
+            authRepository.saveBranchInfo(
+                branchId = branchEntity.id,
+                branchName = branchEntity.name,
+                brandId = brandEntity.id,
+                brandName = brandEntity.name
+            )
             return true
         }
 
@@ -245,6 +254,13 @@ class BranchSelectionViewModel @Inject constructor(
             try {
                 // Save selected branch first
                 branchRepository.saveSelectedBranch(brandEntity, branchEntity)
+                // Also save to AuthRepository for consistent access
+                authRepository.saveBranchInfo(
+                    branchId = branchEntity.id,
+                    branchName = branchEntity.name,
+                    brandId = brandEntity.id,
+                    brandName = brandEntity.name
+                )
                 Log.d(TAG, "confirmSelectionAndSync - Branch saved: ${branchEntity.name}")
 
                 // Perform full sync with progress callback
