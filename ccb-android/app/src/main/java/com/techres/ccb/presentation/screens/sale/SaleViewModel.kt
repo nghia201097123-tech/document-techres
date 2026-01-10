@@ -12,12 +12,14 @@ import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -111,74 +113,79 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Load categories from database
-                val categoryEntities = categoryRepository.getAllCategories(branchId).first()
-                val categories = mutableListOf(
-                    Category(id = "all", name = "Tất cả", icon = "🍽️")
-                )
-                categories.addAll(categoryEntities.map { entity ->
-                    Category(
-                        id = entity.id,
-                        name = entity.name,
-                        icon = entity.imageUrl
+                // Run all database operations on IO dispatcher
+                val (categories, products, tables) = withContext(Dispatchers.IO) {
+                    // Load categories from database
+                    val categoryEntities = categoryRepository.getAllCategories(branchId).first()
+                    val categoryList = mutableListOf(
+                        Category(id = "all", name = "Tất cả", icon = "🍽️")
                     )
-                })
+                    categoryList.addAll(categoryEntities.map { entity ->
+                        Category(
+                            id = entity.id,
+                            name = entity.name,
+                            icon = entity.imageUrl
+                        )
+                    })
 
-                // Load all products
-                val productEntities = productRepository.getAllProducts(branchId).first()
-                    .filter { it.type != "topping" } // Lọc bỏ topping khỏi danh sách sản phẩm chính
+                    // Load all products
+                    val productEntities = productRepository.getAllProducts(branchId).first()
+                        .filter { it.type != "topping" } // Lọc bỏ topping khỏi danh sách sản phẩm chính
 
-                // Cache product entities
-                val allProducts = productRepository.getAllProducts(branchId).first()
-                productEntityMap = allProducts.associateBy { it.id }
+                    // Cache product entities
+                    val allProducts = productRepository.getAllProducts(branchId).first()
+                    productEntityMap = allProducts.associateBy { it.id }
 
-                // Load topping mappings
-                val productIds = productEntities.map { it.id }
-                val allToppings = productToppingDao.getToppingsForProductsSync(productIds)
-                val toppingsByProduct = allToppings.groupBy { it.productId }
+                    // Load topping mappings (blocking call - must be on IO)
+                    val productIds = productEntities.map { it.id }
+                    val allToppings = productToppingDao.getToppingsForProductsSync(productIds)
+                    val toppingsByProduct = allToppings.groupBy { it.productId }
 
-                // Build products with variants
-                val products = productEntities.map { entity ->
-                    val productToppings = toppingsByProduct[entity.id] ?: emptyList()
-                    val variantGroups = buildVariantGroups(productToppings)
+                    // Build products with variants
+                    val productList = productEntities.map { entity ->
+                        val productToppings = toppingsByProduct[entity.id] ?: emptyList()
+                        val variantGroups = buildVariantGroups(productToppings)
 
-                    Product(
-                        id = entity.id,
-                        code = entity.code,
-                        name = entity.name,
-                        categoryId = entity.categoryId ?: "",
-                        price = entity.price.toLong(),
-                        imageUrl = entity.imageUrl,
-                        description = entity.description,
-                        isActive = entity.isActive,
-                        hasVariants = variantGroups.isNotEmpty(),
-                        variants = variantGroups
-                    )
+                        Product(
+                            id = entity.id,
+                            code = entity.code,
+                            name = entity.name,
+                            categoryId = entity.categoryId ?: "",
+                            price = entity.price.toLong(),
+                            imageUrl = entity.imageUrl,
+                            description = entity.description,
+                            isActive = entity.isActive,
+                            hasVariants = variantGroups.isNotEmpty(),
+                            variants = variantGroups
+                        )
+                    }
+
+                    // Load tables and areas
+                    val areas = tableRepository.getAllAreas(branchId).first()
+                    val tableEntities = tableRepository.getAllTables(branchId).first()
+                    val areaMap = areas.associateBy { it.id }
+
+                    val tableList = tableEntities.map { entity ->
+                        Table(
+                            id = entity.id,
+                            name = entity.name,
+                            areaId = entity.areaId ?: "",
+                            areaName = entity.areaId?.let { areaMap[it]?.name } ?: "Khu vực chung",
+                            capacity = entity.capacity,
+                            status = when (entity.status.lowercase()) {
+                                "occupied" -> TableStatus.OCCUPIED
+                                "reserved" -> TableStatus.RESERVED
+                                "cleaning" -> TableStatus.CLEANING
+                                else -> TableStatus.AVAILABLE
+                            },
+                            currentOrderId = entity.currentOrderId
+                        )
+                    }
+
+                    Log.d(TAG, "loadInitialData - Loaded ${categoryList.size} categories, ${productList.size} products, ${allToppings.size} topping mappings, ${tableList.size} tables")
+
+                    Triple(categoryList.toList(), productList, tableList)
                 }
-
-                // Load tables and areas
-                val areas = tableRepository.getAllAreas(branchId).first()
-                val tableEntities = tableRepository.getAllTables(branchId).first()
-                val areaMap = areas.associateBy { it.id }
-
-                val tables = tableEntities.map { entity ->
-                    Table(
-                        id = entity.id,
-                        name = entity.name,
-                        areaId = entity.areaId ?: "",
-                        areaName = entity.areaId?.let { areaMap[it]?.name } ?: "Khu vực chung",
-                        capacity = entity.capacity,
-                        status = when (entity.status.lowercase()) {
-                            "occupied" -> TableStatus.OCCUPIED
-                            "reserved" -> TableStatus.RESERVED
-                            "cleaning" -> TableStatus.CLEANING
-                            else -> TableStatus.AVAILABLE
-                        },
-                        currentOrderId = entity.currentOrderId
-                    )
-                }
-
-                Log.d(TAG, "loadInitialData - Loaded ${categories.size} categories, ${products.size} products, ${allToppings.size} topping mappings, ${tables.size} tables")
 
                 _uiState.update { state ->
                     state.copy(
@@ -244,16 +251,18 @@ class SaleViewModel @Inject constructor(
 
     fun selectCategory(categoryId: String) {
         viewModelScope.launch {
-            val allProducts = productRepository.getAllProducts(branchId).first()
-                .filter { it.type != "topping" } // Lọc bỏ topping
+            val products = withContext(Dispatchers.IO) {
+                val allProducts = productRepository.getAllProducts(branchId).first()
+                    .filter { it.type != "topping" } // Lọc bỏ topping
 
-            val filteredProducts = if (categoryId == "all") {
-                allProducts
-            } else {
-                allProducts.filter { it.categoryId == categoryId }
+                val filteredProducts = if (categoryId == "all") {
+                    allProducts
+                } else {
+                    allProducts.filter { it.categoryId == categoryId }
+                }
+
+                buildProductsWithVariants(filteredProducts)
             }
-
-            val products = buildProductsWithVariants(filteredProducts)
 
             _uiState.update { state ->
                 state.copy(
@@ -267,17 +276,19 @@ class SaleViewModel @Inject constructor(
 
     fun searchProducts(query: String) {
         viewModelScope.launch {
-            val productEntities = if (query.isBlank()) {
-                val allProducts = productRepository.getAllProducts(branchId).first()
-                    .filter { it.type != "topping" }
-                val categoryId = _uiState.value.selectedCategoryId
-                if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
-            } else {
-                productRepository.searchProducts(branchId, query)
-                    .filter { it.type != "topping" }
-            }
+            val products = withContext(Dispatchers.IO) {
+                val productEntities = if (query.isBlank()) {
+                    val allProducts = productRepository.getAllProducts(branchId).first()
+                        .filter { it.type != "topping" }
+                    val categoryId = _uiState.value.selectedCategoryId
+                    if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
+                } else {
+                    productRepository.searchProducts(branchId, query)
+                        .filter { it.type != "topping" }
+                }
 
-            val products = buildProductsWithVariants(productEntities)
+                buildProductsWithVariants(productEntities)
+            }
 
             _uiState.update { state ->
                 state.copy(
