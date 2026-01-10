@@ -59,4 +59,61 @@ interface OrderDao {
 
     @Query("DELETE FROM orders WHERE id = :orderId")
     suspend fun deleteById(orderId: String)
+
+    /**
+     * Get order history with filters - completed and cancelled orders
+     */
+    @Query("""
+        SELECT * FROM orders
+        WHERE branch_id = :branchId
+        AND status IN ('completed', 'cancelled')
+        ORDER BY created_at DESC
+    """)
+    fun getOrderHistory(branchId: String): Flow<List<OrderEntity>>
+
+    /**
+     * Get order history filtered by status
+     */
+    @Query("""
+        SELECT * FROM orders
+        WHERE branch_id = :branchId
+        AND status = :status
+        ORDER BY created_at DESC
+    """)
+    fun getOrderHistoryByStatus(branchId: String, status: String): Flow<List<OrderEntity>>
+
+    /**
+     * Get order history filtered by date range
+     */
+    @Query("""
+        SELECT * FROM orders
+        WHERE branch_id = :branchId
+        AND status IN ('completed', 'cancelled')
+        AND created_at >= :startDate
+        AND created_at <= :endDate
+        ORDER BY created_at DESC
+    """)
+    fun getOrderHistoryByDateRange(
+        branchId: String,
+        startDate: String,
+        endDate: String
+    ): Flow<List<OrderEntity>>
+
+    /**
+     * Get order history filtered by both status and date range
+     */
+    @Query("""
+        SELECT * FROM orders
+        WHERE branch_id = :branchId
+        AND status = :status
+        AND created_at >= :startDate
+        AND created_at <= :endDate
+        ORDER BY created_at DESC
+    """)
+    fun getOrderHistoryFiltered(
+        branchId: String,
+        status: String,
+        startDate: String,
+        endDate: String
+    ): Flow<List<OrderEntity>>
 }

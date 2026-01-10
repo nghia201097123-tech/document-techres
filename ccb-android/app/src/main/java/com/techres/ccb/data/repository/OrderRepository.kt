@@ -88,4 +88,41 @@ class OrderRepository @Inject constructor(
     suspend fun getTotalRevenueByShift(branchId: String, shiftId: String): Double {
         return orderDao.getTotalRevenueByShift(branchId, shiftId)
     }
+
+    /**
+     * Get order history (completed and cancelled orders)
+     */
+    fun getOrderHistory(branchId: String): Flow<List<OrderEntity>> {
+        return orderDao.getOrderHistory(branchId)
+    }
+
+    /**
+     * Get order history filtered by status
+     */
+    fun getOrderHistoryByStatus(branchId: String, status: String): Flow<List<OrderEntity>> {
+        return orderDao.getOrderHistoryByStatus(branchId, status)
+    }
+
+    /**
+     * Get order history filtered by date range
+     */
+    fun getOrderHistoryByDateRange(
+        branchId: String,
+        startDate: String,
+        endDate: String
+    ): Flow<List<OrderEntity>> {
+        return orderDao.getOrderHistoryByDateRange(branchId, startDate, endDate)
+    }
+
+    /**
+     * Get order history with both status and date filters
+     */
+    fun getOrderHistoryFiltered(
+        branchId: String,
+        status: String,
+        startDate: String,
+        endDate: String
+    ): Flow<List<OrderEntity>> {
+        return orderDao.getOrderHistoryFiltered(branchId, status, startDate, endDate)
+    }
 }

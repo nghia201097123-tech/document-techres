@@ -42,6 +42,7 @@ fun DashboardScreen(
     onNavigateToFoodOrders: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToShift: () -> Unit = {},
+    onNavigateToOrderHistory: () -> Unit = {},
     onSwitchStaff: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -73,6 +74,7 @@ fun DashboardScreen(
             onNavigateToSale = onNavigateToSale,
             onNavigateToFoodOrders = onNavigateToFoodOrders,
             onNavigateToShift = onNavigateToShift,
+            onNavigateToOrderHistory = onNavigateToOrderHistory,
             onNavigateToSettings = onNavigateToSettings,
             onSwitchStaff = onSwitchStaff,
             onLogout = onLogout
@@ -269,6 +271,7 @@ private fun DashboardSidebar(
     onNavigateToSale: () -> Unit,
     onNavigateToFoodOrders: () -> Unit,
     onNavigateToShift: () -> Unit,
+    onNavigateToOrderHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onSwitchStaff: () -> Unit,
     onLogout: () -> Unit
@@ -330,6 +333,12 @@ private fun DashboardSidebar(
             icon = Icons.Default.Schedule,
             label = "Ca làm",
             onClick = onNavigateToShift
+        )
+
+        SidebarNavItem(
+            icon = Icons.Default.History,
+            label = "Lịch sử",
+            onClick = onNavigateToOrderHistory
         )
 
         Spacer(modifier = Modifier.weight(1f))

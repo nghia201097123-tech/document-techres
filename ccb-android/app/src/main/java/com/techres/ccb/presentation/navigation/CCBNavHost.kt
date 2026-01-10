@@ -28,6 +28,7 @@ import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
 import com.techres.ccb.presentation.screens.initialsync.InitialSyncScreen
 import com.techres.ccb.presentation.screens.debug.DatabaseDebugScreen
+import com.techres.ccb.presentation.screens.orderhistory.OrderHistoryScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -62,6 +63,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object KitchenPrinter : Screen("kitchen_printer")
     object DatabaseDebug : Screen("database_debug")
+    object OrderHistory : Screen("order_history")
 }
 
 @Composable
@@ -214,6 +216,9 @@ fun CCBNavHost() {
                 onNavigateToShift = {
                     navController.navigate(Screen.CloseShift.route)
                 },
+                onNavigateToOrderHistory = {
+                    navController.navigate(Screen.OrderHistory.route)
+                },
                 onSwitchStaff = {
                     // Navigate to PIN screen for staff switch (keeps device logged in)
                     navController.navigate(Screen.Pin.route) {
@@ -363,6 +368,13 @@ fun CCBNavHost() {
 
         composable(Screen.DatabaseDebug.route) {
             DatabaseDebugScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // Order History Screen
+        composable(Screen.OrderHistory.route) {
+            OrderHistoryScreen(
                 onBack = { navController.popBackStack() }
             )
         }
