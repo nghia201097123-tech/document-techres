@@ -223,6 +223,19 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    /**
+     * Save staff info when staff is selected from local list (Quick Login)
+     */
+    fun saveStaffInfo(staffId: String, staffName: String, staffCode: String, staffRole: String) {
+        sharedPreferences.edit().apply {
+            putString(KEY_STAFF_ID, staffId)
+            putString(KEY_STAFF_NAME, staffName)
+            putString(KEY_STAFF_CODE, staffCode)
+            putString(KEY_STAFF_ROLE, staffRole)
+            apply()
+        }
+    }
+
     fun isLoggedIn(): Boolean {
         return getAccessToken() != null
     }

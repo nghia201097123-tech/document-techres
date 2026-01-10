@@ -42,6 +42,7 @@ fun DashboardScreen(
     onNavigateToFoodOrders: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToShift: () -> Unit = {},
+    onSwitchStaff: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -73,6 +74,7 @@ fun DashboardScreen(
             onNavigateToFoodOrders = onNavigateToFoodOrders,
             onNavigateToShift = onNavigateToShift,
             onNavigateToSettings = onNavigateToSettings,
+            onSwitchStaff = onSwitchStaff,
             onLogout = onLogout
         )
 
@@ -268,6 +270,7 @@ private fun DashboardSidebar(
     onNavigateToFoodOrders: () -> Unit,
     onNavigateToShift: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onSwitchStaff: () -> Unit,
     onLogout: () -> Unit
 ) {
     Column(
@@ -334,13 +337,20 @@ private fun DashboardSidebar(
         // Bottom Items
         SidebarNavItem(
             icon = Icons.Default.Settings,
-            label = "Cài đặt",
+            label = "Cai dat",
             onClick = onNavigateToSettings
+        )
+
+        // Switch Staff Button
+        SidebarNavItem(
+            icon = Icons.Default.SwapHoriz,
+            label = "Doi NV",
+            onClick = onSwitchStaff
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Staff Avatar
+        // Staff Avatar with name initial
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -349,11 +359,15 @@ private fun DashboardSidebar(
                 .clickable(onClick = onLogout),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = "Đăng xuất",
-                modifier = Modifier.size(24.dp),
-                tint = Color.White
+            // Show staff initial
+            val initial = staffName.split(" ")
+                .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                .lastOrNull()?.toString() ?: "?"
+            Text(
+                text = initial,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
         }
     }

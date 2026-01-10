@@ -214,6 +214,12 @@ fun CCBNavHost() {
                 onNavigateToShift = {
                     navController.navigate(Screen.CloseShift.route)
                 },
+                onSwitchStaff = {
+                    // Navigate to PIN screen for staff switch (keeps device logged in)
+                    navController.navigate(Screen.Pin.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Dashboard.route) { inclusive = true }

@@ -537,23 +537,53 @@ fun CartPanel(
             }
         }
 
-        // Order Type Selector
+        // Order Type Selector with icons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             OrderType.entries.forEach { type ->
-                FilterChip(
-                    selected = orderType == type,
-                    onClick = { onOrderTypeChanged(type) },
-                    label = { Text(type.displayName, fontSize = 12.sp) },
-                    modifier = Modifier.weight(1f),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                val isSelected = orderType == type
+                val (icon, bgColor) = when (type) {
+                    OrderType.DINE_IN -> Icons.Default.TableRestaurant to Color(0xFF2196F3)
+                    OrderType.TAKE_AWAY -> Icons.Default.ShoppingBag to Color(0xFF4CAF50)
+                    OrderType.DELIVERY -> Icons.Default.LocalShipping to Color(0xFFFF9800)
+                }
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOrderTypeChanged(type) },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) bgColor else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = if (isSelected) 4.dp else 0.dp
                     )
-                )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = type.displayName,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = type.displayName,
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
 
