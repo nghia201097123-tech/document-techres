@@ -3,6 +3,7 @@ package com.techres.ccb.presentation.screens.sync
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.BranchRepository
@@ -60,6 +61,7 @@ class SyncDataViewModel @Inject constructor(
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
     private val authRepository: AuthRepository,
+    private val productToppingDao: ProductToppingDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val couponDao: CouponDao
 ) : ViewModel() {
@@ -205,6 +207,7 @@ class SyncDataViewModel @Inject constructor(
                 val result = when (item.id) {
                     "categories" -> syncCategories()
                     "products" -> syncProducts()
+                    "product_toppings" -> syncProductToppings()
                     "areas" -> syncAreas()
                     "tables" -> syncTables()
                     "staff" -> syncStaff()
@@ -287,6 +290,16 @@ class SyncDataViewModel @Inject constructor(
         }
     }
 
+    private suspend fun syncProductToppings(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = productToppingDao.countByBranch(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private suspend fun syncAreas(): Result<Int> {
         val branchId = _uiState.value.branchId
         return try {
@@ -353,6 +366,7 @@ class SyncDataViewModel @Inject constructor(
             val count = when (item.id) {
                 "categories" -> try { categoryRepository.getCategoriesCount(branchId) } catch (e: Exception) { 0 }
                 "products" -> try { productRepository.getProductsCount(branchId) } catch (e: Exception) { 0 }
+                "product_toppings" -> try { productToppingDao.countByBranch(branchId) } catch (e: Exception) { 0 }
                 "areas" -> try { tableRepository.getAreasCount(branchId) } catch (e: Exception) { 0 }
                 "tables" -> try { tableRepository.getTablesCount(branchId) } catch (e: Exception) { 0 }
                 "staff" -> try { staffRepository.getStaffCount(branchId) } catch (e: Exception) { 0 }

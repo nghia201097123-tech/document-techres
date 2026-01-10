@@ -101,4 +101,10 @@ interface ProductToppingDao {
      */
     @Query("SELECT COUNT(*) FROM product_toppings WHERE product_id = :productId")
     suspend fun countToppings(productId: String): Int
+
+    /**
+     * Đếm tổng số topping của chi nhánh
+     */
+    @Query("SELECT COUNT(*) FROM product_toppings WHERE branch_id = :branchId")
+    suspend fun countByBranch(branchId: String): Int
 }
