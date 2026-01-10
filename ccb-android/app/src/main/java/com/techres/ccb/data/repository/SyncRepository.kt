@@ -265,6 +265,13 @@ class SyncRepository @Inject constructor(
 
         // Sync tables
         onProgress?.invoke(SyncStepProgress(SyncStep.TABLES, SyncStepStatus.IN_PROGRESS))
+
+        // IMPORTANT: Save active orders' table relationships BEFORE sync
+        // because syncTables() deletes all tables, triggering foreign key SET NULL on orders.table_id
+        val activeOrdersWithTables = orderDao.getAllActiveOrdersWithTable()
+        val orderTableMap = activeOrdersWithTables.associate { it.id to (it.tableId to it.tableName) }
+        Log.d("SyncRepository", "Saved ${orderTableMap.size} active orders' table relationships before sync")
+
         val tables = syncData.tables.map { dto ->
             TableEntity(
                 id = dto.id,
@@ -282,6 +289,23 @@ class SyncRepository @Inject constructor(
             )
         }
         tableRepository.syncTables(branchId, tables)
+
+        // Restore table relationships to orders that lost them due to foreign key constraint
+        val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            .format(java.util.Date())
+        val syncedTableIds = tables.map { it.id }.toSet()
+
+        for ((orderId, tableInfo) in orderTableMap) {
+            val (tableId, tableName) = tableInfo
+            if (tableId != null && tableId in syncedTableIds) {
+                // Restore table_id back to the order
+                orderDao.updateTableId(orderId, tableId, tableName, now)
+                Log.d("SyncRepository", "Restored table $tableId ($tableName) to order $orderId")
+            } else {
+                Log.w("SyncRepository", "Table $tableId not found in synced tables for order $orderId")
+            }
+        }
 
         // Restore table statuses based on active orders (important for shift handover)
         val restoredCount = restoreTableStatusesFromOrders(tables)
@@ -419,6 +443,9 @@ class SyncRepository @Inject constructor(
      * This is important for shift handover - when syncing after login,
      * tables with active orders should show as "occupied" instead of "available".
      *
+     * Note: This should be called AFTER restoring table_ids to orders,
+     * because syncTables() triggers foreign key SET NULL on orders.table_id
+     *
      * @return Number of tables that were restored to "occupied" status
      */
     private suspend fun restoreTableStatusesFromOrders(tables: List<TableEntity>): Int {
@@ -427,15 +454,31 @@ class SyncRepository @Inject constructor(
             .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
             .format(java.util.Date())
 
-        for (table in tables) {
-            val activeOrder = orderDao.getActiveOrderByTable(table.id)
-            if (activeOrder != null) {
-                // Table has an active order - mark as occupied
-                tableDao.updateStatus(table.id, "occupied", activeOrder.id, now)
-                restoredCount++
-                Log.d("SyncRepository", "Restored table ${table.name} (${table.id}) to occupied - order: ${activeOrder.orderNumber}")
+        // Get all active orders that have a table assigned (should have table_ids restored by now)
+        val activeOrders = orderDao.getAllActiveOrdersWithTable()
+        Log.d("SyncRepository", "restoreTableStatuses: Found ${activeOrders.size} active orders with tables")
+
+        // Create a map of synced table IDs for quick lookup
+        val syncedTablesMap = tables.associateBy { it.id }
+        Log.d("SyncRepository", "restoreTableStatuses: ${tables.size} synced tables")
+
+        for (order in activeOrders) {
+            val tableId = order.tableId
+            if (tableId != null) {
+                Log.d("SyncRepository", "restoreTableStatuses: Order ${order.orderNumber} -> tableId=$tableId, tableName=${order.tableName}, status=${order.status}")
+
+                // Check if this table exists in our synced tables
+                val syncedTable = syncedTablesMap[tableId]
+                if (syncedTable != null) {
+                    tableDao.updateStatus(tableId, "occupied", order.id, now)
+                    restoredCount++
+                    Log.d("SyncRepository", "restoreTableStatuses: ✓ Updated ${syncedTable.name} ($tableId) to OCCUPIED")
+                } else {
+                    Log.w("SyncRepository", "restoreTableStatuses: ✗ Table $tableId NOT FOUND in synced tables for order ${order.orderNumber}")
+                }
             }
         }
+        Log.d("SyncRepository", "restoreTableStatuses: Restored $restoredCount tables to occupied status")
         return restoredCount
     }
 

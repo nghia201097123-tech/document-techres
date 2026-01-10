@@ -13,6 +13,9 @@ interface OrderDao {
     @Query("SELECT * FROM orders WHERE branch_id = :branchId AND status NOT IN ('completed', 'cancelled') ORDER BY created_at DESC")
     fun getActiveOrdersByBranch(branchId: String): Flow<List<OrderEntity>>
 
+    @Query("SELECT * FROM orders WHERE status NOT IN ('completed', 'cancelled') AND table_id IS NOT NULL ORDER BY created_at DESC")
+    suspend fun getAllActiveOrdersWithTable(): List<OrderEntity>
+
     @Query("SELECT * FROM orders WHERE branch_id = :branchId AND shift_id = :shiftId ORDER BY created_at DESC")
     fun getByShift(branchId: String, shiftId: String): Flow<List<OrderEntity>>
 
@@ -53,6 +56,9 @@ interface OrderDao {
 
     @Query("UPDATE orders SET sync_status = :syncStatus, synced_at = :syncedAt, retry_count = :retryCount WHERE id = :orderId")
     suspend fun updateSyncStatus(orderId: String, syncStatus: String, syncedAt: String?, retryCount: Int)
+
+    @Query("UPDATE orders SET table_id = :tableId, table_name = :tableName, updated_at = :updatedAt WHERE id = :orderId")
+    suspend fun updateTableId(orderId: String, tableId: String?, tableName: String?, updatedAt: String)
 
     @Delete
     suspend fun delete(order: OrderEntity)
