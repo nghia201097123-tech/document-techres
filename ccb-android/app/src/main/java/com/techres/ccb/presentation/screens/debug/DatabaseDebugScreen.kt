@@ -29,6 +29,7 @@ import com.techres.ccb.data.local.entity.BrandEntity
 import com.techres.ccb.data.local.entity.BranchEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceEntity
 import com.techres.ccb.data.local.entity.CouponEntity
+import com.techres.ccb.data.local.entity.ShiftEntity
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.repository.*
@@ -45,6 +46,7 @@ enum class DebugTab(val title: String) {
     AREAS("Khu vực"),
     TABLES("Bàn"),
     STAFF("Nhân viên"),
+    SHIFTS("Ca làm việc"),
     SEASONAL_PRICES("Giá thời vụ"),
     COUPONS("Coupon")
 }
@@ -59,6 +61,7 @@ data class DebugUiState(
     val areas: List<AreaEntity> = emptyList(),
     val tables: List<TableEntity> = emptyList(),
     val staff: List<StaffEntity> = emptyList(),
+    val shifts: List<ShiftEntity> = emptyList(),
     val seasonalPrices: List<SeasonalPriceEntity> = emptyList(),
     val coupons: List<CouponEntity> = emptyList(),
     val isLoading: Boolean = false
@@ -70,6 +73,7 @@ class DatabaseDebugViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
+    private val shiftRepository: ShiftRepository,
     private val branchRepository: BranchRepository,
     private val authRepository: AuthRepository,
     private val seasonalPriceDao: SeasonalPriceDao,
@@ -164,6 +168,14 @@ class DatabaseDebugViewModel @Inject constructor(
 
         viewModelScope.launch {
             val branchId = _uiState.value.branchId
+            shiftRepository.getAllShiftsByBranch(branchId)
+                .collect { shifts ->
+                    _uiState.update { it.copy(shifts = shifts) }
+                }
+        }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
             seasonalPriceDao.getActiveSeasonalPrices(branchId)
                 .collect { seasonalPrices ->
                     _uiState.update { it.copy(seasonalPrices = seasonalPrices) }
@@ -232,6 +244,7 @@ fun DatabaseDebugScreen(
                         DebugTab.AREAS -> uiState.areas.size
                         DebugTab.TABLES -> uiState.tables.size
                         DebugTab.STAFF -> uiState.staff.size
+                        DebugTab.SHIFTS -> uiState.shifts.size
                         DebugTab.SEASONAL_PRICES -> uiState.seasonalPrices.size
                         DebugTab.COUPONS -> uiState.coupons.size
                     }
@@ -260,6 +273,7 @@ fun DatabaseDebugScreen(
                     DebugTab.AREAS -> AreasTable(uiState.areas)
                     DebugTab.TABLES -> TablesTable(uiState.tables)
                     DebugTab.STAFF -> StaffTable(uiState.staff)
+                    DebugTab.SHIFTS -> ShiftsTable(uiState.shifts)
                     DebugTab.SEASONAL_PRICES -> SeasonalPricesTable(uiState.seasonalPrices)
                     DebugTab.COUPONS -> CouponsTable(uiState.coupons)
                 }
@@ -383,6 +397,25 @@ fun StaffTable(staff: List<StaffEntity>) {
                 s.code,
                 s.role,
                 if (s.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun ShiftsTable(shifts: List<ShiftEntity>) {
+    DataTable(
+        headers = listOf("ID", "Nhân viên", "Trạng thái", "Tiền đầu ca", "Doanh thu", "Mở ca", "Đóng ca"),
+        data = shifts,
+        rowContent = { shift ->
+            listOf(
+                shift.id.take(8) + "...",
+                shift.staffName,
+                if (shift.status == "open") "🟢 Đang mở" else "🔴 Đã đóng",
+                "%,.0f".format(shift.openingAmount),
+                "%,.0f".format(shift.totalRevenue),
+                shift.openedAt.take(19).replace("T", " "),
+                shift.closedAt?.take(19)?.replace("T", " ") ?: "-"
             )
         }
     )
