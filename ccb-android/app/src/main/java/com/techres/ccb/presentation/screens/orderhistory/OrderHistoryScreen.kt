@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -571,30 +572,89 @@ private fun OrderDetailDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 LazyColumn(
-                    modifier = Modifier.height(200.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.height(250.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(orderItems) { item ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        // Grab-style order item display
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // Row 1: Quantity badge + Product name + Total price
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    // Quantity badge
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .background(Color(0xFFE3F2FD), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = item.quantity.toString(),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1976D2)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = item.productName,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                                 Text(
-                                    text = item.productName,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "x${item.quantity} @ ${formatCurrency(item.unitPrice.toLong())}",
-                                    fontSize = 12.sp,
-                                    color = Color.Gray
+                                    text = formatCurrency(item.totalPrice.toLong()),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1976D2)
                                 )
                             }
+
+                            // Row 2: Unit price
                             Text(
-                                text = formatCurrency(item.totalPrice.toLong()),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
+                                text = formatCurrency(item.unitPrice.toLong()),
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(start = 32.dp, top = 2.dp)
                             )
+
+                            // Row 3: Variants/Toppings - Grab style
+                            if (!item.notes.isNullOrBlank()) {
+                                val variants = item.notes.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                if (variants.isNotEmpty()) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 32.dp, top = 6.dp)
+                                    ) {
+                                        variants.forEach { variant ->
+                                            Row(
+                                                modifier = Modifier.padding(vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "•",
+                                                    fontSize = 13.sp,
+                                                    color = Color.Gray,
+                                                    modifier = Modifier.padding(end = 8.dp)
+                                                )
+                                                Text(
+                                                    text = variant,
+                                                    fontSize = 13.sp,
+                                                    color = Color(0xFF424242)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
