@@ -1,5 +1,6 @@
 package com.techres.ccb.data.repository
 
+import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
@@ -25,6 +26,7 @@ enum class SyncStep {
     CATEGORIES,       // Danh mục
     PRODUCTS,         // Sản phẩm
     PRODUCT_TOPPINGS, // Topping sản phẩm
+    COMBO_ITEMS,      // Các món con trong combo
     AREAS,            // Khu vực
     TABLES,           // Bàn
     STAFF,            // Nhân viên
@@ -49,6 +51,7 @@ class SyncRepository @Inject constructor(
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
     private val productToppingDao: ProductToppingDao,
+    private val comboItemDao: ComboItemDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val seasonalPriceProductDao: SeasonalPriceProductDao,
     private val couponDao: CouponDao,
@@ -209,6 +212,30 @@ class SyncRepository @Inject constructor(
             productToppingDao.insertAll(productToppings)
         }
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_TOPPINGS, SyncStepStatus.COMPLETED, productToppings.size))
+
+        // Sync combo items
+        onProgress?.invoke(SyncStepProgress(SyncStep.COMBO_ITEMS, SyncStepStatus.IN_PROGRESS))
+        val comboItemsList = syncData.comboItems?.map { dto ->
+            ComboItemEntity(
+                id = dto.id,
+                comboId = dto.comboId,
+                productId = dto.productId,
+                productName = dto.productName,
+                productCode = dto.productCode,
+                quantity = dto.quantity,
+                sortOrder = dto.sortOrder,
+                isActive = dto.isActive,
+                createdAt = syncTime,
+                updatedAt = syncTime
+            )
+        } ?: emptyList()
+
+        // Clear existing combo items and insert new ones
+        comboItemDao.deleteAll()
+        if (comboItemsList.isNotEmpty()) {
+            comboItemDao.insertAll(comboItemsList)
+        }
+        onProgress?.invoke(SyncStepProgress(SyncStep.COMBO_ITEMS, SyncStepStatus.COMPLETED, comboItemsList.size))
 
         // Sync areas
         onProgress?.invoke(SyncStepProgress(SyncStep.AREAS, SyncStepStatus.IN_PROGRESS))
@@ -383,6 +410,7 @@ class SyncRepository @Inject constructor(
         // Clear synced master data only - keep shifts, orders, etc.
         categoryRepository.clearByBranch(branchId)
         productToppingDao.deleteAllByBranch(branchId) // Delete toppings before products
+        comboItemDao.deleteAll() // Delete combo items before products
         productNoteDao.deleteAllAssignmentsByBranch(branchId) // Delete note assignments before notes
         productNoteDao.deleteAllByBranch(branchId)
         productRepository.clearByBranch(branchId)

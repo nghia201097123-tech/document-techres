@@ -61,6 +61,12 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideComboItemDao(database: CCBDatabase): ComboItemDao {
+        return database.comboItemDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideAreaDao(database: CCBDatabase): AreaDao {
         return database.areaDao()
     }

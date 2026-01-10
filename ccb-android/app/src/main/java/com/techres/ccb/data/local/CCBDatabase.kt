@@ -14,6 +14,7 @@ import com.techres.ccb.data.local.entity.*
         CategoryEntity::class,
         ProductEntity::class,
         ProductToppingEntity::class,
+        ComboItemEntity::class,
         AreaEntity::class,
         TableEntity::class,
         StaffEntity::class,
@@ -35,7 +36,7 @@ import com.techres.ccb.data.local.entity.*
         ProductNoteEntity::class,
         ProductNoteAssignmentEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -46,6 +47,7 @@ abstract class CCBDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun productDao(): ProductDao
     abstract fun productToppingDao(): ProductToppingDao
+    abstract fun comboItemDao(): ComboItemDao
     abstract fun areaDao(): AreaDao
     abstract fun tableDao(): TableDao
     abstract fun staffDao(): StaffDao
@@ -86,6 +88,7 @@ abstract class CCBDatabase : RoomDatabase() {
             db.execSQL("DELETE FROM categories")
             db.execSQL("DELETE FROM products")
             db.execSQL("DELETE FROM product_toppings")
+            db.execSQL("DELETE FROM combo_items")
             db.execSQL("DELETE FROM areas")
             db.execSQL("DELETE FROM tables")
             db.execSQL("DELETE FROM staff")

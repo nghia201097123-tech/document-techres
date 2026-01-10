@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -58,6 +58,8 @@ export class SyncService {
     private productNoteRepository: Repository<ProductNote>,
     @InjectRepository(ProductNoteAssignment)
     private productNoteAssignmentRepository: Repository<ProductNoteAssignment>,
+    @InjectRepository(ComboItem)
+    private comboItemRepository: Repository<ComboItem>,
   ) {}
 
   /**
@@ -374,7 +376,8 @@ export class SyncService {
       // Fetch topping group items and product mappings
       const toppingGroupIds = toppingGroups.map(tg => tg.id);
       const productNoteIds = productNotes.map(pn => pn.id);
-      const [toppingGroupItems, productToppingGroups, productNoteAssignments] = await Promise.all([
+      const productIds = products.map(p => p.id);
+      const [toppingGroupItems, productToppingGroups, productNoteAssignments, comboItems] = await Promise.all([
         toppingGroupIds.length > 0
           ? this.toppingGroupItemRepository.find({
               where: { groupId: In(toppingGroupIds) },
@@ -392,9 +395,17 @@ export class SyncService {
               where: { noteId: In(productNoteIds) },
             })
           : Promise.resolve([]),
+        // Fetch combo items for combo products
+        tenantId
+          ? this.comboItemRepository.find({
+              where: { tenantId, isActive: true },
+              relations: ['product'],
+              order: { sortOrder: 'ASC' },
+            })
+          : Promise.resolve([]),
       ]);
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}`);
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -410,6 +421,7 @@ export class SyncService {
           coupons: coupons.map(c => this.mapCoupon(c)),
           toppingGroups: toppingGroups.map(tg => this.mapToppingGroup(tg, toppingGroupItems, productToppingGroups)),
           productNotes: productNotes.map(pn => this.mapProductNote(pn, productNoteAssignments)),
+          comboItems: comboItems.map(ci => this.mapComboItem(ci)),
         },
         syncTime,
         message: null,
@@ -720,6 +732,21 @@ export class SyncService {
       productIds: productIds,
       createdAt: note.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: note.updatedAt.toISOString(),
+    };
+  }
+
+  private mapComboItem(ci: ComboItem): any {
+    return {
+      id: ci.id,
+      comboId: ci.comboId,
+      productId: ci.productId,
+      productName: ci.product?.name || '',
+      productCode: ci.product?.code || '',
+      quantity: ci.quantity,
+      sortOrder: ci.sortOrder,
+      isActive: ci.isActive,
+      createdAt: ci.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: ci.updatedAt?.toISOString() || new Date().toISOString(),
     };
   }
 }

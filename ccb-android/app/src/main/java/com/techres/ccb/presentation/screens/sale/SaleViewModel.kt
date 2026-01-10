@@ -3,8 +3,10 @@ package com.techres.ccb.presentation.screens.sale
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
+import com.techres.ccb.data.local.entity.ComboItemEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.ProductEntity
@@ -117,6 +119,7 @@ class SaleViewModel @Inject constructor(
     private val orderRepository: OrderRepository,
     private val shiftRepository: ShiftRepository,
     private val productToppingDao: ProductToppingDao,
+    private val comboItemDao: ComboItemDao,
     private val productNoteDao: ProductNoteDao
 ) : ViewModel() {
 
@@ -753,6 +756,111 @@ class SaleViewModel @Inject constructor(
     }
 
     /**
+     * Expand combo items - tạo order items cho cả món combo và các món con
+     * Món con sẽ được gửi xuống bếp để chế biến
+     */
+    private suspend fun expandComboItems(
+        cartItem: CartItem,
+        orderId: String,
+        now: String
+    ): List<OrderItemEntity> {
+        val orderItems = mutableListOf<OrderItemEntity>()
+
+        // Build variants string with prices: "Kiwi:10000, Size S:10000"
+        val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
+            if (variant.price > 0) {
+                "${variant.name}:${variant.price}"
+            } else {
+                variant.name
+            }
+        }
+
+        // Combine variants and user note into notes field
+        val variantsAndNote = buildString {
+            if (variantsWithPrices.isNotEmpty()) {
+                append(variantsWithPrices)
+            }
+            if (!cartItem.note.isNullOrEmpty()) {
+                if (isNotEmpty()) append(" | ")
+                append("Ghi chú: ${cartItem.note}")
+            }
+        }.ifEmpty { null }
+
+        // Get combo child items
+        val comboItems = withContext(Dispatchers.IO) {
+            comboItemDao.getItemsByComboSync(cartItem.product.id)
+        }
+
+        if (comboItems.isEmpty()) {
+            // Not a combo - create single order item
+            orderItems.add(
+                OrderItemEntity(
+                    id = UUID.randomUUID().toString(),
+                    orderId = orderId,
+                    productId = cartItem.product.id,
+                    productCode = cartItem.product.code,
+                    productName = cartItem.product.name,
+                    productImageUrl = cartItem.product.imageUrl,
+                    quantity = cartItem.quantity,
+                    unitPrice = cartItem.product.price.toDouble(),
+                    totalPrice = cartItem.totalPrice.toDouble(),
+                    notes = variantsAndNote,
+                    status = "pending",
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        } else {
+            // This is a combo - create combo parent item
+            orderItems.add(
+                OrderItemEntity(
+                    id = UUID.randomUUID().toString(),
+                    orderId = orderId,
+                    productId = cartItem.product.id,
+                    productCode = cartItem.product.code,
+                    productName = cartItem.product.name,
+                    productImageUrl = cartItem.product.imageUrl,
+                    quantity = cartItem.quantity,
+                    unitPrice = cartItem.product.price.toDouble(),
+                    totalPrice = cartItem.totalPrice.toDouble(),
+                    notes = variantsAndNote,
+                    status = "pending",
+                    isComboParent = true,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+
+            // Create child items for kitchen (price = 0, marked as combo child)
+            comboItems.forEach { comboItem ->
+                orderItems.add(
+                    OrderItemEntity(
+                        id = UUID.randomUUID().toString(),
+                        orderId = orderId,
+                        productId = comboItem.productId,
+                        productCode = comboItem.productCode ?: "",
+                        productName = comboItem.productName,
+                        productImageUrl = null,
+                        quantity = cartItem.quantity * comboItem.quantity,  // Multiply by parent quantity
+                        unitPrice = 0.0,  // Child items have no price (included in combo)
+                        totalPrice = 0.0,
+                        notes = "[Combo: ${cartItem.product.name}]",  // Mark as part of combo
+                        status = "pending",
+                        isComboChild = true,
+                        comboParentId = cartItem.product.id,
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                )
+            }
+
+            Log.d(TAG, "expandComboItems - Expanded combo ${cartItem.product.name} with ${comboItems.size} child items")
+        }
+
+        return orderItems
+    }
+
+    /**
      * Đặt món - Tạo order mới với status pending
      * Table status sẽ chuyển sang occupied
      */
@@ -809,43 +917,11 @@ class SaleViewModel @Inject constructor(
                     idempotencyKey = UUID.randomUUID().toString()
                 )
 
-                // Create order items
-                val orderItems = state.cartItems.mapIndexed { index, cartItem ->
-                    // Build variants string with prices: "Kiwi:10000, Size S:10000"
-                    val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
-                        if (variant.price > 0) {
-                            "${variant.name}:${variant.price}"
-                        } else {
-                            variant.name
-                        }
-                    }
-
-                    // Combine variants and user note into notes field
-                    val variantsAndNote = buildString {
-                        if (variantsWithPrices.isNotEmpty()) {
-                            append(variantsWithPrices)
-                        }
-                        if (!cartItem.note.isNullOrEmpty()) {
-                            if (isNotEmpty()) append(" | ")
-                            append("Ghi chú: ${cartItem.note}")
-                        }
-                    }.ifEmpty { null }
-
-                    OrderItemEntity(
-                        id = UUID.randomUUID().toString(),
-                        orderId = orderId,
-                        productId = cartItem.product.id,
-                        productCode = cartItem.product.code,
-                        productName = cartItem.product.name,
-                        productImageUrl = cartItem.product.imageUrl,
-                        quantity = cartItem.quantity,
-                        unitPrice = cartItem.product.price.toDouble(),  // Base price only (without toppings)
-                        totalPrice = cartItem.totalPrice.toDouble(),
-                        notes = variantsAndNote,
-                        status = "pending",
-                        createdAt = now,
-                        updatedAt = now
-                    )
+                // Create order items with combo expansion
+                val orderItems = mutableListOf<OrderItemEntity>()
+                state.cartItems.forEach { cartItem ->
+                    val expandedItems = expandComboItems(cartItem, orderId, now)
+                    orderItems.addAll(expandedItems)
                 }
 
                 // Save to database
@@ -895,43 +971,11 @@ class SaleViewModel @Inject constructor(
             try {
                 val now = getCurrentTimestamp()
 
-                // Create new order items
-                val newItems = state.cartItems.map { cartItem ->
-                    // Build variants string with prices: "Kiwi:10000, Size S:10000"
-                    val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
-                        if (variant.price > 0) {
-                            "${variant.name}:${variant.price}"
-                        } else {
-                            variant.name
-                        }
-                    }
-
-                    // Combine variants and user note into notes field
-                    val variantsAndNote = buildString {
-                        if (variantsWithPrices.isNotEmpty()) {
-                            append(variantsWithPrices)
-                        }
-                        if (!cartItem.note.isNullOrEmpty()) {
-                            if (isNotEmpty()) append(" | ")
-                            append("Ghi chú: ${cartItem.note}")
-                        }
-                    }.ifEmpty { null }
-
-                    OrderItemEntity(
-                        id = UUID.randomUUID().toString(),
-                        orderId = currentOrder.id,
-                        productId = cartItem.product.id,
-                        productCode = cartItem.product.code,
-                        productName = cartItem.product.name,
-                        productImageUrl = cartItem.product.imageUrl,
-                        quantity = cartItem.quantity,
-                        unitPrice = cartItem.product.price.toDouble(),  // Base price only (without toppings)
-                        totalPrice = cartItem.totalPrice.toDouble(),
-                        notes = variantsAndNote,
-                        status = "pending",
-                        createdAt = now,
-                        updatedAt = now
-                    )
+                // Create new order items with combo expansion
+                val newItems = mutableListOf<OrderItemEntity>()
+                state.cartItems.forEach { cartItem ->
+                    val expandedItems = expandComboItems(cartItem, currentOrder.id, now)
+                    newItems.addAll(expandedItems)
                 }
 
                 // Calculate new totals

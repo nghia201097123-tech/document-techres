@@ -85,7 +85,9 @@ data class FullSyncData(
     // Topping groups với danh sách toppings và gán vào món
     @SerializedName("toppingGroups") val toppingGroups: List<ToppingGroupDto>?,
     // Product notes (ghi chú món ăn)
-    @SerializedName("productNotes") val productNotes: List<ProductNoteDto>?
+    @SerializedName("productNotes") val productNotes: List<ProductNoteDto>?,
+    // Combo items (các món con trong combo)
+    @SerializedName("comboItems") val comboItems: List<ComboItemDto>?
 )
 
 // ============ Master Data DTOs ============
@@ -631,4 +633,21 @@ data class ProductNoteDto(
     @SerializedName("productIds") val productIds: List<String>?,       // Danh sách sản phẩm được gán ghi chú này
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String
+)
+
+// ============ Combo Item DTOs ============
+
+/**
+ * Thông tin món con trong combo
+ * Ví dụ: Combo "Cơm gà + Trà sữa" gồm có: "Cơm gà" x1, "Trà sữa" x1
+ */
+data class ComboItemDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("comboId") val comboId: String,            // ID của sản phẩm combo (sản phẩm cha)
+    @SerializedName("productId") val productId: String,        // ID của sản phẩm con trong combo
+    @SerializedName("productName") val productName: String,    // Tên sản phẩm con (để hiển thị không cần join)
+    @SerializedName("productCode") val productCode: String?,   // Mã sản phẩm con
+    @SerializedName("quantity") val quantity: Int = 1,         // Số lượng sản phẩm con trong combo
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("isActive") val isActive: Boolean = true
 )

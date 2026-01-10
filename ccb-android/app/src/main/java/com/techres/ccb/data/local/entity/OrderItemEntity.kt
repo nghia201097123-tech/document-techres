@@ -102,6 +102,16 @@ data class OrderItemEntity(
     @ColumnInfo(name = "cancel_reason")
     val cancelReason: String? = null,
 
+    // Combo fields - for tracking combo items sent to kitchen
+    @ColumnInfo(name = "is_combo_parent")
+    val isComboParent: Boolean = false,  // True if this item is a combo product
+
+    @ColumnInfo(name = "is_combo_child")
+    val isComboChild: Boolean = false,   // True if this is a child item of a combo
+
+    @ColumnInfo(name = "combo_parent_id")
+    val comboParentId: String? = null,   // ID of parent combo product (for child items)
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 
