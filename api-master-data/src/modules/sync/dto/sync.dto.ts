@@ -336,6 +336,75 @@ export class CouponDto {
   updatedAt: string;
 }
 
+// ============ Topping Group DTOs ============
+
+export class ToppingItemDto {
+  @ApiProperty({ description: 'ID của topping item' })
+  id: string;
+
+  @ApiProperty({ description: 'Mã topping (vd: TOP2962)', nullable: true })
+  code: string | null;
+
+  @ApiProperty({ description: 'Tên topping (vd: Size S)' })
+  name: string;
+
+  @ApiProperty({ description: 'Giá thêm khi chọn topping này' })
+  price: number;
+
+  @ApiProperty({ description: 'Có phải mặc định không' })
+  isDefault: boolean;
+
+  @ApiProperty({ description: 'Số lượng tối đa có thể thêm' })
+  maxQuantity: number;
+
+  @ApiProperty({ description: 'Thứ tự sắp xếp' })
+  sortOrder: number;
+
+  @ApiProperty({ description: 'Còn hoạt động không' })
+  isActive: boolean;
+}
+
+export class ToppingGroupDto {
+  @ApiProperty({ description: 'ID của nhóm topping' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên nhóm (vd: SIZE, ĐƯỜNG, ĐÁ, TOPPING)' })
+  name: string;
+
+  @ApiProperty({ description: 'Loại nhóm (size, sugar, ice, topping, other)' })
+  groupType: string;
+
+  @ApiProperty({ description: 'Bắt buộc phải chọn?' })
+  isRequired: boolean;
+
+  @ApiProperty({ description: 'Cho phép chọn nhiều?' })
+  isMultiple: boolean;
+
+  @ApiProperty({ description: 'Số tối thiểu cần chọn' })
+  minSelect: number;
+
+  @ApiProperty({ description: 'Số tối đa được chọn' })
+  maxSelect: number;
+
+  @ApiProperty({ description: 'Thứ tự sắp xếp' })
+  sortOrder: number;
+
+  @ApiProperty({ description: 'Còn hoạt động không' })
+  isActive: boolean;
+
+  @ApiProperty({ type: [ToppingItemDto], description: 'Danh sách topping trong nhóm' })
+  toppings: ToppingItemDto[];
+
+  @ApiProperty({ type: [String], description: 'Danh sách product ID được gán nhóm này', nullable: true })
+  productIds: string[] | null;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 export class StaffBranchPermissionsSyncDto {
   @ApiProperty({ type: [BrandWithBranchesDto] })
   data: BrandWithBranchesDto[];
@@ -368,6 +437,9 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [CouponDto] })
   coupons: CouponDto[];
+
+  @ApiProperty({ type: [ToppingGroupDto], description: 'Danh sách nhóm topping với các product được gán' })
+  toppingGroups: ToppingGroupDto[];
 }
 
 export class FullSyncResponseDto {

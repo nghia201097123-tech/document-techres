@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -12,6 +12,8 @@ import {
   StaffDto,
   SeasonalPriceDto,
   CouponDto,
+  ToppingGroupDto,
+  ToppingItemDto,
   StaffBranchPermissionsSyncDto,
   BrandWithBranchesDto,
 } from './dto/sync.dto';
@@ -45,6 +47,12 @@ export class SyncService {
     private seasonalPriceProductRepository: Repository<SeasonalPriceProduct>,
     @InjectRepository(Coupon)
     private couponRepository: Repository<Coupon>,
+    @InjectRepository(ToppingGroup)
+    private toppingGroupRepository: Repository<ToppingGroup>,
+    @InjectRepository(ToppingGroupItem)
+    private toppingGroupItemRepository: Repository<ToppingGroupItem>,
+    @InjectRepository(ProductToppingGroup)
+    private productToppingGroupRepository: Repository<ProductToppingGroup>,
   ) {}
 
   /**
@@ -266,7 +274,8 @@ export class SyncService {
       console.log(`[SyncService.getFullSync] branchId=${branchId}, brandId=${brandId}`);
 
       const today = new Date();
-      const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons] = await Promise.all([
+      const tenantId = branch.tenantId;
+      const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons, toppingGroups] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -295,6 +304,10 @@ export class SyncService {
           where: { branchId, isActive: true },
           order: { sortOrder: 'ASC' },
         }),
+        tenantId ? this.toppingGroupRepository.find({
+          where: { tenantId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }) : Promise.resolve([]),
       ]);
 
       const products = branchProducts
@@ -308,7 +321,24 @@ export class SyncService {
           })
         : [];
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}`);
+      // Fetch topping group items and product mappings
+      const toppingGroupIds = toppingGroups.map(tg => tg.id);
+      const [toppingGroupItems, productToppingGroups] = await Promise.all([
+        toppingGroupIds.length > 0
+          ? this.toppingGroupItemRepository.find({
+              where: { groupId: In(toppingGroupIds) },
+              relations: ['topping'],
+              order: { sortOrder: 'ASC' },
+            })
+          : Promise.resolve([]),
+        toppingGroupIds.length > 0
+          ? this.productToppingGroupRepository.find({
+              where: { groupId: In(toppingGroupIds) },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -322,6 +352,7 @@ export class SyncService {
           staff: staff.map(this.mapStaff),
           seasonalPrices: seasonalPrices.map(sp => this.mapSeasonalPrice(sp, seasonalPriceProducts)),
           coupons: coupons.map(c => this.mapCoupon(c)),
+          toppingGroups: toppingGroups.map(tg => this.mapToppingGroup(tg, toppingGroupItems, productToppingGroups)),
         },
         syncTime,
         message: null,
@@ -568,6 +599,49 @@ export class SyncService {
       isActive: c.isActive,
       createdAt: c.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: c.updatedAt.toISOString(),
+    };
+  }
+
+  private mapToppingGroup(
+    tg: ToppingGroup,
+    allItems: ToppingGroupItem[],
+    allProductMappings: ProductToppingGroup[],
+  ): ToppingGroupDto {
+    // Filter items for this topping group
+    const groupItems = allItems.filter(item => item.groupId === tg.id);
+
+    // Filter product mappings for this topping group
+    const productMappings = allProductMappings.filter(ptg => ptg.groupId === tg.id);
+    const productIds = productMappings.map(ptg => ptg.productId);
+
+    return {
+      id: tg.id,
+      name: tg.name,
+      groupType: 'topping', // Default group type
+      isRequired: tg.isRequired,
+      isMultiple: tg.maxSelection > 1,
+      minSelect: tg.minSelection,
+      maxSelect: tg.maxSelection,
+      sortOrder: tg.sortOrder || 0,
+      isActive: tg.isActive,
+      toppings: groupItems.map(item => this.mapToppingItem(item)),
+      productIds: productIds.length > 0 ? productIds : null,
+      createdAt: tg.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: tg.updatedAt.toISOString(),
+    };
+  }
+
+  private mapToppingItem(item: ToppingGroupItem): ToppingItemDto {
+    const topping = item.topping;
+    return {
+      id: item.toppingId,
+      code: topping?.code || null,
+      name: topping?.name || '',
+      price: Number(item.priceAdjustment) || 0,
+      isDefault: false,
+      maxQuantity: item.maxQuantity || 5,
+      sortOrder: item.sortOrder || 0,
+      isActive: topping?.isActive ?? true,
     };
   }
 }

@@ -11,3 +11,6 @@ export * from './device.entity';
 export * from './seasonal-price.entity';
 export * from './seasonal-price-product.entity';
 export * from './coupon.entity';
+export * from './topping-group.entity';
+export * from './topping-group-item.entity';
+export * from './product-topping-group.entity';
