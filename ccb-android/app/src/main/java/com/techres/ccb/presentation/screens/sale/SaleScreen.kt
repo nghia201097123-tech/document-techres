@@ -927,7 +927,7 @@ fun CartItemRow(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                // Product info
+                // Product name + base price
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.product.name,
@@ -936,25 +936,11 @@ fun CartItemRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (item.variantText.isNotEmpty()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 2.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Tune,
-                                contentDescription = null,
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.outline
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = item.variantText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    }
+                    Text(
+                        text = formatCurrency(item.product.price),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
 
                 // Remove button
@@ -968,6 +954,19 @@ fun CartItemRow(
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
+                }
+            }
+
+            // Variants section - Grab style (each variant on its own line)
+            if (item.selectedVariants.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, top = 6.dp)
+                ) {
+                    item.selectedVariants.forEach { variant ->
+                        VariantLineItem(variant = variant)
+                    }
                 }
             }
 
@@ -1069,6 +1068,46 @@ fun CartItemRow(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+        }
+    }
+}
+
+/**
+ * Displays a single variant line item in Grab style
+ * Shows icon based on variant type, name, and price if applicable
+ */
+@Composable
+fun VariantLineItem(variant: SelectedVariant) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Bullet point / prefix
+        Text(
+            text = "•",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(end = 6.dp)
+        )
+
+        // Variant name
+        Text(
+            text = variant.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Price if > 0
+        if (variant.price > 0) {
+            Text(
+                text = "+${formatCurrency(variant.price)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
