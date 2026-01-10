@@ -135,6 +135,12 @@ class SaleViewModel @Inject constructor(
     // Cache topping category IDs to filter out topping products
     private var toppingCategoryIds: Set<String> = emptySet()
 
+    // OPTIMIZATION: Cache all products with variants for fast category switching
+    private var allProductsCache: List<Product> = emptyList()
+
+    // OPTIMIZATION: Pre-computed products by category for instant switching
+    private var productsByCategoryCache: Map<String, List<Product>> = emptyMap()
+
     init {
         loadInitialData()
     }
@@ -262,12 +268,23 @@ class SaleViewModel @Inject constructor(
                         )
                     }
 
+                    // OPTIMIZATION: Cache all products for fast category switching
+                    allProductsCache = productsWithVariants
+
+                    // OPTIMIZATION: Pre-compute products by category for INSTANT switching
+                    val categoryMap = mutableMapOf<String, List<Product>>()
+                    categoryMap["all"] = productsWithVariants
+                    productsWithVariants.groupBy { it.categoryId }.forEach { (catId, products) ->
+                        categoryMap[catId] = products
+                    }
+                    productsByCategoryCache = categoryMap
+
                     // Update UI with variants
                     _uiState.update { state ->
                         state.copy(products = productsWithVariants)
                     }
 
-                    Log.d(TAG, "loadInitialData - Complete with variants in ${System.currentTimeMillis() - startTime}ms, ${allToppings.size} topping mappings")
+                    Log.d(TAG, "loadInitialData - Complete with variants in ${System.currentTimeMillis() - startTime}ms, ${allToppings.size} topping mappings, cached ${productsByCategoryCache.size} categories")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadInitialData - Error: ${e.message}", e)
@@ -364,55 +381,37 @@ class SaleViewModel @Inject constructor(
     // ===== CATEGORY & SEARCH =====
 
     fun selectCategory(categoryId: String) {
-        viewModelScope.launch {
-            val products = withContext(Dispatchers.IO) {
-                val allProducts = productRepository.getAllProducts(branchId).first()
-                    .filter { it.type != "topping" } // Filter by type
-                    .filter { it.categoryId !in toppingCategoryIds } // Filter by topping category
+        // OPTIMIZATION: Use pre-computed cache - NO database query, INSTANT switching
+        val products = productsByCategoryCache[categoryId] ?: allProductsCache
 
-                val filteredProducts = if (categoryId == "all") {
-                    allProducts
-                } else {
-                    allProducts.filter { it.categoryId == categoryId }
-                }
-
-                buildProductsWithVariants(filteredProducts)
-            }
-
-            _uiState.update { state ->
-                state.copy(
-                    selectedCategoryId = categoryId,
-                    products = products,
-                    searchQuery = ""
-                )
-            }
+        _uiState.update { state ->
+            state.copy(
+                selectedCategoryId = categoryId,
+                products = products,
+                searchQuery = ""
+            )
         }
     }
 
     fun searchProducts(query: String) {
-        viewModelScope.launch {
-            val products = withContext(Dispatchers.IO) {
-                val productEntities = if (query.isBlank()) {
-                    val allProducts = productRepository.getAllProducts(branchId).first()
-                        .filter { it.type != "topping" }
-                        .filter { it.categoryId !in toppingCategoryIds }
-                    val categoryId = _uiState.value.selectedCategoryId
-                    if (categoryId == "all") allProducts else allProducts.filter { it.categoryId == categoryId }
-                } else {
-                    productRepository.searchProducts(branchId, query)
-                        .filter { it.type != "topping" }
-                        .filter { it.categoryId !in toppingCategoryIds }
-                }
-
-                buildProductsWithVariants(productEntities)
+        // OPTIMIZATION: Search from cache - NO database query
+        val categoryId = _uiState.value.selectedCategoryId
+        val baseProducts = if (query.isBlank()) {
+            productsByCategoryCache[categoryId] ?: allProductsCache
+        } else {
+            // Search in all products cache
+            val lowerQuery = query.lowercase()
+            allProductsCache.filter { product ->
+                product.name.lowercase().contains(lowerQuery) ||
+                product.code.lowercase().contains(lowerQuery)
             }
+        }
 
-            _uiState.update { state ->
-                state.copy(
-                    searchQuery = query,
-                    products = products
-                )
-            }
+        _uiState.update { state ->
+            state.copy(
+                searchQuery = query,
+                products = baseProducts
+            )
         }
     }
 
