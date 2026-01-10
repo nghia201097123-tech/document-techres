@@ -3,6 +3,8 @@ package com.techres.ccb.presentation.screens.sync
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,76 +22,21 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-
-// Mock data classes for UI preview (avoid conflict with ViewModel classes)
-private data class MockSyncItem(
-    val id: String,
-    val name: String,
-    val icon: ImageVector,
-    val status: MockSyncStatus = MockSyncStatus.PENDING,
-    val itemCount: Int = 0
-)
-
-private enum class MockSyncStatus {
-    PENDING, SYNCING, COMPLETED, ERROR
-}
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun SyncDataScreen(
     branchName: String,
     onSyncComplete: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: SyncDataViewModel = hiltViewModel()
 ) {
-    // Sync items for order-related data
-    var syncItems by remember {
-        mutableStateOf(
-            listOf(
-                MockSyncItem("categories", "Danh mục", Icons.Default.Category),
-                MockSyncItem("products", "Sản phẩm", Icons.Default.Fastfood),
-                MockSyncItem("product_toppings", "Topping sản phẩm", Icons.Default.AddCircle),
-                MockSyncItem("areas", "Khu vực", Icons.Default.Map),
-                MockSyncItem("tables", "Bàn", Icons.Default.TableBar),
-                MockSyncItem("staff", "Nhân viên", Icons.Default.People),
-                MockSyncItem("seasonal_prices", "Giá thời vụ", Icons.Default.Event),
-                MockSyncItem("coupons", "Coupon", Icons.Default.Discount)
-            )
-        )
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
-    var overallProgress by remember { mutableFloatStateOf(0f) }
-    var isCompleted by remember { mutableStateOf(false) }
-
-    // Mock sync animation
-    LaunchedEffect(Unit) {
-        delay(300) // Initial delay
-
-        // Mock counts for each item
-        val mockCounts = listOf(12, 48, 0, 4, 20, 8, 3, 5)
-
-        for (i in syncItems.indices) {
-            // Update current item to syncing
-            syncItems = syncItems.toMutableList().apply {
-                this[i] = this[i].copy(status = MockSyncStatus.SYNCING)
-            }
-
-            // Simulate sync delay
-            delay(600)
-
-            // Update current item to completed
-            syncItems = syncItems.toMutableList().apply {
-                this[i] = this[i].copy(
-                    status = MockSyncStatus.COMPLETED,
-                    itemCount = mockCounts[i]
-                )
-            }
-
-            overallProgress = (i + 1).toFloat() / syncItems.size
-        }
-
-        isCompleted = true
-        delay(1000)
-        onSyncComplete()
+    // Set branch name and start sync when screen loads
+    LaunchedEffect(branchName) {
+        viewModel.setBranchName(branchName)
+        viewModel.startSync(onSyncComplete)
     }
 
     Row(
@@ -167,7 +114,7 @@ fun SyncDataScreen(
                             color = Color.White.copy(alpha = 0.7f)
                         )
                         Text(
-                            text = branchName,
+                            text = uiState.branchName.ifEmpty { branchName },
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -201,7 +148,7 @@ fun SyncDataScreen(
                         label = "rotation"
                     )
 
-                    if (!isCompleted) {
+                    if (!uiState.isCompleted) {
                         Icon(
                             imageVector = Icons.Default.Sync,
                             contentDescription = null,
@@ -222,7 +169,12 @@ fun SyncDataScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = if (isCompleted) "Sẵn sàng phục vụ!" else "Đang đồng bộ...",
+                        text = when {
+                            uiState.error != null -> "Có lỗi xảy ra"
+                            uiState.isCompleted -> "Sẵn sàng phục vụ!"
+                            uiState.currentSyncItem != null -> "Đang tải ${uiState.currentSyncItem}..."
+                            else -> "Đang đồng bộ..."
+                        },
                         fontSize = 16.sp,
                         color = Color.White.copy(alpha = 0.9f)
                     )
@@ -298,7 +250,7 @@ fun SyncDataScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Tải danh mục, sản phẩm, bàn, nhân viên, giá thời vụ và coupon",
+                        text = "Tải danh mục, sản phẩm, topping, bàn, nhân viên, giá thời vụ và coupon",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -307,7 +259,7 @@ fun SyncDataScreen(
 
                     // Overall progress
                     LinearProgressIndicator(
-                        progress = { overallProgress },
+                        progress = { uiState.overallProgress },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
@@ -319,7 +271,7 @@ fun SyncDataScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "${(overallProgress * 100).toInt()}% hoàn tất",
+                        text = "${(uiState.overallProgress * 100).toInt()}% hoàn tất",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.align(Alignment.End)
@@ -328,15 +280,60 @@ fun SyncDataScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Sync items list
-                    syncItems.forEach { item ->
-                        SyncItemRow(item = item)
-                        if (item != syncItems.last()) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.syncItems) { item ->
+                            SyncItemRow(item = item)
+                        }
+                    }
+
+                    // Error message
+                    if (uiState.error != null) {
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFFFEBEE)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = Color(0xFFD32F2F),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Lỗi đồng bộ",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFD32F2F)
+                                    )
+                                    Text(
+                                        text = uiState.error ?: "",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFD32F2F)
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { viewModel.retrySync(onSyncComplete) }
+                                ) {
+                                    Text("Thử lại")
+                                }
+                            }
                         }
                     }
 
                     // Summary when completed
-                    if (isCompleted) {
+                    if (uiState.isCompleted && uiState.error == null) {
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Card(
@@ -365,7 +362,7 @@ fun SyncDataScreen(
                                         color = Color(0xFF2E7D32)
                                     )
                                     Text(
-                                        text = "Tổng cộng ${syncItems.sumOf { it.itemCount }} mục đã tải về",
+                                        text = "Tổng cộng ${uiState.syncItems.sumOf { it.itemCount }} mục đã tải về",
                                         fontSize = 12.sp,
                                         color = Color(0xFF4CAF50)
                                     )
@@ -379,15 +376,34 @@ fun SyncDataScreen(
     }
 }
 
+/**
+ * Map sync item id to icon
+ */
+private fun getIconForSyncItem(id: String): ImageVector {
+    return when (id) {
+        "categories" -> Icons.Default.Category
+        "products" -> Icons.Default.Fastfood
+        "product_toppings" -> Icons.Default.AddCircle
+        "areas" -> Icons.Default.Map
+        "tables" -> Icons.Default.TableBar
+        "staff" -> Icons.Default.People
+        "seasonal_prices" -> Icons.Default.Event
+        "coupons" -> Icons.Default.Discount
+        "settings" -> Icons.Default.Settings
+        else -> Icons.Default.Sync
+    }
+}
+
 @Composable
-private fun SyncItemRow(item: MockSyncItem) {
+private fun SyncItemRow(item: SyncItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 color = when (item.status) {
-                    MockSyncStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    MockSyncStatus.COMPLETED -> Color(0xFFE8F5E9)
+                    SyncStatus.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    SyncStatus.COMPLETED -> Color(0xFFE8F5E9)
+                    SyncStatus.ERROR -> Color(0xFFFFEBEE)
                     else -> Color.Transparent
                 },
                 shape = RoundedCornerShape(12.dp)
@@ -402,20 +418,20 @@ private fun SyncItemRow(item: MockSyncItem) {
                 .clip(CircleShape)
                 .background(
                     when (item.status) {
-                        MockSyncStatus.COMPLETED -> Color(0xFF4CAF50)
-                        MockSyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
-                        MockSyncStatus.ERROR -> MaterialTheme.colorScheme.error
+                        SyncStatus.COMPLETED -> Color(0xFF4CAF50)
+                        SyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
+                        SyncStatus.ERROR -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.surfaceVariant
                     }
                 ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = item.icon,
+                imageVector = getIconForSyncItem(item.id),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = when (item.status) {
-                    MockSyncStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
+                    SyncStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> Color.White
                 }
             )
@@ -431,24 +447,34 @@ private fun SyncItemRow(item: MockSyncItem) {
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            if (item.status == MockSyncStatus.COMPLETED && item.itemCount > 0) {
-                Text(
-                    text = "${item.itemCount} mục",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            } else if (item.status == MockSyncStatus.SYNCING) {
-                Text(
-                    text = "Đang tải...",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            when {
+                item.status == SyncStatus.COMPLETED && item.itemCount > 0 -> {
+                    Text(
+                        text = "${item.itemCount} mục",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                item.status == SyncStatus.SYNCING -> {
+                    Text(
+                        text = "Đang tải...",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                item.status == SyncStatus.ERROR && item.errorMessage != null -> {
+                    Text(
+                        text = item.errorMessage,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
 
         // Status icon
         when (item.status) {
-            MockSyncStatus.PENDING -> {
+            SyncStatus.PENDING -> {
                 Icon(
                     imageVector = Icons.Default.Schedule,
                     contentDescription = null,
@@ -456,14 +482,14 @@ private fun SyncItemRow(item: MockSyncItem) {
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
-            MockSyncStatus.SYNCING -> {
+            SyncStatus.SYNCING -> {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            MockSyncStatus.COMPLETED -> {
+            SyncStatus.COMPLETED -> {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
@@ -471,7 +497,7 @@ private fun SyncItemRow(item: MockSyncItem) {
                     tint = Color(0xFF4CAF50)
                 )
             }
-            MockSyncStatus.ERROR -> {
+            SyncStatus.ERROR -> {
                 Icon(
                     imageVector = Icons.Default.Error,
                     contentDescription = null,
