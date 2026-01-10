@@ -471,6 +471,35 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [ProductNoteDto], description: 'Danh sách ghi chú món ăn' })
   productNotes: ProductNoteDto[];
+
+  @ApiProperty({ type: [ComboItemDto], description: 'Danh sách các món trong combo' })
+  comboItems: ComboItemDto[];
+}
+
+export class ComboItemDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: 'ID của sản phẩm combo (sản phẩm cha)' })
+  comboId: string;
+
+  @ApiProperty({ description: 'ID của sản phẩm con trong combo' })
+  productId: string;
+
+  @ApiProperty({ description: 'Tên sản phẩm con' })
+  productName: string;
+
+  @ApiProperty({ nullable: true, description: 'Mã sản phẩm con' })
+  productCode: string | null;
+
+  @ApiProperty({ description: 'Số lượng sản phẩm con trong combo' })
+  quantity: number;
+
+  @ApiProperty()
+  sortOrder: number;
+
+  @ApiProperty()
+  isActive: boolean;
 }
 
 export class FullSyncResponseDto {
