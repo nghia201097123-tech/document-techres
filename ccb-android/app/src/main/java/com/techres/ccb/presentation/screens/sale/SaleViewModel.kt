@@ -108,7 +108,7 @@ class SaleViewModel @Inject constructor(
                     Category(
                         id = entity.id,
                         name = entity.name,
-                        icon = entity.icon ?: "📦"
+                        icon = entity.imageUrl // Use imageUrl as icon
                     )
                 })
 
@@ -117,12 +117,13 @@ class SaleViewModel @Inject constructor(
                 val products = productEntities.map { entity ->
                     Product(
                         id = entity.id,
+                        code = entity.code,
                         name = entity.name,
+                        categoryId = entity.categoryId ?: "",
                         price = entity.price.toLong(),
                         imageUrl = entity.imageUrl,
-                        categoryId = entity.categoryId,
                         description = entity.description,
-                        isAvailable = entity.isAvailable,
+                        isActive = entity.isActive,
                         hasVariants = false, // TODO: implement variants
                         variants = emptyList()
                     )
@@ -160,12 +161,13 @@ class SaleViewModel @Inject constructor(
             val products = filteredProducts.map { entity ->
                 Product(
                     id = entity.id,
+                    code = entity.code,
                     name = entity.name,
+                    categoryId = entity.categoryId ?: "",
                     price = entity.price.toLong(),
                     imageUrl = entity.imageUrl,
-                    categoryId = entity.categoryId,
                     description = entity.description,
-                    isAvailable = entity.isAvailable,
+                    isActive = entity.isActive,
                     hasVariants = false,
                     variants = emptyList()
                 )
@@ -190,12 +192,13 @@ class SaleViewModel @Inject constructor(
                 filtered.map { entity ->
                     Product(
                         id = entity.id,
+                        code = entity.code,
                         name = entity.name,
+                        categoryId = entity.categoryId ?: "",
                         price = entity.price.toLong(),
                         imageUrl = entity.imageUrl,
-                        categoryId = entity.categoryId,
                         description = entity.description,
-                        isAvailable = entity.isAvailable,
+                        isActive = entity.isActive,
                         hasVariants = false,
                         variants = emptyList()
                     )
@@ -205,12 +208,13 @@ class SaleViewModel @Inject constructor(
                 searchResults.map { entity ->
                     Product(
                         id = entity.id,
+                        code = entity.code,
                         name = entity.name,
+                        categoryId = entity.categoryId ?: "",
                         price = entity.price.toLong(),
                         imageUrl = entity.imageUrl,
-                        categoryId = entity.categoryId,
                         description = entity.description,
-                        isAvailable = entity.isAvailable,
+                        isActive = entity.isActive,
                         hasVariants = false,
                         variants = emptyList()
                     )
