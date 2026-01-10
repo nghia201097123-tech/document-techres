@@ -18,6 +18,8 @@ import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -150,12 +152,27 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Run all database operations on IO dispatcher
-                val (categories, products, tables) = withContext(Dispatchers.IO) {
-                    // Load categories from database
-                    val categoryEntities = categoryRepository.getAllCategories(branchId).first()
+                // OPTIMIZATION: Load all data in PARALLEL using async
+                withContext(Dispatchers.IO) {
+                    val startTime = System.currentTimeMillis()
 
-                    // Find topping category ID to exclude those products - save to class property
+                    // Launch all queries in parallel
+                    val categoriesDeferred = async { categoryRepository.getAllCategories(branchId).first() }
+                    val allProductsDeferred = async { productRepository.getAllProducts(branchId).first() }
+                    val areasDeferred = async { tableRepository.getAllAreas(branchId).first() }
+                    val tablesDeferred = async { tableRepository.getAllTables(branchId).first() }
+                    val notesDeferred = async { productNoteDao.getActiveNotes(branchId).first() }
+
+                    // Await all results
+                    val categoryEntities = categoriesDeferred.await()
+                    val allProducts = allProductsDeferred.await()
+                    val areas = areasDeferred.await()
+                    val tableEntities = tablesDeferred.await()
+                    val notes = notesDeferred.await()
+
+                    Log.d(TAG, "loadInitialData - Parallel queries completed in ${System.currentTimeMillis() - startTime}ms")
+
+                    // Process categories
                     toppingCategoryIds = categoryEntities
                         .filter { it.name.lowercase().contains("topping") }
                         .map { it.id }
@@ -164,7 +181,6 @@ class SaleViewModel @Inject constructor(
                     val categoryList = mutableListOf(
                         Category(id = "all", name = "Tất cả", icon = "🍽️")
                     )
-                    // Exclude Topping category from display
                     categoryList.addAll(categoryEntities
                         .filter { !it.name.lowercase().contains("topping") }
                         .map { entity ->
@@ -175,25 +191,16 @@ class SaleViewModel @Inject constructor(
                             )
                         })
 
-                    // Load all products - filter out toppings by type AND by category
-                    val productEntities = productRepository.getAllProducts(branchId).first()
-                        .filter { it.type != "topping" } // Filter by type
-                        .filter { it.categoryId !in toppingCategoryIds } // Filter by topping category
-
-                    // Cache product entities
-                    val allProducts = productRepository.getAllProducts(branchId).first()
+                    // OPTIMIZATION: Cache all products (load only ONCE)
                     productEntityMap = allProducts.associateBy { it.id }
 
-                    // Load topping mappings (blocking call - must be on IO)
-                    val productIds = productEntities.map { it.id }
-                    val allToppings = productToppingDao.getToppingsForProductsSync(productIds)
-                    val toppingsByProduct = allToppings.groupBy { it.productId }
+                    // Filter products (exclude toppings)
+                    val productEntities = allProducts
+                        .filter { it.type != "topping" }
+                        .filter { it.categoryId !in toppingCategoryIds }
 
-                    // Build products with variants
+                    // OPTIMIZATION: Build products WITHOUT variants first (fast display)
                     val productList = productEntities.map { entity ->
-                        val productToppings = toppingsByProduct[entity.id] ?: emptyList()
-                        val variantGroups = buildVariantGroups(productToppings)
-
                         Product(
                             id = entity.id,
                             code = entity.code,
@@ -203,16 +210,13 @@ class SaleViewModel @Inject constructor(
                             imageUrl = entity.imageUrl,
                             description = entity.description,
                             isActive = entity.isActive,
-                            hasVariants = variantGroups.isNotEmpty(),
-                            variants = variantGroups
+                            hasVariants = false, // Will be updated later
+                            variants = emptyList()
                         )
                     }
 
-                    // Load tables and areas
-                    val areas = tableRepository.getAllAreas(branchId).first()
-                    val tableEntities = tableRepository.getAllTables(branchId).first()
+                    // Process tables
                     val areaMap = areas.associateBy { it.id }
-
                     val tableList = tableEntities.map { entity ->
                         Table(
                             id = entity.id,
@@ -230,24 +234,40 @@ class SaleViewModel @Inject constructor(
                         )
                     }
 
-                    Log.d(TAG, "loadInitialData - Loaded ${categoryList.size} categories, ${productList.size} products, ${allToppings.size} topping mappings, ${tableList.size} tables")
+                    Log.d(TAG, "loadInitialData - Processed ${categoryList.size} categories, ${productList.size} products, ${tableList.size} tables in ${System.currentTimeMillis() - startTime}ms")
 
-                    Triple(categoryList.toList(), productList, tableList)
-                }
+                    // Update UI immediately with products (no variants yet)
+                    _uiState.update { state ->
+                        state.copy(
+                            categories = categoryList.toList(),
+                            products = productList,
+                            tables = tableList,
+                            availableNotes = notes,
+                            isLoading = false
+                        )
+                    }
 
-                // Load available notes
-                val notes = withContext(Dispatchers.IO) {
-                    productNoteDao.getActiveNotes(branchId).first()
-                }
+                    // OPTIMIZATION: Load variants in background AFTER UI is displayed
+                    val productIds = productEntities.map { it.id }
+                    val allToppings = productToppingDao.getToppingsForProductsSync(productIds)
+                    val toppingsByProduct = allToppings.groupBy { it.productId }
 
-                _uiState.update { state ->
-                    state.copy(
-                        categories = categories,
-                        products = products,
-                        tables = tables,
-                        availableNotes = notes,
-                        isLoading = false
-                    )
+                    // Update products with variants
+                    val productsWithVariants = productList.map { product ->
+                        val productToppings = toppingsByProduct[product.id] ?: emptyList()
+                        val variantGroups = buildVariantGroups(productToppings)
+                        product.copy(
+                            hasVariants = variantGroups.isNotEmpty(),
+                            variants = variantGroups
+                        )
+                    }
+
+                    // Update UI with variants
+                    _uiState.update { state ->
+                        state.copy(products = productsWithVariants)
+                    }
+
+                    Log.d(TAG, "loadInitialData - Complete with variants in ${System.currentTimeMillis() - startTime}ms, ${allToppings.size} topping mappings")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadInitialData - Error: ${e.message}", e)
