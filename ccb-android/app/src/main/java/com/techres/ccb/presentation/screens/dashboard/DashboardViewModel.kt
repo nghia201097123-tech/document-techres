@@ -399,20 +399,75 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
+     * Get count of active orders (pending, confirmed status)
+     */
+    fun getActiveOrdersCount(): Int {
+        return _uiState.value.totalActiveOrders
+    }
+
+    /**
+     * Cancel all active orders before logout
+     * Returns number of orders cancelled
+     */
+    suspend fun cancelAllActiveOrders(): Int {
+        return try {
+            val activeOrders = _uiState.value.posOrders
+            var cancelledCount = 0
+            val now = java.time.Instant.now().toString()
+
+            activeOrders.forEach { posOrder ->
+                try {
+                    val order = orderRepository.getOrderById(posOrder.id)
+                    if (order != null && order.status in listOf("pending", "confirmed", "draft")) {
+                        val cancelledOrder = order.copy(
+                            status = "cancelled",
+                            cancelledAt = now,
+                            cancelReason = "Hủy do đăng xuất",
+                            updatedAt = now
+                        )
+                        orderRepository.updateOrder(cancelledOrder)
+
+                        // Reset table status
+                        order.tableId?.let { tableId ->
+                            tableRepository.updateTableStatus(tableId, "available", null, now)
+                        }
+                        cancelledCount++
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "cancelAllActiveOrders - Error cancelling order ${posOrder.id}: ${e.message}")
+                }
+            }
+
+            Log.d(TAG, "cancelAllActiveOrders - Cancelled $cancelledCount orders")
+            cancelledCount
+        } catch (e: Exception) {
+            Log.e(TAG, "cancelAllActiveOrders - Error: ${e.message}", e)
+            0
+        }
+    }
+
+    /**
      * Full logout - Clear all database and preferences
+     * @param cancelActiveOrders if true, cancel all active orders before logout
      * Returns true when logout is complete
      */
-    suspend fun performFullLogout(): Boolean {
+    suspend fun performFullLogout(cancelActiveOrders: Boolean = false): Boolean {
         return try {
             Log.d(TAG, "performFullLogout - Starting full logout...")
 
             // Cancel any active observers
             ordersObserverJob?.cancel()
 
-            // Clear all database tables and preferences
+            // Cancel active orders if requested
+            if (cancelActiveOrders) {
+                val cancelledCount = cancelAllActiveOrders()
+                Log.d(TAG, "performFullLogout - Cancelled $cancelledCount active orders")
+            }
+
+            // Clear master data tables and preferences (preserves order history)
             authRepository.fullLogout()
 
-            Log.d(TAG, "performFullLogout - Logout complete, all data cleared")
+            Log.d(TAG, "performFullLogout - Logout complete, master data cleared")
             true
         } catch (e: Exception) {
             Log.e(TAG, "performFullLogout - Error: ${e.message}", e)

@@ -289,23 +289,62 @@ fun DashboardScreen(
                 )
             },
             text = {
+                val activeOrdersCount = uiState.totalActiveOrders
                 Column {
                     Text("Ban co chac chan muon dang xuat khoi thiet bi?")
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    if (activeOrdersCount > 0) {
+                        Surface(
+                            color = Color(0xFFFFF3E0),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF9800),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        "Co $activeOrdersCount don hang dang hoat dong!",
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFFE65100),
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        "Cac don nay se bi HUY khi dang xuat.",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFE65100)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
                     Text(
-                        "Luu y: Tat ca du lieu (danh muc, san pham, ban, nhan vien...) se bi xoa. " +
-                        "Khi dang nhap lai, he thong se dong bo lai tu dau.",
+                        "Luu y: Du lieu danh muc, san pham, ban, nhan vien se bi xoa. " +
+                        "Lich su don hang duoc giu lai. Khi dang nhap lai, he thong se dong bo lai tu dau.",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
                 }
             },
             confirmButton = {
+                val activeOrdersCount = uiState.totalActiveOrders
                 Button(
                     onClick = {
                         isLoggingOut = true
                         coroutineScope.launch {
-                            val success = viewModel.performFullLogout()
+                            // Cancel active orders if any, then logout
+                            val success = viewModel.performFullLogout(cancelActiveOrders = activeOrdersCount > 0)
                             if (success) {
                                 showLogoutConfirmDialog = false
                                 isLoggingOut = false
@@ -333,7 +372,11 @@ fun DashboardScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Dang xuat")
+                        if (activeOrdersCount > 0) {
+                            Text("Huy don & Dang xuat")
+                        } else {
+                            Text("Dang xuat")
+                        }
                     }
                 }
             },
