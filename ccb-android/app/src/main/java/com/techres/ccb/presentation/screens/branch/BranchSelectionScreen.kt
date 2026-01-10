@@ -670,24 +670,24 @@ private fun BranchDataSyncProgress(
 
         // Sync steps list
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             )
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+            LazyColumn(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                syncSteps.forEach { (step, stepState) ->
+                items(syncSteps.toList()) { (step, stepState) ->
                     SyncStepRow(
                         name = stepState.name,
                         status = stepState.status,
                         count = stepState.count
                     )
-                    if (step != com.techres.ccb.data.repository.SyncStep.PRODUCT_NOTES) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
                 }
             }
         }
