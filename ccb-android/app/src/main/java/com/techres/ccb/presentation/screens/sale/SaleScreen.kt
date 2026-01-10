@@ -3,6 +3,8 @@ package com.techres.ccb.presentation.screens.sale
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +27,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +39,8 @@ import com.techres.ccb.data.local.entity.ProductNoteEntity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
@@ -52,6 +58,12 @@ fun SaleScreen(
     viewModel: SaleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+
+    // Determine if we're on a phone (< 600dp) or tablet
+    val isCompactScreen = screenWidthDp < 600
+    var showCartDialog by remember { mutableStateOf(false) }
 
     // Show success snackbar
     LaunchedEffect(uiState.successMessage) {
@@ -72,57 +84,29 @@ fun SaleScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            // Left Panel - Products (70%)
-            ProductPanel(
-                modifier = Modifier
-                    .weight(0.65f)
-                    .fillMaxHeight(),
-                categories = uiState.categories,
-                products = uiState.products,
-                selectedCategoryId = uiState.selectedCategoryId,
-                searchQuery = uiState.searchQuery,
-                onCategorySelected = viewModel::selectCategory,
-                onSearchQueryChanged = viewModel::searchProducts,
-                onProductClicked = viewModel::addToCart,
-                onProductLongClicked = viewModel::showVariantDialog,
+        if (isCompactScreen) {
+            // Phone Layout: Full screen products + floating cart button
+            PhoneLayout(
+                uiState = uiState,
+                viewModel = viewModel,
+                onNavigateBack = onNavigateBack,
+                onShowCart = { showCartDialog = true }
+            )
+
+            // Cart Dialog for Phone
+            if (showCartDialog) {
+                CartDialog(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onDismiss = { showCartDialog = false }
+                )
+            }
+        } else {
+            // Tablet Layout: Side by side
+            TabletLayout(
+                uiState = uiState,
+                viewModel = viewModel,
                 onNavigateBack = onNavigateBack
-            )
-
-            // Divider
-            VerticalDivider(
-                modifier = Modifier.fillMaxHeight(),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-
-            // Right Panel - Cart (30%)
-            CartPanel(
-                modifier = Modifier
-                    .weight(0.35f)
-                    .fillMaxHeight(),
-                cartItems = uiState.cartItems,
-                orderType = uiState.orderType,
-                selectedTable = uiState.selectedTable,
-                selectedCustomer = uiState.selectedCustomer,
-                subtotal = uiState.subtotal,
-                discountAmount = uiState.discountAmount,
-                taxAmount = uiState.taxAmount,
-                totalAmount = uiState.totalAmount,
-                currentOrder = uiState.currentOrder,
-                currentOrderItems = uiState.currentOrderItems,
-                onOrderTypeChanged = viewModel::setOrderType,
-                onTableClicked = { viewModel.showTableDialog() },
-                onCustomerClicked = { viewModel.showCustomerDialog() },
-                onIncreaseQuantity = viewModel::increaseQuantity,
-                onDecreaseQuantity = viewModel::decreaseQuantity,
-                onRemoveItem = viewModel::removeFromCart,
-                onEditNote = viewModel::showNoteDialog,
-                onClearCart = viewModel::clearCart,
-                onPlaceOrder = viewModel::placeOrder,
-                onAddItemsToOrder = viewModel::addItemsToOrder,
-                onCheckout = { viewModel.showPaymentDialog() },
-                onCancelOrder = { viewModel.cancelOrder() }
             )
         }
 
@@ -255,6 +239,266 @@ fun SaleScreen(
                             note
                         )
                     }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Phone Layout - Full screen products with floating cart button
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PhoneLayout(
+    uiState: SaleUiState,
+    viewModel: SaleViewModel,
+    onNavigateBack: () -> Unit,
+    onShowCart: () -> Unit
+) {
+    val cartItemCount = uiState.cartItems.sumOf { it.quantity }
+    val hasActiveOrder = uiState.currentOrder != null
+    val totalBadgeCount = cartItemCount + (uiState.currentOrderItems.size)
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Full screen product panel
+        ProductPanel(
+            modifier = Modifier.fillMaxSize(),
+            categories = uiState.categories,
+            products = uiState.products,
+            selectedCategoryId = uiState.selectedCategoryId,
+            searchQuery = uiState.searchQuery,
+            onCategorySelected = viewModel::selectCategory,
+            onSearchQueryChanged = viewModel::searchProducts,
+            onProductClicked = viewModel::addToCart,
+            onProductLongClicked = viewModel::showVariantDialog,
+            onNavigateBack = onNavigateBack
+        )
+
+        // Floating Cart Button
+        FloatingActionButton(
+            onClick = onShowCart,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .size(64.dp),
+            containerColor = if (hasActiveOrder) Color(0xFF2196F3) else MaterialTheme.colorScheme.primary
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (hasActiveOrder) Icons.Default.Receipt else Icons.Default.ShoppingCart,
+                    contentDescription = "Giỏ hàng",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+                if (totalBadgeCount > 0) {
+                    Badge(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 8.dp, y = (-8).dp),
+                        containerColor = MaterialTheme.colorScheme.error
+                    ) {
+                        Text(
+                            text = totalBadgeCount.toString(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Show total amount if has items
+        if (totalBadgeCount > 0) {
+            val orderTotal = (uiState.currentOrder?.totalAmount?.toLong() ?: 0L) + uiState.totalAmount
+            Card(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .clickable { onShowCart() },
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (hasActiveOrder) Color(0xFF2196F3) else MaterialTheme.colorScheme.primary
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = formatCurrency(orderTotal),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Tablet Layout - Side by side products and cart
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TabletLayout(
+    uiState: SaleUiState,
+    viewModel: SaleViewModel,
+    onNavigateBack: () -> Unit
+) {
+    Row(modifier = Modifier.fillMaxSize()) {
+        // Left Panel - Products (65%)
+        ProductPanel(
+            modifier = Modifier
+                .weight(0.65f)
+                .fillMaxHeight(),
+            categories = uiState.categories,
+            products = uiState.products,
+            selectedCategoryId = uiState.selectedCategoryId,
+            searchQuery = uiState.searchQuery,
+            onCategorySelected = viewModel::selectCategory,
+            onSearchQueryChanged = viewModel::searchProducts,
+            onProductClicked = viewModel::addToCart,
+            onProductLongClicked = viewModel::showVariantDialog,
+            onNavigateBack = onNavigateBack
+        )
+
+        // Divider
+        VerticalDivider(
+            modifier = Modifier.fillMaxHeight(),
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+
+        // Right Panel - Cart (35%)
+        CartPanel(
+            modifier = Modifier
+                .weight(0.35f)
+                .fillMaxHeight(),
+            cartItems = uiState.cartItems,
+            orderType = uiState.orderType,
+            selectedTable = uiState.selectedTable,
+            selectedCustomer = uiState.selectedCustomer,
+            subtotal = uiState.subtotal,
+            discountAmount = uiState.discountAmount,
+            taxAmount = uiState.taxAmount,
+            totalAmount = uiState.totalAmount,
+            currentOrder = uiState.currentOrder,
+            currentOrderItems = uiState.currentOrderItems,
+            onOrderTypeChanged = viewModel::setOrderType,
+            onTableClicked = { viewModel.showTableDialog() },
+            onCustomerClicked = { viewModel.showCustomerDialog() },
+            onIncreaseQuantity = viewModel::increaseQuantity,
+            onDecreaseQuantity = viewModel::decreaseQuantity,
+            onRemoveItem = viewModel::removeFromCart,
+            onEditNote = viewModel::showNoteDialog,
+            onClearCart = viewModel::clearCart,
+            onPlaceOrder = viewModel::placeOrder,
+            onAddItemsToOrder = viewModel::addItemsToOrder,
+            onCheckout = { viewModel.showPaymentDialog() },
+            onCancelOrder = { viewModel.cancelOrder() }
+        )
+    }
+}
+
+/**
+ * Full screen cart dialog for phone layout
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CartDialog(
+    uiState: SaleUiState,
+    viewModel: SaleViewModel,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f)
+                .padding(horizontal = 8.dp),
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
+        ) {
+            Column {
+                // Dialog Header with close button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (uiState.currentOrder != null) uiState.currentOrder.orderNumber else "Giỏ hàng",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Đóng",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                // Cart Panel content
+                CartPanel(
+                    modifier = Modifier.fillMaxSize(),
+                    cartItems = uiState.cartItems,
+                    orderType = uiState.orderType,
+                    selectedTable = uiState.selectedTable,
+                    selectedCustomer = uiState.selectedCustomer,
+                    subtotal = uiState.subtotal,
+                    discountAmount = uiState.discountAmount,
+                    taxAmount = uiState.taxAmount,
+                    totalAmount = uiState.totalAmount,
+                    currentOrder = uiState.currentOrder,
+                    currentOrderItems = uiState.currentOrderItems,
+                    onOrderTypeChanged = viewModel::setOrderType,
+                    onTableClicked = { viewModel.showTableDialog() },
+                    onCustomerClicked = { viewModel.showCustomerDialog() },
+                    onIncreaseQuantity = viewModel::increaseQuantity,
+                    onDecreaseQuantity = viewModel::decreaseQuantity,
+                    onRemoveItem = viewModel::removeFromCart,
+                    onEditNote = viewModel::showNoteDialog,
+                    onClearCart = viewModel::clearCart,
+                    onPlaceOrder = {
+                        viewModel.placeOrder()
+                        onDismiss()
+                    },
+                    onAddItemsToOrder = {
+                        viewModel.addItemsToOrder()
+                        onDismiss()
+                    },
+                    onCheckout = { viewModel.showPaymentDialog() },
+                    onCancelOrder = {
+                        viewModel.cancelOrder()
+                        onDismiss()
+                    },
+                    isCompactMode = true // Don't show header in compact mode
                 )
             }
         }
@@ -507,55 +751,58 @@ fun CartPanel(
     onPlaceOrder: () -> Unit = {},
     onAddItemsToOrder: () -> Unit = {},
     onCheckout: () -> Unit,
-    onCancelOrder: () -> Unit = {}
+    onCancelOrder: () -> Unit = {},
+    isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
     ) {
-        // Cart Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(if (hasActiveOrder) Color(0xFF2196F3) else MaterialTheme.colorScheme.primary)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (hasActiveOrder) Icons.Default.Receipt else Icons.Default.ShoppingCart,
-                contentDescription = null,
-                tint = Color.White
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (hasActiveOrder) currentOrder?.orderNumber ?: "Đơn hàng" else "Đơn hàng mới",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+        // Cart Header - hide in compact mode (dialog has its own header)
+        if (!isCompactMode) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (hasActiveOrder) Color(0xFF2196F3) else MaterialTheme.colorScheme.primary)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (hasActiveOrder) Icons.Default.Receipt else Icons.Default.ShoppingCart,
+                    contentDescription = null,
+                    tint = Color.White
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasActiveOrder) currentOrder?.orderNumber ?: "Đơn hàng" else "Đơn hàng mới",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    if (hasActiveOrder) {
+                        Text(
+                            text = "Đang chờ thanh toán",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                }
                 if (hasActiveOrder) {
-                    Text(
-                        text = "Đang chờ thanh toán",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-            }
-            if (hasActiveOrder) {
-                Badge(containerColor = Color(0xFF4CAF50)) {
-                    Text(
-                        text = "${currentOrderItems.size} món",
-                        color = Color.White
-                    )
-                }
-            } else if (cartItems.isNotEmpty()) {
-                Badge(containerColor = MaterialTheme.colorScheme.error) {
-                    Text(
-                        text = cartItems.sumOf { it.quantity }.toString(),
-                        color = Color.White
-                    )
+                    Badge(containerColor = Color(0xFF4CAF50)) {
+                        Text(
+                            text = "${currentOrderItems.size} món",
+                            color = Color.White
+                        )
+                    }
+                } else if (cartItems.isNotEmpty()) {
+                    Badge(containerColor = MaterialTheme.colorScheme.error) {
+                        Text(
+                            text = cartItems.sumOf { it.quantity }.toString(),
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
