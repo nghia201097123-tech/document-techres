@@ -167,6 +167,7 @@ fun SaleScreen(
 
         if (uiState.showTableDialog) {
             TableSelectionDialog(
+                tables = uiState.tables,
                 onDismiss = { viewModel.hideTableDialog() },
                 onTableSelected = { viewModel.selectTable(it) }
             )

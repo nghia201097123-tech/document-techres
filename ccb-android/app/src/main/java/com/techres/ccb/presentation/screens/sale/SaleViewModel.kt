@@ -9,6 +9,7 @@ import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.ProductRepository
+import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,9 @@ data class SaleUiState(
     val products: List<Product> = emptyList(),
     val selectedCategoryId: String = "all",
     val searchQuery: String = "",
+
+    // Tables
+    val tables: List<Table> = emptyList(),
 
     // Cart
     val cartItems: List<CartItem> = emptyList(),
@@ -74,6 +78,7 @@ class SaleViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val categoryRepository: CategoryRepository,
     private val productRepository: ProductRepository,
+    private val tableRepository: TableRepository,
     private val productToppingDao: ProductToppingDao
 ) : ViewModel() {
 
@@ -151,12 +156,35 @@ class SaleViewModel @Inject constructor(
                     )
                 }
 
-                Log.d(TAG, "loadInitialData - Loaded ${categories.size} categories, ${products.size} products, ${allToppings.size} topping mappings")
+                // Load tables and areas
+                val areas = tableRepository.getAllAreas(branchId).first()
+                val tableEntities = tableRepository.getAllTables(branchId).first()
+                val areaMap = areas.associateBy { it.id }
+
+                val tables = tableEntities.map { entity ->
+                    Table(
+                        id = entity.id,
+                        name = entity.name,
+                        areaId = entity.areaId ?: "",
+                        areaName = entity.areaId?.let { areaMap[it]?.name } ?: "Khu vực chung",
+                        capacity = entity.capacity,
+                        status = when (entity.status.lowercase()) {
+                            "occupied" -> TableStatus.OCCUPIED
+                            "reserved" -> TableStatus.RESERVED
+                            "cleaning" -> TableStatus.CLEANING
+                            else -> TableStatus.AVAILABLE
+                        },
+                        currentOrderId = entity.currentOrderId
+                    )
+                }
+
+                Log.d(TAG, "loadInitialData - Loaded ${categories.size} categories, ${products.size} products, ${allToppings.size} topping mappings, ${tables.size} tables")
 
                 _uiState.update { state ->
                     state.copy(
                         categories = categories,
                         products = products,
+                        tables = tables,
                         isLoading = false
                     )
                 }
