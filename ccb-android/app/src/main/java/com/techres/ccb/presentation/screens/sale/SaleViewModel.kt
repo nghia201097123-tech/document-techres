@@ -18,7 +18,18 @@ import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
-import com.techres.ccb.domain.model.*
+import com.techres.ccb.domain.model.CartItem
+import com.techres.ccb.domain.model.Category
+import com.techres.ccb.domain.model.ComboChildItem
+import com.techres.ccb.domain.model.Customer
+import com.techres.ccb.domain.model.OrderType
+import com.techres.ccb.domain.model.Product
+import com.techres.ccb.domain.model.ProductVariantGroup
+import com.techres.ccb.domain.model.ProductVariantOption
+import com.techres.ccb.domain.model.SelectedVariant
+import com.techres.ccb.domain.model.Table
+import com.techres.ccb.domain.model.TableStatus
+import com.techres.ccb.domain.model.VariantType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -477,37 +488,56 @@ class SaleViewModel @Inject constructor(
         selectedVariants: List<SelectedVariant>,
         note: String?
     ) {
-        _uiState.update { state ->
-            val existingItemIndex = state.cartItems.indexOfFirst { item ->
-                item.product.id == product.id &&
-                item.selectedVariants == selectedVariants &&
-                item.note == note
+        viewModelScope.launch {
+            // Load combo items if this product is a combo
+            val comboItems = withContext(Dispatchers.IO) {
+                comboItemDao.getItemsByComboSync(product.id).map { entity ->
+                    ComboChildItem(
+                        productId = entity.productId,
+                        productName = entity.productName,
+                        productCode = entity.productCode,
+                        quantity = entity.quantity
+                    )
+                }
             }
 
-            val updatedCart = if (existingItemIndex >= 0) {
-                // Increase quantity of existing item
-                state.cartItems.mapIndexed { index, item ->
-                    if (index == existingItemIndex) {
-                        item.copy(quantity = item.quantity + 1)
-                    } else {
-                        item
-                    }
+            if (comboItems.isNotEmpty()) {
+                Log.d(TAG, "addItemToCart - Product ${product.name} is a combo with ${comboItems.size} child items")
+            }
+
+            _uiState.update { state ->
+                val existingItemIndex = state.cartItems.indexOfFirst { item ->
+                    item.product.id == product.id &&
+                    item.selectedVariants == selectedVariants &&
+                    item.note == note
                 }
-            } else {
-                // Add new item
-                state.cartItems + CartItem(
-                    product = product,
-                    quantity = 1,
-                    selectedVariants = selectedVariants,
-                    note = note
+
+                val updatedCart = if (existingItemIndex >= 0) {
+                    // Increase quantity of existing item
+                    state.cartItems.mapIndexed { index, item ->
+                        if (index == existingItemIndex) {
+                            item.copy(quantity = item.quantity + 1)
+                        } else {
+                            item
+                        }
+                    }
+                } else {
+                    // Add new item with combo children
+                    state.cartItems + CartItem(
+                        product = product,
+                        quantity = 1,
+                        selectedVariants = selectedVariants,
+                        note = note,
+                        comboItems = comboItems
+                    )
+                }
+
+                state.copy(
+                    cartItems = updatedCart,
+                    showVariantDialog = false,
+                    selectedProductForVariant = null
                 )
             }
-
-            state.copy(
-                cartItems = updatedCart,
-                showVariantDialog = false,
-                selectedProductForVariant = null
-            )
         }
     }
 

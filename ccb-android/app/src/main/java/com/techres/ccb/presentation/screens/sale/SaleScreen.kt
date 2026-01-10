@@ -968,7 +968,58 @@ fun CartItemRow(
                 color = Color.Gray
             )
 
-            // Row 3: Variants/Toppings - Grab style
+            // Row 3: Combo child items
+            if (item.comboItems.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFFFF3E0).copy(alpha = 0.5f))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "Bao gồm:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFE65100),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    item.comboItems.forEach { comboChild ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "•",
+                                fontSize = 14.sp,
+                                color = Color(0xFFFF9800),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = comboChild.productName,
+                                fontSize = 13.sp,
+                                color = Color(0xFF424242),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Badge(
+                                containerColor = Color(0xFFFF9800).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "x${comboChild.quantity * item.quantity}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFE65100),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Row 4: Variants/Toppings - Grab style
             if (item.selectedVariants.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Column(

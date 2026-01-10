@@ -56,7 +56,8 @@ data class CartItem(
     val product: Product,
     var quantity: Int = 1,
     val selectedVariants: List<SelectedVariant> = emptyList(),
-    val note: String? = null
+    val note: String? = null,
+    val comboItems: List<ComboChildItem> = emptyList()  // Các món con trong combo
 ) {
     val unitPrice: Long
         get() = product.price + selectedVariants.sumOf { it.price }
@@ -66,6 +67,9 @@ data class CartItem(
 
     val variantText: String
         get() = selectedVariants.joinToString(", ") { it.name }
+
+    val isCombo: Boolean
+        get() = comboItems.isNotEmpty()
 }
 
 data class SelectedVariant(
@@ -74,6 +78,14 @@ data class SelectedVariant(
     val optionId: String,
     val name: String,
     val price: Long
+)
+
+// ===== COMBO CHILD ITEM =====
+data class ComboChildItem(
+    val productId: String,
+    val productName: String,
+    val productCode: String?,
+    val quantity: Int = 1
 )
 
 // ===== ORDER =====
