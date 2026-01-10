@@ -1,7 +1,6 @@
 package com.techres.ccb.presentation.screens.dashboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,50 +22,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.techres.ccb.domain.model.FoodAppOrder
-import com.techres.ccb.domain.model.FoodOrderStatus
+import androidx.hilt.navigation.compose.hiltViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Mock data for UI preview
-data class MockPosOrder(
-    val id: String,
-    val orderNumber: String,
-    val tableName: String?,
-    val totalAmount: Long,
-    val itemCount: Int,
-    val status: MockPosStatus,
-    val createdAt: String
-)
-
-enum class MockPosStatus(val label: String, val color: Long) {
-    DRAFT("Chờ xác nhận", 0xFFFF9800),
-    CONFIRMED("Đã xác nhận", 0xFF2196F3),
-    COMPLETED("Hoàn tất", 0xFF4CAF50)
-}
-
 @Composable
 fun DashboardScreen(
+    viewModel: DashboardViewModel = hiltViewModel(),
     onNavigateToSale: () -> Unit = {},
     onNavigateToFoodOrders: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToShift: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
-    // Mock data
-    val mockOrders = remember {
-        listOf(
-            MockPosOrder("1", "001", "Bàn 1", 250000, 3, MockPosStatus.DRAFT, "10:30"),
-            MockPosOrder("2", "002", "Bàn 3", 180000, 2, MockPosStatus.CONFIRMED, "10:35"),
-            MockPosOrder("3", "003", null, 95000, 1, MockPosStatus.DRAFT, "10:40"),
-            MockPosOrder("4", "004", "Bàn 5", 420000, 5, MockPosStatus.CONFIRMED, "10:42"),
-            MockPosOrder("5", "005", "Bàn 2", 150000, 2, MockPosStatus.DRAFT, "10:45"),
-            MockPosOrder("6", "006", "Bàn 7", 320000, 4, MockPosStatus.CONFIRMED, "10:48")
-        )
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var gridColumns by remember { mutableIntStateOf(4) }
@@ -80,8 +51,8 @@ fun DashboardScreen(
     ) {
         // Left Sidebar
         DashboardSidebar(
-            branchName = "Chi nhánh Quận 1",
-            staffName = "Nguyễn Văn A",
+            branchName = uiState.branchName,
+            staffName = uiState.staffName,
             onNavigateToSale = onNavigateToSale,
             onNavigateToFoodOrders = onNavigateToFoodOrders,
             onNavigateToShift = onNavigateToShift,
@@ -99,34 +70,42 @@ fun DashboardScreen(
             DashboardHeader(
                 currentTime = currentTime,
                 currentDate = currentDate,
-                todayRevenue = 12500000,
-                totalOrders = 45,
-                pendingOrders = mockOrders.count { it.status == MockPosStatus.DRAFT }
+                todayRevenue = uiState.todayRevenue,
+                totalOrders = uiState.todayOrderCount,
+                pendingOrders = uiState.draftPosCount
             )
 
             // Stats Cards
             StatsCardsRow(
-                draftCount = mockOrders.count { it.status == MockPosStatus.DRAFT },
-                confirmedCount = mockOrders.count { it.status == MockPosStatus.CONFIRMED },
-                completedCount = 39,
-                foodAppCount = 8
+                draftCount = uiState.draftPosCount,
+                confirmedCount = uiState.confirmedPosCount,
+                completedCount = uiState.todayOrderCount,
+                foodAppCount = uiState.foodAppOrderCount
             )
 
             // Tab Bar & Grid Controls
             OrdersTabBar(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
-                posCount = mockOrders.size,
-                appCount = 8,
+                posCount = uiState.posOrders.size,
+                appCount = uiState.foodAppOrderCount,
                 gridColumns = gridColumns,
                 onGridColumnsChanged = { gridColumns = it }
             )
 
             // Orders Grid
             Box(modifier = Modifier.weight(1f)) {
-                when (selectedTab) {
-                    0 -> {
-                        if (mockOrders.isEmpty()) {
+                when {
+                    uiState.isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    selectedTab == 0 -> {
+                        if (uiState.posOrders.isEmpty()) {
                             EmptyOrdersState()
                         } else {
                             LazyVerticalGrid(
@@ -136,7 +115,7 @@ fun DashboardScreen(
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(mockOrders, key = { it.id }) { order ->
+                                items(uiState.posOrders, key = { it.id }) { order ->
                                     OrderCard(order = order)
                                 }
                                 // Bottom spacing
@@ -146,11 +125,11 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    1 -> {
+                    else -> {
                         EmptyOrdersState(
                             icon = Icons.Default.DeliveryDining,
                             message = "Đơn từ App",
-                            subMessage = "Hiện có 8 đơn đang xử lý"
+                            subMessage = "Chưa có đơn hàng từ ứng dụng"
                         )
                     }
                 }
@@ -231,7 +210,6 @@ private fun DashboardSidebar(
         SidebarNavItem(
             icon = Icons.Default.DeliveryDining,
             label = "Đơn App",
-            badge = 3,
             onClick = onNavigateToFoodOrders
         )
 
@@ -608,7 +586,7 @@ private fun TabChip(
 }
 
 @Composable
-private fun OrderCard(order: MockPosOrder) {
+private fun OrderCard(order: PosOrder) {
     val statusColor = Color(order.status.color)
 
     Card(
@@ -641,7 +619,7 @@ private fun OrderCard(order: MockPosOrder) {
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "#${order.orderNumber}",
+                        text = "#${order.orderNumber.toString().padStart(3, '0')}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -649,7 +627,7 @@ private fun OrderCard(order: MockPosOrder) {
                 }
                 // Time
                 Text(
-                    text = order.createdAt,
+                    text = formatTime(order.createdAt),
                     fontSize = 11.sp,
                     color = Color.Gray
                 )
@@ -700,7 +678,7 @@ private fun OrderCard(order: MockPosOrder) {
                     color = statusColor.copy(alpha = 0.1f)
                 ) {
                     Text(
-                        text = if (order.status == MockPosStatus.DRAFT) "Xác nhận" else "Hoàn tất",
+                        text = if (order.status == PosOrderStatus.DRAFT) "Xác nhận" else "Hoàn tất",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
@@ -766,4 +744,9 @@ private fun formatCompactCurrency(amount: Long): String {
         amount >= 1_000 -> "${amount / 1_000}K"
         else -> "${amount}đ"
     }
+}
+
+private fun formatTime(timestamp: Long): String {
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp))
 }

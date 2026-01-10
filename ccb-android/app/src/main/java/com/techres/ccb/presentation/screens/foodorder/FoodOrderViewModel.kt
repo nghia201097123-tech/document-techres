@@ -2,7 +2,6 @@ package com.techres.ccb.presentation.screens.foodorder
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techres.ccb.data.mock.FoodOrderMockData
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +18,7 @@ data class FoodOrderUiState(
 
     // Filters
     val selectedFilter: FoodOrderFilter = FoodOrderFilter.ALL,
-    val selectedPlatform: FoodPlatform? = null,  // null = all platforms
+    val selectedPlatform: FoodPlatform? = null,
 
     // Counts
     val newOrdersCount: Int = 0,
@@ -40,8 +39,8 @@ class FoodOrderViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(FoodOrderUiState())
     val uiState: StateFlow<FoodOrderUiState> = _uiState.asStateFlow()
 
-    // Mutable list to simulate state changes
-    private val _ordersList = FoodOrderMockData.foodOrders.toMutableList()
+    // Empty list - Food app orders will come from API integration
+    private val _ordersList = mutableListOf<FoodAppOrder>()
 
     init {
         loadOrders()
@@ -89,12 +88,7 @@ class FoodOrderViewModel @Inject constructor() : ViewModel() {
             filtered = filtered.filter { it.platform == state.selectedPlatform }
         }
 
-        // Sort by created time (newest first for new orders, oldest first for processing)
-        return if (state.selectedFilter == FoodOrderFilter.NEW) {
-            filtered.sortedByDescending { it.createdAt }
-        } else {
-            filtered.sortedByDescending { it.createdAt }
-        }
+        return filtered.sortedByDescending { it.createdAt }
     }
 
     // ===== FILTER ACTIONS =====
@@ -208,6 +202,7 @@ class FoodOrderViewModel @Inject constructor() : ViewModel() {
         _uiState.update { state ->
             state.copy(isLoading = true)
         }
+        // TODO: Implement API call to fetch food app orders
         loadOrders()
     }
 }

@@ -1,7 +1,6 @@
 package com.techres.ccb.presentation.screens.sale.dialogs
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -19,12 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.techres.ccb.data.mock.MockData
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.formatCurrency
 
@@ -32,10 +28,10 @@ import com.techres.ccb.presentation.screens.sale.formatCurrency
 
 @Composable
 fun TableSelectionDialog(
+    tables: List<Table> = emptyList(),
     onDismiss: () -> Unit,
     onTableSelected: (Table) -> Unit
 ) {
-    val tables = MockData.tables
     val areas = tables.map { it.areaName }.distinct()
     var selectedArea by remember { mutableStateOf(areas.firstOrNull() ?: "") }
 
@@ -80,62 +76,94 @@ fun TableSelectionDialog(
                     }
                 }
 
-                // Area Tabs
-                ScrollableTabRow(
-                    selectedTabIndex = areas.indexOf(selectedArea).coerceAtLeast(0),
-                    edgePadding = 8.dp
-                ) {
-                    areas.forEachIndexed { index, area ->
-                        Tab(
-                            selected = selectedArea == area,
-                            onClick = { selectedArea = area },
-                            text = { Text(area) }
-                        )
-                    }
-                }
-
-                // Table Grid
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(100.dp),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    val filteredTables = tables.filter { it.areaName == selectedArea }
-                    items(filteredTables) { table ->
-                        TableCard(
-                            table = table,
-                            onClick = {
-                                if (table.status == TableStatus.AVAILABLE) {
-                                    onTableSelected(table)
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // Legend
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    TableStatus.entries.forEach { status ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(getTableStatusColor(status))
+                if (tables.isEmpty()) {
+                    // Empty state
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.TableBar,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.outline
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = status.displayName,
-                                style = MaterialTheme.typography.labelSmall
+                                text = "Chưa có bàn nào",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.outline
                             )
+                            Text(
+                                text = "Vui lòng đồng bộ dữ liệu",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                } else {
+                    // Area Tabs
+                    if (areas.isNotEmpty()) {
+                        ScrollableTabRow(
+                            selectedTabIndex = areas.indexOf(selectedArea).coerceAtLeast(0),
+                            edgePadding = 8.dp
+                        ) {
+                            areas.forEachIndexed { index, area ->
+                                Tab(
+                                    selected = selectedArea == area,
+                                    onClick = { selectedArea = area },
+                                    text = { Text(area) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Table Grid
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(100.dp),
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        val filteredTables = tables.filter { it.areaName == selectedArea }
+                        items(filteredTables) { table ->
+                            TableCard(
+                                table = table,
+                                onClick = {
+                                    if (table.status == TableStatus.AVAILABLE) {
+                                        onTableSelected(table)
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    // Legend
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        TableStatus.entries.forEach { status ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(getTableStatusColor(status))
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = status.displayName,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
                         }
                     }
                 }
@@ -217,11 +245,11 @@ fun getTableStatusColor(status: TableStatus): Color {
 
 @Composable
 fun CustomerSelectionDialog(
+    customers: List<Customer> = emptyList(),
     onDismiss: () -> Unit,
     onCustomerSelected: (Customer) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val customers = MockData.customers
 
     val filteredCustomers = customers.filter {
         searchQuery.isBlank() ||
@@ -313,7 +341,7 @@ fun CustomerSelectionDialog(
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "Không tìm thấy khách hàng",
+                                        text = if (customers.isEmpty()) "Chưa có khách hàng" else "Không tìm thấy khách hàng",
                                         color = MaterialTheme.colorScheme.outline
                                     )
                                 }
@@ -392,7 +420,7 @@ fun CustomerCard(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "📱 ${customer.phone}",
+                    text = customer.phone,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -407,14 +435,14 @@ fun CustomerCard(
                         else -> Color(0xFFCD7F32)
                     }
                     Text(
-                        text = "⭐ ${customer.memberLevel}",
+                        text = customer.memberLevel,
                         style = MaterialTheme.typography.labelSmall,
                         color = badgeColor,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
-                    text = "💎 ${customer.points} điểm",
+                    text = "${customer.points} điểm",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
