@@ -765,6 +765,7 @@ fun CartPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(if (hasActiveOrder) Color(0xFF2196F3) else MaterialTheme.colorScheme.primary)
+                    .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
