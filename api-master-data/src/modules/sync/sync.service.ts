@@ -282,7 +282,7 @@ export class SyncService {
       const tenantId = branch.tenantId;
       const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons, toppingGroups, productNotes] = await Promise.all([
         this.categoryRepository.find({
-          where: { brandId, isActive: true },
+          where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
         }),
         this.branchProductRepository.find({
@@ -405,10 +405,11 @@ export class SyncService {
       where: { id: branchId },
     });
     const brandId = branch?.brandId;
+    const tenantId = branch?.tenantId;
 
     const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons] = await Promise.all([
-      brandId ? this.categoryRepository.find({
-        where: { brandId, updatedAt: MoreThan(since) },
+      (brandId && tenantId) ? this.categoryRepository.find({
+        where: { brandId, tenantId, updatedAt: MoreThan(since) },
         order: { sortOrder: 'ASC' },
       }) : Promise.resolve([]),
       this.branchProductRepository.find({
