@@ -86,6 +86,7 @@ class SyncDataViewModel @Inject constructor(
         val items = listOf(
             SyncItem("categories", "Danh mục", "category"),
             SyncItem("products", "Sản phẩm", "inventory"),
+            SyncItem("product_toppings", "Topping sản phẩm", "add_circle"),
             SyncItem("areas", "Khu vực", "place"),
             SyncItem("tables", "Bàn", "table_bar"),
             SyncItem("staff", "Nhân viên", "people"),
@@ -145,6 +146,7 @@ class SyncDataViewModel @Inject constructor(
             SyncStep.FETCHING -> null
             SyncStep.CATEGORIES -> "categories"
             SyncStep.PRODUCTS -> "products"
+            SyncStep.PRODUCT_TOPPINGS -> "product_toppings"
             SyncStep.AREAS -> "areas"
             SyncStep.TABLES -> "tables"
             SyncStep.STAFF -> "staff"
