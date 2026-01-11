@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.dashboard
 
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -67,11 +68,14 @@ class DashboardViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val orderRepository: OrderRepository,
     private val shiftRepository: ShiftRepository,
-    private val tableRepository: TableRepository
+    private val tableRepository: TableRepository,
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "DashboardViewModel"
+        private const val KEY_DASHBOARD_GRID_COLUMNS = "dashboard_grid_columns"
+        private const val DEFAULT_GRID_COLUMNS = 8
     }
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -81,7 +85,14 @@ class DashboardViewModel @Inject constructor(
     private var ordersObserverJob: Job? = null
 
     init {
+        loadGridColumnsPreference()
         loadData()
+    }
+
+    private fun loadGridColumnsPreference() {
+        val savedColumns = sharedPreferences.getInt(KEY_DASHBOARD_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+        Log.d(TAG, "loadGridColumnsPreference - Loaded columns from SharedPreferences: $savedColumns")
+        _uiState.update { it.copy(gridColumns = savedColumns) }
     }
 
     fun loadData() {
@@ -204,7 +215,11 @@ class DashboardViewModel @Inject constructor(
 
     fun setGridColumns(columns: Int) {
         if (columns in listOf(4, 6, 8)) {
+            Log.d(TAG, "setGridColumns - Setting columns to: $columns")
             _uiState.update { it.copy(gridColumns = columns) }
+            // Use commit() instead of apply() to ensure synchronous save
+            val saved = sharedPreferences.edit().putInt(KEY_DASHBOARD_GRID_COLUMNS, columns).commit()
+            Log.d(TAG, "setGridColumns - Saved to SharedPreferences: $saved")
         }
     }
 
