@@ -40,6 +40,10 @@ class OrderRepository @Inject constructor(
         return orderDao.getById(id)
     }
 
+    suspend fun getOrdersByIds(ids: List<String>): List<OrderEntity> {
+        return orderDao.getByIds(ids)
+    }
+
     fun getOrderItems(orderId: String): Flow<List<OrderItemEntity>> {
         return orderItemDao.getByOrderId(orderId)
     }

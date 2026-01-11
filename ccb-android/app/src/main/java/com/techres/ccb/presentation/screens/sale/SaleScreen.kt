@@ -60,6 +60,7 @@ import java.util.Locale
 fun SaleScreen(
     onNavigateBack: () -> Unit,
     orderId: String? = null,
+    tableId: String? = null,
     viewModel: SaleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -74,6 +75,13 @@ fun SaleScreen(
     LaunchedEffect(orderId) {
         if (!orderId.isNullOrEmpty()) {
             viewModel.loadExistingOrder(orderId)
+        }
+    }
+
+    // Pre-select table if tableId is provided
+    LaunchedEffect(tableId) {
+        if (!tableId.isNullOrEmpty()) {
+            viewModel.selectTableById(tableId)
         }
     }
 

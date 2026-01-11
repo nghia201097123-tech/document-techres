@@ -48,6 +48,7 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToShift: () -> Unit = {},
     onNavigateToOrderHistory: () -> Unit = {},
+    onNavigateToTables: () -> Unit = {},
     onSwitchStaff: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -97,6 +98,10 @@ fun DashboardScreen(
                         onNavigateToFoodOrders = {
                             coroutineScope.launch { drawerState.close() }
                             onNavigateToFoodOrders()
+                        },
+                        onNavigateToTables = {
+                            coroutineScope.launch { drawerState.close() }
+                            onNavigateToTables()
                         },
                         onNavigateToShift = {
                             coroutineScope.launch { drawerState.close() }
@@ -161,6 +166,7 @@ fun DashboardScreen(
                 staffName = uiState.staffName,
                 onNavigateToSale = onNavigateToSale,
                 onNavigateToFoodOrders = onNavigateToFoodOrders,
+                onNavigateToTables = onNavigateToTables,
                 onNavigateToShift = onNavigateToShift,
                 onNavigateToOrderHistory = onNavigateToOrderHistory,
                 onNavigateToSettings = onNavigateToSettings,
@@ -480,6 +486,7 @@ private fun MobileDrawerContent(
     staffName: String,
     onNavigateToSale: () -> Unit,
     onNavigateToFoodOrders: () -> Unit,
+    onNavigateToTables: () -> Unit,
     onNavigateToShift: () -> Unit,
     onNavigateToOrderHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -539,7 +546,7 @@ private fun MobileDrawerContent(
         Spacer(modifier = Modifier.height(8.dp))
         DrawerNavItem(Icons.Default.PointOfSale, "Bán hàng", true, onNavigateToSale)
         DrawerNavItem(Icons.Default.DeliveryDining, "Đơn App", false, onNavigateToFoodOrders)
-        DrawerNavItem(Icons.Default.TableBar, "Bàn", false, {})
+        DrawerNavItem(Icons.Default.TableBar, "Bàn", false, onNavigateToTables)
         DrawerNavItem(Icons.Default.Schedule, "Ca làm", false, onNavigateToShift)
         DrawerNavItem(Icons.Default.History, "Lịch sử", false, onNavigateToOrderHistory)
 
@@ -839,6 +846,7 @@ private fun DashboardSidebar(
     staffName: String,
     onNavigateToSale: () -> Unit,
     onNavigateToFoodOrders: () -> Unit,
+    onNavigateToTables: () -> Unit,
     onNavigateToShift: () -> Unit,
     onNavigateToOrderHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -895,7 +903,7 @@ private fun DashboardSidebar(
         SidebarNavItem(
             icon = Icons.Default.TableBar,
             label = "Bàn",
-            onClick = {}
+            onClick = onNavigateToTables
         )
 
         SidebarNavItem(

@@ -38,6 +38,9 @@ interface OrderDao {
     @Query("SELECT * FROM orders WHERE id = :id")
     suspend fun getById(id: String): OrderEntity?
 
+    @Query("SELECT * FROM orders WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<String>): List<OrderEntity>
+
     @Query("SELECT * FROM orders WHERE sync_status = 'pending' OR sync_status = 'failed' ORDER BY created_at ASC")
     suspend fun getPendingSyncOrders(): List<OrderEntity>
 

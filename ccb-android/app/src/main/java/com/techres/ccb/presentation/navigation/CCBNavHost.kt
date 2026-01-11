@@ -29,6 +29,7 @@ import com.techres.ccb.presentation.screens.sync.SyncDataScreen
 import com.techres.ccb.presentation.screens.initialsync.InitialSyncScreen
 import com.techres.ccb.presentation.screens.debug.DatabaseDebugScreen
 import com.techres.ccb.presentation.screens.orderhistory.OrderHistoryScreen
+import com.techres.ccb.presentation.screens.table.TableScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -48,8 +49,13 @@ sealed class Screen(val route: String) {
 
     object Dashboard : Screen("dashboard")  // Main dashboard screen
     object Home : Screen("home")
-    object Sale : Screen("sale?orderId={orderId}") {  // New POS Sale Screen
-        fun createRoute(orderId: String? = null) = if (orderId != null) "sale?orderId=$orderId" else "sale"
+    object Sale : Screen("sale?orderId={orderId}&tableId={tableId}") {  // New POS Sale Screen
+        fun createRoute(orderId: String? = null, tableId: String? = null): String {
+            val params = mutableListOf<String>()
+            if (orderId != null) params.add("orderId=$orderId")
+            if (tableId != null) params.add("tableId=$tableId")
+            return if (params.isEmpty()) "sale" else "sale?${params.joinToString("&")}"
+        }
     }
     object FoodOrder : Screen("food_order")  // Food App Orders Screen
     object Menu : Screen("menu?orderId={orderId}") {
@@ -66,6 +72,7 @@ sealed class Screen(val route: String) {
     object KitchenPrinter : Screen("kitchen_printer")
     object DatabaseDebug : Screen("database_debug")
     object OrderHistory : Screen("order_history")
+    object Table : Screen("table")  // Table List Screen
 }
 
 @Composable
@@ -210,7 +217,7 @@ fun CCBNavHost() {
                     navController.navigate(Screen.Sale.createRoute())
                 },
                 onNavigateToSaleWithOrder = { orderId ->
-                    navController.navigate(Screen.Sale.createRoute(orderId))
+                    navController.navigate(Screen.Sale.createRoute(orderId = orderId))
                 },
                 onNavigateToFoodOrders = {
                     navController.navigate(Screen.FoodOrder.route)
@@ -223,6 +230,9 @@ fun CCBNavHost() {
                 },
                 onNavigateToOrderHistory = {
                     navController.navigate(Screen.OrderHistory.route)
+                },
+                onNavigateToTables = {
+                    navController.navigate(Screen.Table.route)
                 },
                 onSwitchStaff = {
                     // Navigate to PIN screen for staff switch (keeps device logged in)
@@ -287,13 +297,20 @@ fun CCBNavHost() {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("tableId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val orderId = backStackEntry.arguments?.getString("orderId")
+            val tableId = backStackEntry.arguments?.getString("tableId")
             SaleScreen(
                 onNavigateBack = { navController.popBackStack() },
-                orderId = orderId
+                orderId = orderId,
+                tableId = tableId
             )
         }
 
@@ -392,6 +409,22 @@ fun CCBNavHost() {
         composable(Screen.OrderHistory.route) {
             OrderHistoryScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        // Table List Screen
+        composable(Screen.Table.route) {
+            TableScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSale = {
+                    navController.navigate(Screen.Sale.createRoute())
+                },
+                onNavigateToSaleWithTable = { tableId ->
+                    navController.navigate(Screen.Sale.createRoute(tableId = tableId))
+                },
+                onNavigateToSaleWithOrder = { orderId ->
+                    navController.navigate(Screen.Sale.createRoute(orderId = orderId))
+                }
             )
         }
     }

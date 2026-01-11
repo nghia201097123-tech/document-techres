@@ -679,6 +679,37 @@ class SaleViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Select a table by ID (used when navigating from TableScreen)
+     */
+    fun selectTableById(tableId: String) {
+        viewModelScope.launch {
+            // Find the table in the loaded tables list
+            val table = _uiState.value.tables.find { it.id == tableId }
+            if (table != null) {
+                selectTable(table)
+                // Also set order type to DINE_IN
+                _uiState.update { it.copy(orderType = OrderType.DINE_IN) }
+                Log.d(TAG, "selectTableById - Selected table: ${table.name}")
+            } else {
+                // Tables might not be loaded yet, try to load them first
+                Log.w(TAG, "selectTableById - Table not found in current list, trying to reload")
+                loadTables()
+                // Delay to allow tables to load
+                kotlinx.coroutines.delay(500)
+                val tableAfterLoad = _uiState.value.tables.find { it.id == tableId }
+                if (tableAfterLoad != null) {
+                    selectTable(tableAfterLoad)
+                    _uiState.update { it.copy(orderType = OrderType.DINE_IN) }
+                    Log.d(TAG, "selectTableById - Selected table after reload: ${tableAfterLoad.name}")
+                } else {
+                    Log.e(TAG, "selectTableById - Table not found: $tableId")
+                    _uiState.update { it.copy(errorMessage = "Không tìm thấy bàn") }
+                }
+            }
+        }
+    }
+
     fun selectTable(table: Table) {
         viewModelScope.launch {
             // Load active order for this table
