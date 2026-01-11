@@ -48,7 +48,9 @@ sealed class Screen(val route: String) {
 
     object Dashboard : Screen("dashboard")  // Main dashboard screen
     object Home : Screen("home")
-    object Sale : Screen("sale")  // New POS Sale Screen
+    object Sale : Screen("sale?orderId={orderId}") {  // New POS Sale Screen
+        fun createRoute(orderId: String? = null) = if (orderId != null) "sale?orderId=$orderId" else "sale"
+    }
     object FoodOrder : Screen("food_order")  // Food App Orders Screen
     object Menu : Screen("menu?orderId={orderId}") {
         fun createRoute(orderId: String? = null) = if (orderId != null) "menu?orderId=$orderId" else "menu"
@@ -205,7 +207,10 @@ fun CCBNavHost() {
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 onNavigateToSale = {
-                    navController.navigate(Screen.Sale.route)
+                    navController.navigate(Screen.Sale.createRoute())
+                },
+                onNavigateToSaleWithOrder = { orderId ->
+                    navController.navigate(Screen.Sale.createRoute(orderId))
                 },
                 onNavigateToFoodOrders = {
                     navController.navigate(Screen.FoodOrder.route)
@@ -275,9 +280,20 @@ fun CCBNavHost() {
             )
         }
 
-        composable(Screen.Sale.route) {
+        composable(
+            route = Screen.Sale.route,
+            arguments = listOf(
+                navArgument("orderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getString("orderId")
             SaleScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                orderId = orderId
             )
         }
 

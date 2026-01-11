@@ -633,6 +633,52 @@ class SaleViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Load an existing order by ID (used when navigating from order detail to add more items)
+     */
+    fun loadExistingOrder(orderId: String) {
+        viewModelScope.launch {
+            try {
+                val order = withContext(Dispatchers.IO) {
+                    orderRepository.getOrderById(orderId)
+                }
+
+                if (order == null) {
+                    Log.e(TAG, "loadExistingOrder - Order not found: $orderId")
+                    _uiState.update { it.copy(errorMessage = "Không tìm thấy đơn hàng") }
+                    return@launch
+                }
+
+                val orderItems = withContext(Dispatchers.IO) {
+                    orderRepository.getOrderItemsSync(orderId)
+                }
+
+                // Find the table if order has tableId
+                val selectedTable = if (!order.tableId.isNullOrEmpty()) {
+                    _uiState.value.tables.find { it.id == order.tableId }
+                } else null
+
+                // Determine order type based on table
+                val orderType = if (selectedTable != null) OrderType.DINE_IN else OrderType.TAKE_AWAY
+
+                _uiState.update { state ->
+                    state.copy(
+                        currentOrder = order,
+                        currentOrderItems = orderItems,
+                        selectedTable = selectedTable,
+                        orderType = orderType,
+                        cartItems = emptyList() // Clear cart when loading existing order
+                    )
+                }
+
+                Log.d(TAG, "loadExistingOrder - Loaded order: ${order.orderNumber}, items: ${orderItems.size}")
+            } catch (e: Exception) {
+                Log.e(TAG, "loadExistingOrder - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi tải đơn hàng: ${e.message}") }
+            }
+        }
+    }
+
     fun selectTable(table: Table) {
         viewModelScope.launch {
             // Load active order for this table

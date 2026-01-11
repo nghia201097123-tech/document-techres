@@ -59,6 +59,7 @@ import java.util.Locale
 @Composable
 fun SaleScreen(
     onNavigateBack: () -> Unit,
+    orderId: String? = null,
     viewModel: SaleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,6 +69,13 @@ fun SaleScreen(
     // Determine if we're on a phone (< 600dp) or tablet
     val isCompactScreen = screenWidthDp < 600
     var showCartDialog by remember { mutableStateOf(false) }
+
+    // Load existing order if orderId is provided
+    LaunchedEffect(orderId) {
+        if (!orderId.isNullOrEmpty()) {
+            viewModel.loadExistingOrder(orderId)
+        }
+    }
 
     // Show success snackbar
     LaunchedEffect(uiState.successMessage) {
