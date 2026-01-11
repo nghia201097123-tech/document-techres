@@ -194,6 +194,7 @@ fun SaleScreen(
         if (uiState.showVariantDialog && uiState.selectedProductForVariant != null) {
             ProductVariantDialog(
                 product = uiState.selectedProductForVariant!!,
+                availableNotes = uiState.availableNotes,
                 onDismiss = { viewModel.hideVariantDialog() },
                 onConfirm = { variants, note ->
                     viewModel.addItemToCart(

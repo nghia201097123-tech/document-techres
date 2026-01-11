@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.formatCurrency
 
@@ -26,6 +27,7 @@ import com.techres.ccb.presentation.screens.sale.formatCurrency
 @Composable
 fun ProductVariantDialog(
     product: Product,
+    availableNotes: List<ProductNoteEntity> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (List<SelectedVariant>, String?) -> Unit
 ) {
@@ -42,6 +44,7 @@ fun ProductVariantDialog(
 
     var quantity by remember { mutableIntStateOf(1) }
     var note by remember { mutableStateOf("") }
+    val selectedNotes = remember { mutableStateListOf<String>() }
 
     // Calculate total price
     val variantPrice = product.variants.sumOf { group ->
@@ -180,10 +183,36 @@ fun ProductVariantDialog(
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    // Available notes as chips
+                    if (availableNotes.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            availableNotes.forEach { noteEntity ->
+                                val isSelected = noteEntity.name in selectedNotes
+                                NoteChip(
+                                    note = noteEntity.name,
+                                    isSelected = isSelected,
+                                    onClick = {
+                                        if (isSelected) {
+                                            selectedNotes.remove(noteEntity.name)
+                                        } else {
+                                            selectedNotes.add(noteEntity.name)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // Free-text note input
                     OutlinedTextField(
                         value = note,
                         onValueChange = { note = it },
-                        placeholder = { Text("Ví dụ: Ít đường, nhiều đá...") },
+                        placeholder = { Text("Ghi chú thêm...") },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 2,
                         shape = RoundedCornerShape(8.dp)
@@ -245,9 +274,16 @@ fun ProductVariantDialog(
                                         )
                                     }
                                 }
+                                // Combine selected notes with free-text note
+                                val allNotes = mutableListOf<String>()
+                                allNotes.addAll(selectedNotes)
+                                if (note.isNotBlank()) {
+                                    allNotes.add(note.trim())
+                                }
+                                val finalNote = if (allNotes.isNotEmpty()) allNotes.joinToString(", ") else null
                                 // Add multiple items based on quantity
                                 repeat(quantity) {
-                                    onConfirm(variants, note.ifBlank { null })
+                                    onConfirm(variants, finalNote)
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -373,5 +409,51 @@ fun FlowRow(
         verticalArrangement = verticalArrangement
     ) {
         content()
+    }
+}
+
+@Composable
+fun NoteChip(
+    note: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.tertiaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.tertiary
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isSelected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = note,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
