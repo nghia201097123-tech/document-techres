@@ -3,6 +3,7 @@ package com.techres.ccb.di
 import android.content.Context
 import androidx.room.Room
 import com.techres.ccb.data.local.CCBDatabase
+import com.techres.ccb.data.local.DatabaseMigrations
 import com.techres.ccb.data.local.dao.*
 import dagger.Module
 import dagger.Provides
@@ -25,6 +26,7 @@ object DatabaseModule {
             CCBDatabase::class.java,
             CCBDatabase.DATABASE_NAME
         )
+            .addMigrations(*DatabaseMigrations.ALL_MIGRATIONS)
             .fallbackToDestructiveMigration()
             .build()
     }
