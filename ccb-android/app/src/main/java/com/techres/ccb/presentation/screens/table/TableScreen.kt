@@ -55,6 +55,10 @@ fun TableScreen(
     val screenWidthDp = configuration.screenWidthDp
     val isCompactScreen = screenWidthDp < 600
 
+    // Grid columns state - default based on screen size
+    var gridColumns by remember { mutableIntStateOf(if (isCompactScreen) 3 else 4) }
+    val columnOptions = if (isCompactScreen) listOf(2, 3, 4) else listOf(3, 4, 5, 6)
+
     // Show error snackbar
     LaunchedEffect(uiState.errorMessage) {
         if (uiState.errorMessage != null) {
@@ -157,11 +161,14 @@ fun TableScreen(
                 }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Statistics bar
+                    // Statistics bar with grid column selector
                     TableStatisticsBar(
                         totalTables = uiState.totalTables,
                         availableTables = uiState.availableTables,
-                        occupiedTables = uiState.occupiedTables
+                        occupiedTables = uiState.occupiedTables,
+                        gridColumns = gridColumns,
+                        columnOptions = columnOptions,
+                        onGridColumnsChange = { gridColumns = it }
                     )
 
                     // Table list grouped by area
@@ -174,7 +181,7 @@ fun TableScreen(
                             item(key = "area_${areaWithTables.area.id}") {
                                 AreaSection(
                                     areaWithTables = areaWithTables,
-                                    isCompactScreen = isCompactScreen,
+                                    gridColumns = gridColumns,
                                     onToggleExpand = { viewModel.toggleAreaExpanded(areaWithTables.area.id) },
                                     onTableClick = { table ->
                                         if (table.currentOrderId != null) {
@@ -205,7 +212,7 @@ fun TableScreen(
                                         tables = uiState.tablesWithoutArea,
                                         isExpanded = true
                                     ),
-                                    isCompactScreen = isCompactScreen,
+                                    gridColumns = gridColumns,
                                     onToggleExpand = { },
                                     onTableClick = { table ->
                                         if (table.currentOrderId != null) {
@@ -256,7 +263,10 @@ fun TableScreen(
 private fun TableStatisticsBar(
     totalTables: Int,
     availableTables: Int,
-    occupiedTables: Int
+    occupiedTables: Int,
+    gridColumns: Int,
+    columnOptions: List<Int>,
+    onGridColumnsChange: (Int) -> Unit
 ) {
     Surface(
         color = Color.White,
@@ -266,23 +276,85 @@ private fun TableStatisticsBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            StatChip(
-                count = availableTables,
-                label = "Trống",
-                color = StatusAvailable
+            // Statistics chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatChip(
+                    count = availableTables,
+                    label = "Trống",
+                    color = StatusAvailable
+                )
+                StatChip(
+                    count = occupiedTables,
+                    label = "Có khách",
+                    color = StatusOccupied
+                )
+            }
+
+            // Grid column selector
+            GridColumnSelector(
+                gridColumns = gridColumns,
+                columnOptions = columnOptions,
+                onGridColumnsChange = onGridColumnsChange
             )
-            StatChip(
-                count = occupiedTables,
-                label = "Có khách",
-                color = StatusOccupied
+        }
+    }
+}
+
+@Composable
+private fun GridColumnSelector(
+    gridColumns: Int,
+    columnOptions: List<Int>,
+    onGridColumnsChange: (Int) -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Grid icon
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFFF5F5F5))
+                .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.GridView,
+                contentDescription = "Grid",
+                modifier = Modifier.size(20.dp),
+                tint = Color.Gray
             )
-            StatChip(
-                count = totalTables - availableTables - occupiedTables,
-                label = "Khác",
-                color = StatusCleaning
-            )
+        }
+
+        // Column options
+        columnOptions.forEach { option ->
+            val isSelected = gridColumns == option
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isSelected) Color(0xFF1976D2) else Color.White)
+                    .border(
+                        1.dp,
+                        if (isSelected) Color(0xFF1976D2) else Color.Gray.copy(alpha = 0.3f),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable { onGridColumnsChange(option) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = option.toString(),
+                    fontSize = 14.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) Color.White else Color.Gray
+                )
+            }
         }
     }
 }
@@ -319,7 +391,7 @@ private fun StatChip(
 @Composable
 private fun AreaSection(
     areaWithTables: AreaWithTables,
-    isCompactScreen: Boolean,
+    gridColumns: Int,
     onToggleExpand: () -> Unit,
     onTableClick: (TableWithOrderInfo) -> Unit
 ) {
@@ -386,8 +458,7 @@ private fun AreaSection(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                // Use a grid layout for tables
-                val gridColumns = if (isCompactScreen) 2 else 4
+                // Use the selected grid columns
                 val rows = areaWithTables.tables.chunked(gridColumns)
 
                 rows.forEach { rowTables ->
