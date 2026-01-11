@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronLeft, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronLeft, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +90,37 @@ const defaultProductColumns: ColumnConfig[] = [
   { key: "printSeafood", label: "In hồ hải sản", visible: false },
   { key: "isActive", label: "Trạng thái", visible: true },
 ];
+
+// Detail view field configuration
+interface DetailFieldConfig {
+  key: string;
+  label: string;
+  visible: boolean;
+}
+
+const defaultProductDetailFields: DetailFieldConfig[] = [
+  { key: "code", label: "Mã món", visible: true },
+  { key: "type", label: "Loại món", visible: true },
+  { key: "name", label: "Tên món", visible: true },
+  { key: "price", label: "Giá bán (đã VAT)", visible: true },
+  { key: "vatRate", label: "VAT", visible: true },
+  { key: "priceBeforeVat", label: "Giá chưa VAT", visible: true },
+  { key: "vatAmount", label: "Thuế VAT", visible: true },
+  { key: "costPrice", label: "Giá vốn", visible: false },
+  { key: "category", label: "Danh mục", visible: true },
+  { key: "description", label: "Mô tả", visible: true },
+  { key: "image", label: "Hình ảnh", visible: true },
+  { key: "unit", label: "Đơn vị", visible: false },
+  { key: "sellingType", label: "Loại bán", visible: false },
+  { key: "preparationTime", label: "Thời gian chế biến", visible: false },
+  { key: "printDish", label: "In món", visible: false },
+  { key: "printLabel", label: "In tem", visible: false },
+  { key: "printSeafood", label: "In hải sản", visible: false },
+  { key: "isActive", label: "Trạng thái", visible: true },
+  { key: "createdAt", label: "Ngày tạo", visible: true },
+];
+
+const PRODUCT_DETAIL_FIELDS_STORAGE_KEY = "product-detail-fields-config";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -197,6 +228,51 @@ export default function ProductsPage() {
   const [saving, setSaving] = React.useState(false);
   const [formData, setFormData] = React.useState<CreateProductDto>(initialFormData);
   const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
+
+  // Detail view field configuration state
+  const [productDetailFields, setProductDetailFields] = React.useState<DetailFieldConfig[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(PRODUCT_DETAIL_FIELDS_STORAGE_KEY);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          return defaultProductDetailFields;
+        }
+      }
+    }
+    return defaultProductDetailFields;
+  });
+  const [detailFieldsPopoverOpen, setDetailFieldsPopoverOpen] = React.useState(false);
+
+  // Helper to check if detail field is visible
+  const isDetailFieldVisible = (key: string) => {
+    const field = productDetailFields.find((f) => f.key === key);
+    return field?.visible ?? true;
+  };
+
+  // Toggle detail field visibility
+  const toggleDetailField = (key: string) => {
+    const newFields = productDetailFields.map((f) =>
+      f.key === key ? { ...f, visible: !f.visible } : f
+    );
+    setProductDetailFields(newFields);
+    localStorage.setItem(PRODUCT_DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
+  };
+
+  // Show all detail fields
+  const showAllDetailFields = () => {
+    const newFields = productDetailFields.map((f) => ({ ...f, visible: true }));
+    setProductDetailFields(newFields);
+    localStorage.setItem(PRODUCT_DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
+  };
+
+  // Hide all detail fields
+  const hideAllDetailFields = () => {
+    const newFields = productDetailFields.map((f) => ({ ...f, visible: false }));
+    setProductDetailFields(newFields);
+    localStorage.setItem(PRODUCT_DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
+  };
 
   // Sorting state
   type SortKey = "code" | "name" | "type" | "categoryName" | "price" | "vatRate" | "costPrice" | "unit" | "sellingType" | "isActive" | "createdAt";
@@ -2609,63 +2685,135 @@ export default function ProductsPage() {
       {/* View Product Dialog */}
       <Dialog open={dialogMode === "view"} onOpenChange={() => handleCloseDialog()}>
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle>Chi tiết món ăn</DialogTitle>
-            <DialogDescription>Thông tin chi tiết của món ăn</DialogDescription>
+          <DialogHeader className="flex flex-row items-start justify-between flex-shrink-0">
+            <div>
+              <DialogTitle>Chi tiết món ăn</DialogTitle>
+              <DialogDescription>Thông tin chi tiết của món ăn</DialogDescription>
+            </div>
+            <Popover open={detailFieldsPopoverOpen} onOpenChange={setDetailFieldsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Cấu hình
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64" align="end">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-sm">Hiển thị Fields</p>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={showAllDetailFields}>
+                        Tất cả
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={hideAllDetailFields}>
+                        Ẩn hết
+                      </Button>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-2">
+                      {productDetailFields.map((field) => (
+                        <div key={field.key} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`detail-field-${field.key}`}
+                            checked={field.visible}
+                            onCheckedChange={() => toggleDetailField(field.key)}
+                          />
+                          <Label
+                            htmlFor={`detail-field-${field.key}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {field.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </PopoverContent>
+            </Popover>
           </DialogHeader>
           {selectedProduct && (
             <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Mã món</Label>
-                  <p className="font-mono font-medium">{selectedProduct.code}</p>
+              {(isDetailFieldVisible("code") || isDetailFieldVisible("type")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("code") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Mã món</Label>
+                      <p className="font-mono font-medium">{selectedProduct.code}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("type") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Loại món</Label>
+                      <Badge className={typeLabels[selectedProduct.type]?.color || ""}>
+                        {typeLabels[selectedProduct.type]?.label || selectedProduct.type}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
+              )}
+              {isDetailFieldVisible("name") && (
                 <div>
-                  <Label className="text-muted-foreground text-xs">Loại món</Label>
-                  <Badge className={typeLabels[selectedProduct.type]?.color || ""}>
-                    {typeLabels[selectedProduct.type]?.label || selectedProduct.type}
-                  </Badge>
+                  <Label className="text-muted-foreground text-xs">Tên món</Label>
+                  <p className="font-medium text-lg">{selectedProduct.name}</p>
                 </div>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Tên món</Label>
-                <p className="font-medium text-lg">{selectedProduct.name}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              )}
+              {(isDetailFieldVisible("price") || isDetailFieldVisible("vatRate")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("price") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Giá bán (đã bao gồm VAT)</Label>
+                      <p className="font-medium text-lg text-green-600">{formatCurrency(selectedProduct.price)}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("vatRate") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">VAT</Label>
+                      <p>{selectedProduct.vatRate || 10}%</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {(isDetailFieldVisible("priceBeforeVat") || isDetailFieldVisible("vatAmount")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("priceBeforeVat") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Giá chưa bao gồm VAT</Label>
+                      <p className="font-medium text-lg text-muted-foreground">
+                        {formatCurrency(Math.round(selectedProduct.price / (1 + (selectedProduct.vatRate || 10) / 100)))}
+                      </p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("vatAmount") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Thuế VAT</Label>
+                      <p className="font-medium text-muted-foreground">
+                        {formatCurrency(Math.round(selectedProduct.price - selectedProduct.price / (1 + (selectedProduct.vatRate || 10) / 100)))}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {isDetailFieldVisible("costPrice") && selectedProduct.costPrice > 0 && (
                 <div>
-                  <Label className="text-muted-foreground text-xs">Giá bán (đã bao gồm VAT)</Label>
-                  <p className="font-medium text-lg text-green-600">{formatCurrency(selectedProduct.price)}</p>
+                  <Label className="text-muted-foreground text-xs">Giá vốn</Label>
+                  <p className="font-medium">{formatCurrency(selectedProduct.costPrice)}</p>
                 </div>
+              )}
+              {isDetailFieldVisible("category") && (
                 <div>
-                  <Label className="text-muted-foreground text-xs">VAT</Label>
-                  <p>{selectedProduct.vatRate || 10}%</p>
+                  <Label className="text-muted-foreground text-xs">Danh mục</Label>
+                  <p>{getCategoryName(selectedProduct.categoryId)}</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Giá chưa bao gồm VAT</Label>
-                  <p className="font-medium text-lg text-muted-foreground">
-                    {formatCurrency(Math.round(selectedProduct.price / (1 + (selectedProduct.vatRate || 10) / 100)))}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Thuế VAT</Label>
-                  <p className="font-medium text-muted-foreground">
-                    {formatCurrency(Math.round(selectedProduct.price - selectedProduct.price / (1 + (selectedProduct.vatRate || 10) / 100)))}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Danh mục</Label>
-                <p>{getCategoryName(selectedProduct.categoryId)}</p>
-              </div>
-              {selectedProduct.description && (
+              )}
+              {isDetailFieldVisible("description") && selectedProduct.description && (
                 <div>
                   <Label className="text-muted-foreground text-xs">Mô tả</Label>
                   <p className="text-sm">{selectedProduct.description}</p>
                 </div>
               )}
-              {selectedProduct.imageUrl && (
+              {isDetailFieldVisible("image") && selectedProduct.imageUrl && (
                 <div>
                   <Label className="text-muted-foreground text-xs">Hình ảnh</Label>
                   <div className="mt-2 w-[120px] h-[120px] rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -2682,18 +2830,68 @@ export default function ProductsPage() {
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Trạng thái</Label>
-                  <Badge variant={selectedProduct.isActive ? "default" : "secondary"}>
-                    {selectedProduct.isActive ? "Hoạt động" : "Tạm ngưng"}
-                  </Badge>
+              {(isDetailFieldVisible("unit") || isDetailFieldVisible("sellingType")) && (selectedProduct.unit || selectedProduct.sellingType) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("unit") && selectedProduct.unit && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Đơn vị</Label>
+                      <p>{selectedProduct.unit}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("sellingType") && selectedProduct.sellingType && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Loại bán</Label>
+                      <p>{selectedProduct.sellingType === "portion" ? "Theo phần" : "Theo ký"}</p>
+                    </div>
+                  )}
                 </div>
+              )}
+              {isDetailFieldVisible("preparationTime") && selectedProduct.preparationTime > 0 && (
                 <div>
-                  <Label className="text-muted-foreground text-xs">Ngày tạo</Label>
-                  <p>{new Date(selectedProduct.createdAt).toLocaleDateString("vi-VN")}</p>
+                  <Label className="text-muted-foreground text-xs">Thời gian chế biến</Label>
+                  <p>{selectedProduct.preparationTime} phút</p>
                 </div>
-              </div>
+              )}
+              {(isDetailFieldVisible("printDish") || isDetailFieldVisible("printLabel") || isDetailFieldVisible("printSeafood")) && (
+                <div className="grid grid-cols-3 gap-4">
+                  {isDetailFieldVisible("printDish") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">In món</Label>
+                      <p>{selectedProduct.printDish ? "Có" : "Không"}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("printLabel") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">In tem</Label>
+                      <p>{selectedProduct.printLabel ? "Có" : "Không"}</p>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("printSeafood") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">In hải sản</Label>
+                      <p>{selectedProduct.printSeafood ? "Có" : "Không"}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {(isDetailFieldVisible("isActive") || isDetailFieldVisible("createdAt")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {isDetailFieldVisible("isActive") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Trạng thái</Label>
+                      <Badge variant={selectedProduct.isActive ? "default" : "secondary"}>
+                        {selectedProduct.isActive ? "Hoạt động" : "Tạm ngưng"}
+                      </Badge>
+                    </div>
+                  )}
+                  {isDetailFieldVisible("createdAt") && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Ngày tạo</Label>
+                      <p>{new Date(selectedProduct.createdAt).toLocaleDateString("vi-VN")}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <DialogFooter className="flex-shrink-0 pt-4 border-t">
