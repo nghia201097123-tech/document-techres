@@ -42,7 +42,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
@@ -682,11 +684,27 @@ fun ProductCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (!product.imageUrl.isNullOrBlank()) {
-                    AsyncImage(
+                    SubcomposeAsyncImage(
                         model = product.imageUrl,
                         contentDescription = product.name,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        loading = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        },
+                        error = {
+                            // Show placeholder on error
+                            Text(
+                                text = "📦",
+                                fontSize = 40.sp
+                            )
+                        },
+                        success = {
+                            SubcomposeAsyncImageContent()
+                        }
                     )
                 } else {
                     // Show category icon as placeholder when no image
