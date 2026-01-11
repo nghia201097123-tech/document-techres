@@ -918,6 +918,33 @@ export const bulkProductService = {
 
     return aggregatedResult;
   },
+
+  assignNotes: async (productIds: string[], noteIds: string[]): Promise<ProductBulkOperationResult> => {
+    const response = await api.post<ProductBulkOperationResult>("/products/bulk/assign-notes", {
+      productIds,
+      noteIds,
+    });
+    return response.data;
+  },
+
+  assignNotesBatched: async (
+    productIds: string[],
+    noteIds: string[],
+    options?: { batchSize?: number; onProgress?: (progress: ProductBatchProgressInfo) => void }
+  ): Promise<ProductBulkOperationResult> => {
+    return processProductBulkInBatches(
+      productIds,
+      options?.batchSize || 50,
+      async (batch) => {
+        const response = await api.post<ProductBulkOperationResult>("/products/bulk/assign-notes", {
+          productIds: batch,
+          noteIds,
+        });
+        return response.data;
+      },
+      options?.onProgress
+    );
+  },
 };
 
 export interface BulkAvatarUpdateResult {

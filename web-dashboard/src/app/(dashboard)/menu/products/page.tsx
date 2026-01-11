@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronLeft, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy, Settings2 } from "lucide-react";
+import { Plus, Search, UtensilsCrossed, Filter, Loader2, MoreHorizontal, Eye, Pencil, Power, Cherry, X, Check, Trash2, ChevronDown, ChevronRight, ChevronLeft, ChevronsUpDown, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, Percent, Printer, Clock, Scale, Tag, ImageIcon, Copy, Settings2, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -385,7 +385,7 @@ export default function ProductsPage() {
   }, [products]);
 
   // Bulk operations state
-  type BulkOperation = "category" | "activate" | "deactivate" | "delete" | "vat" | "price" | "print-label" | "print-seafood" | "print-dish" | "unit" | "selling-type" | "preparation-time" | null;
+  type BulkOperation = "category" | "activate" | "deactivate" | "delete" | "vat" | "price" | "print-label" | "print-seafood" | "print-dish" | "unit" | "selling-type" | "preparation-time" | "notes" | null;
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
   const [bulkOperation, setBulkOperation] = React.useState<BulkOperation>(null);
   const [bulkCategoryId, setBulkCategoryId] = React.useState("");
@@ -396,6 +396,9 @@ export default function ProductsPage() {
   const [bulkUnitComboboxOpen, setBulkUnitComboboxOpen] = React.useState(false);
   const [bulkSellingType, setBulkSellingType] = React.useState<SellingType>(SellingType.PORTION);
   const [bulkPreparationTime, setBulkPreparationTime] = React.useState<number>(0);
+  const [bulkNoteIds, setBulkNoteIds] = React.useState<Set<string>>(new Set());
+  const [bulkNotePopoverOpen, setBulkNotePopoverOpen] = React.useState(false);
+  const [bulkNoteSearchValue, setBulkNoteSearchValue] = React.useState("");
   const [processingBulk, setProcessingBulk] = React.useState(false);
   const [bulkProgress, setBulkProgress] = React.useState<{ current: number; total: number; batchNumber: number; totalBatches: number } | null>(null);
   const [bulkResult, setBulkResult] = React.useState<ProductBulkOperationResult | null>(null);
@@ -544,7 +547,7 @@ export default function ProductsPage() {
   // Load notes when dialog opens
   React.useEffect(() => {
     const loadNotes = async () => {
-      if ((dialogMode === "create" || dialogMode === "edit") && filterBrandId) {
+      if ((dialogMode === "create" || dialogMode === "edit" || bulkOperation === "notes") && filterBrandId) {
         setLoadingNotes(true);
         try {
           const data = await productService.getAllNotes(filterBrandId);
@@ -557,7 +560,7 @@ export default function ProductsPage() {
       }
     };
     loadNotes();
-  }, [dialogMode, filterBrandId]);
+  }, [dialogMode, bulkOperation, filterBrandId]);
 
   // Open create dialog
   const handleOpenCreate = () => {
@@ -1595,6 +1598,8 @@ export default function ProductsPage() {
     setBulkUnit("");
     setBulkSellingType(SellingType.PORTION);
     setBulkPreparationTime(0);
+    setBulkNoteIds(new Set());
+    setBulkNoteSearchValue("");
     setBulkResult(null);
   };
 
@@ -1762,6 +1767,7 @@ export default function ProductsPage() {
       boolValue: bulkPrintValue,
       stringValue: bulkOperation === "unit" ? unitName : bulkSellingType,
       numberValue: bulkPreparationTime,
+      noteIds: bulkOperation === "notes" ? Array.from(bulkNoteIds) : undefined,
       onComplete: (result) => {
         // Reload products when completed
         loadProducts(filterBrandId, filterBranchId);
@@ -2172,6 +2178,10 @@ export default function ProductsPage() {
                         <Clock className="mr-2 h-4 w-4" />
                         Cập nhật Thời gian chế biến
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBulkOperation("notes")}>
+                        <StickyNote className="mr-2 h-4 w-4" />
+                        Gán ghi chú
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBulkOperation("activate")}>
                         <Power className="mr-2 h-4 w-4 text-green-600" />
@@ -2486,6 +2496,7 @@ export default function ProductsPage() {
               {bulkOperation === "unit" && "Cập nhật Đơn vị"}
               {bulkOperation === "selling-type" && "Cập nhật Loại bán"}
               {bulkOperation === "preparation-time" && "Cập nhật Thời gian chế biến"}
+              {bulkOperation === "notes" && "Gán ghi chú"}
             </DialogTitle>
             <DialogDescription>
               Thao tác sẽ áp dụng cho {selectedProductIds.size} món ăn đã chọn
@@ -2684,6 +2695,140 @@ export default function ProductsPage() {
                   value={bulkPreparationTime || ""}
                   onChange={(e) => setBulkPreparationTime(Number(e.target.value))}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Notes selection */}
+          {bulkOperation === "notes" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Chọn ghi chú cho món</Label>
+                <p className="text-xs text-muted-foreground">
+                  Ghi chú này sẽ <strong>thay thế tất cả</strong> ghi chú hiện có của các món đã chọn
+                </p>
+                <Popover open={bulkNotePopoverOpen} onOpenChange={setBulkNotePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={bulkNotePopoverOpen}
+                      className="w-full justify-between h-auto min-h-10"
+                      disabled={loadingNotes}
+                    >
+                      <div className="flex flex-wrap gap-1 flex-1">
+                        {bulkNoteIds.size === 0 ? (
+                          <span className="text-muted-foreground">Chọn hoặc tạo ghi chú...</span>
+                        ) : (
+                          Array.from(bulkNoteIds).map(noteId => {
+                            const note = availableNotes.find(n => n.id === noteId);
+                            return note ? (
+                              <Badge key={noteId} variant="secondary" className="mr-1">
+                                {note.name}
+                                <button
+                                  type="button"
+                                  className="ml-1 hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBulkNoteIds(prev => {
+                                      const next = new Set(prev);
+                                      next.delete(noteId);
+                                      return next;
+                                    });
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      setBulkNoteIds(prev => {
+                                        const next = new Set(prev);
+                                        next.delete(noteId);
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ) : null;
+                          })
+                        )}
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Tìm hoặc tạo ghi chú..."
+                        value={bulkNoteSearchValue}
+                        onValueChange={setBulkNoteSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {bulkNoteSearchValue.trim() ? (
+                            <>
+                              Không tìm thấy ghi chú. Nhấn Enter để tạo{" "}
+                              <span className="font-medium">&quot;{bulkNoteSearchValue}&quot;</span>
+                            </>
+                          ) : (
+                            "Chưa có ghi chú nào. Nhập để tạo mới."
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {/* Option to create new note */}
+                          {bulkNoteSearchValue.trim() && !availableNotes.some(n => n.name.toLowerCase() === bulkNoteSearchValue.toLowerCase()) && (
+                            <CommandItem
+                              value={`create-bulk-${bulkNoteSearchValue}`}
+                              onSelect={() => handleCreateNote(bulkNoteSearchValue).then(() => {
+                                // After creating note, select it for bulk operation
+                                const newNote = availableNotes.find(n => n.name.toLowerCase() === bulkNoteSearchValue.toLowerCase());
+                                if (newNote) {
+                                  setBulkNoteIds(prev => new Set([...prev, newNote.id]));
+                                }
+                                setBulkNoteSearchValue("");
+                              })}
+                              disabled={creatingNote}
+                              className="text-primary"
+                            >
+                              {creatingNote ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Plus className="mr-2 h-4 w-4" />
+                              )}
+                              Tạo mới: &quot;{bulkNoteSearchValue}&quot;
+                            </CommandItem>
+                          )}
+                          {availableNotes.filter(note =>
+                            note.name.toLowerCase().includes(bulkNoteSearchValue.toLowerCase())
+                          ).map((note) => (
+                            <CommandItem
+                              key={note.id}
+                              value={note.name}
+                              onSelect={() => {
+                                setBulkNoteIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(note.id)) {
+                                    next.delete(note.id);
+                                  } else {
+                                    next.add(note.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                            >
+                              <Checkbox
+                                checked={bulkNoteIds.has(note.id)}
+                                className="mr-2"
+                              />
+                              {note.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           )}

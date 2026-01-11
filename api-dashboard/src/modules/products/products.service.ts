@@ -1511,4 +1511,48 @@ export class ProductsService {
 
     return result;
   }
+
+  async bulkAssignNotes(tenantId: string, productIds: string[], noteIds: string[]) {
+    const result = { success: 0, failed: 0, errors: [] as { productId: string; message: string }[] };
+
+    for (const productId of productIds) {
+      try {
+        const product = await this.productRepository.findOne({
+          where: { tenantId, id: productId },
+        });
+
+        if (!product) {
+          result.failed++;
+          result.errors.push({ productId, message: 'Không tìm thấy món ăn' });
+          continue;
+        }
+
+        // Remove all existing assignments for this product
+        await this.productNoteAssignmentRepository.delete({
+          tenantId,
+          productId,
+        });
+
+        // Create new assignments
+        if (noteIds.length > 0) {
+          const assignments = noteIds.map((noteId, index) =>
+            this.productNoteAssignmentRepository.create({
+              tenantId,
+              productId,
+              noteId,
+              sortOrder: index,
+            }),
+          );
+          await this.productNoteAssignmentRepository.save(assignments);
+        }
+
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({ productId, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+      }
+    }
+
+    return result;
+  }
 }

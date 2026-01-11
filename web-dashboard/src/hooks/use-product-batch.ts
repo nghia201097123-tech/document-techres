@@ -25,6 +25,7 @@ export type ProductBatchOperationType =
   | "unit"
   | "selling-type"
   | "preparation-time"
+  | "notes"
   | "import";
 
 /**
@@ -47,6 +48,8 @@ export interface StoredProductBatchOperation {
   boolValue?: boolean;
   stringValue?: string;
   numberValue?: number;
+  // Notes-specific fields
+  noteIds?: string[];
   // Import-specific fields
   importItems?: BulkProductItem[];
   importProcessedIndex?: number; // Index of last processed item
@@ -115,6 +118,7 @@ interface StartBatchOptions {
   boolValue?: boolean;
   stringValue?: string;
   numberValue?: number;
+  noteIds?: string[];
   batchSize?: number;
   onComplete?: (result: ProductBulkOperationResult) => void;
 }
@@ -160,6 +164,7 @@ export function useProductBatch() {
       unit: "Cập nhật đơn vị",
       "selling-type": "Cập nhật loại bán",
       "preparation-time": "Cập nhật thời gian chế biến",
+      notes: "Gán ghi chú",
       import: "Import món ăn",
     };
     return titles[type] || "Xử lý sản phẩm";
@@ -176,7 +181,7 @@ export function useProductBatch() {
         return;
       }
 
-      const { id, type, productIds, processedIds, failedItems, categoryId, vatRate, price, boolValue, stringValue, numberValue, title } = operation;
+      const { id, type, productIds, processedIds, failedItems, categoryId, vatRate, price, boolValue, stringValue, numberValue, noteIds, title } = operation;
       const batchSize = 50;
 
       // Calculate remaining items
@@ -271,6 +276,9 @@ export function useProductBatch() {
                 break;
               case "preparation-time":
                 result = await bulkProductService.updatePreparationTime(batch, numberValue!);
+                break;
+              case "notes":
+                result = await bulkProductService.assignNotes(batch, noteIds || []);
                 break;
               default:
                 throw new Error(`Unknown operation type: ${type}`);
@@ -480,7 +488,7 @@ export function useProductBatch() {
   // Start a new batch operation
   const startBatch = React.useCallback(
     async (options: StartBatchOptions) => {
-      const { productIds, type, categoryId, vatRate, price, boolValue, stringValue, numberValue, onComplete } = options;
+      const { productIds, type, categoryId, vatRate, price, boolValue, stringValue, numberValue, noteIds, onComplete } = options;
 
       if (productIds.length === 0) return;
 
@@ -504,6 +512,7 @@ export function useProductBatch() {
         boolValue,
         stringValue,
         numberValue,
+        noteIds,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };

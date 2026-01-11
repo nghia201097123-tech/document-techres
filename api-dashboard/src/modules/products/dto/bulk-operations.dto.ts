@@ -137,3 +137,15 @@ export class BulkUpdateAvatarDto {
   @IsArray()
   items: BulkAvatarItemDto[];
 }
+
+export class BulkAssignNotesDto {
+  @ApiProperty({ description: 'Danh sách ID món ăn' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  productIds: string[];
+
+  @ApiProperty({ description: 'Danh sách ID ghi chú cần gán' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  noteIds: string[];
+}

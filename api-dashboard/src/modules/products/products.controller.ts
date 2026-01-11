@@ -31,6 +31,7 @@ import {
   BulkUpdateSellingTypeDto,
   BulkUpdatePreparationTimeDto,
   BulkUpdateAvatarDto,
+  BulkAssignNotesDto,
 } from './dto';
 import { ProductType } from '../../database/entities';
 
@@ -309,6 +310,16 @@ export class ProductsController {
   @ApiOperation({ summary: 'Cập nhật ảnh cho nhiều món (theo mã món)' })
   bulkUpdateAvatar(@Request() req, @Body() dto: BulkUpdateAvatarDto) {
     return this.productsService.bulkUpdateAvatar(req.user.tenantId, dto.items);
+  }
+
+  @Post('bulk/assign-notes')
+  @ApiOperation({ summary: 'Gán ghi chú cho nhiều món cùng lúc' })
+  bulkAssignNotes(@Request() req, @Body() dto: BulkAssignNotesDto) {
+    return this.productsService.bulkAssignNotes(
+      req.user.tenantId,
+      dto.productIds,
+      dto.noteIds,
+    );
   }
 
   // === Product CRUD ===
