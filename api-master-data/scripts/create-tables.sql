@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS products (
     category_id UUID,
     code VARCHAR(50) NOT NULL,
     name VARCHAR(255) NOT NULL,
+    search_name VARCHAR(255),  -- Tên không dấu để tìm kiếm
+    abbreviation VARCHAR(50),  -- Tên viết tắt để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")
     description TEXT,
     price DECIMAL(12, 2) NOT NULL,
     cost_price DECIMAL(12, 2) DEFAULT 0,

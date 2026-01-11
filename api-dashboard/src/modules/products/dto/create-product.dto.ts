@@ -27,6 +27,12 @@ export class CreateProductDto {
   @MaxLength(255)
   name: string;
 
+  @ApiPropertyOptional({ example: 'pbt', description: 'Tên viết tắt để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  abbreviation?: string;
+
   @ApiPropertyOptional({ example: 'Phở bò tái thơm ngon' })
   @IsOptional()
   @IsString()

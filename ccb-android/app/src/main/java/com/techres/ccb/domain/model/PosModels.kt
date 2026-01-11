@@ -16,6 +16,8 @@ data class Product(
     val id: String,
     val code: String,
     val name: String,
+    val searchName: String? = null,  // Tên không dấu để tìm kiếm
+    val abbreviation: String? = null, // Tên viết tắt (VD: "ccdc" cho "Cơm chiên dương châu")
     val categoryId: String,
     val price: Long,
     val imageUrl: String? = null,

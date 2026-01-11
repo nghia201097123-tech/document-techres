@@ -40,6 +40,14 @@ data class ProductEntity(
     @ColumnInfo(name = "name")
     val name: String,
 
+    // Tên không dấu - dùng để tìm kiếm
+    @ColumnInfo(name = "search_name")
+    val searchName: String? = null,
+
+    // Tên viết tắt để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")
+    @ColumnInfo(name = "abbreviation")
+    val abbreviation: String? = null,
+
     @ColumnInfo(name = "description")
     val description: String? = null,
 

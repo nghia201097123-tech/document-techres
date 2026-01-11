@@ -13,7 +13,17 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE branch_id = :branchId AND category_id = :categoryId AND is_active = 1 AND is_available = 1 ORDER BY sort_order ASC")
     fun getByCategoryAndBranch(branchId: String, categoryId: String): Flow<List<ProductEntity>>
 
-    @Query("SELECT * FROM products WHERE branch_id = :branchId AND is_active = 1 AND is_available = 1 AND (name LIKE '%' || :query || '%' OR code LIKE '%' || :query || '%') ORDER BY sort_order ASC")
+    @Query("""
+        SELECT * FROM products
+        WHERE branch_id = :branchId AND is_active = 1 AND is_available = 1
+        AND (
+            name LIKE '%' || :query || '%'
+            OR code LIKE '%' || :query || '%'
+            OR search_name LIKE '%' || :query || '%'
+            OR abbreviation LIKE '%' || :query || '%'
+        )
+        ORDER BY sort_order ASC
+    """)
     fun searchProducts(branchId: String, query: String): Flow<List<ProductEntity>>
 
     @Query("SELECT * FROM products WHERE id = :id")

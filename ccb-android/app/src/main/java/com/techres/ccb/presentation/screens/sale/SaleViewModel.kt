@@ -412,11 +412,13 @@ class SaleViewModel @Inject constructor(
                 productsByCategoryCache[categoryId] ?: emptyList()
             }
         } else {
-            // Search in all products cache
+            // Search in all products cache - supports Vietnamese accent-free and abbreviation search
             val lowerQuery = query.lowercase()
             allProductsCache.filter { product ->
                 product.name.lowercase().contains(lowerQuery) ||
-                product.code.lowercase().contains(lowerQuery)
+                product.code.lowercase().contains(lowerQuery) ||
+                product.searchName?.lowercase()?.contains(lowerQuery) == true ||
+                product.abbreviation?.lowercase()?.contains(lowerQuery) == true
             }
         }
 
@@ -444,6 +446,8 @@ class SaleViewModel @Inject constructor(
                 id = entity.id,
                 code = entity.code,
                 name = entity.name,
+                searchName = entity.searchName,
+                abbreviation = entity.abbreviation,
                 categoryId = entity.categoryId ?: "",
                 price = entity.price.toLong(),
                 imageUrl = entity.imageUrl,

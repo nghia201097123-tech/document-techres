@@ -52,6 +52,14 @@ export class Product {
   @Column({ nullable: true })
   name: string;
 
+  // Tên không dấu - dùng để tìm kiếm (auto-generated từ name)
+  @Column({ name: 'search_name', nullable: true })
+  searchName: string;
+
+  // Tên viết tắt - dùng để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")
+  @Column({ nullable: true })
+  abbreviation: string;
+
   @Column({ type: 'text', nullable: true })
   description: string;
 

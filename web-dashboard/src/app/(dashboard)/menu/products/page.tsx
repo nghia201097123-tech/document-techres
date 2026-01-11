@@ -178,6 +178,7 @@ const typeLabels: Record<ProductType, { label: string; color: string }> = {
 
 const initialFormData: CreateProductDto = {
   name: "",
+  abbreviation: "",
   type: ProductType.FOOD,
   price: 0,
   vatRate: 10,
@@ -592,6 +593,7 @@ export default function ProductsPage() {
     setSelectedProduct(product);
     setFormData({
       name: product.name,
+      abbreviation: product.abbreviation || "",
       type: product.type,
       price: product.price,
       vatRate: product.vatRate || 10,
@@ -1073,6 +1075,7 @@ export default function ProductsPage() {
       // Prepare data with proper number types
       const preparedData = {
         name: formData.name,
+        abbreviation: formData.abbreviation?.trim() || undefined,
         type: formData.type,
         price: Number(formData.price) || 0,
         vatRate: parseFloat(String(formData.vatRate)) || 0,
@@ -3132,6 +3135,19 @@ export default function ProductsPage() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="abbreviation">Tên viết tắt (tìm kiếm nhanh)</Label>
+                  <Input
+                    id="abbreviation"
+                    placeholder="VD: pbt (Phở Bò Tái), ccdc (Cơm Chiên Dương Châu)"
+                    value={formData.abbreviation || ""}
+                    onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toLowerCase() })}
+                    maxLength={50}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Để trống sẽ tự động tạo từ chữ cái đầu của tên món
+                  </p>
                 </div>
               </div>
 

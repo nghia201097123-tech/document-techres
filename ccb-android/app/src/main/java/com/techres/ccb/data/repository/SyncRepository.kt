@@ -136,6 +136,8 @@ class SyncRepository @Inject constructor(
                 categoryId = dto.categoryId,
                 code = dto.code ?: "",
                 name = dto.name ?: "",
+                searchName = dto.searchName,
+                abbreviation = dto.abbreviation,
                 description = dto.description,
                 imageUrl = dto.imageUrl,
                 price = dto.price,

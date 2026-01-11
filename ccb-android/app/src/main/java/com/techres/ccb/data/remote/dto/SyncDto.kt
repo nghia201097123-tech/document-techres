@@ -108,6 +108,10 @@ data class ProductDto(
     @SerializedName("categoryId") val categoryId: String?,
     @SerializedName("code") val code: String,
     @SerializedName("name") val name: String,
+    // Tên không dấu để tìm kiếm (VD: "Com chien duong chau")
+    @SerializedName("searchName") val searchName: String? = null,
+    // Tên viết tắt để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")
+    @SerializedName("abbreviation") val abbreviation: String? = null,
     @SerializedName("description") val description: String?,
     @SerializedName("imageUrl") val imageUrl: String?,
     @SerializedName("price") val price: Double,

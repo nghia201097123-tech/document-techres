@@ -47,6 +47,12 @@ export class ProductDto {
   @ApiProperty()
   name: string;
 
+  @ApiProperty({ nullable: true, description: 'Tên không dấu để tìm kiếm' })
+  searchName: string | null;
+
+  @ApiProperty({ nullable: true, description: 'Tên viết tắt để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")' })
+  abbreviation: string | null;
+
   @ApiProperty({ nullable: true })
   description: string | null;
 

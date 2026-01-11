@@ -29,6 +29,8 @@ export interface Product {
   id: string;
   code: string;
   name: string;
+  searchName?: string; // Tên không dấu - auto-generated
+  abbreviation?: string; // Tên viết tắt để tìm kiếm nhanh
   type: ProductType;
   categoryId?: string;
   categoryName?: string;
@@ -53,6 +55,7 @@ export interface Product {
 
 export interface CreateProductDto {
   name: string;
+  abbreviation?: string; // Tên viết tắt để tìm kiếm nhanh (VD: "ccdc" cho "Cơm chiên dương châu")
   type: ProductType;
   categoryId?: string;
   price: number;
@@ -73,6 +76,7 @@ export interface CreateProductDto {
 
 export interface UpdateProductDto {
   name?: string;
+  abbreviation?: string; // Tên viết tắt để tìm kiếm nhanh
   type?: ProductType;
   categoryId?: string;
   price?: number;
