@@ -1509,7 +1509,15 @@ export class DatabaseMigrationService implements OnModuleInit {
     await queryRunner.query(`
       ALTER TABLE products
       ADD COLUMN IF NOT EXISTS vat_rate DECIMAL(5,2) DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'single'
+      ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'single',
+      ADD COLUMN IF NOT EXISTS search_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS abbreviation VARCHAR(50)
+    `);
+
+    // Create indexes for search optimization
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_products_search_name ON products(search_name);
+      CREATE INDEX IF NOT EXISTS idx_products_abbreviation ON products(abbreviation);
     `);
 
     // Add missing columns to categories table
