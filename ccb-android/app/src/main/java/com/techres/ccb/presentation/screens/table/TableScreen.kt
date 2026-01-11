@@ -55,8 +55,8 @@ fun TableScreen(
     val screenWidthDp = configuration.screenWidthDp
     val isCompactScreen = screenWidthDp < 600
 
-    // Grid columns state - default based on screen size
-    var gridColumns by remember { mutableIntStateOf(if (isCompactScreen) 3 else 4) }
+    // Grid columns from ViewModel (persisted in SharedPreferences)
+    val gridColumns = uiState.gridColumns
     val columnOptions = if (isCompactScreen) listOf(2, 3, 4) else listOf(3, 4, 5, 6)
 
     // Show error snackbar
@@ -168,7 +168,7 @@ fun TableScreen(
                         occupiedTables = uiState.occupiedTables,
                         gridColumns = gridColumns,
                         columnOptions = columnOptions,
-                        onGridColumnsChange = { gridColumns = it }
+                        onGridColumnsChange = { viewModel.setGridColumns(it) }
                     )
 
                     // Table list grouped by area

@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.table
 
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -55,18 +56,24 @@ data class TableUiState(
     // Statistics
     val totalTables: Int = 0,
     val availableTables: Int = 0,
-    val occupiedTables: Int = 0
+    val occupiedTables: Int = 0,
+
+    // Grid columns preference
+    val gridColumns: Int = 4
 )
 
 @HiltViewModel
 class TableViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val tableRepository: TableRepository,
-    private val orderRepository: OrderRepository
+    private val orderRepository: OrderRepository,
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "TableViewModel"
+        private const val KEY_TABLE_GRID_COLUMNS = "table_grid_columns"
+        private const val DEFAULT_GRID_COLUMNS = 4
     }
 
     private val _uiState = MutableStateFlow(TableUiState())
@@ -75,7 +82,18 @@ class TableViewModel @Inject constructor(
     private var branchId: String = ""
 
     init {
+        loadGridColumnsPreference()
         loadData()
+    }
+
+    private fun loadGridColumnsPreference() {
+        val savedColumns = sharedPreferences.getInt(KEY_TABLE_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+        _uiState.update { it.copy(gridColumns = savedColumns) }
+    }
+
+    fun setGridColumns(columns: Int) {
+        _uiState.update { it.copy(gridColumns = columns) }
+        sharedPreferences.edit().putInt(KEY_TABLE_GRID_COLUMNS, columns).apply()
     }
 
     fun loadData() {
