@@ -57,7 +57,7 @@ data class DashboardUiState(
     val todayOrderCount: Int = 0,
 
     // Grid settings
-    val gridColumns: Int = 8,
+    val gridColumns: Int = 4,
 
     // Error
     val error: String? = null
@@ -75,7 +75,7 @@ class DashboardViewModel @Inject constructor(
     companion object {
         private const val TAG = "DashboardViewModel"
         private const val KEY_DASHBOARD_GRID_COLUMNS = "dashboard_grid_columns"
-        private const val DEFAULT_GRID_COLUMNS = 8
+        private const val DEFAULT_GRID_COLUMNS = 4
     }
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -214,7 +214,8 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun setGridColumns(columns: Int) {
-        if (columns in listOf(4, 6, 8)) {
+        // Valid options: compact (1, 2, 3) and non-compact (3, 4, 5, 6)
+        if (columns in 1..6) {
             Log.d(TAG, "setGridColumns - Setting columns to: $columns")
             _uiState.update { it.copy(gridColumns = columns) }
             // Use commit() instead of apply() to ensure synchronous save
