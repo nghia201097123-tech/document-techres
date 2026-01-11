@@ -142,6 +142,8 @@ class SyncManager @Inject constructor(
         // Process products
         data.products?.forEach { item ->
             val entity = item.data.toEntity(branchId)
+            // Debug log for searchName and abbreviation
+            Timber.d("$TAG: Syncing product: ${entity.name}, searchName=${entity.searchName}, abbreviation=${entity.abbreviation}")
             if (item.action == "DELETE") {
                 productDao.softDelete(entity.id)
             } else {

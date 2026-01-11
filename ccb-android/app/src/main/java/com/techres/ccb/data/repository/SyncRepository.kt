@@ -157,6 +157,10 @@ class SyncRepository @Inject constructor(
                 syncedAt = syncTime
             )
         }
+        // Debug log for searchName and abbreviation
+        products.forEach { product ->
+            Log.d("SyncRepository", "Syncing product: ${product.name}, searchName=${product.searchName}, abbreviation=${product.abbreviation}")
+        }
         productRepository.syncProducts(branchId, products)
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCTS, SyncStepStatus.COMPLETED, products.size))
 
