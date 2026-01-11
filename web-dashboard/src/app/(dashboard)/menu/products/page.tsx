@@ -2161,11 +2161,18 @@ export default function ProductsPage() {
                     {isColumnVisible("image") && (
                       <TableCell>
                         {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-10 h-10 object-cover rounded"
-                          />
+                          <div className="w-10 h-10 bg-muted rounded overflow-hidden">
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></div>';
+                              }}
+                            />
+                          </div>
                         ) : (
                           <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
                             <UtensilsCrossed className="h-5 w-5 text-muted-foreground" />
@@ -2661,11 +2668,18 @@ export default function ProductsPage() {
               {selectedProduct.imageUrl && (
                 <div>
                   <Label className="text-muted-foreground text-xs">Hình ảnh</Label>
-                  <img
-                    src={selectedProduct.imageUrl}
-                    alt={selectedProduct.name}
-                    className="mt-2 w-full max-w-[200px] rounded-lg object-cover"
-                  />
+                  <div className="mt-2 w-[200px] h-[200px] rounded-lg overflow-hidden bg-muted">
+                    <img
+                      src={selectedProduct.imageUrl}
+                      alt={selectedProduct.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Không thể tải ảnh</div>';
+                      }}
+                    />
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
