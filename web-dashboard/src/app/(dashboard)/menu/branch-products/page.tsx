@@ -667,9 +667,12 @@ export default function BranchProductsPage() {
   // Filter products
   const filteredProducts = React.useMemo(() => {
     return products.filter(p => {
+      const searchLower = search.toLowerCase();
       const matchesSearch = !search ||
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.code?.toLowerCase().includes(search.toLowerCase());
+        p.name.toLowerCase().includes(searchLower) ||
+        p.code?.toLowerCase().includes(searchLower) ||
+        p.searchName?.toLowerCase().includes(searchLower) ||
+        p.abbreviation?.toLowerCase().includes(searchLower);
       const matchesType = typeFilter === "all" || p.type === typeFilter;
       const matchesAvailability = availabilityFilter === "all" ||
         (availabilityFilter === "available" && p.isAvailable) ||
