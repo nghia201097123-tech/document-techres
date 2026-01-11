@@ -39,8 +39,10 @@ import com.techres.ccb.data.local.entity.ProductNoteEntity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
@@ -670,7 +672,7 @@ fun ProductCard(
                 .padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Product Image/Icon placeholder
+            // Product Image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -679,17 +681,26 @@ fun ProductCard(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                // Show category icon as placeholder
-                Text(
-                    text = when {
-                        product.categoryId == "cat_drink" -> "☕"
-                        product.categoryId == "cat_food" -> "🍜"
-                        product.categoryId == "cat_dessert" -> "🍰"
-                        product.categoryId == "cat_combo" -> "🎁"
-                        else -> "📦"
-                    },
-                    fontSize = 40.sp
-                )
+                if (!product.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = product.imageUrl,
+                        contentDescription = product.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Show category icon as placeholder when no image
+                    Text(
+                        text = when {
+                            product.categoryId == "cat_drink" -> "☕"
+                            product.categoryId == "cat_food" -> "🍜"
+                            product.categoryId == "cat_dessert" -> "🍰"
+                            product.categoryId == "cat_combo" -> "🎁"
+                            else -> "📦"
+                        },
+                        fontSize = 40.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
