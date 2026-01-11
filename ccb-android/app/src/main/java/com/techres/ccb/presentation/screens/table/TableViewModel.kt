@@ -88,12 +88,16 @@ class TableViewModel @Inject constructor(
 
     private fun loadGridColumnsPreference() {
         val savedColumns = sharedPreferences.getInt(KEY_TABLE_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+        Log.d(TAG, "loadGridColumnsPreference - Loaded columns from SharedPreferences: $savedColumns")
         _uiState.update { it.copy(gridColumns = savedColumns) }
     }
 
     fun setGridColumns(columns: Int) {
+        Log.d(TAG, "setGridColumns - Setting columns to: $columns")
         _uiState.update { it.copy(gridColumns = columns) }
-        sharedPreferences.edit().putInt(KEY_TABLE_GRID_COLUMNS, columns).apply()
+        // Use commit() instead of apply() to ensure synchronous save
+        val saved = sharedPreferences.edit().putInt(KEY_TABLE_GRID_COLUMNS, columns).commit()
+        Log.d(TAG, "setGridColumns - Saved to SharedPreferences: $saved")
     }
 
     fun loadData() {
