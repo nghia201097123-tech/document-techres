@@ -396,17 +396,17 @@ fun CategoriesTable(categories: List<CategoryEntity>) {
 @Composable
 fun ProductsTable(products: List<ProductEntity>) {
     DataTable(
-        headers = listOf("ID", "Name", "Code", "Price", "Type", "Category", "ImageUrl", "Active"),
+        headers = listOf("ID", "Name", "Code", "SearchName", "Abbrev", "Price", "Type", "Active"),
         data = products,
         rowContent = { product ->
             listOf(
                 product.id.take(8) + "...",
-                product.name,
+                product.name.take(20),
                 product.code,
+                product.searchName?.take(20) ?: "NULL",
+                product.abbreviation ?: "NULL",
                 "%,.0f".format(product.price),
                 product.type,
-                product.categoryId?.take(8) ?: "-",
-                product.imageUrl?.take(30) ?: "NULL",
                 if (product.isActive) "✓" else "✗"
             )
         }
