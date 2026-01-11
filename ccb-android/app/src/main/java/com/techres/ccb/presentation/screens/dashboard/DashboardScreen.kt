@@ -30,9 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.widget.Toast
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -54,6 +56,7 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val screenWidthDp = configuration.screenWidthDp
 
@@ -441,6 +444,11 @@ fun DashboardScreen(
                                 onLogout()
                             } else {
                                 isLoggingOut = false
+                                Toast.makeText(
+                                    context,
+                                    "Đăng xuất thất bại. Vui lòng thử lại.",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
                     },

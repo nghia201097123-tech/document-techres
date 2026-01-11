@@ -8,6 +8,7 @@ import com.techres.ccb.data.remote.dto.LoginResponse
 import com.techres.ccb.data.remote.dto.LoginUserDto
 import com.techres.ccb.data.remote.dto.VerifyPinRequest
 import com.techres.ccb.data.remote.dto.VerifyPinResponse
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -20,6 +21,7 @@ class AuthRepository @Inject constructor(
     private val database: CCBDatabase
 ) {
     companion object {
+        private const val TAG = "AuthRepository"
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_TENANT_ID = "tenant_id"
         private const val KEY_BRANCH_ID = "branch_id"
@@ -288,11 +290,19 @@ class AuthRepository @Inject constructor(
      */
     suspend fun fullLogout() {
         withContext(Dispatchers.IO) {
+            Log.d(TAG, "fullLogout - Starting full logout...")
+
             // 1. Clear only master data tables (preserve orders, shifts, payments)
+            Log.d(TAG, "fullLogout - Clearing master data from database...")
             database.clearMasterData()
+            Log.d(TAG, "fullLogout - Master data cleared successfully")
 
             // 2. Clear all SharedPreferences
+            Log.d(TAG, "fullLogout - Clearing SharedPreferences...")
             sharedPreferences.edit().clear().apply()
+            Log.d(TAG, "fullLogout - SharedPreferences cleared successfully")
+
+            Log.d(TAG, "fullLogout - Full logout completed successfully")
         }
     }
 }
