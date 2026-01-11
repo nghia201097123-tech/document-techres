@@ -2608,13 +2608,13 @@ export default function ProductsPage() {
 
       {/* View Product Dialog */}
       <Dialog open={dialogMode === "view"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Chi tiết món ăn</DialogTitle>
             <DialogDescription>Thông tin chi tiết của món ăn</DialogDescription>
           </DialogHeader>
           {selectedProduct && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground text-xs">Mã món</Label>
@@ -2668,7 +2668,7 @@ export default function ProductsPage() {
               {selectedProduct.imageUrl && (
                 <div>
                   <Label className="text-muted-foreground text-xs">Hình ảnh</Label>
-                  <div className="mt-2 w-[200px] h-[200px] rounded-lg overflow-hidden bg-muted">
+                  <div className="mt-2 w-[120px] h-[120px] rounded-lg overflow-hidden bg-muted flex-shrink-0">
                     <img
                       src={selectedProduct.imageUrl}
                       alt={selectedProduct.name}
@@ -2676,7 +2676,7 @@ export default function ProductsPage() {
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
-                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Không thể tải ảnh</div>';
+                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Không thể tải ảnh</div>';
                       }}
                     />
                   </div>
@@ -2696,7 +2696,7 @@ export default function ProductsPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 pt-4 border-t">
             <Button variant="outline" onClick={() => handleCloseDialog()}>
               Đóng
             </Button>
