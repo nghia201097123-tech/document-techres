@@ -1150,6 +1150,43 @@ export default function ProductsPage() {
     }
   };
 
+  // Delete product state
+  const [productToDelete, setProductToDelete] = React.useState<Product | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  // Handle delete product
+  const handleDeleteProduct = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirm delete product
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+
+    setDeleting(true);
+    try {
+      await productService.delete(productToDelete.id);
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
+      toast({
+        title: "Thành công",
+        description: `Đã xóa món "${productToDelete.name}"`,
+      });
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting product:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể xóa món ăn. Có thể món đang được sử dụng trong đơn hàng.",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Close dialog and reset
   const handleCloseDialog = () => {
     setDialogMode(null);
@@ -2351,6 +2388,13 @@ export default function ProductsPage() {
                           <DropdownMenuItem onClick={() => handleToggleActive(product)}>
                             <Power className="mr-2 h-4 w-4" />
                             {product.isActive ? "Tạm ngưng" : "Kích hoạt"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteProduct(product)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Xóa món
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -4053,6 +4097,40 @@ export default function ProductsPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xác nhận xóa món ăn</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn xóa món <span className="font-semibold text-foreground">"{productToDelete?.name}"</span>?
+              <br />
+              <span className="text-destructive">Hành động này không thể hoàn tác.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setProductToDelete(null);
+              }}
+              disabled={deleting}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteProduct}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xóa món
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

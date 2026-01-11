@@ -249,6 +249,10 @@ export const productService = {
     return response.data;
   },
 
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/products/${id}`);
+  },
+
   // Available Toppings
   getAvailableToppings: async (brandId?: string): Promise<Product[]> => {
     const params: Record<string, any> = {};

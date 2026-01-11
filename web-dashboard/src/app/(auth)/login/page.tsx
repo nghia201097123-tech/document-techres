@@ -16,9 +16,9 @@ export default function LoginPage() {
   const { toast } = useToast();
   const { login, isAuthenticated, isHydrated } = useAuthStore();
 
-  const [tenantId, setTenantId] = React.useState("");
-  const [username, setUsername] = React.useState("");
-  const [password, setPassword] = React.useState("");
+  const [tenantId, setTenantId] = React.useState("CTSG");
+  const [username, setUsername] = React.useState("tr000001");
+  const [password, setPassword] = React.useState("abc123");
   const [isLoading, setIsLoading] = React.useState(false);
 
   React.useEffect(() => {

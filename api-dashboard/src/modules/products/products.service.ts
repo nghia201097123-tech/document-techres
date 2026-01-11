@@ -262,6 +262,12 @@ export class ProductsService {
     return this.productRepository.save(product);
   }
 
+  async delete(tenantId: string, id: string) {
+    const product = await this.findOne(tenantId, id);
+    await this.productRepository.remove(product);
+    return { success: true, message: `Đã xóa món "${product.name}"` };
+  }
+
   private async generateCode(type: ProductType): Promise<string> {
     const prefixes: Record<ProductType, string> = {
       [ProductType.FOOD]: 'MON',

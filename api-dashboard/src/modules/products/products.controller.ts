@@ -351,6 +351,12 @@ export class ProductsController {
     return this.productsService.toggleActive(req.user.tenantId, id);
   }
 
+  @Delete(':id')
+  @ApiOperation({ summary: 'Xóa món' })
+  delete(@Request() req, @Param('id') id: string) {
+    return this.productsService.delete(req.user.tenantId, id);
+  }
+
   // === Product Notes Management ===
 
   @Get('notes/all')
