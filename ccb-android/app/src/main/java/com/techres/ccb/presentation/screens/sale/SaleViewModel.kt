@@ -694,7 +694,7 @@ class SaleViewModel @Inject constructor(
             } else {
                 // Tables might not be loaded yet, try to load them first
                 Log.w(TAG, "selectTableById - Table not found in current list, trying to reload")
-                loadTables()
+                refreshTables()
                 // Delay to allow tables to load
                 kotlinx.coroutines.delay(500)
                 val tableAfterLoad = _uiState.value.tables.find { it.id == tableId }
