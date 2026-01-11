@@ -12,6 +12,7 @@ import com.techres.ccb.data.local.dao.TableDao
 import com.techres.ccb.data.local.entity.*
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.dto.FullSyncData
+import com.techres.ccb.util.StringUtils
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -130,14 +131,19 @@ class SyncRepository @Inject constructor(
         // Sync products
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCTS, SyncStepStatus.IN_PROGRESS))
         val products = syncData.products.map { dto ->
+            // Auto-generate searchName and abbreviation if API doesn't provide them
+            val productName = dto.name ?: ""
+            val searchName = dto.searchName ?: StringUtils.removeVietnameseAccents(productName)
+            val abbreviation = dto.abbreviation ?: StringUtils.generateAbbreviation(productName)
+
             ProductEntity(
                 id = dto.id,
                 branchId = branchId,
                 categoryId = dto.categoryId,
                 code = dto.code ?: "",
-                name = dto.name ?: "",
-                searchName = dto.searchName,
-                abbreviation = dto.abbreviation,
+                name = productName,
+                searchName = searchName,
+                abbreviation = abbreviation,
                 description = dto.description,
                 imageUrl = dto.imageUrl,
                 price = dto.price,

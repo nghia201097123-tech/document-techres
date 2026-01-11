@@ -214,6 +214,8 @@ class SaleViewModel @Inject constructor(
                             id = entity.id,
                             code = entity.code,
                             name = entity.name,
+                            searchName = entity.searchName,
+                            abbreviation = entity.abbreviation,
                             categoryId = entity.categoryId ?: "",
                             price = entity.price.toLong(),
                             imageUrl = entity.imageUrl,
