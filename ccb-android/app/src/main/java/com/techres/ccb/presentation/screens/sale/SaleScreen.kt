@@ -420,7 +420,9 @@ fun TabletLayout(
             onPlaceOrder = viewModel::placeOrder,
             onAddItemsToOrder = viewModel::addItemsToOrder,
             onCheckout = { viewModel.showPaymentDialog() },
-            onCancelOrder = { viewModel.cancelOrder() }
+            onCancelOrder = { viewModel.cancelOrder() },
+            onRemoveOrderItem = viewModel::removeOrderItem,
+            onRemoveOrderItemTopping = viewModel::removeOrderItemTopping
         )
     }
 }
@@ -519,6 +521,8 @@ fun CartDialog(
                         viewModel.cancelOrder()
                         onDismiss()
                     },
+                    onRemoveOrderItem = viewModel::removeOrderItem,
+                    onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -798,6 +802,8 @@ fun CartPanel(
     onAddItemsToOrder: () -> Unit = {},
     onCheckout: () -> Unit,
     onCancelOrder: () -> Unit = {},
+    onRemoveOrderItem: (String) -> Unit = {},
+    onRemoveOrderItemTopping: (String, String) -> Unit = { _, _ -> },
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -987,7 +993,11 @@ fun CartPanel(
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                     currentOrderItems.forEach { item ->
-                        OrderItemRow(item = item)
+                        OrderItemRow(
+                            item = item,
+                            onRemoveItem = onRemoveOrderItem,
+                            onRemoveTopping = onRemoveOrderItemTopping
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
 
@@ -1494,7 +1504,11 @@ fun VariantLineItem(variant: SelectedVariant) {
  *   • Topping 2                +20.000đ
  */
 @Composable
-fun OrderItemRow(item: OrderItemEntity) {
+fun OrderItemRow(
+    item: OrderItemEntity,
+    onRemoveItem: ((String) -> Unit)? = null,
+    onRemoveTopping: ((String, String) -> Unit)? = null
+) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
@@ -1506,7 +1520,7 @@ fun OrderItemRow(item: OrderItemEntity) {
                 .fillMaxWidth()
                 .padding(10.dp)
         ) {
-            // Row 1: Product name + Quantity badge + Price
+            // Row 1: Product name + Quantity badge + Price + Delete button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1539,6 +1553,20 @@ fun OrderItemRow(item: OrderItemEntity) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    // Delete item button
+                    if (onRemoveItem != null) {
+                        IconButton(
+                            onClick = { onRemoveItem(item.id) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Xóa món",
+                                tint = Color(0xFFF44336),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1594,13 +1622,32 @@ fun OrderItemRow(item: OrderItemEntity) {
                                         color = Color(0xFF424242)
                                     )
                                 }
-                                if (price > 0) {
-                                    Text(
-                                        text = "+${formatCurrency(price)}",
-                                        fontSize = 14.sp,
-                                        color = Color(0xFF1976D2),
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (price > 0) {
+                                        Text(
+                                            text = "+${formatCurrency(price)}",
+                                            fontSize = 14.sp,
+                                            color = Color(0xFF1976D2),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    // Delete topping button
+                                    if (onRemoveTopping != null) {
+                                        IconButton(
+                                            onClick = { onRemoveTopping(item.id, name) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Xóa $name",
+                                                tint = Color(0xFFF44336).copy(alpha = 0.7f),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -1273,6 +1273,147 @@ class SaleViewModel @Inject constructor(
         }
     }
 
+    // ===== ORDER ITEM MANAGEMENT =====
+
+    /**
+     * Remove an order item from the current order
+     */
+    fun removeOrderItem(itemId: String) {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+        val itemToRemove = state.currentOrderItems.find { it.id == itemId } ?: return
+
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                    .format(Date())
+
+                withContext(Dispatchers.IO) {
+                    // Delete the item from database
+                    orderRepository.deleteOrderItem(itemToRemove)
+
+                    // Calculate new order totals
+                    val remainingItems = state.currentOrderItems.filter { it.id != itemId }
+                    val newSubtotal = remainingItems.sumOf { it.totalPrice }
+                    val newTotal = newSubtotal // TODO: Apply discount/tax if needed
+
+                    // Update order totals
+                    val updatedOrder = currentOrder.copy(
+                        subtotal = newSubtotal,
+                        totalAmount = newTotal,
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrder(updatedOrder)
+
+                    _uiState.update { s ->
+                        s.copy(
+                            currentOrder = updatedOrder,
+                            currentOrderItems = remainingItems,
+                            successMessage = "Đã xóa ${itemToRemove.productName}"
+                        )
+                    }
+                }
+
+                Log.d(TAG, "removeOrderItem - Removed item: ${itemToRemove.productName}")
+            } catch (e: Exception) {
+                Log.e(TAG, "removeOrderItem - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi xóa món: ${e.message}") }
+            }
+        }
+    }
+
+    /**
+     * Remove a specific topping from an order item
+     * Toppings are stored in notes field as "Topping1:price1, Topping2:price2 | User note"
+     */
+    fun removeOrderItemTopping(itemId: String, toppingName: String) {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+        val item = state.currentOrderItems.find { it.id == itemId } ?: return
+
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                    .format(Date())
+
+                withContext(Dispatchers.IO) {
+                    // Parse notes to find and remove the topping
+                    val notes = item.notes ?: return@withContext
+                    val parts = notes.split(" | ")
+                    val variantsPart = parts.firstOrNull() ?: ""
+                    val userNote = parts.getOrNull(1)
+
+                    // Parse variants and find the one to remove
+                    val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    var toppingPrice = 0.0
+
+                    val updatedVariants = variants.filter { variant ->
+                        val colonIndex = variant.lastIndexOf(":")
+                        val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
+                        if (name == toppingName) {
+                            // Found the topping to remove, get its price
+                            toppingPrice = if (colonIndex > 0) variant.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0 else 0.0
+                            false // Remove this topping
+                        } else {
+                            true // Keep this topping
+                        }
+                    }
+
+                    // Rebuild notes
+                    val newNotes = if (updatedVariants.isEmpty() && userNote == null) {
+                        null
+                    } else if (updatedVariants.isEmpty() && userNote != null) {
+                        userNote
+                    } else if (userNote != null) {
+                        "${updatedVariants.joinToString(", ")} | $userNote"
+                    } else {
+                        updatedVariants.joinToString(", ")
+                    }
+
+                    // Calculate new item price (subtract topping price * quantity)
+                    val newTotalPrice = item.totalPrice - (toppingPrice * item.quantity)
+
+                    // Update item
+                    val updatedItem = item.copy(
+                        notes = newNotes,
+                        totalPrice = newTotalPrice,
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrderItem(updatedItem)
+
+                    // Update order totals
+                    val updatedItems = state.currentOrderItems.map {
+                        if (it.id == itemId) updatedItem else it
+                    }
+                    val newSubtotal = updatedItems.sumOf { it.totalPrice }
+                    val newTotal = newSubtotal
+
+                    val updatedOrder = currentOrder.copy(
+                        subtotal = newSubtotal,
+                        totalAmount = newTotal,
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrder(updatedOrder)
+
+                    _uiState.update { s ->
+                        s.copy(
+                            currentOrder = updatedOrder,
+                            currentOrderItems = updatedItems,
+                            successMessage = "Đã xóa $toppingName"
+                        )
+                    }
+                }
+
+                Log.d(TAG, "removeOrderItemTopping - Removed topping: $toppingName from item: ${item.productName}")
+            } catch (e: Exception) {
+                Log.e(TAG, "removeOrderItemTopping - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi xóa topping: ${e.message}") }
+            }
+        }
+    }
+
     // ===== PAYMENT DIALOG =====
 
     fun showPaymentDialog() {
