@@ -1470,10 +1470,13 @@ export default function ProductsPage() {
   const filteredProducts = React.useMemo(() => {
     // First filter
     let result = products.filter((p) => {
-      // Search filter
+      // Search filter - includes searchName and abbreviation for Vietnamese search
+      const searchLower = search.toLowerCase();
       const matchesSearch =
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.code?.toLowerCase().includes(search.toLowerCase());
+        p.name.toLowerCase().includes(searchLower) ||
+        p.code?.toLowerCase().includes(searchLower) ||
+        p.searchName?.toLowerCase().includes(searchLower) ||
+        p.abbreviation?.toLowerCase().includes(searchLower);
 
       // Brand filter
       const matchesBrand = filterBrandId === "all" || p.brandId === filterBrandId;
