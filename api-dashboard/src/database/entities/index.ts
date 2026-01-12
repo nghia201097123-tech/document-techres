@@ -39,3 +39,5 @@ export * from './payment-method.entity';
 export * from './bank-account.entity';
 export * from './einvoice-config.entity';
 export * from './transaction-voucher.entity';
+export * from './bill-template.entity';
+export * from './bill-printer-config.entity';

@@ -25,6 +25,8 @@ import { SyncModule } from "./modules/sync/sync.module";
 import { TransactionCategoriesModule } from "./modules/transaction-categories/transaction-categories.module";
 import { TransactionVouchersModule } from "./modules/transaction-vouchers/transaction-vouchers.module";
 import { StaffBranchModule } from "./modules/staff-branch/staff-branch.module";
+import { BillTemplatesModule } from "./modules/bill-templates/bill-templates.module";
+import { BillPrinterConfigsModule } from "./modules/bill-printer-configs/bill-printer-configs.module";
 import { DatabaseMigrationService } from "./database/database-migration.service";
 import {
   Company,
@@ -67,6 +69,8 @@ import {
   BankAccount,
   EInvoiceConfig,
   TransactionVoucher,
+  BillTemplate,
+  BillPrinterConfig,
 } from "./database/entities";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 
@@ -125,6 +129,8 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
           BankAccount,
           EInvoiceConfig,
           TransactionVoucher,
+          BillTemplate,
+          BillPrinterConfig,
         ],
         synchronize: false,
       }),
@@ -155,6 +161,8 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     TransactionCategoriesModule,
     TransactionVouchersModule,
     StaffBranchModule,
+    BillTemplatesModule,
+    BillPrinterConfigsModule,
   ],
   providers: [DatabaseMigrationService],
 })
