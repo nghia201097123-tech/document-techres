@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,11 +29,31 @@ import com.techres.ccb.domain.model.Payment
 import com.techres.ccb.domain.model.PaymentMethod
 import com.techres.ccb.domain.model.PaymentStatus
 import com.techres.ccb.presentation.screens.sale.formatCurrency
+import com.techres.ccb.presentation.theme.Success
+
+data class AppliedDiscount(
+    val couponId: String,
+    val code: String,
+    val name: String,
+    val discountType: String,  // percentage, fixed
+    val discountValue: Double,
+    val discountAmount: Long   // Số tiền thực tế được giảm
+)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PaymentDialog(
     totalAmount: Long,
+    subtotal: Long = totalAmount,
+    discountAmount: Long = 0,
+    vatAmount: Long = 0,
+    appliedDiscounts: List<AppliedDiscount> = emptyList(),
+    couponCode: String = "",
+    couponError: String? = null,
+    isApplyingCoupon: Boolean = false,
+    onCouponCodeChange: (String) -> Unit = {},
+    onApplyCoupon: () -> Unit = {},
+    onRemoveDiscount: (String) -> Unit = {},
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
@@ -55,7 +77,7 @@ fun PaymentDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f),
+                .fillMaxHeight(0.95f),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -97,20 +119,192 @@ fun PaymentDialog(
                 }
 
                 Row(modifier = Modifier.weight(1f)) {
-                    // Left panel - Payment methods
+                    // Left panel - Payment methods + Discount
                     Column(
                         modifier = Modifier
-                            .weight(0.35f)
+                            .weight(0.4f)
                             .fillMaxHeight()
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
+                        // Order summary
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Chi tiết đơn hàng",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
+                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
+                                }
+                                if (discountAmount > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Giảm giá:", style = MaterialTheme.typography.bodyMedium, color = Success)
+                                        Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodyMedium, color = Success)
+                                    }
+                                }
+                                if (vatAmount > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("VAT (8%):", style = MaterialTheme.typography.bodyMedium)
+                                        Text(formatCurrency(vatAmount), style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("TỔNG:", fontWeight = FontWeight.Bold)
+                                    Text(
+                                        formatCurrency(totalAmount),
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Coupon section
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Mã giảm giá",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = couponCode,
+                                        onValueChange = onCouponCodeChange,
+                                        placeholder = { Text("Nhập mã", fontSize = 12.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        textStyle = MaterialTheme.typography.bodySmall,
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = { onApplyCoupon() }),
+                                        isError = couponError != null
+                                    )
+                                    Button(
+                                        onClick = onApplyCoupon,
+                                        enabled = !isApplyingCoupon && couponCode.isNotEmpty(),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        if (isApplyingCoupon) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Text("OK", fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                                if (couponError != null) {
+                                    Text(
+                                        text = couponError,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                                // Applied discounts
+                                if (appliedDiscounts.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    appliedDiscounts.forEach { discount ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.LocalOffer,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = Success
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = discount.code,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "-${formatCurrency(discount.discountAmount)}",
+                                                    color = Success,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                IconButton(
+                                                    onClick = { onRemoveDiscount(discount.couponId) },
+                                                    modifier = Modifier.size(20.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Xóa",
+                                                        modifier = Modifier.size(14.dp),
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Payment methods
                         Text(
                             text = "Hình thức thanh toán",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
 
                         PaymentMethod.entries.forEach { method ->
@@ -126,14 +320,14 @@ fun PaymentDialog(
                                     }
                                 }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                         }
                     }
 
                     // Right panel - Amount input
                     Column(
                         modifier = Modifier
-                            .weight(0.65f)
+                            .weight(0.6f)
                             .fillMaxHeight()
                             .padding(16.dp)
                     ) {
