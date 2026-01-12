@@ -417,6 +417,45 @@ export default function TablesPage() {
     setSelectedTableIds(new Set());
   };
 
+  // Select all tables in a specific area
+  const selectAllTablesInArea = (areaId: string) => {
+    const areaTables = tablesByArea.get(areaId) || [];
+    setSelectedTableIds(prev => {
+      const next = new Set(prev);
+      areaTables.forEach(t => next.add(t.id));
+      return next;
+    });
+  };
+
+  // Check if all tables in area are selected
+  const areAllTablesInAreaSelected = (areaId: string) => {
+    const areaTables = tablesByArea.get(areaId) || [];
+    return areaTables.length > 0 && areaTables.every(t => selectedTableIds.has(t.id));
+  };
+
+  // Check if some tables in area are selected
+  const areSomeTablesInAreaSelected = (areaId: string) => {
+    const areaTables = tablesByArea.get(areaId) || [];
+    const selectedCount = areaTables.filter(t => selectedTableIds.has(t.id)).length;
+    return selectedCount > 0 && selectedCount < areaTables.length;
+  };
+
+  // Toggle select all tables in area
+  const toggleSelectAllTablesInArea = (areaId: string) => {
+    const areaTables = tablesByArea.get(areaId) || [];
+    if (areAllTablesInAreaSelected(areaId)) {
+      // Deselect all in this area
+      setSelectedTableIds(prev => {
+        const next = new Set(prev);
+        areaTables.forEach(t => next.delete(t.id));
+        return next;
+      });
+    } else {
+      // Select all in this area
+      selectAllTablesInArea(areaId);
+    }
+  };
+
   // Generate new name based on rename config
   const generateNewName = (originalName: string, index: number): string => {
     switch (bulkRenameConfig.format) {
@@ -626,6 +665,21 @@ export default function TablesPage() {
         </div>
       </div>
 
+      {/* Select All Button - shown when no tables selected but tables exist */}
+      {selectedTableIds.size === 0 && filteredTables.length > 0 && !loading && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={selectAllTables}
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+          >
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Chọn tất cả ({filteredTables.length} bàn)
+          </Button>
+        </div>
+      )}
+
       {/* Bulk Action Bar */}
       {selectedTableIds.size > 0 && (
         <Card className="bg-blue-50 border-blue-200">
@@ -735,11 +789,49 @@ export default function TablesPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {Array.from(tablesByArea.entries()).map(([areaId, areaTables]) => (
+          {Array.from(tablesByArea.entries()).map(([areaId, areaTables]) => {
+            const allSelected = areAllTablesInAreaSelected(areaId);
+            const someSelected = areSomeTablesInAreaSelected(areaId);
+            const selectedInArea = areaTables.filter(t => selectedTableIds.has(t.id)).length;
+            return (
             <Card key={areaId}>
-              <CardHeader>
-                <CardTitle className="text-lg">{getAreaName(areaId)}</CardTitle>
-                <CardDescription>{areaTables.length} bàn</CardDescription>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) {
+                          (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = someSelected;
+                        }
+                      }}
+                      onCheckedChange={() => toggleSelectAllTablesInArea(areaId)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div>
+                      <CardTitle className="text-lg">{getAreaName(areaId)}</CardTitle>
+                      <CardDescription>
+                        {areaTables.length} bàn
+                        {selectedInArea > 0 && (
+                          <span className="text-blue-600 ml-2">
+                            (đã chọn {selectedInArea})
+                          </span>
+                        )}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  {selectedInArea > 0 && selectedInArea < areaTables.length && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => selectAllTablesInArea(areaId)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <CheckSquare className="h-4 w-4 mr-1" />
+                      Chọn tất cả
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -843,7 +935,7 @@ export default function TablesPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          );})}
         </div>
       )}
 
