@@ -28,6 +28,8 @@ import {
   Truck,
   Wallet,
   FolderTree,
+  Printer,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -100,6 +102,13 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    title: "Máy in",
+    icon: Printer,
+    children: [
+      { title: "Mẫu in Bill", href: "/settings/bill-template", icon: FileText },
+    ],
+  },
+  {
     title: "Báo cáo",
     href: "/reports",
     icon: BarChart3,
@@ -114,7 +123,7 @@ const menuItems: MenuItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { company } = useAuthStore();
-  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Kết nối", "Tài chính"]);
+  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Kết nối", "Tài chính", "Máy in"]);
 
   const toggleExpand = (title: string) => {
     setExpandedItems((prev) =>
