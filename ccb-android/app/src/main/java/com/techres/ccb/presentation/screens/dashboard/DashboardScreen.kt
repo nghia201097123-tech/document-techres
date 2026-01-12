@@ -64,7 +64,8 @@ fun DashboardScreen(
     val isCompactScreen = screenWidthDp < 600
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    var gridColumns by remember { mutableIntStateOf(if (isCompactScreen) 2 else 4) }
+    // Use gridColumns from ViewModel (persisted in SharedPreferences)
+    val gridColumns = uiState.gridColumns
     val currentTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
     val currentDate = remember { SimpleDateFormat("EEEE, dd/MM", Locale("vi")).format(Date()) }
 
@@ -136,7 +137,7 @@ fun DashboardScreen(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
                 gridColumns = gridColumns,
-                onGridColumnsChanged = { gridColumns = it },
+                onGridColumnsChanged = { viewModel.setGridColumns(it) },
                 currentTime = currentTime,
                 currentDate = currentDate,
                 onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
@@ -207,7 +208,7 @@ fun DashboardScreen(
                     posCount = uiState.posOrders.size,
                     appCount = uiState.foodAppOrderCount,
                     gridColumns = gridColumns,
-                    onGridColumnsChanged = { gridColumns = it }
+                    onGridColumnsChanged = { viewModel.setGridColumns(it) }
                 )
 
                 // Orders Grid
