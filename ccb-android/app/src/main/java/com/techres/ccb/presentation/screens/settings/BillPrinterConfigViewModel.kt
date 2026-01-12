@@ -55,37 +55,31 @@ class BillPrinterConfigViewModel @Inject constructor(
     }
 
     private fun loadData() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                branchId = authRepository.getBranchId() ?: ""
-                if (branchId.isEmpty()) {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = "Không tìm thấy chi nhánh") }
-                    return@launch
-                }
+        branchId = authRepository.getBranchId() ?: ""
+        if (branchId.isEmpty()) {
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Không tìm thấy chi nhánh") }
+            return
+        }
 
-                withContext(Dispatchers.IO) {
-                    // Load printer configs
-                    billPrinterConfigDao.getAllByBranch(branchId).collect { configs ->
-                        _uiState.update { it.copy(printerConfigs = configs) }
-                    }
+        _uiState.update { it.copy(isLoading = true) }
+
+        // Load printer configs (Flow will keep collecting and updating UI)
+        viewModelScope.launch {
+            try {
+                billPrinterConfigDao.getAllByBranch(branchId).collect { configs ->
+                    _uiState.update { it.copy(printerConfigs = configs, isLoading = false) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading data: ${e.message}", e)
-                _uiState.update { it.copy(errorMessage = "Lỗi tải dữ liệu: ${e.message}") }
-            } finally {
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(errorMessage = "Lỗi tải dữ liệu: ${e.message}", isLoading = false) }
             }
         }
 
         // Also load templates
         viewModelScope.launch {
             try {
-                val branchId = authRepository.getBranchId() ?: return@launch
-                withContext(Dispatchers.IO) {
-                    billTemplateDao.getAllByBranch(branchId).collect { templates ->
-                        _uiState.update { it.copy(templates = templates) }
-                    }
+                billTemplateDao.getAllByBranch(branchId).collect { templates ->
+                    _uiState.update { it.copy(templates = templates) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading templates: ${e.message}", e)
