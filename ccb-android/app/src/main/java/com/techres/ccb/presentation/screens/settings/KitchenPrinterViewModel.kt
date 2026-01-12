@@ -51,10 +51,10 @@ class KitchenPrinterViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Check if we need to insert debug data
-                if (BuildConfig.DEBUG && !_uiState.value.isDebugDataInserted) {
-                    val existingKitchens = kitchenRepository.getAllKitchens(branchId).first()
-                    if (existingKitchens.isEmpty()) {
+                // In DEBUG mode, always check and insert debug data if empty
+                if (BuildConfig.DEBUG) {
+                    val count = kitchenRepository.getKitchensCount(branchId)
+                    if (count == 0) {
                         kitchenRepository.insertDebugKitchens(branchId)
                         _uiState.update { it.copy(isDebugDataInserted = true) }
                     }
@@ -75,6 +75,27 @@ class KitchenPrinterViewModel @Inject constructor(
                         isLoading = false,
                         errorMessage = e.message ?: "Lỗi tải dữ liệu"
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * Force insert debug kitchens (for testing)
+     */
+    fun insertDebugData() {
+        viewModelScope.launch {
+            try {
+                val branchId = authRepository.getBranchId()
+                if (!branchId.isNullOrEmpty()) {
+                    // Clear existing and insert fresh debug data
+                    kitchenRepository.clearByBranch(branchId)
+                    kitchenRepository.insertDebugKitchens(branchId)
+                    _uiState.update { it.copy(isDebugDataInserted = true) }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: "Lỗi thêm dữ liệu debug")
                 }
             }
         }
