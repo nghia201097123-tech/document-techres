@@ -645,21 +645,27 @@ class SaleViewModel @Inject constructor(
      * Note: totalPrice is a computed property that auto-calculates from selectedVariants
      * Allows deletion of required toppings - the "Đặt món" button will be disabled
      * until user selects a new option for required groups
+     *
+     * @param cartItemId The cart item ID
+     * @param groupId The variant group ID (to uniquely identify when names are same across groups)
+     * @param variantName The variant option name
      */
-    fun removeCartItemVariant(cartItemId: String, variantName: String) {
+    fun removeCartItemVariant(cartItemId: String, groupId: String, variantName: String) {
         val state = _uiState.value
         val cartItem = state.cartItems.find { it.id == cartItemId } ?: return
 
-        // Find which group this variant belongs to
+        // Find which group this variant belongs to using groupId
         val variantGroup = cartItem.product.variants.find { group ->
-            group.options.any { it.name == variantName }
+            group.id == groupId
         }
 
-        // Proceed with removal
+        // Proceed with removal - use both groupId and name to uniquely identify
         _uiState.update { s ->
             val updatedCartItems = s.cartItems.map { item ->
                 if (item.id == cartItemId) {
-                    val updatedVariants = item.selectedVariants.filter { it.name != variantName }
+                    val updatedVariants = item.selectedVariants.filter {
+                        !(it.groupId == groupId && it.name == variantName)
+                    }
                     item.copy(selectedVariants = updatedVariants)
                 } else {
                     item
@@ -673,7 +679,7 @@ class SaleViewModel @Inject constructor(
             // Check if there's still a selection in this group after removal
             val updatedCartItem = _uiState.value.cartItems.find { it.id == cartItemId }
             val hasRemainingSelection = updatedCartItem?.selectedVariants?.any { selectedVariant ->
-                variantGroup.options.any { it.name == selectedVariant.name }
+                selectedVariant.groupId == groupId
             } ?: false
 
             if (!hasRemainingSelection) {
@@ -681,7 +687,7 @@ class SaleViewModel @Inject constructor(
             }
         }
 
-        Log.d(TAG, "removeCartItemVariant - Removed $variantName from cart item $cartItemId")
+        Log.d(TAG, "removeCartItemVariant - Removed $variantName (group: $groupId) from cart item $cartItemId")
     }
 
     fun clearCart() {
