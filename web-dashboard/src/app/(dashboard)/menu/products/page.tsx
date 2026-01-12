@@ -4134,13 +4134,15 @@ export default function ProductsPage() {
 
       {/* Bulk Avatar Upload Dialog */}
       <Dialog open={bulkAvatarDialogOpen} onOpenChange={(open) => !open && handleCloseBulkAvatarDialog()}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ImageIcon className="h-5 w-5" />
+        <DialogContent className="max-w-4xl max-h-[90vh] bg-gradient-to-br from-white to-gray-50">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="flex items-center gap-2 text-gray-800">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <ImageIcon className="h-5 w-5 text-blue-600" />
+              </div>
               Cập nhật ảnh hàng loạt
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-gray-500">
               Đặt tên file ảnh theo mã món ăn (VD: SP001.jpg, M002.png).
               Hệ thống sẽ tự động map ảnh với món ăn tương ứng.
             </DialogDescription>
@@ -4185,20 +4187,20 @@ export default function ProductsPage() {
             </div>
           ) : (
             // Show preview
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Đã chọn {bulkAvatarPreviews.length} ảnh,
-                  khớp {bulkAvatarPreviews.filter(p => p.matchedProduct).length} món ăn
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between bg-blue-50 rounded-lg p-3 border border-blue-100">
+                <div className="text-sm text-blue-700">
+                  <span className="font-medium">Đã chọn {bulkAvatarPreviews.length} ảnh</span>,
+                  <span className="text-green-600 font-medium"> khớp {bulkAvatarPreviews.filter(p => p.matchedProduct).length} món ăn</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => bulkAvatarInputRef.current?.click()}>
+                <Button variant="outline" size="sm" onClick={() => bulkAvatarInputRef.current?.click()} className="bg-white hover:bg-blue-50 border-blue-200">
                   Chọn thêm ảnh
                 </Button>
               </div>
 
-              <ScrollArea className="h-[400px] border rounded-lg">
+              <ScrollArea className="h-[400px] border rounded-lg bg-gray-50/50">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-gray-100 sticky top-0">
                     <TableRow>
                       <TableHead className="w-20">Ảnh</TableHead>
                       <TableHead>Tên file</TableHead>
@@ -4209,7 +4211,10 @@ export default function ProductsPage() {
                   </TableHeader>
                   <TableBody>
                     {bulkAvatarPreviews.map((preview, index) => (
-                      <TableRow key={index} className={!preview.matchedProduct ? "bg-red-50" : ""}>
+                      <TableRow
+                        key={index}
+                        className={`${!preview.matchedProduct ? "bg-red-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/70"} hover:bg-blue-50/50 transition-colors`}
+                      >
                         <TableCell>
                           <img
                             src={preview.previewUrl}
@@ -4245,13 +4250,14 @@ export default function ProductsPage() {
                 </Table>
               </ScrollArea>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={handleCloseBulkAvatarDialog}>
+              <DialogFooter className="border-t pt-4 bg-gray-50/50 -mx-6 px-6 -mb-6 pb-6 rounded-b-lg">
+                <Button variant="outline" onClick={handleCloseBulkAvatarDialog} className="hover:bg-gray-100">
                   Hủy
                 </Button>
                 <Button
                   onClick={handleBulkAvatarUpload}
                   disabled={uploadingAvatars || bulkAvatarPreviews.filter(p => p.matchedProduct).length === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
                   {uploadingAvatars && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {bulkAvatarProgress
