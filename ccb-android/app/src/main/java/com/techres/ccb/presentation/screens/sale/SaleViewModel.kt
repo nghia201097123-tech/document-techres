@@ -1741,9 +1741,11 @@ class SaleViewModel @Inject constructor(
         // Use first payment method
         val payment = payments.firstOrNull()
         val method = payment?.method?.name?.lowercase() ?: "cash"
-        val receivedAmount = payment?.amount ?: 0.0
-        val orderTotal = _uiState.value.currentOrder?.totalAmount ?: 0.0
-        val changeAmount = if (receivedAmount > orderTotal) receivedAmount - orderTotal else 0.0
+        // Convert Long to Double and use Payment's receivedAmount/changeAmount if available
+        val receivedAmount = payment?.receivedAmount?.toDouble()
+            ?: payment?.amount?.toDouble()
+            ?: 0.0
+        val changeAmount = payment?.changeAmount?.toDouble() ?: 0.0
         completeOrder(method, receivedAmount, changeAmount)
     }
 
