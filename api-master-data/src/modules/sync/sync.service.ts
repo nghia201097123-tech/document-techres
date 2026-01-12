@@ -443,6 +443,30 @@ export class SyncService {
 
       console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, kitchens=${kitchens.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}, billTemplates=${billTemplates.length}, billPrinterConfigs=${billPrinterConfigs.length}`);
 
+      // Debug log for topping groups with min/max selection limits
+      if (toppingGroups.length > 0) {
+        console.log(`[SyncService.getFullSync] Topping groups details:`);
+        toppingGroups.forEach(tg => {
+          console.log(`  - Group: ${tg.name}, minSelection=${tg.minSelection}, maxSelection=${tg.maxSelection}, isRequired=${tg.isRequired}`);
+        });
+        console.log(`[SyncService.getFullSync] ProductToppingGroups count: ${productToppingGroups.length}`);
+        if (productToppingGroups.length === 0) {
+          console.warn(`[SyncService.getFullSync] WARNING: No ProductToppingGroup records found! Admin needs to assign topping groups to products on dashboard.`);
+        } else {
+          // Log which products have which groups
+          const groupToProducts = new Map<string, string[]>();
+          productToppingGroups.forEach(ptg => {
+            const existing = groupToProducts.get(ptg.groupId) || [];
+            existing.push(ptg.productId);
+            groupToProducts.set(ptg.groupId, existing);
+          });
+          groupToProducts.forEach((productIds, groupId) => {
+            const group = toppingGroups.find(tg => tg.id === groupId);
+            console.log(`  - Group "${group?.name}" assigned to ${productIds.length} products`);
+          });
+        }
+      }
+
       const syncTime = new Date().toISOString();
 
       return {

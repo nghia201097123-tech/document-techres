@@ -225,10 +225,23 @@ class SyncRepository @Inject constructor(
             } ?: emptyList()
         }
 
+        // Debug log for topping groups
+        Log.d("SyncRepository", "Topping groups from API: ${syncData.toppingGroups?.size ?: 0}")
+        syncData.toppingGroups?.forEach { group ->
+            val productCount = group.productIds?.size ?: 0
+            Log.d("SyncRepository", "  - Group: ${group.name}, minSelect=${group.minSelect}, maxSelect=${group.maxSelect}, products=$productCount, toppings=${group.toppings.size}")
+            if (productCount == 0) {
+                Log.w("SyncRepository", "  WARNING: Group '${group.name}' has no products assigned! Min/max limits will not work.")
+            }
+        }
+        Log.d("SyncRepository", "ProductToppings from groups: ${productToppingsFromGroups.size}, from products: ${productToppingsFromProducts.size}")
+
         // Combine both sources (prefer toppingGroups if available)
         val productToppings = if (productToppingsFromGroups.isNotEmpty()) {
+            Log.d("SyncRepository", "Using toppingGroups structure (new)")
             productToppingsFromGroups
         } else {
+            Log.d("SyncRepository", "Using products[].toppings structure (old) - minSelect/maxSelect defaults to 0/99")
             productToppingsFromProducts
         }
 

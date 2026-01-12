@@ -922,6 +922,26 @@ export default function ToppingOptionsPage() {
                           Chưa có sản phẩm loại "Topping". Hãy tạo sản phẩm loại Topping trong mục Món ăn.
                         </div>
                       )}
+
+                      {/* Important notice: Min/Max selection limits */}
+                      {selectedGroup.items.length > 0 && (
+                        <div className="p-4 border rounded-lg bg-blue-50 text-blue-800 text-sm space-y-2">
+                          <div className="font-medium flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            Giới hạn chọn topping
+                          </div>
+                          <div className="text-xs space-y-1">
+                            <div>• Số lượng tối thiểu: <strong>{selectedGroup.minSelection}</strong></div>
+                            <div>• Số lượng tối đa: <strong>{selectedGroup.maxSelection}</strong></div>
+                            <div>• Bắt buộc: <strong>{selectedGroup.isRequired ? "Có" : "Không"}</strong></div>
+                          </div>
+                          <div className="pt-2 border-t border-blue-200">
+                            <p className="text-xs">
+                              <strong>Lưu ý:</strong> Để giới hạn này có hiệu lực trên app CCB, bạn cần gán nhóm topping này vào các món ăn trong tab <strong>"Gán vào món"</strong>.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
