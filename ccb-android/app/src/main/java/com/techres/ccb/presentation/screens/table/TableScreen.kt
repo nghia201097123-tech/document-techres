@@ -59,6 +59,11 @@ fun TableScreen(
     val gridColumns = uiState.gridColumns
     val columnOptions = if (isCompactScreen) listOf(2, 3, 4) else listOf(3, 4, 5, 6)
 
+    // Initialize data lazily - allows screen to render immediately for smooth navigation
+    LaunchedEffect(Unit) {
+        viewModel.initializeData()
+    }
+
     // Show error snackbar
     LaunchedEffect(uiState.errorMessage) {
         if (uiState.errorMessage != null) {

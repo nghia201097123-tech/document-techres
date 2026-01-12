@@ -81,28 +81,29 @@ class TableViewModel @Inject constructor(
 
     private var branchId: String = ""
 
-    // Cache flag to avoid reloading on navigation
+    // Cache flag to avoid reloading
     private var isDataLoaded = false
 
-    init {
-        loadGridColumnsPreference()
-        // Load data asynchronously without blocking init
-        loadDataIfNeeded()
-    }
+    // NO init block - data will be loaded lazily via initializeData()
 
     /**
-     * Load data only if not already loaded (for smooth navigation)
+     * Initialize data - called from LaunchedEffect in Screen for smooth navigation
+     * This allows the screen to render immediately before data is loaded
      */
-    private fun loadDataIfNeeded() {
-        if (!isDataLoaded) {
-            loadData()
-        }
-    }
+    fun initializeData() {
+        if (isDataLoaded) return
 
-    private fun loadGridColumnsPreference() {
-        val savedColumns = sharedPreferences.getInt(KEY_TABLE_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
-        Log.d(TAG, "loadGridColumnsPreference - Loaded columns from SharedPreferences: $savedColumns")
-        _uiState.update { it.copy(gridColumns = savedColumns) }
+        viewModelScope.launch {
+            // Load grid columns preference async (non-blocking)
+            val savedColumns = withContext(Dispatchers.IO) {
+                sharedPreferences.getInt(KEY_TABLE_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+            }
+            Log.d(TAG, "initializeData - Loaded columns from SharedPreferences: $savedColumns")
+            _uiState.update { it.copy(gridColumns = savedColumns) }
+
+            // Then load table data
+            loadDataInternal()
+        }
     }
 
     fun setGridColumns(columns: Int) {
@@ -113,127 +114,128 @@ class TableViewModel @Inject constructor(
         Log.d(TAG, "setGridColumns - Saved to SharedPreferences: $saved")
     }
 
-    fun loadData() {
-        viewModelScope.launch {
-            // Only show loading if this is the first load
-            if (!isDataLoaded) {
-                _uiState.update { it.copy(isLoading = true) }
+    /**
+     * Internal method to load table data
+     */
+    private suspend fun loadDataInternal() {
+        // Only show loading if this is the first load
+        if (!isDataLoaded) {
+            _uiState.update { it.copy(isLoading = true) }
+        }
+
+        try {
+            branchId = authRepository.getBranchId() ?: ""
+            Log.d(TAG, "loadDataInternal - branchId: $branchId")
+
+            if (branchId.isEmpty()) {
+                _uiState.update { it.copy(isLoading = false, errorMessage = "Không tìm thấy chi nhánh") }
+                return
             }
 
-            try {
-                branchId = authRepository.getBranchId() ?: ""
-                Log.d(TAG, "loadData - branchId: $branchId")
+            withContext(Dispatchers.IO) {
+                // Load areas and tables in parallel
+                val areasDeferred = async { tableRepository.getAllAreas(branchId).first() }
+                val tablesDeferred = async { tableRepository.getAllTables(branchId).first() }
 
-                if (branchId.isEmpty()) {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = "Không tìm thấy chi nhánh") }
-                    return@launch
+                val areas = areasDeferred.await()
+                val tables = tablesDeferred.await()
+
+                Log.d(TAG, "loadDataInternal - Loaded ${areas.size} areas, ${tables.size} tables")
+
+                // Load order info for occupied tables
+                val tableOrderIds = tables
+                    .filter { !it.currentOrderId.isNullOrEmpty() }
+                    .mapNotNull { it.currentOrderId }
+
+                // Load orders and item counts in parallel (optimized - single batch query)
+                val ordersDeferred = async {
+                    if (tableOrderIds.isNotEmpty()) {
+                        orderRepository.getOrdersByIds(tableOrderIds).associateBy { it.id }
+                    } else {
+                        emptyMap()
+                    }
+                }
+                val itemCountsDeferred = async {
+                    orderRepository.getItemCountsByOrderIds(tableOrderIds)
                 }
 
-                withContext(Dispatchers.IO) {
-                    // Load areas and tables in parallel
-                    val areasDeferred = async { tableRepository.getAllAreas(branchId).first() }
-                    val tablesDeferred = async { tableRepository.getAllTables(branchId).first() }
+                val ordersMap = ordersDeferred.await()
+                val itemCountsMap = itemCountsDeferred.await()
 
-                    val areas = areasDeferred.await()
-                    val tables = tablesDeferred.await()
+                // Pre-calculate date formatter once
+                val dateFormatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                val currentTime = System.currentTimeMillis()
 
-                    Log.d(TAG, "loadData - Loaded ${areas.size} areas, ${tables.size} tables")
+                // Build table with order info (optimized - no N+1 queries)
+                val tablesWithInfo = tables.map { table ->
+                    val order = table.currentOrderId?.let { ordersMap[it] }
+                    val itemCount = table.currentOrderId?.let { itemCountsMap[it] } ?: 0
 
-                    // Load order info for occupied tables
-                    val tableOrderIds = tables
-                        .filter { !it.currentOrderId.isNullOrEmpty() }
-                        .mapNotNull { it.currentOrderId }
-
-                    // Load orders and item counts in parallel (optimized - single batch query)
-                    val ordersDeferred = async {
-                        if (tableOrderIds.isNotEmpty()) {
-                            orderRepository.getOrdersByIds(tableOrderIds).associateBy { it.id }
-                        } else {
-                            emptyMap()
-                        }
-                    }
-                    val itemCountsDeferred = async {
-                        orderRepository.getItemCountsByOrderIds(tableOrderIds)
-                    }
-
-                    val ordersMap = ordersDeferred.await()
-                    val itemCountsMap = itemCountsDeferred.await()
-
-                    // Pre-calculate date formatter once
-                    val dateFormatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                    val currentTime = System.currentTimeMillis()
-
-                    // Build table with order info (optimized - no N+1 queries)
-                    val tablesWithInfo = tables.map { table ->
-                        val order = table.currentOrderId?.let { ordersMap[it] }
-                        val itemCount = table.currentOrderId?.let { itemCountsMap[it] } ?: 0
-
-                        val occupiedMinutes = if (order != null) {
-                            try {
-                                val createdAt = dateFormatter.parse(order.createdAt)?.time ?: 0L
-                                ((currentTime - createdAt) / 60000).toInt()
-                            } catch (e: Exception) {
-                                0
-                            }
-                        } else {
+                    val occupiedMinutes = if (order != null) {
+                        try {
+                            val createdAt = dateFormatter.parse(order.createdAt)?.time ?: 0L
+                            ((currentTime - createdAt) / 60000).toInt()
+                        } catch (e: Exception) {
                             0
                         }
-
-                        TableWithOrderInfo(
-                            id = table.id,
-                            name = table.name,
-                            areaId = table.areaId,
-                            capacity = table.capacity,
-                            status = table.status,
-                            currentOrderId = table.currentOrderId,
-                            orderNumber = order?.orderNumber,
-                            orderItemCount = itemCount,
-                            orderTotal = order?.totalAmount?.toLong() ?: 0,
-                            occupiedMinutes = occupiedMinutes
-                        )
+                    } else {
+                        0
                     }
 
-                    // Group tables by area
-                    val currentExpandedState = _uiState.value.areas.associate { it.area.id to it.isExpanded }
-
-                    val areasWithTables = areas.map { area ->
-                        AreaWithTables(
-                            area = area,
-                            tables = tablesWithInfo.filter { it.areaId == area.id }.sortedBy { it.name },
-                            isExpanded = currentExpandedState[area.id] ?: true
-                        )
-                    }.filter { it.tables.isNotEmpty() }.sortedBy { it.area.sortOrder }
-
-                    val tablesWithoutArea = tablesWithInfo.filter { it.areaId.isNullOrEmpty() }.sortedBy { it.name }
-
-                    // Calculate statistics
-                    val totalTables = tables.size
-                    val availableTables = tables.count { it.status == "available" }
-                    val occupiedTables = tables.count { it.status == "occupied" || it.status == "reserved" }
-
-                    _uiState.update { state ->
-                        state.copy(
-                            areas = areasWithTables,
-                            tablesWithoutArea = tablesWithoutArea,
-                            totalTables = totalTables,
-                            availableTables = availableTables,
-                            occupiedTables = occupiedTables,
-                            isLoading = false,
-                            errorMessage = null
-                        )
-                    }
-
-                    // Mark data as loaded for caching
-                    isDataLoaded = true
-
-                    Log.d(TAG, "loadData - Complete: ${areasWithTables.size} areas with tables")
+                    TableWithOrderInfo(
+                        id = table.id,
+                        name = table.name,
+                        areaId = table.areaId,
+                        capacity = table.capacity,
+                        status = table.status,
+                        currentOrderId = table.currentOrderId,
+                        orderNumber = order?.orderNumber,
+                        orderItemCount = itemCount,
+                        orderTotal = order?.totalAmount?.toLong() ?: 0,
+                        occupiedMinutes = occupiedMinutes
+                    )
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "loadData - Error: ${e.message}", e)
-                _uiState.update {
-                    it.copy(isLoading = false, errorMessage = "Lỗi tải dữ liệu: ${e.message}")
+
+                // Group tables by area
+                val currentExpandedState = _uiState.value.areas.associate { it.area.id to it.isExpanded }
+
+                val areasWithTables = areas.map { area ->
+                    AreaWithTables(
+                        area = area,
+                        tables = tablesWithInfo.filter { it.areaId == area.id }.sortedBy { it.name },
+                        isExpanded = currentExpandedState[area.id] ?: true
+                    )
+                }.filter { it.tables.isNotEmpty() }.sortedBy { it.area.sortOrder }
+
+                val tablesWithoutArea = tablesWithInfo.filter { it.areaId.isNullOrEmpty() }.sortedBy { it.name }
+
+                // Calculate statistics
+                val totalTables = tables.size
+                val availableTables = tables.count { it.status == "available" }
+                val occupiedTables = tables.count { it.status == "occupied" || it.status == "reserved" }
+
+                _uiState.update { state ->
+                    state.copy(
+                        areas = areasWithTables,
+                        tablesWithoutArea = tablesWithoutArea,
+                        totalTables = totalTables,
+                        availableTables = availableTables,
+                        occupiedTables = occupiedTables,
+                        isLoading = false,
+                        errorMessage = null
+                    )
                 }
+
+                // Mark data as loaded for caching
+                isDataLoaded = true
+
+                Log.d(TAG, "loadDataInternal - Complete: ${areasWithTables.size} areas with tables")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "loadDataInternal - Error: ${e.message}", e)
+            _uiState.update {
+                it.copy(isLoading = false, errorMessage = "Lỗi tải dữ liệu: ${e.message}")
             }
         }
     }
@@ -243,7 +245,9 @@ class TableViewModel @Inject constructor(
      */
     fun refreshData() {
         isDataLoaded = false
-        loadData()
+        viewModelScope.launch {
+            loadDataInternal()
+        }
     }
 
     fun toggleAreaExpanded(areaId: String) {
