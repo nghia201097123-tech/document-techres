@@ -66,8 +66,8 @@ data class SaleUiState(
     // Tax
     val taxRate: Double = 0.0,  // 0% default, có thể set 10% VAT
 
-    // UI State
-    val isLoading: Boolean = false,
+    // UI State - Start with loading=true to show indicator on first render
+    val isLoading: Boolean = true,
     val showVariantDialog: Boolean = false,
     val selectedProductForVariant: Product? = null,
     val showPaymentDialog: Boolean = false,

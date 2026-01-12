@@ -104,7 +104,29 @@ fun SaleScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (isCompactScreen) {
+        // Show loading indicator while data is loading
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Đang tải dữ liệu...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else if (isCompactScreen) {
             // Phone Layout: Full screen products + floating cart button
             PhoneLayout(
                 uiState = uiState,
