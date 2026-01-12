@@ -602,6 +602,34 @@ class SaleViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Remove a specific variant/topping from a cart item
+     */
+    fun removeCartItemVariant(cartItemId: String, variantName: String) {
+        _uiState.update { state ->
+            val updatedCartItems = state.cartItems.map { item ->
+                if (item.id == cartItemId) {
+                    // Find and remove the variant
+                    val variantToRemove = item.selectedVariants.find { it.name == variantName }
+                    val updatedVariants = item.selectedVariants.filter { it.name != variantName }
+
+                    // Recalculate total price
+                    val variantPrice = variantToRemove?.price ?: 0L
+                    val newTotalPrice = item.totalPrice - (variantPrice * item.quantity)
+
+                    item.copy(
+                        selectedVariants = updatedVariants,
+                        totalPrice = newTotalPrice
+                    )
+                } else {
+                    item
+                }
+            }
+            state.copy(cartItems = updatedCartItems)
+        }
+        Log.d(TAG, "removeCartItemVariant - Removed $variantName from cart item $cartItemId")
+    }
+
     fun clearCart() {
         _uiState.update { state ->
             state.copy(

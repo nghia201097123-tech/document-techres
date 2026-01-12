@@ -422,7 +422,8 @@ fun TabletLayout(
             onCheckout = { viewModel.showPaymentDialog() },
             onCancelOrder = { viewModel.cancelOrder() },
             onRemoveOrderItem = viewModel::removeOrderItem,
-            onRemoveOrderItemTopping = viewModel::removeOrderItemTopping
+            onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
+            onRemoveCartItemVariant = viewModel::removeCartItemVariant
         )
     }
 }
@@ -523,6 +524,7 @@ fun CartDialog(
                     },
                     onRemoveOrderItem = viewModel::removeOrderItem,
                     onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
+                    onRemoveCartItemVariant = viewModel::removeCartItemVariant,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -804,6 +806,7 @@ fun CartPanel(
     onCancelOrder: () -> Unit = {},
     onRemoveOrderItem: (String) -> Unit = {},
     onRemoveOrderItemTopping: (String, String) -> Unit = { _, _ -> },
+    onRemoveCartItemVariant: (String, String) -> Unit = { _, _ -> },
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1020,7 +1023,8 @@ fun CartPanel(
                         onIncrease = { onIncreaseQuantity(item.id) },
                         onDecrease = { onDecreaseQuantity(item.id) },
                         onRemove = { onRemoveItem(item.id) },
-                        onEditNote = { onEditNote(item.id) }
+                        onEditNote = { onEditNote(item.id) },
+                        onRemoveVariant = onRemoveCartItemVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -1228,7 +1232,8 @@ fun CartItemRow(
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
     onRemove: () -> Unit,
-    onEditNote: () -> Unit = {}
+    onEditNote: () -> Unit = {},
+    onRemoveVariant: ((String, String) -> Unit)? = null // (itemId, variantName)
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -1355,13 +1360,32 @@ fun CartItemRow(
                                     color = Color(0xFF424242)
                                 )
                             }
-                            if (variant.price > 0) {
-                                Text(
-                                    text = "+${formatCurrency(variant.price)}",
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF1976D2),
-                                    fontWeight = FontWeight.Medium
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (variant.price > 0) {
+                                    Text(
+                                        text = "+${formatCurrency(variant.price)}",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF1976D2),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                // Delete topping button
+                                if (onRemoveVariant != null) {
+                                    IconButton(
+                                        onClick = { onRemoveVariant(item.id, variant.name) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Xóa ${variant.name}",
+                                            tint = Color(0xFFF44336).copy(alpha = 0.7f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
