@@ -200,16 +200,27 @@ fun SaleScreen(
 
         // Dialogs
         if (uiState.showVariantDialog && uiState.selectedProductForVariant != null) {
+            val isAddingToExistingItem = uiState.selectedCartItemForTopping != null
             ProductVariantDialog(
                 product = uiState.selectedProductForVariant!!,
                 availableNotes = uiState.availableNotes,
+                isAddingTopping = isAddingToExistingItem,
                 onDismiss = { viewModel.hideVariantDialog() },
                 onConfirm = { variants, note ->
-                    viewModel.addItemToCart(
-                        uiState.selectedProductForVariant!!,
-                        variants,
-                        note
-                    )
+                    if (isAddingToExistingItem) {
+                        // Add toppings to existing cart item
+                        viewModel.addToppingsToCartItem(
+                            uiState.selectedCartItemForTopping!!,
+                            variants
+                        )
+                    } else {
+                        // Add new item to cart
+                        viewModel.addItemToCart(
+                            uiState.selectedProductForVariant!!,
+                            variants,
+                            note
+                        )
+                    }
                 }
             )
         }
@@ -423,7 +434,8 @@ fun TabletLayout(
             onCancelOrder = { viewModel.cancelOrder() },
             onRemoveOrderItem = viewModel::removeOrderItem,
             onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
-            onRemoveCartItemVariant = viewModel::removeCartItemVariant
+            onRemoveCartItemVariant = viewModel::removeCartItemVariant,
+            onAddToppingToCartItem = viewModel::showAddToppingDialog
         )
     }
 }
@@ -525,6 +537,7 @@ fun CartDialog(
                     onRemoveOrderItem = viewModel::removeOrderItem,
                     onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
                     onRemoveCartItemVariant = viewModel::removeCartItemVariant,
+                    onAddToppingToCartItem = viewModel::showAddToppingDialog,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -807,6 +820,7 @@ fun CartPanel(
     onRemoveOrderItem: (String) -> Unit = {},
     onRemoveOrderItemTopping: (String, String) -> Unit = { _, _ -> },
     onRemoveCartItemVariant: (String, String) -> Unit = { _, _ -> },
+    onAddToppingToCartItem: (String) -> Unit = {}, // cartItemId
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1024,7 +1038,8 @@ fun CartPanel(
                         onDecrease = { onDecreaseQuantity(item.id) },
                         onRemove = { onRemoveItem(item.id) },
                         onEditNote = { onEditNote(item.id) },
-                        onRemoveVariant = onRemoveCartItemVariant
+                        onRemoveVariant = onRemoveCartItemVariant,
+                        onAddTopping = { onAddToppingToCartItem(item.id) }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -1233,7 +1248,8 @@ fun CartItemRow(
     onDecrease: () -> Unit,
     onRemove: () -> Unit,
     onEditNote: () -> Unit = {},
-    onRemoveVariant: ((String, String) -> Unit)? = null // (itemId, variantName)
+    onRemoveVariant: ((String, String) -> Unit)? = null, // (itemId, variantName)
+    onAddTopping: (() -> Unit)? = null // Open topping dialog
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -1392,32 +1408,56 @@ fun CartItemRow(
                 }
             }
 
-            // Row 4: Note (if exists)
-            if (!item.note.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                        .clickable { onEditNote() }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // Row 4: Action buttons (Note + Add Topping)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Note button
+                OutlinedButton(
+                    onClick = onEditNote,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (item.note.isNullOrEmpty()) Color.Gray else MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Ghi chu",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        imageVector = if (item.note.isNullOrEmpty()) Icons.Default.NoteAdd else Icons.Default.Edit,
+                        contentDescription = "Ghi chú",
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = item.note!!,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = if (item.note.isNullOrEmpty()) "Ghi chú" else item.note!!,
+                        fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                // Add topping button (only show if product has variants)
+                if (onAddTopping != null && item.product.hasVariants) {
+                    OutlinedButton(
+                        onClick = onAddTopping,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF1976D2)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Thêm topping",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Topping",
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
 

@@ -28,6 +28,7 @@ import com.techres.ccb.presentation.screens.sale.formatCurrency
 fun ProductVariantDialog(
     product: Product,
     availableNotes: List<ProductNoteEntity> = emptyList(),
+    isAddingTopping: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (List<SelectedVariant>, String?) -> Unit
 ) {
@@ -136,93 +137,95 @@ fun ProductVariantDialog(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // Quantity Section
-                    Text(
-                        text = "Số lượng",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        IconButton(
-                            onClick = { if (quantity > 1) quantity-- },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(8.dp)
-                                )
-                        ) {
-                            Icon(Icons.Default.Remove, contentDescription = "Giảm")
-                        }
-
+                    // Quantity Section - hide when adding topping to existing item
+                    if (!isAddingTopping) {
                         Text(
-                            text = quantity.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 32.dp)
+                            text = "Số lượng",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
-
-                        IconButton(
-                            onClick = { quantity++ },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    RoundedCornerShape(8.dp)
-                                )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Tăng")
-                        }
-                    }
+                            IconButton(
+                                onClick = { if (quantity > 1) quantity-- },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                Icon(Icons.Default.Remove, contentDescription = "Giảm")
+                            }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = quantity.toString(),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            )
 
-                    // Note Section
-                    Text(
-                        text = "Ghi chú",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Available notes as chips
-                    if (availableNotes.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            availableNotes.forEach { noteEntity ->
-                                val isSelected = noteEntity.name in selectedNotes
-                                NoteChip(
-                                    note = noteEntity.name,
-                                    isSelected = isSelected,
-                                    onClick = {
-                                        if (isSelected) {
-                                            selectedNotes.remove(noteEntity.name)
-                                        } else {
-                                            selectedNotes.add(noteEntity.name)
-                                        }
-                                    }
-                                )
+                            IconButton(
+                                onClick = { quantity++ },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Tăng")
                             }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
 
-                    // Free-text note input
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it },
-                        placeholder = { Text("Ghi chú thêm...") },
-                        modifier = Modifier.fillMaxWidth(),
-                        maxLines = 2,
-                        shape = RoundedCornerShape(8.dp)
-                    )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Note Section - hide when adding topping
+                        Text(
+                            text = "Ghi chú",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Available notes as chips
+                        if (availableNotes.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                availableNotes.forEach { noteEntity ->
+                                    val isSelected = noteEntity.name in selectedNotes
+                                    NoteChip(
+                                        note = noteEntity.name,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            if (isSelected) {
+                                                selectedNotes.remove(noteEntity.name)
+                                            } else {
+                                                selectedNotes.add(noteEntity.name)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        // Free-text note input
+                        OutlinedTextField(
+                            value = note,
+                            onValueChange = { note = it },
+                            placeholder = { Text("Ghi chú thêm...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 2,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
                 }
 
                 // Footer with Total and Actions
@@ -311,7 +314,10 @@ fun ProductVariantDialog(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Thêm vào đơn", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isAddingTopping) "Thêm topping" else "Thêm vào đơn",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

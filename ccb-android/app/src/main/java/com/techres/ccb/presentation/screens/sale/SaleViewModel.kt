@@ -75,6 +75,7 @@ data class SaleUiState(
     val showCustomerDialog: Boolean = false,
     val showNoteDialog: Boolean = false,
     val selectedCartItemForNote: String? = null,
+    val selectedCartItemForTopping: String? = null, // For adding toppings to existing cart item
 
     // Messages
     val successMessage: String? = null,
@@ -868,9 +869,50 @@ class SaleViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 showVariantDialog = false,
-                selectedProductForVariant = null
+                selectedProductForVariant = null,
+                selectedCartItemForTopping = null
             )
         }
+    }
+
+    /**
+     * Show dialog to add more toppings to an existing cart item
+     */
+    fun showAddToppingDialog(cartItemId: String) {
+        val cartItem = _uiState.value.cartItems.find { it.id == cartItemId } ?: return
+        _uiState.update { state ->
+            state.copy(
+                showVariantDialog = true,
+                selectedProductForVariant = cartItem.product,
+                selectedCartItemForTopping = cartItemId
+            )
+        }
+    }
+
+    /**
+     * Add selected toppings to an existing cart item
+     */
+    fun addToppingsToCartItem(cartItemId: String, newVariants: List<SelectedVariant>) {
+        _uiState.update { state ->
+            val updatedCartItems = state.cartItems.map { item ->
+                if (item.id == cartItemId) {
+                    // Merge existing variants with new ones (avoid duplicates)
+                    val existingNames = item.selectedVariants.map { it.name }.toSet()
+                    val uniqueNewVariants = newVariants.filter { it.name !in existingNames }
+                    val mergedVariants = item.selectedVariants + uniqueNewVariants
+                    item.copy(selectedVariants = mergedVariants)
+                } else {
+                    item
+                }
+            }
+            state.copy(
+                cartItems = updatedCartItems,
+                showVariantDialog = false,
+                selectedProductForVariant = null,
+                selectedCartItemForTopping = null
+            )
+        }
+        Log.d(TAG, "addToppingsToCartItem - Added ${newVariants.size} toppings to cart item $cartItemId")
     }
 
     // ===== NOTE DIALOG =====
