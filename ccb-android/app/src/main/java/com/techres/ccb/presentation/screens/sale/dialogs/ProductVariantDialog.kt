@@ -29,16 +29,30 @@ fun ProductVariantDialog(
     product: Product,
     availableNotes: List<ProductNoteEntity> = emptyList(),
     isAddingTopping: Boolean = false,
+    existingVariants: List<SelectedVariant> = emptyList(), // Pre-selected variants when adding topping
     onDismiss: () -> Unit,
     onConfirm: (List<SelectedVariant>, String?) -> Unit
 ) {
     // State for selected variants
     val selectedOptions = remember {
         mutableStateMapOf<String, MutableList<String>>().apply {
-            // Initialize with default options
-            product.variants.forEach { group ->
-                val defaults = group.options.filter { it.isDefault }.map { it.id }
-                this[group.id] = defaults.toMutableList()
+            if (isAddingTopping && existingVariants.isNotEmpty()) {
+                // Initialize with existing variants from cart item
+                product.variants.forEach { group ->
+                    val existingInGroup = existingVariants
+                        .filter { it.groupId == group.id || it.groupName == group.name }
+                        .mapNotNull { existing ->
+                            // Find option by name since optionId might be different
+                            group.options.find { it.name == existing.name }?.id
+                        }
+                    this[group.id] = existingInGroup.toMutableList()
+                }
+            } else {
+                // Initialize with default options
+                product.variants.forEach { group ->
+                    val defaults = group.options.filter { it.isDefault }.map { it.id }
+                    this[group.id] = defaults.toMutableList()
+                }
             }
         }
     }

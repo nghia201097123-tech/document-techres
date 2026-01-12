@@ -223,15 +223,22 @@ fun SaleScreen(
         // Dialogs
         if (uiState.showVariantDialog && uiState.selectedProductForVariant != null) {
             val isAddingToExistingItem = uiState.selectedCartItemForTopping != null
+            // Get existing variants from cart item when adding toppings
+            val existingVariants = if (isAddingToExistingItem) {
+                uiState.cartItems.find { it.id == uiState.selectedCartItemForTopping }?.selectedVariants ?: emptyList()
+            } else {
+                emptyList()
+            }
             ProductVariantDialog(
                 product = uiState.selectedProductForVariant!!,
                 availableNotes = uiState.availableNotes,
                 isAddingTopping = isAddingToExistingItem,
+                existingVariants = existingVariants,
                 onDismiss = { viewModel.hideVariantDialog() },
                 onConfirm = { variants, note ->
                     if (isAddingToExistingItem) {
-                        // Add toppings to existing cart item
-                        viewModel.addToppingsToCartItem(
+                        // Replace all toppings on cart item with new selection
+                        viewModel.updateCartItemVariants(
                             uiState.selectedCartItemForTopping!!,
                             variants
                         )

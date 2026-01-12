@@ -976,6 +976,30 @@ class SaleViewModel @Inject constructor(
         Log.d(TAG, "addToppingsToCartItem - Added ${newVariants.size} toppings to cart item $cartItemId")
     }
 
+    /**
+     * Replace all variants on a cart item with new selection
+     * Used when editing/updating toppings from the dialog
+     */
+    fun updateCartItemVariants(cartItemId: String, newVariants: List<SelectedVariant>) {
+        _uiState.update { state ->
+            val updatedCartItems = state.cartItems.map { item ->
+                if (item.id == cartItemId) {
+                    // Replace all variants with new selection
+                    item.copy(selectedVariants = newVariants)
+                } else {
+                    item
+                }
+            }
+            state.copy(
+                cartItems = updatedCartItems,
+                showVariantDialog = false,
+                selectedProductForVariant = null,
+                selectedCartItemForTopping = null
+            )
+        }
+        Log.d(TAG, "updateCartItemVariants - Updated cart item $cartItemId with ${newVariants.size} variants")
+    }
+
     // ===== NOTE DIALOG =====
 
     fun showNoteDialog(cartItemId: String) {
