@@ -159,6 +159,7 @@ class SyncDataViewModel @Inject constructor(
             SyncStep.AREAS -> "areas"
             SyncStep.TABLES -> "tables"
             SyncStep.STAFF -> "staff"
+            SyncStep.KITCHENS -> "kitchens"
             SyncStep.SEASONAL_PRICES -> "seasonal_prices"
             SyncStep.COUPONS -> "coupons"
             SyncStep.PRODUCT_NOTES -> "product_notes"
