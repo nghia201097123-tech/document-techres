@@ -79,6 +79,7 @@ data class BranchSelectionUiState(
         SyncStep.AREAS to SyncStepUiState("Khu vực"),
         SyncStep.TABLES to SyncStepUiState("Bàn"),
         SyncStep.STAFF to SyncStepUiState("Nhân viên"),
+        SyncStep.KITCHENS to SyncStepUiState("Bếp"),
         SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
         SyncStep.COUPONS to SyncStepUiState("Coupon"),
         SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
@@ -248,6 +249,7 @@ class BranchSelectionViewModel @Inject constructor(
                 SyncStep.AREAS to SyncStepUiState("Khu vực"),
                 SyncStep.TABLES to SyncStepUiState("Bàn"),
                 SyncStep.STAFF to SyncStepUiState("Nhân viên"),
+                SyncStep.KITCHENS to SyncStepUiState("Bếp"),
                 SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
                 SyncStep.COUPONS to SyncStepUiState("Coupon"),
                 SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
@@ -353,6 +355,7 @@ class BranchSelectionViewModel @Inject constructor(
             SyncStep.AREAS to SyncStepUiState("Khu vực"),
             SyncStep.TABLES to SyncStepUiState("Bàn"),
             SyncStep.STAFF to SyncStepUiState("Nhân viên"),
+            SyncStep.KITCHENS to SyncStepUiState("Bếp"),
             SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
             SyncStep.COUPONS to SyncStepUiState("Coupon"),
             SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
