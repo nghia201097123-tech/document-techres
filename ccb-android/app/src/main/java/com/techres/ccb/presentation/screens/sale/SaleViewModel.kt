@@ -606,19 +606,45 @@ class SaleViewModel @Inject constructor(
     /**
      * Remove a specific variant/topping from a cart item
      * Note: totalPrice is a computed property that auto-calculates from selectedVariants
+     * Will NOT remove if it's the last option in a required group
      */
     fun removeCartItemVariant(cartItemId: String, variantName: String) {
-        _uiState.update { state ->
-            val updatedCartItems = state.cartItems.map { item ->
+        val state = _uiState.value
+        val cartItem = state.cartItems.find { it.id == cartItemId } ?: return
+
+        // Find which group this variant belongs to
+        val variantGroup = cartItem.product.variants.find { group ->
+            group.options.any { it.name == variantName }
+        }
+
+        // Check if this is a required group
+        if (variantGroup != null && variantGroup.isRequired) {
+            // Count how many options from this group are currently selected
+            val selectedOptionsInGroup = cartItem.selectedVariants.count { selectedVariant ->
+                variantGroup.options.any { it.name == selectedVariant.name }
+            }
+
+            // If this is the last selected option in a required group, don't allow removal
+            if (selectedOptionsInGroup <= 1) {
+                _uiState.update { s ->
+                    s.copy(errorMessage = "Không thể xóa ${variantGroup.name} - bắt buộc chọn")
+                }
+                Log.d(TAG, "removeCartItemVariant - Cannot remove $variantName, required group ${variantGroup.name}")
+                return
+            }
+        }
+
+        // Proceed with removal
+        _uiState.update { s ->
+            val updatedCartItems = s.cartItems.map { item ->
                 if (item.id == cartItemId) {
-                    // Remove the variant - totalPrice will auto-recalculate
                     val updatedVariants = item.selectedVariants.filter { it.name != variantName }
                     item.copy(selectedVariants = updatedVariants)
                 } else {
                     item
                 }
             }
-            state.copy(cartItems = updatedCartItems)
+            s.copy(cartItems = updatedCartItems)
         }
         Log.d(TAG, "removeCartItemVariant - Removed $variantName from cart item $cartItemId")
     }
