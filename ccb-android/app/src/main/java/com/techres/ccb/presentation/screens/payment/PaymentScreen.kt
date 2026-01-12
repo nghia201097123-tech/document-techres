@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +64,7 @@ fun PaymentScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
             // Order summary
             Card(
@@ -89,25 +94,40 @@ fun PaymentScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Tạm tính:")
-                        Text(formatPrice(uiState.order?.subtotal ?: 0.0))
+                        Text(formatPrice(uiState.subtotal))
                     }
-                    if ((uiState.order?.discountAmount ?: 0.0) > 0) {
+                    // Show discount if any
+                    if (uiState.totalDiscount > 0) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Giảm giá:")
-                            Text("-${formatPrice(uiState.order?.discountAmount ?: 0.0)}")
+                            Text("Giảm giá:", color = Success)
+                            Text(
+                                "-${formatPrice(uiState.totalDiscount)}",
+                                color = Success,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    // Show VAT
+                    if (uiState.vatAmount > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("VAT (8%):")
+                            Text(formatPrice(uiState.vatAmount))
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("TỔNG CỘNG:", fontWeight = FontWeight.Bold)
                         Text(
-                            formatPrice(uiState.order?.totalAmount ?: 0.0),
+                            formatPrice(uiState.grandTotal),
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
                             color = MaterialTheme.colorScheme.primary
@@ -116,7 +136,124 @@ fun PaymentScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Coupon/Discount section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Mã giảm giá",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.couponCode,
+                            onValueChange = { viewModel.setCouponCode(it) },
+                            placeholder = { Text("Nhập mã giảm giá") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { viewModel.applyCoupon() }),
+                            isError = uiState.discountError != null
+                        )
+                        Button(
+                            onClick = { viewModel.applyCoupon() },
+                            enabled = !uiState.isApplyingCoupon && uiState.couponCode.isNotEmpty()
+                        ) {
+                            if (uiState.isApplyingCoupon) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Áp dụng")
+                            }
+                        }
+                    }
+                    // Show error
+                    if (uiState.discountError != null) {
+                        Text(
+                            text = uiState.discountError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    // Show applied coupons
+                    if (uiState.appliedCoupons.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Đã áp dụng:",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        uiState.appliedCoupons.forEach { coupon ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.LocalOffer,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = Success
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = coupon.code,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = coupon.name,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "-${formatPrice(coupon.discountAmount)}",
+                                        color = Success,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    IconButton(
+                                        onClick = { viewModel.removeCoupon(coupon.couponId) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Xóa",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Payment method selection
             Text(
@@ -194,7 +331,7 @@ fun PaymentScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Confirm button
             Button(
