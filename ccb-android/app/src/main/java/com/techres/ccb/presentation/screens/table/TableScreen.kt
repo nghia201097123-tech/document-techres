@@ -395,7 +395,10 @@ private fun AreaSection(
     onToggleExpand: () -> Unit,
     onTableClick: (TableWithOrderInfo) -> Unit
 ) {
-    val availableCount = areaWithTables.tables.count { it.status == "available" }
+    // Use remember for computed values to avoid recalculation on every recomposition
+    val availableCount = remember(areaWithTables.tables) {
+        areaWithTables.tables.count { it.status == "available" }
+    }
     val totalCount = areaWithTables.tables.size
 
     Column(
@@ -447,38 +450,43 @@ private fun AreaSection(
             }
         }
 
-        // Tables grid
-        AnimatedVisibility(
-            visible = areaWithTables.isExpanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
+        // Tables grid - only render when expanded
+        if (areaWithTables.isExpanded) {
+            // Cache the chunked rows to avoid recalculation
+            val rows = remember(areaWithTables.tables, gridColumns) {
+                areaWithTables.tables.chunked(gridColumns)
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                // Use the selected grid columns
-                val rows = areaWithTables.tables.chunked(gridColumns)
-
-                rows.forEach { rowTables ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        rowTables.forEach { table ->
-                            TableCard(
-                                table = table,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onTableClick(table) }
-                            )
+                rows.forEachIndexed { rowIndex, rowTables ->
+                    key(rowIndex) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowTables.forEach { table ->
+                                key(table.id) {
+                                    TableCard(
+                                        table = table,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onTableClick(table) }
+                                    )
+                                }
+                            }
+                            // Fill remaining space if row is not complete
+                            repeat(gridColumns - rowTables.size) { index ->
+                                Spacer(
+                                    modifier = Modifier.weight(1f),
+                                    // key is not applicable to Spacer directly
+                                )
+                            }
                         }
-                        // Fill remaining space if row is not complete
-                        repeat(gridColumns - rowTables.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -491,29 +499,48 @@ private fun TableCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val statusColor = when (table.status.lowercase()) {
-        "available" -> StatusAvailable
-        "occupied" -> if (table.orderNumber?.startsWith("pending") == true || table.orderNumber == null) StatusPending else StatusOccupied
-        "reserved" -> StatusReserved
-        "cleaning" -> StatusCleaning
-        else -> StatusAvailable
+    // Cache computed values with remember to avoid recalculation on recomposition
+    val statusColor = remember(table.status, table.orderNumber) {
+        when (table.status.lowercase()) {
+            "available" -> StatusAvailable
+            "occupied" -> if (table.orderNumber?.startsWith("pending") == true || table.orderNumber == null) StatusPending else StatusOccupied
+            "reserved" -> StatusReserved
+            "cleaning" -> StatusCleaning
+            else -> StatusAvailable
+        }
     }
 
     val hasOrder = table.currentOrderId != null
 
-    Card(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = if (hasOrder) statusColor.copy(alpha = 0.1f) else Color.White
-        ),
-        shape = RoundedCornerShape(12.dp),
-        border = if (hasOrder) {
+    // Pre-calculate colors to avoid repeated calculation
+    val containerColor = remember(hasOrder, statusColor) {
+        if (hasOrder) statusColor.copy(alpha = 0.1f) else Color.White
+    }
+
+    val borderStroke = remember(hasOrder, statusColor) {
+        if (hasOrder) {
             androidx.compose.foundation.BorderStroke(2.dp, statusColor)
         } else {
             androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
         }
+    }
+
+    // Cache formatted currency
+    val formattedTotal = remember(table.orderTotal) {
+        if (table.orderTotal > 0) formatCurrency(table.orderTotal) else ""
+    }
+
+    val timeColor = remember(table.occupiedMinutes) {
+        if (table.occupiedMinutes > 30) Color(0xFFF44336) else Color.Gray
+    }
+
+    Card(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(12.dp),
+        border = borderStroke
     ) {
         Column(
             modifier = Modifier
@@ -563,9 +590,9 @@ private fun TableCard(
                     )
                 }
 
-                if (table.orderTotal > 0) {
+                if (formattedTotal.isNotEmpty()) {
                     Text(
-                        text = formatCurrency(table.orderTotal),
+                        text = formattedTotal,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1976D2)
@@ -574,20 +601,18 @@ private fun TableCard(
 
                 // Wait time
                 if (table.occupiedMinutes > 0) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.Schedule,
                             contentDescription = null,
                             modifier = Modifier.size(10.dp),
-                            tint = if (table.occupiedMinutes > 30) Color(0xFFF44336) else Color.Gray
+                            tint = timeColor
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
                             text = "${table.occupiedMinutes}p",
                             fontSize = 10.sp,
-                            color = if (table.occupiedMinutes > 30) Color(0xFFF44336) else Color.Gray
+                            color = timeColor
                         )
                     }
                 }
