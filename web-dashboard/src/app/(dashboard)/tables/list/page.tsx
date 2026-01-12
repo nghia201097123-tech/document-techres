@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Table2, Loader2, MoreHorizontal, Pencil, Power, Trash2, Users, Check, ChevronsUpDown, X } from "lucide-react";
+import { Plus, Table2, Loader2, MoreHorizontal, Pencil, Power, Trash2, Users, Check, ChevronsUpDown, X, CheckSquare, Square, Type, PowerOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,8 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { tableService, type Table, type CreateTableDto, type UpdateTableDto, TableStatus, tableStatusLabels } from "@/services/table-service";
 import { areaService, type Area } from "@/services/area-service";
@@ -60,6 +62,27 @@ import { cn } from "@/lib/utils";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
 type DialogMode = "create" | "edit" | null;
+
+// Rename format types (like macOS)
+type RenameFormat = "replace" | "add_prefix" | "add_suffix" | "name_and_index";
+
+interface BulkRenameConfig {
+  format: RenameFormat;
+  findText: string;
+  replaceText: string;
+  prefix: string;
+  suffix: string;
+  customFormat: string;
+  startNumber: number;
+  where: "before" | "after";
+}
+
+interface BulkProgress {
+  current: number;
+  total: number;
+  status: "idle" | "processing" | "completed" | "error";
+  message?: string;
+}
 
 export default function TablesPage() {
   const { toast } = useToast();
@@ -95,6 +118,26 @@ export default function TablesPage() {
   // Area combobox state
   const [areaComboboxOpen, setAreaComboboxOpen] = React.useState(false);
   const [areaSearchValue, setAreaSearchValue] = React.useState("");
+
+  // Bulk operations state
+  const [selectedTableIds, setSelectedTableIds] = React.useState<Set<string>>(new Set());
+  const [bulkRenameDialogOpen, setBulkRenameDialogOpen] = React.useState(false);
+  const [bulkRenameConfig, setBulkRenameConfig] = React.useState<BulkRenameConfig>({
+    format: "name_and_index",
+    findText: "",
+    replaceText: "",
+    prefix: "",
+    suffix: "",
+    customFormat: "Bàn ",
+    startNumber: 1,
+    where: "after",
+  });
+  const [bulkProgress, setBulkProgress] = React.useState<BulkProgress>({
+    current: 0,
+    total: 0,
+    status: "idle",
+  });
+  const [bulkToggleAction, setBulkToggleAction] = React.useState<"enable" | "disable" | null>(null);
 
   // Load data - only when branch is selected
   const loadData = React.useCallback(async (branchId: string) => {
@@ -344,6 +387,173 @@ export default function TablesPage() {
     return areas.find((a) => a.id === areaId)?.name || "Không xác định";
   };
 
+  // ===== BULK OPERATIONS =====
+
+  // Get selected tables
+  const selectedTables = React.useMemo(() => {
+    return tables.filter(t => selectedTableIds.has(t.id));
+  }, [tables, selectedTableIds]);
+
+  // Toggle table selection
+  const toggleTableSelection = (tableId: string) => {
+    setSelectedTableIds(prev => {
+      const next = new Set(prev);
+      if (next.has(tableId)) {
+        next.delete(tableId);
+      } else {
+        next.add(tableId);
+      }
+      return next;
+    });
+  };
+
+  // Select all tables in current filter
+  const selectAllTables = () => {
+    setSelectedTableIds(new Set(filteredTables.map(t => t.id)));
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedTableIds(new Set());
+  };
+
+  // Generate new name based on rename config
+  const generateNewName = (originalName: string, index: number): string => {
+    switch (bulkRenameConfig.format) {
+      case "replace":
+        if (bulkRenameConfig.findText) {
+          return originalName.replace(
+            new RegExp(bulkRenameConfig.findText, 'g'),
+            bulkRenameConfig.replaceText
+          );
+        }
+        return originalName;
+      case "add_prefix":
+        return bulkRenameConfig.prefix + originalName;
+      case "add_suffix":
+        return originalName + bulkRenameConfig.suffix;
+      case "name_and_index":
+        const number = bulkRenameConfig.startNumber + index;
+        if (bulkRenameConfig.where === "before") {
+          return `${number}${bulkRenameConfig.customFormat}`;
+        } else {
+          return `${bulkRenameConfig.customFormat}${number}`;
+        }
+      default:
+        return originalName;
+    }
+  };
+
+  // Preview renamed tables
+  const renamePreview = React.useMemo(() => {
+    return selectedTables.map((table, index) => ({
+      id: table.id,
+      oldName: table.name,
+      newName: generateNewName(table.name, index),
+    }));
+  }, [selectedTables, bulkRenameConfig]);
+
+  // Handle bulk rename
+  const handleBulkRename = async () => {
+    if (selectedTables.length === 0) return;
+
+    setBulkProgress({ current: 0, total: selectedTables.length, status: "processing" });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedTables.length; i++) {
+      const table = selectedTables[i];
+      const newName = generateNewName(table.name, i);
+
+      try {
+        const updated = await tableService.update(table.id, { name: newName });
+        setTables(prev => prev.map(t => t.id === table.id ? updated : t));
+        successCount++;
+      } catch (error) {
+        console.error(`Error renaming table ${table.name}:`, error);
+        failCount++;
+      }
+
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+
+      // Small delay to prevent overwhelming the server
+      if (i < selectedTables.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    setBulkProgress(prev => ({
+      ...prev,
+      status: "completed",
+      message: `Đổi tên thành công ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
+    }));
+
+    toast({
+      title: "Hoàn tất",
+      description: `Đã đổi tên ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
+    });
+
+    // Clear selection and close dialog after a delay
+    setTimeout(() => {
+      clearSelection();
+      setBulkRenameDialogOpen(false);
+      setBulkProgress({ current: 0, total: 0, status: "idle" });
+    }, 1500);
+  };
+
+  // Handle bulk toggle active
+  const handleBulkToggleActive = async (action: "enable" | "disable") => {
+    if (selectedTables.length === 0) return;
+
+    setBulkProgress({ current: 0, total: selectedTables.length, status: "processing" });
+    setBulkToggleAction(action);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedTables.length; i++) {
+      const table = selectedTables[i];
+      const shouldToggle = action === "enable" ? !table.isActive : table.isActive;
+
+      if (shouldToggle) {
+        try {
+          const updated = await tableService.toggleActive(table.id);
+          setTables(prev => prev.map(t => t.id === table.id ? updated : t));
+          successCount++;
+        } catch (error) {
+          console.error(`Error toggling table ${table.name}:`, error);
+          failCount++;
+        }
+      }
+
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+
+      // Small delay
+      if (i < selectedTables.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    setBulkProgress(prev => ({
+      ...prev,
+      status: "completed",
+      message: `${action === "enable" ? "Kích hoạt" : "Tạm ngưng"} thành công ${successCount} bàn`,
+    }));
+
+    toast({
+      title: "Hoàn tất",
+      description: `Đã ${action === "enable" ? "kích hoạt" : "tạm ngưng"} ${successCount} bàn`,
+    });
+
+    // Clear
+    setTimeout(() => {
+      clearSelection();
+      setBulkToggleAction(null);
+      setBulkProgress({ current: 0, total: 0, status: "idle" });
+    }, 1500);
+  };
+
   // Filter areas for combobox
   const filteredAreas = areas.filter(area =>
     area.name.toLowerCase().includes(areaSearchValue.toLowerCase())
@@ -416,6 +626,82 @@ export default function TablesPage() {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedTableIds.size > 0 && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={selectedTableIds.size === filteredTables.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) selectAllTables();
+                    else clearSelection();
+                  }}
+                />
+                <span className="font-medium text-blue-800">
+                  Đã chọn {selectedTableIds.size} bàn
+                </span>
+                <Button variant="ghost" size="sm" onClick={clearSelection} className="text-blue-600 hover:text-blue-800">
+                  <X className="h-4 w-4 mr-1" />
+                  Bỏ chọn
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkRenameDialogOpen(true)}
+                  className="bg-white"
+                >
+                  <Type className="h-4 w-4 mr-2" />
+                  Đổi tên
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkToggleActive("enable")}
+                  disabled={bulkProgress.status === "processing"}
+                  className="bg-white text-green-600 hover:text-green-700 hover:bg-green-50"
+                >
+                  <Power className="h-4 w-4 mr-2" />
+                  Bật
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkToggleActive("disable")}
+                  disabled={bulkProgress.status === "processing"}
+                  className="bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <PowerOff className="h-4 w-4 mr-2" />
+                  Tắt
+                </Button>
+              </div>
+            </div>
+
+            {/* Progress bar when processing */}
+            {bulkProgress.status === "processing" && (
+              <div className="mt-3 space-y-2">
+                <Progress value={(bulkProgress.current / bulkProgress.total) * 100} className="h-2" />
+                <p className="text-sm text-blue-600">
+                  Đang xử lý: {bulkProgress.current}/{bulkProgress.total}
+                </p>
+              </div>
+            )}
+
+            {bulkProgress.status === "completed" && bulkProgress.message && (
+              <div className="mt-3">
+                <p className="text-sm text-green-600 font-medium flex items-center gap-2">
+                  <Check className="h-4 w-4" />
+                  {bulkProgress.message}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {!filterBranchId ? (
         <FilterRequiredPlaceholder
           title="Vui lòng chọn chi nhánh"
@@ -459,11 +745,27 @@ export default function TablesPage() {
                 <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {areaTables.map((table) => {
                     const statusInfo = tableStatusLabels[table.status];
+                    const isSelected = selectedTableIds.has(table.id);
                     return (
-                      <Card key={table.id} className={`relative ${!table.isActive ? "opacity-60" : ""}`}>
+                      <Card
+                        key={table.id}
+                        className={cn(
+                          "relative transition-all cursor-pointer",
+                          !table.isActive && "opacity-60",
+                          isSelected && "ring-2 ring-blue-500 bg-blue-50/50"
+                        )}
+                        onClick={() => toggleTableSelection(table.id)}
+                      >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-2">
+                              {/* Selection checkbox */}
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleTableSelection(table.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mr-1"
+                              />
                               <div className={`p-2 rounded-lg ${statusInfo.color}`}>
                                 <Table2 className="h-4 w-4" />
                               </div>
@@ -485,7 +787,12 @@ export default function TablesPage() {
                             </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -722,6 +1029,234 @@ export default function TablesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Rename Dialog - macOS Style */}
+      <Dialog open={bulkRenameDialogOpen} onOpenChange={setBulkRenameDialogOpen}>
+        <DialogContent className="max-w-2xl bg-gradient-to-br from-white to-gray-50">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Type className="h-5 w-5 text-blue-600" />
+              </div>
+              Đổi tên hàng loạt
+            </DialogTitle>
+            <DialogDescription>
+              Đổi tên {selectedTableIds.size} bàn đã chọn. Chọn định dạng tên như macOS Finder.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            {/* Format Selection */}
+            <div className="grid gap-2">
+              <Label>Định dạng</Label>
+              <Select
+                value={bulkRenameConfig.format}
+                onValueChange={(value: RenameFormat) =>
+                  setBulkRenameConfig(prev => ({ ...prev, format: value }))
+                }
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name_and_index">Tên và số thứ tự</SelectItem>
+                  <SelectItem value="replace">Tìm và thay thế</SelectItem>
+                  <SelectItem value="add_prefix">Thêm tiền tố</SelectItem>
+                  <SelectItem value="add_suffix">Thêm hậu tố</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Format-specific options */}
+            {bulkRenameConfig.format === "name_and_index" && (
+              <div className="grid gap-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Định dạng tên</Label>
+                    <Input
+                      value={bulkRenameConfig.customFormat}
+                      onChange={(e) => setBulkRenameConfig(prev => ({
+                        ...prev,
+                        customFormat: e.target.value
+                      }))}
+                      placeholder="Bàn "
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Vị trí số</Label>
+                    <Select
+                      value={bulkRenameConfig.where}
+                      onValueChange={(value: "before" | "after") =>
+                        setBulkRenameConfig(prev => ({ ...prev, where: value }))
+                      }
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="after">Sau tên</SelectItem>
+                        <SelectItem value="before">Trước tên</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Bắt đầu từ số</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={bulkRenameConfig.startNumber}
+                    onChange={(e) => setBulkRenameConfig(prev => ({
+                      ...prev,
+                      startNumber: parseInt(e.target.value) || 0
+                    }))}
+                    className="w-32 bg-white"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Ví dụ: {bulkRenameConfig.where === "after"
+                    ? `${bulkRenameConfig.customFormat}${bulkRenameConfig.startNumber}`
+                    : `${bulkRenameConfig.startNumber}${bulkRenameConfig.customFormat}`}
+                </p>
+              </div>
+            )}
+
+            {bulkRenameConfig.format === "replace" && (
+              <div className="grid gap-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="grid gap-2">
+                  <Label>Tìm văn bản</Label>
+                  <Input
+                    value={bulkRenameConfig.findText}
+                    onChange={(e) => setBulkRenameConfig(prev => ({
+                      ...prev,
+                      findText: e.target.value
+                    }))}
+                    placeholder="Văn bản cần tìm..."
+                    className="bg-white"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Thay thế bằng</Label>
+                  <Input
+                    value={bulkRenameConfig.replaceText}
+                    onChange={(e) => setBulkRenameConfig(prev => ({
+                      ...prev,
+                      replaceText: e.target.value
+                    }))}
+                    placeholder="Văn bản thay thế..."
+                    className="bg-white"
+                  />
+                </div>
+              </div>
+            )}
+
+            {bulkRenameConfig.format === "add_prefix" && (
+              <div className="grid gap-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="grid gap-2">
+                  <Label>Tiền tố</Label>
+                  <Input
+                    value={bulkRenameConfig.prefix}
+                    onChange={(e) => setBulkRenameConfig(prev => ({
+                      ...prev,
+                      prefix: e.target.value
+                    }))}
+                    placeholder="VIP_"
+                    className="bg-white"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Ví dụ: {bulkRenameConfig.prefix || "VIP_"}Bàn 1
+                </p>
+              </div>
+            )}
+
+            {bulkRenameConfig.format === "add_suffix" && (
+              <div className="grid gap-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="grid gap-2">
+                  <Label>Hậu tố</Label>
+                  <Input
+                    value={bulkRenameConfig.suffix}
+                    onChange={(e) => setBulkRenameConfig(prev => ({
+                      ...prev,
+                      suffix: e.target.value
+                    }))}
+                    placeholder="_VIP"
+                    className="bg-white"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Ví dụ: Bàn 1{bulkRenameConfig.suffix || "_VIP"}
+                </p>
+              </div>
+            )}
+
+            {/* Preview */}
+            <div className="grid gap-2">
+              <Label>Xem trước kết quả</Label>
+              <ScrollArea className="h-[200px] border rounded-lg bg-white">
+                <div className="p-2 space-y-1">
+                  {renamePreview.slice(0, 20).map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "flex items-center justify-between p-2 rounded text-sm",
+                        index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                      )}
+                    >
+                      <span className="text-muted-foreground line-through">{item.oldName}</span>
+                      <span className="mx-2">→</span>
+                      <span className="font-medium text-blue-600">{item.newName}</span>
+                    </div>
+                  ))}
+                  {renamePreview.length > 20 && (
+                    <p className="text-center text-sm text-muted-foreground py-2">
+                      ... và {renamePreview.length - 20} bàn khác
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Progress */}
+            {bulkProgress.status === "processing" && (
+              <div className="space-y-2">
+                <Progress value={(bulkProgress.current / bulkProgress.total) * 100} className="h-2" />
+                <p className="text-sm text-center text-muted-foreground">
+                  Đang đổi tên: {bulkProgress.current}/{bulkProgress.total}
+                </p>
+              </div>
+            )}
+
+            {bulkProgress.status === "completed" && bulkProgress.message && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                  <Check className="h-4 w-4" />
+                  {bulkProgress.message}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t pt-4 bg-gray-50/50 -mx-6 px-6 -mb-6 pb-6 rounded-b-lg">
+            <Button
+              variant="outline"
+              onClick={() => setBulkRenameDialogOpen(false)}
+              disabled={bulkProgress.status === "processing"}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleBulkRename}
+              disabled={bulkProgress.status === "processing"}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {bulkProgress.status === "processing" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Đổi tên {selectedTableIds.size} bàn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
