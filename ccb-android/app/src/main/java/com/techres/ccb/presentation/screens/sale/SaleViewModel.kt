@@ -604,23 +604,15 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Remove a specific variant/topping from a cart item
+     * Note: totalPrice is a computed property that auto-calculates from selectedVariants
      */
     fun removeCartItemVariant(cartItemId: String, variantName: String) {
         _uiState.update { state ->
             val updatedCartItems = state.cartItems.map { item ->
                 if (item.id == cartItemId) {
-                    // Find and remove the variant
-                    val variantToRemove = item.selectedVariants.find { it.name == variantName }
+                    // Remove the variant - totalPrice will auto-recalculate
                     val updatedVariants = item.selectedVariants.filter { it.name != variantName }
-
-                    // Recalculate total price
-                    val variantPrice = variantToRemove?.price ?: 0L
-                    val newTotalPrice = item.totalPrice - (variantPrice * item.quantity)
-
-                    item.copy(
-                        selectedVariants = updatedVariants,
-                        totalPrice = newTotalPrice
-                    )
+                    item.copy(selectedVariants = updatedVariants)
                 } else {
                     item
                 }
