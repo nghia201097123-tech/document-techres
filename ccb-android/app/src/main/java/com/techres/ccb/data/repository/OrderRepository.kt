@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import com.techres.ccb.data.local.dao.OrderDao
+import com.techres.ccb.data.local.dao.OrderItemCount
 import com.techres.ccb.data.local.dao.OrderItemDao
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
@@ -50,6 +51,16 @@ class OrderRepository @Inject constructor(
 
     suspend fun getOrderItemsSync(orderId: String): List<OrderItemEntity> {
         return orderItemDao.getByOrderIdSync(orderId)
+    }
+
+    /**
+     * Get item counts for multiple orders in a single batch query
+     * More efficient than calling getOrderItemsSync for each order
+     */
+    suspend fun getItemCountsByOrderIds(orderIds: List<String>): Map<String, Int> {
+        if (orderIds.isEmpty()) return emptyMap()
+        return orderItemDao.getItemCountsByOrderIds(orderIds)
+            .associate { it.orderId to it.itemCount }
     }
 
     suspend fun getPendingSyncOrders(): List<OrderEntity> {

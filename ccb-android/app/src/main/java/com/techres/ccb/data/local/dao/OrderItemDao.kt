@@ -59,4 +59,19 @@ interface OrderItemDao {
 
     @Query("DELETE FROM order_items WHERE order_id = :orderId")
     suspend fun deleteByOrderId(orderId: String)
+
+    /**
+     * Get item counts for multiple orders in a single query
+     * Returns a list of OrderItemCount with orderId and count
+     */
+    @Query("SELECT order_id AS orderId, COUNT(*) AS itemCount FROM order_items WHERE order_id IN (:orderIds) GROUP BY order_id")
+    suspend fun getItemCountsByOrderIds(orderIds: List<String>): List<OrderItemCount>
 }
+
+/**
+ * Data class for batch item count query result
+ */
+data class OrderItemCount(
+    val orderId: String,
+    val itemCount: Int
+)

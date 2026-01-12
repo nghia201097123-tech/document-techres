@@ -81,9 +81,22 @@ class TableViewModel @Inject constructor(
 
     private var branchId: String = ""
 
+    // Cache flag to avoid reloading on navigation
+    private var isDataLoaded = false
+
     init {
         loadGridColumnsPreference()
-        loadData()
+        // Load data asynchronously without blocking init
+        loadDataIfNeeded()
+    }
+
+    /**
+     * Load data only if not already loaded (for smooth navigation)
+     */
+    private fun loadDataIfNeeded() {
+        if (!isDataLoaded) {
+            loadData()
+        }
     }
 
     private fun loadGridColumnsPreference() {
@@ -102,7 +115,10 @@ class TableViewModel @Inject constructor(
 
     fun loadData() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            // Only show loading if this is the first load
+            if (!isDataLoaded) {
+                _uiState.update { it.copy(isLoading = true) }
+            }
 
             try {
                 branchId = authRepository.getBranchId() ?: ""
@@ -128,28 +144,35 @@ class TableViewModel @Inject constructor(
                         .filter { !it.currentOrderId.isNullOrEmpty() }
                         .mapNotNull { it.currentOrderId }
 
-                    val ordersMap = if (tableOrderIds.isNotEmpty()) {
-                        val orders = orderRepository.getOrdersByIds(tableOrderIds)
-                        orders.associateBy { it.id }
-                    } else {
-                        emptyMap()
+                    // Load orders and item counts in parallel (optimized - single batch query)
+                    val ordersDeferred = async {
+                        if (tableOrderIds.isNotEmpty()) {
+                            orderRepository.getOrdersByIds(tableOrderIds).associateBy { it.id }
+                        } else {
+                            emptyMap()
+                        }
+                    }
+                    val itemCountsDeferred = async {
+                        orderRepository.getItemCountsByOrderIds(tableOrderIds)
                     }
 
-                    // Build table with order info
+                    val ordersMap = ordersDeferred.await()
+                    val itemCountsMap = itemCountsDeferred.await()
+
+                    // Pre-calculate date formatter once
+                    val dateFormatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                    val currentTime = System.currentTimeMillis()
+
+                    // Build table with order info (optimized - no N+1 queries)
                     val tablesWithInfo = tables.map { table ->
                         val order = table.currentOrderId?.let { ordersMap[it] }
-                        val orderItems = if (order != null) {
-                            orderRepository.getOrderItemsSync(order.id)
-                        } else {
-                            emptyList()
-                        }
+                        val itemCount = table.currentOrderId?.let { itemCountsMap[it] } ?: 0
 
                         val occupiedMinutes = if (order != null) {
                             try {
-                                val createdAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                                    .parse(order.createdAt)?.time ?: 0L
-                                ((System.currentTimeMillis() - createdAt) / 60000).toInt()
+                                val createdAt = dateFormatter.parse(order.createdAt)?.time ?: 0L
+                                ((currentTime - createdAt) / 60000).toInt()
                             } catch (e: Exception) {
                                 0
                             }
@@ -165,7 +188,7 @@ class TableViewModel @Inject constructor(
                             status = table.status,
                             currentOrderId = table.currentOrderId,
                             orderNumber = order?.orderNumber,
-                            orderItemCount = orderItems.size,
+                            orderItemCount = itemCount,
                             orderTotal = order?.totalAmount?.toLong() ?: 0,
                             occupiedMinutes = occupiedMinutes
                         )
@@ -201,6 +224,9 @@ class TableViewModel @Inject constructor(
                         )
                     }
 
+                    // Mark data as loaded for caching
+                    isDataLoaded = true
+
                     Log.d(TAG, "loadData - Complete: ${areasWithTables.size} areas with tables")
                 }
             } catch (e: Exception) {
@@ -210,6 +236,14 @@ class TableViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Force refresh data (for manual refresh button)
+     */
+    fun refreshData() {
+        isDataLoaded = false
+        loadData()
     }
 
     fun toggleAreaExpanded(areaId: String) {

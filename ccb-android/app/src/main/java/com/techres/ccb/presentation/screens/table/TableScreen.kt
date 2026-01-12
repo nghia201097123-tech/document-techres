@@ -89,8 +89,8 @@ fun TableScreen(
                     }
                 },
                 actions = {
-                    // Refresh button
-                    IconButton(onClick = { viewModel.loadData() }) {
+                    // Refresh button - force refresh data
+                    IconButton(onClick = { viewModel.refreshData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Làm mới")
                     }
                 },
