@@ -54,6 +54,12 @@ fun ProductVariantDialog(
     val unitPrice = product.price + variantPrice
     val totalPrice = unitPrice * quantity
 
+    // Validate required groups - check if all required groups have at least one selection
+    val missingRequiredGroups = product.variants.filter { group ->
+        group.isRequired && (selectedOptions[group.id]?.isEmpty() ?: true)
+    }
+    val isValid = missingRequiredGroups.isEmpty()
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -226,6 +232,16 @@ fun ProductVariantDialog(
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(16.dp)
                 ) {
+                    // Show validation error message
+                    if (!isValid) {
+                        Text(
+                            text = "Vui lòng chọn: ${missingRequiredGroups.joinToString(", ") { it.name }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -287,8 +303,10 @@ fun ProductVariantDialog(
                                 }
                             },
                             modifier = Modifier.weight(1f),
+                            enabled = isValid,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                             )
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
