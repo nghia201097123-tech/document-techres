@@ -5,10 +5,16 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.os.Environment
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -69,43 +75,78 @@ object PrinterService {
     )
 
     /**
-     * Render text to bitmap with Vietnamese support
+     * Render text to bitmap with Vietnamese support using StaticLayout
+     * StaticLayout handles complex text (diacritics, combining characters) better
      */
     private fun textToBitmap(
         text: String,
         style: TextStyle = TextStyle(),
         paperWidth: Int = PAPER_WIDTH_80MM
     ): Bitmap {
-        val paint = Paint().apply {
+        // Use TextPaint for better text rendering
+        val textPaint = TextPaint().apply {
             color = Color.BLACK
             textSize = style.fontSize * (if (style.doubleHeight || style.doubleWidth) 1.5f else 1f)
             isAntiAlias = true
-            typeface = if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            // Use SERIF font which has better Unicode/Vietnamese support
+            typeface = if (style.bold) {
+                Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            } else {
+                Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+            }
+            // Enable subpixel text for better rendering
+            isSubpixelText = true
         }
 
-        // Calculate text bounds
-        val lines = text.split("\n")
-        val lineHeight = (paint.descent() - paint.ascent()).toInt() + 4
-        val totalHeight = lineHeight * lines.size
+        // Determine text alignment
+        val alignment = if (style.centerAlign) {
+            Layout.Alignment.ALIGN_CENTER
+        } else {
+            Layout.Alignment.ALIGN_NORMAL
+        }
 
-        // Create bitmap
-        val bitmap = Bitmap.createBitmap(paperWidth, totalHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        // Create StaticLayout for proper text layout with Vietnamese support
+        val staticLayout = StaticLayout.Builder
+            .obtain(text, 0, text.length, textPaint, paperWidth)
+            .setAlignment(alignment)
+            .setLineSpacing(0f, 1.0f)
+            .setIncludePad(true)
+            .build()
+
+        // Create bitmap with calculated height
+        val height = staticLayout.height.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(paperWidth, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
 
-        // Draw text
-        var y = -paint.ascent()
-        for (line in lines) {
-            val x = if (style.centerAlign) {
-                (paperWidth - paint.measureText(line)) / 2
-            } else {
-                0f
-            }
-            canvas.drawText(line, x.coerceAtLeast(0f), y, paint)
-            y += lineHeight
-        }
+        // Draw the text using StaticLayout
+        staticLayout.draw(canvas)
+
+        // DEBUG: Save bitmap to file to verify Vietnamese rendering
+        saveBitmapForDebug(bitmap, text)
 
         return bitmap
+    }
+
+    /**
+     * Save bitmap to Downloads folder for debugging
+     */
+    private fun saveBitmapForDebug(bitmap: Bitmap, text: String) {
+        try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = System.currentTimeMillis()
+            val fileName = "print_debug_${timestamp}.png"
+            val file = File(downloadsDir, fileName)
+
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+
+            Log.d(TAG, "DEBUG: Saved bitmap to ${file.absolutePath}")
+            Log.d(TAG, "DEBUG: Text was: $text")
+        } catch (e: Exception) {
+            Log.e(TAG, "DEBUG: Failed to save bitmap: ${e.message}")
+        }
     }
 
     /**
