@@ -40,6 +40,19 @@ data class AppliedDiscount(
     val discountAmount: Long   // Số tiền thực tế được giảm
 )
 
+/**
+ * Thông tin món để hiển thị trong PaymentDialog
+ */
+data class PaymentOrderItem(
+    val id: String,
+    val name: String,
+    val quantity: Int,
+    val unitPrice: Long,
+    val totalPrice: Long,
+    val discountAmount: Long = 0,
+    val categoryId: String? = null
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PaymentDialog(
@@ -51,12 +64,15 @@ fun PaymentDialog(
     couponCode: String = "",
     couponError: String? = null,
     isApplyingCoupon: Boolean = false,
+    // Order items for item-level discount
+    orderItems: List<PaymentOrderItem> = emptyList(),
     onCouponCodeChange: (String) -> Unit = {},
     onApplyCoupon: () -> Unit = {},
     onRemoveDiscount: (String) -> Unit = {},
     // Manual discount callbacks
     onApplyManualDiscount: (amount: Long, reason: String?) -> Unit = { _, _ -> },
     onApplyPercentDiscount: (percent: Int, reason: String?) -> Unit = { _, _ -> },
+    onApplyItemDiscount: (itemId: String, amount: Long) -> Unit = { _, _ -> },
     onClearDiscount: () -> Unit = {},
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
@@ -69,6 +85,12 @@ fun PaymentDialog(
     var manualDiscountText by remember { mutableStateOf("") }
     var showDiscountInput by remember { mutableStateOf(false) }
     var discountInputType by remember { mutableStateOf("fixed") } // "fixed" or "percent"
+
+    // Item discount states
+    var showItemDiscounts by remember { mutableStateOf(false) }
+    var selectedItemForDiscount by remember { mutableStateOf<String?>(null) }
+    var itemDiscountText by remember { mutableStateOf("") }
+    var itemDiscountType by remember { mutableStateOf("percent") } // "fixed" or "percent"
 
     val receivedAmount = receivedAmountText.toLongOrNull() ?: 0L
     val changeAmount = if (receivedAmount >= totalAmount) receivedAmount - totalAmount else 0L
@@ -461,6 +483,156 @@ fun PaymentDialog(
                                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                                         ) {
                                             Text("Áp dụng", fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Item-level discount section
+                        if (orderItems.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    // Header with toggle
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { showItemDiscounts = !showItemDiscounts }
+                                            .padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                if (showItemDiscounts) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Giảm giá theo món",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Text(
+                                            text = "${orderItems.size} món",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+
+                                    // Item list with discount options
+                                    if (showItemDiscounts) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        orderItems.forEach { item ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        selectedItemForDiscount = if (selectedItemForDiscount == item.id) null else item.id
+                                                        itemDiscountText = ""
+                                                    }
+                                                    .padding(vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "${item.name} x${item.quantity}",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        maxLines = 1
+                                                    )
+                                                    if (item.discountAmount > 0) {
+                                                        Text(
+                                                            text = "Đã giảm: -${formatCurrency(item.discountAmount)}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = Success
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = formatCurrency(item.totalPrice - item.discountAmount),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+
+                                            // Discount input for selected item
+                                            if (selectedItemForDiscount == item.id) {
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    // Quick discount buttons for item
+                                                    listOf(5, 10, 20).forEach { percent ->
+                                                        FilterChip(
+                                                            selected = false,
+                                                            onClick = {
+                                                                val discountAmt = (item.totalPrice * percent / 100)
+                                                                onApplyItemDiscount(item.id, discountAmt)
+                                                                selectedItemForDiscount = null
+                                                            },
+                                                            label = { Text("$percent%", fontSize = 10.sp) },
+                                                            modifier = Modifier.height(28.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    OutlinedTextField(
+                                                        value = itemDiscountText,
+                                                        onValueChange = { itemDiscountText = it.filter { c -> c.isDigit() } },
+                                                        placeholder = { Text("Số tiền", fontSize = 11.sp) },
+                                                        modifier = Modifier.weight(1f).height(44.dp),
+                                                        singleLine = true,
+                                                        textStyle = MaterialTheme.typography.bodySmall,
+                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                        suffix = { Text("đ", fontSize = 11.sp) }
+                                                    )
+                                                    Button(
+                                                        onClick = {
+                                                            val value = itemDiscountText.toLongOrNull() ?: 0L
+                                                            if (value > 0) {
+                                                                onApplyItemDiscount(item.id, value.coerceAtMost(item.totalPrice))
+                                                                itemDiscountText = ""
+                                                                selectedItemForDiscount = null
+                                                            }
+                                                        },
+                                                        enabled = itemDiscountText.isNotEmpty(),
+                                                        modifier = Modifier.height(44.dp),
+                                                        contentPadding = PaddingValues(horizontal = 10.dp)
+                                                    ) {
+                                                        Text("OK", fontSize = 11.sp)
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                            }
+
+                                            if (orderItems.last() != item) {
+                                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                            }
                                         }
                                     }
                                 }

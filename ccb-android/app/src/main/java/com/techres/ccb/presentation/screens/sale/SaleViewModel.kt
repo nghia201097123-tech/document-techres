@@ -79,6 +79,7 @@ data class SaleUiState(
     val couponError: String? = null,                 // Lỗi khi áp dụng coupon
     val isApplyingCoupon: Boolean = false,           // Đang xử lý áp dụng coupon
     val availableCoupons: List<CouponEntity> = emptyList(),     // Coupon có thể áp dụng
+    val itemDiscounts: Map<String, Long> = emptyMap(),          // Giảm giá theo món: itemId -> discountAmount
     val vatAmount: Long = 0,                         // Tiền VAT
 
     // Tax
@@ -949,17 +950,30 @@ class SaleViewModel @Inject constructor(
 
     // ===== DISCOUNT / COUPON =====
 
+    /**
+     * Tổng tiền order thực tế = currentOrder.subtotal + cart.subtotal
+     */
+    private fun getOrderSubtotal(): Long {
+        val state = _uiState.value
+        val orderSubtotal = state.currentOrder?.subtotal?.toLong() ?: 0L
+        return orderSubtotal + state.subtotal
+    }
+
     fun applyDiscount(amount: Long, reason: String?) {
+        val orderSubtotal = getOrderSubtotal()
+        Log.d(TAG, "applyDiscount - amount: $amount, orderSubtotal: $orderSubtotal, reason: $reason")
         _uiState.update { state ->
             state.copy(
-                discountAmount = amount.coerceAtMost(state.subtotal),
+                discountAmount = amount.coerceAtMost(orderSubtotal),
                 discountReason = reason
             )
         }
     }
 
     fun applyPercentDiscount(percent: Int, reason: String?) {
-        val discountAmount = (_uiState.value.subtotal * percent / 100)
+        val orderSubtotal = getOrderSubtotal()
+        val discountAmount = (orderSubtotal * percent / 100)
+        Log.d(TAG, "applyPercentDiscount - percent: $percent%, orderSubtotal: $orderSubtotal, discountAmount: $discountAmount")
         applyDiscount(discountAmount, reason)
     }
 
@@ -970,9 +984,41 @@ class SaleViewModel @Inject constructor(
                 discountReason = null,
                 couponCode = "",
                 appliedDiscounts = emptyList(),
-                couponError = null
+                couponError = null,
+                itemDiscounts = emptyMap()
             )
         }
+    }
+
+    /**
+     * Áp dụng giảm giá cho một món cụ thể
+     */
+    fun applyItemDiscount(itemId: String, amount: Long) {
+        Log.d(TAG, "applyItemDiscount - itemId: $itemId, amount: $amount")
+        _uiState.update { state ->
+            val newItemDiscounts = state.itemDiscounts.toMutableMap()
+            if (amount > 0) {
+                newItemDiscounts[itemId] = amount
+            } else {
+                newItemDiscounts.remove(itemId)
+            }
+
+            // Tính tổng giảm giá = bill discount + item discounts
+            val totalItemDiscount = newItemDiscounts.values.sum()
+            val newTotalDiscount = state.discountAmount - (state.itemDiscounts.values.sum()) + totalItemDiscount
+
+            state.copy(
+                itemDiscounts = newItemDiscounts,
+                discountAmount = newTotalDiscount.coerceAtLeast(0L)
+            )
+        }
+    }
+
+    /**
+     * Xóa giảm giá của một món
+     */
+    fun clearItemDiscount(itemId: String) {
+        applyItemDiscount(itemId, 0)
     }
 
     /**

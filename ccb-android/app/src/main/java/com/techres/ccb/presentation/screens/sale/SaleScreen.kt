@@ -50,6 +50,7 @@ import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.NoteDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
+import com.techres.ccb.presentation.screens.sale.dialogs.PaymentOrderItem
 import com.techres.ccb.presentation.screens.sale.dialogs.ProductVariantDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.TableSelectionDialog
 import java.text.NumberFormat
@@ -271,6 +272,34 @@ fun SaleScreen(
             val priceBeforeVat = paymentTotal / (1 + uiState.taxRate / 100.0)
             val vatAmount = (paymentTotal - priceBeforeVat).toLong()
 
+            // Tạo danh sách món cho item-level discount
+            val orderItems = buildList {
+                // Thêm các món từ order đang active
+                uiState.currentOrderItems.forEach { item ->
+                    add(PaymentOrderItem(
+                        id = item.id,
+                        name = item.productName,
+                        quantity = item.quantity,
+                        unitPrice = item.unitPrice.toLong(),
+                        totalPrice = item.totalPrice.toLong(),
+                        discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
+                        categoryId = null
+                    ))
+                }
+                // Thêm các món từ giỏ hàng hiện tại
+                uiState.cartItems.forEach { item ->
+                    add(PaymentOrderItem(
+                        id = item.id,
+                        name = item.product.name,
+                        quantity = item.quantity,
+                        unitPrice = item.product.price.toLong(),
+                        totalPrice = item.totalPrice,
+                        discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
+                        categoryId = item.product.categoryId
+                    ))
+                }
+            }
+
             PaymentDialog(
                 totalAmount = paymentTotal,
                 subtotal = subtotal,
@@ -280,11 +309,13 @@ fun SaleScreen(
                 couponCode = uiState.couponCode,
                 couponError = uiState.couponError,
                 isApplyingCoupon = uiState.isApplyingCoupon,
+                orderItems = orderItems,
                 onCouponCodeChange = { viewModel.setCouponCode(it) },
                 onApplyCoupon = { viewModel.applyCoupon() },
                 onRemoveDiscount = { viewModel.removeCoupon(it) },
                 onApplyManualDiscount = { amount, reason -> viewModel.applyDiscount(amount, reason) },
                 onApplyPercentDiscount = { percent, reason -> viewModel.applyPercentDiscount(percent, reason) },
+                onApplyItemDiscount = { itemId, amount -> viewModel.applyItemDiscount(itemId, amount) },
                 onClearDiscount = { viewModel.clearDiscount() },
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
