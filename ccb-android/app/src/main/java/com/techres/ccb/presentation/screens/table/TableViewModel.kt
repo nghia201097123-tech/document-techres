@@ -50,7 +50,8 @@ data class AreaWithTables(
 data class TableUiState(
     val areas: List<AreaWithTables> = emptyList(),
     val tablesWithoutArea: List<TableWithOrderInfo> = emptyList(),
-    val isLoading: Boolean = false,
+    // Start with loading=true for immediate loading indicator on first render
+    val isLoading: Boolean = true,
     val errorMessage: String? = null,
 
     // Statistics
@@ -74,15 +75,26 @@ class TableViewModel @Inject constructor(
         private const val TAG = "TableViewModel"
         private const val KEY_TABLE_GRID_COLUMNS = "table_grid_columns"
         private const val DEFAULT_GRID_COLUMNS = 4
+
+        // Global cache that survives ViewModel recreation for instant load
+        @Volatile
+        private var cachedState: TableUiState? = null
+        private var cacheTimestamp: Long = 0L
+        private const val CACHE_VALIDITY_MS = 30_000L // 30 seconds cache validity
     }
 
-    private val _uiState = MutableStateFlow(TableUiState())
+    // Initialize with cached state if available for instant display
+    private val _uiState = MutableStateFlow(
+        cachedState?.takeIf { System.currentTimeMillis() - cacheTimestamp < CACHE_VALIDITY_MS }
+            ?.copy(isLoading = false)
+            ?: TableUiState()
+    )
     val uiState: StateFlow<TableUiState> = _uiState.asStateFlow()
 
     private var branchId: String = ""
 
     // Cache flag to avoid reloading
-    private var isDataLoaded = false
+    private var isDataLoaded = cachedState != null && System.currentTimeMillis() - cacheTimestamp < CACHE_VALIDITY_MS
 
     // NO init block - data will be loaded lazily via initializeData()
 
@@ -215,22 +227,25 @@ class TableViewModel @Inject constructor(
                 val availableTables = tables.count { it.status == "available" }
                 val occupiedTables = tables.count { it.status == "occupied" || it.status == "reserved" }
 
-                _uiState.update { state ->
-                    state.copy(
-                        areas = areasWithTables,
-                        tablesWithoutArea = tablesWithoutArea,
-                        totalTables = totalTables,
-                        availableTables = availableTables,
-                        occupiedTables = occupiedTables,
-                        isLoading = false,
-                        errorMessage = null
-                    )
-                }
+                val newState = _uiState.value.copy(
+                    areas = areasWithTables,
+                    tablesWithoutArea = tablesWithoutArea,
+                    totalTables = totalTables,
+                    availableTables = availableTables,
+                    occupiedTables = occupiedTables,
+                    isLoading = false,
+                    errorMessage = null
+                )
+                _uiState.value = newState
+
+                // Save to global cache for instant load on next navigation
+                cachedState = newState
+                cacheTimestamp = System.currentTimeMillis()
 
                 // Mark data as loaded for caching
                 isDataLoaded = true
 
-                Log.d(TAG, "loadDataInternal - Complete: ${areasWithTables.size} areas with tables")
+                Log.d(TAG, "loadDataInternal - Complete: ${areasWithTables.size} areas with tables, cached for instant load")
             }
         } catch (e: Exception) {
             Log.e(TAG, "loadDataInternal - Error: ${e.message}", e)
