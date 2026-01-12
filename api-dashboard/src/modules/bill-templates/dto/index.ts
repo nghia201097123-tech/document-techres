@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum, IsUUID, IsNotEmpty } from 'class-validator';
 import { BillTemplateType } from '../../../database/entities/bill-template.entity';
 
 export class CreateBillTemplateDto {
   @ApiProperty({ description: 'ID chi nhánh' })
-  @IsString()
+  @IsUUID('4', { message: 'branchId phải là UUID hợp lệ' })
+  @IsNotEmpty({ message: 'branchId không được để trống' })
   branchId: string;
 
   @ApiProperty({ description: 'Tên mẫu bill' })
