@@ -12,6 +12,13 @@ import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.ProductEntity
 import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.local.entity.ProductNoteEntity
+import com.techres.ccb.data.local.dao.BillPrinterConfigDao
+import com.techres.ccb.data.local.dao.BillTemplateDao
+import com.techres.ccb.data.printer.BillData
+import com.techres.ccb.data.printer.BillItem
+import com.techres.ccb.data.printer.BillPrintService
+import com.techres.ccb.data.printer.BillTopping
+import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.OrderRepository
@@ -158,7 +165,9 @@ class SaleViewModel @Inject constructor(
     private val shiftRepository: ShiftRepository,
     private val productToppingDao: ProductToppingDao,
     private val comboItemDao: ComboItemDao,
-    private val productNoteDao: ProductNoteDao
+    private val productNoteDao: ProductNoteDao,
+    private val billTemplateDao: BillTemplateDao,
+    private val billPrinterConfigDao: BillPrinterConfigDao
 ) : ViewModel() {
 
     companion object {
@@ -1302,9 +1311,13 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Thanh toán và hoàn tất order
-     * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics
+     * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics -> Bill Print
      */
-    fun completeOrder(paymentMethod: String = "cash") {
+    fun completeOrder(
+        paymentMethod: String = "cash",
+        receivedAmount: Double = 0.0,
+        changeAmount: Double = 0.0
+    ) {
         val state = _uiState.value
         val currentOrder = state.currentOrder ?: return
 
@@ -1342,6 +1355,54 @@ class SaleViewModel @Inject constructor(
                             updatedAt = now
                         )
                     }
+
+                    // 5. Print bill (if auto-print is enabled)
+                    try {
+                        val printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
+                        if (printerConfig != null && printerConfig.isActive && printerConfig.autoPrintOnPayment) {
+                            // Get template (from printer config or default for branch)
+                            val template = if (printerConfig.templateId != null) {
+                                billTemplateDao.getById(printerConfig.templateId)
+                            } else {
+                                billTemplateDao.getDefaultByBranch(branchId)
+                            }
+
+                            if (template != null && template.isActive) {
+                                // Build bill data from order
+                                val billData = buildBillData(
+                                    order = completedOrder,
+                                    orderItems = state.currentOrderItems,
+                                    tableName = state.selectedTable?.name,
+                                    staffName = completedOrder.staffName,
+                                    customerName = completedOrder.customerName,
+                                    paymentMethod = paymentMethod,
+                                    receivedAmount = receivedAmount,
+                                    changeAmount = changeAmount
+                                )
+
+                                // Print bill
+                                val result = BillPrintService.printBill(printerConfig, template, billData)
+                                when (result) {
+                                    is PrinterResult.Success -> {
+                                        Log.d(TAG, "completeOrder - Bill printed successfully")
+                                        // Update last print time
+                                        billPrinterConfigDao.updateLastPrint(printerConfig.id, now)
+                                    }
+                                    is PrinterResult.Error -> {
+                                        Log.e(TAG, "completeOrder - Bill print failed: ${result.message}")
+                                        billPrinterConfigDao.updateLastError(printerConfig.id, result.message)
+                                    }
+                                }
+                            } else {
+                                Log.w(TAG, "completeOrder - No active bill template found")
+                            }
+                        } else {
+                            Log.d(TAG, "completeOrder - Auto print disabled or no printer configured")
+                        }
+                    } catch (e: Exception) {
+                        // Don't fail the payment if printing fails
+                        Log.e(TAG, "completeOrder - Bill print error: ${e.message}", e)
+                    }
                 }
 
                 Log.d(TAG, "completeOrder - Completed order with full sync: ${currentOrder.orderNumber}")
@@ -1365,6 +1426,98 @@ class SaleViewModel @Inject constructor(
                 _uiState.update { it.copy(errorMessage = "Lỗi thanh toán: ${e.message}") }
             }
         }
+    }
+
+    /**
+     * Build BillData from order for printing
+     */
+    private fun buildBillData(
+        order: OrderEntity,
+        orderItems: List<OrderItemEntity>,
+        tableName: String?,
+        staffName: String?,
+        customerName: String?,
+        paymentMethod: String,
+        receivedAmount: Double,
+        changeAmount: Double
+    ): BillData {
+        // Parse order date
+        val orderDate = try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(order.createdAt) ?: Date()
+        } catch (e: Exception) {
+            Date()
+        }
+
+        // Convert order items to bill items (exclude combo children - they're already shown in combo parent)
+        val billItems = orderItems.filter { !it.isComboChild }.map { item ->
+            // Parse toppings from notes field "Topping1:price1, Topping2:price2 | User note"
+            val parts = item.notes?.split(" | ") ?: emptyList()
+            val variantsPart = parts.firstOrNull()?.takeIf { it.isNotEmpty() && !it.startsWith("Ghi chú:") } ?: ""
+            val userNote = parts.getOrNull(1)?.removePrefix("Ghi chú: ")
+                ?: parts.firstOrNull()?.takeIf { it.startsWith("Ghi chú:") }?.removePrefix("Ghi chú: ")
+
+            val toppings = variantsPart.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .map { variant ->
+                    val colonIndex = variant.lastIndexOf(":")
+                    if (colonIndex > 0) {
+                        BillTopping(
+                            name = variant.substring(0, colonIndex),
+                            price = variant.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0
+                        )
+                    } else {
+                        BillTopping(name = variant, price = 0.0)
+                    }
+                }
+
+            BillItem(
+                code = item.productCode,
+                name = item.productName,
+                quantity = item.quantity,
+                unitPrice = item.unitPrice,
+                totalPrice = item.totalPrice,
+                note = userNote,
+                toppings = toppings
+            )
+        }
+
+        // Calculate VAT (assuming 10% VAT rate)
+        val vatRate = 10.0
+        val priceBeforeVat = order.totalAmount / (1 + vatRate / 100)
+        val vatAmount = order.totalAmount - priceBeforeVat
+
+        // Map payment method to display text
+        val paymentMethodDisplay = when (paymentMethod.lowercase()) {
+            "cash" -> "Tiền mặt"
+            "card" -> "Thẻ"
+            "transfer" -> "Chuyển khoản"
+            "momo" -> "MoMo"
+            "zalopay" -> "ZaloPay"
+            "vnpay" -> "VNPay"
+            else -> paymentMethod
+        }
+
+        return BillData(
+            orderNumber = order.orderNumber,
+            orderDate = orderDate,
+            tableName = tableName,
+            staffName = staffName,
+            customerName = customerName,
+            items = billItems,
+            subtotal = order.subtotal,
+            discountAmount = order.discountAmount,
+            discountPercent = if (order.subtotal > 0) (order.discountAmount / order.subtotal * 100) else 0.0,
+            serviceFee = 0.0,
+            vatRate = vatRate,
+            vatAmount = vatAmount,
+            priceBeforeVat = priceBeforeVat,
+            priceAfterVat = order.totalAmount,
+            totalAmount = order.totalAmount,
+            paymentMethod = paymentMethodDisplay,
+            receivedAmount = receivedAmount,
+            changeAmount = changeAmount
+        )
     }
 
     /**
@@ -1586,8 +1739,12 @@ class SaleViewModel @Inject constructor(
     fun processPayment(payments: List<Payment>) {
         hidePaymentDialog()
         // Use first payment method
-        val method = payments.firstOrNull()?.method?.name?.lowercase() ?: "cash"
-        completeOrder(method)
+        val payment = payments.firstOrNull()
+        val method = payment?.method?.name?.lowercase() ?: "cash"
+        val receivedAmount = payment?.amount ?: 0.0
+        val orderTotal = _uiState.value.currentOrder?.totalAmount ?: 0.0
+        val changeAmount = if (receivedAmount > orderTotal) receivedAmount - orderTotal else 0.0
+        completeOrder(method, receivedAmount, changeAmount)
     }
 
     // ===== MESSAGES =====

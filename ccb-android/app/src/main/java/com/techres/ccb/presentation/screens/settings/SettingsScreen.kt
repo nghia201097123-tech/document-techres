@@ -31,6 +31,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDebug: () -> Unit = {},
     onNavigateToKitchenPrinter: () -> Unit = {},
+    onNavigateToBillPrinter: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -115,6 +116,15 @@ fun SettingsScreen(
                     title = "Quản lý Bếp & Máy in",
                     subtitle = "Gán máy in cho từng bếp",
                     onClick = onNavigateToKitchenPrinter
+                )
+            }
+
+            item {
+                SettingsCard(
+                    icon = Icons.Default.Receipt,
+                    title = "Máy in Bill",
+                    subtitle = "Cấu hình máy in hóa đơn",
+                    onClick = onNavigateToBillPrinter
                 )
             }
 
