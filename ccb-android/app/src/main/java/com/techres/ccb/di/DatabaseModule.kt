@@ -165,4 +165,17 @@ object DatabaseModule {
     fun provideProductNoteDao(database: CCBDatabase): ProductNoteDao {
         return database.productNoteDao()
     }
+
+    // Bill printing DAOs
+    @Provides
+    @Singleton
+    fun provideBillTemplateDao(database: CCBDatabase): BillTemplateDao {
+        return database.billTemplateDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBillPrinterConfigDao(database: CCBDatabase): BillPrinterConfigDao {
+        return database.billPrinterConfigDao()
+    }
 }
