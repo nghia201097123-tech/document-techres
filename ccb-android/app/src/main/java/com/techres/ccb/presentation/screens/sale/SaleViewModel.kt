@@ -700,9 +700,9 @@ class SaleViewModel @Inject constructor(
      *
      * @param cartItemId The cart item ID
      * @param groupId The variant group ID (to uniquely identify when names are same across groups)
-     * @param variantName The variant option name
+     * @param optionId The variant option ID (unique identifier for each option)
      */
-    fun removeCartItemVariant(cartItemId: String, groupId: String, variantName: String) {
+    fun removeCartItemVariant(cartItemId: String, groupId: String, optionId: String) {
         val state = _uiState.value
         val cartItem = state.cartItems.find { it.id == cartItemId } ?: return
 
@@ -711,12 +711,17 @@ class SaleViewModel @Inject constructor(
             group.id == groupId
         }
 
-        // Proceed with removal - use both groupId and name to uniquely identify
+        // Find the variant name for logging
+        val variantToRemove = cartItem.selectedVariants.find { it.optionId == optionId }
+        val variantName = variantToRemove?.name ?: "unknown"
+
+        // Proceed with removal - use optionId for unique identification
+        // This fixes the bug where two toppings with the same name would both be deleted
         _uiState.update { s ->
             val updatedCartItems = s.cartItems.map { item ->
                 if (item.id == cartItemId) {
                     val updatedVariants = item.selectedVariants.filter {
-                        !(it.groupId == groupId && it.name == variantName)
+                        it.optionId != optionId
                     }
                     item.copy(selectedVariants = updatedVariants)
                 } else {
@@ -739,7 +744,7 @@ class SaleViewModel @Inject constructor(
             }
         }
 
-        Log.d(TAG, "removeCartItemVariant - Removed $variantName (group: $groupId) from cart item $cartItemId")
+        Log.d(TAG, "removeCartItemVariant - Removed $variantName (optionId: $optionId, group: $groupId) from cart item $cartItemId")
     }
 
     fun clearCart() {

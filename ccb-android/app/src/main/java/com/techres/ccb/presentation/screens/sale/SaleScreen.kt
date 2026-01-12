@@ -910,7 +910,7 @@ fun CartPanel(
     onCancelOrder: () -> Unit = {},
     onRemoveOrderItem: (String) -> Unit = {},
     onRemoveOrderItemTopping: (String, String) -> Unit = { _, _ -> },
-    onRemoveCartItemVariant: (String, String, String) -> Unit = { _, _, _ -> }, // (cartItemId, groupId, variantName)
+    onRemoveCartItemVariant: (String, String, String) -> Unit = { _, _, _ -> }, // (cartItemId, groupId, optionId)
     onAddToppingToCartItem: (String) -> Unit = {}, // cartItemId
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
@@ -1368,7 +1368,7 @@ fun CartItemRow(
     onDecrease: () -> Unit,
     onRemove: () -> Unit,
     onEditNote: () -> Unit = {},
-    onRemoveVariant: ((String, String, String) -> Unit)? = null, // (itemId, groupId, variantName)
+    onRemoveVariant: ((String, String, String) -> Unit)? = null, // (itemId, groupId, optionId)
     onAddTopping: (() -> Unit)? = null, // Open topping dialog
     missingRequiredGroups: List<String> = emptyList() // Groups that need selection
 ) {
@@ -1540,7 +1540,7 @@ fun CartItemRow(
                                 // Delete topping button
                                 if (onRemoveVariant != null) {
                                     IconButton(
-                                        onClick = { onRemoveVariant(item.id, variant.groupId, variant.name) },
+                                        onClick = { onRemoveVariant(item.id, variant.groupId, variant.optionId) },
                                         modifier = Modifier.size(24.dp)
                                     ) {
                                         Icon(
