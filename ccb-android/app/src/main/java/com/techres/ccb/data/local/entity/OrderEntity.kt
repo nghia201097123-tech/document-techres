@@ -84,6 +84,34 @@ data class OrderEntity(
     @ColumnInfo(name = "discount_reason")
     val discountReason: String? = null,
 
+    // Coupon information
+    @ColumnInfo(name = "coupon_id")
+    val couponId: String? = null,
+
+    @ColumnInfo(name = "coupon_code")
+    val couponCode: String? = null,
+
+    // JSON string chứa danh sách coupon IDs (khi kết hợp nhiều coupon)
+    @ColumnInfo(name = "coupon_ids")
+    val couponIds: String? = null,
+
+    // JSON string chứa chi tiết các coupon đã áp dụng
+    @ColumnInfo(name = "applied_coupons_json")
+    val appliedCouponsJson: String? = null,
+
+    // Giảm giá cần phê duyệt
+    @ColumnInfo(name = "discount_requires_approval")
+    val discountRequiresApproval: Boolean = false,
+
+    @ColumnInfo(name = "discount_approval_status")
+    val discountApprovalStatus: String? = null, // pending, approved, rejected
+
+    @ColumnInfo(name = "discount_approved_by")
+    val discountApprovedBy: String? = null,
+
+    @ColumnInfo(name = "discount_approved_at")
+    val discountApprovedAt: String? = null,
+
     @ColumnInfo(name = "surcharge_amount")
     val surchargeAmount: Double = 0.0,
 

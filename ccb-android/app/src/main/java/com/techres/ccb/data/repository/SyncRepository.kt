@@ -449,6 +449,14 @@ class SyncRepository @Inject constructor(
         // Sync coupons
         onProgress?.invoke(SyncStepProgress(SyncStep.COUPONS, SyncStepStatus.IN_PROGRESS))
         val couponsList = syncData.coupons?.map { dto ->
+            // Convert productIds/categoryIds lists to JSON strings for Room storage
+            val productIdsJson = dto.productIds?.let {
+                com.google.gson.Gson().toJson(it)
+            }
+            val categoryIdsJson = dto.categoryIds?.let {
+                com.google.gson.Gson().toJson(it)
+            }
+
             CouponEntity(
                 id = dto.id,
                 branchId = branchId,
@@ -456,9 +464,16 @@ class SyncRepository @Inject constructor(
                 name = dto.name ?: "",
                 description = dto.description,
                 couponType = dto.couponType,
+                applyTo = dto.applyTo,
+                activationType = dto.activationType,
                 discountValue = dto.discountValue,
                 maxDiscount = dto.maxDiscount,
                 minOrderAmount = dto.minOrderAmount,
+                minQuantity = dto.minQuantity,
+                productIds = productIdsJson,
+                categoryIds = categoryIdsJson,
+                isCombinable = dto.isCombinable,
+                priority = dto.priority,
                 usageLimit = dto.usageLimit,
                 usageCount = dto.usageCount,
                 dailyLimit = dto.dailyLimit,

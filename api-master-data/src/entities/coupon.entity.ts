@@ -40,6 +40,14 @@ export class Coupon {
   @Column({ name: 'coupon_type', type: 'varchar', default: 'percentage' })
   couponType: string;
 
+  // Áp dụng cho: bill (hóa đơn), item (món), category (danh mục)
+  @Column({ name: 'apply_to', type: 'varchar', default: 'bill' })
+  applyTo: string;
+
+  // Cách kích hoạt: manual (nhập mã), auto (tự động)
+  @Column({ name: 'activation_type', type: 'varchar', default: 'manual' })
+  activationType: string;
+
   @Column({ name: 'discount_value', type: 'decimal', precision: 15, scale: 2, default: 0 })
   discountValue: number;
 
@@ -48,6 +56,26 @@ export class Coupon {
 
   @Column({ name: 'min_order_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
   minOrderAmount: number;
+
+  // Số lượng tối thiểu của món để áp dụng
+  @Column({ name: 'min_quantity', type: 'int', default: 1 })
+  minQuantity: number;
+
+  // Danh sách product IDs (JSON array)
+  @Column({ name: 'product_ids', type: 'simple-json', nullable: true })
+  productIds: string[];
+
+  // Danh sách category IDs (JSON array)
+  @Column({ name: 'category_ids', type: 'simple-json', nullable: true })
+  categoryIds: string[];
+
+  // Có thể kết hợp với coupon khác
+  @Column({ name: 'is_combinable', default: false })
+  isCombinable: boolean;
+
+  // Độ ưu tiên
+  @Column({ name: 'priority', type: 'int', default: 100 })
+  priority: number;
 
   @Column({ name: 'usage_limit', nullable: true })
   usageLimit: number;

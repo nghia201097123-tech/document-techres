@@ -50,6 +50,88 @@ interface CouponDao {
     """)
     suspend fun getValidCouponByCode(code: String, branchId: String, currentDate: String): CouponEntity?
 
+    /**
+     * Lấy danh sách coupon tự động áp dụng (activationType = 'auto')
+     * Sắp xếp theo priority (số nhỏ = ưu tiên cao)
+     */
+    @Query("""
+        SELECT * FROM coupons
+        WHERE branch_id = :branchId
+        AND is_active = 1
+        AND activation_type = 'auto'
+        AND (start_date IS NULL OR start_date <= :currentDate)
+        AND (end_date IS NULL OR end_date >= :currentDate)
+        AND (usage_limit IS NULL OR usage_count < usage_limit)
+        AND (daily_limit IS NULL OR daily_usage_count < daily_limit)
+        ORDER BY priority ASC, sort_order ASC
+    """)
+    suspend fun getAutoCoupons(branchId: String, currentDate: String): List<CouponEntity>
+
+    /**
+     * Lấy coupon có thể áp dụng (bao gồm cả manual và auto)
+     * cho một giá trị đơn hàng cụ thể
+     */
+    @Query("""
+        SELECT * FROM coupons
+        WHERE branch_id = :branchId
+        AND is_active = 1
+        AND (start_date IS NULL OR start_date <= :currentDate)
+        AND (end_date IS NULL OR end_date >= :currentDate)
+        AND (usage_limit IS NULL OR usage_count < usage_limit)
+        AND (daily_limit IS NULL OR daily_usage_count < daily_limit)
+        AND min_order_amount <= :orderAmount
+        ORDER BY priority ASC, sort_order ASC
+    """)
+    suspend fun getApplicableCoupons(branchId: String, currentDate: String, orderAmount: Double): List<CouponEntity>
+
+    /**
+     * Lấy coupon áp dụng cho bill (apply_to = 'bill')
+     */
+    @Query("""
+        SELECT * FROM coupons
+        WHERE branch_id = :branchId
+        AND is_active = 1
+        AND apply_to = 'bill'
+        AND (start_date IS NULL OR start_date <= :currentDate)
+        AND (end_date IS NULL OR end_date >= :currentDate)
+        AND (usage_limit IS NULL OR usage_count < usage_limit)
+        AND (daily_limit IS NULL OR daily_usage_count < daily_limit)
+        ORDER BY priority ASC, sort_order ASC
+    """)
+    suspend fun getBillLevelCoupons(branchId: String, currentDate: String): List<CouponEntity>
+
+    /**
+     * Lấy coupon áp dụng cho món cụ thể (apply_to = 'item')
+     */
+    @Query("""
+        SELECT * FROM coupons
+        WHERE branch_id = :branchId
+        AND is_active = 1
+        AND apply_to = 'item'
+        AND (start_date IS NULL OR start_date <= :currentDate)
+        AND (end_date IS NULL OR end_date >= :currentDate)
+        AND (usage_limit IS NULL OR usage_count < usage_limit)
+        AND (daily_limit IS NULL OR daily_usage_count < daily_limit)
+        ORDER BY priority ASC, sort_order ASC
+    """)
+    suspend fun getItemLevelCoupons(branchId: String, currentDate: String): List<CouponEntity>
+
+    /**
+     * Lấy coupon áp dụng cho danh mục (apply_to = 'category')
+     */
+    @Query("""
+        SELECT * FROM coupons
+        WHERE branch_id = :branchId
+        AND is_active = 1
+        AND apply_to = 'category'
+        AND (start_date IS NULL OR start_date <= :currentDate)
+        AND (end_date IS NULL OR end_date >= :currentDate)
+        AND (usage_limit IS NULL OR usage_count < usage_limit)
+        AND (daily_limit IS NULL OR daily_usage_count < daily_limit)
+        ORDER BY priority ASC, sort_order ASC
+    """)
+    suspend fun getCategoryLevelCoupons(branchId: String, currentDate: String): List<CouponEntity>
+
     @Query("UPDATE coupons SET usage_count = usage_count + 1 WHERE id = :id")
     suspend fun incrementUsage(id: String)
 

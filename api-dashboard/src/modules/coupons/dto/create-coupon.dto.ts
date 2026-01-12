@@ -1,6 +1,6 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum, IsNumber, IsBoolean, IsDateString, Min, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsEnum, IsNumber, IsBoolean, IsDateString, IsArray, IsUUID, Min, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CouponType } from '../../../database/entities';
+import { CouponType, CouponApplyTo, CouponActivationType } from '../../../database/entities';
 
 export class CreateCouponDto {
   @ApiProperty({ example: 'GIAM10', description: 'Mã coupon' })
@@ -24,6 +24,16 @@ export class CreateCouponDto {
   @IsEnum(CouponType, { message: 'Loại coupon không hợp lệ' })
   couponType: CouponType;
 
+  @ApiPropertyOptional({ enum: CouponApplyTo, default: CouponApplyTo.BILL, description: 'Áp dụng cho: bill (hóa đơn), item (món), category (danh mục)' })
+  @IsOptional()
+  @IsEnum(CouponApplyTo)
+  applyTo?: CouponApplyTo;
+
+  @ApiPropertyOptional({ enum: CouponActivationType, default: CouponActivationType.MANUAL, description: 'Cách kích hoạt: manual (nhập mã), auto (tự động)' })
+  @IsOptional()
+  @IsEnum(CouponActivationType)
+  activationType?: CouponActivationType;
+
   @ApiProperty({ example: 10, description: 'Giá trị giảm (% hoặc số tiền)' })
   @IsNumber({}, { message: 'Giá trị giảm phải là số' })
   @Min(0, { message: 'Giá trị giảm phải >= 0' })
@@ -40,6 +50,35 @@ export class CreateCouponDto {
   @IsNumber()
   @Min(0)
   minOrderAmount?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'Số lượng tối thiểu của món để áp dụng' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  minQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Danh sách product IDs (khi apply_to = item)' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  productIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Danh sách category IDs (khi apply_to = category)' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  categoryIds?: string[];
+
+  @ApiPropertyOptional({ example: false, description: 'Có thể kết hợp với coupon khác' })
+  @IsOptional()
+  @IsBoolean()
+  isCombinable?: boolean;
+
+  @ApiPropertyOptional({ example: 100, description: 'Độ ưu tiên (số nhỏ = ưu tiên cao)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  priority?: number;
 
   @ApiPropertyOptional({ example: 100, description: 'Giới hạn lượt sử dụng tổng' })
   @IsOptional()
