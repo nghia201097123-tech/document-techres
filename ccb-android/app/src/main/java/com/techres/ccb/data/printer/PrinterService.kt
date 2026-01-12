@@ -69,43 +69,126 @@ object PrinterService {
     }
 
     /**
-     * Test connection to printer
+     * Test connection to printer with retry logic
+     * @param maxRetries Số lần thử lại khi gặp Connection Refused
      */
-    suspend fun testConnection(ip: String, port: Int = DEFAULT_PORT): PrinterResult {
+    suspend fun testConnection(
+        ip: String,
+        port: Int = DEFAULT_PORT,
+        maxRetries: Int = 3
+    ): PrinterResult {
         return withContext(Dispatchers.IO) {
-            try {
-                val socket = Socket()
-                socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
-                socket.close()
-                PrinterResult.Success("Kết nối thành công đến $ip:$port")
-            } catch (e: IOException) {
-                Log.e(TAG, "Connection failed: ${e.message}")
-                PrinterResult.Error("Không thể kết nối: ${e.message}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error: ${e.message}")
-                PrinterResult.Error("Lỗi: ${e.message}")
+            var lastError: String? = null
+
+            for (attempt in 1..maxRetries) {
+                try {
+                    Log.d(TAG, "Connection attempt $attempt/$maxRetries to $ip:$port")
+
+                    val socket = Socket().apply {
+                        reuseAddress = true
+                        keepAlive = true
+                        tcpNoDelay = true
+                        setSoLinger(true, 2)
+                    }
+                    socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
+
+                    // Connection successful - clean close
+                    try {
+                        socket.shutdownOutput()
+                        socket.close()
+                    } catch (e: Exception) {
+                        // Ignore close errors
+                    }
+
+                    return@withContext PrinterResult.Success("Kết nối thành công đến $ip:$port")
+
+                } catch (e: IOException) {
+                    lastError = e.message
+                    Log.e(TAG, "Connection attempt $attempt failed: ${e.message}")
+
+                    // Retry on Connection Refused
+                    if ((e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ||
+                         e.message?.contains("Connection refused", ignoreCase = true) == true) &&
+                        attempt < maxRetries) {
+                        Log.d(TAG, "Connection refused, waiting before retry...")
+                        kotlinx.coroutines.delay(500L * attempt) // Exponential backoff
+                        continue
+                    }
+
+                    return@withContext PrinterResult.Error("Không thể kết nối: ${e.message}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error: ${e.message}")
+                    return@withContext PrinterResult.Error("Lỗi: ${e.message}")
+                }
             }
+
+            PrinterResult.Error("Không thể kết nối sau $maxRetries lần thử: $lastError")
         }
     }
 
     /**
-     * Print test page
+     * Print test page with retry logic
      */
     suspend fun printTestPage(
         ip: String,
         port: Int = DEFAULT_PORT,
         kitchenName: String,
-        printerName: String?
+        printerName: String?,
+        maxRetries: Int = 3
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             var socket: Socket? = null
             var outputStream: OutputStream? = null
+            var lastError: String? = null
+
+            for (attempt in 1..maxRetries) {
+                try {
+                    Log.d(TAG, "Print attempt $attempt/$maxRetries to $ip:$port")
+
+                    // Connect with better socket options
+                    socket = Socket().apply {
+                        reuseAddress = true
+                        keepAlive = true
+                        tcpNoDelay = true
+                        setSoLinger(true, 2)
+                    }
+                    socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
+                    outputStream = socket.getOutputStream()
+
+                    // If we get here, connection is successful - break retry loop and print
+                    break
+
+                } catch (e: IOException) {
+                    lastError = e.message
+                    Log.e(TAG, "Print connection attempt $attempt failed: ${e.message}")
+
+                    // Clean up failed socket
+                    try {
+                        outputStream?.close()
+                        socket?.close()
+                    } catch (ex: Exception) {}
+                    socket = null
+                    outputStream = null
+
+                    // Retry on Connection Refused
+                    if ((e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ||
+                         e.message?.contains("Connection refused", ignoreCase = true) == true) &&
+                        attempt < maxRetries) {
+                        Log.d(TAG, "Connection refused, waiting before retry...")
+                        kotlinx.coroutines.delay(500L * attempt)
+                        continue
+                    }
+
+                    return@withContext PrinterResult.Error("Lỗi in: ${e.message}")
+                }
+            }
+
+            // Check if connection was established after retry loop
+            if (socket == null || outputStream == null) {
+                return@withContext PrinterResult.Error("Lỗi in: Không thể kết nối sau $maxRetries lần thử: $lastError")
+            }
 
             try {
-                // Connect
-                socket = Socket()
-                socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
-                outputStream = socket.getOutputStream()
 
                 // Build test print content
                 val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
@@ -180,8 +263,17 @@ object PrinterService {
                 Log.e(TAG, "Error: ${e.message}")
                 PrinterResult.Error("Lỗi: ${e.message}")
             } finally {
+                // Clean close with proper shutdown
+                try {
+                    outputStream?.flush()
+                } catch (e: Exception) {}
+                try {
+                    socket?.shutdownOutput()
+                } catch (e: Exception) {}
                 try {
                     outputStream?.close()
+                } catch (e: Exception) {}
+                try {
                     socket?.close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error closing: ${e.message}")
@@ -191,7 +283,7 @@ object PrinterService {
     }
 
     /**
-     * Print kitchen order ticket
+     * Print kitchen order ticket with retry logic
      */
     suspend fun printKitchenTicket(
         ip: String,
@@ -200,16 +292,62 @@ object PrinterService {
         orderNumber: String,
         tableName: String?,
         items: List<KitchenOrderItem>,
-        notes: String? = null
+        notes: String? = null,
+        maxRetries: Int = 3
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             var socket: Socket? = null
             var outputStream: OutputStream? = null
+            var lastError: String? = null
+
+            for (attempt in 1..maxRetries) {
+                try {
+                    Log.d(TAG, "Kitchen print attempt $attempt/$maxRetries to $ip:$port")
+
+                    // Connect with better socket options
+                    socket = Socket().apply {
+                        reuseAddress = true
+                        keepAlive = true
+                        tcpNoDelay = true
+                        setSoLinger(true, 2)
+                    }
+                    socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
+                    outputStream = socket.getOutputStream()
+
+                    // If we get here, connection is successful - break retry loop and print
+                    break
+
+                } catch (e: IOException) {
+                    lastError = e.message
+                    Log.e(TAG, "Kitchen print connection attempt $attempt failed: ${e.message}")
+
+                    // Clean up failed socket
+                    try {
+                        outputStream?.close()
+                        socket?.close()
+                    } catch (ex: Exception) {}
+                    socket = null
+                    outputStream = null
+
+                    // Retry on Connection Refused
+                    if ((e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ||
+                         e.message?.contains("Connection refused", ignoreCase = true) == true) &&
+                        attempt < maxRetries) {
+                        Log.d(TAG, "Connection refused, waiting before retry...")
+                        kotlinx.coroutines.delay(500L * attempt)
+                        continue
+                    }
+
+                    return@withContext PrinterResult.Error("Lỗi in: ${e.message}")
+                }
+            }
+
+            // Check if connection was established after retry loop
+            if (socket == null || outputStream == null) {
+                return@withContext PrinterResult.Error("Lỗi in: Không thể kết nối sau $maxRetries lần thử: $lastError")
+            }
 
             try {
-                socket = Socket()
-                socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
-                outputStream = socket.getOutputStream()
 
                 val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                 val currentTime = dateFormat.format(Date())
@@ -271,12 +409,24 @@ object PrinterService {
 
                 PrinterResult.Success("In order thành công!")
 
-            } catch (e: Exception) {
-                Log.e(TAG, "Print failed: ${e.message}")
+            } catch (e: IOException) {
+                Log.e(TAG, "Kitchen print failed: ${e.message}")
                 PrinterResult.Error("Lỗi in: ${e.message}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Kitchen print error: ${e.message}")
+                PrinterResult.Error("Lỗi: ${e.message}")
             } finally {
+                // Clean close with proper shutdown
+                try {
+                    outputStream?.flush()
+                } catch (e: Exception) {}
+                try {
+                    socket?.shutdownOutput()
+                } catch (e: Exception) {}
                 try {
                     outputStream?.close()
+                } catch (e: Exception) {}
+                try {
                     socket?.close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error closing: ${e.message}")

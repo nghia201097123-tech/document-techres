@@ -101,9 +101,22 @@ class NetworkPrinterAdapter @Inject constructor(
             // Đóng kết nối cũ
             closeConnection()
 
-            // Tạo socket với timeout
+            // Thêm delay nhỏ để máy in giải phóng kết nối cũ
+            delay(100)
+
+            // Tạo socket với các options để ổn định kết nối
             socket = Socket().apply {
+                // Cho phép reuse address để tránh "Address already in use"
+                reuseAddress = true
+                // Enable TCP Keep-Alive để detect dead connections
+                keepAlive = true
+                // Disable Nagle's algorithm cho real-time printing
+                tcpNoDelay = true
+                // Set linger để đảm bảo data được gửi trước khi đóng
+                setSoLinger(true, 2)
+                // Read timeout
                 soTimeout = READ_TIMEOUT_MS
+                // Connect với timeout
                 connect(InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS)
             }
 
@@ -148,6 +161,60 @@ class NetworkPrinterAdapter @Inject constructor(
         return connect(device)
     }
 
+    /**
+     * Kết nối với retry logic cho các trường hợp Connection Refused
+     * @param maxRetries Số lần thử lại tối đa
+     * @param retryDelayMs Thời gian chờ giữa các lần thử (ms)
+     */
+    suspend fun connectWithRetry(
+        device: PrinterDevice,
+        maxRetries: Int = 3,
+        retryDelayMs: Long = 500
+    ): PrinterResult = withContext(Dispatchers.IO) {
+        var lastError: String? = null
+
+        for (attempt in 1..maxRetries) {
+            Timber.d("$TAG: Connection attempt $attempt/$maxRetries")
+
+            val result = connect(device)
+            if (result is PrinterResult.Success) {
+                return@withContext result
+            }
+
+            lastError = (result as? PrinterResult.Error)?.message
+
+            // Nếu là lỗi Connection Refused, chờ và thử lại
+            if (lastError?.contains("ECONNREFUSED", ignoreCase = true) == true ||
+                lastError?.contains("Connection refused", ignoreCase = true) == true) {
+
+                if (attempt < maxRetries) {
+                    Timber.d("$TAG: Connection refused, waiting ${retryDelayMs}ms before retry...")
+                    delay(retryDelayMs)
+                    // Tăng delay exponentially
+                    delay(retryDelayMs * attempt)
+                }
+            } else {
+                // Các lỗi khác (timeout, unknown host) không cần retry
+                return@withContext result
+            }
+        }
+
+        return@withContext PrinterResult.Error("Failed after $maxRetries attempts: $lastError")
+    }
+
+    /**
+     * Kết nối với retry bằng IP và port
+     */
+    suspend fun connectWithRetry(
+        ip: String,
+        port: Int = PORT_RAW,
+        maxRetries: Int = 3,
+        retryDelayMs: Long = 500
+    ): PrinterResult {
+        val device = PrinterDevice.fromNetworkAddress(ip, port)
+        return connectWithRetry(device, maxRetries, retryDelayMs)
+    }
+
     override suspend fun disconnect(): PrinterResult = withContext(Dispatchers.IO) {
         closeConnection()
         _connectedDevice = null
@@ -158,9 +225,33 @@ class NetworkPrinterAdapter @Inject constructor(
 
     private fun closeConnection() {
         try {
-            outputStream?.close()
-            inputStream?.close()
-            socket?.close()
+            // Shutdown output stream first to signal end of transmission
+            try {
+                socket?.shutdownOutput()
+            } catch (e: Exception) {
+                // Socket may not be connected
+            }
+
+            // Close streams
+            try {
+                outputStream?.flush()
+                outputStream?.close()
+            } catch (e: Exception) {
+                Timber.w(e, "$TAG: Error closing output stream")
+            }
+
+            try {
+                inputStream?.close()
+            } catch (e: Exception) {
+                Timber.w(e, "$TAG: Error closing input stream")
+            }
+
+            // Close socket
+            try {
+                socket?.close()
+            } catch (e: Exception) {
+                Timber.w(e, "$TAG: Error closing socket")
+            }
         } catch (e: Exception) {
             Timber.w(e, "$TAG: Error closing connection")
         }
