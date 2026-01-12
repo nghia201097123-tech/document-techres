@@ -763,6 +763,12 @@ export class SyncService {
     const productMappings = allProductMappings.filter(ptg => ptg.groupId === tg.id);
     const productIds = productMappings.map(ptg => ptg.productId);
 
+    // Debug log for min/max selection mapping
+    console.log(`[SyncService.mapToppingGroup] Group: "${tg.name}" (${tg.id})`);
+    console.log(`  - DB values: minSelection=${tg.minSelection}, maxSelection=${tg.maxSelection}`);
+    console.log(`  - isRequired=${tg.isRequired}, productIds count=${productIds.length}`);
+    console.log(`  - toppings count=${groupItems.length}`);
+
     return {
       id: tg.id,
       name: tg.name,
