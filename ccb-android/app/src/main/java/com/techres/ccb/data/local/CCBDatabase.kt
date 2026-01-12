@@ -19,6 +19,7 @@ import com.techres.ccb.data.local.entity.*
         AreaEntity::class,
         TableEntity::class,
         StaffEntity::class,
+        KitchenEntity::class,
         // Transaction entities
         OrderEntity::class,
         OrderItemEntity::class,
@@ -37,7 +38,7 @@ import com.techres.ccb.data.local.entity.*
         ProductNoteEntity::class,
         ProductNoteAssignmentEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -52,6 +53,7 @@ abstract class CCBDatabase : RoomDatabase() {
     abstract fun areaDao(): AreaDao
     abstract fun tableDao(): TableDao
     abstract fun staffDao(): StaffDao
+    abstract fun kitchenDao(): KitchenDao
 
     // Transaction DAOs
     abstract fun orderDao(): OrderDao
@@ -103,6 +105,8 @@ abstract class CCBDatabase : RoomDatabase() {
             db.execSQL("DELETE FROM tables")
             Log.d(TAG, "clearMasterData - Clearing staff...")
             db.execSQL("DELETE FROM staff")
+            Log.d(TAG, "clearMasterData - Clearing kitchens...")
+            db.execSQL("DELETE FROM kitchens")
 
             // Clear support tables
             Log.d(TAG, "clearMasterData - Clearing vouchers...")

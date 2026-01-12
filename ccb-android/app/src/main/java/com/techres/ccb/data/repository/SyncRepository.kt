@@ -34,6 +34,7 @@ enum class SyncStep {
     AREAS,            // Khu vực
     TABLES,           // Bàn
     STAFF,            // Nhân viên
+    KITCHENS,         // Bếp
     SEASONAL_PRICES,  // Giá thời vụ
     COUPONS,          // Mã giảm giá
     PRODUCT_NOTES     // Ghi chú món ăn
@@ -54,6 +55,7 @@ class SyncRepository @Inject constructor(
     private val productRepository: ProductRepository,
     private val tableRepository: TableRepository,
     private val staffRepository: StaffRepository,
+    private val kitchenRepository: KitchenRepository,
     private val productToppingDao: ProductToppingDao,
     private val comboItemDao: ComboItemDao,
     private val seasonalPriceDao: SeasonalPriceDao,
@@ -370,6 +372,26 @@ class SyncRepository @Inject constructor(
         staffRepository.syncStaff(branchId, staffList)
         onProgress?.invoke(SyncStepProgress(SyncStep.STAFF, SyncStepStatus.COMPLETED, staffList.size))
 
+        // Sync kitchens
+        onProgress?.invoke(SyncStepProgress(SyncStep.KITCHENS, SyncStepStatus.IN_PROGRESS))
+        val kitchensList = syncData.kitchens?.map { dto ->
+            KitchenEntity(
+                id = dto.id,
+                branchId = branchId,
+                name = dto.name ?: "",
+                description = dto.description,
+                kitchenType = dto.kitchenType,
+                sortOrder = dto.sortOrder,
+                isActive = dto.isActive,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+        kitchenRepository.syncKitchens(branchId, kitchensList)
+        onProgress?.invoke(SyncStepProgress(SyncStep.KITCHENS, SyncStepStatus.COMPLETED, kitchensList.size))
+
         // Sync seasonal prices
         onProgress?.invoke(SyncStepProgress(SyncStep.SEASONAL_PRICES, SyncStepStatus.IN_PROGRESS))
         val seasonalPricesList = syncData.seasonalPrices?.map { dto ->
@@ -529,6 +551,7 @@ class SyncRepository @Inject constructor(
         productRepository.clearByBranch(branchId)
         tableRepository.clearByBranch(branchId)
         staffRepository.clearByBranch(branchId)
+        kitchenRepository.clearByBranch(branchId)
         seasonalPriceDao.deleteAllByBranch(branchId)
         seasonalPriceProductDao.deleteAllByBranch(branchId)
         couponDao.deleteAllByBranch(branchId)

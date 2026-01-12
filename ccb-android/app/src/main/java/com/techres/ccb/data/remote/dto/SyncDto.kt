@@ -79,6 +79,7 @@ data class FullSyncData(
     @SerializedName("areas") val areas: List<AreaDto>,
     @SerializedName("tables") val tables: List<TableDto>,
     @SerializedName("staff") val staff: List<StaffDto>,
+    @SerializedName("kitchens") val kitchens: List<KitchenDto>?,
     @SerializedName("branchInfo") val branchInfo: BranchInfoDto?,
     @SerializedName("seasonalPrices") val seasonalPrices: List<SeasonalPriceDto>?,
     @SerializedName("coupons") val coupons: List<CouponDto>?,
@@ -177,6 +178,17 @@ data class StaffDto(
     @SerializedName("role") val role: String,
     @SerializedName("permissions") val permissions: String?,
     @SerializedName("isActive") val isActive: Boolean,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+data class KitchenDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("kitchenType") val kitchenType: String?, // "cooking", "grill", "bar", "dessert", etc.
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String
 )

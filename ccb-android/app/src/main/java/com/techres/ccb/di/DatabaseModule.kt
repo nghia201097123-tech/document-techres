@@ -87,6 +87,12 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideKitchenDao(database: CCBDatabase): KitchenDao {
+        return database.kitchenDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideOrderDao(database: CCBDatabase): OrderDao {
         return database.orderDao()
     }

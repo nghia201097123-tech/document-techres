@@ -1,8 +1,6 @@
 package com.techres.ccb.presentation.screens.settings
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,72 +23,50 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
+import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
 
-// Mock data for kitchens
-data class MockKitchen(
-    val id: String,
-    val name: String,
-    val icon: ImageVector,
-    val color: Color,
-    val description: String,
-    var printerIp: String? = null,
-    var printerPort: Int = 9100,
-    var printerName: String? = null,
-    var isConnected: Boolean = false
-)
+/**
+ * Get icon for kitchen based on type
+ */
+private fun getKitchenIcon(kitchenType: String?): ImageVector {
+    return when (kitchenType?.lowercase()) {
+        "cooking", "nau" -> Icons.Default.Countertops
+        "grill", "nuong" -> Icons.Default.OutdoorGrill
+        "bar", "drink", "uong" -> Icons.Default.LocalBar
+        "dessert", "sweet" -> Icons.Default.Cake
+        else -> Icons.Default.Restaurant
+    }
+}
+
+/**
+ * Get color for kitchen based on type
+ */
+private fun getKitchenColor(kitchenType: String?): Color {
+    return when (kitchenType?.lowercase()) {
+        "cooking", "nau" -> Color(0xFFFF5722)
+        "grill", "nuong" -> Color(0xFFE91E63)
+        "bar", "drink", "uong" -> Color(0xFF2196F3)
+        "dessert", "sweet" -> Color(0xFFFF9800)
+        else -> Color(0xFF9C27B0)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KitchenPrinterScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: KitchenPrinterViewModel = hiltViewModel()
 ) {
-    // Mock 3 kitchens
-    var kitchens by remember {
-        mutableStateOf(
-            listOf(
-                MockKitchen(
-                    id = "kitchen_1",
-                    name = "Bếp nấu",
-                    icon = Icons.Default.Countertops,
-                    color = Color(0xFFFF5722),
-                    description = "Chế biến các món nấu, canh, súp",
-                    printerIp = "192.168.1.101",
-                    printerPort = 9100,
-                    printerName = "EPSON TM-T82",
-                    isConnected = true
-                ),
-                MockKitchen(
-                    id = "kitchen_2",
-                    name = "Bếp nướng",
-                    icon = Icons.Default.OutdoorGrill,
-                    color = Color(0xFFE91E63),
-                    description = "Các món nướng, BBQ, xiên que",
-                    printerIp = "192.168.1.102",
-                    printerPort = 9100,
-                    printerName = "EPSON TM-T88",
-                    isConnected = true
-                ),
-                MockKitchen(
-                    id = "kitchen_3",
-                    name = "Kho bia",
-                    icon = Icons.Default.LocalBar,
-                    color = Color(0xFF2196F3),
-                    description = "Bia, nước giải khát, đồ uống",
-                    printerIp = null,
-                    printerName = null,
-                    isConnected = false
-                )
-            )
-        )
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
-    var selectedKitchen by remember { mutableStateOf<MockKitchen?>(null) }
+    var selectedKitchen by remember { mutableStateOf<KitchenEntity?>(null) }
     var showPrinterDialog by remember { mutableStateOf(false) }
     var showTestPrintDialog by remember { mutableStateOf(false) }
-    var testPrintKitchen by remember { mutableStateOf<MockKitchen?>(null) }
+    var testPrintKitchen by remember { mutableStateOf<KitchenEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -153,29 +129,85 @@ fun KitchenPrinterScreen(
                 }
             }
 
-            // Kitchen list
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(kitchens) { kitchen ->
-                    KitchenPrinterCard(
-                        kitchen = kitchen,
-                        onConfigurePrinter = {
-                            selectedKitchen = kitchen
-                            showPrinterDialog = true
-                        },
-                        onTestPrint = {
-                            testPrintKitchen = kitchen
-                            showTestPrintDialog = true
+            // Content based on state
+            when {
+                uiState.isLoading -> {
+                    // Loading state
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            CircularProgressIndicator()
+                            Text(
+                                text = "Đang tải dữ liệu...",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
                         }
-                    )
+                    }
                 }
+                uiState.kitchens.isEmpty() -> {
+                    // Empty state
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Restaurant,
+                                contentDescription = null,
+                                modifier = Modifier.size(80.dp),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            )
+                            Text(
+                                text = "Chưa có bếp nào",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "Vui lòng đồng bộ dữ liệu từ server hoặc thêm bếp trên hệ thống quản lý",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    // Kitchen list
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.kitchens) { kitchen ->
+                            KitchenPrinterCard(
+                                kitchen = kitchen,
+                                onConfigurePrinter = {
+                                    selectedKitchen = kitchen
+                                    showPrinterDialog = true
+                                },
+                                onTestPrint = {
+                                    testPrintKitchen = kitchen
+                                    showTestPrintDialog = true
+                                }
+                            )
+                        }
 
-                // Bottom spacing
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                        // Bottom spacing
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
                 }
             }
         }
@@ -187,16 +219,13 @@ fun KitchenPrinterScreen(
             kitchen = selectedKitchen!!,
             onDismiss = { showPrinterDialog = false },
             onSave = { ip, port, name ->
-                kitchens = kitchens.map {
-                    if (it.id == selectedKitchen!!.id) {
-                        it.copy(
-                            printerIp = ip,
-                            printerPort = port,
-                            printerName = name,
-                            isConnected = ip.isNotBlank()
-                        )
-                    } else it
-                }
+                viewModel.updatePrinterConfig(
+                    kitchenId = selectedKitchen!!.id,
+                    ip = ip.ifBlank { null },
+                    port = port,
+                    name = name.ifBlank { null },
+                    isConnected = ip.isNotBlank()
+                )
                 showPrinterDialog = false
             }
         )
@@ -213,10 +242,13 @@ fun KitchenPrinterScreen(
 
 @Composable
 private fun KitchenPrinterCard(
-    kitchen: MockKitchen,
+    kitchen: KitchenEntity,
     onConfigurePrinter: () -> Unit,
     onTestPrint: () -> Unit
 ) {
+    val icon = getKitchenIcon(kitchen.kitchenType)
+    val color = getKitchenColor(kitchen.kitchenType)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -238,14 +270,14 @@ private fun KitchenPrinterCard(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(kitchen.color.copy(alpha = 0.15f)),
+                        .background(color.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = kitchen.icon,
+                        imageVector = icon,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
-                        tint = kitchen.color
+                        tint = color
                     )
                 }
 
@@ -260,7 +292,7 @@ private fun KitchenPrinterCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = kitchen.description,
+                        text = kitchen.description ?: kitchen.kitchenType ?: "",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -271,7 +303,7 @@ private fun KitchenPrinterCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(
-                            if (kitchen.isConnected) Color(0xFFE8F5E9)
+                            if (kitchen.isPrinterConnected) Color(0xFFE8F5E9)
                             else Color(0xFFFFEBEE)
                         )
                         .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -282,16 +314,16 @@ private fun KitchenPrinterCard(
                                 .size(8.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (kitchen.isConnected) Color(0xFF4CAF50)
+                                    if (kitchen.isPrinterConnected) Color(0xFF4CAF50)
                                     else Color(0xFFE53935)
                                 )
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (kitchen.isConnected) "Đã kết nối" else "Chưa kết nối",
+                            text = if (kitchen.isPrinterConnected) "Đã kết nối" else "Chưa kết nối",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = if (kitchen.isConnected) Color(0xFF2E7D32) else Color(0xFFC62828)
+                            color = if (kitchen.isPrinterConnected) Color(0xFF2E7D32) else Color(0xFFC62828)
                         )
                     }
                 }
@@ -373,10 +405,10 @@ private fun KitchenPrinterCard(
                 Button(
                     onClick = onTestPrint,
                     modifier = Modifier.weight(1f),
-                    enabled = kitchen.isConnected,
+                    enabled = kitchen.isPrinterConnected,
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = kitchen.color
+                        containerColor = color
                     )
                 ) {
                     Icon(
@@ -417,10 +449,12 @@ private fun PrinterInfoRow(label: String, value: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PrinterConfigDialog(
-    kitchen: MockKitchen,
+    kitchen: KitchenEntity,
     onDismiss: () -> Unit,
     onSave: (ip: String, port: Int, name: String) -> Unit
 ) {
+    val color = getKitchenColor(kitchen.kitchenType)
+
     var printerName by remember { mutableStateOf(kitchen.printerName ?: "") }
     var printerIp by remember { mutableStateOf(kitchen.printerIp ?: "") }
     var printerPort by remember { mutableStateOf(kitchen.printerPort.toString()) }
@@ -444,14 +478,14 @@ private fun PrinterConfigDialog(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(kitchen.color.copy(alpha = 0.15f)),
+                            .background(color.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Print,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
-                            tint = kitchen.color
+                            tint = color
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -464,7 +498,7 @@ private fun PrinterConfigDialog(
                         Text(
                             text = kitchen.name,
                             fontSize = 14.sp,
-                            color = kitchen.color
+                            color = color
                         )
                     }
                 }
@@ -545,7 +579,7 @@ private fun PrinterConfigDialog(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = kitchen.color
+                            containerColor = color
                         )
                     ) {
                         Icon(Icons.Default.Save, contentDescription = null)
@@ -560,9 +594,11 @@ private fun PrinterConfigDialog(
 
 @Composable
 private fun TestPrintDialog(
-    kitchen: MockKitchen,
+    kitchen: KitchenEntity,
     onDismiss: () -> Unit
 ) {
+    val color = getKitchenColor(kitchen.kitchenType)
+
     var printState by remember { mutableStateOf<PrintState>(PrintState.Idle) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -637,7 +673,7 @@ private fun TestPrintDialog(
                             when (printState) {
                                 PrintState.Success -> Color(0xFFE8F5E9)
                                 PrintState.Error -> Color(0xFFFFEBEE)
-                                else -> kitchen.color.copy(alpha = 0.1f)
+                                else -> color.copy(alpha = 0.1f)
                             }
                         ),
                     contentAlignment = Alignment.Center
@@ -646,7 +682,7 @@ private fun TestPrintDialog(
                         PrintState.Idle, PrintState.Connecting, PrintState.Sending -> {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(40.dp),
-                                color = kitchen.color,
+                                color = color,
                                 strokeWidth = 3.dp
                             )
                         }
@@ -756,7 +792,7 @@ private fun TestPrintDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (printState == PrintState.Success) Color(0xFF4CAF50) else kitchen.color
+                            containerColor = if (printState == PrintState.Success) Color(0xFF4CAF50) else color
                         )
                     ) {
                         Text("Đóng")
