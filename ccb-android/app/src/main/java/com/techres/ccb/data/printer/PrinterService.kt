@@ -1,8 +1,14 @@
 package com.techres.ccb.data.printer
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -12,21 +18,16 @@ import java.util.*
 
 /**
  * Printer Service for connecting to thermal printers via TCP/IP
- * Supports ESC/POS protocol used by most thermal printers:
- * - Epson TM-T88, TM-T82, TM-P20, TM-U220
- * - Star Micronics TSP100, TSP654, SM-T300
- * - Bixolon SRP-350, SPP-R310, SPP-R200
- * - Citizen CT-S310, CT-E651, CMP-30
- * - Xprinter XP-N160II, XP-58IIH, XP-80
- * - HPRT TP806L, TP808, TP585
- * - Rongta RP80, RP58, RP330
- * - Zjiang ZJ-5890K, ZJ-8250
- * - MUNBYN IMP001, IMP002
+ * Supports ESC/POS protocol with bitmap printing for Vietnamese text
  */
 object PrinterService {
     private const val TAG = "PrinterService"
     private const val DEFAULT_PORT = 9100
     private const val CONNECTION_TIMEOUT = 5000 // 5 seconds
+
+    // Paper width in pixels (for 80mm paper at 203 DPI)
+    private const val PAPER_WIDTH_80MM = 576 // 80mm paper
+    private const val PAPER_WIDTH_58MM = 384 // 58mm paper
 
     // ESC/POS Commands
     object EscPos {
@@ -38,62 +39,143 @@ object PrinterService {
         val ALIGN_CENTER = byteArrayOf(0x1B, 0x61, 0x01)
         val ALIGN_RIGHT = byteArrayOf(0x1B, 0x61, 0x02)
 
-        // Text size
-        val TEXT_NORMAL = byteArrayOf(0x1B, 0x21, 0x00)
-        val TEXT_DOUBLE_HEIGHT = byteArrayOf(0x1B, 0x21, 0x10)
-        val TEXT_DOUBLE_WIDTH = byteArrayOf(0x1B, 0x21, 0x20)
-        val TEXT_DOUBLE = byteArrayOf(0x1B, 0x21, 0x30) // Both double
-
-        // Text style
-        val BOLD_ON = byteArrayOf(0x1B, 0x45, 0x01)
-        val BOLD_OFF = byteArrayOf(0x1B, 0x45, 0x00)
-        val UNDERLINE_ON = byteArrayOf(0x1B, 0x2D, 0x01)
-        val UNDERLINE_OFF = byteArrayOf(0x1B, 0x2D, 0x00)
-
         // Paper control
         val LINE_FEED = byteArrayOf(0x0A)
         val FEED_LINES_3 = byteArrayOf(0x1B, 0x64, 0x03)
         val FEED_LINES_5 = byteArrayOf(0x1B, 0x64, 0x05)
 
         // Cut paper
-        val CUT_FULL = byteArrayOf(0x1D, 0x56, 0x00) // Full cut
-        val CUT_PARTIAL = byteArrayOf(0x1D, 0x56, 0x01) // Partial cut
-        val CUT_FEED = byteArrayOf(0x1D, 0x56, 0x42, 0x00) // Feed and cut
+        val CUT_FULL = byteArrayOf(0x1D, 0x56, 0x00)
+        val CUT_PARTIAL = byteArrayOf(0x1D, 0x56, 0x01)
+        val CUT_FEED = byteArrayOf(0x1D, 0x56, 0x42, 0x00)
 
-        // Beep (for some printers)
-        val BEEP = byteArrayOf(0x1B, 0x42, 0x03, 0x02) // Beep 3 times, 200ms each
+        // Beep
+        val BEEP = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
 
-        // Character set for Vietnamese (Code Page 1258 or UTF-8)
-        val CHARSET_PC1258 = byteArrayOf(0x1B, 0x74, 0x1E) // Vietnamese code page (CP1258)
-        val CHARSET_UTF8 = byteArrayOf(0x1B, 0x74, 0x00) // UTF-8
-
-        // Multi-byte character mode (for Asian characters including Vietnamese)
-        // Different printers use different commands - try multiple approaches
-        val ENABLE_MULTIBYTE = byteArrayOf(0x1C, 0x26) // FS & - Enable Kanji/multi-byte mode
-        val SELECT_UTF8_MODE = byteArrayOf(0x1C, 0x43, 0x00) // FS C 0 - Select UTF-8 encoding
-        val SELECT_UTF8_MODE_ALT = byteArrayOf(0x1C, 0x2E) // FS . - Alternative UTF-8 mode
-
-        // International character set
-        val SELECT_INTL_CHARSET = byteArrayOf(0x1B, 0x52, 0x00) // ESC R 0 - USA charset as base
-
-        // Combined Vietnamese initialization sequence
-        // Tries multiple approaches for maximum compatibility
-        fun getVietnameseInit(): ByteArray {
-            return INIT + SELECT_INTL_CHARSET + ENABLE_MULTIBYTE + SELECT_UTF8_MODE
-        }
+        // Line spacing
+        val LINE_SPACING_DEFAULT = byteArrayOf(0x1B, 0x32) // Default line spacing
+        val LINE_SPACING_SET = byteArrayOf(0x1B, 0x33, 0x00) // Set line spacing to 0
     }
 
     /**
-     * Convert text to bytes with Vietnamese support
-     * Uses UTF-8 encoding which works with most modern thermal printers
+     * Text style options for bitmap rendering
      */
-    private fun textToBytes(text: String): ByteArray {
-        return text.toByteArray(Charsets.UTF_8)
+    data class TextStyle(
+        val fontSize: Float = 24f,
+        val bold: Boolean = false,
+        val centerAlign: Boolean = false,
+        val doubleHeight: Boolean = false,
+        val doubleWidth: Boolean = false
+    )
+
+    /**
+     * Render text to bitmap with Vietnamese support
+     */
+    private fun textToBitmap(
+        text: String,
+        style: TextStyle = TextStyle(),
+        paperWidth: Int = PAPER_WIDTH_80MM
+    ): Bitmap {
+        val paint = Paint().apply {
+            color = Color.BLACK
+            textSize = style.fontSize * (if (style.doubleHeight || style.doubleWidth) 1.5f else 1f)
+            isAntiAlias = true
+            typeface = if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+
+        // Calculate text bounds
+        val lines = text.split("\n")
+        val lineHeight = (paint.descent() - paint.ascent()).toInt() + 4
+        val totalHeight = lineHeight * lines.size
+
+        // Create bitmap
+        val bitmap = Bitmap.createBitmap(paperWidth, totalHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+
+        // Draw text
+        var y = -paint.ascent()
+        for (line in lines) {
+            val x = if (style.centerAlign) {
+                (paperWidth - paint.measureText(line)) / 2
+            } else {
+                0f
+            }
+            canvas.drawText(line, x.coerceAtLeast(0f), y, paint)
+            y += lineHeight
+        }
+
+        return bitmap
+    }
+
+    /**
+     * Convert bitmap to ESC/POS raster format (GS v 0)
+     */
+    private fun bitmapToEscPosRaster(bitmap: Bitmap): ByteArray {
+        val width = bitmap.width
+        val height = bitmap.height
+        val bytesPerLine = (width + 7) / 8
+
+        val output = ByteArrayOutputStream()
+
+        // GS v 0 command: Print raster bit image
+        // Format: 0x1D 0x76 0x30 m xL xH yL yH d1...dk
+        output.write(0x1D)
+        output.write(0x76)
+        output.write(0x30)
+        output.write(0x00) // m = 0 (normal mode)
+        output.write(bytesPerLine and 0xFF) // xL
+        output.write((bytesPerLine shr 8) and 0xFF) // xH
+        output.write(height and 0xFF) // yL
+        output.write((height shr 8) and 0xFF) // yH
+
+        // Convert bitmap to monochrome raster data
+        for (y in 0 until height) {
+            for (byteIndex in 0 until bytesPerLine) {
+                var byte = 0
+                for (bit in 0 until 8) {
+                    val x = byteIndex * 8 + bit
+                    if (x < width) {
+                        val pixel = bitmap.getPixel(x, y)
+                        // Convert to grayscale and threshold
+                        val gray = (Color.red(pixel) * 0.299 + Color.green(pixel) * 0.587 + Color.blue(pixel) * 0.114).toInt()
+                        if (gray < 128) {
+                            byte = byte or (0x80 shr bit)
+                        }
+                    }
+                }
+                output.write(byte)
+            }
+        }
+
+        return output.toByteArray()
+    }
+
+    /**
+     * Print text as bitmap image
+     */
+    private fun printTextAsBitmap(
+        outputStream: OutputStream,
+        text: String,
+        style: TextStyle = TextStyle(),
+        paperWidth: Int = PAPER_WIDTH_80MM
+    ) {
+        if (text.isBlank()) return
+        val bitmap = textToBitmap(text, style, paperWidth)
+        val rasterData = bitmapToEscPosRaster(bitmap)
+        outputStream.write(rasterData)
+        bitmap.recycle()
+    }
+
+    /**
+     * Print a divider line
+     */
+    private fun printDivider(outputStream: OutputStream, char: Char = '-', length: Int = 32) {
+        printTextAsBitmap(outputStream, char.toString().repeat(length))
     }
 
     /**
      * Test connection to printer with retry logic
-     * @param maxRetries Số lần thử lại khi gặp Connection Refused
      */
     suspend fun testConnection(
         ip: String,
@@ -115,13 +197,10 @@ object PrinterService {
                     }
                     socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
 
-                    // Connection successful - clean close
                     try {
                         socket.shutdownOutput()
                         socket.close()
-                    } catch (e: Exception) {
-                        // Ignore close errors
-                    }
+                    } catch (e: Exception) {}
 
                     return@withContext PrinterResult.Success("Kết nối thành công đến $ip:$port")
 
@@ -129,12 +208,11 @@ object PrinterService {
                     lastError = e.message
                     Log.e(TAG, "Connection attempt $attempt failed: ${e.message}")
 
-                    // Retry on Connection Refused
                     if ((e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ||
                          e.message?.contains("Connection refused", ignoreCase = true) == true) &&
                         attempt < maxRetries) {
                         Log.d(TAG, "Connection refused, waiting before retry...")
-                        kotlinx.coroutines.delay(500L * attempt) // Exponential backoff
+                        kotlinx.coroutines.delay(500L * attempt)
                         continue
                     }
 
@@ -150,7 +228,7 @@ object PrinterService {
     }
 
     /**
-     * Print test page with retry logic
+     * Print test page with Vietnamese text support
      */
     suspend fun printTestPage(
         ip: String,
@@ -168,7 +246,6 @@ object PrinterService {
                 try {
                     Log.d(TAG, "Print attempt $attempt/$maxRetries to $ip:$port")
 
-                    // Connect with better socket options
                     socket = Socket().apply {
                         reuseAddress = true
                         keepAlive = true
@@ -177,15 +254,12 @@ object PrinterService {
                     }
                     socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
                     outputStream = socket.getOutputStream()
-
-                    // If we get here, connection is successful - break retry loop and print
                     break
 
                 } catch (e: IOException) {
                     lastError = e.message
                     Log.e(TAG, "Print connection attempt $attempt failed: ${e.message}")
 
-                    // Clean up failed socket
                     try {
                         outputStream?.close()
                         socket?.close()
@@ -193,7 +267,6 @@ object PrinterService {
                     socket = null
                     outputStream = null
 
-                    // Retry on Connection Refused
                     if ((e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ||
                          e.message?.contains("Connection refused", ignoreCase = true) == true) &&
                         attempt < maxRetries) {
@@ -206,78 +279,74 @@ object PrinterService {
                 }
             }
 
-            // Check if connection was established after retry loop
             if (socket == null || outputStream == null) {
                 return@withContext PrinterResult.Error("Lỗi in: Không thể kết nối sau $maxRetries lần thử: $lastError")
             }
 
             try {
-
-                // Build test print content
                 val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
                 val currentTime = dateFormat.format(Date())
 
-                // Initialize printer with Vietnamese/UTF-8 support
-                outputStream.write(EscPos.getVietnameseInit())
+                // Initialize printer
+                outputStream.write(EscPos.INIT)
+                outputStream.write(EscPos.LINE_SPACING_SET)
 
-                // Header - centered, double size
-                outputStream.write(EscPos.ALIGN_CENTER)
-                outputStream.write(EscPos.TEXT_DOUBLE)
-                outputStream.write(EscPos.BOLD_ON)
-                outputStream.write(textToBytes("** IN THỬ **\n"))
-                outputStream.write(EscPos.BOLD_OFF)
-                outputStream.write(EscPos.TEXT_NORMAL)
-
-                outputStream.write(EscPos.LINE_FEED)
+                // Header - centered, large
+                printTextAsBitmap(
+                    outputStream,
+                    "** IN THỬ **",
+                    TextStyle(fontSize = 32f, bold = true, centerAlign = true)
+                )
 
                 // Kitchen name
-                outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
-                outputStream.write(EscPos.BOLD_ON)
-                outputStream.write(textToBytes("$kitchenName\n"))
-                outputStream.write(EscPos.BOLD_OFF)
-                outputStream.write(EscPos.TEXT_NORMAL)
+                printTextAsBitmap(
+                    outputStream,
+                    kitchenName,
+                    TextStyle(fontSize = 28f, bold = true, centerAlign = true)
+                )
 
-                // Divider
-                outputStream.write(textToBytes("--------------------------------\n"))
+                printDivider(outputStream)
 
-                // Printer info - left aligned
-                outputStream.write(EscPos.ALIGN_LEFT)
-                outputStream.write(textToBytes("Máy in: ${printerName ?: "N/A"}\n"))
-                outputStream.write(textToBytes("IP: $ip\n"))
-                outputStream.write(textToBytes("Port: $port\n"))
-                outputStream.write(textToBytes("Thời gian: $currentTime\n"))
+                // Printer info
+                printTextAsBitmap(outputStream, "Máy in: ${printerName ?: "N/A"}")
+                printTextAsBitmap(outputStream, "IP: $ip")
+                printTextAsBitmap(outputStream, "Port: $port")
+                printTextAsBitmap(outputStream, "Thời gian: $currentTime")
 
-                // Divider
-                outputStream.write(EscPos.ALIGN_CENTER)
-                outputStream.write(textToBytes("--------------------------------\n"))
+                printDivider(outputStream)
 
                 // Test characters
-                outputStream.write(EscPos.ALIGN_LEFT)
-                outputStream.write(textToBytes("Test ký tự:\n"))
-                outputStream.write(textToBytes("ABCDEFGHIJKLMNOPQRSTUVWXYZ\n"))
-                outputStream.write(textToBytes("abcdefghijklmnopqrstuvwxyz\n"))
-                outputStream.write(textToBytes("0123456789\n"))
-                outputStream.write(textToBytes("!@#\$%^&*()_+-=[]{}|;':\",./<>?\n"))
+                printTextAsBitmap(outputStream, "Test ký tự:")
+                printTextAsBitmap(outputStream, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                printTextAsBitmap(outputStream, "abcdefghijklmnopqrstuvwxyz")
+                printTextAsBitmap(outputStream, "0123456789")
 
                 // Vietnamese test WITH diacritics
-                outputStream.write(textToBytes("\nTest tiếng Việt có dấu:\n"))
-                outputStream.write(textToBytes("Xin chào! Kết nối thành công!\n"))
-                outputStream.write(textToBytes("Cà phê, Phở, Bánh mì, Bún bò\n"))
-                outputStream.write(textToBytes("ă â đ ê ô ơ ư\n"))
-                outputStream.write(textToBytes("ẮẰẲẴẶẤẦẨẪẬĐẾỀỂỄỆỐỒỔỖỘỚỜỞỠỢỨỪỬỮỰ\n"))
+                printTextAsBitmap(outputStream, "\nTest tiếng Việt có dấu:", TextStyle(bold = true))
+                printTextAsBitmap(outputStream, "Xin chào! Kết nối thành công!")
+                printTextAsBitmap(outputStream, "Cà phê, Phở, Bánh mì, Bún bò")
+                printTextAsBitmap(outputStream, "ă â đ ê ô ơ ư")
+                printTextAsBitmap(outputStream, "ẮẰẲẴẶẤẦẨẪẬĐ")
+                printTextAsBitmap(outputStream, "ẾỀỂỄỆỐỒỔỖỘ")
+                printTextAsBitmap(outputStream, "ỚỜỞỠỢỨỪỬỮỰ")
+
+                printDivider(outputStream)
 
                 // Footer
-                outputStream.write(EscPos.ALIGN_CENTER)
-                outputStream.write(textToBytes("--------------------------------\n"))
-                outputStream.write(EscPos.BOLD_ON)
-                outputStream.write(textToBytes("CCB POS - TechRes\n"))
-                outputStream.write(EscPos.BOLD_OFF)
-                outputStream.write(textToBytes("www.techres.vn\n"))
+                printTextAsBitmap(
+                    outputStream,
+                    "CCB POS - TechRes",
+                    TextStyle(bold = true, centerAlign = true)
+                )
+                printTextAsBitmap(
+                    outputStream,
+                    "www.techres.vn",
+                    TextStyle(centerAlign = true)
+                )
 
                 // Feed and cut
                 outputStream.write(EscPos.FEED_LINES_5)
                 outputStream.write(EscPos.CUT_FEED)
-
                 outputStream.flush()
 
                 PrinterResult.Success("In thử thành công!")
@@ -289,19 +358,10 @@ object PrinterService {
                 Log.e(TAG, "Error: ${e.message}")
                 PrinterResult.Error("Lỗi: ${e.message}")
             } finally {
-                // Clean close with proper shutdown
-                try {
-                    outputStream?.flush()
-                } catch (e: Exception) {}
-                try {
-                    socket?.shutdownOutput()
-                } catch (e: Exception) {}
-                try {
-                    outputStream?.close()
-                } catch (e: Exception) {}
-                try {
-                    socket?.close()
-                } catch (e: Exception) {
+                try { outputStream?.flush() } catch (e: Exception) {}
+                try { socket?.shutdownOutput() } catch (e: Exception) {}
+                try { outputStream?.close() } catch (e: Exception) {}
+                try { socket?.close() } catch (e: Exception) {
                     Log.e(TAG, "Error closing: ${e.message}")
                 }
             }
@@ -309,7 +369,7 @@ object PrinterService {
     }
 
     /**
-     * Print kitchen order ticket with retry logic
+     * Print kitchen order ticket with Vietnamese support
      */
     suspend fun printKitchenTicket(
         ip: String,
@@ -330,7 +390,6 @@ object PrinterService {
                 try {
                     Log.d(TAG, "Kitchen print attempt $attempt/$maxRetries to $ip:$port")
 
-                    // Connect with better socket options
                     socket = Socket().apply {
                         reuseAddress = true
                         keepAlive = true
@@ -339,15 +398,12 @@ object PrinterService {
                     }
                     socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
                     outputStream = socket.getOutputStream()
-
-                    // If we get here, connection is successful - break retry loop and print
                     break
 
                 } catch (e: IOException) {
                     lastError = e.message
                     Log.e(TAG, "Kitchen print connection attempt $attempt failed: ${e.message}")
 
-                    // Clean up failed socket
                     try {
                         outputStream?.close()
                         socket?.close()
@@ -355,7 +411,6 @@ object PrinterService {
                     socket = null
                     outputStream = null
 
-                    // Retry on Connection Refused
                     if ((e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ||
                          e.message?.contains("Connection refused", ignoreCase = true) == true) &&
                         attempt < maxRetries) {
@@ -368,69 +423,78 @@ object PrinterService {
                 }
             }
 
-            // Check if connection was established after retry loop
             if (socket == null || outputStream == null) {
                 return@withContext PrinterResult.Error("Lỗi in: Không thể kết nối sau $maxRetries lần thử: $lastError")
             }
 
             try {
-
                 val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                 val currentTime = dateFormat.format(Date())
 
-                // Initialize with Vietnamese/UTF-8 support
-                outputStream.write(EscPos.getVietnameseInit())
+                // Initialize
+                outputStream.write(EscPos.INIT)
+                outputStream.write(EscPos.LINE_SPACING_SET)
 
                 // Beep to alert kitchen
                 outputStream.write(EscPos.BEEP)
 
-                // Header
-                outputStream.write(EscPos.ALIGN_CENTER)
-                outputStream.write(EscPos.TEXT_DOUBLE)
-                outputStream.write(EscPos.BOLD_ON)
-                outputStream.write(textToBytes("$kitchenName\n"))
-                outputStream.write(EscPos.BOLD_OFF)
-                outputStream.write(EscPos.TEXT_NORMAL)
+                // Header - Kitchen name
+                printTextAsBitmap(
+                    outputStream,
+                    kitchenName,
+                    TextStyle(fontSize = 32f, bold = true, centerAlign = true)
+                )
+
+                printDivider(outputStream, '=')
 
                 // Order info
-                outputStream.write(textToBytes("================================\n"))
-                outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
-                outputStream.write(textToBytes("Đơn: $orderNumber\n"))
+                printTextAsBitmap(
+                    outputStream,
+                    "Đơn: $orderNumber",
+                    TextStyle(fontSize = 28f, bold = true)
+                )
                 if (tableName != null) {
-                    outputStream.write(textToBytes("Bàn: $tableName\n"))
+                    printTextAsBitmap(
+                        outputStream,
+                        "Bàn: $tableName",
+                        TextStyle(fontSize = 28f, bold = true)
+                    )
                 }
-                outputStream.write(EscPos.TEXT_NORMAL)
-                outputStream.write(textToBytes("Giờ: $currentTime\n"))
-                outputStream.write(textToBytes("================================\n"))
+                printTextAsBitmap(outputStream, "Giờ: $currentTime")
 
-                // Items
-                outputStream.write(EscPos.ALIGN_LEFT)
-                outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
+                printDivider(outputStream, '=')
+
+                // Items - larger font for kitchen visibility
                 items.forEach { item ->
-                    outputStream.write(textToBytes("${item.quantity}x ${item.name}\n"))
+                    printTextAsBitmap(
+                        outputStream,
+                        "${item.quantity}x ${item.name}",
+                        TextStyle(fontSize = 28f, bold = true)
+                    )
                     if (item.note != null) {
-                        outputStream.write(EscPos.TEXT_NORMAL)
-                        outputStream.write(textToBytes("   -> ${item.note}\n"))
-                        outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
+                        printTextAsBitmap(
+                            outputStream,
+                            "   → ${item.note}",
+                            TextStyle(fontSize = 22f)
+                        )
                     }
                 }
-                outputStream.write(EscPos.TEXT_NORMAL)
 
                 // Notes
                 if (notes != null) {
-                    outputStream.write(textToBytes("--------------------------------\n"))
-                    outputStream.write(EscPos.BOLD_ON)
-                    outputStream.write(textToBytes("Ghi chú: $notes\n"))
-                    outputStream.write(EscPos.BOLD_OFF)
+                    printDivider(outputStream)
+                    printTextAsBitmap(
+                        outputStream,
+                        "Ghi chú: $notes",
+                        TextStyle(bold = true)
+                    )
                 }
 
-                // Footer
-                outputStream.write(textToBytes("================================\n"))
+                printDivider(outputStream, '=')
 
                 // Feed and cut
                 outputStream.write(EscPos.FEED_LINES_3)
                 outputStream.write(EscPos.CUT_FEED)
-
                 outputStream.flush()
 
                 PrinterResult.Success("In order thành công!")
@@ -442,19 +506,10 @@ object PrinterService {
                 Log.e(TAG, "Kitchen print error: ${e.message}")
                 PrinterResult.Error("Lỗi: ${e.message}")
             } finally {
-                // Clean close with proper shutdown
-                try {
-                    outputStream?.flush()
-                } catch (e: Exception) {}
-                try {
-                    socket?.shutdownOutput()
-                } catch (e: Exception) {}
-                try {
-                    outputStream?.close()
-                } catch (e: Exception) {}
-                try {
-                    socket?.close()
-                } catch (e: Exception) {
+                try { outputStream?.flush() } catch (e: Exception) {}
+                try { socket?.shutdownOutput() } catch (e: Exception) {}
+                try { outputStream?.close() } catch (e: Exception) {}
+                try { socket?.close() } catch (e: Exception) {
                     Log.e(TAG, "Error closing: ${e.message}")
                 }
             }
