@@ -1392,14 +1392,14 @@ export default function BillTemplatePage() {
               <div className="space-y-2">
                 <Label>Mẫu bill</Label>
                 <Select
-                  value={printerForm.templateId || ""}
-                  onValueChange={(value) => setPrinterForm({ ...printerForm, templateId: value || undefined })}
+                  value={printerForm.templateId || "__none__"}
+                  onValueChange={(value) => setPrinterForm({ ...printerForm, templateId: value === "__none__" ? undefined : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn mẫu bill..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Không chọn (dùng mẫu mặc định)</SelectItem>
+                    <SelectItem value="__none__">Không chọn (dùng mẫu mặc định)</SelectItem>
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name} ({BILL_TEMPLATE_TYPE_LABELS[template.templateType]})
