@@ -50,7 +50,7 @@ data class AreaWithTables(
 data class TableUiState(
     val areas: List<AreaWithTables> = emptyList(),
     val tablesWithoutArea: List<TableWithOrderInfo> = emptyList(),
-    // Start with loading=true for immediate loading indicator on first render
+    // Start with loading=false if we have cached data
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 
@@ -81,20 +81,35 @@ class TableViewModel @Inject constructor(
         private var cachedState: TableUiState? = null
         private var cacheTimestamp: Long = 0L
         private const val CACHE_VALIDITY_MS = 30_000L // 30 seconds cache validity
+
+        // Also cache grid columns to avoid SharedPreferences read
+        @Volatile
+        private var cachedGridColumns: Int? = null
     }
 
-    // Initialize with cached state if available for instant display
+    // Check cache validity synchronously in the initializer
+    private val isCacheValid = cachedState != null &&
+        System.currentTimeMillis() - cacheTimestamp < CACHE_VALIDITY_MS
+
+    // Initialize with cached state IMMEDIATELY for instant display - no async here
     private val _uiState = MutableStateFlow(
-        cachedState?.takeIf { System.currentTimeMillis() - cacheTimestamp < CACHE_VALIDITY_MS }
-            ?.copy(isLoading = false)
-            ?: TableUiState()
+        if (isCacheValid) {
+            // Use cached state directly with isLoading = false for instant display
+            cachedState!!.copy(isLoading = false)
+        } else {
+            // No cache - show loading state but with cached grid columns if available
+            TableUiState(
+                isLoading = true,
+                gridColumns = cachedGridColumns ?: DEFAULT_GRID_COLUMNS
+            )
+        }
     )
     val uiState: StateFlow<TableUiState> = _uiState.asStateFlow()
 
     private var branchId: String = ""
 
     // Cache flag to avoid reloading
-    private var isDataLoaded = cachedState != null && System.currentTimeMillis() - cacheTimestamp < CACHE_VALIDITY_MS
+    private var isDataLoaded = isCacheValid
 
     // NO init block - data will be loaded lazily via initializeData()
 
@@ -103,15 +118,22 @@ class TableViewModel @Inject constructor(
      * This allows the screen to render immediately before data is loaded
      */
     fun initializeData() {
-        if (isDataLoaded) return
+        // If cache is valid, no need to do anything - we already have the data
+        if (isDataLoaded) {
+            Log.d(TAG, "initializeData - Using cached data, skipping load")
+            return
+        }
 
         viewModelScope.launch {
-            // Load grid columns preference async (non-blocking)
-            val savedColumns = withContext(Dispatchers.IO) {
-                sharedPreferences.getInt(KEY_TABLE_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+            // Load grid columns preference async if not cached
+            if (cachedGridColumns == null) {
+                val savedColumns = withContext(Dispatchers.IO) {
+                    sharedPreferences.getInt(KEY_TABLE_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+                }
+                cachedGridColumns = savedColumns
+                Log.d(TAG, "initializeData - Loaded columns from SharedPreferences: $savedColumns")
+                _uiState.update { it.copy(gridColumns = savedColumns) }
             }
-            Log.d(TAG, "initializeData - Loaded columns from SharedPreferences: $savedColumns")
-            _uiState.update { it.copy(gridColumns = savedColumns) }
 
             // Then load table data
             loadDataInternal()
@@ -120,10 +142,16 @@ class TableViewModel @Inject constructor(
 
     fun setGridColumns(columns: Int) {
         Log.d(TAG, "setGridColumns - Setting columns to: $columns")
+        cachedGridColumns = columns // Update memory cache
         _uiState.update { it.copy(gridColumns = columns) }
         // Use commit() instead of apply() to ensure synchronous save
         val saved = sharedPreferences.edit().putInt(KEY_TABLE_GRID_COLUMNS, columns).commit()
         Log.d(TAG, "setGridColumns - Saved to SharedPreferences: $saved")
+
+        // Also update the global cached state if it exists
+        cachedState?.let {
+            cachedState = it.copy(gridColumns = columns)
+        }
     }
 
     /**
