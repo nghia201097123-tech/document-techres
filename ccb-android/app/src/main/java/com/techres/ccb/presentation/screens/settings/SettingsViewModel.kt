@@ -45,7 +45,8 @@ data class SettingsUiState(
         SyncStep.KITCHENS to SyncStepUiState("Bếp"),
         SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
         SyncStep.COUPONS to SyncStepUiState("Coupon"),
-        SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
+        SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú"),
+        SyncStep.BILL_TEMPLATES to SyncStepUiState("Mẫu in bill")
     )
 )
 
@@ -95,7 +96,8 @@ class SettingsViewModel @Inject constructor(
                 SyncStep.KITCHENS to SyncStepUiState("Bếp"),
                 SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
                 SyncStep.COUPONS to SyncStepUiState("Coupon"),
-                SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
+                SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú"),
+                SyncStep.BILL_TEMPLATES to SyncStepUiState("Mẫu in bill")
             )
 
             _uiState.update {
@@ -175,7 +177,8 @@ class SettingsViewModel @Inject constructor(
             SyncStep.KITCHENS to SyncStepUiState("Bếp"),
             SyncStep.SEASONAL_PRICES to SyncStepUiState("Giá thời vụ"),
             SyncStep.COUPONS to SyncStepUiState("Coupon"),
-            SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú")
+            SyncStep.PRODUCT_NOTES to SyncStepUiState("Ghi chú"),
+            SyncStep.BILL_TEMPLATES to SyncStepUiState("Mẫu in bill")
         )
         _uiState.update {
             it.copy(
