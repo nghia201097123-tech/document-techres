@@ -69,11 +69,29 @@ fun ProductVariantDialog(
     val unitPrice = product.price + variantPrice
     val totalPrice = unitPrice * quantity
 
-    // Validate required groups - check if all required groups have at least one selection
-    val missingRequiredGroups = product.variants.filter { group ->
-        group.isRequired && (selectedOptions[group.id]?.isEmpty() ?: true)
+    // Validate required groups and min/max selection
+    val validationErrors = mutableListOf<String>()
+
+    product.variants.forEach { group ->
+        val selectedCount = selectedOptions[group.id]?.size ?: 0
+
+        // Check required (at least 1)
+        if (group.isRequired && selectedCount == 0) {
+            validationErrors.add("${group.name}: chưa chọn (bắt buộc)")
+        }
+
+        // Check minSelect
+        if (group.minSelect > 0 && selectedCount < group.minSelect) {
+            validationErrors.add("${group.name}: cần chọn tối thiểu ${group.minSelect}")
+        }
+
+        // Check maxSelect
+        if (group.maxSelect < 99 && selectedCount > group.maxSelect) {
+            validationErrors.add("${group.name}: chỉ được chọn tối đa ${group.maxSelect}")
+        }
     }
-    val isValid = missingRequiredGroups.isEmpty()
+
+    val isValid = validationErrors.isEmpty()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -135,9 +153,14 @@ fun ProductVariantDialog(
                                 if (group.isMultiple) {
                                     // Toggle selection for multiple choice
                                     if (optionId in currentSelected) {
+                                        // Always allow deselect
                                         currentSelected.remove(optionId)
                                     } else {
-                                        currentSelected.add(optionId)
+                                        // Check maxSelect before adding
+                                        if (currentSelected.size < group.maxSelect) {
+                                            currentSelected.add(optionId)
+                                        }
+                                        // Else: do nothing, max reached
                                     }
                                 } else {
                                     // Single selection
@@ -252,7 +275,7 @@ fun ProductVariantDialog(
                     // Show validation error message
                     if (!isValid) {
                         Text(
-                            text = "Vui lòng chọn: ${missingRequiredGroups.joinToString(", ") { it.name }}",
+                            text = validationErrors.joinToString("\n"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -361,11 +384,34 @@ fun VariantGroupSection(
                     fontWeight = FontWeight.Bold
                 )
             }
-            if (group.isMultiple) {
+
+            // Show min/max info
+            val minMaxText = buildString {
+                if (group.isMultiple) {
+                    append(" (")
+                    if (group.minSelect > 0 && group.maxSelect < 99) {
+                        append("chọn ${group.minSelect}-${group.maxSelect}")
+                    } else if (group.minSelect > 0) {
+                        append("tối thiểu ${group.minSelect}")
+                    } else if (group.maxSelect < 99) {
+                        append("tối đa ${group.maxSelect}")
+                    } else {
+                        append("chọn nhiều")
+                    }
+                    append(") ")
+                    // Show current selection count
+                    append("[${selectedIds.size}]")
+                }
+            }
+            if (minMaxText.isNotEmpty()) {
                 Text(
-                    text = " (chọn nhiều)",
+                    text = minMaxText,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = if (selectedIds.size >= group.maxSelect && group.maxSelect < 99) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }
                 )
             }
         }

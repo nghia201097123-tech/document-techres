@@ -405,6 +405,8 @@ class SaleViewModel @Inject constructor(
                 type = mapGroupType(firstTopping.groupType),
                 isRequired = firstTopping.isRequired,
                 isMultiple = firstTopping.isMultiple,
+                minSelect = firstTopping.minSelect,
+                maxSelect = firstTopping.maxSelect,
                 options = groupToppings.mapNotNull { topping ->
                     val toppingProduct = productEntityMap[topping.toppingId]
                     if (toppingProduct != null) {

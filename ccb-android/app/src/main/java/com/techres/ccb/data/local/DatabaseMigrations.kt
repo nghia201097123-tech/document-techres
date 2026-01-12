@@ -205,11 +205,40 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 12 to 13
+     * Adds min_select and max_select columns to product_toppings table
+     */
+    val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 12 to 13...")
+
+            // Add min_select column (default 0)
+            try {
+                db.execSQL("ALTER TABLE product_toppings ADD COLUMN min_select INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added min_select column to product_toppings")
+            } catch (e: Exception) {
+                Log.d(TAG, "min_select column may already exist: ${e.message}")
+            }
+
+            // Add max_select column (default 99)
+            try {
+                db.execSQL("ALTER TABLE product_toppings ADD COLUMN max_select INTEGER NOT NULL DEFAULT 99")
+                Log.d(TAG, "Added max_select column to product_toppings")
+            } catch (e: Exception) {
+                Log.d(TAG, "max_select column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 12 to 13 complete - Added min_select/max_select to product_toppings")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
         MIGRATION_9_10,
         MIGRATION_10_11,
-        MIGRATION_11_12
+        MIGRATION_11_12,
+        MIGRATION_12_13
     )
 }

@@ -34,6 +34,8 @@ data class ProductVariantGroup(
     val type: VariantType,
     val isRequired: Boolean = false,
     val isMultiple: Boolean = false,  // Có thể chọn nhiều (topping)
+    val minSelect: Int = 0,           // Số tối thiểu cần chọn
+    val maxSelect: Int = 99,          // Số tối đa được chọn
     val options: List<ProductVariantOption>
 )
 

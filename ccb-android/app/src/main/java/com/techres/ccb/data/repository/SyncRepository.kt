@@ -193,6 +193,8 @@ class SyncRepository @Inject constructor(
                         groupType = group.groupType,
                         isRequired = group.isRequired,
                         isMultiple = group.isMultiple,
+                        minSelect = group.minSelect,
+                        maxSelect = group.maxSelect,
                         extraPrice = topping.price,
                         isDefault = topping.isDefault,
                         sortOrder = topping.sortOrder,

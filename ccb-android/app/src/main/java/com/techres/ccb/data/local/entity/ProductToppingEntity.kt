@@ -59,6 +59,14 @@ data class ProductToppingEntity(
     @ColumnInfo(name = "is_multiple")
     val isMultiple: Boolean = true,
 
+    // Số tối thiểu cần chọn trong nhóm
+    @ColumnInfo(name = "min_select")
+    val minSelect: Int = 0,
+
+    // Số tối đa được chọn trong nhóm
+    @ColumnInfo(name = "max_select")
+    val maxSelect: Int = 99,
+
     // Giá cộng thêm khi chọn topping này (có thể khác price trong ProductEntity)
     @ColumnInfo(name = "extra_price")
     val extraPrice: Double = 0.0,
