@@ -10,14 +10,6 @@ import {
 } from 'typeorm';
 import { Branch } from './branch.entity';
 
-export enum KitchenType {
-  COOKING = 'cooking',
-  GRILL = 'grill',
-  BAR = 'bar',
-  DESSERT = 'dessert',
-  OTHER = 'other',
-}
-
 export enum PrintMode {
   INDIVIDUAL = 'individual', // In từng món riêng lẻ
   LIST = 'list', // In danh sách món
@@ -45,15 +37,6 @@ export class Kitchen {
 
   @Column({ type: 'text', nullable: true })
   description: string;
-
-  @Column({
-    name: 'kitchen_type',
-    type: 'varchar',
-    length: 50,
-    nullable: true,
-    default: 'cooking',
-  })
-  kitchenType: string;
 
   @Column({ name: 'printer_name', nullable: true })
   printerName: string;

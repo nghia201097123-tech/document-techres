@@ -488,9 +488,6 @@ export class KitchenDto {
   @ApiProperty({ description: 'Mô tả', nullable: true })
   description: string | null;
 
-  @ApiProperty({ description: 'Loại bếp (cooking, grill, bar, dessert, other)', nullable: true })
-  kitchenType: string | null;
-
   @ApiProperty({ description: 'Thứ tự sắp xếp' })
   sortOrder: number;
 

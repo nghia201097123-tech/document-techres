@@ -656,7 +656,6 @@ export class SyncService {
       id: kitchen.id,
       name: kitchen.name,
       description: kitchen.description || null,
-      kitchenType: kitchen.kitchenType || null,
       sortOrder: kitchen.sortOrder || 0,
       isActive: kitchen.isActive,
       createdAt: kitchen.createdAt?.toISOString() || new Date().toISOString(),
