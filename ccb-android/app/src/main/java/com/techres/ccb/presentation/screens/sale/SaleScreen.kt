@@ -284,6 +284,9 @@ fun SaleScreen(
                 onCouponCodeChange = { viewModel.setCouponCode(it) },
                 onApplyCoupon = { viewModel.applyCoupon() },
                 onRemoveDiscount = { viewModel.removeCoupon(it) },
+                onApplyManualDiscount = { amount, reason -> viewModel.applyDiscount(amount, reason) },
+                onApplyPercentDiscount = { percent, reason -> viewModel.applyPercentDiscount(percent, reason) },
+                onClearDiscount = { viewModel.clearDiscount() },
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)

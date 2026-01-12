@@ -54,12 +54,21 @@ fun PaymentDialog(
     onCouponCodeChange: (String) -> Unit = {},
     onApplyCoupon: () -> Unit = {},
     onRemoveDiscount: (String) -> Unit = {},
+    // Manual discount callbacks
+    onApplyManualDiscount: (amount: Long, reason: String?) -> Unit = { _, _ -> },
+    onApplyPercentDiscount: (percent: Int, reason: String?) -> Unit = { _, _ -> },
+    onClearDiscount: () -> Unit = {},
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
     var selectedMethod by remember { mutableStateOf(PaymentMethod.CASH) }
     var receivedAmountText by remember { mutableStateOf("") }
     var showKeypad by remember { mutableStateOf(true) }
+
+    // Manual discount states
+    var manualDiscountText by remember { mutableStateOf("") }
+    var showDiscountInput by remember { mutableStateOf(false) }
+    var discountInputType by remember { mutableStateOf("fixed") } // "fixed" or "percent"
 
     val receivedAmount = receivedAmountText.toLongOrNull() ?: 0L
     val changeAmount = if (receivedAmount >= totalAmount) receivedAmount - totalAmount else 0L
@@ -291,6 +300,158 @@ fun PaymentDialog(
                                                     )
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Manual discount section
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Giảm giá nhanh",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (discountAmount > 0 && appliedDiscounts.isEmpty()) {
+                                        TextButton(
+                                            onClick = onClearDiscount,
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text("Xóa", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Quick percent buttons
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    listOf(5, 10, 15, 20, 30).forEach { percent ->
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = {
+                                                onApplyPercentDiscount(percent, "Giảm $percent%")
+                                            },
+                                            label = { Text("$percent%", fontSize = 12.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                            )
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Toggle for manual input
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showDiscountInput = !showDiscountInput }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if (showDiscountInput) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Nhập số tiền giảm",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                // Manual discount input
+                                if (showDiscountInput) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Discount type selector
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = discountInputType == "fixed",
+                                            onClick = { discountInputType = "fixed" },
+                                            label = { Text("Số tiền", fontSize = 11.sp) }
+                                        )
+                                        FilterChip(
+                                            selected = discountInputType == "percent",
+                                            onClick = { discountInputType = "percent" },
+                                            label = { Text("Phần trăm", fontSize = 11.sp) }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedTextField(
+                                            value = manualDiscountText,
+                                            onValueChange = { manualDiscountText = it.filter { c -> c.isDigit() } },
+                                            placeholder = {
+                                                Text(
+                                                    if (discountInputType == "fixed") "Số tiền" else "% giảm",
+                                                    fontSize = 12.sp
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            textStyle = MaterialTheme.typography.bodySmall,
+                                            keyboardOptions = KeyboardOptions(
+                                                keyboardType = KeyboardType.Number,
+                                                imeAction = ImeAction.Done
+                                            ),
+                                            suffix = {
+                                                Text(
+                                                    if (discountInputType == "fixed") "đ" else "%",
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        )
+                                        Button(
+                                            onClick = {
+                                                val value = manualDiscountText.toLongOrNull() ?: 0L
+                                                if (value > 0) {
+                                                    if (discountInputType == "fixed") {
+                                                        onApplyManualDiscount(value, "Giảm ${formatCurrency(value)}")
+                                                    } else {
+                                                        onApplyPercentDiscount(value.toInt(), "Giảm $value%")
+                                                    }
+                                                    manualDiscountText = ""
+                                                    showDiscountInput = false
+                                                }
+                                            },
+                                            enabled = manualDiscountText.isNotEmpty(),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            Text("Áp dụng", fontSize = 12.sp)
                                         }
                                     }
                                 }
