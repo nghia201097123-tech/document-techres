@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
-import android.os.Environment
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -13,8 +12,6 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -122,78 +119,71 @@ object PrinterService {
         // Draw the text using StaticLayout
         staticLayout.draw(canvas)
 
-        // DEBUG: Save bitmap to file to verify Vietnamese rendering
-        saveBitmapForDebug(bitmap, text)
-
         return bitmap
     }
 
     /**
-     * Save bitmap to Downloads folder for debugging
+     * Convert bitmap to ESC/POS format using ESC * command (line by line)
+     * This is more widely supported than GS v 0
      */
-    private fun saveBitmapForDebug(bitmap: Bitmap, text: String) {
-        try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val timestamp = System.currentTimeMillis()
-            val fileName = "print_debug_${timestamp}.png"
-            val file = File(downloadsDir, fileName)
-
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-
-            Log.d(TAG, "DEBUG: Saved bitmap to ${file.absolutePath}")
-            Log.d(TAG, "DEBUG: Text was: $text")
-        } catch (e: Exception) {
-            Log.e(TAG, "DEBUG: Failed to save bitmap: ${e.message}")
-        }
-    }
-
-    /**
-     * Convert bitmap to ESC/POS raster format (GS v 0)
-     */
-    private fun bitmapToEscPosRaster(bitmap: Bitmap): ByteArray {
+    private fun bitmapToEscPosLineByLine(bitmap: Bitmap): ByteArray {
         val width = bitmap.width
         val height = bitmap.height
-        val bytesPerLine = (width + 7) / 8
-
         val output = ByteArrayOutputStream()
 
-        // GS v 0 command: Print raster bit image
-        // Format: 0x1D 0x76 0x30 m xL xH yL yH d1...dk
-        output.write(0x1D)
-        output.write(0x76)
-        output.write(0x30)
-        output.write(0x00) // m = 0 (normal mode)
-        output.write(bytesPerLine and 0xFF) // xL
-        output.write((bytesPerLine shr 8) and 0xFF) // xH
-        output.write(height and 0xFF) // yL
-        output.write((height shr 8) and 0xFF) // yH
+        // Process image in 24-dot (3 byte) vertical strips
+        // ESC * 33 nL nH - 24-dot double density
+        val dotsPerStrip = 24
 
-        // Convert bitmap to monochrome raster data
-        for (y in 0 until height) {
-            for (byteIndex in 0 until bytesPerLine) {
-                var byte = 0
-                for (bit in 0 until 8) {
-                    val x = byteIndex * 8 + bit
-                    if (x < width) {
-                        val pixel = bitmap.getPixel(x, y)
-                        // Convert to grayscale and threshold
-                        val gray = (Color.red(pixel) * 0.299 + Color.green(pixel) * 0.587 + Color.blue(pixel) * 0.114).toInt()
-                        if (gray < 128) {
-                            byte = byte or (0x80 shr bit)
+        var y = 0
+        while (y < height) {
+            // Set line spacing to 0 for seamless image
+            output.write(0x1B)
+            output.write(0x33)
+            output.write(dotsPerStrip)
+
+            // ESC * 33 (24-dot double density)
+            output.write(0x1B)
+            output.write(0x2A)
+            output.write(33) // 24-dot double density mode
+            output.write(width and 0xFF) // nL
+            output.write((width shr 8) and 0xFF) // nH
+
+            // Send image data for this strip
+            for (x in 0 until width) {
+                for (byteNum in 0 until 3) { // 3 bytes = 24 dots vertical
+                    var byte = 0
+                    for (bit in 0 until 8) {
+                        val pixelY = y + byteNum * 8 + bit
+                        if (pixelY < height) {
+                            val pixel = bitmap.getPixel(x, pixelY)
+                            val gray = (Color.red(pixel) * 0.299 +
+                                       Color.green(pixel) * 0.587 +
+                                       Color.blue(pixel) * 0.114).toInt()
+                            if (gray < 128) {
+                                byte = byte or (0x80 shr bit)
+                            }
                         }
                     }
+                    output.write(byte)
                 }
-                output.write(byte)
             }
+
+            // Line feed
+            output.write(0x0A)
+
+            y += dotsPerStrip
         }
+
+        // Reset line spacing to default
+        output.write(0x1B)
+        output.write(0x32)
 
         return output.toByteArray()
     }
 
     /**
-     * Print text as bitmap image
+     * Print text as bitmap image using ESC * command
      */
     private fun printTextAsBitmap(
         outputStream: OutputStream,
@@ -203,8 +193,8 @@ object PrinterService {
     ) {
         if (text.isBlank()) return
         val bitmap = textToBitmap(text, style, paperWidth)
-        val rasterData = bitmapToEscPosRaster(bitmap)
-        outputStream.write(rasterData)
+        val imageData = bitmapToEscPosLineByLine(bitmap)
+        outputStream.write(imageData)
         bitmap.recycle()
     }
 
