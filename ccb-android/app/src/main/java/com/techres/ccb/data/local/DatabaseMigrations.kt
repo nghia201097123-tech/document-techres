@@ -233,12 +233,213 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 13 to 14
+     * Adds discount/coupon fields to coupons, orders, and order_items tables
+     * for Vietnamese tax law compliance
+     */
+    val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 13 to 14...")
+
+            // ============ COUPONS TABLE ============
+            // Add apply_to column (bill, item, category)
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN apply_to TEXT NOT NULL DEFAULT 'bill'")
+                Log.d(TAG, "Added apply_to column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "apply_to column may already exist: ${e.message}")
+            }
+
+            // Add activation_type column (manual, auto)
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN activation_type TEXT NOT NULL DEFAULT 'manual'")
+                Log.d(TAG, "Added activation_type column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "activation_type column may already exist: ${e.message}")
+            }
+
+            // Add min_quantity column
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN min_quantity INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added min_quantity column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "min_quantity column may already exist: ${e.message}")
+            }
+
+            // Add product_ids column (JSON string)
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN product_ids TEXT DEFAULT NULL")
+                Log.d(TAG, "Added product_ids column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "product_ids column may already exist: ${e.message}")
+            }
+
+            // Add category_ids column (JSON string)
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN category_ids TEXT DEFAULT NULL")
+                Log.d(TAG, "Added category_ids column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "category_ids column may already exist: ${e.message}")
+            }
+
+            // Add is_combinable column
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN is_combinable INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added is_combinable column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "is_combinable column may already exist: ${e.message}")
+            }
+
+            // Add priority column
+            try {
+                db.execSQL("ALTER TABLE coupons ADD COLUMN priority INTEGER NOT NULL DEFAULT 100")
+                Log.d(TAG, "Added priority column to coupons")
+            } catch (e: Exception) {
+                Log.d(TAG, "priority column may already exist: ${e.message}")
+            }
+
+            // ============ ORDERS TABLE ============
+            // Add coupon_id column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN coupon_id TEXT DEFAULT NULL")
+                Log.d(TAG, "Added coupon_id column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "coupon_id column may already exist: ${e.message}")
+            }
+
+            // Add coupon_code column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN coupon_code TEXT DEFAULT NULL")
+                Log.d(TAG, "Added coupon_code column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "coupon_code column may already exist: ${e.message}")
+            }
+
+            // Add coupon_ids column (JSON string for multiple coupons)
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN coupon_ids TEXT DEFAULT NULL")
+                Log.d(TAG, "Added coupon_ids column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "coupon_ids column may already exist: ${e.message}")
+            }
+
+            // Add applied_coupons_json column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN applied_coupons_json TEXT DEFAULT NULL")
+                Log.d(TAG, "Added applied_coupons_json column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "applied_coupons_json column may already exist: ${e.message}")
+            }
+
+            // Add discount_requires_approval column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN discount_requires_approval INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added discount_requires_approval column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "discount_requires_approval column may already exist: ${e.message}")
+            }
+
+            // Add discount_approval_status column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN discount_approval_status TEXT DEFAULT NULL")
+                Log.d(TAG, "Added discount_approval_status column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "discount_approval_status column may already exist: ${e.message}")
+            }
+
+            // Add discount_approved_by column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN discount_approved_by TEXT DEFAULT NULL")
+                Log.d(TAG, "Added discount_approved_by column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "discount_approved_by column may already exist: ${e.message}")
+            }
+
+            // Add discount_approved_at column
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN discount_approved_at TEXT DEFAULT NULL")
+                Log.d(TAG, "Added discount_approved_at column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "discount_approved_at column may already exist: ${e.message}")
+            }
+
+            // ============ ORDER_ITEMS TABLE ============
+            // Add category_id column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN category_id TEXT DEFAULT NULL")
+                Log.d(TAG, "Added category_id column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "category_id column may already exist: ${e.message}")
+            }
+
+            // Add original_price column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN original_price REAL NOT NULL DEFAULT 0.0")
+                Log.d(TAG, "Added original_price column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "original_price column may already exist: ${e.message}")
+            }
+
+            // Add discount_type column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN discount_type TEXT DEFAULT NULL")
+                Log.d(TAG, "Added discount_type column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "discount_type column may already exist: ${e.message}")
+            }
+
+            // Add discount_value column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN discount_value REAL NOT NULL DEFAULT 0.0")
+                Log.d(TAG, "Added discount_value column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "discount_value column may already exist: ${e.message}")
+            }
+
+            // Add coupon_id column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN coupon_id TEXT DEFAULT NULL")
+                Log.d(TAG, "Added coupon_id column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "coupon_id column may already exist: ${e.message}")
+            }
+
+            // Add coupon_code column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN coupon_code TEXT DEFAULT NULL")
+                Log.d(TAG, "Added coupon_code column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "coupon_code column may already exist: ${e.message}")
+            }
+
+            // Add price_before_vat column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN price_before_vat REAL NOT NULL DEFAULT 0.0")
+                Log.d(TAG, "Added price_before_vat column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "price_before_vat column may already exist: ${e.message}")
+            }
+
+            // Add price_after_vat column
+            try {
+                db.execSQL("ALTER TABLE order_items ADD COLUMN price_after_vat REAL NOT NULL DEFAULT 0.0")
+                Log.d(TAG, "Added price_after_vat column to order_items")
+            } catch (e: Exception) {
+                Log.d(TAG, "price_after_vat column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 13 to 14 complete - Added discount/coupon fields")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
         MIGRATION_9_10,
         MIGRATION_10_11,
         MIGRATION_11_12,
-        MIGRATION_12_13
+        MIGRATION_12_13,
+        MIGRATION_13_14
     )
 }
