@@ -420,6 +420,9 @@ fun TabletLayout(
             totalAmount = uiState.totalAmount,
             currentOrder = uiState.currentOrder,
             currentOrderItems = uiState.currentOrderItems,
+            canPlaceOrder = uiState.canPlaceOrder,
+            missingRequiredToppingsMessage = uiState.missingRequiredToppingsMessage,
+            cartItemsWithMissingRequiredToppings = uiState.cartItemsWithMissingRequiredToppings,
             onOrderTypeChanged = viewModel::setOrderType,
             onTableClicked = { viewModel.showTableDialog() },
             onCustomerClicked = { viewModel.showCustomerDialog() },
@@ -513,6 +516,9 @@ fun CartDialog(
                     totalAmount = uiState.totalAmount,
                     currentOrder = uiState.currentOrder,
                     currentOrderItems = uiState.currentOrderItems,
+                    canPlaceOrder = uiState.canPlaceOrder,
+                    missingRequiredToppingsMessage = uiState.missingRequiredToppingsMessage,
+                    cartItemsWithMissingRequiredToppings = uiState.cartItemsWithMissingRequiredToppings,
                     onOrderTypeChanged = viewModel::setOrderType,
                     onTableClicked = { viewModel.showTableDialog() },
                     onCustomerClicked = { viewModel.showCustomerDialog() },
@@ -805,6 +811,9 @@ fun CartPanel(
     totalAmount: Long,
     currentOrder: OrderEntity? = null,
     currentOrderItems: List<OrderItemEntity> = emptyList(),
+    canPlaceOrder: Boolean = true,
+    missingRequiredToppingsMessage: String? = null,
+    cartItemsWithMissingRequiredToppings: List<Pair<String, List<String>>> = emptyList(),
     onOrderTypeChanged: (OrderType) -> Unit,
     onTableClicked: () -> Unit,
     onCustomerClicked: () -> Unit,
@@ -1032,6 +1041,11 @@ fun CartPanel(
 
                 // Display new cart items (editable)
                 cartItems.forEach { item ->
+                    // Check if this item is missing required toppings
+                    val missingGroups = cartItemsWithMissingRequiredToppings
+                        .find { it.first == item.id }
+                        ?.second ?: emptyList()
+
                     CartItemRow(
                         item = item,
                         onIncrease = { onIncreaseQuantity(item.id) },
@@ -1039,7 +1053,8 @@ fun CartPanel(
                         onRemove = { onRemoveItem(item.id) },
                         onEditNote = { onEditNote(item.id) },
                         onRemoveVariant = onRemoveCartItemVariant,
-                        onAddTopping = { onAddToppingToCartItem(item.id) }
+                        onAddTopping = { onAddToppingToCartItem(item.id) },
+                        missingRequiredGroups = missingGroups
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -1136,6 +1151,40 @@ fun CartPanel(
             }
         }
 
+        // Warning message for missing required toppings
+        if (missingRequiredToppingsMessage != null && !hasActiveOrder) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFFF3E0)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color(0xFFFF9800),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Vui lòng chọn lại topping bắt buộc ($missingRequiredToppingsMessage)",
+                        fontSize = 13.sp,
+                        color = Color(0xFFE65100),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
         // Action Buttons
         if (hasActiveOrder) {
             // Active order buttons
@@ -1150,6 +1199,7 @@ fun CartPanel(
                     Button(
                         onClick = onAddItemsToOrder,
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = canPlaceOrder,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF2196F3)
                         )
@@ -1216,7 +1266,7 @@ fun CartPanel(
                 Button(
                     onClick = onPlaceOrder,
                     modifier = Modifier.weight(0.75f),
-                    enabled = cartItems.isNotEmpty(),
+                    enabled = canPlaceOrder,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF2196F3)
                     )
@@ -1249,16 +1299,45 @@ fun CartItemRow(
     onRemove: () -> Unit,
     onEditNote: () -> Unit = {},
     onRemoveVariant: ((String, String) -> Unit)? = null, // (itemId, variantName)
-    onAddTopping: (() -> Unit)? = null // Open topping dialog
+    onAddTopping: (() -> Unit)? = null, // Open topping dialog
+    missingRequiredGroups: List<String> = emptyList() // Groups that need selection
 ) {
+    val hasMissingRequired = missingRequiredGroups.isNotEmpty()
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (hasMissingRequired) Color(0xFFFFF3E0) else MaterialTheme.colorScheme.surface
         ),
+        border = if (hasMissingRequired) {
+            androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFF9800))
+        } else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            // Warning for missing required toppings
+            if (hasMissingRequired) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color(0xFFFF9800),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Chọn: ${missingRequiredGroups.joinToString(", ")}",
+                        fontSize = 12.sp,
+                        color = Color(0xFFE65100),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             // Row 1: Product name + Remove button
             Row(
                 modifier = Modifier.fillMaxWidth(),

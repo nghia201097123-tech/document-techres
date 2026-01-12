@@ -95,7 +95,44 @@ data class SaleUiState(
         get() = cartItems.sumOf { it.quantity }
 
     val canPlaceOrder: Boolean
-        get() = cartItems.isNotEmpty()
+        get() = cartItems.isNotEmpty() && cartItemsWithMissingRequiredToppings.isEmpty()
+
+    /**
+     * List of cart items that are missing required topping selections
+     * Returns pairs of (cartItemId, list of missing group names)
+     */
+    val cartItemsWithMissingRequiredToppings: List<Pair<String, List<String>>>
+        get() = cartItems.mapNotNull { cartItem ->
+            val missingGroups = cartItem.product.variants
+                .filter { group -> group.isRequired }
+                .filter { group ->
+                    // Check if any option from this required group is selected
+                    val hasSelection = cartItem.selectedVariants.any { selectedVariant ->
+                        group.options.any { it.name == selectedVariant.name }
+                    }
+                    !hasSelection
+                }
+                .map { it.name }
+
+            if (missingGroups.isNotEmpty()) {
+                cartItem.id to missingGroups
+            } else {
+                null
+            }
+        }
+
+    /**
+     * Message to show when cart items are missing required toppings
+     */
+    val missingRequiredToppingsMessage: String?
+        get() {
+            val missing = cartItemsWithMissingRequiredToppings
+            if (missing.isEmpty()) return null
+
+            return missing.joinToString("; ") { (_, groups) ->
+                "Thiếu: ${groups.joinToString(", ")}"
+            }
+        }
 
     val canCheckout: Boolean
         get() = currentOrder != null
@@ -606,7 +643,8 @@ class SaleViewModel @Inject constructor(
     /**
      * Remove a specific variant/topping from a cart item
      * Note: totalPrice is a computed property that auto-calculates from selectedVariants
-     * Will NOT remove if it's the last option in a required group
+     * Allows deletion of required toppings - the "Đặt món" button will be disabled
+     * until user selects a new option for required groups
      */
     fun removeCartItemVariant(cartItemId: String, variantName: String) {
         val state = _uiState.value
@@ -615,23 +653,6 @@ class SaleViewModel @Inject constructor(
         // Find which group this variant belongs to
         val variantGroup = cartItem.product.variants.find { group ->
             group.options.any { it.name == variantName }
-        }
-
-        // Check if this is a required group
-        if (variantGroup != null && variantGroup.isRequired) {
-            // Count how many options from this group are currently selected
-            val selectedOptionsInGroup = cartItem.selectedVariants.count { selectedVariant ->
-                variantGroup.options.any { it.name == selectedVariant.name }
-            }
-
-            // If this is the last selected option in a required group, don't allow removal
-            if (selectedOptionsInGroup <= 1) {
-                _uiState.update { s ->
-                    s.copy(errorMessage = "Không thể xóa ${variantGroup.name} - bắt buộc chọn")
-                }
-                Log.d(TAG, "removeCartItemVariant - Cannot remove $variantName, required group ${variantGroup.name}")
-                return
-            }
         }
 
         // Proceed with removal
@@ -646,6 +667,20 @@ class SaleViewModel @Inject constructor(
             }
             s.copy(cartItems = updatedCartItems)
         }
+
+        // Show info message if this was a required group
+        if (variantGroup != null && variantGroup.isRequired) {
+            // Check if there's still a selection in this group after removal
+            val updatedCartItem = _uiState.value.cartItems.find { it.id == cartItemId }
+            val hasRemainingSelection = updatedCartItem?.selectedVariants?.any { selectedVariant ->
+                variantGroup.options.any { it.name == selectedVariant.name }
+            } ?: false
+
+            if (!hasRemainingSelection) {
+                Log.d(TAG, "removeCartItemVariant - Removed required topping $variantName from ${variantGroup.name}, order button disabled")
+            }
+        }
+
         Log.d(TAG, "removeCartItemVariant - Removed $variantName from cart item $cartItemId")
     }
 
