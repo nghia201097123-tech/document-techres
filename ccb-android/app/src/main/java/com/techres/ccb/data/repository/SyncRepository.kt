@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import android.util.Log
+import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
@@ -66,7 +67,8 @@ class SyncRepository @Inject constructor(
     private val productNoteDao: ProductNoteDao,
     private val orderDao: OrderDao,
     private val tableDao: TableDao,
-    private val billTemplateDao: BillTemplateDao
+    private val billTemplateDao: BillTemplateDao,
+    private val billPrinterConfigDao: BillPrinterConfigDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -577,6 +579,50 @@ class SyncRepository @Inject constructor(
             Log.d("SyncRepository", "Saved ${billTemplatesList.size} bill templates to database")
         }
         onProgress?.invoke(SyncStepProgress(SyncStep.BILL_TEMPLATES, SyncStepStatus.COMPLETED, billTemplatesList.size))
+
+        // Sync bill printer configs (after templates since configs may reference templates)
+        val billPrinterConfigsList = syncData.billPrinterConfigs?.map { dto ->
+            BillPrinterConfigEntity(
+                id = dto.id,
+                branchId = branchId,
+                name = dto.name,
+                description = dto.description,
+                // Connection config
+                connectionType = dto.connectionType,
+                printerIp = dto.printerIp,
+                printerPort = dto.printerPort,
+                printerMac = dto.printerMac,
+                printerUsbPath = dto.printerUsbPath,
+                // Template config
+                templateId = dto.templateId,
+                // Print config
+                paperWidth = dto.paperWidth,
+                autoPrintOnPayment = dto.autoPrintOnPayment,
+                printPreview = dto.printPreview,
+                numberOfCopies = dto.numberOfCopies,
+                cutPaper = dto.cutPaper,
+                openCashDrawer = dto.openCashDrawer,
+                beepAfterPrint = dto.beepAfterPrint,
+                // Retry config
+                retryCount = dto.retryCount,
+                retryDelayMs = dto.retryDelayMs,
+                connectionTimeoutMs = dto.connectionTimeoutMs,
+                // Status
+                isDefault = dto.isDefault,
+                isActive = dto.isActive,
+                sortOrder = dto.sortOrder,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+
+        billPrinterConfigDao.deleteByBranch(branchId)
+        if (billPrinterConfigsList.isNotEmpty()) {
+            billPrinterConfigDao.insertAll(billPrinterConfigsList)
+            Log.d("SyncRepository", "Saved ${billPrinterConfigsList.size} bill printer configs to database")
+        }
     }
 
     /**
@@ -643,5 +689,6 @@ class SyncRepository @Inject constructor(
         seasonalPriceProductDao.deleteAllByBranch(branchId)
         couponDao.deleteAllByBranch(branchId)
         billTemplateDao.deleteByBranch(branchId)
+        billPrinterConfigDao.deleteByBranch(branchId)
     }
 }
