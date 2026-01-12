@@ -172,15 +172,6 @@ fun PaymentDialog(
                                         Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodyMedium, color = Success)
                                     }
                                 }
-                                if (vatAmount > 0) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("VAT (8%):", style = MaterialTheme.typography.bodyMedium)
-                                        Text(formatCurrency(vatAmount), style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                }
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -192,6 +183,24 @@ fun PaymentDialog(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
+                                }
+                                // VAT được tách ra để hiển thị (đã bao gồm trong tổng)
+                                if (vatAmount > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            "  (Trong đó VAT 8%:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Text(
+                                            "${formatCurrency(vatAmount)})",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
                                 }
                             }
                         }

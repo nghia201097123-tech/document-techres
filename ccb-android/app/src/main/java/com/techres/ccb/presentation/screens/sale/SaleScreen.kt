@@ -263,14 +263,13 @@ fun SaleScreen(
                 uiState.subtotal
             }
 
-            // Giá sau giảm
-            val priceAfterDiscount = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
+            // Tổng = Tạm tính - Giảm giá (giá đã bao gồm VAT nên không cộng thêm)
+            val paymentTotal = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
 
-            // VAT tính trên giá sau giảm (luật thuế Việt Nam)
-            val vatAmount = (priceAfterDiscount * uiState.taxRate / 100.0).toLong()
-
-            // Tổng = (Subtotal - Discount) + VAT
-            val paymentTotal = priceAfterDiscount + vatAmount
+            // VAT tách ra từ tổng để hiển thị (không cộng thêm)
+            // Công thức: VAT = Tổng - (Tổng / 1.08)
+            val priceBeforeVat = paymentTotal / (1 + uiState.taxRate / 100.0)
+            val vatAmount = (paymentTotal - priceBeforeVat).toLong()
 
             PaymentDialog(
                 totalAmount = paymentTotal,
@@ -1169,21 +1168,9 @@ fun CartPanel(
                     }
                 }
 
-                // Tax
-                if (taxAmount > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("VAT:", style = MaterialTheme.typography.bodyMedium)
-                        Text(formatCurrency(taxAmount), style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                // Total
+                // Total (giá đã bao gồm VAT, không cộng thêm)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween

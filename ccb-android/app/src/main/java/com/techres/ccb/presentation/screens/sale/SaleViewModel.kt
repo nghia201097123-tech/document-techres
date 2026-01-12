@@ -83,6 +83,7 @@ data class SaleUiState(
 
     // Tax
     val taxRate: Double = 8.0,  // VAT 8% cho F&B (Nghị định 174/2025)
+    val pricesIncludeVat: Boolean = true,  // Giá sản phẩm đã bao gồm VAT
 
     // UI State - Start with loading=true to show indicator on first render
     val isLoading: Boolean = true,
@@ -103,19 +104,34 @@ data class SaleUiState(
     val subtotal: Long
         get() = cartItems.sumOf { it.totalPrice }
 
+    /**
+     * Tổng tiền sau giảm giá
+     * Vì giá sản phẩm đã bao gồm VAT nên KHÔNG cộng thêm VAT
+     */
+    val totalAmount: Long
+        get() = (subtotal - discountAmount).coerceAtLeast(0L)
+
+    /**
+     * Tiền VAT (tách ra từ tổng để hiển thị trên hóa đơn)
+     * Công thức: VAT = Tổng - (Tổng / (1 + VAT_rate))
+     * Ví dụ: 48,000đ có VAT 8% → VAT = 48,000 - 48,000/1.08 = 3,556đ
+     */
     val taxAmount: Long
         get() {
-            // VAT tính trên giá sau giảm (tuân thủ luật thuế Việt Nam)
-            val priceAfterDiscount = (subtotal - discountAmount).coerceAtLeast(0L)
-            return (priceAfterDiscount * taxRate / 100.0).toLong()
+            if (!pricesIncludeVat) {
+                // Nếu giá chưa bao gồm VAT, tính VAT thêm
+                return (totalAmount * taxRate / 100.0).toLong()
+            }
+            // Giá đã bao gồm VAT - tách VAT ra để hiển thị
+            val priceBeforeVat = totalAmount / (1 + taxRate / 100.0)
+            return (totalAmount - priceBeforeVat).toLong()
         }
 
-    val totalAmount: Long
-        get() {
-            // Tổng = (Tạm tính - Giảm giá) + VAT
-            val priceAfterDiscount = (subtotal - discountAmount).coerceAtLeast(0L)
-            return priceAfterDiscount + taxAmount
-        }
+    /**
+     * Giá trước VAT (để hiển thị trên hóa đơn)
+     */
+    val priceBeforeVat: Long
+        get() = totalAmount - taxAmount
 
     // Tổng tiền giảm giá từ các coupon đã áp dụng
     val totalCouponDiscount: Long
