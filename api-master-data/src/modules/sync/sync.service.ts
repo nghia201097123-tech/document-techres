@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -10,6 +10,7 @@ import {
   AreaDto,
   TableDto,
   StaffDto,
+  KitchenDto,
   SeasonalPriceDto,
   CouponDto,
   ToppingGroupDto,
@@ -60,6 +61,8 @@ export class SyncService {
     private productNoteAssignmentRepository: Repository<ProductNoteAssignment>,
     @InjectRepository(ComboItem)
     private comboItemRepository: Repository<ComboItem>,
+    @InjectRepository(Kitchen)
+    private kitchenRepository: Repository<Kitchen>,
   ) {}
 
   /**
@@ -284,7 +287,7 @@ export class SyncService {
       const tenantId = branch.tenantId;
       console.log(`[SyncService.getFullSync] tenantId=${tenantId}, branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, branchProducts, areas, tables, staff, seasonalPrices, coupons, toppingGroups, productNotes] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff, kitchens, seasonalPrices, coupons, toppingGroups, productNotes] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -309,6 +312,10 @@ export class SyncService {
         }),
         this.staffRepository.find({
           where: { branchId, isActive: true },
+        }),
+        this.kitchenRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
         }),
         this.seasonalPriceRepository.find({
           where: { branchId, isActive: true },
@@ -418,7 +425,7 @@ export class SyncService {
             }),
       ]);
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}`);
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, kitchens=${kitchens.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -430,6 +437,7 @@ export class SyncService {
           areas: areas.map(this.mapArea),
           tables: tables.map(this.mapTable),
           staff: staff.map(this.mapStaff),
+          kitchens: kitchens.map(this.mapKitchen),
           seasonalPrices: seasonalPrices.map(sp => this.mapSeasonalPrice(sp, seasonalPriceProducts)),
           coupons: coupons.map(c => this.mapCoupon(c)),
           toppingGroups: toppingGroups.map(tg => this.mapToppingGroup(tg, toppingGroupItems, productToppingGroups)),
@@ -640,6 +648,19 @@ export class SyncService {
       isActive: staff.isActive,
       createdAt: staff.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: staff.updatedAt.toISOString(),
+    };
+  }
+
+  private mapKitchen(kitchen: Kitchen): KitchenDto {
+    return {
+      id: kitchen.id,
+      name: kitchen.name,
+      description: kitchen.description || null,
+      kitchenType: kitchen.kitchenType || null,
+      sortOrder: kitchen.sortOrder || 0,
+      isActive: kitchen.isActive,
+      createdAt: kitchen.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: kitchen.updatedAt.toISOString(),
     };
   }
 

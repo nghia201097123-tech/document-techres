@@ -476,6 +476,34 @@ export class ComboItemDto {
   isActive: boolean;
 }
 
+// ============ Kitchen DTOs ============
+
+export class KitchenDto {
+  @ApiProperty({ description: 'ID của bếp' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên bếp' })
+  name: string;
+
+  @ApiProperty({ description: 'Mô tả', nullable: true })
+  description: string | null;
+
+  @ApiProperty({ description: 'Loại bếp (cooking, grill, bar, dessert, other)', nullable: true })
+  kitchenType: string | null;
+
+  @ApiProperty({ description: 'Thứ tự sắp xếp' })
+  sortOrder: number;
+
+  @ApiProperty({ description: 'Còn hoạt động không' })
+  isActive: boolean;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 export class FullSyncDataDto {
   @ApiProperty({ type: [CategoryDto] })
   categories: CategoryDto[];
@@ -491,6 +519,9 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [StaffDto] })
   staff: StaffDto[];
+
+  @ApiProperty({ type: [KitchenDto], description: 'Danh sách bếp' })
+  kitchens: KitchenDto[];
 
   @ApiProperty({ type: [SeasonalPriceDto] })
   seasonalPrices: SeasonalPriceDto[];
