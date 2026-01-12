@@ -2,6 +2,7 @@ package com.techres.ccb.presentation.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.KitchenRepository
@@ -9,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -16,7 +18,8 @@ import javax.inject.Inject
 data class KitchenPrinterUiState(
     val kitchens: List<KitchenEntity> = emptyList(),
     val isLoading: Boolean = true,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isDebugDataInserted: Boolean = false
 )
 
 @HiltViewModel
@@ -46,6 +49,15 @@ class KitchenPrinterViewModel @Inject constructor(
                         )
                     }
                     return@launch
+                }
+
+                // Check if we need to insert debug data
+                if (BuildConfig.DEBUG && !_uiState.value.isDebugDataInserted) {
+                    val existingKitchens = kitchenRepository.getAllKitchens(branchId).first()
+                    if (existingKitchens.isEmpty()) {
+                        kitchenRepository.insertDebugKitchens(branchId)
+                        _uiState.update { it.copy(isDebugDataInserted = true) }
+                    }
                 }
 
                 kitchenRepository.getAllKitchens(branchId).collect { kitchens ->

@@ -43,4 +43,61 @@ class KitchenRepository @Inject constructor(
     suspend fun clearByBranch(branchId: String) {
         kitchenDao.deleteAllByBranch(branchId)
     }
+
+    /**
+     * Insert debug/demo kitchen data for testing
+     */
+    suspend fun insertDebugKitchens(branchId: String) {
+        val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            .format(java.util.Date())
+
+        val debugKitchens = listOf(
+            KitchenEntity(
+                id = "kitchen-debug-1",
+                branchId = branchId,
+                name = "Bếp chính",
+                description = "Bếp nấu món chính",
+                kitchenType = "cooking",
+                sortOrder = 1,
+                isActive = true,
+                createdAt = now,
+                updatedAt = now
+            ),
+            KitchenEntity(
+                id = "kitchen-debug-2",
+                branchId = branchId,
+                name = "Bếp nướng",
+                description = "Bếp chế biến món nướng",
+                kitchenType = "grill",
+                sortOrder = 2,
+                isActive = true,
+                createdAt = now,
+                updatedAt = now
+            ),
+            KitchenEntity(
+                id = "kitchen-debug-3",
+                branchId = branchId,
+                name = "Quầy bar",
+                description = "Pha chế đồ uống",
+                kitchenType = "bar",
+                sortOrder = 3,
+                isActive = true,
+                createdAt = now,
+                updatedAt = now
+            ),
+            KitchenEntity(
+                id = "kitchen-debug-4",
+                branchId = branchId,
+                name = "Quầy tráng miệng",
+                description = "Món tráng miệng và bánh ngọt",
+                kitchenType = "dessert",
+                sortOrder = 4,
+                isActive = true,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+
+        kitchenDao.insertAll(debugKitchens)
+    }
 }
