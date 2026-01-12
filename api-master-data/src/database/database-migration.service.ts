@@ -282,6 +282,12 @@ export class DatabaseMigrationService implements OnModuleInit {
       // Create function to remove Vietnamese diacritics and populate existing products
       await this.populateProductSearchFields(queryRunner);
 
+      // Create bill_templates table
+      await this.createBillTemplatesTable(queryRunner);
+
+      // Create bill_printer_configs table
+      await this.createBillPrinterConfigsTable(queryRunner);
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
@@ -400,5 +406,135 @@ export class DatabaseMigrationService implements OnModuleInit {
       WHERE search_name IS NULL OR abbreviation IS NULL;
     `);
     this.logger.log(`Updated ${updateResult?.length || 0} products with search fields`);
+  }
+
+  private async createBillTemplatesTable(queryRunner: any): Promise<void> {
+    const exists = await this.tableExists(queryRunner, 'bill_templates');
+    if (!exists) {
+      this.logger.log('Creating bill_templates table...');
+      await queryRunner.query(`
+        CREATE TABLE bill_templates (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          branch_id UUID NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          template_type VARCHAR(50) DEFAULT 'classic',
+          description TEXT,
+          -- Header config
+          show_logo BOOLEAN DEFAULT true,
+          logo_url TEXT,
+          store_name VARCHAR(200) NOT NULL,
+          store_address TEXT,
+          store_phone VARCHAR(50),
+          tax_code VARCHAR(50),
+          header_text TEXT,
+          -- Content config
+          bill_title VARCHAR(100) DEFAULT 'HÓA ĐƠN BÁN HÀNG',
+          show_order_number BOOLEAN DEFAULT true,
+          show_table_name BOOLEAN DEFAULT true,
+          show_staff_name BOOLEAN DEFAULT true,
+          show_customer_name BOOLEAN DEFAULT true,
+          show_date_time BOOLEAN DEFAULT true,
+          date_format VARCHAR(50) DEFAULT 'dd/MM/yyyy HH:mm',
+          -- Items config
+          show_item_code BOOLEAN DEFAULT false,
+          show_item_note BOOLEAN DEFAULT true,
+          show_unit_price BOOLEAN DEFAULT true,
+          show_quantity BOOLEAN DEFAULT true,
+          -- Price config
+          show_subtotal BOOLEAN DEFAULT true,
+          show_discount BOOLEAN DEFAULT true,
+          show_discount_percent BOOLEAN DEFAULT true,
+          show_service_fee BOOLEAN DEFAULT true,
+          show_vat BOOLEAN DEFAULT true,
+          show_vat_details BOOLEAN DEFAULT true,
+          show_price_before_vat BOOLEAN DEFAULT true,
+          show_price_after_vat BOOLEAN DEFAULT true,
+          vat_label VARCHAR(50) DEFAULT 'VAT',
+          price_before_vat_label VARCHAR(100) DEFAULT 'Giá trước thuế',
+          price_after_vat_label VARCHAR(100) DEFAULT 'Giá sau thuế',
+          -- Payment config
+          show_payment_method BOOLEAN DEFAULT true,
+          show_received_amount BOOLEAN DEFAULT true,
+          show_change_amount BOOLEAN DEFAULT true,
+          -- Footer config
+          show_qr_code BOOLEAN DEFAULT false,
+          qr_code_type VARCHAR(50) DEFAULT 'order_id',
+          qr_code_content TEXT,
+          show_barcode BOOLEAN DEFAULT false,
+          thank_you_message TEXT DEFAULT 'Cảm ơn quý khách!',
+          comeback_message TEXT DEFAULT 'Hẹn gặp lại!',
+          footer_text TEXT,
+          show_wifi_info BOOLEAN DEFAULT false,
+          wifi_name VARCHAR(100),
+          wifi_password VARCHAR(100),
+          -- Style config
+          paper_width INT DEFAULT 80,
+          font_size VARCHAR(20) DEFAULT 'normal',
+          separator_char CHAR(1) DEFAULT '-',
+          double_separator_char CHAR(1) DEFAULT '=',
+          cut_paper BOOLEAN DEFAULT true,
+          open_cash_drawer BOOLEAN DEFAULT false,
+          beep_after_print BOOLEAN DEFAULT false,
+          number_of_copies INT DEFAULT 1,
+          -- Status
+          is_default BOOLEAN DEFAULT false,
+          is_active BOOLEAN DEFAULT true,
+          sort_order INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_bill_templates_tenant ON bill_templates(tenant_id);
+        CREATE INDEX idx_bill_templates_branch ON bill_templates(branch_id);
+        CREATE INDEX idx_bill_templates_tenant_branch ON bill_templates(tenant_id, branch_id);
+      `);
+      this.logger.log('bill_templates table created successfully');
+    }
+  }
+
+  private async createBillPrinterConfigsTable(queryRunner: any): Promise<void> {
+    const exists = await this.tableExists(queryRunner, 'bill_printer_configs');
+    if (!exists) {
+      this.logger.log('Creating bill_printer_configs table...');
+      await queryRunner.query(`
+        CREATE TABLE bill_printer_configs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tenant_id VARCHAR(50) NOT NULL,
+          branch_id UUID NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          description TEXT,
+          -- Connection config
+          connection_type VARCHAR(50) DEFAULT 'network',
+          printer_ip VARCHAR(50),
+          printer_port INT DEFAULT 9100,
+          printer_mac VARCHAR(50),
+          printer_usb_path VARCHAR(200),
+          -- Template config
+          template_id UUID REFERENCES bill_templates(id),
+          -- Print config
+          paper_width INT DEFAULT 80,
+          auto_print_on_payment BOOLEAN DEFAULT true,
+          print_preview BOOLEAN DEFAULT false,
+          number_of_copies INT DEFAULT 1,
+          cut_paper BOOLEAN DEFAULT true,
+          open_cash_drawer BOOLEAN DEFAULT true,
+          beep_after_print BOOLEAN DEFAULT true,
+          -- Retry config
+          retry_count INT DEFAULT 3,
+          retry_delay_ms INT DEFAULT 1000,
+          connection_timeout_ms INT DEFAULT 5000,
+          -- Status
+          is_default BOOLEAN DEFAULT false,
+          is_active BOOLEAN DEFAULT true,
+          sort_order INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_bill_printer_configs_tenant ON bill_printer_configs(tenant_id);
+        CREATE INDEX idx_bill_printer_configs_branch ON bill_printer_configs(branch_id);
+        CREATE INDEX idx_bill_printer_configs_tenant_branch ON bill_printer_configs(tenant_id, branch_id);
+      `);
+      this.logger.log('bill_printer_configs table created successfully');
+    }
   }
 }
