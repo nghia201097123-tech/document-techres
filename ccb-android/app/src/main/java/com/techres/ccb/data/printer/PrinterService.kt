@@ -3,15 +3,14 @@ package com.techres.ccb.data.printer
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Log
+import com.techres.ccb.printer.core.EscPosCommands
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -123,67 +122,17 @@ object PrinterService {
     }
 
     /**
-     * Convert bitmap to ESC/POS format using ESC * command (line by line)
-     * This is more widely supported than GS v 0
+     * Convert bitmap to ESC/POS format using the existing EscPosCommands
+     * Uses printBitmap which has been tested to work with Vietnamese text
      */
-    private fun bitmapToEscPosLineByLine(bitmap: Bitmap): ByteArray {
-        val width = bitmap.width
-        val height = bitmap.height
-        val output = ByteArrayOutputStream()
-
-        // Process image in 24-dot (3 byte) vertical strips
-        // ESC * 33 nL nH - 24-dot double density
-        val dotsPerStrip = 24
-
-        var y = 0
-        while (y < height) {
-            // Set line spacing to 0 for seamless image
-            output.write(0x1B)
-            output.write(0x33)
-            output.write(dotsPerStrip)
-
-            // ESC * 33 (24-dot double density)
-            output.write(0x1B)
-            output.write(0x2A)
-            output.write(33) // 24-dot double density mode
-            output.write(width and 0xFF) // nL
-            output.write((width shr 8) and 0xFF) // nH
-
-            // Send image data for this strip
-            for (x in 0 until width) {
-                for (byteNum in 0 until 3) { // 3 bytes = 24 dots vertical
-                    var byte = 0
-                    for (bit in 0 until 8) {
-                        val pixelY = y + byteNum * 8 + bit
-                        if (pixelY < height) {
-                            val pixel = bitmap.getPixel(x, pixelY)
-                            val gray = (Color.red(pixel) * 0.299 +
-                                       Color.green(pixel) * 0.587 +
-                                       Color.blue(pixel) * 0.114).toInt()
-                            if (gray < 128) {
-                                byte = byte or (0x80 shr bit)
-                            }
-                        }
-                    }
-                    output.write(byte)
-                }
-            }
-
-            // Line feed
-            output.write(0x0A)
-
-            y += dotsPerStrip
-        }
-
-        // Reset line spacing to default
-        output.write(0x1B)
-        output.write(0x32)
-
-        return output.toByteArray()
+    private fun bitmapToEscPos(bitmap: Bitmap): ByteArray {
+        // Use the existing printBitmap function from EscPosCommands
+        // which has been proven to work with the user's printers
+        return EscPosCommands.printBitmap(bitmap, 0) // 0 = left align
     }
 
     /**
-     * Print text as bitmap image using ESC * command
+     * Print text as bitmap image using ESC/POS commands
      */
     private fun printTextAsBitmap(
         outputStream: OutputStream,
@@ -193,7 +142,7 @@ object PrinterService {
     ) {
         if (text.isBlank()) return
         val bitmap = textToBitmap(text, style, paperWidth)
-        val imageData = bitmapToEscPosLineByLine(bitmap)
+        val imageData = bitmapToEscPos(bitmap)
         outputStream.write(imageData)
         bitmap.recycle()
     }
