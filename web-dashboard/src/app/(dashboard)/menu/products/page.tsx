@@ -4150,39 +4150,52 @@ export default function ProductsPage() {
 
           {bulkAvatarResult ? (
             // Show result
-            <div className="space-y-4">
+            <div className="space-y-4 pt-2">
               <div className="rounded-lg bg-green-50 p-4 border border-green-200">
-                <p className="font-medium text-green-800">Kết quả cập nhật</p>
+                <p className="font-medium text-green-800 flex items-center gap-2">
+                  <Check className="h-5 w-5" />
+                  Kết quả cập nhật
+                </p>
                 <div className="mt-2 space-y-1 text-sm text-green-700">
-                  <p>Thành công: {bulkAvatarResult.success} món</p>
-                  <p>Thất bại: {bulkAvatarResult.failed} món</p>
+                  <p>Thành công: <span className="font-bold">{bulkAvatarResult.success}</span> món</p>
+                  <p>Thất bại: <span className="font-bold">{bulkAvatarResult.failed}</span> món</p>
                 </div>
               </div>
 
               {bulkAvatarResult.errors.length > 0 && (
                 <div className="rounded-lg bg-red-50 p-4 border border-red-200">
-                  <p className="font-medium text-red-800">Lỗi</p>
-                  <ul className="mt-2 space-y-1 text-sm text-red-700 list-disc pl-4">
-                    {bulkAvatarResult.errors.map((err, i) => (
-                      <li key={i}>{err.productCode}: {err.message}</li>
-                    ))}
-                  </ul>
+                  <p className="font-medium text-red-800 flex items-center gap-2">
+                    <X className="h-5 w-5" />
+                    Lỗi
+                  </p>
+                  <ScrollArea className="max-h-[150px] mt-2">
+                    <ul className="space-y-1 text-sm text-red-700 list-disc pl-4">
+                      {bulkAvatarResult.errors.map((err, i) => (
+                        <li key={i}>{err.productCode}: {err.message}</li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
                 </div>
               )}
 
               {bulkAvatarResult.updated.length > 0 && (
                 <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-                  <p className="font-medium text-blue-800">Đã cập nhật</p>
-                  <ul className="mt-2 space-y-1 text-sm text-blue-700 list-disc pl-4">
-                    {bulkAvatarResult.updated.map((item, i) => (
-                      <li key={i}>{item.productCode}: {item.productName}</li>
-                    ))}
-                  </ul>
+                  <p className="font-medium text-blue-800 flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" />
+                    Đã cập nhật ({bulkAvatarResult.updated.length} món)
+                  </p>
+                  <ScrollArea className="h-[300px] mt-2">
+                    <ul className="space-y-1 text-sm text-blue-700 list-disc pl-4 pr-2">
+                      {bulkAvatarResult.updated.map((item, i) => (
+                        <li key={i} className="py-0.5">{item.productCode}: {item.productName}</li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
                 </div>
               )}
 
-              <DialogFooter>
-                <Button onClick={handleCloseBulkAvatarDialog}>Đóng</Button>
+              <DialogFooter className="border-t pt-4 bg-gray-50/50 -mx-6 px-6 -mb-6 pb-6 rounded-b-lg">
+                <Button onClick={handleCloseBulkAvatarDialog} className="bg-blue-600 hover:bg-blue-700">Đóng</Button>
               </DialogFooter>
             </div>
           ) : (
