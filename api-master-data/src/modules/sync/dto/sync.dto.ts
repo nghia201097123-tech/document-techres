@@ -293,8 +293,14 @@ export class CouponDto {
   @ApiProperty({ nullable: true })
   description: string | null;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Loại: percentage (%), fixed (cố định)' })
   couponType: string;
+
+  @ApiProperty({ description: 'Áp dụng cho: bill, item, category' })
+  applyTo: string;
+
+  @ApiProperty({ description: 'Kích hoạt: manual, auto' })
+  activationType: string;
 
   @ApiProperty()
   discountValue: number;
@@ -304,6 +310,21 @@ export class CouponDto {
 
   @ApiProperty()
   minOrderAmount: number;
+
+  @ApiProperty({ description: 'Số lượng tối thiểu để áp dụng' })
+  minQuantity: number;
+
+  @ApiProperty({ nullable: true, description: 'Product IDs (khi applyTo=item)' })
+  productIds: string[] | null;
+
+  @ApiProperty({ nullable: true, description: 'Category IDs (khi applyTo=category)' })
+  categoryIds: string[] | null;
+
+  @ApiProperty({ description: 'Có thể kết hợp với coupon khác' })
+  isCombinable: boolean;
+
+  @ApiProperty({ description: 'Độ ưu tiên (số nhỏ = ưu tiên cao)' })
+  priority: number;
 
   @ApiProperty({ nullable: true })
   usageLimit: number | null;

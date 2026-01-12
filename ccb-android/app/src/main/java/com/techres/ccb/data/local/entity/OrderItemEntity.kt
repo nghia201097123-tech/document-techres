@@ -48,6 +48,9 @@ data class OrderItemEntity(
     @ColumnInfo(name = "product_image_url")
     val productImageUrl: String? = null,
 
+    @ColumnInfo(name = "category_id")
+    val categoryId: String? = null,
+
     @ColumnInfo(name = "category_name")
     val categoryName: String? = null,
 
@@ -57,17 +60,44 @@ data class OrderItemEntity(
     @ColumnInfo(name = "unit_price")
     val unitPrice: Double,
 
+    // Giá gốc (trước giảm giá) = unitPrice * quantity
+    @ColumnInfo(name = "original_price")
+    val originalPrice: Double = 0.0,
+
     @ColumnInfo(name = "discount_amount")
     val discountAmount: Double = 0.0,
+
+    // Loại giảm giá (percentage, fixed)
+    @ColumnInfo(name = "discount_type")
+    val discountType: String? = null,
+
+    // Giá trị giảm (% hoặc số tiền cố định)
+    @ColumnInfo(name = "discount_value")
+    val discountValue: Double = 0.0,
+
+    // Coupon áp dụng cho item này
+    @ColumnInfo(name = "coupon_id")
+    val couponId: String? = null,
+
+    @ColumnInfo(name = "coupon_code")
+    val couponCode: String? = null,
+
+    // Giá sau giảm, trước VAT (dùng cho hóa đơn điện tử)
+    @ColumnInfo(name = "price_before_vat")
+    val priceBeforeVat: Double = 0.0,
 
     @ColumnInfo(name = "total_price")
     val totalPrice: Double,
 
     @ColumnInfo(name = "vat_rate")
-    val vatRate: Double = 10.0,
+    val vatRate: Double = 8.0, // VAT F&B hiện tại 8%
 
     @ColumnInfo(name = "vat_amount")
     val vatAmount: Double = 0.0,
+
+    // Giá sau VAT (= priceBeforeVat + vatAmount)
+    @ColumnInfo(name = "price_after_vat")
+    val priceAfterVat: Double = 0.0,
 
     @ColumnInfo(name = "notes")
     val notes: String? = null,

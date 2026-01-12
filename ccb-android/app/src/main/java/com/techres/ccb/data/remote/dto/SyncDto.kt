@@ -585,9 +585,23 @@ data class CouponDto(
     @SerializedName("name") val name: String,
     @SerializedName("description") val description: String?,
     @SerializedName("couponType") val couponType: String,
+    // Áp dụng cho: bill (hóa đơn), item (món), category (danh mục)
+    @SerializedName("applyTo") val applyTo: String = "bill",
+    // Cách kích hoạt: manual (nhập mã), auto (tự động)
+    @SerializedName("activationType") val activationType: String = "manual",
     @SerializedName("discountValue") val discountValue: Double,
     @SerializedName("maxDiscount") val maxDiscount: Double?,
     @SerializedName("minOrderAmount") val minOrderAmount: Double,
+    // Số lượng tối thiểu để áp dụng (cho item/category)
+    @SerializedName("minQuantity") val minQuantity: Int = 1,
+    // Danh sách product IDs (khi applyTo=item)
+    @SerializedName("productIds") val productIds: List<String>? = null,
+    // Danh sách category IDs (khi applyTo=category)
+    @SerializedName("categoryIds") val categoryIds: List<String>? = null,
+    // Có thể kết hợp với coupon khác
+    @SerializedName("isCombinable") val isCombinable: Boolean = false,
+    // Độ ưu tiên (số nhỏ = ưu tiên cao)
+    @SerializedName("priority") val priority: Int = 100,
     @SerializedName("usageLimit") val usageLimit: Int?,
     @SerializedName("usageCount") val usageCount: Int,
     @SerializedName("dailyLimit") val dailyLimit: Int?,

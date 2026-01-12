@@ -35,6 +35,14 @@ data class CouponEntity(
     @ColumnInfo(name = "coupon_type")
     val couponType: String, // percentage, fixed
 
+    // Áp dụng cho: bill (hóa đơn), item (món), category (danh mục)
+    @ColumnInfo(name = "apply_to")
+    val applyTo: String = "bill",
+
+    // Cách kích hoạt: manual (nhập mã), auto (tự động)
+    @ColumnInfo(name = "activation_type")
+    val activationType: String = "manual",
+
     @ColumnInfo(name = "discount_value")
     val discountValue: Double,
 
@@ -43,6 +51,26 @@ data class CouponEntity(
 
     @ColumnInfo(name = "min_order_amount")
     val minOrderAmount: Double = 0.0,
+
+    // Số lượng tối thiểu của món để áp dụng
+    @ColumnInfo(name = "min_quantity")
+    val minQuantity: Int = 1,
+
+    // Danh sách product IDs (JSON string)
+    @ColumnInfo(name = "product_ids")
+    val productIds: String? = null,
+
+    // Danh sách category IDs (JSON string)
+    @ColumnInfo(name = "category_ids")
+    val categoryIds: String? = null,
+
+    // Có thể kết hợp với coupon khác
+    @ColumnInfo(name = "is_combinable")
+    val isCombinable: Boolean = false,
+
+    // Độ ưu tiên (số nhỏ = ưu tiên cao)
+    @ColumnInfo(name = "priority")
+    val priority: Int = 100,
 
     @ColumnInfo(name = "usage_limit")
     val usageLimit: Int? = null,

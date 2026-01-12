@@ -11,8 +11,14 @@ import {
 import { Branch } from './branch.entity';
 
 export enum CouponType {
-  PERCENTAGE = 'percentage',
-  FIXED = 'fixed',
+  PERCENTAGE = 'percentage',  // Giảm theo %
+  FIXED = 'fixed',            // Giảm số tiền cố định
+}
+
+export enum CouponApplyTo {
+  BILL = 'bill',              // Áp dụng cho toàn hóa đơn
+  ITEM = 'item',              // Áp dụng cho món cụ thể
+  CATEGORY = 'category',      // Áp dụng cho danh mục
 }
 
 export enum CouponApprovalStatus {
@@ -20,6 +26,11 @@ export enum CouponApprovalStatus {
   PENDING = 'pending',              // Đang chờ phê duyệt
   APPROVED = 'approved',            // Đã được phê duyệt
   REJECTED = 'rejected',            // Bị từ chối
+}
+
+export enum CouponActivationType {
+  MANUAL = 'manual',          // Nhập mã thủ công
+  AUTO = 'auto',              // Tự động áp dụng khi đủ điều kiện
 }
 
 @Entity('coupons')
@@ -52,6 +63,14 @@ export class Coupon {
   @Column({ name: 'coupon_type', type: 'enum', enum: CouponType, default: CouponType.PERCENTAGE })
   couponType: CouponType;
 
+  // Áp dụng cho: bill (hóa đơn), item (món), category (danh mục)
+  @Column({ name: 'apply_to', type: 'enum', enum: CouponApplyTo, default: CouponApplyTo.BILL })
+  applyTo: CouponApplyTo;
+
+  // Cách kích hoạt: manual (nhập mã), auto (tự động)
+  @Column({ name: 'activation_type', type: 'enum', enum: CouponActivationType, default: CouponActivationType.MANUAL })
+  activationType: CouponActivationType;
+
   @Column({ name: 'discount_value', type: 'decimal', precision: 15, scale: 2, default: 0 })
   discountValue: number;
 
@@ -60,6 +79,26 @@ export class Coupon {
 
   @Column({ name: 'min_order_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
   minOrderAmount: number;
+
+  // Số lượng tối thiểu của món để áp dụng (chỉ dùng cho item/category)
+  @Column({ name: 'min_quantity', type: 'int', default: 1 })
+  minQuantity: number;
+
+  // Danh sách product IDs được áp dụng (JSON array) - chỉ dùng khi apply_to = 'item'
+  @Column({ name: 'product_ids', type: 'simple-json', nullable: true })
+  productIds: string[];
+
+  // Danh sách category IDs được áp dụng (JSON array) - chỉ dùng khi apply_to = 'category'
+  @Column({ name: 'category_ids', type: 'simple-json', nullable: true })
+  categoryIds: string[];
+
+  // Có thể kết hợp với coupon khác không
+  @Column({ name: 'is_combinable', default: false })
+  isCombinable: boolean;
+
+  // Độ ưu tiên khi áp dụng (số nhỏ = ưu tiên cao)
+  @Column({ name: 'priority', type: 'int', default: 100 })
+  priority: number;
 
   // Giới hạn sử dụng tổng
   @Column({ name: 'usage_limit', nullable: true })
