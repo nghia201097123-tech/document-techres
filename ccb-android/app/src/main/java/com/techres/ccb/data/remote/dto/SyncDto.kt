@@ -88,7 +88,11 @@ data class FullSyncData(
     // Product notes (ghi chú món ăn)
     @SerializedName("productNotes") val productNotes: List<ProductNoteDto>?,
     // Combo items (các món con trong combo)
-    @SerializedName("comboItems") val comboItems: List<ComboItemDto>?
+    @SerializedName("comboItems") val comboItems: List<ComboItemDto>?,
+    // Bill templates (mẫu hóa đơn)
+    @SerializedName("billTemplates") val billTemplates: List<BillTemplateDto>?,
+    // Bill printer configs (cấu hình máy in bill)
+    @SerializedName("billPrinterConfigs") val billPrinterConfigs: List<BillPrinterConfigDto>?
 )
 
 // ============ Master Data DTOs ============
@@ -666,4 +670,115 @@ data class ComboItemDto(
     @SerializedName("quantity") val quantity: Int = 1,         // Số lượng sản phẩm con trong combo
     @SerializedName("sortOrder") val sortOrder: Int = 0,
     @SerializedName("isActive") val isActive: Boolean = true
+)
+
+// ============ Bill Template DTOs ============
+
+/**
+ * Mẫu hóa đơn (Bill Template)
+ * Được cấu hình từ web-dashboard và sync về CCB
+ */
+data class BillTemplateDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("templateType") val templateType: String = "classic",
+    @SerializedName("description") val description: String?,
+    // Header config
+    @SerializedName("showLogo") val showLogo: Boolean = true,
+    @SerializedName("logoUrl") val logoUrl: String?,
+    @SerializedName("storeName") val storeName: String,
+    @SerializedName("storeAddress") val storeAddress: String?,
+    @SerializedName("storePhone") val storePhone: String?,
+    @SerializedName("taxCode") val taxCode: String?,
+    @SerializedName("headerText") val headerText: String?,
+    // Content config
+    @SerializedName("billTitle") val billTitle: String = "HÓA ĐƠN BÁN HÀNG",
+    @SerializedName("showOrderNumber") val showOrderNumber: Boolean = true,
+    @SerializedName("showTableName") val showTableName: Boolean = true,
+    @SerializedName("showStaffName") val showStaffName: Boolean = true,
+    @SerializedName("showCustomerName") val showCustomerName: Boolean = true,
+    @SerializedName("showDateTime") val showDateTime: Boolean = true,
+    @SerializedName("dateFormat") val dateFormat: String = "dd/MM/yyyy HH:mm",
+    // Items config
+    @SerializedName("showItemCode") val showItemCode: Boolean = false,
+    @SerializedName("showItemNote") val showItemNote: Boolean = true,
+    @SerializedName("showUnitPrice") val showUnitPrice: Boolean = true,
+    @SerializedName("showQuantity") val showQuantity: Boolean = true,
+    // Price config
+    @SerializedName("showSubtotal") val showSubtotal: Boolean = true,
+    @SerializedName("showDiscount") val showDiscount: Boolean = true,
+    @SerializedName("showDiscountPercent") val showDiscountPercent: Boolean = true,
+    @SerializedName("showServiceFee") val showServiceFee: Boolean = true,
+    @SerializedName("showVat") val showVat: Boolean = true,
+    @SerializedName("showVatDetails") val showVatDetails: Boolean = true,
+    @SerializedName("showPriceBeforeVat") val showPriceBeforeVat: Boolean = true,
+    @SerializedName("showPriceAfterVat") val showPriceAfterVat: Boolean = true,
+    @SerializedName("vatLabel") val vatLabel: String = "VAT",
+    @SerializedName("priceBeforeVatLabel") val priceBeforeVatLabel: String = "Giá trước thuế",
+    @SerializedName("priceAfterVatLabel") val priceAfterVatLabel: String = "Giá sau thuế",
+    // Payment config
+    @SerializedName("showPaymentMethod") val showPaymentMethod: Boolean = true,
+    @SerializedName("showReceivedAmount") val showReceivedAmount: Boolean = true,
+    @SerializedName("showChangeAmount") val showChangeAmount: Boolean = true,
+    // Footer config
+    @SerializedName("showQrCode") val showQrCode: Boolean = false,
+    @SerializedName("qrCodeType") val qrCodeType: String = "order_id",
+    @SerializedName("qrCodeContent") val qrCodeContent: String?,
+    @SerializedName("showBarcode") val showBarcode: Boolean = false,
+    @SerializedName("thankYouMessage") val thankYouMessage: String = "Cảm ơn quý khách!",
+    @SerializedName("comebackMessage") val comebackMessage: String = "Hẹn gặp lại!",
+    @SerializedName("footerText") val footerText: String?,
+    @SerializedName("showWifiInfo") val showWifiInfo: Boolean = false,
+    @SerializedName("wifiName") val wifiName: String?,
+    @SerializedName("wifiPassword") val wifiPassword: String?,
+    // Style config
+    @SerializedName("paperWidth") val paperWidth: Int = 80,
+    @SerializedName("fontSize") val fontSize: String = "normal",
+    @SerializedName("separatorChar") val separatorChar: String = "-",
+    @SerializedName("doubleSeparatorChar") val doubleSeparatorChar: String = "=",
+    @SerializedName("cutPaper") val cutPaper: Boolean = true,
+    @SerializedName("openCashDrawer") val openCashDrawer: Boolean = false,
+    @SerializedName("beepAfterPrint") val beepAfterPrint: Boolean = false,
+    @SerializedName("numberOfCopies") val numberOfCopies: Int = 1,
+    // Status
+    @SerializedName("isDefault") val isDefault: Boolean = false,
+    @SerializedName("isActive") val isActive: Boolean = true,
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+/**
+ * Cấu hình máy in bill (Bill Printer Config)
+ */
+data class BillPrinterConfigDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    // Connection config
+    @SerializedName("connectionType") val connectionType: String = "network",
+    @SerializedName("printerIp") val printerIp: String?,
+    @SerializedName("printerPort") val printerPort: Int = 9100,
+    @SerializedName("printerMac") val printerMac: String?,
+    @SerializedName("printerUsbPath") val printerUsbPath: String?,
+    // Template config
+    @SerializedName("templateId") val templateId: String?,
+    // Print config
+    @SerializedName("paperWidth") val paperWidth: Int = 80,
+    @SerializedName("autoPrintOnPayment") val autoPrintOnPayment: Boolean = true,
+    @SerializedName("printPreview") val printPreview: Boolean = false,
+    @SerializedName("numberOfCopies") val numberOfCopies: Int = 1,
+    @SerializedName("cutPaper") val cutPaper: Boolean = true,
+    @SerializedName("openCashDrawer") val openCashDrawer: Boolean = true,
+    @SerializedName("beepAfterPrint") val beepAfterPrint: Boolean = true,
+    // Retry config
+    @SerializedName("retryCount") val retryCount: Int = 3,
+    @SerializedName("retryDelayMs") val retryDelayMs: Int = 1000,
+    @SerializedName("connectionTimeoutMs") val connectionTimeoutMs: Int = 5000,
+    // Status
+    @SerializedName("isDefault") val isDefault: Boolean = false,
+    @SerializedName("isActive") val isActive: Boolean = true,
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
 )

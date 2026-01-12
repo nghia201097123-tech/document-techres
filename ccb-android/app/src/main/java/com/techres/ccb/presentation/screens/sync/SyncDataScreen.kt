@@ -390,6 +390,7 @@ private fun getIconForSyncItem(id: String): ImageVector {
         "seasonal_prices" -> Icons.Default.Event
         "coupons" -> Icons.Default.Discount
         "product_notes" -> Icons.Default.Note
+        "bill_templates" -> Icons.Default.Receipt
         "settings" -> Icons.Default.Settings
         else -> Icons.Default.Sync
     }

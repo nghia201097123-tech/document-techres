@@ -2,6 +2,7 @@ package com.techres.ccb.presentation.screens.sync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
@@ -67,7 +68,8 @@ class SyncDataViewModel @Inject constructor(
     private val comboItemDao: ComboItemDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val couponDao: CouponDao,
-    private val productNoteDao: ProductNoteDao
+    private val productNoteDao: ProductNoteDao,
+    private val billTemplateDao: BillTemplateDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SyncDataUiState())
@@ -100,6 +102,7 @@ class SyncDataViewModel @Inject constructor(
             SyncItem("seasonal_prices", "Giá thời vụ", "event"),
             SyncItem("coupons", "Coupon", "discount"),
             SyncItem("product_notes", "Ghi chú", "note"),
+            SyncItem("bill_templates", "Mẫu in bill", "receipt"),
             SyncItem("settings", "Cấu hình", "settings")
         )
         _uiState.update { it.copy(syncItems = items) }
@@ -163,6 +166,7 @@ class SyncDataViewModel @Inject constructor(
             SyncStep.SEASONAL_PRICES -> "seasonal_prices"
             SyncStep.COUPONS -> "coupons"
             SyncStep.PRODUCT_NOTES -> "product_notes"
+            SyncStep.BILL_TEMPLATES -> "bill_templates"
         }
 
         if (itemId != null) {
@@ -224,6 +228,7 @@ class SyncDataViewModel @Inject constructor(
                     "seasonal_prices" -> syncSeasonalPrices()
                     "coupons" -> syncCoupons()
                     "product_notes" -> syncProductNotes()
+                    "bill_templates" -> syncBillTemplates()
                     "settings" -> syncSettings()
                     else -> Result.success(0)
                 }
@@ -380,6 +385,16 @@ class SyncDataViewModel @Inject constructor(
         }
     }
 
+    private suspend fun syncBillTemplates(): Result<Int> {
+        val branchId = _uiState.value.branchId
+        return try {
+            val count = billTemplateDao.getActiveCount(branchId)
+            Result.success(count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private suspend fun syncSettings(): Result<Int> {
         // Settings sync is always successful with 1 item
         return Result.success(1)
@@ -404,6 +419,7 @@ class SyncDataViewModel @Inject constructor(
                 "seasonal_prices" -> try { seasonalPriceDao.countActive(branchId) } catch (e: Exception) { 0 }
                 "coupons" -> try { couponDao.countActive(branchId) } catch (e: Exception) { 0 }
                 "product_notes" -> try { productNoteDao.countActive(branchId) } catch (e: Exception) { 0 }
+                "bill_templates" -> try { billTemplateDao.getActiveCount(branchId) } catch (e: Exception) { 0 }
                 "settings" -> 1
                 else -> 0
             }

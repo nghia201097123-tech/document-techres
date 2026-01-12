@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import android.util.Log
+import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.OrderDao
@@ -37,7 +38,8 @@ enum class SyncStep {
     KITCHENS,         // Bếp
     SEASONAL_PRICES,  // Giá thời vụ
     COUPONS,          // Mã giảm giá
-    PRODUCT_NOTES     // Ghi chú món ăn
+    PRODUCT_NOTES,    // Ghi chú món ăn
+    BILL_TEMPLATES    // Mẫu hóa đơn
 }
 
 enum class SyncStepStatus {
@@ -63,7 +65,8 @@ class SyncRepository @Inject constructor(
     private val couponDao: CouponDao,
     private val productNoteDao: ProductNoteDao,
     private val orderDao: OrderDao,
-    private val tableDao: TableDao
+    private val tableDao: TableDao,
+    private val billTemplateDao: BillTemplateDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -490,6 +493,90 @@ class SyncRepository @Inject constructor(
         productNoteDao.syncProductNotes(branchId, productNotesList)
         productNoteDao.syncProductNoteAssignments(branchId, productNoteAssignmentsList)
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_NOTES, SyncStepStatus.COMPLETED, productNotesList.size))
+
+        // Sync bill templates
+        onProgress?.invoke(SyncStepProgress(SyncStep.BILL_TEMPLATES, SyncStepStatus.IN_PROGRESS))
+        val billTemplatesList = syncData.billTemplates?.map { dto ->
+            BillTemplateEntity(
+                id = dto.id,
+                branchId = branchId,
+                name = dto.name,
+                templateType = dto.templateType,
+                description = dto.description,
+                // Header config
+                showLogo = dto.showLogo,
+                logoUrl = dto.logoUrl,
+                storeName = dto.storeName,
+                storeAddress = dto.storeAddress,
+                storePhone = dto.storePhone,
+                taxCode = dto.taxCode,
+                headerText = dto.headerText,
+                // Content config
+                billTitle = dto.billTitle,
+                showOrderNumber = dto.showOrderNumber,
+                showTableName = dto.showTableName,
+                showStaffName = dto.showStaffName,
+                showCustomerName = dto.showCustomerName,
+                showDateTime = dto.showDateTime,
+                dateFormat = dto.dateFormat,
+                // Items config
+                showItemCode = dto.showItemCode,
+                showItemNote = dto.showItemNote,
+                showUnitPrice = dto.showUnitPrice,
+                showQuantity = dto.showQuantity,
+                // Price config
+                showSubtotal = dto.showSubtotal,
+                showDiscount = dto.showDiscount,
+                showDiscountPercent = dto.showDiscountPercent,
+                showServiceFee = dto.showServiceFee,
+                showVat = dto.showVat,
+                showVatDetails = dto.showVatDetails,
+                showPriceBeforeVat = dto.showPriceBeforeVat,
+                showPriceAfterVat = dto.showPriceAfterVat,
+                vatLabel = dto.vatLabel,
+                priceBeforeVatLabel = dto.priceBeforeVatLabel,
+                priceAfterVatLabel = dto.priceAfterVatLabel,
+                // Payment config
+                showPaymentMethod = dto.showPaymentMethod,
+                showReceivedAmount = dto.showReceivedAmount,
+                showChangeAmount = dto.showChangeAmount,
+                // Footer config
+                showQrCode = dto.showQrCode,
+                qrCodeType = dto.qrCodeType,
+                qrCodeContent = dto.qrCodeContent,
+                showBarcode = dto.showBarcode,
+                thankYouMessage = dto.thankYouMessage,
+                comebackMessage = dto.comebackMessage,
+                footerText = dto.footerText,
+                showWifiInfo = dto.showWifiInfo,
+                wifiName = dto.wifiName,
+                wifiPassword = dto.wifiPassword,
+                // Style config
+                paperWidth = dto.paperWidth,
+                fontSize = dto.fontSize,
+                separatorChar = dto.separatorChar,
+                doubleSeparatorChar = dto.doubleSeparatorChar,
+                cutPaper = dto.cutPaper,
+                openCashDrawer = dto.openCashDrawer,
+                beepAfterPrint = dto.beepAfterPrint,
+                numberOfCopies = dto.numberOfCopies,
+                // Status
+                isDefault = dto.isDefault,
+                isActive = dto.isActive,
+                sortOrder = dto.sortOrder,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+
+        billTemplateDao.deleteByBranch(branchId)
+        if (billTemplatesList.isNotEmpty()) {
+            billTemplateDao.insertAll(billTemplatesList)
+            Log.d("SyncRepository", "Saved ${billTemplatesList.size} bill templates to database")
+        }
+        onProgress?.invoke(SyncStepProgress(SyncStep.BILL_TEMPLATES, SyncStepStatus.COMPLETED, billTemplatesList.size))
     }
 
     /**
@@ -555,5 +642,6 @@ class SyncRepository @Inject constructor(
         seasonalPriceDao.deleteAllByBranch(branchId)
         seasonalPriceProductDao.deleteAllByBranch(branchId)
         couponDao.deleteAllByBranch(branchId)
+        billTemplateDao.deleteByBranch(branchId)
     }
 }
