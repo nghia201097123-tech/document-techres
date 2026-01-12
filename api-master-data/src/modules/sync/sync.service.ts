@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, BillTemplate, BillPrinterConfig } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -18,6 +18,8 @@ import {
   ProductNoteDto,
   StaffBranchPermissionsSyncDto,
   BrandWithBranchesDto,
+  BillTemplateDto,
+  BillPrinterConfigDto,
 } from './dto/sync.dto';
 
 @Injectable()
@@ -63,6 +65,10 @@ export class SyncService {
     private comboItemRepository: Repository<ComboItem>,
     @InjectRepository(Kitchen)
     private kitchenRepository: Repository<Kitchen>,
+    @InjectRepository(BillTemplate)
+    private billTemplateRepository: Repository<BillTemplate>,
+    @InjectRepository(BillPrinterConfig)
+    private billPrinterConfigRepository: Repository<BillPrinterConfig>,
   ) {}
 
   /**
@@ -287,7 +293,7 @@ export class SyncService {
       const tenantId = branch.tenantId;
       console.log(`[SyncService.getFullSync] tenantId=${tenantId}, branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, branchProducts, areas, tables, staff, kitchens, seasonalPrices, coupons, toppingGroups, productNotes] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff, kitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -333,6 +339,16 @@ export class SyncService {
           where: { tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
         }) : Promise.resolve([]),
+        // Bill templates for this branch
+        this.billTemplateRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
+        // Bill printer configs for this branch
+        this.billPrinterConfigRepository.find({
+          where: { branchId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }),
       ]);
 
       // Log branchProducts info for debugging
@@ -425,7 +441,7 @@ export class SyncService {
             }),
       ]);
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, kitchens=${kitchens.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}`);
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, kitchens=${kitchens.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}, billTemplates=${billTemplates.length}, billPrinterConfigs=${billPrinterConfigs.length}`);
 
       const syncTime = new Date().toISOString();
 
@@ -443,6 +459,8 @@ export class SyncService {
           toppingGroups: toppingGroups.map(tg => this.mapToppingGroup(tg, toppingGroupItems, productToppingGroups)),
           productNotes: productNotes.map(pn => this.mapProductNote(pn, productNoteAssignments)),
           comboItems: comboItems.map(ci => this.mapComboItem(ci)),
+          billTemplates: billTemplates.map(bt => this.mapBillTemplate(bt)),
+          billPrinterConfigs: billPrinterConfigs.map(bpc => this.mapBillPrinterConfig(bpc)),
         },
         syncTime,
         message: null,
@@ -782,6 +800,112 @@ export class SyncService {
       quantity: ci.quantity,
       sortOrder: ci.sortOrder,
       isActive: true,  // Always active since table doesn't have isActive column
+    };
+  }
+
+  private mapBillTemplate(bt: BillTemplate): BillTemplateDto {
+    return {
+      id: bt.id,
+      name: bt.name,
+      templateType: bt.templateType,
+      description: bt.description || null,
+      // Header config
+      showLogo: bt.showLogo,
+      logoUrl: bt.logoUrl || null,
+      storeName: bt.storeName,
+      storeAddress: bt.storeAddress || null,
+      storePhone: bt.storePhone || null,
+      taxCode: bt.taxCode || null,
+      headerText: bt.headerText || null,
+      // Content config
+      billTitle: bt.billTitle,
+      showOrderNumber: bt.showOrderNumber,
+      showTableName: bt.showTableName,
+      showStaffName: bt.showStaffName,
+      showCustomerName: bt.showCustomerName,
+      showDateTime: bt.showDateTime,
+      dateFormat: bt.dateFormat,
+      // Items config
+      showItemCode: bt.showItemCode,
+      showItemNote: bt.showItemNote,
+      showUnitPrice: bt.showUnitPrice,
+      showQuantity: bt.showQuantity,
+      // Price config
+      showSubtotal: bt.showSubtotal,
+      showDiscount: bt.showDiscount,
+      showDiscountPercent: bt.showDiscountPercent,
+      showServiceFee: bt.showServiceFee,
+      showVat: bt.showVat,
+      showVatDetails: bt.showVatDetails,
+      showPriceBeforeVat: bt.showPriceBeforeVat,
+      showPriceAfterVat: bt.showPriceAfterVat,
+      vatLabel: bt.vatLabel,
+      priceBeforeVatLabel: bt.priceBeforeVatLabel,
+      priceAfterVatLabel: bt.priceAfterVatLabel,
+      // Payment config
+      showPaymentMethod: bt.showPaymentMethod,
+      showReceivedAmount: bt.showReceivedAmount,
+      showChangeAmount: bt.showChangeAmount,
+      // Footer config
+      showQrCode: bt.showQrCode,
+      qrCodeType: bt.qrCodeType,
+      qrCodeContent: bt.qrCodeContent || null,
+      showBarcode: bt.showBarcode,
+      thankYouMessage: bt.thankYouMessage,
+      comebackMessage: bt.comebackMessage,
+      footerText: bt.footerText || null,
+      showWifiInfo: bt.showWifiInfo,
+      wifiName: bt.wifiName || null,
+      wifiPassword: bt.wifiPassword || null,
+      // Style config
+      paperWidth: bt.paperWidth,
+      fontSize: bt.fontSize,
+      separatorChar: bt.separatorChar,
+      doubleSeparatorChar: bt.doubleSeparatorChar,
+      cutPaper: bt.cutPaper,
+      openCashDrawer: bt.openCashDrawer,
+      beepAfterPrint: bt.beepAfterPrint,
+      numberOfCopies: bt.numberOfCopies,
+      // Status
+      isDefault: bt.isDefault,
+      isActive: bt.isActive,
+      sortOrder: bt.sortOrder,
+      createdAt: bt.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: bt.updatedAt.toISOString(),
+    };
+  }
+
+  private mapBillPrinterConfig(bpc: BillPrinterConfig): BillPrinterConfigDto {
+    return {
+      id: bpc.id,
+      name: bpc.name,
+      description: bpc.description || null,
+      // Connection config
+      connectionType: bpc.connectionType,
+      printerIp: bpc.printerIp || null,
+      printerPort: bpc.printerPort,
+      printerMac: bpc.printerMac || null,
+      printerUsbPath: bpc.printerUsbPath || null,
+      // Template config
+      templateId: bpc.templateId || null,
+      // Print config
+      paperWidth: bpc.paperWidth,
+      autoPrintOnPayment: bpc.autoPrintOnPayment,
+      printPreview: bpc.printPreview,
+      numberOfCopies: bpc.numberOfCopies,
+      cutPaper: bpc.cutPaper,
+      openCashDrawer: bpc.openCashDrawer,
+      beepAfterPrint: bpc.beepAfterPrint,
+      // Retry config
+      retryCount: bpc.retryCount,
+      retryDelayMs: bpc.retryDelayMs,
+      connectionTimeoutMs: bpc.connectionTimeoutMs,
+      // Status
+      isDefault: bpc.isDefault,
+      isActive: bpc.isActive,
+      sortOrder: bpc.sortOrder,
+      createdAt: bpc.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: bpc.updatedAt.toISOString(),
     };
   }
 }

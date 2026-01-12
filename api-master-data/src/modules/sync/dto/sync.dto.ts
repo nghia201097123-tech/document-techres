@@ -501,6 +501,276 @@ export class KitchenDto {
   updatedAt: string;
 }
 
+// ============ Bill Template DTOs ============
+
+export class BillTemplateDto {
+  @ApiProperty({ description: 'ID của mẫu bill' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên mẫu' })
+  name: string;
+
+  @ApiProperty({ description: 'Loại mẫu: classic, modern, compact, detailed, premium' })
+  templateType: string;
+
+  @ApiProperty({ description: 'Mô tả', nullable: true })
+  description: string | null;
+
+  // Header config
+  @ApiProperty({ description: 'Hiển thị logo' })
+  showLogo: boolean;
+
+  @ApiProperty({ description: 'URL logo', nullable: true })
+  logoUrl: string | null;
+
+  @ApiProperty({ description: 'Tên cửa hàng' })
+  storeName: string;
+
+  @ApiProperty({ description: 'Địa chỉ cửa hàng', nullable: true })
+  storeAddress: string | null;
+
+  @ApiProperty({ description: 'Số điện thoại', nullable: true })
+  storePhone: string | null;
+
+  @ApiProperty({ description: 'Mã số thuế', nullable: true })
+  taxCode: string | null;
+
+  @ApiProperty({ description: 'Text header tùy chỉnh', nullable: true })
+  headerText: string | null;
+
+  // Content config
+  @ApiProperty({ description: 'Tiêu đề hóa đơn' })
+  billTitle: string;
+
+  @ApiProperty()
+  showOrderNumber: boolean;
+
+  @ApiProperty()
+  showTableName: boolean;
+
+  @ApiProperty()
+  showStaffName: boolean;
+
+  @ApiProperty()
+  showCustomerName: boolean;
+
+  @ApiProperty()
+  showDateTime: boolean;
+
+  @ApiProperty({ description: 'Định dạng ngày giờ' })
+  dateFormat: string;
+
+  // Items config
+  @ApiProperty()
+  showItemCode: boolean;
+
+  @ApiProperty()
+  showItemNote: boolean;
+
+  @ApiProperty()
+  showUnitPrice: boolean;
+
+  @ApiProperty()
+  showQuantity: boolean;
+
+  // Price config - VAT details
+  @ApiProperty()
+  showSubtotal: boolean;
+
+  @ApiProperty()
+  showDiscount: boolean;
+
+  @ApiProperty()
+  showDiscountPercent: boolean;
+
+  @ApiProperty()
+  showServiceFee: boolean;
+
+  @ApiProperty()
+  showVat: boolean;
+
+  @ApiProperty({ description: 'Hiển thị chi tiết VAT (giá trước/sau)' })
+  showVatDetails: boolean;
+
+  @ApiProperty({ description: 'Hiển thị giá trước VAT' })
+  showPriceBeforeVat: boolean;
+
+  @ApiProperty({ description: 'Hiển thị giá sau VAT' })
+  showPriceAfterVat: boolean;
+
+  @ApiProperty({ description: 'Nhãn VAT' })
+  vatLabel: string;
+
+  @ApiProperty({ description: 'Nhãn giá trước thuế' })
+  priceBeforeVatLabel: string;
+
+  @ApiProperty({ description: 'Nhãn giá sau thuế' })
+  priceAfterVatLabel: string;
+
+  // Payment config
+  @ApiProperty()
+  showPaymentMethod: boolean;
+
+  @ApiProperty()
+  showReceivedAmount: boolean;
+
+  @ApiProperty()
+  showChangeAmount: boolean;
+
+  // Footer config
+  @ApiProperty()
+  showQrCode: boolean;
+
+  @ApiProperty({ description: 'Loại QR: order_id, payment, review, custom' })
+  qrCodeType: string;
+
+  @ApiProperty({ description: 'Nội dung QR tùy chỉnh', nullable: true })
+  qrCodeContent: string | null;
+
+  @ApiProperty()
+  showBarcode: boolean;
+
+  @ApiProperty({ description: 'Lời cảm ơn' })
+  thankYouMessage: string;
+
+  @ApiProperty({ description: 'Lời chào tạm biệt' })
+  comebackMessage: string;
+
+  @ApiProperty({ description: 'Text footer tùy chỉnh', nullable: true })
+  footerText: string | null;
+
+  @ApiProperty()
+  showWifiInfo: boolean;
+
+  @ApiProperty({ nullable: true })
+  wifiName: string | null;
+
+  @ApiProperty({ nullable: true })
+  wifiPassword: string | null;
+
+  // Style config
+  @ApiProperty({ description: 'Độ rộng giấy (58 hoặc 80)' })
+  paperWidth: number;
+
+  @ApiProperty({ description: 'Cỡ chữ: small, normal, large' })
+  fontSize: string;
+
+  @ApiProperty()
+  separatorChar: string;
+
+  @ApiProperty()
+  doubleSeparatorChar: string;
+
+  @ApiProperty()
+  cutPaper: boolean;
+
+  @ApiProperty()
+  openCashDrawer: boolean;
+
+  @ApiProperty()
+  beepAfterPrint: boolean;
+
+  @ApiProperty()
+  numberOfCopies: number;
+
+  // Status
+  @ApiProperty()
+  isDefault: boolean;
+
+  @ApiProperty()
+  isActive: boolean;
+
+  @ApiProperty()
+  sortOrder: number;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
+// ============ Bill Printer Config DTOs ============
+
+export class BillPrinterConfigDto {
+  @ApiProperty({ description: 'ID cấu hình' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên máy in (VD: Quầy thu ngân 1)' })
+  name: string;
+
+  @ApiProperty({ description: 'Mô tả', nullable: true })
+  description: string | null;
+
+  // Connection config
+  @ApiProperty({ description: 'Loại kết nối: network, bluetooth, usb, sunmi' })
+  connectionType: string;
+
+  @ApiProperty({ description: 'IP máy in', nullable: true })
+  printerIp: string | null;
+
+  @ApiProperty({ description: 'Port máy in' })
+  printerPort: number;
+
+  @ApiProperty({ description: 'MAC address (Bluetooth)', nullable: true })
+  printerMac: string | null;
+
+  @ApiProperty({ description: 'USB path', nullable: true })
+  printerUsbPath: string | null;
+
+  // Template config
+  @ApiProperty({ description: 'ID mẫu bill', nullable: true })
+  templateId: string | null;
+
+  // Print config
+  @ApiProperty({ description: 'Độ rộng giấy' })
+  paperWidth: number;
+
+  @ApiProperty({ description: 'Tự động in khi thanh toán' })
+  autoPrintOnPayment: boolean;
+
+  @ApiProperty({ description: 'Xem trước khi in' })
+  printPreview: boolean;
+
+  @ApiProperty({ description: 'Số bản in' })
+  numberOfCopies: number;
+
+  @ApiProperty()
+  cutPaper: boolean;
+
+  @ApiProperty()
+  openCashDrawer: boolean;
+
+  @ApiProperty()
+  beepAfterPrint: boolean;
+
+  // Retry config
+  @ApiProperty({ description: 'Số lần thử lại' })
+  retryCount: number;
+
+  @ApiProperty({ description: 'Thời gian chờ giữa các lần thử (ms)' })
+  retryDelayMs: number;
+
+  @ApiProperty({ description: 'Timeout kết nối (ms)' })
+  connectionTimeoutMs: number;
+
+  // Status
+  @ApiProperty()
+  isDefault: boolean;
+
+  @ApiProperty()
+  isActive: boolean;
+
+  @ApiProperty()
+  sortOrder: number;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 export class FullSyncDataDto {
   @ApiProperty({ type: [CategoryDto] })
   categories: CategoryDto[];
@@ -534,6 +804,12 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [ComboItemDto], description: 'Danh sách các món trong combo' })
   comboItems: ComboItemDto[];
+
+  @ApiProperty({ type: [BillTemplateDto], description: 'Danh sách mẫu bill' })
+  billTemplates: BillTemplateDto[];
+
+  @ApiProperty({ type: [BillPrinterConfigDto], description: 'Cấu hình máy in bill' })
+  billPrinterConfigs: BillPrinterConfigDto[];
 }
 
 export class FullSyncResponseDto {
