@@ -255,15 +255,35 @@ fun SaleScreen(
         }
 
         if (uiState.showPaymentDialog) {
-            // Use order total when there's an active order
+            // Tính toán các giá trị cho PaymentDialog
             val currentOrder = uiState.currentOrder
-            val paymentTotal = if (currentOrder != null) {
-                currentOrder.totalAmount.toLong() + uiState.totalAmount
+            val subtotal = if (currentOrder != null) {
+                currentOrder.subtotal.toLong() + uiState.subtotal
             } else {
-                uiState.totalAmount
+                uiState.subtotal
             }
+
+            // Giá sau giảm
+            val priceAfterDiscount = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
+
+            // VAT tính trên giá sau giảm (luật thuế Việt Nam)
+            val vatAmount = (priceAfterDiscount * uiState.taxRate / 100.0).toLong()
+
+            // Tổng = (Subtotal - Discount) + VAT
+            val paymentTotal = priceAfterDiscount + vatAmount
+
             PaymentDialog(
                 totalAmount = paymentTotal,
+                subtotal = subtotal,
+                discountAmount = uiState.discountAmount,
+                vatAmount = vatAmount,
+                appliedDiscounts = uiState.appliedDiscounts,
+                couponCode = uiState.couponCode,
+                couponError = uiState.couponError,
+                isApplyingCoupon = uiState.isApplyingCoupon,
+                onCouponCodeChange = { viewModel.setCouponCode(it) },
+                onApplyCoupon = { viewModel.applyCoupon() },
+                onRemoveDiscount = { viewModel.removeCoupon(it) },
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)

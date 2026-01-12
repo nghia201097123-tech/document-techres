@@ -4,14 +4,19 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.dao.ComboItemDao
+import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.entity.ComboItemEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
+import com.techres.ccb.data.local.entity.CouponEntity
 import com.techres.ccb.data.local.entity.ProductEntity
 import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.local.entity.ProductNoteEntity
+import com.techres.ccb.presentation.screens.sale.dialogs.AppliedDiscount
+import com.techres.ccb.util.DiscountCalculator
+import com.techres.ccb.util.OrderItemForDiscount
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.printer.BillData
@@ -66,12 +71,18 @@ data class SaleUiState(
     // Available notes for quick selection
     val availableNotes: List<ProductNoteEntity> = emptyList(),
 
-    // Discount
+    // Discount/Coupon
     val discountAmount: Long = 0,
     val discountReason: String? = null,
+    val couponCode: String = "",                     // Mã coupon nhập vào
+    val appliedDiscounts: List<AppliedDiscount> = emptyList(),  // Danh sách coupon đã áp dụng
+    val couponError: String? = null,                 // Lỗi khi áp dụng coupon
+    val isApplyingCoupon: Boolean = false,           // Đang xử lý áp dụng coupon
+    val availableCoupons: List<CouponEntity> = emptyList(),     // Coupon có thể áp dụng
+    val vatAmount: Long = 0,                         // Tiền VAT
 
     // Tax
-    val taxRate: Double = 0.0,  // 0% default, có thể set 10% VAT
+    val taxRate: Double = 8.0,  // VAT 8% cho F&B (Nghị định 174/2025)
 
     // UI State - Start with loading=true to show indicator on first render
     val isLoading: Boolean = true,
@@ -93,10 +104,22 @@ data class SaleUiState(
         get() = cartItems.sumOf { it.totalPrice }
 
     val taxAmount: Long
-        get() = (subtotal * taxRate).toLong()
+        get() {
+            // VAT tính trên giá sau giảm (tuân thủ luật thuế Việt Nam)
+            val priceAfterDiscount = (subtotal - discountAmount).coerceAtLeast(0L)
+            return (priceAfterDiscount * taxRate / 100.0).toLong()
+        }
 
     val totalAmount: Long
-        get() = subtotal - discountAmount + taxAmount
+        get() {
+            // Tổng = (Tạm tính - Giảm giá) + VAT
+            val priceAfterDiscount = (subtotal - discountAmount).coerceAtLeast(0L)
+            return priceAfterDiscount + taxAmount
+        }
+
+    // Tổng tiền giảm giá từ các coupon đã áp dụng
+    val totalCouponDiscount: Long
+        get() = appliedDiscounts.sumOf { it.discountAmount }
 
     val cartItemCount: Int
         get() = cartItems.sumOf { it.quantity }
@@ -166,6 +189,7 @@ class SaleViewModel @Inject constructor(
     private val productToppingDao: ProductToppingDao,
     private val comboItemDao: ComboItemDao,
     private val productNoteDao: ProductNoteDao,
+    private val couponDao: CouponDao,
     private val billTemplateDao: BillTemplateDao,
     private val billPrinterConfigDao: BillPrinterConfigDao
 ) : ViewModel() {
@@ -907,7 +931,7 @@ class SaleViewModel @Inject constructor(
         }
     }
 
-    // ===== DISCOUNT =====
+    // ===== DISCOUNT / COUPON =====
 
     fun applyDiscount(amount: Long, reason: String?) {
         _uiState.update { state ->
@@ -927,9 +951,252 @@ class SaleViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 discountAmount = 0,
-                discountReason = null
+                discountReason = null,
+                couponCode = "",
+                appliedDiscounts = emptyList(),
+                couponError = null
             )
         }
+    }
+
+    /**
+     * Cập nhật mã coupon đang nhập
+     */
+    fun setCouponCode(code: String) {
+        _uiState.update { state ->
+            state.copy(
+                couponCode = code.uppercase(),
+                couponError = null
+            )
+        }
+    }
+
+    /**
+     * Áp dụng coupon từ mã đã nhập
+     */
+    fun applyCoupon() {
+        val state = _uiState.value
+        val code = state.couponCode.trim()
+
+        if (code.isEmpty()) {
+            _uiState.update { it.copy(couponError = "Vui lòng nhập mã giảm giá") }
+            return
+        }
+
+        // Kiểm tra coupon đã được áp dụng chưa
+        if (state.appliedDiscounts.any { it.code.equals(code, ignoreCase = true) }) {
+            _uiState.update { it.copy(couponError = "Mã giảm giá này đã được áp dụng") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isApplyingCoupon = true, couponError = null) }
+
+            try {
+                val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                    .format(java.util.Date())
+
+                val coupon = withContext(Dispatchers.IO) {
+                    couponDao.getValidCouponByCode(code, branchId, currentDate)
+                }
+
+                if (coupon == null) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Mã giảm giá không hợp lệ hoặc đã hết hạn"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Kiểm tra giá trị đơn hàng tối thiểu
+                val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
+                if (orderAmount < coupon.minOrderAmount) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Đơn hàng tối thiểu ${formatCurrencyVN(coupon.minOrderAmount.toLong())} để áp dụng mã này"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Kiểm tra combinable
+                val hasNonCombinableCoupon = state.appliedDiscounts.isNotEmpty() &&
+                    state.availableCoupons.any { c ->
+                        state.appliedDiscounts.any { d -> d.couponId == c.id } && !c.isCombinable
+                    }
+
+                if (hasNonCombinableCoupon && !coupon.isCombinable) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Không thể kết hợp với mã giảm giá đã áp dụng"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Tính số tiền giảm
+                val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
+
+                // Thêm vào danh sách đã áp dụng
+                val appliedDiscount = AppliedDiscount(
+                    couponId = coupon.id,
+                    code = coupon.code,
+                    name = coupon.name,
+                    discountType = coupon.couponType,
+                    discountValue = coupon.discountValue,
+                    discountAmount = discountAmount
+                )
+
+                val newAppliedDiscounts = state.appliedDiscounts + appliedDiscount
+                val totalDiscount = newAppliedDiscounts.sumOf { it.discountAmount }
+
+                // Tính VAT (trên giá sau giảm)
+                val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
+                val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
+                val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+
+                _uiState.update {
+                    it.copy(
+                        isApplyingCoupon = false,
+                        couponCode = "",
+                        couponError = null,
+                        appliedDiscounts = newAppliedDiscounts,
+                        discountAmount = totalDiscount,
+                        vatAmount = vatAmount,
+                        availableCoupons = it.availableCoupons + coupon,
+                        successMessage = "Đã áp dụng mã ${coupon.code}"
+                    )
+                }
+
+                Log.d(TAG, "applyCoupon - Applied coupon: ${coupon.code}, discount: $discountAmount")
+            } catch (e: Exception) {
+                Log.e(TAG, "applyCoupon - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isApplyingCoupon = false,
+                        couponError = "Lỗi áp dụng mã giảm giá: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Xóa coupon đã áp dụng
+     */
+    fun removeCoupon(couponId: String) {
+        _uiState.update { state ->
+            val newAppliedDiscounts = state.appliedDiscounts.filter { it.couponId != couponId }
+            val totalDiscount = newAppliedDiscounts.sumOf { it.discountAmount }
+
+            // Tính lại VAT
+            val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
+            val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
+            val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+
+            state.copy(
+                appliedDiscounts = newAppliedDiscounts,
+                discountAmount = totalDiscount,
+                vatAmount = vatAmount
+            )
+        }
+        Log.d(TAG, "removeCoupon - Removed coupon: $couponId")
+    }
+
+    /**
+     * Tính số tiền giảm từ coupon
+     */
+    private fun calculateCouponDiscountAmount(coupon: CouponEntity, orderAmount: Double): Long {
+        val discount = when (coupon.couponType) {
+            "percentage" -> {
+                val calculated = orderAmount * (coupon.discountValue / 100.0)
+                // Áp dụng max discount nếu có
+                coupon.maxDiscount?.let { max ->
+                    calculated.coerceAtMost(max)
+                } ?: calculated
+            }
+            "fixed" -> {
+                coupon.discountValue.coerceAtMost(orderAmount)
+            }
+            else -> 0.0
+        }
+        return discount.toLong()
+    }
+
+    /**
+     * Load coupon tự động áp dụng khi mở PaymentDialog
+     */
+    fun loadAutoCoupons() {
+        viewModelScope.launch {
+            try {
+                val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                    .format(java.util.Date())
+
+                val state = _uiState.value
+                val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
+
+                val autoCoupons = withContext(Dispatchers.IO) {
+                    couponDao.getAutoCoupons(branchId, currentDate)
+                }
+
+                // Áp dụng auto coupons
+                val appliedDiscounts = mutableListOf<AppliedDiscount>()
+                var totalDiscount = 0L
+
+                for (coupon in autoCoupons.filter { it.minOrderAmount <= orderAmount }) {
+                    // Kiểm tra combinable
+                    if (!coupon.isCombinable && appliedDiscounts.isNotEmpty()) {
+                        continue
+                    }
+                    if (appliedDiscounts.any { applied ->
+                        autoCoupons.find { it.id == applied.couponId }?.isCombinable == false
+                    }) {
+                        continue
+                    }
+
+                    val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
+                    appliedDiscounts.add(
+                        AppliedDiscount(
+                            couponId = coupon.id,
+                            code = coupon.code,
+                            name = coupon.name,
+                            discountType = coupon.couponType,
+                            discountValue = coupon.discountValue,
+                            discountAmount = discountAmount
+                        )
+                    )
+                    totalDiscount += discountAmount
+                }
+
+                // Tính VAT
+                val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
+                val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
+                val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+
+                _uiState.update { s ->
+                    s.copy(
+                        appliedDiscounts = appliedDiscounts,
+                        discountAmount = totalDiscount,
+                        vatAmount = vatAmount,
+                        availableCoupons = autoCoupons
+                    )
+                }
+
+                Log.d(TAG, "loadAutoCoupons - Applied ${appliedDiscounts.size} auto coupons")
+            } catch (e: Exception) {
+                Log.e(TAG, "loadAutoCoupons - Error: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun formatCurrencyVN(amount: Long): String {
+        return String.format(java.util.Locale.US, "%,d", amount) + "đ"
     }
 
     // ===== VARIANT DIALOG =====
@@ -1726,6 +1993,8 @@ class SaleViewModel @Inject constructor(
 
     fun showPaymentDialog() {
         if (_uiState.value.currentOrder != null) {
+            // Load auto coupons khi mở dialog thanh toán
+            loadAutoCoupons()
             _uiState.update { state ->
                 state.copy(showPaymentDialog = true)
             }
@@ -1734,7 +2003,12 @@ class SaleViewModel @Inject constructor(
 
     fun hidePaymentDialog() {
         _uiState.update { state ->
-            state.copy(showPaymentDialog = false)
+            state.copy(
+                showPaymentDialog = false,
+                couponCode = "",
+                couponError = null,
+                isApplyingCoupon = false
+            )
         }
     }
 
