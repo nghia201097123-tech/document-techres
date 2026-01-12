@@ -64,8 +64,31 @@ object PrinterService {
         val BEEP = byteArrayOf(0x1B, 0x42, 0x03, 0x02) // Beep 3 times, 200ms each
 
         // Character set for Vietnamese (Code Page 1258 or UTF-8)
-        val CHARSET_PC1258 = byteArrayOf(0x1B, 0x74, 0x1E) // Vietnamese code page
+        val CHARSET_PC1258 = byteArrayOf(0x1B, 0x74, 0x1E) // Vietnamese code page (CP1258)
         val CHARSET_UTF8 = byteArrayOf(0x1B, 0x74, 0x00) // UTF-8
+
+        // Multi-byte character mode (for Asian characters including Vietnamese)
+        // Different printers use different commands - try multiple approaches
+        val ENABLE_MULTIBYTE = byteArrayOf(0x1C, 0x26) // FS & - Enable Kanji/multi-byte mode
+        val SELECT_UTF8_MODE = byteArrayOf(0x1C, 0x43, 0x00) // FS C 0 - Select UTF-8 encoding
+        val SELECT_UTF8_MODE_ALT = byteArrayOf(0x1C, 0x2E) // FS . - Alternative UTF-8 mode
+
+        // International character set
+        val SELECT_INTL_CHARSET = byteArrayOf(0x1B, 0x52, 0x00) // ESC R 0 - USA charset as base
+
+        // Combined Vietnamese initialization sequence
+        // Tries multiple approaches for maximum compatibility
+        fun getVietnameseInit(): ByteArray {
+            return INIT + SELECT_INTL_CHARSET + ENABLE_MULTIBYTE + SELECT_UTF8_MODE
+        }
+    }
+
+    /**
+     * Convert text to bytes with Vietnamese support
+     * Uses UTF-8 encoding which works with most modern thermal printers
+     */
+    private fun textToBytes(text: String): ByteArray {
+        return text.toByteArray(Charsets.UTF_8)
     }
 
     /**
@@ -194,14 +217,14 @@ object PrinterService {
                 val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
                 val currentTime = dateFormat.format(Date())
 
-                // Initialize printer
-                outputStream.write(EscPos.INIT)
+                // Initialize printer with Vietnamese/UTF-8 support
+                outputStream.write(EscPos.getVietnameseInit())
 
                 // Header - centered, double size
                 outputStream.write(EscPos.ALIGN_CENTER)
                 outputStream.write(EscPos.TEXT_DOUBLE)
                 outputStream.write(EscPos.BOLD_ON)
-                outputStream.write("** IN THU **\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("** IN THỬ **\n"))
                 outputStream.write(EscPos.BOLD_OFF)
                 outputStream.write(EscPos.TEXT_NORMAL)
 
@@ -210,43 +233,46 @@ object PrinterService {
                 // Kitchen name
                 outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
                 outputStream.write(EscPos.BOLD_ON)
-                outputStream.write("$kitchenName\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("$kitchenName\n"))
                 outputStream.write(EscPos.BOLD_OFF)
                 outputStream.write(EscPos.TEXT_NORMAL)
 
                 // Divider
-                outputStream.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("--------------------------------\n"))
 
                 // Printer info - left aligned
                 outputStream.write(EscPos.ALIGN_LEFT)
-                outputStream.write("May in: ${printerName ?: "N/A"}\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("IP: $ip\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("Port: $port\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("Thoi gian: $currentTime\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("Máy in: ${printerName ?: "N/A"}\n"))
+                outputStream.write(textToBytes("IP: $ip\n"))
+                outputStream.write(textToBytes("Port: $port\n"))
+                outputStream.write(textToBytes("Thời gian: $currentTime\n"))
 
                 // Divider
                 outputStream.write(EscPos.ALIGN_CENTER)
-                outputStream.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("--------------------------------\n"))
 
                 // Test characters
                 outputStream.write(EscPos.ALIGN_LEFT)
-                outputStream.write("Test ky tu:\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("ABCDEFGHIJKLMNOPQRSTUVWXYZ\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("abcdefghijklmnopqrstuvwxyz\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("0123456789\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("!@#\$%^&*()_+-=[]{}|;':\",./<>?\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("Test ký tự:\n"))
+                outputStream.write(textToBytes("ABCDEFGHIJKLMNOPQRSTUVWXYZ\n"))
+                outputStream.write(textToBytes("abcdefghijklmnopqrstuvwxyz\n"))
+                outputStream.write(textToBytes("0123456789\n"))
+                outputStream.write(textToBytes("!@#\$%^&*()_+-=[]{}|;':\",./<>?\n"))
 
-                // Vietnamese test (basic Latin without diacritics for compatibility)
-                outputStream.write("\nTest tieng Viet (khong dau):\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("Xin chao! Ket noi thanh cong!\n".toByteArray(Charsets.UTF_8))
+                // Vietnamese test WITH diacritics
+                outputStream.write(textToBytes("\nTest tiếng Việt có dấu:\n"))
+                outputStream.write(textToBytes("Xin chào! Kết nối thành công!\n"))
+                outputStream.write(textToBytes("Cà phê, Phở, Bánh mì, Bún bò\n"))
+                outputStream.write(textToBytes("ă â đ ê ô ơ ư\n"))
+                outputStream.write(textToBytes("ẮẰẲẴẶẤẦẨẪẬĐẾỀỂỄỆỐỒỔỖỘỚỜỞỠỢỨỪỬỮỰ\n"))
 
                 // Footer
                 outputStream.write(EscPos.ALIGN_CENTER)
-                outputStream.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("--------------------------------\n"))
                 outputStream.write(EscPos.BOLD_ON)
-                outputStream.write("CCB POS - TechRes\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("CCB POS - TechRes\n"))
                 outputStream.write(EscPos.BOLD_OFF)
-                outputStream.write("www.techres.vn\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("www.techres.vn\n"))
 
                 // Feed and cut
                 outputStream.write(EscPos.FEED_LINES_5)
@@ -352,8 +378,8 @@ object PrinterService {
                 val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                 val currentTime = dateFormat.format(Date())
 
-                // Initialize
-                outputStream.write(EscPos.INIT)
+                // Initialize with Vietnamese/UTF-8 support
+                outputStream.write(EscPos.getVietnameseInit())
 
                 // Beep to alert kitchen
                 outputStream.write(EscPos.BEEP)
@@ -362,29 +388,29 @@ object PrinterService {
                 outputStream.write(EscPos.ALIGN_CENTER)
                 outputStream.write(EscPos.TEXT_DOUBLE)
                 outputStream.write(EscPos.BOLD_ON)
-                outputStream.write("$kitchenName\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("$kitchenName\n"))
                 outputStream.write(EscPos.BOLD_OFF)
                 outputStream.write(EscPos.TEXT_NORMAL)
 
                 // Order info
-                outputStream.write("================================\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("================================\n"))
                 outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
-                outputStream.write("Don: $orderNumber\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("Đơn: $orderNumber\n"))
                 if (tableName != null) {
-                    outputStream.write("Ban: $tableName\n".toByteArray(Charsets.UTF_8))
+                    outputStream.write(textToBytes("Bàn: $tableName\n"))
                 }
                 outputStream.write(EscPos.TEXT_NORMAL)
-                outputStream.write("Gio: $currentTime\n".toByteArray(Charsets.UTF_8))
-                outputStream.write("================================\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("Giờ: $currentTime\n"))
+                outputStream.write(textToBytes("================================\n"))
 
                 // Items
                 outputStream.write(EscPos.ALIGN_LEFT)
                 outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
                 items.forEach { item ->
-                    outputStream.write("${item.quantity}x ${item.name}\n".toByteArray(Charsets.UTF_8))
+                    outputStream.write(textToBytes("${item.quantity}x ${item.name}\n"))
                     if (item.note != null) {
                         outputStream.write(EscPos.TEXT_NORMAL)
-                        outputStream.write("   -> ${item.note}\n".toByteArray(Charsets.UTF_8))
+                        outputStream.write(textToBytes("   -> ${item.note}\n"))
                         outputStream.write(EscPos.TEXT_DOUBLE_HEIGHT)
                     }
                 }
@@ -392,14 +418,14 @@ object PrinterService {
 
                 // Notes
                 if (notes != null) {
-                    outputStream.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
+                    outputStream.write(textToBytes("--------------------------------\n"))
                     outputStream.write(EscPos.BOLD_ON)
-                    outputStream.write("Ghi chu: $notes\n".toByteArray(Charsets.UTF_8))
+                    outputStream.write(textToBytes("Ghi chú: $notes\n"))
                     outputStream.write(EscPos.BOLD_OFF)
                 }
 
                 // Footer
-                outputStream.write("================================\n".toByteArray(Charsets.UTF_8))
+                outputStream.write(textToBytes("================================\n"))
 
                 // Feed and cut
                 outputStream.write(EscPos.FEED_LINES_3)
