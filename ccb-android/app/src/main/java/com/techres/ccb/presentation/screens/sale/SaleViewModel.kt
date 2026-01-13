@@ -7,6 +7,8 @@ import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
+import com.techres.ccb.data.local.dao.SeasonalPriceDao
+import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
 import com.techres.ccb.data.local.entity.ComboItemEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
@@ -14,6 +16,8 @@ import com.techres.ccb.data.local.entity.CouponEntity
 import com.techres.ccb.data.local.entity.ProductEntity
 import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.local.entity.ProductNoteEntity
+import com.techres.ccb.data.local.entity.SeasonalPriceEntity
+import com.techres.ccb.data.local.entity.SeasonalPriceProductEntity
 import com.techres.ccb.presentation.screens.sale.dialogs.AppliedDiscount
 import com.techres.ccb.util.DiscountCalculator
 import com.techres.ccb.util.OrderItemForDiscount
@@ -217,7 +221,9 @@ class SaleViewModel @Inject constructor(
     private val productNoteDao: ProductNoteDao,
     private val couponDao: CouponDao,
     private val billTemplateDao: BillTemplateDao,
-    private val billPrinterConfigDao: BillPrinterConfigDao
+    private val billPrinterConfigDao: BillPrinterConfigDao,
+    private val seasonalPriceDao: SeasonalPriceDao,
+    private val seasonalPriceProductDao: SeasonalPriceProductDao
 ) : ViewModel() {
 
     companion object {
@@ -237,6 +243,9 @@ class SaleViewModel @Inject constructor(
 
     // OPTIMIZATION: Cache all products with variants for fast category switching
     private var allProductsCache: List<Product> = emptyList()
+
+    // Cache seasonal price adjustments: productId -> SeasonalPriceEntity
+    private var seasonalPriceMap: Map<String, SeasonalPriceEntity> = emptyMap()
 
     // OPTIMIZATION: Pre-computed products by category for instant switching
     private var productsByCategoryCache: Map<String, List<Product>> = emptyMap()
@@ -269,12 +278,35 @@ class SaleViewModel @Inject constructor(
                     val tablesDeferred = async { tableRepository.getAllTables(branchId).first() }
                     val notesDeferred = async { productNoteDao.getActiveNotes(branchId).first() }
 
+                    // Load seasonal prices (giá thời vụ)
+                    val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    val seasonalPricesDeferred = async { seasonalPriceDao.getValidSeasonalPrices(branchId, currentDate) }
+
                     // Await all results
                     val categoryEntities = categoriesDeferred.await()
                     val allProducts = allProductsDeferred.await()
                     val areas = areasDeferred.await()
                     val tableEntities = tablesDeferred.await()
                     val notes = notesDeferred.await()
+                    val seasonalPrices = seasonalPricesDeferred.await()
+
+                    // Build seasonal price map: productId -> SeasonalPriceEntity
+                    seasonalPriceMap = if (seasonalPrices.isNotEmpty()) {
+                        val priceMap = mutableMapOf<String, SeasonalPriceEntity>()
+                        seasonalPrices.forEach { sp ->
+                            val products = seasonalPriceProductDao.getBySeasonalPriceId(sp.id)
+                            products.forEach { spp ->
+                                // Nếu có nhiều giá thời vụ cho 1 sản phẩm, lấy cái có sortOrder nhỏ nhất (đã sort)
+                                if (!priceMap.containsKey(spp.productId)) {
+                                    priceMap[spp.productId] = sp
+                                }
+                            }
+                        }
+                        Log.d(TAG, "loadInitialData - Seasonal prices: ${priceMap.size} products affected")
+                        priceMap
+                    } else {
+                        emptyMap()
+                    }
 
                     Log.d(TAG, "loadInitialData - Parallel queries completed in ${System.currentTimeMillis() - startTime}ms")
 
@@ -307,6 +339,15 @@ class SaleViewModel @Inject constructor(
 
                     // OPTIMIZATION: Build products WITHOUT variants first (fast display)
                     val productList = productEntities.map { entity ->
+                        // Tính giá thời vụ nếu có
+                        val basePrice = entity.price.toLong()
+                        val seasonalPrice = seasonalPriceMap[entity.id]
+                        val finalPrice = if (seasonalPrice != null) {
+                            calculateSeasonalPrice(basePrice, seasonalPrice)
+                        } else {
+                            basePrice
+                        }
+
                         Product(
                             id = entity.id,
                             code = entity.code,
@@ -314,7 +355,7 @@ class SaleViewModel @Inject constructor(
                             searchName = entity.searchName,
                             abbreviation = entity.abbreviation,
                             categoryId = entity.categoryId ?: "",
-                            price = entity.price.toLong(),
+                            price = finalPrice,
                             vatRate = entity.vatRate,
                             imageUrl = entity.imageUrl,
                             description = entity.description,
@@ -461,10 +502,25 @@ class SaleViewModel @Inject constructor(
                 options = groupToppings.mapNotNull { topping ->
                     val toppingProduct = productEntityMap[topping.toppingId]
                     if (toppingProduct != null) {
+                        // Tính giá topping: nếu có extraPrice thì dùng, không thì dùng giá sản phẩm
+                        // Áp dụng giá thời vụ cho cả topping
+                        val basePrice = if (topping.extraPrice > 0) {
+                            topping.extraPrice.toLong()
+                        } else {
+                            toppingProduct.price.toLong()
+                        }
+                        val seasonalPrice = seasonalPriceMap[topping.toppingId]
+                        val finalPrice = if (seasonalPrice != null && topping.extraPrice <= 0) {
+                            // Chỉ áp dụng giá thời vụ nếu dùng giá sản phẩm (không có extraPrice riêng)
+                            calculateSeasonalPrice(basePrice, seasonalPrice)
+                        } else {
+                            basePrice
+                        }
+
                         ProductVariantOption(
                             id = topping.toppingId,
                             name = toppingProduct.name,
-                            price = if (topping.extraPrice > 0) topping.extraPrice.toLong() else toppingProduct.price.toLong(),
+                            price = finalPrice,
                             isDefault = topping.isDefault
                         )
                     } else null
@@ -544,6 +600,15 @@ class SaleViewModel @Inject constructor(
             val productToppings = toppingsByProduct[entity.id] ?: emptyList()
             val variantGroups = buildVariantGroups(productToppings)
 
+            // Tính giá thời vụ nếu có
+            val basePrice = entity.price.toLong()
+            val seasonalPrice = seasonalPriceMap[entity.id]
+            val finalPrice = if (seasonalPrice != null) {
+                calculateSeasonalPrice(basePrice, seasonalPrice)
+            } else {
+                basePrice
+            }
+
             Product(
                 id = entity.id,
                 code = entity.code,
@@ -551,7 +616,7 @@ class SaleViewModel @Inject constructor(
                 searchName = entity.searchName,
                 abbreviation = entity.abbreviation,
                 categoryId = entity.categoryId ?: "",
-                price = entity.price.toLong(),
+                price = finalPrice,
                 vatRate = entity.vatRate,
                 imageUrl = entity.imageUrl,
                 description = entity.description,
@@ -2398,5 +2463,26 @@ class SaleViewModel @Inject constructor(
         val timestamp = System.currentTimeMillis()
         val random = (1000..9999).random()
         return "HD${timestamp % 1000000}$random"
+    }
+
+    /**
+     * Tính giá thời vụ dựa trên giá gốc và cấu hình giảm giá/tăng giá
+     * @param basePrice Giá gốc của sản phẩm
+     * @param seasonalPrice Cấu hình giá thời vụ
+     * @return Giá sau khi áp dụng điều chỉnh thời vụ
+     */
+    private fun calculateSeasonalPrice(basePrice: Long, seasonalPrice: SeasonalPriceEntity): Long {
+        return when (seasonalPrice.adjustmentType.lowercase()) {
+            "percentage" -> {
+                // Điều chỉnh theo phần trăm (VD: +10% -> adjustmentValue = 10)
+                val adjustment = basePrice * seasonalPrice.adjustmentValue / 100
+                (basePrice + adjustment).toLong()
+            }
+            "fixed" -> {
+                // Điều chỉnh số tiền cố định (VD: +5000đ -> adjustmentValue = 5000)
+                (basePrice + seasonalPrice.adjustmentValue).toLong()
+            }
+            else -> basePrice
+        }
     }
 }
