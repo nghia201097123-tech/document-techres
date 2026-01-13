@@ -596,14 +596,12 @@ fun PaymentDialog(
                                                 val isPresetAmount = !isPercentDiscount && billDiscountTotal in presetAmounts
 
                                                 // State for custom input and discount type selection
-                                                // Initialize based on applied discount
+                                                // Initialize based on applied discount - show value in TextField for both preset and custom
                                                 var customPercentText by remember(billDiscountTotal, billDiscountDescription) {
-                                                    // Show in TextField only if it's a custom percent (not matching preset)
-                                                    mutableStateOf(if (isPercentDiscount && !isPresetPercent) parsedPercent?.toString() ?: "" else "")
+                                                    mutableStateOf(if (isPercentDiscount && parsedPercent != null) parsedPercent.toString() else "")
                                                 }
                                                 var customAmountText by remember(billDiscountTotal, billDiscountDescription) {
-                                                    // Show in TextField only if it's a custom amount (not matching preset)
-                                                    mutableStateOf(if (!isPercentDiscount && billDiscountTotal > 0 && !isPresetAmount) billDiscountTotal.toString() else "")
+                                                    mutableStateOf(if (!isPercentDiscount && billDiscountTotal > 0) billDiscountTotal.toString() else "")
                                                 }
                                                 // 0 = none, 1 = percent, 2 = fixed amount
                                                 var selectedDiscountType by remember(billDiscountTotal) {
@@ -634,10 +632,10 @@ fun PaymentDialog(
                                                                 // Clear fixed amount selection
                                                                 customAmountText = ""
                                                                 selectedAmountValue = null
-                                                                // Set percent selection
+                                                                // Set percent selection and show in TextField
                                                                 selectedDiscountType = 1
                                                                 selectedPercentValue = percent
-                                                                customPercentText = ""
+                                                                customPercentText = percent.toString()
                                                                 onApplyPercentDiscount(percent, "Giảm $percent%")
                                                             },
                                                             label = { Text("$percent%", fontSize = 10.sp) },
@@ -728,10 +726,10 @@ fun PaymentDialog(
                                                                 // Clear percent selection
                                                                 customPercentText = ""
                                                                 selectedPercentValue = null
-                                                                // Set amount selection
+                                                                // Set amount selection and show in TextField
                                                                 selectedDiscountType = 2
                                                                 selectedAmountValue = amount
-                                                                customAmountText = "" // Clear custom input when selecting chip
+                                                                customAmountText = amount.toString()
                                                                 onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
                                                             },
                                                             label = { Text("${amount/1000}k", fontSize = 10.sp) },
