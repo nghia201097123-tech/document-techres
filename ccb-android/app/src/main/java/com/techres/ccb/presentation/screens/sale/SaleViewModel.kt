@@ -1831,9 +1831,16 @@ class SaleViewModel @Inject constructor(
 
                 Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, discount: $finalDiscountAmount, total: $finalTotalAmount")
 
+                // Lưu thông tin cần thiết cho việc in bill
+                val completedOrder: OrderEntity
+                val orderItemsForPrint = state.currentOrderItems
+                val itemDiscountsForPrint = state.itemDiscounts
+                val billDiscountForPrint = state.billDiscountAmount
+                val tableNameForPrint = state.selectedTable?.name
+
                 withContext(Dispatchers.IO) {
                     // 1. Update order status to completed with correct discount and total
-                    val completedOrder = currentOrder.copy(
+                    completedOrder = currentOrder.copy(
                         status = "completed",
                         paymentStatus = "paid",
                         paymentMethod = paymentMethod,
@@ -1864,10 +1871,38 @@ class SaleViewModel @Inject constructor(
                             updatedAt = now
                         )
                     }
+                }
 
-                    // 5. Print bill (always print on payment completion)
+                Log.d(TAG, "completeOrder - Completed order with full sync: ${currentOrder.orderNumber}")
+
+                // Cập nhật UI ngay lập tức - không chờ in bill
+                _uiState.update { s ->
+                    s.copy(
+                        cartItems = emptyList(),
+                        currentOrder = null,
+                        currentOrderItems = emptyList(),
+                        selectedTable = null,
+                        selectedCustomer = null,
+                        // Clear all discount states to prevent cache
+                        itemDiscounts = emptyMap(),
+                        billDiscountAmount = 0,
+                        billDiscountDescription = null,
+                        couponCode = "",
+                        appliedDiscounts = emptyList(),
+                        couponError = null,
+                        // Reset temp bill print count
+                        tempBillPrintCount = 0,
+                        successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
+                    )
+                }
+
+                // Refresh tables to show updated status
+                refreshTables()
+
+                // 5. In bill BẤT ĐỒNG BỘ - không block UI
+                viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        Log.d(TAG, "completeOrder - Attempting to print bill, branchId: $branchId")
+                        Log.d(TAG, "completeOrder - Attempting to print bill async, branchId: $branchId")
                         // Try to get default printer, fallback to first active printer
                         var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                         if (printerConfig == null) {
@@ -1897,10 +1932,10 @@ class SaleViewModel @Inject constructor(
                                 // Build bill data from order
                                 val billData = buildBillData(
                                     order = completedOrder,
-                                    orderItems = state.currentOrderItems,
-                                    itemDiscounts = state.itemDiscounts,
-                                    billDiscountAmount = state.billDiscountAmount,
-                                    tableName = state.selectedTable?.name,
+                                    orderItems = orderItemsForPrint,
+                                    itemDiscounts = itemDiscountsForPrint,
+                                    billDiscountAmount = billDiscountForPrint,
+                                    tableName = tableNameForPrint,
                                     staffName = completedOrder.staffName,
                                     customerName = completedOrder.customerName,
                                     paymentMethod = paymentMethod,
@@ -1933,31 +1968,6 @@ class SaleViewModel @Inject constructor(
                         e.printStackTrace()
                     }
                 }
-
-                Log.d(TAG, "completeOrder - Completed order with full sync: ${currentOrder.orderNumber}")
-
-                _uiState.update { s ->
-                    s.copy(
-                        cartItems = emptyList(),
-                        currentOrder = null,
-                        currentOrderItems = emptyList(),
-                        selectedTable = null,
-                        selectedCustomer = null,
-                        // Clear all discount states to prevent cache
-                        itemDiscounts = emptyMap(),
-                        billDiscountAmount = 0,
-                        billDiscountDescription = null,
-                        couponCode = "",
-                        appliedDiscounts = emptyList(),
-                        couponError = null,
-                        // Reset temp bill print count
-                        tempBillPrintCount = 0,
-                        successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
-                    )
-                }
-
-                // Refresh tables to show updated status
-                refreshTables()
 
             } catch (e: Exception) {
                 Log.e(TAG, "completeOrder - Error: ${e.message}", e)
