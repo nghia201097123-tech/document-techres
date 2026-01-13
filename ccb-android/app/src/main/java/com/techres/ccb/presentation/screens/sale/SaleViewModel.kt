@@ -1361,8 +1361,12 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Tính số tiền giảm
-                val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
+                // Tính số tiền còn lại sau khi trừ giảm giá món và giảm giá bill
+                // Thứ tự ưu tiên: 1. Giảm giá món → 2. Giảm giá bill → 3. Coupon
+                val remainingAmount = (orderAmount - state.itemDiscountTotal - state.billDiscountAmount).coerceAtLeast(0.0)
+
+                // Tính số tiền giảm từ coupon (trên số tiền còn lại, không phải subtotal gốc)
+                val discountAmount = calculateCouponDiscountAmount(coupon, remainingAmount)
 
                 // Tạo discount mới
                 val appliedDiscount = AppliedDiscount(
@@ -1376,11 +1380,12 @@ class SaleViewModel @Inject constructor(
 
                 // Thay thế tất cả coupon cũ bằng coupon mới (chỉ cho phép 1 coupon tại 1 thời điểm)
                 val newAppliedDiscounts = listOf(appliedDiscount)
-                val totalDiscount = discountAmount
+                val totalCouponDiscount = discountAmount
 
-                // Tính VAT (trên giá sau giảm)
+                // Tính VAT (trên giá sau giảm - bao gồm tất cả các loại giảm giá)
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
-                val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
+                val totalAllDiscounts = state.itemDiscountTotal + state.billDiscountAmount + totalCouponDiscount
+                val priceAfterDiscount = (subtotal - totalAllDiscounts).coerceAtLeast(0L)
                 val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
 
                 _uiState.update {
@@ -1395,7 +1400,7 @@ class SaleViewModel @Inject constructor(
                     )
                 }
 
-                Log.d(TAG, "applyCoupon - Applied coupon: ${coupon.code}, discount: $discountAmount (replaced previous coupons)")
+                Log.d(TAG, "applyCoupon - Applied coupon: ${coupon.code}, discount: $discountAmount on remaining: $remainingAmount (replaced previous coupons)")
             } catch (e: Exception) {
                 Log.e(TAG, "applyCoupon - Error: ${e.message}", e)
                 _uiState.update {
@@ -1464,8 +1469,12 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Tính số tiền giảm
-                val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
+                // Tính số tiền còn lại sau khi trừ giảm giá món và giảm giá bill
+                // Thứ tự ưu tiên: 1. Giảm giá món → 2. Giảm giá bill → 3. Coupon
+                val remainingAmount = (orderAmount - state.itemDiscountTotal - state.billDiscountAmount).coerceAtLeast(0.0)
+
+                // Tính số tiền giảm từ coupon (trên số tiền còn lại, không phải subtotal gốc)
+                val discountAmount = calculateCouponDiscountAmount(coupon, remainingAmount)
 
                 // Tạo discount mới
                 val appliedDiscount = AppliedDiscount(
@@ -1481,9 +1490,10 @@ class SaleViewModel @Inject constructor(
                 val newAppliedDiscounts = listOf(appliedDiscount)
                 val totalDiscount = discountAmount
 
-                // Tính VAT (trên giá sau giảm)
+                // Tính VAT (trên giá sau giảm - bao gồm tất cả các loại giảm giá)
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
-                val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
+                val totalAllDiscounts = state.itemDiscountTotal + state.billDiscountAmount + totalDiscount
+                val priceAfterDiscount = (subtotal - totalAllDiscounts).coerceAtLeast(0L)
                 val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
 
                 _uiState.update {
