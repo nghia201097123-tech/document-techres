@@ -380,13 +380,14 @@ fun PaymentDialog(
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text("Giảm giá", style = MaterialTheme.typography.bodySmall, color = Success)
-                                            // Hiển thị loại giảm giá
+                                            // Hiển thị loại giảm giá: Món, HĐ, Coupon
                                             val discountTypes = mutableListOf<String>()
                                             if (itemDiscountTotal > 0) discountTypes.add("Món")
                                             if (billDiscountTotal > 0) {
                                                 val desc = billDiscountDescription?.replace("Giảm ", "") ?: "HĐ"
                                                 discountTypes.add(desc)
                                             }
+                                            if (appliedDiscounts.isNotEmpty()) discountTypes.add("Coupon")
                                             if (discountTypes.isNotEmpty()) {
                                                 Text(
                                                     " (${discountTypes.joinToString(", ")})",
@@ -456,10 +457,11 @@ fun PaymentDialog(
                                         Text("Giảm giá", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                                         if (discountAmount > 0) {
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            // Show count of discount types applied
+                                            // Show count of discount types applied: Món, HĐ, Coupon
                                             val discountCount = listOfNotNull(
                                                 if (itemDiscountTotal > 0) "Món" else null,
-                                                if (billDiscountTotal > 0) "HĐ" else null
+                                                if (billDiscountTotal > 0) "HĐ" else null,
+                                                if (appliedDiscounts.isNotEmpty()) "Coupon" else null
                                             )
                                             if (discountCount.isNotEmpty()) {
                                                 Text(
