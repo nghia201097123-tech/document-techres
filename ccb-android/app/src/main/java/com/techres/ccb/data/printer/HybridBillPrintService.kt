@@ -44,7 +44,8 @@ object HybridBillPrintService {
             val capability = PrinterCapabilityDetector.detect(ip, printerConfig.printerPort)
 
             // Generate bill content với Hybrid builder
-            val billContent = generateHybridBill(template, billData, capability)
+            // Sử dụng paperWidth từ printerConfig (ưu tiên) hoặc template
+            val billContent = generateHybridBill(printerConfig, template, billData, capability)
 
             // Retry logic
             repeat(printerConfig.retryCount) { attempt ->
@@ -113,9 +114,10 @@ object HybridBillPrintService {
 
     /**
      * Generate bill content với Hybrid approach
-     * Luôn sử dụng config từ template entity, không phân biệt template_type
+     * Sử dụng paperWidth từ printerConfig, các config khác từ template
      */
     private fun generateHybridBill(
+        printerConfig: BillPrinterConfigEntity,
         template: BillTemplateEntity,
         billData: BillData,
         capability: PrinterCapability
@@ -123,21 +125,25 @@ object HybridBillPrintService {
         // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
         val useBitmapMode = !capability.supportVietnameseUtf8
 
-        // Luôn sử dụng generateBillFromConfig để đọc config từ template
-        // Không phân biệt template_type nữa - tất cả config lấy từ web dashboard
-        return generateBillFromConfig(template, billData, useBitmapMode)
+        // Sử dụng paperWidth từ printerConfig (đã được user chọn trong app)
+        val paperWidth = printerConfig.paperWidth
+
+        return generateBillFromConfig(paperWidth, template, billData, useBitmapMode)
     }
 
     /**
      * Generate bill theo đúng config từ web dashboard
-     * Đọc từng field config từ template entity
+     * paperWidth: Lấy từ printerConfig (được user chọn trong app)
+     * template: Chứa các config hiển thị (từ web dashboard)
      */
     private fun generateBillFromConfig(
+        paperWidth: Int,
         template: BillTemplateEntity,
         billData: BillData,
         useBitmapMode: Boolean
     ): ByteArray {
-        val builder = HybridBillBuilder(template.paperWidth, useBitmapMode)
+        Log.d(TAG, "Generating bill with paperWidth: ${paperWidth}mm, useBitmapMode: $useBitmapMode")
+        val builder = HybridBillBuilder(paperWidth, useBitmapMode)
 
         builder.apply {
             init()
@@ -238,7 +244,8 @@ object HybridBillPrintService {
             separator()
 
             // ============ TOTAL ============
-            lineKeyValue("TỔNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true, fontSize = 28f))
+            // Font size sẽ được tự động scale trong lineKeyValue với bold = true
+            lineKeyValue("TỔNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
 
             // ============ PAYMENT INFO ============
             if (template.showPaymentMethod) {

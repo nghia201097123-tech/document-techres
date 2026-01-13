@@ -210,6 +210,33 @@ object BitmapTextRenderer {
     }
 
     /**
+     * Tính font size phù hợp với khổ giấy
+     * Base: 80mm (576px) = 24f
+     * Font size scale theo tỉ lệ pixel width
+     */
+    fun getBaseFontSize(paperWidthMm: Int): Float {
+        val pixelWidth = getPixelWidth(paperWidthMm)
+        // Base: 576px = 24f, scale proportionally
+        val scaledSize = 24f * pixelWidth / PAPER_WIDTH_80MM
+        // Giới hạn min 16f, max 36f
+        return scaledSize.coerceIn(16f, 36f)
+    }
+
+    /**
+     * Tính font size cho title (lớn hơn base 1.5x)
+     */
+    fun getTitleFontSize(paperWidthMm: Int): Float {
+        return getBaseFontSize(paperWidthMm) * 1.5f
+    }
+
+    /**
+     * Tính font size cho total (lớn hơn base 1.2x)
+     */
+    fun getTotalFontSize(paperWidthMm: Int): Float {
+        return getBaseFontSize(paperWidthMm) * 1.2f
+    }
+
+    /**
      * Render text thành bitmap với Vietnamese support
      */
     fun renderText(
@@ -330,6 +357,14 @@ class HybridBillBuilder(
     private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
     val lineWidth = BitmapTextRenderer.getLineWidth(paperWidth)
 
+    // Font sizes scaled by paper width
+    private val baseFontSize = BitmapTextRenderer.getBaseFontSize(paperWidth)
+    private val titleFontSize = BitmapTextRenderer.getTitleFontSize(paperWidth)
+    private val totalFontSize = BitmapTextRenderer.getTotalFontSize(paperWidth)
+
+    // Default style với font size đã scale
+    private val defaultStyle get() = BitmapTextStyle(fontSize = baseFontSize)
+
     // ESC/POS Commands
     private val ESC = 0x1B.toByte()
     private val GS = 0x1D.toByte()
@@ -348,22 +383,27 @@ class HybridBillBuilder(
 
     /**
      * In text - tự động chọn bitmap hoặc text mode
+     * Sử dụng font size đã scale theo paper width
      */
-    fun line(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+    fun line(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
         if (text.isEmpty()) {
             buffer.write(EscPosCommands.LF)
             return this
         }
 
+        // Merge với default style để có font size đã scale
+        val actualStyle = style?.copy(fontSize = style.fontSize.takeIf { it != 24f } ?: baseFontSize)
+            ?: defaultStyle
+
         if (useBitmapMode) {
             // BITMAP MODE - Đảm bảo Vietnamese hiển thị đúng
-            val bitmap = BitmapTextRenderer.renderText(text, style, pixelWidth)
+            val bitmap = BitmapTextRenderer.renderText(text, actualStyle, pixelWidth)
             val imageData = EscPosCommands.printRasterBitmap(bitmap)
             buffer.write(imageData)
             bitmap.recycle()
         } else {
             // TEXT MODE - Chỉ dùng khi máy in hỗ trợ UTF-8 Vietnamese
-            applyTextStyle(style)
+            applyTextStyle(actualStyle)
             buffer.write(text.toByteArray(Charsets.UTF_8))
             buffer.write(EscPosCommands.LF)
             resetTextStyle()
@@ -374,37 +414,53 @@ class HybridBillBuilder(
     /**
      * In text căn giữa
      */
-    fun lineCenter(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
-        return line(text, style.copy(centerAlign = true))
+    fun lineCenter(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
+        val baseStyle = style ?: defaultStyle
+        return line(text, baseStyle.copy(centerAlign = true))
     }
 
     /**
      * In text căn phải
      */
-    fun lineRight(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
-        return line(text, style.copy(rightAlign = true))
+    fun lineRight(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
+        val baseStyle = style ?: defaultStyle
+        return line(text, baseStyle.copy(rightAlign = true))
     }
 
     /**
      * In text đậm
      */
-    fun lineBold(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
-        return line(text, style.copy(bold = true))
+    fun lineBold(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
+        val baseStyle = style ?: defaultStyle
+        return line(text, baseStyle.copy(bold = true))
     }
 
     /**
-     * In text lớn (double size)
+     * In text lớn (double size) - sử dụng titleFontSize
      */
-    fun lineDouble(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
-        return line(text, style.copy(doubleHeight = true, doubleWidth = true, bold = true))
+    fun lineDouble(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
+        val titleStyle = BitmapTextStyle(
+            fontSize = titleFontSize,
+            bold = true,
+            centerAlign = style?.centerAlign ?: false,
+            rightAlign = style?.rightAlign ?: false
+        )
+        return line(text, titleStyle)
     }
 
     /**
      * In key-value (ví dụ: "Tổng tiền:" và "100,000đ")
+     * Sử dụng font size đã scale
+     * Nếu bold = true, sử dụng totalFontSize (lớn hơn cho dòng tổng)
      */
-    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle? = null): HybridBillBuilder {
+        // Nếu bold thì dùng totalFontSize, không thì dùng baseFontSize
+        val fontSize = if (style?.bold == true) totalFontSize else baseFontSize
+        val actualStyle = style?.copy(fontSize = fontSize)
+            ?: defaultStyle
+
         if (useBitmapMode) {
-            val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, style)
+            val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
             val imageData = EscPosCommands.printRasterBitmap(bitmap)
             buffer.write(imageData)
             bitmap.recycle()
@@ -426,7 +482,7 @@ class HybridBillBuilder(
      */
     fun separator(char: Char = '-'): HybridBillBuilder {
         if (useBitmapMode) {
-            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth)
+            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, baseFontSize)
             val imageData = EscPosCommands.printRasterBitmap(bitmap)
             buffer.write(imageData)
             bitmap.recycle()
