@@ -650,7 +650,7 @@ fun SeasonalPricesTable(seasonalPrices: List<SeasonalPriceEntity>) {
 @Composable
 fun CouponsTable(coupons: List<CouponEntity>) {
     DataTable(
-        headers = listOf("ID", "Mã", "Tên", "Loại", "Giá trị", "Giới hạn", "Đã dùng", "Active"),
+        headers = listOf("ID", "Mã", "Tên", "Loại", "Giá trị", "Giới hạn", "Đã dùng", "GH/ngày", "Ngày BĐ", "Ngày KT", "Active"),
         data = coupons,
         rowContent = { c ->
             val discountText = if (c.couponType == "percentage") {
@@ -666,6 +666,9 @@ fun CouponsTable(coupons: List<CouponEntity>) {
                 discountText,
                 c.usageLimit?.toString() ?: "∞",
                 c.usageCount.toString(),
+                c.dailyLimit?.toString() ?: "∞",
+                c.startDate?.take(10) ?: "-",
+                c.endDate?.take(10) ?: "-",
                 if (c.isActive) "✓" else "✗"
             )
         }
