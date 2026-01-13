@@ -1,5 +1,8 @@
 package com.techres.ccb.presentation.screens.sale.dialogs
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -79,18 +82,16 @@ fun PaymentDialog(
 ) {
     var selectedMethod by remember { mutableStateOf(PaymentMethod.CASH) }
     var receivedAmountText by remember { mutableStateOf("") }
-    var showKeypad by remember { mutableStateOf(true) }
 
-    // Manual discount states
+    // Discount section - collapsed by default
+    var showDiscountSection by remember { mutableStateOf(false) }
     var manualDiscountText by remember { mutableStateOf("") }
     var showDiscountInput by remember { mutableStateOf(false) }
-    var discountInputType by remember { mutableStateOf("fixed") } // "fixed" or "percent"
 
     // Item discount states
     var showItemDiscounts by remember { mutableStateOf(false) }
     var selectedItemForDiscount by remember { mutableStateOf<String?>(null) }
     var itemDiscountText by remember { mutableStateOf("") }
-    var itemDiscountType by remember { mutableStateOf("percent") } // "fixed" or "percent"
 
     val receivedAmount = receivedAmountText.toLongOrNull() ?: 0L
     val changeAmount = if (receivedAmount >= totalAmount) receivedAmount - totalAmount else 0L
@@ -108,39 +109,44 @@ fun PaymentDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.95f),
+                .fillMaxHeight(0.92f),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
+                // ===== HEADER - Compact with total =====
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF4CAF50))
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Payment,
+                        Icons.Default.Receipt,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Thanh toán",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Tổng: ${formatCurrency(totalAmount)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
+                    Text(
+                        text = "Thanh toán",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    // Total amount - prominent
+                    Text(
+                        text = formatCurrency(totalAmount),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Đóng",
@@ -149,527 +155,77 @@ fun PaymentDialog(
                     }
                 }
 
-                Row(modifier = Modifier.weight(1f)) {
-                    // Left panel - Payment methods + Discount
-                    Column(
-                        modifier = Modifier
-                            .weight(0.4f)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        // Order summary
+                // ===== PAYMENT METHOD TABS - Prominent =====
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Show only main payment methods as tabs
+                    listOf(PaymentMethod.CASH, PaymentMethod.BANK_TRANSFER).forEach { method ->
+                        val isSelected = selectedMethod == method
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp)
-                            ) {
-                                Text(
-                                    text = "Chi tiết đơn hàng",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
-                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
-                                }
-                                if (discountAmount > 0) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("Giảm giá:", style = MaterialTheme.typography.bodyMedium, color = Success)
-                                        Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodyMedium, color = Success)
-                                    }
-                                }
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("TỔNG:", fontWeight = FontWeight.Bold)
-                                    Text(
-                                        formatCurrency(totalAmount),
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                // VAT được tách ra để hiển thị (đã bao gồm trong tổng)
-                                if (vatAmount > 0) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            "  (Trong đó VAT 8%:",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                        Text(
-                                            "${formatCurrency(vatAmount)})",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Coupon section
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp)
-                            ) {
-                                Text(
-                                    text = "Mã giảm giá",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    OutlinedTextField(
-                                        value = couponCode,
-                                        onValueChange = onCouponCodeChange,
-                                        placeholder = { Text("Nhập mã", fontSize = 12.sp) },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true,
-                                        textStyle = MaterialTheme.typography.bodySmall,
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                        keyboardActions = KeyboardActions(onDone = { onApplyCoupon() }),
-                                        isError = couponError != null
-                                    )
-                                    Button(
-                                        onClick = onApplyCoupon,
-                                        enabled = !isApplyingCoupon && couponCode.isNotEmpty(),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                                    ) {
-                                        if (isApplyingCoupon) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                        } else {
-                                            Text("OK", fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-                                if (couponError != null) {
-                                    Text(
-                                        text = couponError,
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                                // Applied discounts
-                                if (appliedDiscounts.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    appliedDiscounts.forEach { discount ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.LocalOffer,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = Success
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = discount.code,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "-${formatCurrency(discount.discountAmount)}",
-                                                    color = Success,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                                IconButton(
-                                                    onClick = { onRemoveDiscount(discount.couponId) },
-                                                    modifier = Modifier.size(20.dp)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Close,
-                                                        contentDescription = "Xóa",
-                                                        modifier = Modifier.size(14.dp),
-                                                        tint = MaterialTheme.colorScheme.error
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Manual discount section
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Giảm giá nhanh",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    if (discountAmount > 0 && appliedDiscounts.isEmpty()) {
-                                        TextButton(
-                                            onClick = onClearDiscount,
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text("Xóa", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Quick percent buttons
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    listOf(5, 10, 15, 20, 30).forEach { percent ->
-                                        FilterChip(
-                                            selected = false,
-                                            onClick = {
-                                                onApplyPercentDiscount(percent, "Giảm $percent%")
-                                            },
-                                            label = { Text("$percent%", fontSize = 12.sp) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                            )
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Toggle for manual input
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { showDiscountInput = !showDiscountInput }
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        if (showDiscountInput) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Nhập số tiền giảm",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-
-                                // Manual discount input
-                                if (showDiscountInput) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // Discount type selector
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        FilterChip(
-                                            selected = discountInputType == "fixed",
-                                            onClick = { discountInputType = "fixed" },
-                                            label = { Text("Số tiền", fontSize = 11.sp) }
-                                        )
-                                        FilterChip(
-                                            selected = discountInputType == "percent",
-                                            onClick = { discountInputType = "percent" },
-                                            label = { Text("Phần trăm", fontSize = 11.sp) }
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        OutlinedTextField(
-                                            value = manualDiscountText,
-                                            onValueChange = { manualDiscountText = it.filter { c -> c.isDigit() } },
-                                            placeholder = {
-                                                Text(
-                                                    if (discountInputType == "fixed") "Số tiền" else "% giảm",
-                                                    fontSize = 12.sp
-                                                )
-                                            },
-                                            modifier = Modifier.weight(1f),
-                                            singleLine = true,
-                                            textStyle = MaterialTheme.typography.bodySmall,
-                                            keyboardOptions = KeyboardOptions(
-                                                keyboardType = KeyboardType.Number,
-                                                imeAction = ImeAction.Done
-                                            ),
-                                            suffix = {
-                                                Text(
-                                                    if (discountInputType == "fixed") "đ" else "%",
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                        )
-                                        Button(
-                                            onClick = {
-                                                val value = manualDiscountText.toLongOrNull() ?: 0L
-                                                if (value > 0) {
-                                                    if (discountInputType == "fixed") {
-                                                        onApplyManualDiscount(value, "Giảm ${formatCurrency(value)}")
-                                                    } else {
-                                                        onApplyPercentDiscount(value.toInt(), "Giảm $value%")
-                                                    }
-                                                    manualDiscountText = ""
-                                                    showDiscountInput = false
-                                                }
-                                            },
-                                            enabled = manualDiscountText.isNotEmpty(),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                                        ) {
-                                            Text("Áp dụng", fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Item-level discount section
-                        if (orderItems.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp)
-                                ) {
-                                    // Header with toggle
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { showItemDiscounts = !showItemDiscounts }
-                                            .padding(vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                if (showItemDiscounts) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp),
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "Giảm giá theo món",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Text(
-                                            text = "${orderItems.size} món",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-
-                                    // Item list with discount options
-                                    if (showItemDiscounts) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        HorizontalDivider()
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        orderItems.forEach { item ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        selectedItemForDiscount = if (selectedItemForDiscount == item.id) null else item.id
-                                                        itemDiscountText = ""
-                                                    }
-                                                    .padding(vertical = 6.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = "${item.name} x${item.quantity}",
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        maxLines = 1
-                                                    )
-                                                    if (item.discountAmount > 0) {
-                                                        Text(
-                                                            text = "Đã giảm: -${formatCurrency(item.discountAmount)}",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = Success
-                                                        )
-                                                    }
-                                                }
-                                                Text(
-                                                    text = formatCurrency(item.totalPrice - item.discountAmount),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
-
-                                            // Discount input for selected item
-                                            if (selectedItemForDiscount == item.id) {
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Row(
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    // Quick discount buttons for item
-                                                    listOf(5, 10, 20).forEach { percent ->
-                                                        FilterChip(
-                                                            selected = false,
-                                                            onClick = {
-                                                                val discountAmt = (item.totalPrice * percent / 100)
-                                                                onApplyItemDiscount(item.id, discountAmt)
-                                                                selectedItemForDiscount = null
-                                                            },
-                                                            label = { Text("$percent%", fontSize = 10.sp) },
-                                                            modifier = Modifier.height(28.dp)
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    OutlinedTextField(
-                                                        value = itemDiscountText,
-                                                        onValueChange = { itemDiscountText = it.filter { c -> c.isDigit() } },
-                                                        placeholder = { Text("Số tiền", fontSize = 11.sp) },
-                                                        modifier = Modifier.weight(1f).height(44.dp),
-                                                        singleLine = true,
-                                                        textStyle = MaterialTheme.typography.bodySmall,
-                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                        suffix = { Text("đ", fontSize = 11.sp) }
-                                                    )
-                                                    Button(
-                                                        onClick = {
-                                                            val value = itemDiscountText.toLongOrNull() ?: 0L
-                                                            if (value > 0) {
-                                                                onApplyItemDiscount(item.id, value.coerceAtMost(item.totalPrice))
-                                                                itemDiscountText = ""
-                                                                selectedItemForDiscount = null
-                                                            }
-                                                        },
-                                                        enabled = itemDiscountText.isNotEmpty(),
-                                                        modifier = Modifier.height(44.dp),
-                                                        contentPadding = PaddingValues(horizontal = 10.dp)
-                                                    ) {
-                                                        Text("OK", fontSize = 11.sp)
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                            }
-
-                                            if (orderItems.last() != item) {
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Payment methods
-                        Text(
-                            text = "Hình thức thanh toán",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        PaymentMethod.entries.forEach { method ->
-                            PaymentMethodCard(
-                                method = method,
-                                isSelected = selectedMethod == method,
-                                onClick = {
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
                                     selectedMethod = method
                                     if (method != PaymentMethod.CASH) {
                                         receivedAmountText = totalAmount.toString()
                                     } else {
                                         receivedAmountText = ""
                                     }
-                                }
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected)
+                                    Color(0xFFFF5722)
+                                else
+                                    MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = if (isSelected) 4.dp else 1.dp
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp, horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = method.icon,
+                                    fontSize = 20.sp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = method.displayName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSelected) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
+                }
 
-                    // Right panel - Amount input
+                // ===== MAIN CONTENT =====
+                Row(modifier = Modifier.weight(1f)) {
+                    // ===== LEFT: Amount input + Numpad =====
                     Column(
                         modifier = Modifier
-                            .weight(0.6f)
+                            .weight(0.55f)
                             .fillMaxHeight()
                             .padding(16.dp)
                     ) {
@@ -681,9 +237,9 @@ fun PaymentDialog(
                                 fontWeight = FontWeight.Bold
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                            // Amount display
+                            // Amount display - larger
                             OutlinedTextField(
                                 value = receivedAmountText,
                                 onValueChange = { receivedAmountText = it.filter { c -> c.isDigit() } },
@@ -692,76 +248,95 @@ fun PaymentDialog(
                                     textAlign = TextAlign.End,
                                     fontWeight = FontWeight.Bold
                                 ),
-                                suffix = { Text("đ", style = MaterialTheme.typography.titleLarge) },
+                                suffix = {
+                                    Text(
+                                        "đ",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF4CAF50),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Quick amount buttons
+                            // Quick amount suggestions - horizontal scroll
                             Text(
                                 text = "Gợi ý",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.outline
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             val suggestions = listOf(
-                                totalAmount,
-                                roundUp(totalAmount, 10000),
-                                roundUp(totalAmount, 50000),
-                                roundUp(totalAmount, 100000),
-                                roundUp(totalAmount, 200000),
-                                roundUp(totalAmount, 500000)
-                            ).distinct().filter { it >= totalAmount }.take(6)
+                                totalAmount to "Đủ tiền",
+                                roundUp(totalAmount, 10000) to null,
+                                roundUp(totalAmount, 50000) to null,
+                                roundUp(totalAmount, 100000) to null,
+                                roundUp(totalAmount, 200000) to null,
+                                roundUp(totalAmount, 500000) to null
+                            ).filter { it.first >= totalAmount }
+                                .distinctBy { it.first }
+                                .take(5)
 
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                suggestions.forEach { amount ->
+                                suggestions.forEach { (amount, label) ->
+                                    val isActive = receivedAmount == amount
                                     SuggestionChip(
                                         onClick = { receivedAmountText = amount.toString() },
                                         label = {
                                             Text(
-                                                if (amount == totalAmount) "Đủ tiền" else formatCurrency(amount),
-                                                fontSize = 12.sp
+                                                label ?: formatCurrency(amount),
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                                             )
                                         },
                                         colors = SuggestionChipDefaults.suggestionChipColors(
-                                            containerColor = if (receivedAmount == amount)
-                                                MaterialTheme.colorScheme.primaryContainer
+                                            containerColor = if (isActive)
+                                                Color(0xFF4CAF50).copy(alpha = 0.2f)
                                             else
                                                 MaterialTheme.colorScheme.surface
-                                        )
+                                        ),
+                                        border = if (isActive)
+                                            SuggestionChipDefaults.suggestionChipBorder(
+                                                enabled = true,
+                                                borderColor = Color(0xFF4CAF50)
+                                            )
+                                        else
+                                            SuggestionChipDefaults.suggestionChipBorder(enabled = true)
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            // Numpad
-                            if (showKeypad) {
-                                NumPad(
-                                    onNumberClick = { num ->
-                                        receivedAmountText += num
-                                    },
-                                    onBackspace = {
-                                        if (receivedAmountText.isNotEmpty()) {
-                                            receivedAmountText = receivedAmountText.dropLast(1)
-                                        }
-                                    },
-                                    onClear = {
-                                        receivedAmountText = ""
+                            // Numpad - bigger buttons
+                            NumPadCompact(
+                                onNumberClick = { num ->
+                                    receivedAmountText += num
+                                },
+                                onBackspace = {
+                                    if (receivedAmountText.isNotEmpty()) {
+                                        receivedAmountText = receivedAmountText.dropLast(1)
                                     }
-                                )
-                            }
+                                },
+                                onClear = {
+                                    receivedAmountText = ""
+                                }
+                            )
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            // Change amount display
+                            // Change amount display - prominent
                             if (receivedAmount >= totalAmount) {
                                 Card(
                                     colors = CardDefaults.cardColors(
@@ -772,15 +347,18 @@ fun PaymentDialog(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(16.dp),
+                                            .padding(12.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "💰 Tiền thừa:",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("💰", fontSize = 20.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Tiền thừa:",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                        }
                                         Text(
                                             text = formatCurrency(changeAmount),
                                             style = MaterialTheme.typography.headlineSmall,
@@ -791,19 +369,20 @@ fun PaymentDialog(
                                 }
                             }
                         } else {
-                            // Other payment methods UI
+                            // Other payment methods UI - centered with QR
                             Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(32.dp),
+                                modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
                                     Text(
                                         text = selectedMethod.icon,
-                                        fontSize = 64.sp
+                                        fontSize = 56.sp
                                     )
-                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     Text(
                                         text = selectedMethod.displayName,
                                         style = MaterialTheme.typography.headlineSmall,
@@ -822,18 +401,15 @@ fun PaymentDialog(
                                         PaymentMethod.BANK_TRANSFER -> {
                                             Text(
                                                 text = "Quét QR hoặc chuyển khoản",
-                                                style = MaterialTheme.typography.bodyLarge,
+                                                style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.outline
                                             )
+                                            Spacer(modifier = Modifier.height(12.dp))
                                             // QR Code placeholder
-                                            Spacer(modifier = Modifier.height(16.dp))
                                             Box(
                                                 modifier = Modifier
-                                                    .size(150.dp)
-                                                    .background(
-                                                        Color.White,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
+                                                    .size(140.dp)
+                                                    .background(Color.White, RoundedCornerShape(8.dp))
                                                     .border(
                                                         1.dp,
                                                         MaterialTheme.colorScheme.outline,
@@ -844,22 +420,432 @@ fun PaymentDialog(
                                                 Text("QR Code", color = MaterialTheme.colorScheme.outline)
                                             }
                                         }
-                                        PaymentMethod.MOMO, PaymentMethod.ZALOPAY, PaymentMethod.VNPAY -> {
+                                        else -> {
                                             Text(
-                                                text = "Mở app ${selectedMethod.displayName} để thanh toán",
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = MaterialTheme.colorScheme.outline,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                        PaymentMethod.CARD -> {
-                                            Text(
-                                                text = "Quẹt thẻ trên máy POS",
-                                                style = MaterialTheme.typography.bodyLarge,
+                                                text = "Đã thanh toán qua ${selectedMethod.displayName}",
+                                                style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.outline
                                             )
                                         }
-                                        else -> {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ===== RIGHT: Order summary + Discount (collapsible) =====
+                    Column(
+                        modifier = Modifier
+                            .weight(0.45f)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // Order summary - compact
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
+                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
+                                }
+                                if (discountAmount > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Giảm giá:", style = MaterialTheme.typography.bodyMedium, color = Success)
+                                        Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodyMedium, color = Success)
+                                    }
+                                }
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("TỔNG:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        formatCurrency(totalAmount),
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color(0xFFFF5722)
+                                    )
+                                }
+                                if (vatAmount > 0) {
+                                    Text(
+                                        "(Đã bao gồm VAT 8%: ${formatCurrency(vatAmount)})",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // ===== DISCOUNT SECTION - Collapsible =====
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // Header - clickable to expand/collapse
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showDiscountSection = !showDiscountSection }
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.LocalOffer,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = if (discountAmount > 0) Success else MaterialTheme.colorScheme.outline
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Giảm giá",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (discountAmount > 0) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Badge(containerColor = Success) {
+                                                Text(
+                                                    "-${formatCurrency(discountAmount)}",
+                                                    fontSize = 10.sp,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Icon(
+                                        if (showDiscountSection) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // Discount content - animated visibility
+                                AnimatedVisibility(
+                                    visible = showDiscountSection,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp)
+                                            .padding(bottom = 12.dp)
+                                    ) {
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Quick percent buttons
+                                        Text(
+                                            "Giảm nhanh",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            listOf(5, 10, 15, 20, 30).forEach { percent ->
+                                                FilterChip(
+                                                    selected = false,
+                                                    onClick = {
+                                                        onApplyPercentDiscount(percent, "Giảm $percent%")
+                                                    },
+                                                    label = { Text("$percent%", fontSize = 11.sp) },
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        // Clear discount button
+                                        if (discountAmount > 0 && appliedDiscounts.isEmpty()) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            TextButton(
+                                                onClick = onClearDiscount,
+                                                modifier = Modifier.align(Alignment.End),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Clear,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Xóa giảm giá", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Manual input toggle
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { showDiscountInput = !showDiscountInput },
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                if (showDiscountInput) Icons.Default.ExpandLess else Icons.Default.Edit,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                "Nhập số tiền giảm",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+
+                                        // Manual input
+                                        AnimatedVisibility(
+                                            visible = showDiscountInput,
+                                            enter = expandVertically(),
+                                            exit = shrinkVertically()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = manualDiscountText,
+                                                    onValueChange = { manualDiscountText = it.filter { c -> c.isDigit() } },
+                                                    placeholder = { Text("Số tiền", fontSize = 12.sp) },
+                                                    modifier = Modifier.weight(1f),
+                                                    singleLine = true,
+                                                    textStyle = MaterialTheme.typography.bodySmall,
+                                                    keyboardOptions = KeyboardOptions(
+                                                        keyboardType = KeyboardType.Number,
+                                                        imeAction = ImeAction.Done
+                                                    ),
+                                                    suffix = { Text("đ", fontSize = 12.sp) }
+                                                )
+                                                Button(
+                                                    onClick = {
+                                                        val value = manualDiscountText.toLongOrNull() ?: 0L
+                                                        if (value > 0) {
+                                                            onApplyManualDiscount(value, "Giảm ${formatCurrency(value)}")
+                                                            manualDiscountText = ""
+                                                            showDiscountInput = false
+                                                        }
+                                                    },
+                                                    enabled = manualDiscountText.isNotEmpty(),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                                ) {
+                                                    Text("OK", fontSize = 12.sp)
+                                                }
+                                            }
+                                        }
+
+                                        // Coupon input
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            "Mã giảm giá",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            OutlinedTextField(
+                                                value = couponCode,
+                                                onValueChange = onCouponCodeChange,
+                                                placeholder = { Text("Nhập mã", fontSize = 12.sp) },
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true,
+                                                textStyle = MaterialTheme.typography.bodySmall,
+                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                                keyboardActions = KeyboardActions(onDone = { onApplyCoupon() }),
+                                                isError = couponError != null
+                                            )
+                                            Button(
+                                                onClick = onApplyCoupon,
+                                                enabled = !isApplyingCoupon && couponCode.isNotEmpty(),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                            ) {
+                                                if (isApplyingCoupon) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(14.dp),
+                                                        strokeWidth = 2.dp
+                                                    )
+                                                } else {
+                                                    Text("OK", fontSize = 12.sp)
+                                                }
+                                            }
+                                        }
+                                        if (couponError != null) {
+                                            Text(
+                                                text = couponError,
+                                                color = MaterialTheme.colorScheme.error,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            )
+                                        }
+
+                                        // Applied discounts
+                                        if (appliedDiscounts.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            appliedDiscounts.forEach { discount ->
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 2.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.CheckCircle,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(14.dp),
+                                                            tint = Success
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = discount.code,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+                                                    }
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = "-${formatCurrency(discount.discountAmount)}",
+                                                            color = Success,
+                                                            fontSize = 12.sp
+                                                        )
+                                                        IconButton(
+                                                            onClick = { onRemoveDiscount(discount.couponId) },
+                                                            modifier = Modifier.size(20.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.Close,
+                                                                contentDescription = "Xóa",
+                                                                modifier = Modifier.size(14.dp),
+                                                                tint = MaterialTheme.colorScheme.error
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Item-level discount
+                                        if (orderItems.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { showItemDiscounts = !showItemDiscounts },
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    "Giảm theo món (${orderItems.size})",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.outline
+                                                )
+                                                Icon(
+                                                    if (showItemDiscounts) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+
+                                            AnimatedVisibility(
+                                                visible = showItemDiscounts,
+                                                enter = expandVertically(),
+                                                exit = shrinkVertically()
+                                            ) {
+                                                Column(modifier = Modifier.padding(top = 8.dp)) {
+                                                    orderItems.forEach { item ->
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clickable {
+                                                                    selectedItemForDiscount = if (selectedItemForDiscount == item.id) null else item.id
+                                                                    itemDiscountText = ""
+                                                                }
+                                                                .padding(vertical = 4.dp),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                "${item.name} x${item.quantity}",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                modifier = Modifier.weight(1f),
+                                                                maxLines = 1
+                                                            )
+                                                            if (item.discountAmount > 0) {
+                                                                Text(
+                                                                    "-${formatCurrency(item.discountAmount)}",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = Success
+                                                                )
+                                                            }
+                                                        }
+
+                                                        // Discount input for selected item
+                                                        if (selectedItemForDiscount == item.id) {
+                                                            Row(
+                                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                                modifier = Modifier.padding(vertical = 4.dp)
+                                                            ) {
+                                                                listOf(5, 10, 20).forEach { percent ->
+                                                                    FilterChip(
+                                                                        selected = false,
+                                                                        onClick = {
+                                                                            val discountAmt = (item.totalPrice * percent / 100)
+                                                                            onApplyItemDiscount(item.id, discountAmt)
+                                                                            selectedItemForDiscount = null
+                                                                        },
+                                                                        label = { Text("$percent%", fontSize = 10.sp) },
+                                                                        modifier = Modifier.height(24.dp)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -867,17 +853,17 @@ fun PaymentDialog(
                     }
                 }
 
-                // Footer - Action buttons
+                // ===== FOOTER - Action buttons =====
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(0.3f)
+                        modifier = Modifier.weight(0.25f)
                     ) {
                         Text("Hủy")
                     }
@@ -893,10 +879,11 @@ fun PaymentDialog(
                             )
                             onPaymentComplete(listOf(payment))
                         },
-                        modifier = Modifier.weight(0.7f),
+                        modifier = Modifier.weight(0.75f),
                         enabled = canComplete,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50)
+                            containerColor = Color(0xFF4CAF50),
+                            disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                         )
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null)
@@ -909,60 +896,11 @@ fun PaymentDialog(
     }
 }
 
+/**
+ * Compact numpad for payment dialog
+ */
 @Composable
-fun PaymentMethodCard(
-    method: PaymentMethod,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surface
-        ),
-        border = if (isSelected) {
-            CardDefaults.outlinedCardBorder().copy(
-                brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)
-            )
-        } else null
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = method.icon,
-                fontSize = 24.sp
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = method.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            )
-            if (isSelected) {
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun NumPad(
+fun NumPadCompact(
     onNumberClick: (String) -> Unit,
     onBackspace: () -> Unit,
     onClear: () -> Unit
@@ -975,12 +913,12 @@ fun NumPad(
     )
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         buttons.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 row.forEach { button ->
                     Button(
@@ -993,20 +931,20 @@ fun NumPad(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when (button) {
-                                "C" -> MaterialTheme.colorScheme.errorContainer
+                                "C" -> Color(0xFFFFEBEE)
                                 "⌫" -> MaterialTheme.colorScheme.surfaceVariant
-                                else -> MaterialTheme.colorScheme.surface
+                                else -> Color(0xFFFFF3E0)
                             },
                             contentColor = when (button) {
-                                "C" -> MaterialTheme.colorScheme.onErrorContainer
+                                "C" -> Color(0xFFD32F2F)
                                 else -> MaterialTheme.colorScheme.onSurface
                             }
                         ),
                         shape = RoundedCornerShape(8.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
                     ) {
                         Text(
                             text = button,
