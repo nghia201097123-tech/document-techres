@@ -49,8 +49,8 @@ export class Product {
   @Column({ length: 50, nullable: true })
   unit: string;
 
-  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 0, nullable: true })
-  vatRate: number;
+  @Column({ name: 'vat_rate', type: 'decimal', precision: 5, scale: 2, default: 8, nullable: true })
+  vatRate: number; // VAT F&B mặc định 8%
 
   @Column({ name: 'product_type', length: 50, default: 'single', nullable: true })
   productType: string;

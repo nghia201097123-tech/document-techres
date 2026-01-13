@@ -609,7 +609,7 @@ export class SyncService {
       imageUrl: product.imageUrl || null,
       price: Number(product.price),
       costPrice: Number(product.costPrice || 0),
-      vatRate: Number(product.vatRate || 0),
+      vatRate: Number(product.vatRate || 8), // Default VAT F&B 8%
       unit: product.unit || null,
       type: product.productType || 'food',
       isAvailable: product.isAvailable ?? true,
@@ -637,7 +637,7 @@ export class SyncService {
       imageUrl: product.imageUrl || null,
       price,
       costPrice: Number(product.costPrice || 0),
-      vatRate: Number(product.vatRate || 0),
+      vatRate: Number(product.vatRate || 8), // Default VAT F&B 8%
       unit: product.unit || null,
       type: product.productType || 'food',
       isAvailable: bp.isAvailable,
