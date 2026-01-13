@@ -1696,13 +1696,23 @@ class SaleViewModel @Inject constructor(
             try {
                 val now = getCurrentTimestamp()
 
+                // Calculate final amounts with applied discounts
+                val orderSubtotal = currentOrder.subtotal
+                val finalDiscountAmount = state.discountAmount.toDouble()  // Includes bill + item + coupon discounts
+                val finalTotalAmount = (orderSubtotal - finalDiscountAmount).coerceAtLeast(0.0)
+
+                Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, discount: $finalDiscountAmount, total: $finalTotalAmount")
+
                 withContext(Dispatchers.IO) {
-                    // 1. Update order status to completed
+                    // 1. Update order status to completed with correct discount and total
                     val completedOrder = currentOrder.copy(
                         status = "completed",
                         paymentStatus = "paid",
                         paymentMethod = paymentMethod,
-                        paidAmount = currentOrder.totalAmount,
+                        discountAmount = finalDiscountAmount,
+                        discountReason = state.billDiscountDescription,
+                        totalAmount = finalTotalAmount,
+                        paidAmount = finalTotalAmount,
                         completedAt = now,
                         updatedAt = now
                     )
@@ -1716,12 +1726,12 @@ class SaleViewModel @Inject constructor(
                         tableRepository.updateTableStatus(table.id, "available", null, now)
                     }
 
-                    // 4. Update shift statistics
+                    // 4. Update shift statistics with correct discount
                     currentOrder.shiftId?.let { shiftId ->
                         shiftRepository.addOrderRevenue(
                             shiftId = shiftId,
-                            orderTotal = currentOrder.totalAmount,
-                            discountAmount = currentOrder.discountAmount,
+                            orderTotal = finalTotalAmount,
+                            discountAmount = finalDiscountAmount,
                             paymentMethod = paymentMethod,
                             updatedAt = now
                         )
