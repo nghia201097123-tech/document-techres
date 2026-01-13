@@ -21,8 +21,8 @@ import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.printer.BillData
 import com.techres.ccb.data.printer.BillItem
-import com.techres.ccb.data.printer.BillPrintService
 import com.techres.ccb.data.printer.BillTopping
+import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
@@ -1790,8 +1790,8 @@ class SaleViewModel @Inject constructor(
                                     changeAmount = changeAmount
                                 )
 
-                                // Print bill
-                                val result = BillPrintService.printBill(printerConfig, template, billData)
+                                // Print bill using Hybrid approach (supports Vietnamese diacritics)
+                                val result = HybridBillPrintService.printBill(printerConfig, template, billData)
                                 when (result) {
                                     is PrinterResult.Success -> {
                                         Log.d(TAG, "completeOrder - Bill printed successfully")

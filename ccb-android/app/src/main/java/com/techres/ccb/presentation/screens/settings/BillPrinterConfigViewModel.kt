@@ -7,7 +7,7 @@ import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
-import com.techres.ccb.data.printer.BillPrintService
+import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -203,7 +203,7 @@ class BillPrinterConfigViewModel @Inject constructor(
                             changeAmount = 10000.0
                         )
 
-                        BillPrintService.printBill(config, template, testBillData)
+                        HybridBillPrintService.printBill(config, template, testBillData)
                     }
                 }
 
