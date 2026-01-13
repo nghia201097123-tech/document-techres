@@ -1,16 +1,59 @@
 import api from "./api";
 import { Product } from "./product-service";
 
-export type PrintMode = "individual" | "list";
+/**
+ * Chế độ in của bếp
+ * - TICKET: In phiếu bếp (nhiều món trên 1 tờ)
+ * - LABEL: In tem (1 tem cho mỗi món/ly)
+ * - BOTH: In cả phiếu và tem
+ */
+export type KitchenPrintMode = "TICKET" | "LABEL" | "BOTH";
+
+/**
+ * Loại bếp
+ */
+export type KitchenType =
+  | "kitchen"   // Bếp chính
+  | "bar"       // Quầy bar/đồ uống
+  | "grill"     // Bếp nướng
+  | "dessert"   // Tráng miệng
+  | "seafood"   // Hải sản
+  | "hotpot"    // Lẩu
+  | "bakery"    // Bánh
+  | "other";    // Khác
+
+/**
+ * Label cho các loại bếp
+ */
+export const KitchenTypeLabels: Record<KitchenType, string> = {
+  kitchen: "Bếp chính",
+  bar: "Quầy Bar",
+  grill: "Bếp nướng",
+  dessert: "Tráng miệng",
+  seafood: "Hải sản",
+  hotpot: "Lẩu",
+  bakery: "Bánh",
+  other: "Khác",
+};
+
+/**
+ * Label cho các chế độ in
+ */
+export const PrintModeLabels: Record<KitchenPrintMode, string> = {
+  TICKET: "In phiếu bếp",
+  LABEL: "In tem/sticker",
+  BOTH: "In cả phiếu và tem",
+};
 
 export interface Kitchen {
   id: string;
   name: string;
+  kitchenType?: KitchenType;
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
-  paperSize?: string;
-  printMode?: PrintMode;
+  paperWidth?: number; // 58, 80, 110, etc.
+  printMode?: KitchenPrintMode;
   description?: string;
   isActive: boolean;
   sortOrder: number;
@@ -22,21 +65,23 @@ export interface Kitchen {
 
 export interface CreateKitchenDto {
   name: string;
+  kitchenType?: KitchenType;
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
-  paperSize?: string;
-  printMode?: PrintMode;
+  paperWidth?: number;
+  printMode?: KitchenPrintMode;
   description?: string;
 }
 
 export interface UpdateKitchenDto {
   name?: string;
+  kitchenType?: KitchenType;
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
-  paperSize?: string;
-  printMode?: PrintMode;
+  paperWidth?: number;
+  printMode?: KitchenPrintMode;
   description?: string;
 }
 
