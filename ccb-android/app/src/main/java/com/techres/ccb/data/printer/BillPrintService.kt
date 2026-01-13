@@ -617,7 +617,11 @@ data class BillData(
     val totalAmount: Double,
     val paymentMethod: String = "Tiền mặt",
     val receivedAmount: Double = 0.0,
-    val changeAmount: Double = 0.0
+    val changeAmount: Double = 0.0,
+    // ============ TEMPORARY BILL (Bill tạm) ============
+    val isTemporaryBill: Boolean = false,    // Đánh dấu là bill tạm
+    val printCount: Int = 0,                  // Số lần in (lần thứ mấy)
+    val printTime: Date? = null               // Thời gian in bill này
 )
 
 /**

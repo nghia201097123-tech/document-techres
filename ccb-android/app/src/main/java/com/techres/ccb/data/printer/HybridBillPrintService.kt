@@ -157,8 +157,27 @@ object HybridBillPrintService {
             template.headerText?.let { lineCenter(it) }
 
             doubleSeparator()
-            lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
-            doubleSeparator()
+
+            // ============ BILL TITLE - Phân biệt bill tạm và bill chính thức ============
+            if (billData.isTemporaryBill) {
+                // Bill tạm - hiển thị khác biệt
+                lineDouble("*** BILL TẠM ***", BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+
+                // Hiển thị thông tin lần in và thời gian
+                lineCenter("Lần in thứ: ${billData.printCount}")
+                billData.printTime?.let { printTime ->
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    lineCenter("Thời gian in: ${timeFormat.format(printTime)}")
+                }
+                lineCenter("(Chưa thanh toán)")
+
+                separator()
+            } else {
+                // Bill chính thức
+                lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+            }
 
             // ============ ORDER INFO ============
             if (template.showOrderNumber) {
@@ -271,17 +290,23 @@ object HybridBillPrintService {
 
             // ============ TOTAL - TỔNG CỘNG ============
             // Font size sẽ được tự động scale trong lineKeyValue với bold = true
-            lineKeyValue("TỔNG CỘNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
+            if (billData.isTemporaryBill) {
+                lineKeyValue("TỔNG TẠM TÍNH:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
+            } else {
+                lineKeyValue("TỔNG CỘNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
+            }
 
-            // ============ PAYMENT INFO ============
-            if (template.showPaymentMethod) {
-                lineKeyValue("Thanh toán:", billData.paymentMethod)
-            }
-            if (template.showReceivedAmount && billData.receivedAmount > 0) {
-                lineKeyValue("Tiền khách:", formatCurrency(billData.receivedAmount))
-            }
-            if (template.showChangeAmount && billData.changeAmount > 0) {
-                lineKeyValue("Tiền thừa:", formatCurrency(billData.changeAmount))
+            // ============ PAYMENT INFO (chỉ hiển thị cho bill chính thức) ============
+            if (!billData.isTemporaryBill) {
+                if (template.showPaymentMethod) {
+                    lineKeyValue("Thanh toán:", billData.paymentMethod)
+                }
+                if (template.showReceivedAmount && billData.receivedAmount > 0) {
+                    lineKeyValue("Tiền khách:", formatCurrency(billData.receivedAmount))
+                }
+                if (template.showChangeAmount && billData.changeAmount > 0) {
+                    lineKeyValue("Tiền thừa:", formatCurrency(billData.changeAmount))
+                }
             }
 
             // ============ QR CODE (theo config) ============
@@ -309,9 +334,17 @@ object HybridBillPrintService {
 
             // ============ FOOTER ============
             separator()
-            lineCenter(template.thankYouMessage)
-            lineCenter(template.comebackMessage)
-            template.footerText?.let { lineCenter(it) }
+            if (billData.isTemporaryBill) {
+                // Footer cho bill tạm
+                lineCenter("*** ĐÂY LÀ BILL TẠM ***")
+                lineCenter("Vui lòng thanh toán tại quầy")
+                lineCenter("để nhận hóa đơn chính thức")
+            } else {
+                // Footer cho bill chính thức
+                lineCenter(template.thankYouMessage)
+                lineCenter(template.comebackMessage)
+                template.footerText?.let { lineCenter(it) }
+            }
 
             // ============ PRINTER ACTIONS ============
             // Feed đủ nhiều để đẩy footer ra khỏi vị trí cắt (5-6 dòng)

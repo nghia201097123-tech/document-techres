@@ -67,6 +67,7 @@ data class SaleUiState(
     // Current active order for selected table
     val currentOrder: OrderEntity? = null,
     val currentOrderItems: List<OrderItemEntity> = emptyList(),
+    val tempBillPrintCount: Int = 0,         // Số lần in bill tạm
 
     // Available notes for quick selection
     val availableNotes: List<ProductNoteEntity> = emptyList(),
@@ -915,7 +916,9 @@ class SaleViewModel @Inject constructor(
                     currentOrder = activeOrder,
                     currentOrderItems = orderItems,
                     // Clear cart when switching tables with active order
-                    cartItems = if (activeOrder != null) emptyList() else state.cartItems
+                    cartItems = if (activeOrder != null) emptyList() else state.cartItems,
+                    // Reset temp bill print count when switching tables
+                    tempBillPrintCount = 0
                 )
             }
         }
@@ -1710,6 +1713,98 @@ class SaleViewModel @Inject constructor(
     }
 
     /**
+     * In bill tạm - dùng để cho khách xem trước khi thanh toán
+     * Mỗi lần in sẽ tăng số lần in và hiển thị thời gian in
+     */
+    fun printTemporaryBill() {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: run {
+            _uiState.update { it.copy(errorMessage = "Không có order để in bill tạm") }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                // Tăng số lần in bill tạm
+                val newPrintCount = state.tempBillPrintCount + 1
+                _uiState.update { it.copy(tempBillPrintCount = newPrintCount) }
+
+                withContext(Dispatchers.IO) {
+                    // Get printer and template
+                    var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
+                    if (printerConfig == null) {
+                        val activePrinters = billPrinterConfigDao.getAllByBranchSync(branchId)
+                        printerConfig = activePrinters.firstOrNull()
+                    }
+
+                    if (printerConfig != null && printerConfig.isActive) {
+                        var template = if (printerConfig.templateId != null) {
+                            billTemplateDao.getById(printerConfig.templateId)
+                        } else {
+                            billTemplateDao.getDefaultByBranch(branchId)
+                        }
+                        if (template == null || !template.isActive) {
+                            val activeTemplates = billTemplateDao.getAllByBranchSync(branchId)
+                            template = activeTemplates.firstOrNull()
+                        }
+
+                        if (template != null && template.isActive) {
+                            // Build temporary bill data
+                            val billData = buildBillData(
+                                order = currentOrder,
+                                orderItems = state.currentOrderItems,
+                                itemDiscounts = state.itemDiscounts,
+                                billDiscountAmount = state.billDiscountAmount,
+                                tableName = state.selectedTable?.name,
+                                staffName = currentOrder.staffName,
+                                customerName = currentOrder.customerName,
+                                paymentMethod = "",
+                                receivedAmount = 0.0,
+                                changeAmount = 0.0
+                            ).copy(
+                                // Mark as temporary bill with print count and time
+                                isTemporaryBill = true,
+                                printCount = newPrintCount,
+                                printTime = Date()
+                            )
+
+                            // Print temporary bill
+                            val result = HybridBillPrintService.printBill(printerConfig, template, billData)
+                            when (result) {
+                                is PrinterResult.Success -> {
+                                    Log.d(TAG, "printTemporaryBill - Success, printCount: $newPrintCount")
+                                    withContext(Dispatchers.Main) {
+                                        _uiState.update { it.copy(successMessage = "In bill tạm thành công (lần thứ $newPrintCount)") }
+                                    }
+                                }
+                                is PrinterResult.Error -> {
+                                    Log.e(TAG, "printTemporaryBill - Error: ${result.message}")
+                                    withContext(Dispatchers.Main) {
+                                        _uiState.update { it.copy(errorMessage = "Lỗi in bill tạm: ${result.message}") }
+                                    }
+                                }
+                                else -> {}
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                _uiState.update { it.copy(errorMessage = "Không tìm thấy mẫu bill") }
+                            }
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            _uiState.update { it.copy(errorMessage = "Không tìm thấy máy in") }
+                        }
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "printTemporaryBill - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi in bill tạm: ${e.message}") }
+            }
+        }
+    }
+
+    /**
      * Thanh toán và hoàn tất order
      * Đồng bộ: Order -> Order Items -> Table -> Shift Statistics -> Bill Print
      */
@@ -1851,6 +1946,8 @@ class SaleViewModel @Inject constructor(
                         couponCode = "",
                         appliedDiscounts = emptyList(),
                         couponError = null,
+                        // Reset temp bill print count
+                        tempBillPrintCount = 0,
                         successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
                     )
                 }
