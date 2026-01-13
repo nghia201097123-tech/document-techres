@@ -975,13 +975,17 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Áp dụng giảm giá hóa đơn (số tiền cố định)
+     * Giới hạn giảm giá để tổng không bị âm
      */
     fun applyDiscount(amount: Long, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
-        Log.d(TAG, "applyDiscount - amount: $amount, orderSubtotal: $orderSubtotal, reason: $reason")
         _uiState.update { state ->
+            // Số tiền tối đa có thể giảm = orderSubtotal - itemDiscountTotal - couponDiscount
+            val maxBillDiscount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
+            val finalAmount = amount.coerceAtMost(maxBillDiscount)
+            Log.d(TAG, "applyDiscount - requested: $amount, maxAllowed: $maxBillDiscount, applied: $finalAmount")
             state.copy(
-                billDiscountAmount = amount.coerceAtMost(orderSubtotal),
+                billDiscountAmount = finalAmount,
                 billDiscountDescription = reason
             )
         }
@@ -989,14 +993,18 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Áp dụng giảm giá hóa đơn theo phần trăm
+     * Giới hạn giảm giá để tổng không bị âm
      */
     fun applyPercentDiscount(percent: Int, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
         val discountAmount = (orderSubtotal * percent / 100)
-        Log.d(TAG, "applyPercentDiscount - percent: $percent%, orderSubtotal: $orderSubtotal, discountAmount: $discountAmount")
         _uiState.update { state ->
+            // Số tiền tối đa có thể giảm = orderSubtotal - itemDiscountTotal - couponDiscount
+            val maxBillDiscount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
+            val finalAmount = discountAmount.coerceAtMost(maxBillDiscount)
+            Log.d(TAG, "applyPercentDiscount - percent: $percent%, calculated: $discountAmount, maxAllowed: $maxBillDiscount, applied: $finalAmount")
             state.copy(
-                billDiscountAmount = discountAmount.coerceAtMost(orderSubtotal),
+                billDiscountAmount = finalAmount,
                 billDiscountDescription = reason
             )
         }
@@ -1043,13 +1051,34 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Áp dụng giảm giá cho một món cụ thể
+     * Giới hạn giảm giá không vượt quá giá của món và tổng đơn hàng
      */
     fun applyItemDiscount(itemId: String, amount: Long) {
-        Log.d(TAG, "applyItemDiscount - itemId: $itemId, amount: $amount")
+        val orderSubtotal = getOrderSubtotal()
         _uiState.update { state ->
+            // Tìm giá của món từ cartItems hoặc currentOrderItems
+            val itemPrice = state.cartItems.find { it.id == itemId }?.totalPrice
+                ?: state.currentOrderItems.find { it.id == itemId }?.totalPrice?.toLong()
+                ?: 0L
+
+            // Tính tổng giảm giá các món khác (không bao gồm món hiện tại)
+            val otherItemDiscounts = state.itemDiscounts
+                .filterKeys { it != itemId }
+                .values.sum()
+
+            // Số tiền tối đa có thể giảm cho món này
+            // = min(giá món, orderSubtotal - otherItemDiscounts - billDiscount - couponDiscount)
+            val maxItemDiscount = minOf(
+                itemPrice,
+                (orderSubtotal - otherItemDiscounts - state.billDiscountAmount - state.totalCouponDiscount).coerceAtLeast(0L)
+            )
+
+            val finalAmount = amount.coerceAtMost(maxItemDiscount)
+            Log.d(TAG, "applyItemDiscount - itemId: $itemId, requested: $amount, itemPrice: $itemPrice, maxAllowed: $maxItemDiscount, applied: $finalAmount")
+
             val newItemDiscounts = state.itemDiscounts.toMutableMap()
-            if (amount > 0) {
-                newItemDiscounts[itemId] = amount
+            if (finalAmount > 0) {
+                newItemDiscounts[itemId] = finalAmount
             } else {
                 newItemDiscounts.remove(itemId)
             }
