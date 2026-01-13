@@ -36,6 +36,10 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.widget.Toast
 import com.techres.ccb.data.local.entity.OrderItemEntity
+import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
+import com.techres.ccb.domain.model.Payment
+import com.techres.ccb.domain.model.PaymentMethod
+import com.techres.ccb.domain.model.PaymentStatus
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -341,16 +345,45 @@ fun DashboardScreen(
         )
     }
 
-    // Quick Payment Dialog
+    // Payment Dialog - Sử dụng PaymentDialog giống như SaleScreen
     if (showQuickPaymentDialog && orderForPayment != null) {
-        QuickPaymentDialog(
-            order = orderForPayment!!,
+        val order = orderForPayment!!
+        // Tính VAT từ items (mỗi item có vatRate riêng)
+        val vatAmount = order.items.sumOf { item ->
+            val itemTotal = item.totalPrice
+            val vatRate = item.vatRate
+            (itemTotal - itemTotal / (1 + vatRate / 100)).toLong()
+        }
+
+        PaymentDialog(
+            totalAmount = order.totalAmount,
+            subtotal = order.totalAmount,
+            discountAmount = 0,
+            vatAmount = vatAmount,
+            appliedDiscounts = emptyList(),
+            couponCode = "",
+            couponError = null,
+            isApplyingCoupon = false,
+            orderItems = order.items,
+            itemDiscountTotal = 0,
+            billDiscountTotal = 0,
+            billDiscountDescription = null,
+            onCouponCodeChange = {},
+            onApplyCoupon = {},
+            onRemoveDiscount = {},
+            onApplyManualDiscount = { _, _ -> },
+            onApplyPercentDiscount = { _, _ -> },
+            onApplyItemDiscount = { _, _ -> },
+            onClearDiscount = {},
+            onClearItemDiscounts = {},
+            onClearBillDiscount = {},
+            onPrintTemporaryBill = {},
             onDismiss = {
                 showQuickPaymentDialog = false
                 orderForPayment = null
             },
-            onPaymentComplete = { paymentMethod ->
-                viewModel.completePosOrder(orderForPayment!!.id)
+            onPaymentComplete = { payments ->
+                viewModel.completePosOrder(order.id)
                 showQuickPaymentDialog = false
                 orderForPayment = null
                 // Also close detail dialog if open
