@@ -182,11 +182,10 @@ object HybridBillPrintService {
 
             // ============ ITEMS ============
             billData.items.forEach { item ->
-                // Item name with quantity
-                val itemLine = "${item.name}"
-                line(itemLine)
+                // Main item name - IN ĐẬM để nổi bật
+                lineBold(item.name)
 
-                // Price line
+                // Price line - thụt vào 2 spaces
                 lineKeyValue("  ${item.quantity} x ${formatCurrency(item.unitPrice)}", formatCurrency(item.totalPrice))
 
                 // Item code (optional)
@@ -199,9 +198,12 @@ object HybridBillPrintService {
                     line("  Ghi chú: ${item.note}")
                 }
 
-                // Toppings
-                item.toppings.forEach { topping ->
-                    line("  + ${topping.name}: ${formatCurrency(topping.price)}")
+                // Toppings - thụt vào nhiều hơn, dùng ký hiệu khác
+                if (item.toppings.isNotEmpty()) {
+                    item.toppings.forEach { topping ->
+                        // Dùng "  └ " để thể hiện đây là item con của món chính
+                        lineKeyValue("    └ ${topping.name}", formatCurrency(topping.price))
+                    }
                 }
             }
 
