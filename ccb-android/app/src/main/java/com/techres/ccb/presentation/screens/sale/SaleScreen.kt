@@ -310,6 +310,10 @@ fun SaleScreen(
                 couponError = uiState.couponError,
                 isApplyingCoupon = uiState.isApplyingCoupon,
                 orderItems = orderItems,
+                // Discount breakdown
+                itemDiscountTotal = uiState.itemDiscountTotal,
+                billDiscountTotal = uiState.billDiscountAmount,
+                billDiscountDescription = uiState.billDiscountDescription,
                 onCouponCodeChange = { viewModel.setCouponCode(it) },
                 onApplyCoupon = { viewModel.applyCoupon() },
                 onRemoveDiscount = { viewModel.removeCoupon(it) },
@@ -317,6 +321,8 @@ fun SaleScreen(
                 onApplyPercentDiscount = { percent, reason -> viewModel.applyPercentDiscount(percent, reason) },
                 onApplyItemDiscount = { itemId, amount -> viewModel.applyItemDiscount(itemId, amount) },
                 onClearDiscount = { viewModel.clearDiscount() },
+                onClearItemDiscounts = { viewModel.clearItemDiscounts() },
+                onClearBillDiscount = { viewModel.clearBillDiscount() },
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)

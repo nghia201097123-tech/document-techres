@@ -72,8 +72,8 @@ data class SaleUiState(
     val availableNotes: List<ProductNoteEntity> = emptyList(),
 
     // Discount/Coupon
-    val discountAmount: Long = 0,
-    val discountReason: String? = null,
+    val billDiscountAmount: Long = 0,                // Giảm giá hóa đơn (riêng biệt với item discounts)
+    val billDiscountDescription: String? = null,     // Mô tả giảm giá HĐ (VD: "Giảm 10%")
     val couponCode: String = "",                     // Mã coupon nhập vào
     val appliedDiscounts: List<AppliedDiscount> = emptyList(),  // Danh sách coupon đã áp dụng
     val couponError: String? = null,                 // Lỗi khi áp dụng coupon
@@ -105,6 +105,18 @@ data class SaleUiState(
     val subtotal: Long
         get() = cartItems.sumOf { it.totalPrice }
 
+    // Tổng giảm giá món
+    val itemDiscountTotal: Long
+        get() = itemDiscounts.values.sum()
+
+    // Tổng giảm giá (món + hóa đơn + coupon)
+    val discountAmount: Long
+        get() = billDiscountAmount + itemDiscountTotal + totalCouponDiscount
+
+    // Tổng tiền giảm giá từ các coupon đã áp dụng
+    val totalCouponDiscount: Long
+        get() = appliedDiscounts.sumOf { it.discountAmount }
+
     /**
      * Tổng tiền sau giảm giá
      * Vì giá sản phẩm đã bao gồm VAT nên KHÔNG cộng thêm VAT
@@ -133,10 +145,6 @@ data class SaleUiState(
      */
     val priceBeforeVat: Long
         get() = totalAmount - taxAmount
-
-    // Tổng tiền giảm giá từ các coupon đã áp dụng
-    val totalCouponDiscount: Long
-        get() = appliedDiscounts.sumOf { it.discountAmount }
 
     val cartItemCount: Int
         get() = cartItems.sumOf { it.quantity }
@@ -751,8 +759,9 @@ class SaleViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 cartItems = emptyList(),
-                discountAmount = 0,
-                discountReason = null,
+                billDiscountAmount = 0,
+                billDiscountDescription = null,
+                itemDiscounts = emptyMap(),
                 selectedTable = null,
                 selectedCustomer = null
             )
@@ -964,32 +973,69 @@ class SaleViewModel @Inject constructor(
         return orderSubtotal + state.subtotal
     }
 
+    /**
+     * Áp dụng giảm giá hóa đơn (số tiền cố định)
+     */
     fun applyDiscount(amount: Long, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
         Log.d(TAG, "applyDiscount - amount: $amount, orderSubtotal: $orderSubtotal, reason: $reason")
         _uiState.update { state ->
             state.copy(
-                discountAmount = amount.coerceAtMost(orderSubtotal),
-                discountReason = reason
+                billDiscountAmount = amount.coerceAtMost(orderSubtotal),
+                billDiscountDescription = reason
             )
         }
     }
 
+    /**
+     * Áp dụng giảm giá hóa đơn theo phần trăm
+     */
     fun applyPercentDiscount(percent: Int, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
         val discountAmount = (orderSubtotal * percent / 100)
         Log.d(TAG, "applyPercentDiscount - percent: $percent%, orderSubtotal: $orderSubtotal, discountAmount: $discountAmount")
-        applyDiscount(discountAmount, reason)
+        _uiState.update { state ->
+            state.copy(
+                billDiscountAmount = discountAmount.coerceAtMost(orderSubtotal),
+                billDiscountDescription = reason
+            )
+        }
     }
 
+    /**
+     * Xóa tất cả giảm giá (hóa đơn + món)
+     */
     fun clearDiscount() {
         _uiState.update { state ->
             state.copy(
-                discountAmount = 0,
-                discountReason = null,
+                billDiscountAmount = 0,
+                billDiscountDescription = null,
                 couponCode = "",
                 appliedDiscounts = emptyList(),
                 couponError = null,
+                itemDiscounts = emptyMap()
+            )
+        }
+    }
+
+    /**
+     * Xóa chỉ giảm giá hóa đơn
+     */
+    fun clearBillDiscount() {
+        _uiState.update { state ->
+            state.copy(
+                billDiscountAmount = 0,
+                billDiscountDescription = null
+            )
+        }
+    }
+
+    /**
+     * Xóa tất cả giảm giá món
+     */
+    fun clearItemDiscounts() {
+        _uiState.update { state ->
+            state.copy(
                 itemDiscounts = emptyMap()
             )
         }
@@ -1007,15 +1053,7 @@ class SaleViewModel @Inject constructor(
             } else {
                 newItemDiscounts.remove(itemId)
             }
-
-            // Tính tổng giảm giá = bill discount + item discounts
-            val totalItemDiscount = newItemDiscounts.values.sum()
-            val newTotalDiscount = state.discountAmount - (state.itemDiscounts.values.sum()) + totalItemDiscount
-
-            state.copy(
-                itemDiscounts = newItemDiscounts,
-                discountAmount = newTotalDiscount.coerceAtLeast(0L)
-            )
+            state.copy(itemDiscounts = newItemDiscounts)
         }
     }
 
@@ -1133,7 +1171,6 @@ class SaleViewModel @Inject constructor(
                         couponCode = "",
                         couponError = null,
                         appliedDiscounts = newAppliedDiscounts,
-                        discountAmount = totalDiscount,
                         vatAmount = vatAmount,
                         availableCoupons = it.availableCoupons + coupon,
                         successMessage = "Đã áp dụng mã ${coupon.code}"
@@ -1168,7 +1205,6 @@ class SaleViewModel @Inject constructor(
 
             state.copy(
                 appliedDiscounts = newAppliedDiscounts,
-                discountAmount = totalDiscount,
                 vatAmount = vatAmount
             )
         }
@@ -1249,7 +1285,6 @@ class SaleViewModel @Inject constructor(
                 _uiState.update { s ->
                     s.copy(
                         appliedDiscounts = appliedDiscounts,
-                        discountAmount = totalDiscount,
                         vatAmount = vatAmount,
                         availableCoupons = autoCoupons
                     )
@@ -1537,7 +1572,7 @@ class SaleViewModel @Inject constructor(
                     orderType = state.orderType.name.lowercase(),
                     subtotal = state.subtotal.toDouble(),
                     discountAmount = state.discountAmount.toDouble(),
-                    discountReason = state.discountReason,
+                    discountReason = state.billDiscountDescription,
                     totalAmount = state.totalAmount.toDouble(),
                     paymentStatus = "unpaid",
                     createdAt = now,
