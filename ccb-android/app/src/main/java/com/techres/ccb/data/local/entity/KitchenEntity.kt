@@ -5,6 +5,29 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Chế độ in của bếp
+ */
+enum class KitchenPrintMode {
+    TICKET,     // In phiếu bếp (nhiều món trên 1 tờ)
+    LABEL,      // In tem (1 tem cho mỗi món/ly)
+    BOTH        // In cả phiếu và tem
+}
+
+/**
+ * Loại bếp
+ */
+enum class KitchenType(val value: String) {
+    KITCHEN("kitchen"),     // Bếp chính
+    BAR("bar"),             // Quầy bar/đồ uống
+    GRILL("grill"),         // Bếp nướng
+    DESSERT("dessert"),     // Tráng miệng
+    SEAFOOD("seafood"),     // Hải sản
+    HOTPOT("hotpot"),       // Lẩu
+    BAKERY("bakery"),       // Bánh
+    OTHER("other")          // Khác
+}
+
 @Entity(
     tableName = "kitchens",
     indices = [
@@ -27,7 +50,7 @@ data class KitchenEntity(
     val description: String? = null,
 
     @ColumnInfo(name = "kitchen_type")
-    val kitchenType: String? = null, // "cooking", "grill", "bar", "dessert", etc.
+    val kitchenType: String? = null, // "kitchen", "bar", "grill", "dessert", etc.
 
     @ColumnInfo(name = "sort_order")
     val sortOrder: Int = 0,
@@ -35,7 +58,14 @@ data class KitchenEntity(
     @ColumnInfo(name = "is_active")
     val isActive: Boolean = true,
 
-    // Printer configuration (stored locally)
+    // ========== PRINT MODE ==========
+    @ColumnInfo(name = "print_mode")
+    val printMode: String = KitchenPrintMode.TICKET.name, // TICKET, LABEL, BOTH
+
+    @ColumnInfo(name = "paper_width")
+    val paperWidth: Int = 80, // 58mm, 80mm, etc.
+
+    // ========== PRINTER CONFIGURATION ==========
     @ColumnInfo(name = "printer_ip")
     val printerIp: String? = null,
 
@@ -63,4 +93,38 @@ data class KitchenEntity(
 
     @ColumnInfo(name = "version")
     val version: Int = 1
-)
+) {
+    /**
+     * Lấy KitchenPrintMode enum từ string
+     */
+    fun getPrintModeEnum(): KitchenPrintMode {
+        return try {
+            KitchenPrintMode.valueOf(printMode)
+        } catch (e: Exception) {
+            KitchenPrintMode.TICKET
+        }
+    }
+
+    /**
+     * Lấy KitchenType enum từ string
+     */
+    fun getKitchenTypeEnum(): KitchenType {
+        return KitchenType.entries.find { it.value == kitchenType } ?: KitchenType.OTHER
+    }
+
+    /**
+     * Kiểm tra có in phiếu không
+     */
+    fun shouldPrintTicket(): Boolean {
+        val mode = getPrintModeEnum()
+        return mode == KitchenPrintMode.TICKET || mode == KitchenPrintMode.BOTH
+    }
+
+    /**
+     * Kiểm tra có in tem không
+     */
+    fun shouldPrintLabel(): Boolean {
+        val mode = getPrintModeEnum()
+        return mode == KitchenPrintMode.LABEL || mode == KitchenPrintMode.BOTH
+    }
+}
