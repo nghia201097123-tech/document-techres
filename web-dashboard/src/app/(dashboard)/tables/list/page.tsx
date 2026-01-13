@@ -138,6 +138,7 @@ export default function TablesPage() {
     status: "idle",
   });
   const [bulkToggleAction, setBulkToggleAction] = React.useState<"enable" | "disable" | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = React.useState(false);
 
   // Load data - only when branch is selected
   const loadData = React.useCallback(async (branchId: string) => {
@@ -593,6 +594,54 @@ export default function TablesPage() {
     }, 1500);
   };
 
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedTables.length === 0) return;
+
+    setBulkProgress({ current: 0, total: selectedTables.length, status: "processing" });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedTables.length; i++) {
+      const table = selectedTables[i];
+
+      try {
+        await tableService.delete(table.id);
+        setTables(prev => prev.filter(t => t.id !== table.id));
+        successCount++;
+      } catch (error) {
+        console.error(`Error deleting table ${table.name}:`, error);
+        failCount++;
+      }
+
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+
+      // Small delay
+      if (i < selectedTables.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    setBulkProgress(prev => ({
+      ...prev,
+      status: "completed",
+      message: `Xóa thành công ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
+    }));
+
+    toast({
+      title: "Hoàn tất",
+      description: `Đã xóa ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
+    });
+
+    // Clear
+    setTimeout(() => {
+      clearSelection();
+      setBulkDeleteDialogOpen(false);
+      setBulkProgress({ current: 0, total: 0, status: "idle" });
+    }, 1500);
+  };
+
   // Filter areas for combobox
   const filteredAreas = areas.filter(area =>
     area.name.toLowerCase().includes(areaSearchValue.toLowerCase())
@@ -726,10 +775,20 @@ export default function TablesPage() {
                   size="sm"
                   onClick={() => handleBulkToggleActive("disable")}
                   disabled={bulkProgress.status === "processing"}
-                  className="bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="bg-white text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                 >
                   <PowerOff className="h-4 w-4 mr-2" />
                   Tắt
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkDeleteDialogOpen(true)}
+                  disabled={bulkProgress.status === "processing"}
+                  className="bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Xóa
                 </Button>
               </div>
             </div>
@@ -1349,6 +1408,78 @@ export default function TablesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Xác nhận xóa hàng loạt
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa <strong>{selectedTableIds.size} bàn</strong> đã chọn?
+              <br />
+              <span className="text-red-500 font-medium">Hành động này không thể hoàn tác.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {/* Preview list */}
+          <ScrollArea className="h-[150px] border rounded-lg my-2">
+            <div className="p-2 space-y-1">
+              {selectedTables.slice(0, 20).map((table, index) => (
+                <div
+                  key={table.id}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded text-sm",
+                    index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                  )}
+                >
+                  <Table2 className="h-4 w-4 text-muted-foreground" />
+                  <span>{table.name}</span>
+                  <span className="text-muted-foreground text-xs">({getAreaName(table.areaId)})</span>
+                </div>
+              ))}
+              {selectedTables.length > 20 && (
+                <p className="text-center text-sm text-muted-foreground py-2">
+                  ... và {selectedTables.length - 20} bàn khác
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Progress */}
+          {bulkProgress.status === "processing" && (
+            <div className="space-y-2 my-2">
+              <Progress value={(bulkProgress.current / bulkProgress.total) * 100} className="h-2" />
+              <p className="text-sm text-center text-muted-foreground">
+                Đang xóa: {bulkProgress.current}/{bulkProgress.total}
+              </p>
+            </div>
+          )}
+
+          {bulkProgress.status === "completed" && bulkProgress.message && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg my-2">
+              <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                {bulkProgress.message}
+              </p>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkProgress.status === "processing"}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkProgress.status === "processing"}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {bulkProgress.status === "processing" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xóa {selectedTableIds.size} bàn
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
