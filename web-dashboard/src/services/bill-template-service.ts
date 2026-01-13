@@ -57,6 +57,8 @@ export interface BillTemplate {
 
   // Price config
   showSubtotal: boolean;
+  showItemDiscount: boolean;       // Hiển thị giảm giá trên từng món
+  showTotalItemDiscount: boolean;  // Hiển thị tổng giảm giá các món
   showDiscount: boolean;
   showDiscountPercent: boolean;
   showServiceFee: boolean;
@@ -181,6 +183,8 @@ export interface CreateBillTemplateDto {
 
   // Price
   showSubtotal?: boolean;
+  showItemDiscount?: boolean;       // Hiển thị giảm giá trên từng món
+  showTotalItemDiscount?: boolean;  // Hiển thị tổng giảm giá các món
   showDiscount?: boolean;
   showDiscountPercent?: boolean;
   showServiceFee?: boolean;
@@ -422,6 +426,8 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   showUnitPrice: true,
   showQuantity: true,
   showSubtotal: true,
+  showItemDiscount: true,
+  showTotalItemDiscount: true,
   showDiscount: true,
   showDiscountPercent: true,
   showServiceFee: true,

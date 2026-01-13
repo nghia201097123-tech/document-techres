@@ -110,6 +110,12 @@ export class BillTemplate {
   @Column({ name: 'show_subtotal', default: true })
   showSubtotal: boolean;
 
+  @Column({ name: 'show_item_discount', default: true })
+  showItemDiscount: boolean; // Hiển thị giảm giá trên từng món
+
+  @Column({ name: 'show_total_item_discount', default: true })
+  showTotalItemDiscount: boolean; // Hiển thị tổng giảm giá các món
+
   @Column({ name: 'show_discount', default: true })
   showDiscount: boolean;
 

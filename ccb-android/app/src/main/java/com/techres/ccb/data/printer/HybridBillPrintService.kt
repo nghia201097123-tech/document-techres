@@ -185,8 +185,24 @@ object HybridBillPrintService {
                 // Main item name - IN ĐẬM để nổi bật
                 lineBold(item.name)
 
-                // Price line - thụt vào 2 spaces
-                lineKeyValue("  ${item.quantity} x ${formatCurrency(item.unitPrice)}", formatCurrency(item.totalPrice))
+                // Kiểm tra có giảm giá trên món hay không
+                val hasItemDiscount = item.discountAmount > 0 && item.originalPrice > 0
+
+                if (hasItemDiscount && template.showItemDiscount) {
+                    // Hiển thị giá gốc (gạch ngang) và giá sau giảm
+                    val discountInfo = if (item.discountPercent > 0) {
+                        " (-${item.discountPercent.toInt()}%)"
+                    } else {
+                        ""
+                    }
+                    // Dòng 1: Số lượng x Giá gốc (gạch bỏ)
+                    line("  ${item.quantity} x ${formatCurrency(item.originalPrice)}$discountInfo")
+                    // Dòng 2: Giảm và thành tiền
+                    lineKeyValue("  → Giảm: -${formatCurrency(item.discountAmount)}", formatCurrency(item.totalPrice))
+                } else {
+                    // Không có giảm giá - hiển thị bình thường
+                    lineKeyValue("  ${item.quantity} x ${formatCurrency(item.unitPrice)}", formatCurrency(item.totalPrice))
+                }
 
                 // Item code (optional)
                 if (template.showItemCode && item.code != null) {
@@ -209,20 +225,28 @@ object HybridBillPrintService {
 
             separator()
 
-            // ============ TOTALS ============
+            // ============ TOTALS - TỔNG KẾT ============
+            // 1. Tạm tính (tổng giá gốc các món)
             if (template.showSubtotal) {
                 lineKeyValue("Tạm tính:", formatCurrency(billData.subtotal))
             }
 
+            // 2. Tổng giảm giá các món (nếu có)
+            if (template.showTotalItemDiscount && billData.totalItemDiscount > 0) {
+                lineKeyValue("Giảm giá món:", "-${formatCurrency(billData.totalItemDiscount)}")
+            }
+
+            // 3. Giảm giá đơn hàng (coupon/voucher)
             if (template.showDiscount && billData.discountAmount > 0) {
                 val discountText = if (template.showDiscountPercent && billData.discountPercent > 0) {
-                    "Giảm giá (${billData.discountPercent.toInt()}%):"
+                    "Giảm giá HĐ (${billData.discountPercent.toInt()}%):"
                 } else {
-                    "Giảm giá:"
+                    "Giảm giá HĐ:"
                 }
                 lineKeyValue(discountText, "-${formatCurrency(billData.discountAmount)}")
             }
 
+            // 4. Phí dịch vụ
             if (template.showServiceFee && billData.serviceFee > 0) {
                 lineKeyValue("Phí dịch vụ:", formatCurrency(billData.serviceFee))
             }
@@ -243,11 +267,11 @@ object HybridBillPrintService {
                 lineKeyValue("${template.vatLabel} (${billData.vatRate.toInt()}%):", formatCurrency(billData.vatAmount))
             }
 
-            separator()
+            doubleSeparator()
 
-            // ============ TOTAL ============
+            // ============ TOTAL - TỔNG CỘNG ============
             // Font size sẽ được tự động scale trong lineKeyValue với bold = true
-            lineKeyValue("TỔNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
+            lineKeyValue("TỔNG CỘNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
 
             // ============ PAYMENT INFO ============
             if (template.showPaymentMethod) {

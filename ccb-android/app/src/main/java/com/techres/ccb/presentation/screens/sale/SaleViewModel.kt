@@ -1899,16 +1899,29 @@ class SaleViewModel @Inject constructor(
                     }
                 }
 
+            // Tính % giảm giá nếu có originalPrice
+            val itemDiscountPercent = if (item.originalPrice > 0 && item.discountAmount > 0) {
+                (item.discountAmount / (item.originalPrice * item.quantity)) * 100
+            } else {
+                0.0
+            }
+
             BillItem(
                 code = item.productCode,
                 name = item.productName,
                 quantity = item.quantity,
                 unitPrice = item.unitPrice,
+                originalPrice = if (item.originalPrice > 0) item.originalPrice else item.unitPrice,
+                discountAmount = item.discountAmount,
+                discountPercent = itemDiscountPercent,
                 totalPrice = item.totalPrice,
                 note = userNote,
                 toppings = toppings
             )
         }
+
+        // Tính tổng giảm giá các món
+        val totalItemDiscount = billItems.sumOf { it.discountAmount }
 
         // Calculate VAT (assuming 10% VAT rate)
         val vatRate = 10.0
@@ -1934,6 +1947,7 @@ class SaleViewModel @Inject constructor(
             customerName = customerName,
             items = billItems,
             subtotal = order.subtotal,
+            totalItemDiscount = totalItemDiscount,
             discountAmount = order.discountAmount,
             discountPercent = if (order.subtotal > 0) (order.discountAmount / order.subtotal * 100) else 0.0,
             serviceFee = 0.0,

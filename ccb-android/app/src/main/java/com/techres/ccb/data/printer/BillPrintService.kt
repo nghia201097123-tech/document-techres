@@ -605,9 +605,10 @@ data class BillData(
     val staffName: String? = null,
     val customerName: String? = null,
     val items: List<BillItem>,
-    val subtotal: Double,
-    val discountAmount: Double = 0.0,
-    val discountPercent: Double = 0.0,
+    val subtotal: Double,                    // Tạm tính (tổng giá gốc các món)
+    val totalItemDiscount: Double = 0.0,     // Tổng giảm giá các món
+    val discountAmount: Double = 0.0,        // Giảm giá đơn hàng (coupon/voucher)
+    val discountPercent: Double = 0.0,       // % giảm giá đơn hàng
     val serviceFee: Double = 0.0,
     val vatRate: Double = 10.0,
     val vatAmount: Double,
@@ -619,12 +620,18 @@ data class BillData(
     val changeAmount: Double = 0.0
 )
 
+/**
+ * Bill Item - Thông tin món trong hóa đơn
+ */
 data class BillItem(
     val code: String? = null,
     val name: String,
     val quantity: Int,
-    val unitPrice: Double,
-    val totalPrice: Double,
+    val unitPrice: Double,           // Đơn giá sau giảm
+    val originalPrice: Double = 0.0, // Đơn giá gốc (trước giảm)
+    val discountAmount: Double = 0.0,// Số tiền giảm trên món này
+    val discountPercent: Double = 0.0,// % giảm giá (nếu có)
+    val totalPrice: Double,          // Thành tiền (sau giảm)
     val note: String? = null,
     val toppings: List<BillTopping> = emptyList()
 )

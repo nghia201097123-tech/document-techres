@@ -120,6 +120,16 @@ export class CreateBillTemplateDto {
   @IsBoolean()
   showSubtotal?: boolean;
 
+  @ApiPropertyOptional({ description: 'Hiển thị giảm giá trên từng món' })
+  @IsOptional()
+  @IsBoolean()
+  showItemDiscount?: boolean;
+
+  @ApiPropertyOptional({ description: 'Hiển thị tổng giảm giá các món' })
+  @IsOptional()
+  @IsBoolean()
+  showTotalItemDiscount?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

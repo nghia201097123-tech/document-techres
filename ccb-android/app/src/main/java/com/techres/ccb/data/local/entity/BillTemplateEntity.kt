@@ -101,6 +101,12 @@ data class BillTemplateEntity(
     @ColumnInfo(name = "show_subtotal")
     val showSubtotal: Boolean = true,
 
+    @ColumnInfo(name = "show_item_discount")
+    val showItemDiscount: Boolean = true, // Hiển thị giảm giá trên từng món
+
+    @ColumnInfo(name = "show_total_item_discount")
+    val showTotalItemDiscount: Boolean = true, // Hiển thị tổng giảm giá các món
+
     @ColumnInfo(name = "show_discount")
     val showDiscount: Boolean = true,
 

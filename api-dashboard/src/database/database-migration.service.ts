@@ -1146,6 +1146,33 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Transaction vouchers table created successfully');
       }
 
+      // 41. Add item discount columns to bill_templates table
+      const hasBillTemplatesTable = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'bill_templates'
+        );
+      `);
+
+      if (hasBillTemplatesTable[0].exists) {
+        const hasShowItemDiscount = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_templates' AND column_name = 'show_item_discount'
+          );
+        `);
+
+        if (!hasShowItemDiscount[0].exists) {
+          this.logger.log('Adding item discount columns to bill_templates table...');
+          await queryRunner.query(`
+            ALTER TABLE bill_templates
+            ADD COLUMN IF NOT EXISTS show_item_discount BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS show_total_item_discount BOOLEAN DEFAULT TRUE
+          `);
+          this.logger.log('Item discount columns added to bill_templates table');
+        }
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
