@@ -3,6 +3,7 @@ package com.techres.ccb.presentation.screens.sale.dialogs
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,6 +46,20 @@ enum class DiscountTarget(val displayName: String) {
     CATEGORY("Danh mục"),
     PRODUCT_TYPE("Loại sản phẩm")
 }
+
+// Hiển thị coupon trong PaymentDialog
+data class CouponDisplayItem(
+    val id: String,
+    val code: String,
+    val name: String,
+    val description: String?,
+    val couponType: String,      // percentage, fixed
+    val applyTo: String,         // bill, item, category
+    val discountValue: Double,
+    val maxDiscount: Double?,
+    val minOrderAmount: Double,
+    val isApplied: Boolean = false
+)
 
 data class AppliedDiscount(
     val couponId: String,
@@ -81,6 +97,7 @@ fun PaymentDialog(
     couponCode: String = "",
     couponError: String? = null,
     isApplyingCoupon: Boolean = false,
+    availableCoupons: List<CouponDisplayItem> = emptyList(), // Danh sách coupon có thể áp dụng
     // Order items for item-level discount
     orderItems: List<PaymentOrderItem> = emptyList(),
     // Discount breakdown for clear display
@@ -89,6 +106,7 @@ fun PaymentDialog(
     billDiscountDescription: String? = null,  // e.g. "Giảm 10%" or "Giảm 50,000đ"
     onCouponCodeChange: (String) -> Unit = {},
     onApplyCoupon: () -> Unit = {},
+    onApplyCouponById: (String) -> Unit = {}, // Áp dụng coupon theo ID
     onRemoveDiscount: (String) -> Unit = {},
     // Manual discount callbacks
     onApplyManualDiscount: (amount: Long, reason: String?) -> Unit = { _, _ -> },
@@ -1159,48 +1177,75 @@ fun PaymentDialog(
                                             }
 
                                             2 -> {
-                                                // Coupon input
-                                                Text("Nhập mã giảm giá:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Row(
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                // Coupon section
+                                                Column(
+                                                    modifier = Modifier.verticalScroll(rememberScrollState())
                                                 ) {
-                                                    OutlinedTextField(
-                                                        value = couponCode,
-                                                        onValueChange = onCouponCodeChange,
-                                                        placeholder = { Text("VD: SALE10", fontSize = 11.sp) },
-                                                        modifier = Modifier.weight(1f),
-                                                        singleLine = true,
-                                                        textStyle = MaterialTheme.typography.bodySmall,
-                                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                                        keyboardActions = KeyboardActions(onDone = { onApplyCoupon() }),
-                                                        isError = couponError != null
-                                                    )
-                                                    Button(
-                                                        onClick = onApplyCoupon,
-                                                        enabled = !isApplyingCoupon && couponCode.isNotEmpty(),
-                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                                    // Nhập mã coupon
+                                                    Text("Nhập mã giảm giá:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        if (isApplyingCoupon) {
-                                                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                                                        } else {
-                                                            Text("Áp dụng", fontSize = 11.sp)
+                                                        OutlinedTextField(
+                                                            value = couponCode,
+                                                            onValueChange = onCouponCodeChange,
+                                                            placeholder = { Text("VD: SALE10", fontSize = 11.sp) },
+                                                            modifier = Modifier.weight(1f),
+                                                            singleLine = true,
+                                                            textStyle = MaterialTheme.typography.bodySmall,
+                                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                                            keyboardActions = KeyboardActions(onDone = { onApplyCoupon() }),
+                                                            isError = couponError != null
+                                                        )
+                                                        Button(
+                                                            onClick = onApplyCoupon,
+                                                            enabled = !isApplyingCoupon && couponCode.isNotEmpty(),
+                                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                                        ) {
+                                                            if (isApplyingCoupon) {
+                                                                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                                                            } else {
+                                                                Text("Áp dụng", fontSize = 11.sp)
+                                                            }
                                                         }
                                                     }
-                                                }
-                                                if (couponError != null) {
-                                                    Text(couponError, color = MaterialTheme.colorScheme.error, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
-                                                }
+                                                    if (couponError != null) {
+                                                        Text(couponError, color = MaterialTheme.colorScheme.error, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
+                                                    }
 
-                                                // Example coupons hint
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text("Đối tượng áp dụng:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                                Column(modifier = Modifier.padding(start = 8.dp)) {
-                                                    Text("• Toàn bộ hóa đơn", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
-                                                    Text("• Món cụ thể", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
-                                                    Text("• Danh mục (VD: Trà sữa)", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
-                                                    Text("• Loại sản phẩm", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                                    // Danh sách coupon có sẵn
+                                                    if (availableCoupons.isNotEmpty()) {
+                                                        Spacer(modifier = Modifier.height(12.dp))
+                                                        HorizontalDivider()
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Text(
+                                                            "Coupon có thể áp dụng:",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                                        availableCoupons.forEach { coupon ->
+                                                            val isAlreadyApplied = appliedDiscounts.any { it.couponId == coupon.id }
+                                                            CouponCard(
+                                                                coupon = coupon,
+                                                                isApplied = isAlreadyApplied,
+                                                                onApply = { onApplyCouponById(coupon.id) }
+                                                            )
+                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                        }
+                                                    } else {
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Text(
+                                                            "Không có coupon nào có thể áp dụng cho đơn hàng này",
+                                                            fontSize = 10.sp,
+                                                            color = MaterialTheme.colorScheme.outline,
+                                                            fontStyle = FontStyle.Italic
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -1387,4 +1432,115 @@ private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, Stri
         .distinctBy { it.first }
         .sortedBy { it.first }
         .take(8)
+}
+
+/**
+ * Card hiển thị thông tin coupon
+ */
+@Composable
+private fun CouponCard(
+    coupon: CouponDisplayItem,
+    isApplied: Boolean,
+    onApply: () -> Unit
+) {
+    val discountText = when (coupon.couponType) {
+        "percentage" -> {
+            val maxText = coupon.maxDiscount?.let { " (tối đa ${formatCurrency(it.toLong())})" } ?: ""
+            "Giảm ${coupon.discountValue.toInt()}%$maxText"
+        }
+        else -> "Giảm ${formatCurrency(coupon.discountValue.toLong())}"
+    }
+
+    val applyToText = when (coupon.applyTo) {
+        "bill" -> "Áp dụng: Toàn hóa đơn"
+        "item" -> "Áp dụng: Món cụ thể"
+        "category" -> "Áp dụng: Theo danh mục"
+        else -> ""
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isApplied)
+                Success.copy(alpha = 0.1f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        border = if (isApplied)
+            BorderStroke(1.dp, Success)
+        else
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocalOffer,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isApplied) Success else MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = coupon.code,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (isApplied) Success else MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text(
+                    text = coupon.name,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = discountText,
+                    fontSize = 10.sp,
+                    color = Success,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (coupon.minOrderAmount > 0) {
+                    Text(
+                        text = "Đơn tối thiểu: ${formatCurrency(coupon.minOrderAmount.toLong())}",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                if (applyToText.isNotEmpty()) {
+                    Text(
+                        text = applyToText,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+
+            if (isApplied) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Đã áp dụng",
+                    tint = Success,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Button(
+                    onClick = onApply,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("Dùng", fontSize = 10.sp)
+                }
+            }
+        }
+    }
+}
+
+private fun formatCurrency(amount: Long): String {
+    return java.text.NumberFormat.getInstance(java.util.Locale("vi", "VN")).format(amount) + "đ"
 }

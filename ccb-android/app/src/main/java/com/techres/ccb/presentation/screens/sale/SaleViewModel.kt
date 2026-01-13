@@ -1311,6 +1311,101 @@ class SaleViewModel @Inject constructor(
     }
 
     /**
+     * Áp dụng coupon theo ID (từ danh sách available coupons)
+     */
+    fun applyCouponById(couponId: String) {
+        val state = _uiState.value
+        val coupon = state.availableCoupons.find { it.id == couponId }
+
+        if (coupon == null) {
+            _uiState.update { it.copy(couponError = "Không tìm thấy mã giảm giá") }
+            return
+        }
+
+        // Kiểm tra đã áp dụng chưa
+        if (state.appliedDiscounts.any { it.couponId == couponId }) {
+            _uiState.update { it.copy(couponError = "Mã giảm giá này đã được áp dụng") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isApplyingCoupon = true, couponError = null) }
+
+            try {
+                val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
+
+                // Kiểm tra giá trị đơn hàng tối thiểu
+                if (orderAmount < coupon.minOrderAmount) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Đơn hàng tối thiểu ${formatCurrencyVN(coupon.minOrderAmount.toLong())} để áp dụng mã này"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Kiểm tra combinable
+                val hasNonCombinableCoupon = state.appliedDiscounts.isNotEmpty() &&
+                    state.availableCoupons.any { c ->
+                        state.appliedDiscounts.any { d -> d.couponId == c.id } && !c.isCombinable
+                    }
+
+                if (hasNonCombinableCoupon && !coupon.isCombinable) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Không thể kết hợp với mã giảm giá đã áp dụng"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Tính số tiền giảm
+                val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
+
+                // Thêm vào danh sách đã áp dụng
+                val appliedDiscount = AppliedDiscount(
+                    couponId = coupon.id,
+                    code = coupon.code,
+                    name = coupon.name,
+                    discountType = coupon.couponType,
+                    discountValue = coupon.discountValue,
+                    discountAmount = discountAmount
+                )
+
+                val newAppliedDiscounts = state.appliedDiscounts + appliedDiscount
+                val totalDiscount = newAppliedDiscounts.sumOf { it.discountAmount }
+
+                // Tính VAT (trên giá sau giảm)
+                val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
+                val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
+                val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+
+                _uiState.update {
+                    it.copy(
+                        isApplyingCoupon = false,
+                        couponError = null,
+                        appliedDiscounts = newAppliedDiscounts,
+                        vatAmount = vatAmount,
+                        successMessage = "Đã áp dụng mã ${coupon.code}"
+                    )
+                }
+
+                Log.d(TAG, "applyCouponById - Applied coupon: ${coupon.code}, discount: $discountAmount")
+            } catch (e: Exception) {
+                Log.e(TAG, "applyCouponById - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isApplyingCoupon = false,
+                        couponError = "Lỗi áp dụng mã giảm giá: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
      * Tính số tiền giảm từ coupon
      */
     private fun calculateCouponDiscountAmount(coupon: CouponEntity, orderAmount: Double): Long {

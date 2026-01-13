@@ -47,6 +47,7 @@ import coil.compose.SubcomposeAsyncImageContent
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
+import com.techres.ccb.presentation.screens.sale.dialogs.CouponDisplayItem
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.NoteDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
@@ -300,6 +301,22 @@ fun SaleScreen(
                 }
             }
 
+            // Convert CouponEntity to CouponDisplayItem
+            val couponDisplayItems = uiState.availableCoupons.map { coupon ->
+                CouponDisplayItem(
+                    id = coupon.id,
+                    code = coupon.code,
+                    name = coupon.name,
+                    description = coupon.description,
+                    couponType = coupon.couponType,
+                    applyTo = coupon.applyTo,
+                    discountValue = coupon.discountValue,
+                    maxDiscount = coupon.maxDiscount,
+                    minOrderAmount = coupon.minOrderAmount,
+                    isApplied = uiState.appliedDiscounts.any { it.couponId == coupon.id }
+                )
+            }
+
             PaymentDialog(
                 totalAmount = paymentTotal,
                 subtotal = subtotal,
@@ -309,6 +326,7 @@ fun SaleScreen(
                 couponCode = uiState.couponCode,
                 couponError = uiState.couponError,
                 isApplyingCoupon = uiState.isApplyingCoupon,
+                availableCoupons = couponDisplayItems,
                 orderItems = orderItems,
                 // Discount breakdown
                 itemDiscountTotal = uiState.itemDiscountTotal,
@@ -316,6 +334,7 @@ fun SaleScreen(
                 billDiscountDescription = uiState.billDiscountDescription,
                 onCouponCodeChange = { viewModel.setCouponCode(it) },
                 onApplyCoupon = { viewModel.applyCoupon() },
+                onApplyCouponById = { viewModel.applyCouponById(it) },
                 onRemoveDiscount = { viewModel.removeCoupon(it) },
                 onApplyManualDiscount = { amount, reason -> viewModel.applyDiscount(amount, reason) },
                 onApplyPercentDiscount = { percent, reason -> viewModel.applyPercentDiscount(percent, reason) },
