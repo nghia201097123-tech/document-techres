@@ -406,6 +406,81 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('paper_size column converted to varchar');
       }
 
+      // 19.1. Add kitchen_type column to kitchens table
+      const hasKitchenType = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'kitchen_type'
+        );
+      `);
+
+      if (!hasKitchenType[0].exists) {
+        this.logger.log('Adding kitchen_type column to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN kitchen_type VARCHAR(50) DEFAULT 'kitchen'
+        `);
+        this.logger.log('kitchen_type column added to kitchens table');
+      }
+
+      // 19.2. Add paper_width column to kitchens table (integer for mm)
+      const hasPaperWidth = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'paper_width'
+        );
+      `);
+
+      if (!hasPaperWidth[0].exists) {
+        this.logger.log('Adding paper_width column to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN paper_width INTEGER DEFAULT 80
+        `);
+        this.logger.log('paper_width column added to kitchens table');
+      }
+
+      // 19.3. Update print_mode to new values (TICKET, LABEL, BOTH)
+      const printModeType = await queryRunner.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'kitchens' AND column_name = 'print_mode'
+      `);
+
+      if (printModeType.length > 0) {
+        this.logger.log('Updating print_mode column to support new values...');
+        // First convert to varchar if it's an enum
+        if (printModeType[0].data_type === 'USER-DEFINED') {
+          await queryRunner.query(`
+            ALTER TABLE kitchens
+            ALTER COLUMN print_mode TYPE VARCHAR(20) USING
+              CASE
+                WHEN print_mode::text = 'list' THEN 'TICKET'
+                WHEN print_mode::text = 'individual' THEN 'LABEL'
+                ELSE 'TICKET'
+              END
+          `);
+        } else {
+          // If already varchar, just update the values
+          await queryRunner.query(`
+            UPDATE kitchens SET print_mode = 'TICKET' WHERE print_mode = 'list' OR print_mode IS NULL
+          `);
+          await queryRunner.query(`
+            UPDATE kitchens SET print_mode = 'LABEL' WHERE print_mode = 'individual'
+          `);
+        }
+
+        // Set new default
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ALTER COLUMN print_mode SET DEFAULT 'TICKET'
+        `);
+
+        this.logger.log('print_mode column updated to support TICKET/LABEL/BOTH');
+      }
+
+      // Drop old print_mode enum if exists
+      await queryRunner.query(`DROP TYPE IF EXISTS print_mode CASCADE`);
+
       // 20. Add parent_id column to departments table for hierarchy support
       const hasParentId = await queryRunner.query(`
         SELECT EXISTS (
