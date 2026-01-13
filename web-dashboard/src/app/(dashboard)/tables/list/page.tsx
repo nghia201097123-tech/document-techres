@@ -111,6 +111,17 @@ export default function TablesPage() {
   // Continue creating checkbox
   const [continueCreating, setContinueCreating] = React.useState(false);
 
+  // Bulk create mode
+  const [bulkCreateEnabled, setBulkCreateEnabled] = React.useState(false);
+  const [bulkCreateQuantity, setBulkCreateQuantity] = React.useState(5);
+  const [bulkCreateFormat, setBulkCreateFormat] = React.useState("Bàn ");
+  const [bulkCreateStartNumber, setBulkCreateStartNumber] = React.useState(1);
+  const [bulkCreateProgress, setBulkCreateProgress] = React.useState<BulkProgress>({
+    current: 0,
+    total: 0,
+    status: "idle",
+  });
+
   // Track newly created and updated table IDs for badges
   const [newTableIds, setNewTableIds] = React.useState<Set<string>>(new Set());
   const [updatedTableIds, setUpdatedTableIds] = React.useState<Set<string>>(new Set());
@@ -229,7 +240,19 @@ export default function TablesPage() {
     setFormData({ areaId: "", name: "", capacity: 4, sortOrder: 0 });
     setAreaSearchValue("");
     setContinueCreating(false);
+    // Reset bulk create
+    setBulkCreateEnabled(false);
+    setBulkCreateProgress({ current: 0, total: 0, status: "idle" });
   };
+
+  // Preview for bulk create
+  const bulkCreatePreview = React.useMemo(() => {
+    if (!bulkCreateEnabled) return [];
+    return Array.from({ length: bulkCreateQuantity }, (_, index) => ({
+      name: `${bulkCreateFormat}${bulkCreateStartNumber + index}`,
+      index: bulkCreateStartNumber + index,
+    }));
+  }, [bulkCreateEnabled, bulkCreateQuantity, bulkCreateFormat, bulkCreateStartNumber]);
 
   // Reset form for continue creating
   const resetFormForContinue = () => {
@@ -259,7 +282,9 @@ export default function TablesPage() {
   // Handle form submit (create or update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
+
+    // For bulk create mode, we don't need a name
+    if (!bulkCreateEnabled && !formData.name.trim()) {
       toast({ title: "Lỗi", description: "Vui lòng nhập tên bàn", variant: "destructive" });
       return;
     }
@@ -280,21 +305,74 @@ export default function TablesPage() {
       }
 
       if (dialogMode === "create") {
-        const result = await tableService.create({ ...formData, areaId });
-        setTables((prev) => [result, ...prev]);
-        setNewTableIds(prev => new Set([...prev, result.id]));
-        toast({ title: "Thành công", description: `Đã tạo bàn "${result.name}"` });
+        // Bulk create mode
+        if (bulkCreateEnabled) {
+          setBulkCreateProgress({ current: 0, total: bulkCreateQuantity, status: "processing" });
 
-        // If continue creating is checked, reset form but keep dialog open
-        if (continueCreating) {
-          setFormData(prev => ({
-            areaId: areaId,
-            name: "",
-            capacity: prev.capacity,
-            sortOrder: (prev.sortOrder || 0) + 1,
+          let successCount = 0;
+          let failCount = 0;
+          const newTables: Table[] = [];
+
+          for (let i = 0; i < bulkCreateQuantity; i++) {
+            const tableName = `${bulkCreateFormat}${bulkCreateStartNumber + i}`;
+            try {
+              const result = await tableService.create({
+                areaId,
+                name: tableName,
+                capacity: formData.capacity,
+                sortOrder: (formData.sortOrder || 0) + i,
+              });
+              newTables.push(result);
+              setNewTableIds(prev => new Set([...prev, result.id]));
+              successCount++;
+            } catch (error) {
+              console.error(`Error creating table ${tableName}:`, error);
+              failCount++;
+            }
+            setBulkCreateProgress(prev => ({ ...prev, current: i + 1 }));
+
+            // Small delay to prevent overwhelming the server
+            if (i < bulkCreateQuantity - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
+
+          // Add all new tables to state
+          setTables(prev => [...newTables, ...prev]);
+
+          setBulkCreateProgress(prev => ({
+            ...prev,
+            status: "completed",
+            message: `Tạo thành công ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
           }));
+
+          toast({
+            title: "Hoàn tất",
+            description: `Đã tạo ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
+          });
+
+          // Close dialog after a delay
+          setTimeout(() => {
+            handleCloseDialog();
+          }, 1500);
         } else {
-          handleCloseDialog();
+          // Single table create
+          const result = await tableService.create({ ...formData, areaId });
+          setTables((prev) => [result, ...prev]);
+          setNewTableIds(prev => new Set([...prev, result.id]));
+          toast({ title: "Thành công", description: `Đã tạo bàn "${result.name}"` });
+
+          // If continue creating is checked, reset form but keep dialog open
+          if (continueCreating) {
+            setFormData(prev => ({
+              areaId: areaId,
+              name: "",
+              capacity: prev.capacity,
+              sortOrder: (prev.sortOrder || 0) + 1,
+            }));
+          } else {
+            handleCloseDialog();
+          }
         }
       } else if (dialogMode === "edit" && selectedTable) {
         const updateData: UpdateTableDto = {
@@ -1096,17 +1174,111 @@ export default function TablesPage() {
                   </p>
                 )}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="name">Tên bàn *</Label>
-                <Input
-                  id="name"
-                  placeholder="Bàn 1, Bàn 2, Bàn VIP..."
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  autoFocus={dialogMode === "create" && continueCreating}
-                />
-              </div>
+              {/* Bulk create toggle - only show in create mode */}
+              {dialogMode === "create" && (
+                <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <Checkbox
+                    id="bulkCreateEnabled"
+                    checked={bulkCreateEnabled}
+                    onCheckedChange={(checked) => setBulkCreateEnabled(checked === true)}
+                  />
+                  <Label
+                    htmlFor="bulkCreateEnabled"
+                    className="text-sm font-medium cursor-pointer text-blue-800"
+                  >
+                    Tạo nhanh nhiều bàn
+                  </Label>
+                </div>
+              )}
+
+              {/* Bulk create options */}
+              {dialogMode === "create" && bulkCreateEnabled ? (
+                <div className="grid gap-4 p-4 bg-gray-50 rounded-lg border">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Định dạng tên</Label>
+                      <Input
+                        value={bulkCreateFormat}
+                        onChange={(e) => setBulkCreateFormat(e.target.value)}
+                        placeholder="Bàn "
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Số lượng</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={bulkCreateQuantity}
+                        onChange={(e) => setBulkCreateQuantity(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Bắt đầu từ số</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={bulkCreateStartNumber}
+                      onChange={(e) => setBulkCreateStartNumber(parseInt(e.target.value) || 0)}
+                      className="w-32 bg-white"
+                    />
+                  </div>
+
+                  {/* Preview */}
+                  <div className="grid gap-2">
+                    <Label className="flex items-center justify-between">
+                      <span>Xem trước ({bulkCreateQuantity} bàn)</span>
+                    </Label>
+                    <ScrollArea className="h-[120px] border rounded-lg bg-white">
+                      <div className="p-2 flex flex-wrap gap-2">
+                        {bulkCreatePreview.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800"
+                          >
+                            {item.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  {/* Progress */}
+                  {bulkCreateProgress.status === "processing" && (
+                    <div className="space-y-2">
+                      <Progress value={(bulkCreateProgress.current / bulkCreateProgress.total) * 100} className="h-2" />
+                      <p className="text-sm text-center text-muted-foreground">
+                        Đang tạo: {bulkCreateProgress.current}/{bulkCreateProgress.total}
+                      </p>
+                    </div>
+                  )}
+
+                  {bulkCreateProgress.status === "completed" && bulkCreateProgress.message && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                        <Check className="h-4 w-4" />
+                        {bulkCreateProgress.message}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Tên bàn *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Bàn 1, Bàn 2, Bàn VIP..."
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    autoFocus={dialogMode === "create" && continueCreating}
+                  />
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="capacity">Số chỗ ngồi</Label>
                 <Input
@@ -1130,8 +1302,8 @@ export default function TablesPage() {
                 />
               </div>
 
-              {/* Continue creating checkbox - only show in create mode */}
-              {dialogMode === "create" && (
+              {/* Continue creating checkbox - only show in create mode when not bulk creating */}
+              {dialogMode === "create" && !bulkCreateEnabled && (
                 <div className="flex items-center space-x-2 pt-2">
                   <Checkbox
                     id="continueCreating"
@@ -1148,15 +1320,29 @@ export default function TablesPage() {
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseDialog}
+                disabled={saving || bulkCreateProgress.status === "processing"}
+              >
                 Hủy
               </Button>
               <Button
                 type="submit"
-                disabled={saving || !formData.name.trim() || (!formData.areaId && !areaSearchValue.trim())}
+                disabled={
+                  saving ||
+                  bulkCreateProgress.status === "processing" ||
+                  (!bulkCreateEnabled && !formData.name.trim()) ||
+                  (!formData.areaId && !areaSearchValue.trim())
+                }
               >
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create" ? "Tạo bàn" : "Cập nhật"}
+                {(saving || bulkCreateProgress.status === "processing") && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {dialogMode === "create"
+                  ? bulkCreateEnabled
+                    ? `Tạo ${bulkCreateQuantity} bàn`
+                    : "Tạo bàn"
+                  : "Cập nhật"}
               </Button>
             </DialogFooter>
           </form>
