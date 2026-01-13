@@ -580,13 +580,49 @@ fun PaymentDialog(
 
                                         when (discountTab) {
                                             0 -> {
+                                                // Preset values
+                                                val presetPercents = listOf(5, 10, 15, 20, 30)
+                                                val presetAmounts = listOf(5000L, 10000L, 20000L, 50000L, 100000L)
+
+                                                // Parse billDiscountDescription to determine type and value
+                                                // Format: "Giảm X%" for percent, "Giảm X,XXXđ" for amount
+                                                val isPercentDiscount = billDiscountDescription?.contains("%") == true
+                                                val parsedPercent = if (isPercentDiscount && billDiscountTotal > 0) {
+                                                    billDiscountDescription?.replace(Regex("[^0-9]"), "")?.toIntOrNull()
+                                                } else null
+
+                                                // Check if value matches a preset
+                                                val isPresetPercent = parsedPercent != null && parsedPercent in presetPercents
+                                                val isPresetAmount = !isPercentDiscount && billDiscountTotal in presetAmounts
+
                                                 // State for custom input and discount type selection
-                                                var customPercentText by remember { mutableStateOf("") }
-                                                var customAmountText by remember { mutableStateOf("") }
+                                                // Initialize based on applied discount
+                                                var customPercentText by remember(billDiscountTotal, billDiscountDescription) {
+                                                    // Show in TextField only if it's a custom percent (not matching preset)
+                                                    mutableStateOf(if (isPercentDiscount && !isPresetPercent) parsedPercent?.toString() ?: "" else "")
+                                                }
+                                                var customAmountText by remember(billDiscountTotal, billDiscountDescription) {
+                                                    // Show in TextField only if it's a custom amount (not matching preset)
+                                                    mutableStateOf(if (!isPercentDiscount && billDiscountTotal > 0 && !isPresetAmount) billDiscountTotal.toString() else "")
+                                                }
                                                 // 0 = none, 1 = percent, 2 = fixed amount
-                                                var selectedDiscountType by remember { mutableStateOf(0) }
-                                                var selectedPercentValue by remember { mutableStateOf<Int?>(null) }
-                                                var selectedAmountValue by remember { mutableStateOf<Long?>(null) }
+                                                var selectedDiscountType by remember(billDiscountTotal) {
+                                                    mutableStateOf(
+                                                        when {
+                                                            billDiscountTotal == 0L -> 0
+                                                            isPercentDiscount -> 1
+                                                            else -> 2
+                                                        }
+                                                    )
+                                                }
+                                                var selectedPercentValue by remember(billDiscountTotal, billDiscountDescription) {
+                                                    // Only set if it matches a preset chip
+                                                    mutableStateOf(if (isPresetPercent) parsedPercent else null)
+                                                }
+                                                var selectedAmountValue by remember(billDiscountTotal, billDiscountDescription) {
+                                                    // Only set if it matches a preset chip
+                                                    mutableStateOf(if (isPresetAmount) billDiscountTotal else null)
+                                                }
 
                                                 // Bill discount - Giảm % section
                                                 Text("Giảm %:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
