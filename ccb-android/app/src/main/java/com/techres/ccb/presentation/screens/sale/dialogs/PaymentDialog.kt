@@ -490,19 +490,36 @@ fun PaymentDialog(
 
                                         when (discountTab) {
                                             0 -> {
-                                                // State for custom input
+                                                // State for custom input and discount type selection
                                                 var customPercentText by remember { mutableStateOf("") }
                                                 var customAmountText by remember { mutableStateOf("") }
+                                                // 0 = none, 1 = percent, 2 = fixed amount
+                                                var selectedDiscountType by remember { mutableStateOf(0) }
+                                                var selectedPercentValue by remember { mutableStateOf<Int?>(null) }
+                                                var selectedAmountValue by remember { mutableStateOf<Long?>(null) }
 
-                                                // Bill discount - 1 tap to apply
+                                                // Bill discount - Giảm % section
                                                 Text("Giảm %:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                                     listOf(5, 10, 15, 20, 30).forEach { percent ->
                                                         FilterChip(
-                                                            selected = false,
-                                                            onClick = { onApplyPercentDiscount(percent, "Giảm $percent%") },
+                                                            selected = selectedDiscountType == 1 && selectedPercentValue == percent,
+                                                            onClick = {
+                                                                // Clear fixed amount selection
+                                                                customAmountText = ""
+                                                                selectedAmountValue = null
+                                                                // Set percent selection
+                                                                selectedDiscountType = 1
+                                                                selectedPercentValue = percent
+                                                                customPercentText = ""
+                                                                onApplyPercentDiscount(percent, "Giảm $percent%")
+                                                            },
                                                             label = { Text("$percent%", fontSize = 10.sp) },
-                                                            modifier = Modifier.weight(1f)
+                                                            modifier = Modifier.weight(1f),
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                selectedContainerColor = Color(0xFFFF5722),
+                                                                selectedLabelColor = Color.White
+                                                            )
                                                         )
                                                     }
                                                 }
@@ -520,6 +537,11 @@ fun PaymentDialog(
                                                             val filtered = it.filter { c -> c.isDigit() }
                                                             if (filtered.isEmpty() || filtered.toIntOrNull()?.let { v -> v <= 100 } == true) {
                                                                 customPercentText = filtered
+                                                                // Clear fixed amount when typing percent
+                                                                if (filtered.isNotEmpty()) {
+                                                                    customAmountText = ""
+                                                                    selectedAmountValue = null
+                                                                }
                                                             }
                                                         },
                                                         placeholder = { Text("Nhập %", fontSize = 11.sp) },
@@ -534,6 +556,9 @@ fun PaymentDialog(
                                                             onDone = {
                                                                 customPercentText.toIntOrNull()?.let { percent ->
                                                                     if (percent in 1..100) {
+                                                                        selectedDiscountType = 1
+                                                                        selectedPercentValue = percent
+                                                                        selectedAmountValue = null
                                                                         onApplyPercentDiscount(percent, "Giảm $percent%")
                                                                         customPercentText = ""
                                                                     }
@@ -546,6 +571,10 @@ fun PaymentDialog(
                                                         onClick = {
                                                             customPercentText.toIntOrNull()?.let { percent ->
                                                                 if (percent in 1..100) {
+                                                                    selectedDiscountType = 1
+                                                                    selectedPercentValue = percent
+                                                                    selectedAmountValue = null
+                                                                    customAmountText = ""
                                                                     onApplyPercentDiscount(percent, "Giảm $percent%")
                                                                     customPercentText = ""
                                                                 }
@@ -567,9 +596,22 @@ fun PaymentDialog(
                                                 ) {
                                                     listOf(5000L, 10000L, 20000L, 50000L, 100000L).forEach { amount ->
                                                         FilterChip(
-                                                            selected = false,
-                                                            onClick = { onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}") },
-                                                            label = { Text("${amount/1000}k", fontSize = 10.sp) }
+                                                            selected = selectedDiscountType == 2 && selectedAmountValue == amount,
+                                                            onClick = {
+                                                                // Clear percent selection
+                                                                customPercentText = ""
+                                                                selectedPercentValue = null
+                                                                // Set amount selection
+                                                                selectedDiscountType = 2
+                                                                selectedAmountValue = amount
+                                                                customAmountText = ""
+                                                                onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
+                                                            },
+                                                            label = { Text("${amount/1000}k", fontSize = 10.sp) },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                selectedContainerColor = Color(0xFFFF5722),
+                                                                selectedLabelColor = Color.White
+                                                            )
                                                         )
                                                     }
                                                 }
@@ -583,7 +625,14 @@ fun PaymentDialog(
                                                 ) {
                                                     OutlinedTextField(
                                                         value = customAmountText,
-                                                        onValueChange = { customAmountText = it.filter { c -> c.isDigit() } },
+                                                        onValueChange = {
+                                                            customAmountText = it.filter { c -> c.isDigit() }
+                                                            // Clear percent when typing amount
+                                                            if (it.isNotEmpty()) {
+                                                                customPercentText = ""
+                                                                selectedPercentValue = null
+                                                            }
+                                                        },
                                                         placeholder = { Text("Nhập số tiền", fontSize = 11.sp) },
                                                         modifier = Modifier.weight(1f).height(48.dp),
                                                         singleLine = true,
@@ -596,6 +645,9 @@ fun PaymentDialog(
                                                             onDone = {
                                                                 customAmountText.toLongOrNull()?.let { amount ->
                                                                     if (amount > 0) {
+                                                                        selectedDiscountType = 2
+                                                                        selectedAmountValue = amount
+                                                                        selectedPercentValue = null
                                                                         onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
                                                                         customAmountText = ""
                                                                     }
@@ -608,6 +660,10 @@ fun PaymentDialog(
                                                         onClick = {
                                                             customAmountText.toLongOrNull()?.let { amount ->
                                                                 if (amount > 0) {
+                                                                    selectedDiscountType = 2
+                                                                    selectedAmountValue = amount
+                                                                    selectedPercentValue = null
+                                                                    customPercentText = ""
                                                                     onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
                                                                     customAmountText = ""
                                                                 }
@@ -625,7 +681,14 @@ fun PaymentDialog(
                                                 if (discountAmount > 0 && appliedDiscounts.isEmpty()) {
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     TextButton(
-                                                        onClick = onClearDiscount,
+                                                        onClick = {
+                                                            selectedDiscountType = 0
+                                                            selectedPercentValue = null
+                                                            selectedAmountValue = null
+                                                            customPercentText = ""
+                                                            customAmountText = ""
+                                                            onClearDiscount()
+                                                        },
                                                         modifier = Modifier.align(Alignment.End),
                                                         contentPadding = PaddingValues(4.dp)
                                                     ) {
@@ -642,6 +705,7 @@ fun PaymentDialog(
                                                 } else {
                                                     orderItems.take(5).forEach { item ->
                                                         var expanded by remember { mutableStateOf(false) }
+                                                        var customItemDiscountText by remember { mutableStateOf("") }
                                                         Column {
                                                             Row(
                                                                 modifier = Modifier
@@ -665,20 +729,69 @@ fun PaymentDialog(
                                                             }
 
                                                             AnimatedVisibility(visible = expanded) {
-                                                                Row(
-                                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
-                                                                ) {
-                                                                    listOf(5, 10, 20, 50).forEach { percent ->
-                                                                        FilterChip(
-                                                                            selected = false,
-                                                                            onClick = {
-                                                                                onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
-                                                                                expanded = false
-                                                                            },
-                                                                            label = { Text("$percent%", fontSize = 9.sp) },
-                                                                            modifier = Modifier.height(24.dp)
+                                                                Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
+                                                                    // Preset percentage chips
+                                                                    Row(
+                                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                                    ) {
+                                                                        listOf(5, 10, 20, 50).forEach { percent ->
+                                                                            FilterChip(
+                                                                                selected = false,
+                                                                                onClick = {
+                                                                                    onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
+                                                                                    expanded = false
+                                                                                },
+                                                                                label = { Text("$percent%", fontSize = 9.sp) },
+                                                                                modifier = Modifier.height(24.dp)
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                    // Custom amount input for item discount
+                                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                                    Row(
+                                                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        OutlinedTextField(
+                                                                            value = customItemDiscountText,
+                                                                            onValueChange = { customItemDiscountText = it.filter { c -> c.isDigit() } },
+                                                                            placeholder = { Text("Nhập tiền", fontSize = 9.sp) },
+                                                                            modifier = Modifier.weight(1f).height(36.dp),
+                                                                            singleLine = true,
+                                                                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                                                            keyboardOptions = KeyboardOptions(
+                                                                                keyboardType = KeyboardType.Number,
+                                                                                imeAction = ImeAction.Done
+                                                                            ),
+                                                                            keyboardActions = KeyboardActions(
+                                                                                onDone = {
+                                                                                    customItemDiscountText.toLongOrNull()?.let { amount ->
+                                                                                        if (amount > 0 && amount <= item.totalPrice) {
+                                                                                            onApplyItemDiscount(item.id, amount)
+                                                                                            customItemDiscountText = ""
+                                                                                            expanded = false
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            ),
+                                                                            suffix = { Text("đ", fontSize = 9.sp) }
                                                                         )
+                                                                        Button(
+                                                                            onClick = {
+                                                                                customItemDiscountText.toLongOrNull()?.let { amount ->
+                                                                                    if (amount > 0 && amount <= item.totalPrice) {
+                                                                                        onApplyItemDiscount(item.id, amount)
+                                                                                        customItemDiscountText = ""
+                                                                                        expanded = false
+                                                                                    }
+                                                                                }
+                                                                            },
+                                                                            enabled = customItemDiscountText.toLongOrNull()?.let { it > 0 && it <= item.totalPrice } == true,
+                                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                                            modifier = Modifier.height(36.dp)
+                                                                        ) {
+                                                                            Text("OK", fontSize = 9.sp)
+                                                                        }
                                                                     }
                                                                 }
                                                             }
