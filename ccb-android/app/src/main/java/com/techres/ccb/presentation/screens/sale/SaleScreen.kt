@@ -323,6 +323,7 @@ fun SaleScreen(
                 onClearDiscount = { viewModel.clearDiscount() },
                 onClearItemDiscounts = { viewModel.clearItemDiscounts() },
                 onClearBillDiscount = { viewModel.clearBillDiscount() },
+                onPrintTemporaryBill = { viewModel.printTemporaryBill() },
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)
@@ -526,8 +527,7 @@ fun TabletLayout(
             onRemoveOrderItem = viewModel::removeOrderItem,
             onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
             onRemoveCartItemVariant = viewModel::removeCartItemVariant,
-            onAddToppingToCartItem = viewModel::showAddToppingDialog,
-            onPrintTemporaryBill = viewModel::printTemporaryBill
+            onAddToppingToCartItem = viewModel::showAddToppingDialog
         )
     }
 }
@@ -633,7 +633,6 @@ fun CartDialog(
                     onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
                     onRemoveCartItemVariant = viewModel::removeCartItemVariant,
                     onAddToppingToCartItem = viewModel::showAddToppingDialog,
-                    onPrintTemporaryBill = viewModel::printTemporaryBill,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -920,7 +919,6 @@ fun CartPanel(
     onRemoveOrderItemTopping: (String, String) -> Unit = { _, _ -> },
     onRemoveCartItemVariant: (String, String, String) -> Unit = { _, _, _ -> }, // (cartItemId, groupId, optionId)
     onAddToppingToCartItem: (String) -> Unit = {}, // cartItemId
-    onPrintTemporaryBill: () -> Unit = {}, // In bill tạm
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1287,19 +1285,6 @@ fun CartPanel(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("THÊM ${cartItems.size} MÓN", fontWeight = FontWeight.Bold)
                     }
-                }
-
-                // Print Temp Bill button
-                OutlinedButton(
-                    onClick = onPrintTemporaryBill,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFFFF9800)
-                    )
-                ) {
-                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("IN BILL TẠM", fontWeight = FontWeight.Bold)
                 }
 
                 // Payment and Cancel buttons

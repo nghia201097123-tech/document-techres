@@ -98,6 +98,7 @@ fun PaymentDialog(
     onClearDiscount: () -> Unit = {},
     onClearItemDiscounts: () -> Unit = {},
     onClearBillDiscount: () -> Unit = {},
+    onPrintTemporaryBill: () -> Unit = {}, // In bill tạm (sau khi đã áp dụng giảm giá)
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
@@ -1254,38 +1255,57 @@ fun PaymentDialog(
                 }
 
                 // ===== FOOTER =====
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(0.25f)) {
-                        Text("Hủy")
-                    }
-
-                    Button(
-                        onClick = {
-                            val payment = Payment(
-                                method = selectedMethod,
-                                amount = totalAmount,
-                                receivedAmount = if (selectedMethod == PaymentMethod.CASH) receivedAmount else null,
-                                changeAmount = if (selectedMethod == PaymentMethod.CASH) changeAmount else null,
-                                status = PaymentStatus.COMPLETED
-                            )
-                            onPaymentComplete(listOf(payment))
-                        },
-                        modifier = Modifier.weight(0.75f),
-                        enabled = canComplete,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50),
-                            disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    // Print Temporary Bill button
+                    OutlinedButton(
+                        onClick = onPrintTemporaryBill,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFFF9800)
                         )
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("XÁC NHẬN THANH TOÁN", fontWeight = FontWeight.Bold)
+                        Text("IN BILL TẠM", fontWeight = FontWeight.Bold)
+                    }
+
+                    // Cancel and Confirm buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(0.25f)) {
+                            Text("Hủy")
+                        }
+
+                        Button(
+                            onClick = {
+                                val payment = Payment(
+                                    method = selectedMethod,
+                                    amount = totalAmount,
+                                    receivedAmount = if (selectedMethod == PaymentMethod.CASH) receivedAmount else null,
+                                    changeAmount = if (selectedMethod == PaymentMethod.CASH) changeAmount else null,
+                                    status = PaymentStatus.COMPLETED
+                                )
+                                onPaymentComplete(listOf(payment))
+                            },
+                            modifier = Modifier.weight(0.75f),
+                            enabled = canComplete,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF4CAF50),
+                                disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("XÁC NHẬN THANH TOÁN", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
