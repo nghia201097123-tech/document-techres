@@ -37,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import android.widget.Toast
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
+import com.techres.ccb.presentation.screens.sale.dialogs.PaymentOrderItem
 import com.techres.ccb.domain.model.Payment
 import com.techres.ccb.domain.model.PaymentMethod
 import com.techres.ccb.domain.model.PaymentStatus
@@ -354,6 +355,17 @@ fun DashboardScreen(
             val vatRate = item.vatRate
             (itemTotal - itemTotal / (1 + vatRate / 100)).toLong()
         }
+        // Convert OrderItemEntity to PaymentOrderItem
+        val paymentOrderItems = order.items.map { item ->
+            PaymentOrderItem(
+                id = item.id,
+                name = item.productName,
+                quantity = item.quantity,
+                unitPrice = item.unitPrice.toLong(),
+                totalPrice = item.totalPrice.toLong(),
+                discountAmount = 0
+            )
+        }
 
         PaymentDialog(
             totalAmount = order.totalAmount,
@@ -364,7 +376,7 @@ fun DashboardScreen(
             couponCode = "",
             couponError = null,
             isApplyingCoupon = false,
-            orderItems = order.items,
+            orderItems = paymentOrderItems,
             itemDiscountTotal = 0,
             billDiscountTotal = 0,
             billDiscountDescription = null,
