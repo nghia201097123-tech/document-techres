@@ -1799,6 +1799,8 @@ class SaleViewModel @Inject constructor(
                                 val billData = buildBillData(
                                     order = completedOrder,
                                     orderItems = state.currentOrderItems,
+                                    itemDiscounts = state.itemDiscounts,
+                                    billDiscountAmount = state.billDiscountAmount,
                                     tableName = state.selectedTable?.name,
                                     staffName = completedOrder.staffName,
                                     customerName = completedOrder.customerName,
@@ -1842,6 +1844,13 @@ class SaleViewModel @Inject constructor(
                         currentOrderItems = emptyList(),
                         selectedTable = null,
                         selectedCustomer = null,
+                        // Clear all discount states to prevent cache
+                        itemDiscounts = emptyMap(),
+                        billDiscountAmount = 0,
+                        billDiscountDescription = null,
+                        couponCode = "",
+                        appliedDiscounts = emptyList(),
+                        couponError = null,
                         successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
                     )
                 }
@@ -1858,10 +1867,14 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Build BillData from order for printing
+     * @param itemDiscounts Map of itemId -> discount amount (from UI state)
+     * @param billDiscountAmount Giảm giá tổng bill (từ giảm giá thủ công hoặc %)
      */
     private fun buildBillData(
         order: OrderEntity,
         orderItems: List<OrderItemEntity>,
+        itemDiscounts: Map<String, Long> = emptyMap(),
+        billDiscountAmount: Long = 0,
         tableName: String?,
         staffName: String?,
         customerName: String?,
@@ -1901,30 +1914,41 @@ class SaleViewModel @Inject constructor(
                     }
                 }
 
-            // CHỈ hiển thị giảm giá nếu MÓN NÀY có giảm giá riêng (item.discountAmount > 0)
-            // KHÔNG phân bổ giảm giá đơn hàng (order.discountAmount) vào từng món
+            // Lấy giảm giá món từ UI state (itemDiscounts) hoặc từ OrderItemEntity
+            val itemDiscountFromState = itemDiscounts[item.id]?.toDouble() ?: 0.0
+            val itemDiscountFromEntity = item.discountAmount
+            val finalItemDiscount = if (itemDiscountFromState > 0) itemDiscountFromState else itemDiscountFromEntity
+
             val itemOriginalPrice = if (item.originalPrice > 0) item.originalPrice else item.unitPrice
-            val itemDiscountPercent = if (item.discountAmount > 0 && itemOriginalPrice > 0) {
-                (item.discountAmount / (itemOriginalPrice * item.quantity)) * 100
+            val itemOriginalTotal = itemOriginalPrice * item.quantity
+            val itemDiscountPercent = if (finalItemDiscount > 0 && itemOriginalTotal > 0) {
+                (finalItemDiscount / itemOriginalTotal) * 100
             } else {
                 0.0
+            }
+
+            // Tính lại totalPrice nếu có giảm giá
+            val finalTotalPrice = if (finalItemDiscount > 0) {
+                itemOriginalTotal - finalItemDiscount
+            } else {
+                item.totalPrice
             }
 
             BillItem(
                 code = item.productCode,
                 name = item.productName,
                 quantity = item.quantity,
-                unitPrice = item.unitPrice,
+                unitPrice = if (finalItemDiscount > 0) (finalTotalPrice / item.quantity) else item.unitPrice,
                 originalPrice = itemOriginalPrice,
-                discountAmount = item.discountAmount, // Chỉ lấy giảm giá riêng của món (không phân bổ)
+                discountAmount = finalItemDiscount,
                 discountPercent = itemDiscountPercent,
-                totalPrice = item.totalPrice,
+                totalPrice = finalTotalPrice,
                 note = userNote,
                 toppings = toppings
             )
         }
 
-        // Tính tổng giảm giá các MÓN (chỉ từ item.discountAmount, KHÔNG bao gồm order.discountAmount)
+        // Tính tổng giảm giá các MÓN (item-level discounts)
         val totalItemDiscount = billItems.sumOf { it.discountAmount }
 
         // Calculate VAT (assuming 10% VAT rate)
@@ -1943,9 +1967,18 @@ class SaleViewModel @Inject constructor(
             else -> paymentMethod
         }
 
-        // Tính % giảm giá đơn hàng (order-level discount từ coupon/voucher)
-        val orderDiscountPercent = if (order.discountAmount > 0 && order.subtotal > 0) {
-            (order.discountAmount / order.subtotal) * 100
+        // Giảm giá tổng bill (từ giảm giá thủ công/% hoặc coupon)
+        // Ưu tiên: billDiscountAmount từ UI state > order.discountAmount - totalItemDiscount
+        val finalBillDiscount = if (billDiscountAmount > 0) {
+            billDiscountAmount.toDouble()
+        } else {
+            // order.discountAmount có thể bao gồm cả item discount và bill discount
+            // Nên chỉ lấy phần bill discount (order.discountAmount - totalItemDiscount)
+            (order.discountAmount - totalItemDiscount).coerceAtLeast(0.0)
+        }
+
+        val orderDiscountPercent = if (finalBillDiscount > 0 && order.subtotal > 0) {
+            (finalBillDiscount / order.subtotal) * 100
         } else {
             0.0
         }
@@ -1959,7 +1992,7 @@ class SaleViewModel @Inject constructor(
             items = billItems,
             subtotal = order.subtotal, // Tạm tính từ order
             totalItemDiscount = totalItemDiscount, // Tổng giảm giá các món (item-level)
-            discountAmount = order.discountAmount, // Giảm giá tổng bill (order-level: coupon/voucher)
+            discountAmount = finalBillDiscount, // Giảm giá tổng bill (order-level: coupon/voucher)
             discountPercent = orderDiscountPercent,
             serviceFee = 0.0,
             vatRate = vatRate,
