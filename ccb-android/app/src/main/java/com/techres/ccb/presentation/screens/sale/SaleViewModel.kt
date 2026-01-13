@@ -1876,19 +1876,9 @@ class SaleViewModel @Inject constructor(
             Date()
         }
 
-        // Tính tổng giá gốc để phân bổ giảm giá
-        val filteredItems = orderItems.filter { !it.isComboChild }
-        val totalOriginalPrice = filteredItems.sumOf { it.unitPrice * it.quantity }
-
-        // Kiểm tra xem có giảm giá đơn hàng cần phân bổ không
-        val hasOrderDiscount = order.discountAmount > 0 && totalOriginalPrice > 0
-        val orderDiscountPercent = if (hasOrderDiscount) {
-            (order.discountAmount / totalOriginalPrice) * 100
-        } else {
-            0.0
-        }
-
         // Convert order items to bill items (exclude combo children - they're already shown in combo parent)
+        val filteredItems = orderItems.filter { !it.isComboChild }
+
         val billItems = filteredItems.map { item ->
             // Parse toppings from notes field "Topping1:price1, Topping2:price2 | User note"
             val parts = item.notes?.split(" | ") ?: emptyList()
@@ -1911,47 +1901,30 @@ class SaleViewModel @Inject constructor(
                     }
                 }
 
-            // Tính giảm giá cho món này
-            // Ưu tiên: item.discountAmount > 0 (giảm giá riêng) > phân bổ từ order
-            val itemOriginalTotal = item.unitPrice * item.quantity
-            val (itemDiscountAmount, itemDiscountPercent) = when {
-                // Nếu item đã có giảm giá riêng
-                item.discountAmount > 0 && item.originalPrice > 0 -> {
-                    Pair(
-                        item.discountAmount,
-                        (item.discountAmount / (item.originalPrice * item.quantity)) * 100
-                    )
-                }
-                // Nếu có giảm giá đơn hàng - phân bổ theo tỷ lệ
-                hasOrderDiscount -> {
-                    val allocatedDiscount = (itemOriginalTotal / totalOriginalPrice) * order.discountAmount
-                    Pair(allocatedDiscount, orderDiscountPercent)
-                }
-                // Không có giảm giá
-                else -> Pair(0.0, 0.0)
-            }
-
-            val finalTotalPrice = if (itemDiscountAmount > 0) {
-                itemOriginalTotal - itemDiscountAmount
+            // CHỈ hiển thị giảm giá nếu MÓN NÀY có giảm giá riêng (item.discountAmount > 0)
+            // KHÔNG phân bổ giảm giá đơn hàng (order.discountAmount) vào từng món
+            val itemOriginalPrice = if (item.originalPrice > 0) item.originalPrice else item.unitPrice
+            val itemDiscountPercent = if (item.discountAmount > 0 && itemOriginalPrice > 0) {
+                (item.discountAmount / (itemOriginalPrice * item.quantity)) * 100
             } else {
-                item.totalPrice
+                0.0
             }
 
             BillItem(
                 code = item.productCode,
                 name = item.productName,
                 quantity = item.quantity,
-                unitPrice = if (itemDiscountAmount > 0) (finalTotalPrice / item.quantity) else item.unitPrice,
-                originalPrice = item.unitPrice, // Giá gốc luôn là unitPrice
-                discountAmount = itemDiscountAmount,
+                unitPrice = item.unitPrice,
+                originalPrice = itemOriginalPrice,
+                discountAmount = item.discountAmount, // Chỉ lấy giảm giá riêng của món (không phân bổ)
                 discountPercent = itemDiscountPercent,
-                totalPrice = finalTotalPrice,
+                totalPrice = item.totalPrice,
                 note = userNote,
                 toppings = toppings
             )
         }
 
-        // Tính tổng giảm giá các món (để hiển thị trong summary)
+        // Tính tổng giảm giá các MÓN (chỉ từ item.discountAmount, KHÔNG bao gồm order.discountAmount)
         val totalItemDiscount = billItems.sumOf { it.discountAmount }
 
         // Calculate VAT (assuming 10% VAT rate)
@@ -1970,13 +1943,11 @@ class SaleViewModel @Inject constructor(
             else -> paymentMethod
         }
 
-        // Nếu đã phân bổ giảm giá đơn hàng vào các món, không hiển thị lại ở phần giảm giá HĐ
-        // Chỉ hiển thị giảm giá HĐ nếu có giảm giá riêng không thuộc về món (ví dụ: coupon giảm shipping)
-        val remainingOrderDiscount = if (hasOrderDiscount) {
-            // Giảm giá đã được phân bổ vào món, không cần hiển thị riêng
-            0.0
+        // Tính % giảm giá đơn hàng (order-level discount từ coupon/voucher)
+        val orderDiscountPercent = if (order.discountAmount > 0 && order.subtotal > 0) {
+            (order.discountAmount / order.subtotal) * 100
         } else {
-            order.discountAmount
+            0.0
         }
 
         return BillData(
@@ -1986,14 +1957,10 @@ class SaleViewModel @Inject constructor(
             staffName = staffName,
             customerName = customerName,
             items = billItems,
-            subtotal = totalOriginalPrice, // Tổng giá gốc các món
-            totalItemDiscount = totalItemDiscount,
-            discountAmount = remainingOrderDiscount, // Giảm giá HĐ còn lại (nếu có)
-            discountPercent = if (remainingOrderDiscount > 0 && order.subtotal > 0) {
-                (remainingOrderDiscount / order.subtotal * 100)
-            } else {
-                0.0
-            },
+            subtotal = order.subtotal, // Tạm tính từ order
+            totalItemDiscount = totalItemDiscount, // Tổng giảm giá các món (item-level)
+            discountAmount = order.discountAmount, // Giảm giá tổng bill (order-level: coupon/voucher)
+            discountPercent = orderDiscountPercent,
             serviceFee = 0.0,
             vatRate = vatRate,
             vatAmount = vatAmount,

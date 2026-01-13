@@ -184,6 +184,8 @@ export default function BillTemplatePage() {
         showUnitPrice: template.showUnitPrice,
         showQuantity: template.showQuantity,
         showSubtotal: template.showSubtotal,
+        showItemDiscount: template.showItemDiscount ?? true,
+        showTotalItemDiscount: template.showTotalItemDiscount ?? true,
         showDiscount: template.showDiscount,
         showDiscountPercent: template.showDiscountPercent,
         showServiceFee: template.showServiceFee,
@@ -947,24 +949,48 @@ export default function BillTemplatePage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={templateForm.showDiscount || false}
-                        onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscount: checked })}
-                      />
-                      <Label>Hiển thị giảm giá</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={templateForm.showDiscountPercent || false}
-                        onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscountPercent: checked })}
-                      />
-                      <Label>Hiển thị % giảm giá</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
                         checked={templateForm.showServiceFee || false}
                         onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showServiceFee: checked })}
                       />
                       <Label>Hiển thị phí dịch vụ</Label>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3">Cấu hình giảm giá</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Giảm giá món: Giảm giá áp dụng trực tiếp trên từng món ăn<br/>
+                      Giảm giá bill: Giảm giá áp dụng trên tổng hóa đơn (coupon, voucher)
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showItemDiscount ?? true}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showItemDiscount: checked })}
+                        />
+                        <Label>Hiển thị giảm giá từng món</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showTotalItemDiscount ?? true}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showTotalItemDiscount: checked })}
+                        />
+                        <Label>Hiển thị tổng giảm giá các món</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showDiscount || false}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscount: checked })}
+                        />
+                        <Label>Hiển thị giảm giá tổng bill</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showDiscountPercent || false}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscountPercent: checked })}
+                        />
+                        <Label>Hiển thị % giảm giá</Label>
+                      </div>
                     </div>
                   </div>
 
@@ -1584,9 +1610,9 @@ export default function BillTemplatePage() {
 
                 {/* ============ ITEMS ============ */}
                 <div className="space-y-2">
-                  {/* Item 1 */}
+                  {/* Item 1 - Không giảm giá */}
                   <div>
-                    <p>Phở bò tái nạm</p>
+                    <p className="font-bold">Phở bò tái nạm</p>
                     {(previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
                       <div className="flex justify-between text-xs">
                         <span className="pl-2">
@@ -1605,9 +1631,38 @@ export default function BillTemplatePage() {
                     )}
                   </div>
 
-                  {/* Item 2 */}
+                  {/* Item 2 - Có giảm giá món */}
                   <div>
-                    <p>Trà đá</p>
+                    <p className="font-bold">Cơm gà xào sả ớt</p>
+                    {previewTemplate.showItemDiscount ? (
+                      <>
+                        <div className="text-xs pl-2">
+                          {previewTemplate.showQuantity && "1"}
+                          {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
+                          {previewTemplate.showUnitPrice && "35,000"} (-20%)
+                        </div>
+                        <div className="flex justify-between text-xs text-green-600">
+                          <span className="pl-2">→ Giảm: -7,000</span>
+                          <span>28,000</span>
+                        </div>
+                      </>
+                    ) : (
+                      (previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
+                        <div className="flex justify-between text-xs">
+                          <span className="pl-2">
+                            {previewTemplate.showQuantity && "1"}
+                            {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
+                            {previewTemplate.showUnitPrice && "28,000"}
+                          </span>
+                          <span>28,000</span>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {/* Item 3 - Không giảm giá */}
+                  <div>
+                    <p className="font-bold">Trà đá</p>
                     {(previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
                       <div className="flex justify-between text-xs">
                         <span className="pl-2">
@@ -1630,16 +1685,23 @@ export default function BillTemplatePage() {
                 {previewTemplate.showSubtotal && (
                   <div className="flex justify-between">
                     <span>Tạm tính:</span>
-                    <span>55,000</span>
+                    <span>90,000</span>
+                  </div>
+                )}
+
+                {previewTemplate.showTotalItemDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Giảm giá món:</span>
+                    <span>-7,000</span>
                   </div>
                 )}
 
                 {previewTemplate.showDiscount && (
                   <div className="flex justify-between text-green-600">
                     <span>
-                      Giảm giá{previewTemplate.showDiscountPercent && " (10%)"}:
+                      Giảm giá bill{previewTemplate.showDiscountPercent && " (10%)"}:
                     </span>
-                    <span>-5,500</span>
+                    <span>-8,300</span>
                   </div>
                 )}
 
