@@ -344,7 +344,7 @@ fun PaymentDialog(
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // Order summary with VAT breakdown
+                        // Order summary with VAT breakdown - Simplified layout
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -363,30 +363,23 @@ fun PaymentDialog(
                             val totalVat = totalAmount - totalBeforeVat
 
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                                // === PHẦN GIÁ BÁN ===
-                                Text("GIÁ BÁN", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-
+                                // === TẠM TÍNH ===
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Giá chưa VAT:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                    Text(formatCurrency(subtotalBeforeVat), style = MaterialTheme.typography.bodySmall)
-                                }
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("VAT (8%):", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                    Text(formatCurrency(subtotalVat), style = MaterialTheme.typography.bodySmall)
-                                }
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Tạm tính (đã gồm VAT):", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                     Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                 }
+                                Text(
+                                    "  └ Chưa VAT: ${formatCurrency(subtotalBeforeVat)} + VAT: ${formatCurrency(subtotalVat)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
 
-                                // === PHẦN GIẢM GIÁ ===
+                                // === GIẢM GIÁ (nếu có) ===
                                 if (discountAmount > 0) {
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                                    Text("GIẢM GIÁ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Success)
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
 
-                                    // Item discount breakdown with delete button
+                                    // Giảm giá món
                                     if (itemDiscountTotal > 0) {
                                         val itemDiscountBeforeVat = (itemDiscountTotal / (1 + vatRate)).toLong()
                                         val itemDiscountVat = itemDiscountTotal - itemDiscountBeforeVat
@@ -395,33 +388,27 @@ fun PaymentDialog(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Column {
-                                                Text("Giảm giá món:", style = MaterialTheme.typography.bodySmall, color = Success)
-                                                Text("(Chưa VAT: ${formatCurrency(itemDiscountBeforeVat)} + VAT: ${formatCurrency(itemDiscountVat)})",
-                                                    style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
-                                            }
+                                            Text("Giảm giá món:", style = MaterialTheme.typography.bodySmall, color = Success)
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text("-${formatCurrency(itemDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
-                                                IconButton(
-                                                    onClick = onClearItemDiscounts,
-                                                    modifier = Modifier.size(20.dp).padding(start = 4.dp)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Close,
-                                                        contentDescription = "Xóa giảm giá món",
-                                                        modifier = Modifier.size(14.dp),
-                                                        tint = MaterialTheme.colorScheme.error
-                                                    )
+                                                IconButton(onClick = onClearItemDiscounts, modifier = Modifier.size(20.dp)) {
+                                                    Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                                                 }
                                             }
                                         }
+                                        Text(
+                                            "  └ Chưa VAT: ${formatCurrency(itemDiscountBeforeVat)} + VAT: ${formatCurrency(itemDiscountVat)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
                                     }
 
-                                    // Bill discount breakdown with delete button
+                                    // Giảm giá hóa đơn
                                     if (billDiscountTotal > 0) {
                                         val billDiscountBeforeVat = (billDiscountTotal / (1 + vatRate)).toLong()
                                         val billDiscountVat = billDiscountTotal - billDiscountBeforeVat
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        if (itemDiscountTotal > 0) Spacer(modifier = Modifier.height(4.dp))
                                         Row(
                                             Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -430,58 +417,37 @@ fun PaymentDialog(
                                             Column {
                                                 Text("Giảm giá HĐ:", style = MaterialTheme.typography.bodySmall, color = Success)
                                                 if (billDiscountDescription != null) {
-                                                    Text(billDiscountDescription, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                                                    Text("  ($billDiscountDescription)", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
                                                 }
-                                                Text("(Chưa VAT: ${formatCurrency(billDiscountBeforeVat)} + VAT: ${formatCurrency(billDiscountVat)})",
-                                                    style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
                                             }
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text("-${formatCurrency(billDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
-                                                IconButton(
-                                                    onClick = onClearBillDiscount,
-                                                    modifier = Modifier.size(20.dp).padding(start = 4.dp)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Close,
-                                                        contentDescription = "Xóa giảm giá hóa đơn",
-                                                        modifier = Modifier.size(14.dp),
-                                                        tint = MaterialTheme.colorScheme.error
-                                                    )
+                                                IconButton(onClick = onClearBillDiscount, modifier = Modifier.size(20.dp)) {
+                                                    Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                                                 }
                                             }
                                         }
-                                    }
-
-                                    // Show total discount summary
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Column {
-                                            Text("Tổng giảm giá:", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Bold)
-                                            Text("(Chưa VAT: ${formatCurrency(discountBeforeVat)} + VAT: ${formatCurrency(discountVat)})",
-                                                style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
-                                        }
-                                        Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            "  └ Chưa VAT: ${formatCurrency(billDiscountBeforeVat)} + VAT: ${formatCurrency(billDiscountVat)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
                                     }
                                 }
 
-                                // === PHẦN TỔNG THANH TOÁN ===
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                                Text("THANH TOÁN", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFFFF5722))
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Giá chưa VAT:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                    Text(formatCurrency(totalBeforeVat), style = MaterialTheme.typography.bodySmall)
-                                }
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("VAT (8%):", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                    Text(formatCurrency(totalVat), style = MaterialTheme.typography.bodySmall)
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
+                                // === TỔNG THANH TOÁN ===
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text("TỔNG THANH TOÁN:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                                     Text(formatCurrency(totalAmount), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color(0xFFFF5722))
                                 }
+                                Text(
+                                    "  └ Chưa VAT: ${formatCurrency(totalBeforeVat)} + VAT: ${formatCurrency(totalVat)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
                             }
                         }
 
@@ -940,10 +906,18 @@ fun PaymentDialog(
 
                                                     orderItems.take(5).forEach { item ->
                                                         var expanded by remember { mutableStateOf(false) }
-                                                        var customItemPercentText by remember { mutableStateOf("") }
-                                                        var customItemAmountText by remember { mutableStateOf("") }
+                                                        // Initialize state based on item's current discount
+                                                        val presetAmounts = listOf(5000L, 10000L, 20000L)
+                                                        val isPresetAmount = item.discountAmount in presetAmounts
+
+                                                        var customItemPercentText by remember(item.discountAmount) { mutableStateOf("") }
+                                                        var customItemAmountText by remember(item.discountAmount) {
+                                                            mutableStateOf(if (item.discountAmount > 0) item.discountAmount.toString() else "")
+                                                        }
                                                         // 0 = none, 1 = percent, 2 = amount
-                                                        var itemDiscountType by remember { mutableStateOf(0) }
+                                                        var itemDiscountType by remember(item.discountAmount) {
+                                                            mutableStateOf(if (item.discountAmount > 0) 2 else 0)
+                                                        }
 
                                                         Column(modifier = Modifier.fillMaxWidth()) {
                                                             Row(
@@ -994,14 +968,21 @@ fun PaymentDialog(
                                                                     Spacer(modifier = Modifier.height(2.dp))
                                                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                                                         listOf(5, 10, 20, 50).forEach { percent ->
+                                                                            val discountForPercent = item.totalPrice * percent / 100
                                                                             FilterChip(
-                                                                                selected = false,
+                                                                                selected = item.discountAmount == discountForPercent,
                                                                                 onClick = {
-                                                                                    onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
-                                                                                    expanded = false
+                                                                                    customItemAmountText = ""
+                                                                                    customItemPercentText = percent.toString()
+                                                                                    itemDiscountType = 1
+                                                                                    onApplyItemDiscount(item.id, discountForPercent)
                                                                                 },
                                                                                 label = { Text("$percent%", fontSize = 10.sp) },
-                                                                                modifier = Modifier.height(28.dp)
+                                                                                modifier = Modifier.height(28.dp),
+                                                                                colors = FilterChipDefaults.filterChipColors(
+                                                                                    selectedContainerColor = Color(0xFFFF5722),
+                                                                                    selectedLabelColor = Color.White
+                                                                                )
                                                                             )
                                                                         }
                                                                     }
@@ -1035,7 +1016,6 @@ fun PaymentDialog(
                                                                                     customItemPercentText.toIntOrNull()?.let { percent ->
                                                                                         if (percent in 1..100) {
                                                                                             onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
-                                                                                            expanded = false
                                                                                         }
                                                                                     }
                                                                                 }
@@ -1047,7 +1027,6 @@ fun PaymentDialog(
                                                                                 customItemPercentText.toIntOrNull()?.let { percent ->
                                                                                     if (percent in 1..100) {
                                                                                         onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
-                                                                                        expanded = false
                                                                                     }
                                                                                 }
                                                                             },
@@ -1066,16 +1045,23 @@ fun PaymentDialog(
                                                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                                                         listOf(5000L, 10000L, 20000L).forEach { amount ->
                                                                             FilterChip(
-                                                                                selected = false,
+                                                                                selected = item.discountAmount == amount,
                                                                                 onClick = {
                                                                                     if (amount <= item.totalPrice) {
+                                                                                        customItemPercentText = ""
+                                                                                        customItemAmountText = amount.toString()
+                                                                                        itemDiscountType = 2
                                                                                         onApplyItemDiscount(item.id, amount)
                                                                                         expanded = false
                                                                                     }
                                                                                 },
                                                                                 label = { Text("${amount/1000}k", fontSize = 10.sp) },
                                                                                 modifier = Modifier.height(28.dp),
-                                                                                enabled = amount <= item.totalPrice
+                                                                                enabled = amount <= item.totalPrice,
+                                                                                colors = FilterChipDefaults.filterChipColors(
+                                                                                    selectedContainerColor = Color(0xFFFF5722),
+                                                                                    selectedLabelColor = Color.White
+                                                                                )
                                                                             )
                                                                         }
                                                                     }
