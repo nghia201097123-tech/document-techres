@@ -344,98 +344,143 @@ fun PaymentDialog(
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // Order summary
+                        // Order summary with VAT breakdown
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
+                            // VAT rate 8% for F&B (Nghị định 174/2025)
+                            val vatRate = 0.08
+                            // Giá bán đã bao gồm VAT, tách ra để hiển thị
+                            val subtotalBeforeVat = (subtotal / (1 + vatRate)).toLong()
+                            val subtotalVat = subtotal - subtotalBeforeVat
+                            // Giảm giá cũng bao gồm VAT
+                            val discountBeforeVat = (discountAmount / (1 + vatRate)).toLong()
+                            val discountVat = discountAmount - discountBeforeVat
+                            // Tổng sau giảm giá
+                            val totalBeforeVat = (totalAmount / (1 + vatRate)).toLong()
+                            val totalVat = totalAmount - totalBeforeVat
+
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                // === PHẦN GIÁ BÁN ===
+                                Text("GIÁ BÁN", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
-                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
+                                    Text("Giá chưa VAT:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(formatCurrency(subtotalBeforeVat), style = MaterialTheme.typography.bodySmall)
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("VAT (8%):", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(formatCurrency(subtotalVat), style = MaterialTheme.typography.bodySmall)
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Tạm tính (đã gồm VAT):", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                 }
 
-                                // Item discount breakdown with delete button
-                                if (itemDiscountTotal > 0) {
+                                // === PHẦN GIẢM GIÁ ===
+                                if (discountAmount > 0) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                                    Text("GIẢM GIÁ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Success)
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("Giảm giá món:", style = MaterialTheme.typography.bodySmall, color = Success)
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("-${formatCurrency(itemDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
-                                            IconButton(
-                                                onClick = onClearItemDiscounts,
-                                                modifier = Modifier.size(20.dp).padding(start = 4.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    contentDescription = "Xóa giảm giá món",
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = MaterialTheme.colorScheme.error
-                                                )
+
+                                    // Item discount breakdown with delete button
+                                    if (itemDiscountTotal > 0) {
+                                        val itemDiscountBeforeVat = (itemDiscountTotal / (1 + vatRate)).toLong()
+                                        val itemDiscountVat = itemDiscountTotal - itemDiscountBeforeVat
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text("Giảm giá món:", style = MaterialTheme.typography.bodySmall, color = Success)
+                                                Text("(Chưa VAT: ${formatCurrency(itemDiscountBeforeVat)} + VAT: ${formatCurrency(itemDiscountVat)})",
+                                                    style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("-${formatCurrency(itemDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
+                                                IconButton(
+                                                    onClick = onClearItemDiscounts,
+                                                    modifier = Modifier.size(20.dp).padding(start = 4.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Xóa giảm giá món",
+                                                        modifier = Modifier.size(14.dp),
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                // Bill discount breakdown with delete button
-                                if (billDiscountTotal > 0) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text("Giảm giá HĐ:", style = MaterialTheme.typography.bodySmall, color = Success)
-                                            if (billDiscountDescription != null) {
-                                                Text(
-                                                    text = billDiscountDescription,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.outline,
-                                                    fontSize = 9.sp
-                                                )
+                                    // Bill discount breakdown with delete button
+                                    if (billDiscountTotal > 0) {
+                                        val billDiscountBeforeVat = (billDiscountTotal / (1 + vatRate)).toLong()
+                                        val billDiscountVat = billDiscountTotal - billDiscountBeforeVat
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text("Giảm giá HĐ:", style = MaterialTheme.typography.bodySmall, color = Success)
+                                                if (billDiscountDescription != null) {
+                                                    Text(billDiscountDescription, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                                                }
+                                                Text("(Chưa VAT: ${formatCurrency(billDiscountBeforeVat)} + VAT: ${formatCurrency(billDiscountVat)})",
+                                                    style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
                                             }
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("-${formatCurrency(billDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
-                                            IconButton(
-                                                onClick = onClearBillDiscount,
-                                                modifier = Modifier.size(20.dp).padding(start = 4.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    contentDescription = "Xóa giảm giá hóa đơn",
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = MaterialTheme.colorScheme.error
-                                                )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("-${formatCurrency(billDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
+                                                IconButton(
+                                                    onClick = onClearBillDiscount,
+                                                    modifier = Modifier.size(20.dp).padding(start = 4.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Xóa giảm giá hóa đơn",
+                                                        modifier = Modifier.size(14.dp),
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                // Show total discount if both item and bill have discounts
-                                if (itemDiscountTotal > 0 && billDiscountTotal > 0) {
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    // Show total discount summary
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("Tổng giảm:", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Bold)
+                                        Column {
+                                            Text("Tổng giảm giá:", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Bold)
+                                            Text("(Chưa VAT: ${formatCurrency(discountBeforeVat)} + VAT: ${formatCurrency(discountVat)})",
+                                                style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                                        }
                                         Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Bold)
                                     }
                                 }
 
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                // === PHẦN TỔNG THANH TOÁN ===
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                                Text("THANH TOÁN", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFFFF5722))
+                                Spacer(modifier = Modifier.height(4.dp))
+
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("TỔNG:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                    Text(formatCurrency(totalAmount), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color(0xFFFF5722))
+                                    Text("Giá chưa VAT:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(formatCurrency(totalBeforeVat), style = MaterialTheme.typography.bodySmall)
                                 }
-                                if (vatAmount > 0) {
-                                    Text("(Đã gồm VAT: ${formatCurrency(vatAmount)})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("VAT (8%):", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(formatCurrency(totalVat), style = MaterialTheme.typography.bodySmall)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("TỔNG THANH TOÁN:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                    Text(formatCurrency(totalAmount), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color(0xFFFF5722))
                                 }
                             }
                         }
