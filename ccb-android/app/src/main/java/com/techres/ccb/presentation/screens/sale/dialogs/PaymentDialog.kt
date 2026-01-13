@@ -906,17 +906,40 @@ fun PaymentDialog(
 
                                                     orderItems.take(5).forEach { item ->
                                                         var expanded by remember { mutableStateOf(false) }
-                                                        // Initialize state based on item's current discount
+
+                                                        // Detect if discount matches a preset percent value
+                                                        val presetPercents = listOf(5, 10, 20, 50)
                                                         val presetAmounts = listOf(5000L, 10000L, 20000L)
+
+                                                        // Check if discount matches a percent preset
+                                                        val matchedPercent = presetPercents.find { percent ->
+                                                            item.totalPrice * percent / 100 == item.discountAmount
+                                                        }
+                                                        val isPercentDiscount = matchedPercent != null
                                                         val isPresetAmount = item.discountAmount in presetAmounts
 
-                                                        var customItemPercentText by remember(item.discountAmount) { mutableStateOf("") }
+                                                        // Initialize state based on discount type (like bill discount)
+                                                        var customItemPercentText by remember(item.discountAmount) {
+                                                            mutableStateOf(if (isPercentDiscount && matchedPercent != null) matchedPercent.toString() else "")
+                                                        }
                                                         var customItemAmountText by remember(item.discountAmount) {
-                                                            mutableStateOf(if (item.discountAmount > 0) item.discountAmount.toString() else "")
+                                                            mutableStateOf(if (!isPercentDiscount && item.discountAmount > 0) item.discountAmount.toString() else "")
                                                         }
                                                         // 0 = none, 1 = percent, 2 = amount
                                                         var itemDiscountType by remember(item.discountAmount) {
-                                                            mutableStateOf(if (item.discountAmount > 0) 2 else 0)
+                                                            mutableStateOf(
+                                                                when {
+                                                                    item.discountAmount == 0L -> 0
+                                                                    isPercentDiscount -> 1
+                                                                    else -> 2
+                                                                }
+                                                            )
+                                                        }
+                                                        var selectedItemPercentValue by remember(item.discountAmount) {
+                                                            mutableStateOf(if (isPercentDiscount) matchedPercent else null)
+                                                        }
+                                                        var selectedItemAmountValue by remember(item.discountAmount) {
+                                                            mutableStateOf(if (isPresetAmount && !isPercentDiscount) item.discountAmount else null)
                                                         }
 
                                                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -970,11 +993,15 @@ fun PaymentDialog(
                                                                         listOf(5, 10, 20, 50).forEach { percent ->
                                                                             val discountForPercent = item.totalPrice * percent / 100
                                                                             FilterChip(
-                                                                                selected = item.discountAmount == discountForPercent,
+                                                                                selected = itemDiscountType == 1 && selectedItemPercentValue == percent,
                                                                                 onClick = {
+                                                                                    // Clear amount selection
                                                                                     customItemAmountText = ""
-                                                                                    customItemPercentText = percent.toString()
+                                                                                    selectedItemAmountValue = null
+                                                                                    // Set percent selection
                                                                                     itemDiscountType = 1
+                                                                                    selectedItemPercentValue = percent
+                                                                                    customItemPercentText = percent.toString()
                                                                                     onApplyItemDiscount(item.id, discountForPercent)
                                                                                 },
                                                                                 label = { Text("$percent%", fontSize = 10.sp) },
@@ -1003,6 +1030,8 @@ fun PaymentDialog(
                                                                                     if (filtered.isNotEmpty()) {
                                                                                         customItemAmountText = ""
                                                                                         itemDiscountType = 1
+                                                                                        selectedItemAmountValue = null
+                                                                                        selectedItemPercentValue = null // Custom value, not preset
                                                                                     }
                                                                                 }
                                                                             },
@@ -1015,6 +1044,8 @@ fun PaymentDialog(
                                                                                 onDone = {
                                                                                     customItemPercentText.toIntOrNull()?.let { percent ->
                                                                                         if (percent in 1..100) {
+                                                                                            selectedItemPercentValue = null
+                                                                                            selectedItemAmountValue = null
                                                                                             onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
                                                                                         }
                                                                                     }
@@ -1026,6 +1057,8 @@ fun PaymentDialog(
                                                                             onClick = {
                                                                                 customItemPercentText.toIntOrNull()?.let { percent ->
                                                                                     if (percent in 1..100) {
+                                                                                        selectedItemPercentValue = null
+                                                                                        selectedItemAmountValue = null
                                                                                         onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
                                                                                     }
                                                                                 }
@@ -1045,14 +1078,17 @@ fun PaymentDialog(
                                                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                                                         listOf(5000L, 10000L, 20000L).forEach { amount ->
                                                                             FilterChip(
-                                                                                selected = item.discountAmount == amount,
+                                                                                selected = itemDiscountType == 2 && selectedItemAmountValue == amount,
                                                                                 onClick = {
                                                                                     if (amount <= item.totalPrice) {
+                                                                                        // Clear percent selection
                                                                                         customItemPercentText = ""
-                                                                                        customItemAmountText = amount.toString()
+                                                                                        selectedItemPercentValue = null
+                                                                                        // Set amount selection
                                                                                         itemDiscountType = 2
+                                                                                        selectedItemAmountValue = amount
+                                                                                        customItemAmountText = amount.toString()
                                                                                         onApplyItemDiscount(item.id, amount)
-                                                                                        expanded = false
                                                                                     }
                                                                                 },
                                                                                 label = { Text("${amount/1000}k", fontSize = 10.sp) },
@@ -1080,6 +1116,8 @@ fun PaymentDialog(
                                                                                 if (it.isNotEmpty()) {
                                                                                     customItemPercentText = ""
                                                                                     itemDiscountType = 2
+                                                                                    selectedItemPercentValue = null
+                                                                                    selectedItemAmountValue = null // Custom value, not preset
                                                                                 }
                                                                             },
                                                                             placeholder = { Text("Nhập số tiền", fontSize = 11.sp) },
@@ -1091,8 +1129,9 @@ fun PaymentDialog(
                                                                                 onDone = {
                                                                                     customItemAmountText.toLongOrNull()?.let { amount ->
                                                                                         if (amount > 0 && amount <= item.totalPrice) {
+                                                                                            selectedItemPercentValue = null
+                                                                                            selectedItemAmountValue = null
                                                                                             onApplyItemDiscount(item.id, amount)
-                                                                                            expanded = false
                                                                                         }
                                                                                     }
                                                                                 }
@@ -1103,8 +1142,9 @@ fun PaymentDialog(
                                                                             onClick = {
                                                                                 customItemAmountText.toLongOrNull()?.let { amount ->
                                                                                     if (amount > 0 && amount <= item.totalPrice) {
+                                                                                        selectedItemPercentValue = null
+                                                                                        selectedItemAmountValue = null
                                                                                         onApplyItemDiscount(item.id, amount)
-                                                                                        expanded = false
                                                                                     }
                                                                                 }
                                                                             },
