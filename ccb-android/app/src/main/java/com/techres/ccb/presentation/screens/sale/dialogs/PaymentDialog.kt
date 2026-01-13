@@ -58,7 +58,18 @@ data class CouponDisplayItem(
     val discountValue: Double,
     val maxDiscount: Double?,
     val minOrderAmount: Double,
-    val isApplied: Boolean = false
+    val isApplied: Boolean = false,
+    // Usage limits
+    val usageLimit: Int? = null,
+    val usageCount: Int = 0,
+    val dailyLimit: Int? = null,
+    val dailyUsageCount: Int = 0,
+    // Date validity
+    val startDate: String? = null,
+    val endDate: String? = null,
+    // Availability status - computed based on conditions
+    val isAvailable: Boolean = true,
+    val unavailableReason: String? = null
 )
 
 data class AppliedDiscount(
@@ -97,7 +108,7 @@ fun PaymentDialog(
     couponCode: String = "",
     couponError: String? = null,
     isApplyingCoupon: Boolean = false,
-    availableCoupons: List<CouponDisplayItem> = emptyList(), // Danh sách coupon có thể áp dụng
+    availableCoupons: List<CouponDisplayItem> = emptyList(), // Danh sách tất cả coupon (bao gồm cả không khả dụng)
     // Order items for item-level discount
     orderItems: List<PaymentOrderItem> = emptyList(),
     // Discount breakdown for clear display
@@ -1243,33 +1254,73 @@ fun PaymentDialog(
                                                         Text(couponError, color = MaterialTheme.colorScheme.error, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
                                                     }
 
-                                                    // Danh sách coupon có sẵn
+                                                    // Danh sách tất cả coupon
                                                     if (availableCoupons.isNotEmpty()) {
                                                         Spacer(modifier = Modifier.height(12.dp))
                                                         HorizontalDivider()
                                                         Spacer(modifier = Modifier.height(8.dp))
-                                                        Text(
-                                                            "Coupon có thể áp dụng:",
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = MaterialTheme.colorScheme.primary
-                                                        )
-                                                        Spacer(modifier = Modifier.height(6.dp))
 
-                                                        availableCoupons.forEach { coupon ->
-                                                            val isAlreadyApplied = appliedDiscounts.any { it.couponId == coupon.id }
-                                                            CouponCard(
-                                                                coupon = coupon,
-                                                                isApplied = isAlreadyApplied,
-                                                                onApply = { onApplyCouponById(coupon.id) },
-                                                                onRemove = { onRemoveDiscount(coupon.id) }
+                                                        // Separate available and unavailable coupons
+                                                        val usableCoupons = availableCoupons.filter { it.isAvailable }
+                                                        val unavailableCoupons = availableCoupons.filter { !it.isAvailable }
+
+                                                        // Available coupons section
+                                                        if (usableCoupons.isNotEmpty()) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text(
+                                                                    "Có thể dùng (${usableCoupons.size}):",
+                                                                    style = MaterialTheme.typography.labelSmall,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Success
+                                                                )
+                                                            }
+                                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                                            usableCoupons.forEach { coupon ->
+                                                                val isAlreadyApplied = appliedDiscounts.any { it.couponId == coupon.id }
+                                                                CouponCard(
+                                                                    coupon = coupon,
+                                                                    isApplied = isAlreadyApplied,
+                                                                    currentOrderAmount = subtotal,
+                                                                    onApply = { onApplyCouponById(coupon.id) },
+                                                                    onRemove = { onRemoveDiscount(coupon.id) }
+                                                                )
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                            }
+                                                        }
+
+                                                        // Unavailable coupons section
+                                                        if (unavailableCoupons.isNotEmpty()) {
+                                                            if (usableCoupons.isNotEmpty()) {
+                                                                Spacer(modifier = Modifier.height(8.dp))
+                                                            }
+                                                            Text(
+                                                                "Chưa đủ điều kiện (${unavailableCoupons.size}):",
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                fontWeight = FontWeight.Medium,
+                                                                color = MaterialTheme.colorScheme.outline
                                                             )
-                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                                            unavailableCoupons.forEach { coupon ->
+                                                                CouponCard(
+                                                                    coupon = coupon,
+                                                                    isApplied = false,
+                                                                    currentOrderAmount = subtotal,
+                                                                    onApply = { },
+                                                                    onRemove = { }
+                                                                )
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                            }
                                                         }
                                                     } else {
                                                         Spacer(modifier = Modifier.height(8.dp))
                                                         Text(
-                                                            "Không có coupon nào có thể áp dụng cho đơn hàng này",
+                                                            "Chưa có coupon nào",
                                                             fontSize = 10.sp,
                                                             color = MaterialTheme.colorScheme.outline,
                                                             fontStyle = FontStyle.Italic
@@ -1464,114 +1515,210 @@ private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, Stri
 }
 
 /**
- * Card hiển thị thông tin coupon
+ * Card hiển thị thông tin coupon với trạng thái chi tiết
  * @param onRemove Callback khi user click để bỏ chọn coupon đã áp dụng
+ * @param currentOrderAmount Số tiền đơn hàng hiện tại (để tính thiếu bao nhiêu)
  */
 @Composable
 private fun CouponCard(
     coupon: CouponDisplayItem,
     isApplied: Boolean,
+    currentOrderAmount: Long = 0,
     onApply: () -> Unit,
     onRemove: () -> Unit = {}
 ) {
     val discountText = when (coupon.couponType) {
         "percentage" -> {
-            val maxText = coupon.maxDiscount?.let { " (tối đa ${formatCurrency(it.toLong())})" } ?: ""
-            "Giảm ${coupon.discountValue.toInt()}%$maxText"
+            val maxText = coupon.maxDiscount?.let { " (max ${formatCurrency(it.toLong())})" } ?: ""
+            "-${coupon.discountValue.toInt()}%$maxText"
         }
-        else -> "Giảm ${formatCurrency(coupon.discountValue.toLong())}"
+        else -> "-${formatCurrency(coupon.discountValue.toLong())}"
     }
 
-    val applyToText = when (coupon.applyTo) {
-        "bill" -> "Áp dụng: Toàn hóa đơn"
-        "item" -> "Áp dụng: Món cụ thể"
-        "category" -> "Áp dụng: Theo danh mục"
-        else -> ""
-    }
+    // Calculate usage remaining
+    val usageRemaining = coupon.usageLimit?.let { it - coupon.usageCount }
+    val dailyRemaining = coupon.dailyLimit?.let { it - coupon.dailyUsageCount }
+
+    // Check if coupon is available
+    val canUse = coupon.isAvailable && !isApplied
+
+    // Build conditions info
+    val missingAmount = if (coupon.minOrderAmount > 0 && currentOrderAmount < coupon.minOrderAmount.toLong()) {
+        coupon.minOrderAmount.toLong() - currentOrderAmount
+    } else null
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                // Toggle behavior: click để áp dụng hoặc bỏ chọn
-                if (isApplied) onRemove() else onApply()
-            },
+            .then(
+                if (canUse || isApplied) {
+                    Modifier.clickable {
+                        if (isApplied) onRemove() else onApply()
+                    }
+                } else Modifier
+            ),
         colors = CardDefaults.cardColors(
-            containerColor = if (isApplied)
-                Success.copy(alpha = 0.1f)
-            else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = when {
+                isApplied -> Success.copy(alpha = 0.1f)
+                !coupon.isAvailable -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
         ),
-        border = if (isApplied)
-            BorderStroke(1.dp, Success)
-        else
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        border = when {
+            isApplied -> BorderStroke(1.dp, Success)
+            !coupon.isAvailable -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
+                .padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
+            // Left: Coupon info
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.LocalOffer,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (isApplied) Success else MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+                // Row 1: Code + Discount badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Text(
                         text = coupon.code,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
-                        color = if (isApplied) Success else MaterialTheme.colorScheme.primary
+                        color = when {
+                            isApplied -> Success
+                            !coupon.isAvailable -> MaterialTheme.colorScheme.outline
+                            else -> MaterialTheme.colorScheme.primary
+                        }
                     )
+                    Badge(
+                        containerColor = when {
+                            isApplied -> Success
+                            !coupon.isAvailable -> MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            else -> Color(0xFFFF5722)
+                        }
+                    ) {
+                        Text(discountText, fontSize = 9.sp, color = Color.White)
+                    }
                 }
+
+                // Row 2: Name (compact)
                 Text(
                     text = coupon.name,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = discountText,
                     fontSize = 10.sp,
-                    color = Success,
-                    fontWeight = FontWeight.SemiBold
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (!coupon.isAvailable) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                 )
-                if (coupon.minOrderAmount > 0) {
-                    Text(
-                        text = "Đơn tối thiểu: ${formatCurrency(coupon.minOrderAmount.toLong())}",
-                        fontSize = 9.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+
+                // Row 3: Usage info + Conditions (compact horizontal)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Usage remaining
+                    if (usageRemaining != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Inventory,
+                                null,
+                                Modifier.size(10.dp),
+                                tint = if (usageRemaining <= 0) MaterialTheme.colorScheme.error
+                                       else if (usageRemaining <= 3) Color(0xFFFF9800)
+                                       else MaterialTheme.colorScheme.outline
+                            )
+                            Text(
+                                " ${coupon.usageCount}/${coupon.usageLimit}",
+                                fontSize = 9.sp,
+                                color = if (usageRemaining <= 0) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+
+                    // Daily remaining
+                    if (dailyRemaining != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Today,
+                                null,
+                                Modifier.size(10.dp),
+                                tint = if (dailyRemaining <= 0) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.outline
+                            )
+                            Text(
+                                " ${coupon.dailyUsageCount}/${coupon.dailyLimit}/ngày",
+                                fontSize = 9.sp,
+                                color = if (dailyRemaining <= 0) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+
+                    // Min order amount
+                    if (coupon.minOrderAmount > 0) {
+                        Text(
+                            "≥${formatCurrency(coupon.minOrderAmount.toLong())}",
+                            fontSize = 9.sp,
+                            color = if (missingAmount != null) MaterialTheme.colorScheme.error
+                                   else MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
-                if (applyToText.isNotEmpty()) {
+
+                // Row 4: Unavailable reason or missing amount (if any)
+                if (!coupon.isAvailable && coupon.unavailableReason != null) {
                     Text(
-                        text = applyToText,
+                        text = "⚠ ${coupon.unavailableReason}",
                         fontSize = 9.sp,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else if (missingAmount != null && coupon.isAvailable) {
+                    Text(
+                        text = "Cần thêm ${formatCurrency(missingAmount)}",
+                        fontSize = 9.sp,
+                        color = Color(0xFFFF9800),
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
 
-            if (isApplied) {
-                // Hiển thị checkmark và cho phép click để bỏ chọn
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Đã áp dụng - Click để bỏ chọn",
-                    tint = Success,
-                    modifier = Modifier.size(24.dp)
-                )
-            } else {
-                Button(
-                    onClick = onApply,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("Dùng", fontSize = 10.sp)
+            // Right: Action button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(start = 4.dp)
+            ) {
+                when {
+                    isApplied -> {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Đã áp dụng",
+                            tint = Success,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    !coupon.isAvailable -> {
+                        Icon(
+                            imageVector = Icons.Default.Block,
+                            contentDescription = "Không khả dụng",
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    else -> {
+                        Button(
+                            onClick = onApply,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(24.dp)
+                        ) {
+                            Text("Dùng", fontSize = 9.sp)
+                        }
+                    }
                 }
             }
         }

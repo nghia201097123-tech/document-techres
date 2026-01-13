@@ -1598,14 +1598,23 @@ class SaleViewModel @Inject constructor(
                 val state = _uiState.value
                 val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
 
-                // Lấy tất cả coupon có thể áp dụng (cả auto và manual) để hiển thị
-                val allApplicableCoupons = try {
+                // Lấy TẤT CẢ coupon đang active (bao gồm cả đủ và chưa đủ điều kiện)
+                // để hiển thị cho user biết còn những coupon nào và cần gì để sử dụng
+                val allCoupons = try {
                     withContext(Dispatchers.IO) {
-                        couponDao.getApplicableCoupons(branchId, currentDate, orderAmount)
+                        couponDao.getValidCoupons(branchId, currentDate)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "loadAutoCoupons - Error fetching coupons: ${e.message}", e)
                     emptyList()
+                }
+
+                // Filter applicable coupons (for auto-apply logic)
+                val allApplicableCoupons = allCoupons.filter { coupon ->
+                    val usageOk = coupon.usageLimit == null || coupon.usageCount < coupon.usageLimit
+                    val dailyOk = coupon.dailyLimit == null || coupon.dailyUsageCount < coupon.dailyLimit
+                    val minAmountOk = coupon.minOrderAmount <= orderAmount
+                    usageOk && dailyOk && minAmountOk
                 }
 
                 // Lọc chỉ auto coupon để tự động áp dụng
@@ -1651,11 +1660,11 @@ class SaleViewModel @Inject constructor(
                     s.copy(
                         appliedDiscounts = appliedDiscounts,
                         vatAmount = vatAmount,
-                        availableCoupons = allApplicableCoupons  // Hiển thị tất cả coupon có thể áp dụng
+                        availableCoupons = allCoupons  // Hiển thị TẤT CẢ coupon (UI sẽ tính toán availability)
                     )
                 }
 
-                Log.d(TAG, "loadAutoCoupons - Applied ${appliedDiscounts.size} auto coupons, showing ${allApplicableCoupons.size} available coupons")
+                Log.d(TAG, "loadAutoCoupons - Applied ${appliedDiscounts.size} auto coupons, showing ${allCoupons.size} total coupons (${allApplicableCoupons.size} applicable)")
             } catch (e: Exception) {
                 Log.e(TAG, "loadAutoCoupons - Error: ${e.message}", e)
                 // Đảm bảo state được reset khi có lỗi

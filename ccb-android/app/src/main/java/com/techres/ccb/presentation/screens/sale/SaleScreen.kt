@@ -315,8 +315,21 @@ fun SaleScreen(
                 }
             }
 
-            // Convert CouponEntity to CouponDisplayItem
+            // Convert CouponEntity to CouponDisplayItem with availability status
             val couponDisplayItems = uiState.availableCoupons.map { coupon ->
+                // Compute availability and reason
+                val usageRemaining = coupon.usageLimit?.let { it - coupon.usageCount }
+                val dailyRemaining = coupon.dailyLimit?.let { it - coupon.dailyUsageCount }
+                val needsMoreAmount = coupon.minOrderAmount > 0 && subtotal < coupon.minOrderAmount.toLong()
+                val missingAmount = if (needsMoreAmount) coupon.minOrderAmount.toLong() - subtotal else 0L
+
+                val (isAvailable, unavailableReason) = when {
+                    usageRemaining != null && usageRemaining <= 0 -> false to "Đã hết lượt sử dụng"
+                    dailyRemaining != null && dailyRemaining <= 0 -> false to "Đã hết lượt hôm nay"
+                    needsMoreAmount -> false to "Cần thêm ${formatCurrency(missingAmount)}"
+                    else -> true to null
+                }
+
                 CouponDisplayItem(
                     id = coupon.id,
                     code = coupon.code,
@@ -327,9 +340,18 @@ fun SaleScreen(
                     discountValue = coupon.discountValue,
                     maxDiscount = coupon.maxDiscount,
                     minOrderAmount = coupon.minOrderAmount,
-                    isApplied = uiState.appliedDiscounts.any { it.couponId == coupon.id }
+                    isApplied = uiState.appliedDiscounts.any { it.couponId == coupon.id },
+                    // New fields
+                    usageLimit = coupon.usageLimit,
+                    usageCount = coupon.usageCount,
+                    dailyLimit = coupon.dailyLimit,
+                    dailyUsageCount = coupon.dailyUsageCount,
+                    startDate = coupon.startDate,
+                    endDate = coupon.endDate,
+                    isAvailable = isAvailable,
+                    unavailableReason = unavailableReason
                 )
-            }
+            }.sortedByDescending { it.isAvailable } // Show available coupons first
 
             PaymentDialog(
                 totalAmount = paymentTotal,
