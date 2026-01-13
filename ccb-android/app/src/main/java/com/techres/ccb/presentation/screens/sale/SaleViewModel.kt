@@ -1349,6 +1349,28 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
+                // Kiểm tra giới hạn tổng lượt dùng
+                if (coupon.usageLimit != null && coupon.usageCount >= coupon.usageLimit!!) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Mã giảm giá đã hết lượt sử dụng (${coupon.usageCount}/${coupon.usageLimit})"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Kiểm tra giới hạn lượt dùng trong ngày
+                if (coupon.dailyLimit != null && coupon.dailyUsageCount >= coupon.dailyLimit!!) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Mã giảm giá đã hết lượt sử dụng hôm nay (${coupon.dailyUsageCount}/${coupon.dailyLimit})"
+                        )
+                    }
+                    return@launch
+                }
+
                 // Kiểm tra giá trị đơn hàng tối thiểu
                 val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
                 if (orderAmount < coupon.minOrderAmount) {
@@ -1457,6 +1479,28 @@ class SaleViewModel @Inject constructor(
 
             try {
                 val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
+
+                // Kiểm tra giới hạn tổng lượt dùng
+                if (coupon.usageLimit != null && coupon.usageCount >= coupon.usageLimit!!) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Mã giảm giá đã hết lượt sử dụng (${coupon.usageCount}/${coupon.usageLimit})"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Kiểm tra giới hạn lượt dùng trong ngày
+                if (coupon.dailyLimit != null && coupon.dailyUsageCount >= coupon.dailyLimit!!) {
+                    _uiState.update {
+                        it.copy(
+                            isApplyingCoupon = false,
+                            couponError = "Mã giảm giá đã hết lượt sử dụng hôm nay (${coupon.dailyUsageCount}/${coupon.dailyLimit})"
+                        )
+                    }
+                    return@launch
+                }
 
                 // Kiểm tra giá trị đơn hàng tối thiểu
                 if (orderAmount < coupon.minOrderAmount) {
@@ -2160,6 +2204,13 @@ class SaleViewModel @Inject constructor(
                             paymentMethod = paymentMethod,
                             updatedAt = now
                         )
+                    }
+
+                    // 5. Increment coupon usage count
+                    state.appliedDiscounts.forEach { discount ->
+                        couponDao.incrementUsage(discount.couponId)
+                        couponDao.incrementDailyUsage(discount.couponId)
+                        Log.d(TAG, "completeOrder - Incremented usage for coupon: ${discount.code}")
                     }
                 }
 
