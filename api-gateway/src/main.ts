@@ -1,9 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  // Disable built-in body parser to use custom one with higher limit
+  const app = await NestFactory.create(AppModule, {
+    cors: true,
+    bodyParser: false,
+  });
+
+  // Increase body size limit for large imports (e.g., Excel with 1000+ rows)
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Global prefix
   app.setGlobalPrefix('api');
@@ -21,7 +30,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT ?? 3000;
+  const port = process.env.PORT ?? 4000;
   await app.listen(port);
 
   console.log(`🚀 API Gateway is running on: http://localhost:${port}`);

@@ -202,7 +202,134 @@ Mở app lần đầu
 
 ---
 
-## 6. Customer App
+## 6. API Master Data
+
+**Vai trò:** Service đồng bộ dữ liệu master từ cloud xuống các ứng dụng POS
+
+**Nền tảng:** NestJS + TypeORM + PostgreSQL
+
+### Chức năng chính
+
+- Xác thực thiết bị bằng mã cửa hàng
+- Xác thực nhân viên bằng mã PIN
+- Đồng bộ dữ liệu master (categories, products, areas, tables, staff)
+- Hỗ trợ full sync và incremental sync
+
+### Kiến trúc
+
+```
+┌─────────────────────────────────────────┐
+│         API Master Data                 │
+│           (NestJS)                      │
+├─────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────────┐   │
+│  │ Auth Module │  │  Sync Module    │   │
+│  │ - login     │  │  - full sync    │   │
+│  │ - verify-pin│  │  - incremental  │   │
+│  └─────────────┘  └─────────────────┘   │
+│                                         │
+│  ┌─────────────────────────────────────┐│
+│  │          PostgreSQL                 ││
+│  └─────────────────────────────────────┘│
+└─────────────────────────────────────────┘
+```
+
+### API Endpoints
+
+| Endpoint | Method | Mô tả |
+|----------|--------|-------|
+| `/api/v1/auth/login` | POST | Đăng nhập thiết bị |
+| `/api/v1/auth/verify-pin` | POST | Xác thực mã PIN |
+| `/api/v1/sync/full` | GET | Full sync master data |
+| `/api/v1/sync/incremental` | GET | Incremental sync |
+
+---
+
+## 7. API OAuth
+
+**Vai trò:** Service Authentication tập trung cho toàn bộ hệ thống
+
+**Nền tảng:** NestJS + TypeORM + PostgreSQL
+
+### Chức năng chính
+
+- Đăng nhập/Đăng ký cho Admin và Tenant users
+- Quản lý JWT Access Token và Refresh Token
+- Two-Factor Authentication (2FA) với TOTP
+- Quản lý Sessions
+- Password Reset
+- Audit Logging
+
+### Kiến trúc
+
+```
+┌─────────────────────────────────────────┐
+│            API OAuth                     │
+│            (NestJS)                      │
+├─────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────────┐   │
+│  │ Auth Module │  │ Sessions Module │   │
+│  │ - login     │  │ - list sessions │   │
+│  │ - register  │  │ - revoke        │   │
+│  │ - logout    │  │                 │   │
+│  │ - refresh   │  │                 │   │
+│  └─────────────┘  └─────────────────┘   │
+│                                         │
+│  ┌─────────────┐  ┌─────────────────┐   │
+│  │ 2FA Module  │  │ Password Module │   │
+│  │ - setup     │  │ - change        │   │
+│  │ - enable    │  │ - forgot        │   │
+│  │ - disable   │  │ - reset         │   │
+│  └─────────────┘  └─────────────────┘   │
+│                                         │
+│  ┌─────────────────────────────────────┐│
+│  │          PostgreSQL                 ││
+│  └─────────────────────────────────────┘│
+└─────────────────────────────────────────┘
+```
+
+### User Types
+
+| Type | Mô tả | Use Case |
+|------|-------|----------|
+| **ADMIN** | Super Admin, Support | Web Admin |
+| **TENANT** | Owner, Manager, Staff | Web Dashboard, Mobile Apps |
+
+### Token Management
+
+| Token | Expiration | Mô tả |
+|-------|------------|-------|
+| **Access Token** | 15 phút | Short-lived, cho API calls |
+| **Refresh Token** | 7 ngày | Long-lived, để refresh |
+
+### API Endpoints
+
+| Endpoint | Method | Mô tả |
+|----------|--------|-------|
+| `/api/v1/auth/login` | POST | Đăng nhập |
+| `/api/v1/auth/register` | POST | Đăng ký |
+| `/api/v1/auth/refresh` | POST | Refresh token |
+| `/api/v1/auth/logout` | POST | Đăng xuất |
+| `/api/v1/auth/2fa/setup` | POST | Setup 2FA |
+| `/api/v1/auth/2fa/enable` | POST | Bật 2FA |
+| `/api/v1/auth/2fa/disable` | POST | Tắt 2FA |
+| `/api/v1/auth/change-password` | POST | Đổi mật khẩu |
+| `/api/v1/auth/forgot-password` | POST | Quên mật khẩu |
+| `/api/v1/auth/reset-password` | POST | Reset mật khẩu |
+| `/api/v1/auth/sessions` | GET | Danh sách sessions |
+| `/api/v1/auth/sessions/:id` | DELETE | Revoke session |
+| `/api/v1/auth/verify` | POST | Verify token (cho services khác) |
+
+### Security Features
+
+- Account lockout sau 5 lần đăng nhập sai (30 phút)
+- Password requirements: 8+ ký tự, 1 hoa, 1 thường, 1 số, 1 đặc biệt
+- Audit log cho tất cả authentication events
+- IP và User-Agent tracking
+
+---
+
+## 8. Customer App
 
 **Vai trò:** App cho khách hàng - chỉ chạy **Online**
 

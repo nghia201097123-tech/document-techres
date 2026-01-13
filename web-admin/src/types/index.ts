@@ -5,6 +5,7 @@ export interface Company {
   id: string;
   name: string;
   code: string;
+  logo?: string;
   taxCode?: string;
   address?: string;
   phone?: string;
@@ -18,6 +19,7 @@ export interface Company {
 export interface CreateCompanyDto {
   name: string;
   code: string;
+  logo?: string;
   taxCode?: string;
   address?: string;
   phone?: string;
@@ -37,7 +39,7 @@ export interface Brand {
   name: string;
   code: string;
   businessModel: BusinessModel;
-  logo?: string;
+  logo?: string; // Backend returns 'logo' in GET response
   description?: string;
   isActive: boolean;
   branchCount?: number;
@@ -50,7 +52,7 @@ export interface CreateBrandDto {
   name: string;
   code: string;
   businessModel: BusinessModel;
-  logo?: string;
+  logoUrl?: string;
   description?: string;
 }
 
@@ -64,6 +66,7 @@ export interface Branch {
   companyName?: string;
   name: string;
   code: string;
+  logo?: string; // Backend returns 'logo' in GET response
   address?: string;
   phone?: string;
   email?: string;
@@ -81,6 +84,7 @@ export interface CreateBranchDto {
   brandId: string;
   name: string;
   code: string;
+  logoUrl?: string;
   address?: string;
   phone?: string;
   email?: string;

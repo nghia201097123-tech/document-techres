@@ -4,857 +4,586 @@ sidebar_position: 2
 
 # Web Dashboard
 
-Web Dashboard là ứng dụng dành cho **Chủ quán (Owner)** để quản lý Công ty, Thương hiệu và Chi nhánh của mình.
+Web Dashboard là ứng dụng quản lý dành cho **Chủ quán (Owner)** để quản lý toàn bộ hoạt động kinh doanh trong phạm vi tenant của mình.
 
 ## Tổng quan
 
 | Thông tin | Chi tiết |
 |-----------|----------|
-| **Nền tảng** | React/Next.js |
-| **Users** | Owner, Manager |
-| **Mục đích** | Quản lý nhân sự, menu, bàn, bếp, ca, HĐĐT, cài đặt |
+| **Framework** | Next.js 15 (App Router) |
+| **UI Library** | Shadcn/ui + TailwindCSS |
+| **State Management** | Redux (global filters) + Zustand (auth) |
+| **Đăng nhập** | Tenant ID + Username + Password |
 
-## Đăng nhập
-
-Owner đăng nhập bằng tài khoản được Web Admin cấp:
+## Cấu trúc Menu
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        ĐĂNG NHẬP                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   Mã công ty:    [annhonquan              ]                     │
-│                                                                  │
-│   Tên đăng nhập: [tr000001                ]                     │
-│                                                                  │
-│   Mật khẩu:      [••••••••••              ]                     │
-│                                                                  │
-│                      [  ĐĂNG NHẬP  ]                            │
-│                                                                  │
-│   Quên mật khẩu?                                                │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+├── Tổng quan (Dashboard)
+├── Nhân sự (HR)
+│   ├── Nhân viên (Staff)
+│   └── Bộ phận (Departments)
+├── Menu
+│   ├── Món ăn (Products)
+│   ├── Món theo CN (Branch Products)
+│   ├── Danh mục (Categories)
+│   ├── Đơn vị tính (Units)
+│   ├── Topping Options
+│   ├── Ghi chú (Product Notes)
+│   ├── Phụ thu (Surcharges)
+│   ├── Giá thời vụ (Seasonal Prices)
+│   ├── Món tặng (Gift Items)
+│   ├── Voucher
+│   └── Coupon
+├── Quản lý bàn (Tables)
+│   ├── Khu vực (Areas)
+│   └── Danh sách bàn (Table List)
+├── Bếp (Kitchen)
+├── Kết nối (Integrations)
+│   └── App Food (Food Partners)
+├── Báo cáo (Reports)
+└── Thiết lập (Settings)
 ```
 
-### Thông tin đăng nhập
+---
 
+## Chi tiết tính năng
+
+### 1. Dashboard (`/dashboard`)
+
+**Mô tả:** Trang tổng quan hiển thị các chỉ số kinh doanh
+
+**Tính năng:**
+- **Cards thống kê:**
+  - Doanh thu hôm nay
+  - Số đơn hàng
+  - Món bán chạy (Top 5)
+  - Nhân viên đang làm việc
+- **Hoạt động gần đây:** Danh sách orders/activities mới nhất
+- **Thống kê nhanh:** Biểu đồ doanh thu, phân bổ thanh toán
+
+---
+
+### 2. Quản lý Nhân sự (HR)
+
+#### 2.1 Nhân viên (`/hr/staff`)
+
+**Mô tả:** Quản lý thông tin nhân viên của chi nhánh
+
+**Tính năng:**
+- Danh sách nhân viên với tìm kiếm và lọc
+- Tạo/Sửa/Xóa nhân viên
+- Upload ảnh đại diện (avatar)
+- Phân công bộ phận
+- Gán vai trò (Owner, Manager, Cashier, Staff, Kitchen)
+- Bật/tắt trạng thái hoạt động
+- Quản lý mật khẩu và PIN code
+- Bulk operations:
+  - Import từ Excel
+  - Cập nhật bộ phận hàng loạt
+  - Cập nhật chi nhánh hàng loạt
+  - Toggle active hàng loạt
+  - Reset password hàng loạt
+
+**Các trường thông tin:**
 | Trường | Mô tả |
 |--------|-------|
-| **Mã công ty** | Mã định danh công ty (VD: `annhonquan`, `phobien`) |
-| **Tên đăng nhập** | Username được cấp (VD: `tr000001`) |
-| **Mật khẩu** | Password được cấp |
+| Họ tên | Tên đầy đủ |
+| Email | Email đăng nhập |
+| Số điện thoại | SĐT liên hệ |
+| Username | Tên đăng nhập (auto-generate) |
+| Vai trò | owner/manager/cashier/staff/kitchen |
+| Bộ phận | Thuộc bộ phận nào |
+| Mã PIN | PIN để đăng nhập POS (4-6 số) |
+| Giới tính | Nam/Nữ/Khác |
+| Trạng thái | Active/Inactive |
 
-### Quy trình đăng nhập
+#### 2.2 Bộ phận (`/hr/departments`)
 
-1. **Nhận thông tin từ Web Admin:**
-   - Mã công ty
-   - Tên đăng nhập (username)
-   - Mật khẩu tạm
+**Mô tả:** Quản lý cấu trúc bộ phận theo mô hình cây cha-con (hierarchical)
 
-2. **Đăng nhập lần đầu:**
-   - Nhập đầy đủ 3 thông tin
-   - Bắt buộc đổi mật khẩu mới
-
-3. **Bắt đầu thiết lập:**
-   - Tạo Thương hiệu
-   - Tạo Chi nhánh
-   - Cấu hình menu, bàn, nhân viên
-
----
-
-## Phạm vi quản lý theo cấp
-
-| Cấp | Dữ liệu quản lý |
-|-----|-----------------|
-| **Công ty** | Bộ phận, Thiết lập công ty |
-| **Thương hiệu** | Món ăn, Danh mục, Đơn vị, Ghi chú, Lý do hủy, Coupon, Thiết lập thương hiệu |
-| **Chi nhánh** | Nhân viên, Khu, Bàn, Món tăng giá, Bếp, Gán món-bếp, Ca, Đơn hàng, HĐĐT, Thiết lập chi nhánh |
+**Tính năng:**
+- Hiển thị phân cấp bộ phận với OKR-style cards
+- 6 cấp: Owner → Level 1 → Level 2 → Level 3 → Level 4 → Level 5
+- Tạo/Sửa/Xóa bộ phận
+- Quan hệ cha-con linh hoạt
+- Gán quyền cho bộ phận
+- Cascade activate/deactivate (ảnh hưởng bộ phận con và nhân viên)
+- Chuyển nhân viên khi xóa bộ phận (soft delete)
+- Đếm số nhân viên theo bộ phận
+- Color-coded hierarchy levels
+- Expand/collapse hierarchical view
+- Badge "Mới"/"Đã cập nhật" để track changes
+- Chế độ "Tiếp tục tạo" (continue creating mode)
 
 ---
 
-## 1. Quản lý Nhân sự (HR)
+### 3. Quản lý Menu
 
-### 1.1 Danh sách Nhân viên (Chi nhánh)
+#### 3.1 Món ăn (`/menu/products`)
 
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm nhân viên | Tạo mới với đầy đủ thông tin |
-| Sửa thông tin | Cập nhật thông tin nhân viên |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt nhân viên |
-| Reset mật khẩu | Đặt lại mật khẩu về mặc định |
-| Gán quyền chi nhánh | Cho phép làm việc trên nhiều chi nhánh |
-| Import Excel | Import danh sách từ file Excel |
-| Export Excel | Xuất danh sách ra file Excel |
+**Mô tả:** Quản lý danh sách sản phẩm/món ăn theo thương hiệu
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  NHÂN VIÊN - Chi nhánh Quận 1            [Import] [Export] [+]  │
-├─────────────────────────────────────────────────────────────────┤
-│  🔍 Tìm kiếm...                         [Bộ phận: Tất cả ▼]     │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Mã NV    │ Tên          │ SĐT         │ Bộ phận   │ Trạng thái │
-│  ├──────────┼──────────────┼─────────────┼───────────┼────────────┤
-│  │ tr000001 │ Nguyễn Văn A │ 0901234567  │ Thu ngân  │ ● Hoạt động│
-│  │ tr000002 │ Trần Thị B   │ 0909876543  │ Phục vụ   │ ● Hoạt động│
-│  │ tr000003 │ Lê Văn C     │ 0912345678  │ Bếp chính │ ○ Tạm khóa │
-│  └──────────┴──────────────┴─────────────┴───────────┴────────────┘
-└─────────────────────────────────────────────────────────────────┘
-```
+**5 loại sản phẩm:**
+| Loại | Mô tả | Hiển thị order | Gán vào Combo |
+|------|-------|----------------|---------------|
+| **Đồ ăn (food)** | Món ăn chính | ✅ Có | ✅ Có thể |
+| **Đồ uống (drink)** | Nước, trà, cafe... | ✅ Có | ✅ Có thể |
+| **Khác (other)** | Món khác | ✅ Có | ✅ Có thể |
+| **Topping** | Món thêm | ❌ Chỉ trong topping | ❌ Không |
+| **Combo** | Gói combo | ✅ Có | ❌ Không |
 
-### 1.2 Thông tin Nhân viên Chi tiết
+**Tính năng:**
+- CRUD sản phẩm đầy đủ
+- Upload hình ảnh sản phẩm
+- Cấu hình giá bán, giá vốn
+- Thiết lập thuế VAT (%)
+- Chọn đơn vị tính
+- Bật/tắt trạng thái
+- Mô tả và ghi chú
+- Chế độ "Tiếp tục tạo"
+- Bulk operations:
+  - Import từ Excel
+  - Cập nhật danh mục hàng loạt
+  - Cập nhật giá hàng loạt
+  - Cập nhật VAT hàng loạt
+  - Toggle active hàng loạt
 
-Khi thêm/sửa nhân viên, cần nhập các thông tin theo nhóm:
+**Các trường:**
+| Trường | Mô tả |
+|--------|-------|
+| Tên món | Tên sản phẩm |
+| Mã | Mã sản phẩm (code) |
+| Danh mục | Thuộc danh mục nào |
+| Loại | food/drink/other/topping/combo |
+| Giá bán | Giá bán lẻ (đã bao gồm VAT) |
+| Giá vốn | Giá nhập/cost |
+| Thuế VAT | % thuế (0%, 5%, 8%, 10%) |
+| Đơn vị | Đơn vị tính (ly, phần, cái...) |
+| Hình ảnh | URL ảnh |
+| Thời gian chuẩn bị | Phút (preparation time) |
 
-#### Thông tin cá nhân
+#### 3.2 Danh mục (`/menu/categories`)
 
-| Trường | Bắt buộc | Mô tả |
-|--------|----------|-------|
-| **Tên nhân viên** | ✅ | Họ và tên đầy đủ |
-| **Số điện thoại** | ✅ | SĐT liên hệ |
-| **Ngày sinh** | ❌ | Ngày tháng năm sinh |
-| **Giới tính** | ❌ | Nam / Nữ / Khác |
-| **CMND/CCCD** | ❌ | Số chứng minh nhân dân hoặc căn cước |
-| **Email** | ❌ | Email cá nhân |
-| **Nơi sinh** | ❌ | Tỉnh/thành phố sinh |
+**Mô tả:** Quản lý nhóm danh mục sản phẩm theo thương hiệu
 
-#### Địa chỉ
+**Tính năng:**
+- Tạo/Sửa/Xóa danh mục
+- Phân loại theo 5 loại sản phẩm
+- Cấu hình thứ tự hiển thị (order index)
+- Bật/tắt trạng thái
+- Đếm số sản phẩm theo danh mục (count by type)
+- Lọc theo type và status
+- Cấu hình cột hiển thị (column visibility)
+- Lọc theo brand
 
-| Trường | Bắt buộc | Mô tả |
-|--------|----------|-------|
-| **Tỉnh/Thành phố** | ❌ | Chọn từ danh sách |
-| **Quận/Huyện** | ❌ | Chọn theo Tỉnh/Thành |
-| **Phường/Xã** | ❌ | Chọn theo Quận/Huyện |
-| **Số nhà, tên đường** | ❌ | Địa chỉ chi tiết |
+#### 3.3 Đơn vị tính (`/menu/units`)
 
-#### Phân loại
+**Mô tả:** Quản lý đơn vị đo lường (ly, phần, cái, chai, lon...)
 
-| Trường | Bắt buộc | Mô tả |
-|--------|----------|-------|
-| **Loại nhân viên** | ✅ | Fulltime / Part-time / Thử việc |
-| **Bậc lương** | ❌ | Bậc 1 / Bậc 2 / Bậc 3... |
-| **Khối bộ phận** | ✅ | Bếp / Phục vụ / Thu ngân / Quản lý |
-| **Bộ phận** | ✅ | Bộ phận cụ thể trong khối |
+**Tính năng:**
+- Tạo/Sửa/Xóa đơn vị
+- Mô tả đơn vị
+- Cấu hình thứ tự hiển thị
+- Bật/tắt trạng thái
+- Cấu hình cột hiển thị
+- Lọc theo brand
 
-#### Làm việc
+#### 3.4 Topping Options (`/menu/topping-options`)
 
-| Trường | Bắt buộc | Mô tả |
-|--------|----------|-------|
-| **Thương hiệu** | ✅ | Thương hiệu làm việc |
-| **Chi nhánh chính** | ✅ | Chi nhánh làm việc chính |
-| **Quyền hoạt động** | ❌ | Multi-select: Các chi nhánh được phép làm việc |
-| **Khu vực** | ❌ | Khu vực phụ trách (Tầng 1, Sân vườn...) |
-| **Quản lý khu vực** | ❌ | Có/Không - Nếu có sẽ hưởng doanh số khu vực |
+**Mô tả:** Quản lý các món thêm/topping
 
-#### Hệ thống
+**Tính năng:**
+- Tạo nhóm topping (Topping Groups)
+- Thêm topping items với giá
+- Gán topping vào sản phẩm
+- Cấu hình số lượng tối đa có thể chọn
 
-| Trường | Bắt buộc | Mô tả |
-|--------|----------|-------|
-| **Ngày bắt đầu làm việc** | ✅ | Ngày vào làm |
-| **Username** | Tự động | Tự sinh: `tr000001`, `tr000002`... |
-| **Password** | ✅ | Mật khẩu đăng nhập (có thể reset) |
-| **PIN Code** | ❌ | Mã PIN đăng nhập nhanh trên app |
+#### 3.5 Ghi chú món (`/menu/product-notes`)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  THÊM NHÂN VIÊN                                           [X]   │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ THÔNG TIN CÁ NHÂN                                       │    │
-│  ├─────────────────────────────────────────────────────────┤    │
-│  │  Tên nhân viên*: [Nguyễn Văn A              ]           │    │
-│  │  Số điện thoại*: [0901234567                ]           │    │
-│  │  Ngày sinh:      [15/03/1995                ]           │    │
-│  │  Giới tính:      [● Nam  ○ Nữ  ○ Khác       ]           │    │
-│  │  CMND/CCCD:      [079123456789              ]           │    │
-│  │  Email:          [nguyenvana@gmail.com      ]           │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ PHÂN LOẠI                                               │    │
-│  ├─────────────────────────────────────────────────────────┤    │
-│  │  Loại nhân viên*: [Fulltime           ▼]                │    │
-│  │  Bậc lương:       [Bậc 2              ▼]                │    │
-│  │  Khối bộ phận*:   [Thu ngân           ▼]                │    │
-│  │  Bộ phận*:        [Thu ngân chính     ▼]                │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ LÀM VIỆC                                                │    │
-│  ├─────────────────────────────────────────────────────────┤    │
-│  │  Thương hiệu*:    [Phở Việt           ▼]                │    │
-│  │  Chi nhánh*:      [Quận 1             ▼]                │    │
-│  │  Quyền hoạt động: [☑ Quận 1  ☑ Quận 3  ☐ Quận 7]        │    │
-│  │  Khu vực:         [Tầng 1             ▼]                │    │
-│  │  Quản lý khu vực: [☑ Có]                                │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ HỆ THỐNG                                                │    │
-│  ├─────────────────────────────────────────────────────────┤    │
-│  │  Ngày bắt đầu*:   [01/01/2024                ]          │    │
-│  │  Username:        [tr000001] (Tự động sinh)             │    │
-│  │  Password*:       [••••••••                  ]          │    │
-│  │  PIN Code:        [1234                      ]          │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│                                      [Hủy] [Lưu]                │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Mô tả:** Quản lý thư viện ghi chú/hướng dẫn cho món
 
-### 1.3 Quản lý quyền Chi nhánh
+**Ví dụ:** Ít đá, Nhiều đường, Không hành, Ít cay, Thêm rau...
 
-Nhân viên có thể được cấp quyền làm việc trên nhiều chi nhánh:
+**Tính năng:**
+- Tạo/Sửa/Xóa ghi chú mẫu
+- Gán ghi chú vào sản phẩm
+- Nhân viên chọn nhanh khi order
 
-| Chức năng | Mô tả |
-|-----------|-------|
-| Gán chi nhánh | Cho phép NV làm việc tại chi nhánh khác |
-| Gỡ chi nhánh | Thu hồi quyền làm việc tại chi nhánh |
-| Xem chi nhánh | Xem danh sách chi nhánh NV được phép làm việc |
+#### 3.6 Phụ thu (`/menu/surcharges`)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  QUYỀN CHI NHÁNH - Nguyễn Văn A (tr000001)                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Chi nhánh chính: Quận 1                                        │
-│                                                                  │
-│  Quyền hoạt động tại các chi nhánh khác:                        │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ ☑ Quận 1 (Chi nhánh chính)                              │    │
-│  │ ☑ Quận 3                                                │    │
-│  │ ☐ Quận 7                                                │    │
-│  │ ☐ Bình Thạnh                                            │    │
-│  │ ☐ Gò Vấp                                                │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│                                      [Hủy] [Lưu]                │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Mô tả:** Quản lý các khoản phụ thu (phí dịch vụ, phí giao hàng...)
 
-### 1.4 Quản lý Khu vực & Doanh số
+**Tính năng:**
+- Tạo/Sửa/Xóa phụ thu
+- Cấu hình số tiền hoặc %
+- Áp dụng cho sản phẩm/đơn hàng
 
-| Khái niệm | Mô tả |
-|-----------|-------|
-| **Khu vực** | Khu vực phục vụ trong chi nhánh (Tầng 1, Tầng 2, Sân vườn...) |
-| **Quản lý khu vực** | Nhân viên được gán làm quản lý khu vực |
-| **Doanh số khu vực** | Quản lý khu vực được tính doanh số từ đơn hàng trong khu vực |
+#### 3.7 Giá thời vụ (`/menu/seasonal-prices`)
 
-```
-Nhân viên A (Quản lý khu vực: Tầng 1)
-        │
-        ▼
-Đơn hàng tại Bàn 1-10 (thuộc Tầng 1)
-        │
-        ▼
-Doanh số được tính cho Nhân viên A
-```
+**Mô tả:** Cấu hình giá theo mùa/khuyến mãi
 
-### 1.5 Danh sách Loại nhân viên (Công ty)
+**Tính năng:**
+- Thiết lập giá theo khoảng thời gian (date range)
+- Override giá gốc trong period cụ thể
+- Áp dụng theo sản phẩm
+- Tự động apply khi trong thời gian
 
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm loại | Tạo loại nhân viên mới |
-| Sửa loại | Cập nhật tên, mô tả |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
+#### 3.8 Món tặng (`/menu/gift-items`)
 
-**Danh sách mặc định:**
+**Mô tả:** Quản lý các món quà tặng/khuyến mãi
 
-| Mã | Tên | Mô tả |
-|----|-----|-------|
-| `fulltime` | Fulltime | Nhân viên toàn thời gian |
-| `parttime` | Part-time | Nhân viên bán thời gian |
-| `probation` | Thử việc | Nhân viên thử việc |
-| `intern` | Thực tập | Sinh viên thực tập |
+#### 3.9 Voucher (`/menu/vouchers`)
 
-### 1.6 Danh sách Bậc lương (Công ty)
+**Mô tả:** Quản lý mã giảm giá voucher
 
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm bậc | Tạo bậc lương mới |
-| Sửa bậc | Cập nhật tên, mô tả, hệ số |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
+**Tính năng:**
+- Tạo mã voucher
+- Cấu hình % hoặc số tiền giảm
+- Thiết lập thời hạn sử dụng
+- Giới hạn số lần dùng
+- Theo dõi số lần đã sử dụng
 
-**Danh sách mặc định:**
+#### 3.10 Coupon (`/menu/coupons`)
 
-| Bậc | Tên | Mô tả |
-|-----|-----|-------|
-| 1 | Bậc 1 | Nhân viên mới |
-| 2 | Bậc 2 | Nhân viên có kinh nghiệm |
-| 3 | Bậc 3 | Nhân viên lành nghề |
-| 4 | Bậc 4 | Nhân viên kỹ năng cao |
-| 5 | Bậc 5 | Chuyên gia |
+**Mô tả:** Quản lý promotional coupons
 
-### 1.8 Danh sách Bộ phận (Công ty)
+**Tính năng:**
+- Tạo mã coupon
+- Loại giảm: Phần trăm / Số tiền cố định
+- Đơn tối thiểu để áp dụng
+- Giảm tối đa (nếu là %)
+- Thời hạn sử dụng
 
-Bộ phận có cấu trúc **cha-con** (hierarchical):
+#### 3.11 Món theo chi nhánh (`/menu/branch-products`)
 
-```
-Bộ phận Bếp
-    ├── Bếp chính
-    ├── Bếp phụ
-    └── Sơ chế
+**Mô tả:** Override cấu hình sản phẩm theo từng chi nhánh
 
-Bộ phận Phục vụ
-    ├── Phục vụ bàn
-    └── Thu ngân
-```
+**Tính năng:**
+- Bật/tắt sản phẩm theo chi nhánh
+- Override giá theo chi nhánh (món tăng giá)
+- Quản lý tồn kho theo chi nhánh
 
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm bộ phận | Tạo mới, chọn bộ phận cha (nếu có) |
-| Sửa bộ phận | Cập nhật tên, mô tả |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Sắp xếp | Thay đổi thứ tự hiển thị |
+---
 
-### 1.9 Gán quyền (Chi nhánh)
+### 4. Quản lý Bàn
 
-Gán quyền cho nhân viên theo 2 cách:
+#### 4.1 Khu vực (`/tables/areas`)
 
-| Cách gán | Mô tả |
+**Mô tả:** Quản lý các khu vực trong quán (Tầng 1, Sân vườn, Phòng VIP...)
+
+**Tính năng:**
+- Tạo/Sửa/Xóa khu vực
+- Thêm nhanh nhiều bàn khi tạo khu vực (bulk add 5 tables)
+- Inline table entry: edit name, capacity trực tiếp
+- Đếm số bàn theo khu vực
+- Lọc theo trạng thái
+- Cấu hình cột hiển thị
+
+#### 4.2 Danh sách bàn (`/tables/list`)
+
+**Mô tả:** Quản lý chi tiết từng bàn
+
+**Tính năng:**
+- Tạo/Sửa/Xóa bàn
+- Trạng thái bàn với màu sắc:
+  - 🟢 Available (Trống)
+  - 🔴 Occupied (Có khách)
+  - 🟡 Reserved (Đã đặt)
+- Hiển thị sức chứa (capacity)
+- Nhóm theo khu vực
+- Toggle active/inactive
+- Tìm kiếm và lọc
+- Quick area creation từ table page
+- Table cards với action dropdown
+
+---
+
+### 5. Quản lý Bếp (`/kitchen`)
+
+**Mô tả:** Cấu hình các trạm bếp/bar và máy in
+
+**Tính năng:**
+- Tạo nhiều bếp cho chi nhánh
+- Cấu hình máy in:
+  | Cấu hình | Mô tả |
+  |----------|-------|
+  | Tên máy in | Tên để nhận dạng |
+  | IP Address | Địa chỉ IP máy in |
+  | Port | Cổng kết nối (mặc định 9100) |
+  | Khổ giấy | 58mm, 80mm, 76mm, 110mm, A4 |
+  | Chế độ in | Danh sách / Từng món riêng lẻ |
+- Gán sản phẩm vào bếp:
+  - Chọn món in ra bếp nào
+  - Lọc theo loại (food, drink, other, combo)
+  - Multi-select với checkbox
+  - Product count per kitchen
+- Bật/tắt trạng thái bếp
+- Chế độ "Tiếp tục tạo"
+- Badge "Mới"/"Đã cập nhật"
+
+---
+
+### 6. Kết nối đối tác (`/integrations/food-partners`)
+
+**Mô tả:** Liên kết với các app giao đồ ăn
+
+**Đối tác hỗ trợ:**
+- Shopee Food
+- Grab Food
+- BFood
+- (Mở rộng thêm)
+
+**Tính năng:**
+- **Quản lý cổng kết nối (ports):**
+  - Phân bổ port cho từng đối tác/chi nhánh
+  - Cấu hình Shop Number
+  - Giới hạn số kết nối mỗi port
+  - Bật/tắt trạng thái port
+- **Liên kết tài khoản:**
+  - Nhiều tài khoản mỗi port
+  - Theo dõi trạng thái kết nối:
+    - 🟢 Connected
+    - ⚪ Disconnected
+    - 🟡 Pending
+    - 🔴 Error
+  - Thời gian sync gần nhất
+  - Hiển thị error message
+- Link/Unlink tài khoản
+- Refresh/Re-sync kết nối
+
+---
+
+### 7. Báo cáo (`/reports`)
+
+**Mô tả:** Xem báo cáo kinh doanh
+
+**Tính năng:**
+- **Thống kê tổng quan:**
+  - Tổng doanh thu
+  - Số đơn hàng
+  - Đơn trung bình
+  - Số khách hàng
+- **Lọc theo thời gian:**
+  - Hôm nay
+  - Tuần này
+  - Tháng này
+  - Quý này
+- **Biểu đồ:**
+  - Doanh thu theo ngày (7 ngày gần nhất)
+  - Top 5 món bán chạy
+  - Phân bổ theo hình thức thanh toán:
+    - Tiền mặt
+    - Chuyển khoản
+    - Thẻ/Ví điện tử
+- **Xuất báo cáo:** Download Excel/PDF
+
+---
+
+### 8. Thiết lập (`/settings`)
+
+#### 8.1 Thông tin công ty
+
+**Hiển thị (read-only từ auth):**
+- Tên công ty
+- Mã công ty (tenant_id)
+- Email liên hệ
+- Số điện thoại
+
+#### 8.2 Phương thức thanh toán
+
+**Mô tả:** Cấu hình các hình thức thanh toán
+
+**Loại thanh toán:**
+- Tiền mặt (Cash)
+- Chuyển khoản (Bank Transfer)
+- Thẻ/Ví điện tử (Card/E-wallet)
+- Custom types
+
+**Tính năng:**
+- Tạo/Sửa/Xóa phương thức
+- Mô tả phương thức
+- Cấu hình thứ tự hiển thị
+- Bật/tắt trạng thái
+- Brand-specific payment methods
+
+#### 8.3 Tài khoản ngân hàng
+
+**Mô tả:** Quản lý tài khoản nhận thanh toán
+
+**Tính năng:**
+- Chọn từ danh sách ngân hàng Việt Nam
+- Nhập số tài khoản
+- Tên chủ tài khoản
+- Bank code và BIN
+- Template chuyển khoản (với placeholder `{order_code}`)
+- Đánh dấu tài khoản chính (primary)
+- **Tạo QR Code VietQR:**
+  - QR động với số tiền và mô tả
+  - Download QR image
+  - Copy URL to clipboard
+  - Mở trong tab mới
+- Bật/tắt trạng thái
+- Hỗ trợ nhiều tài khoản per brand
+
+#### 8.4 Hóa đơn điện tử (E-Invoice)
+
+**Mô tả:** Cấu hình xuất HĐĐT
+
+**Nhà cung cấp hỗ trợ:**
+| Provider | Mô tả |
 |----------|-------|
-| **Theo cá nhân** | Gán quyền trực tiếp cho từng nhân viên |
-| **Theo bộ phận** | Gán quyền cho cả bộ phận, tất cả nhân viên trong bộ phận sẽ có quyền đó |
+| FPT e-Invoice | FPT |
+| VNPT e-Invoice | VNPT |
+| MISA e-Invoice | MISA |
+| Viettel e-Invoice | Viettel |
+| MIFI e-Invoice | MIFI |
+| Invoice.vn | Invoice.vn |
+| Hilo | Hilo |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  GÁN QUYỀN - Nguyễn Văn A (Thu ngân)                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ☑ QUẢN LÝ ORDER                                               │
-│     ☑ Tạo order                                                │
-│     ☑ Sửa order                                                │
-│     ☐ Hủy order                                                │
-│                                                                 │
-│  ☑ THANH TOÁN                                                  │
-│     ☑ Thanh toán tiền mặt                                      │
-│     ☑ Thanh toán chuyển khoản                                  │
-│     ☐ Áp dụng giảm giá                                         │
-│                                                                 │
-│  ☐ QUẢN LÝ CA                                                  │
-│     ☐ Mở ca                                                    │
-│     ☐ Đóng ca                                                  │
-│                                                                 │
-│                                    [Hủy] [Lưu]                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Cấu hình:**
+| Trường | Mô tả |
+|--------|-------|
+| Mã số thuế (MST) | Tax code |
+| Tên công ty | Company name từ tax registration |
+| Địa chỉ | Company address |
+| Mẫu hóa đơn | Invoice template code |
+| Ký hiệu hóa đơn | Invoice series/symbol |
+| API URL | Provider API endpoint |
+| Username/Password | API credentials |
+| Tự động xuất | Toggle auto-issue on payment |
 
 ---
 
-## 2. Xây dựng dữ liệu Bán hàng
+## Tính năng chung
 
-### 2.1 Danh sách Món ăn (Thương hiệu)
+### Global Filters
+- Bộ lọc thương hiệu (Brand selector)
+- Bộ lọc chi nhánh (Branch selector)
+- Filter áp dụng cho toàn bộ dữ liệu
+- Hiển thị placeholder khi chưa chọn filter
 
-#### 5 loại món ăn
+### Cấu hình cột (Column Configuration)
+- Hiển thị/ẩn cột
+- Khóa/mở khóa cột
+- Reset về mặc định
+- Lưu vào localStorage
+- Áp dụng cho: Categories, Units, Areas
 
-| Loại | Mô tả | Hiển thị order | In | Gán vào Combo |
-|------|-------|----------------|-----|---------------|
-| **Đồ ăn** | Món ăn chính | ✅ Có | In món + In stamp | ✅ Có thể |
-| **Đồ uống** | Nước, trà, cafe... | ✅ Có | In món + In stamp | ✅ Có thể |
-| **Khác** | Món khác | ✅ Có | In món + In stamp | ✅ Có thể |
-| **Topping** | Món thêm | ❌ Không (chỉ hiện trong topping) | Theo món chính | ❌ Không |
-| **Combo** | Gói combo | ✅ Có | In món + In stamp | ❌ Không |
+### Quản lý dữ liệu
+- CRUD đầy đủ cho hầu hết entity
+- Chế độ "Tiếp tục tạo" (continue creating mode)
+- Bulk operations (where applicable)
+- Soft delete với confirmation dialog
+- Toggle active/inactive
+- Badge "Mới"/"Đã cập nhật" (track recent changes)
 
-> **Quy tắc Combo:**
-> - Combo có thể chứa: **Đồ ăn**, **Đồ uống**, **Khác**
-> - Combo **KHÔNG** được chứa: **Topping**, **Combo** (không cho phép lồng combo)
-> - Mỗi món trong combo chỉ gán món, **không gán topping** cho món đó
+### Tìm kiếm & Lọc
+- Text search across listings
+- Status filtering (active/inactive)
+- Type filtering (where applicable)
+- Area/location filtering
+- Brand/branch filtering
+- Date range selection (reports)
 
-#### Chức năng
+### Header User Menu
+- Hiển thị avatar và tên
+- Role badge (Owner, Manager, Cashier, Staff, Kitchen)
+- Notification bell với count
+- **Đổi mật khẩu:**
+  - Mật khẩu hiện tại
+  - Mật khẩu mới (tối thiểu 6 ký tự)
+  - Xác nhận mật khẩu
+  - Validation matching
+- Đăng xuất
 
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm món | Tạo mới với tên, giá, hình ảnh, danh mục, đơn vị |
-| Sửa món | Cập nhật thông tin |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Import Excel | Import danh sách từ file Excel |
-| Export Excel | Xuất danh sách ra file Excel |
-| Cài đặt in | Chọn in ra bếp / in tem dán |
+### Dialog Management
+- Create dialogs for adding
+- Edit dialogs for modifying
+- Confirmation dialogs for deletions
+- Product assignment dialogs (Kitchen)
+- Permission assignment dialogs (Departments)
+- QR generation dialogs (Bank accounts)
 
-#### Cài đặt món ăn
-
-| Cài đặt | Mô tả | Giá trị |
-|---------|-------|---------|
-| **In món** | In ra bếp/bar | Có/Không |
-| **In stamp** | In tem dán | Có/Không |
-| **% VAT** | Thuế giá trị gia tăng | 0%, 5%, 8%, 10% |
-| **Gán nhiều bếp** | 1 món có thể in ra nhiều bếp khác nhau | Chọn bếp |
-
-> **Lưu ý VAT:**
-> - Mỗi món ăn có % VAT riêng
-> - **Giá món hiển thị đã bao gồm VAT**
-> - Khi in bill sẽ tách riêng tiền thuế để hiển thị
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  MÓN ĂN - Thương hiệu Phở Việt           [Import] [Export] [+]  │
-├─────────────────────────────────────────────────────────────────┤
-│  🔍 Tìm kiếm...        [Loại: Tất cả ▼] [Danh mục: Tất cả ▼]   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐            │
-│  │ [Hình]  │  │ [Hình]  │  │ [Hình]  │  │ [Hình]  │            │
-│  │ Phở bò  │  │ Phở gà  │  │ Bún chả │  │ Nem     │            │
-│  │ 55,000đ │  │ 50,000đ │  │ 45,000đ │  │ 35,000đ │            │
-│  │ 🍽️ Đồ ăn │  │ 🍽️ Đồ ăn │  │ 🍽️ Đồ ăn │  │ 🍽️ Đồ ăn │            │
-│  │ [Sửa]   │  │ [Sửa]   │  │ [Sửa]   │  │ [Sửa]   │            │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘            │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 Danh sách Danh mục (Thương hiệu)
-
-Danh mục thuộc về 1 loại món:
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm danh mục | Tạo mới, chọn loại món (Đồ ăn/Đồ uống/Khác) |
-| Sửa danh mục | Cập nhật tên, hình ảnh |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Sắp xếp | Thay đổi thứ tự hiển thị |
-
-```
-Loại: Đồ ăn
-├── Danh mục: Phở
-├── Danh mục: Bún
-└── Danh mục: Cơm
-
-Loại: Đồ uống
-├── Danh mục: Trà
-├── Danh mục: Cà phê
-└── Danh mục: Sinh tố
-```
-
-### 2.3 Danh sách Đơn vị (Thương hiệu)
-
-Đơn vị tính chỉ để hiển thị, không ảnh hưởng business logic:
-
-- Phần, Ly, Chai, Đĩa, Tô, Lon, Hộp...
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm đơn vị | Tạo mới |
-| Sửa đơn vị | Cập nhật tên |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-
-### 2.4 Ghi chú Món ăn (Thương hiệu)
-
-Danh sách ghi chú mẫu để nhân viên chọn nhanh khi order:
-
-- Ít đá, Nhiều đường, Không hành, Ít cay, Thêm rau...
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm ghi chú | Tạo ghi chú mẫu mới |
-| Sửa ghi chú | Cập nhật nội dung |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Sắp xếp | Thay đổi thứ tự hiển thị |
-
-### 2.5 Lý do Hủy món (Thương hiệu)
-
-Danh sách lý do hủy món để thống kê và kiểm soát:
-
-- Hết nguyên liệu, Khách đổi ý, Làm sai, Chờ quá lâu...
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm lý do | Tạo lý do mới |
-| Sửa lý do | Cập nhật nội dung |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-
-### 2.6 Danh sách Coupon (Thương hiệu)
-
-Quản lý mã giảm giá:
-
-| Thông tin | Mô tả |
-|-----------|-------|
-| Mã coupon | VD: GIAMGIA10, FREESHIP |
-| Loại giảm | Phần trăm / Số tiền cố định |
-| Giá trị | VD: 10% hoặc 50,000đ |
-| Đơn tối thiểu | Giá trị đơn tối thiểu để áp dụng |
-| Giảm tối đa | Số tiền giảm tối đa (nếu là %) |
-| Số lần sử dụng | Giới hạn số lần sử dụng |
-| Thời hạn | Ngày bắt đầu - Ngày kết thúc |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  COUPON - Thương hiệu Phở Việt                            [+]   │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Mã        │ Loại     │ Giá trị │ Còn lại │ Hạn       │      │
-│  ├───────────┼──────────┼─────────┼─────────┼───────────┼──────┤
-│  │ GIAMGIA10 │ Phần trăm│ 10%     │ 45/100  │ 31/12/2024│ ● On │
-│  │ KHAIMO    │ Cố định  │ 50,000đ │ Unlimit │ 30/06/2024│ ● On │
-│  │ VIP20     │ Phần trăm│ 20%     │ 0/50    │ Hết hạn   │ ○Off │
-│  └───────────┴──────────┴─────────┴─────────┴───────────┴──────┘
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 2.7 Quản lý Khu (Chi nhánh)
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm khu | Tạo khu vực mới (Tầng 1, Sân vườn...) |
-| Sửa khu | Cập nhật tên |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Sắp xếp | Thay đổi thứ tự hiển thị |
-
-### 2.8 Quản lý Bàn (Chi nhánh)
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm bàn | Tạo bàn mới, chọn khu, đặt sức chứa |
-| Sửa bàn | Cập nhật thông tin |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Sắp xếp | Thay đổi thứ tự hiển thị |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  QUẢN LÝ BÀN - Chi nhánh Quận 1                  [+ Thêm bàn]   │
-├─────────────────────────────────────────────────────────────────┤
-│  Khu vực: [Tầng 1 ▼]                                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐          │
-│  │  1  │  │  2  │  │  3  │  │  4  │  │  5  │  │  6  │          │
-│  │ 4ng │  │ 4ng │  │ 2ng │  │ 6ng │  │ 4ng │  │ 4ng │          │
-│  └─────┘  └─────┘  └─────┘  └─────┘  └─────┘  └─────┘          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 2.9 Món tăng giá (Chi nhánh)
-
-Điều chỉnh giá món theo chi nhánh (override giá gốc từ Thương hiệu):
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm điều chỉnh | Chọn món, nhập giá mới tại chi nhánh |
-| Sửa giá | Cập nhật giá điều chỉnh |
-| Xóa điều chỉnh | Quay về giá gốc từ Thương hiệu |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  MÓN TĂNG GIÁ - Chi nhánh Quận 1                          [+]   │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Món           │ Giá gốc (TH) │ Giá CN    │ Chênh lệch │     │
-│  ├───────────────┼──────────────┼───────────┼────────────┼─────┤
-│  │ Phở bò đặc biệt│ 55,000đ     │ 65,000đ   │ +10,000đ   │ [x] │
-│  │ Cà phê sữa    │ 29,000đ      │ 35,000đ   │ +6,000đ    │ [x] │
-│  └───────────────┴──────────────┴───────────┴────────────┴─────┘
-└─────────────────────────────────────────────────────────────────┘
-```
+### Status Indicators
+- Active/Inactive badges
+- New item badges (green)
+- Updated item badges (blue)
+- Error status badges (red)
+- Pending badges (yellow)
+- Connected/Disconnected badges
 
 ---
 
-## 3. Xây dựng dữ liệu Bếp
+## Công nghệ sử dụng
 
-### 3.1 Danh sách Bếp (Chi nhánh)
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Thêm bếp | Tạo bếp mới, thiết lập máy in |
-| Sửa bếp | Cập nhật tên, máy in |
-| Tắt/Bật | Vô hiệu hóa hoặc kích hoạt |
-| Cấu hình máy in | Chọn máy in (tên, IP) |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  BẾP - Chi nhánh Quận 1                                   [+]   │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Tên bếp      │ Máy in       │ IP           │ Trạng thái │   │
-│  ├──────────────┼──────────────┼──────────────┼────────────┼───┤
-│  │ Bếp chính    │ Kitchen_01   │ 192.168.1.50 │ ● Online   │ ⚙️ │
-│  │ Quầy Bar     │ Bar_01       │ 192.168.1.51 │ ● Online   │ ⚙️ │
-│  │ Bếp lạnh     │ Kitchen_02   │ 192.168.1.52 │ ○ Offline  │ ⚙️ │
-│  └──────────────┴──────────────┴──────────────┴────────────┴───┘
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 3.2 Gán món vào Bếp (Chi nhánh)
-
-Cấu hình món nào in ra bếp nào:
-
-```
-Bếp chính (Máy in: Kitchen_01)
-    ├── Phở bò
-    ├── Phở gà
-    ├── Cơm tấm
-    └── Bún chả
-
-Quầy Bar (Máy in: Bar_01)
-    ├── Trà đào
-    ├── Cà phê sữa
-    ├── Sinh tố
-    └── Nước ép
-```
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Gán món | Chọn bếp, thêm các món vào bếp đó |
-| Gỡ món | Xóa món khỏi bếp |
-| Di chuyển | Chuyển món sang bếp khác |
-
----
-
-## 4. Quản lý Ca Thu ngân
-
-### 4.1 Danh sách Ca (Chi nhánh)
-
-**Chỉ xem** - không sửa (ca được mở/đóng trên app CCB):
-
-| Thông tin | Mô tả |
-|-----------|-------|
-| Nhân viên | Ai mở ca |
-| Thời gian | Giờ mở - Giờ đóng |
-| Tiền đầu ca | Số tiền mặt ban đầu |
-| Tiền cuối ca | Số tiền mặt khi đóng ca |
-| Doanh thu | Tổng doanh thu trong ca |
-| Số đơn | Tổng số đơn hàng |
-| Trạng thái | Đang mở / Đã đóng |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  CA LÀM VIỆC - Chi nhánh Quận 1                                 │
-├─────────────────────────────────────────────────────────────────┤
-│  🔍 Tìm kiếm...                    [Từ ngày] [Đến ngày] [Lọc]   │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Nhân viên │ Mở ca    │ Đóng ca  │ Doanh thu │ Đơn │ Status │ │
-│  ├───────────┼──────────┼──────────┼───────────┼─────┼────────┤ │
-│  │ Nguyễn A  │ 08:00    │ 16:00    │ 5,250,000 │ 45  │ Đã đóng│ │
-│  │ Trần B    │ 16:00    │ 23:00    │ 3,800,000 │ 32  │ Đã đóng│ │
-│  │ Lê C      │ 08:00    │ -        │ 1,200,000 │ 12  │ Đang mở│ │
-│  └───────────┴──────────┴──────────┴───────────┴─────┴────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 4.2 Danh sách Đơn hàng (Chi nhánh)
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Xem danh sách | Lọc theo ngày, trạng thái, nhân viên |
-| Xem chi tiết | Xem thông tin đơn hàng |
-| Hủy đơn | Hủy đơn hàng (cần quyền) |
-| In lại bill | In lại hóa đơn |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  ĐƠN HÀNG - Chi nhánh Quận 1                                    │
-├─────────────────────────────────────────────────────────────────┤
-│  🔍 Tìm kiếm...    [Ngày] [Trạng thái ▼] [Thanh toán ▼] [Lọc]   │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Mã đơn   │ Bàn │ Tổng tiền │ TT      │ Thanh toán │ Thời gian│
-│  ├──────────┼─────┼───────────┼─────────┼────────────┼──────────┤
-│  │ #001245  │ 5   │ 235,000đ  │ Hoàn thành│ Tiền mặt │ 10:30    │
-│  │ #001244  │ 12  │ 180,000đ  │ Hoàn thành│ Chuyển khoản│ 10:15 │
-│  │ #001243  │ 3   │ 95,000đ   │ Đã hủy  │ -          │ 10:00    │
-│  └──────────┴─────┴───────────┴─────────┴────────────┴──────────┘
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 5. Quản lý Hóa đơn điện tử (E-Invoice)
-
-### 5.1 Liên kết Đối tác HĐĐT (Chi nhánh)
-
-Kết nối API với các đối tác hóa đơn điện tử:
-
-| Đối tác | Mã |
-|---------|-----|
-| FPT | FPT |
-| INVOICE | INVOICE |
-| MIFI | MIFI |
-| VNPT | VNPT |
-| MISA | MISA |
-| HILO | HILO |
-| VIETTEL | VIETTEL |
-
-| Thông tin cấu hình | Mô tả |
-|-------------------|-------|
-| Đối tác | Chọn nhà cung cấp HĐĐT |
-| API Key | Key xác thực |
-| API Secret | Secret xác thực |
-| Username | Tài khoản (nếu có) |
-| Password | Mật khẩu (nếu có) |
-
-### 5.2 Danh sách HĐĐT (Chi nhánh)
-
-| Trạng thái | Mô tả |
-|------------|-------|
-| **Chưa xuất** | Đơn hàng chưa xuất HĐĐT |
-| **Chờ duyệt** | Đã gửi lên provider, chờ duyệt |
-| **Đã duyệt** | HĐĐT đã được duyệt |
-| **Từ chối** | HĐĐT bị từ chối, cần sửa và gửi lại |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  HÓA ĐƠN ĐIỆN TỬ - Chi nhánh Quận 1                             │
-├─────────────────────────────────────────────────────────────────┤
-│  [Chưa xuất: 5] [Chờ duyệt: 2] [Đã duyệt: 150] [Từ chối: 1]    │
-├─────────────────────────────────────────────────────────────────┤
-│  │ Số HĐ     │ Đơn hàng │ Khách hàng   │ Tiền    │ Trạng thái │ │
-│  ├───────────┼──────────┼──────────────┼─────────┼────────────┤ │
-│  │ AA/24/001 │ #001245  │ Cty ABC      │ 235,000 │ ✅ Đã duyệt│ │
-│  │ AA/24/002 │ #001250  │ Nguyễn Văn A │ 180,000 │ ⏳ Chờ duyệt│ │
-│  │ -         │ #001255  │ -            │ 95,000  │ 📝 Chưa xuất│ │
-│  │ AA/24/003 │ #001260  │ Cty XYZ      │ 500,000 │ ❌ Từ chối │ │
-│  └───────────┴──────────┴──────────────┴─────────┴────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-| Chức năng | Mô tả |
-|-----------|-------|
-| Xuất HĐĐT | Chọn đơn → Nhập thông tin khách → Xuất |
-| Xem HĐĐT | Xem PDF hóa đơn |
-| Gửi lại | Gửi lại HĐĐT bị từ chối |
-| Hủy HĐĐT | Hủy hóa đơn đã xuất |
-
----
-
-## 6. Thiết lập (Settings)
-
-### 6.1 Thiết lập Công ty
-
-| Thông tin | Mô tả |
-|-----------|-------|
-| Tên công ty | Tên đầy đủ |
-| Mã số thuế | MST doanh nghiệp |
-| Địa chỉ | Địa chỉ đăng ký kinh doanh |
-| Người đại diện | Họ tên người đại diện |
-| Logo | Logo công ty |
-
-### 6.2 Thiết lập Thương hiệu
-
-| Thông tin | Mô tả |
-|-----------|-------|
-| Tên thương hiệu | Tên thương hiệu |
-| Logo | Logo thương hiệu |
-| Mô tả | Mô tả ngắn |
-| Màu chủ đạo | Màu brand |
-
-### 6.3 Thiết lập Chi nhánh
-
-| Thông tin | Mô tả |
-|-----------|-------|
-| Tên chi nhánh | Tên chi nhánh |
-| Địa chỉ | Địa chỉ chi nhánh |
-| SĐT | Số điện thoại |
-| Email | Email chi nhánh |
-| Giờ mở cửa | Thời gian hoạt động |
-| Cấu hình thuế | VAT, phí dịch vụ |
-| Cấu hình in | Máy in bill, máy in bếp |
-| Mô hình sử dụng | Order Only / CCB Only / Full System |
-
----
-
-## Phân quyền
-
-| Role | Quyền |
-|------|-------|
-| **Owner** | Toàn quyền: quản lý tất cả tính năng |
-| **Manager** | Quản lý menu, nhân viên, xem báo cáo (không xem billing, không xóa chi nhánh) |
-
----
-
-## Sync với Thiết bị
-
-Khi thay đổi trên Dashboard:
-
-```
-Owner thay đổi dữ liệu (menu, bàn, nhân viên...)
-        │
-        ▼
-Lưu vào PostgreSQL (Cloud Server)
-        │
-        ▼
-Đánh dấu có thay đổi mới (version++)
-        │
-        ▼
-CCB/Local Server kiểm tra định kỳ hoặc nhận push notification
-        │
-        ▼
-Tải về thay đổi mới
-        │
-        ▼
-Cập nhật SQLite local
-        │
-        ▼
-Broadcast đến tất cả Order App (nếu Full System)
-```
+| Thành phần | Công nghệ |
+|------------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| UI Components | Shadcn/ui |
+| Styling | TailwindCSS |
+| State Management | Redux (global filters), Zustand (auth) |
+| Forms | React Hook Form + Zod validation |
+| API Client | Axios với service layer |
+| Icons | Lucide React |
+| Data Persistence | localStorage (column configs) |
+| Notifications | Toast notifications |
 
 ---
 
 ## API Endpoints
 
-### Nhân sự
-
+### Auth
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/hr/staff` | Danh sách nhân viên |
-| POST | `/hr/staff` | Thêm nhân viên |
-| PUT | `/hr/staff/:id` | Sửa nhân viên |
-| POST | `/hr/staff/import` | Import từ Excel |
-| GET | `/hr/staff/export` | Export ra Excel |
-| GET | `/hr/departments` | Danh sách bộ phận |
-| POST | `/hr/departments` | Thêm bộ phận |
-| GET | `/hr/permissions` | Danh sách quyền |
-| POST | `/hr/staff/:id/permissions` | Gán quyền cho nhân viên |
+| POST | `/auth/login` | Đăng nhập (tenant_id + username + password) |
+| POST | `/auth/change-password` | Đổi mật khẩu |
+| GET | `/auth/me` | Lấy thông tin user hiện tại |
+
+### Nhân sự
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/staff` | Danh sách nhân viên |
+| POST | `/staff` | Thêm nhân viên |
+| PUT | `/staff/:id` | Sửa nhân viên |
+| PATCH | `/staff/:id/toggle-active` | Toggle trạng thái |
+| POST | `/staff/:id/reset-password` | Reset mật khẩu |
+| POST | `/staff/bulk-import` | Import hàng loạt |
+| POST | `/staff/bulk/update-department` | Cập nhật bộ phận hàng loạt |
+| GET | `/departments` | Danh sách bộ phận |
+| POST | `/departments` | Thêm bộ phận |
 
 ### Menu
-
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/menu/products` | Danh sách món |
-| POST | `/menu/products` | Thêm món |
-| PUT | `/menu/products/:id` | Sửa món |
-| POST | `/menu/products/import` | Import từ Excel |
-| GET | `/menu/categories` | Danh sách danh mục |
-| POST | `/menu/categories` | Thêm danh mục |
-| GET | `/menu/units` | Danh sách đơn vị |
-| GET | `/menu/notes` | Danh sách ghi chú mẫu |
-| GET | `/menu/cancel-reasons` | Danh sách lý do hủy |
-| GET | `/menu/coupons` | Danh sách coupon |
-| GET | `/menu/areas` | Danh sách khu |
-| GET | `/menu/tables` | Danh sách bàn |
-| GET | `/menu/price-adjustments` | Danh sách món tăng giá |
+| GET | `/products` | Danh sách món |
+| POST | `/products` | Thêm món |
+| PUT | `/products/:id` | Sửa món |
+| DELETE | `/products/:id` | Xóa món |
+| POST | `/products/bulk-import` | Import hàng loạt |
+| GET | `/categories` | Danh sách danh mục |
+| GET | `/categories/count-by-type` | Đếm theo loại |
+| GET | `/units` | Danh sách đơn vị |
+| POST | `/products/topping-groups` | Tạo nhóm topping |
+| POST | `/products/notes` | Tạo ghi chú |
+
+### Bàn
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/areas` | Danh sách khu vực |
+| POST | `/areas` | Thêm khu vực |
+| GET | `/tables` | Danh sách bàn |
+| POST | `/tables` | Thêm bàn |
 
 ### Bếp
-
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/kitchen/stations` | Danh sách bếp |
-| POST | `/kitchen/stations` | Thêm bếp |
-| PUT | `/kitchen/stations/:id` | Sửa bếp |
-| GET | `/kitchen/mappings` | Danh sách gán món-bếp |
-| POST | `/kitchen/mappings` | Gán món vào bếp |
+| GET | `/kitchen` | Danh sách bếp |
+| POST | `/kitchen` | Thêm bếp |
+| PUT | `/kitchen/:id` | Sửa bếp |
 
-### Ca & Đơn hàng
-
+### Dashboard
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/cashier/shifts` | Danh sách ca |
-| GET | `/cashier/shifts/:id` | Chi tiết ca |
-| GET | `/cashier/orders` | Danh sách đơn hàng |
-| GET | `/cashier/orders/:id` | Chi tiết đơn |
-| POST | `/cashier/orders/:id/cancel` | Hủy đơn |
-
-### HĐĐT
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| GET | `/e-invoice/providers` | Danh sách đối tác |
-| POST | `/e-invoice/config` | Cấu hình liên kết |
-| GET | `/e-invoice/invoices` | Danh sách HĐĐT |
-| POST | `/e-invoice/invoices` | Xuất HĐĐT |
-| GET | `/e-invoice/invoices/:id/pdf` | Tải PDF |
-
-### Thiết lập
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| GET | `/settings/company` | Thông tin công ty |
-| PUT | `/settings/company` | Cập nhật công ty |
-| GET | `/settings/brand` | Thông tin thương hiệu |
-| PUT | `/settings/brand` | Cập nhật thương hiệu |
-| GET | `/settings/branch` | Thông tin chi nhánh |
-| PUT | `/settings/branch` | Cập nhật chi nhánh |
+| GET | `/dashboard/stats` | Thống kê tổng quan |
+| GET | `/dashboard/recent-activity` | Hoạt động gần đây |

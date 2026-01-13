@@ -1,0 +1,60 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
+
+@Entity('staff')
+@Index('idx_staff_username_tenant', ['tenantId', 'username'])
+export class Staff {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'tenant_id', length: 50 })
+  tenantId: string;
+
+  @Column({ name: 'branch_id', type: 'uuid' })
+  branchId: string;
+
+  @Column({ length: 50, nullable: true })
+  username: string;
+
+  @Column({ length: 50 })
+  code: string;
+
+  @Column({ length: 255 })
+  name: string;
+
+  @Column({ length: 20, nullable: true })
+  phone: string;
+
+  @Column({ length: 255, nullable: true })
+  email: string;
+
+  @Column({ name: 'pin_code', length: 10 })
+  pinCode: string;
+
+  @Column({ length: 50 })
+  role: string;
+
+  @Column({ type: 'text', nullable: true })
+  permissions: string;
+
+  @Column({ name: 'avatar_url', type: 'text', nullable: true })
+  avatarUrl: string;
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean;
+
+  @Column({ type: 'int', default: 1 })
+  version: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}

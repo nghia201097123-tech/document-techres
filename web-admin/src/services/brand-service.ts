@@ -1,6 +1,8 @@
 import api from "./api";
 import type { Brand, BusinessModel } from "@/types";
 
+export type { Brand };
+
 interface BrandListParams {
   page?: number;
   limit?: number;
@@ -22,7 +24,7 @@ interface CreateBrandData {
   name: string;
   code: string;
   businessModel: BusinessModel;
-  logo?: string;
+  logoUrl?: string;
   description?: string;
 }
 
@@ -30,9 +32,28 @@ interface UpdateBrandData extends Partial<CreateBrandData> {
   isActive?: boolean;
 }
 
+// Helper to clean data - remove empty strings for optional fields
+function cleanBrandData<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(
+      ([, value]) => value !== undefined && value !== ""
+    )
+  ) as T;
+}
+
 export const brandService = {
   async getList(params?: BrandListParams): Promise<BrandListResponse> {
-    const response = await api.get<BrandListResponse>("/brands", { params });
+    // Filter out empty/undefined params
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) => value !== undefined && value !== ""
+          )
+        )
+      : undefined;
+    const response = await api.get<BrandListResponse>("/brands", {
+      params: cleanParams,
+    });
     return response.data;
   },
 
@@ -42,12 +63,14 @@ export const brandService = {
   },
 
   async create(data: CreateBrandData): Promise<Brand> {
-    const response = await api.post<Brand>("/brands", data);
+    const cleanedData = cleanBrandData(data);
+    const response = await api.post<Brand>("/brands", cleanedData);
     return response.data;
   },
 
   async update(id: string, data: UpdateBrandData): Promise<Brand> {
-    const response = await api.put<Brand>(`/brands/${id}`, data);
+    const cleanedData = cleanBrandData(data);
+    const response = await api.patch<Brand>(`/brands/${id}`, cleanedData);
     return response.data;
   },
 
@@ -58,5 +81,12 @@ export const brandService = {
   async toggleStatus(id: string): Promise<Brand> {
     const response = await api.patch<Brand>(`/brands/${id}/toggle-status`);
     return response.data;
+  },
+
+  async getByCompany(companyId: string): Promise<Brand[]> {
+    const response = await api.get<BrandListResponse>("/brands", {
+      params: { companyId, limit: 100 },
+    });
+    return response.data.data;
   },
 };

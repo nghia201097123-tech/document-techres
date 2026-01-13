@@ -1,0 +1,45 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Product,
+  ToppingGroup,
+  ToppingGroupItem,
+  ProductToppingGroup,
+  ProductNote,
+  ProductNoteAssignment,
+  ComboItem,
+  Category,
+  Unit,
+  SeasonalPrice,
+  SeasonalPriceProduct,
+  BranchProduct,
+  Branch,
+  Brand,
+} from '../../database/entities';
+import { ProductsService } from './products.service';
+import { ProductsController } from './products.controller';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      Product,
+      ToppingGroup,
+      ToppingGroupItem,
+      ProductToppingGroup,
+      ProductNote,
+      ProductNoteAssignment,
+      ComboItem,
+      Category,
+      Unit,
+      SeasonalPrice,
+      SeasonalPriceProduct,
+      BranchProduct,
+      Branch,
+      Brand,
+    ]),
+  ],
+  controllers: [ProductsController],
+  providers: [ProductsService],
+  exports: [ProductsService],
+})
+export class ProductsModule {}

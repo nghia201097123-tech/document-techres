@@ -28,7 +28,7 @@ export class CreateCompanyDto {
   @ApiPropertyOptional({ example: 'https://example.com/logo.png' })
   @IsOptional()
   @IsString()
-  logoUrl?: string;
+  logo?: string;
 
   @ApiPropertyOptional({ example: '0123456789' })
   @IsOptional()

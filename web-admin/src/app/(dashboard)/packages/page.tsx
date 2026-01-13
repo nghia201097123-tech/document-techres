@@ -11,6 +11,7 @@ import {
   Eye,
   Check,
   X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,90 +41,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import type { Package as PackageType } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import {
+  packageService,
+  type Package as PackageType,
+  type PackageFeatures,
+} from "@/services/package-service";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
-// Mock data
-const mockPackages: PackageType[] = [
-  {
-    id: "1",
-    name: "Basic",
-    code: "BASIC",
-    maxBranches: 3,
-    monthlyPrice: 500000,
-    yearlyPrice: 5000000,
-    features: {
-      orderManagement: true,
-      inventoryManagement: false,
-      reporting: true,
-      multipleUsers: false,
-      apiAccess: false,
-      prioritySupport: false,
-    },
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "2",
-    name: "Standard",
-    code: "STANDARD",
-    maxBranches: 10,
-    monthlyPrice: 1500000,
-    yearlyPrice: 15000000,
-    features: {
-      orderManagement: true,
-      inventoryManagement: true,
-      reporting: true,
-      multipleUsers: true,
-      apiAccess: false,
-      prioritySupport: false,
-    },
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "3",
-    name: "Premium",
-    code: "PREMIUM",
-    maxBranches: 30,
-    monthlyPrice: 3000000,
-    yearlyPrice: 30000000,
-    features: {
-      orderManagement: true,
-      inventoryManagement: true,
-      reporting: true,
-      multipleUsers: true,
-      apiAccess: true,
-      prioritySupport: true,
-    },
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "4",
-    name: "Enterprise",
-    code: "ENTERPRISE",
-    maxBranches: -1,
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    features: {
-      orderManagement: true,
-      inventoryManagement: true,
-      reporting: true,
-      multipleUsers: true,
-      apiAccess: true,
-      prioritySupport: true,
-    },
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-];
-
-const featureLabels: Record<string, string> = {
+const featureLabels: Record<keyof PackageFeatures, string> = {
   orderManagement: "Quản lý đơn hàng",
   inventoryManagement: "Quản lý kho",
   reporting: "Báo cáo",
@@ -132,13 +58,22 @@ const featureLabels: Record<string, string> = {
   prioritySupport: "Hỗ trợ ưu tiên",
 };
 
+const defaultFeatures: PackageFeatures = {
+  orderManagement: true,
+  inventoryManagement: false,
+  reporting: true,
+  multipleUsers: false,
+  apiAccess: false,
+  prioritySupport: false,
+};
+
 interface PackageFormData {
   name: string;
   code: string;
   maxBranches: number;
   monthlyPrice: number;
   yearlyPrice: number;
-  features: Record<string, boolean>;
+  features: PackageFeatures;
 }
 
 const initialFormData: PackageFormData = {
@@ -147,30 +82,40 @@ const initialFormData: PackageFormData = {
   maxBranches: 3,
   monthlyPrice: 0,
   yearlyPrice: 0,
-  features: {
-    orderManagement: true,
-    inventoryManagement: false,
-    reporting: true,
-    multipleUsers: false,
-    apiAccess: false,
-    prioritySupport: false,
-  },
+  features: { ...defaultFeatures },
 };
 
 export default function PackagesPage() {
-  const [packages, setPackages] = React.useState<PackageType[]>(mockPackages);
+  const { toast } = useToast();
+  const [packages, setPackages] = React.useState<PackageType[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedPackage, setSelectedPackage] = React.useState<PackageType | null>(null);
   const [formData, setFormData] = React.useState<PackageFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const filteredPackages = packages.filter(
-    (pkg) =>
-      pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pkg.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const fetchPackages = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await packageService.getAll({ search: searchQuery || undefined });
+      setPackages(response.data);
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải danh sách gói",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, toast]);
+
+  React.useEffect(() => {
+    fetchPackages();
+  }, [fetchPackages]);
 
   const handleOpenCreate = () => {
     setSelectedPackage(null);
@@ -187,7 +132,7 @@ export default function PackagesPage() {
       maxBranches: pkg.maxBranches,
       monthlyPrice: pkg.monthlyPrice,
       yearlyPrice: pkg.yearlyPrice,
-      features: { ...pkg.features },
+      features: { ...defaultFeatures, ...pkg.features },
     });
     setIsViewMode(false);
     setIsDialogOpen(true);
@@ -201,7 +146,7 @@ export default function PackagesPage() {
       maxBranches: pkg.maxBranches,
       monthlyPrice: pkg.monthlyPrice,
       yearlyPrice: pkg.yearlyPrice,
-      features: { ...pkg.features },
+      features: { ...defaultFeatures, ...pkg.features },
     });
     setIsViewMode(true);
     setIsDialogOpen(true);
@@ -212,41 +157,71 @@ export default function PackagesPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedPackage) {
-      setPackages((prev) =>
-        prev.map((p) =>
-          p.id === selectedPackage.id
-            ? { ...p, ...formData, updatedAt: new Date().toISOString() }
-            : p
-        )
-      );
-    } else {
-      const newPackage: PackageType = {
-        id: String(Date.now()),
-        ...formData,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setPackages((prev) => [newPackage, ...prev]);
+    setIsSubmitting(true);
+    try {
+      if (selectedPackage) {
+        await packageService.update(selectedPackage.id, {
+          name: formData.name,
+          maxBranches: formData.maxBranches,
+          monthlyPrice: formData.monthlyPrice,
+          yearlyPrice: formData.yearlyPrice,
+          features: formData.features,
+        });
+        toast({ title: "Thành công", description: "Đã cập nhật gói" });
+      } else {
+        await packageService.create(formData);
+        toast({ title: "Thành công", description: "Đã thêm gói mới" });
+      }
+      setIsDialogOpen(false);
+      fetchPackages();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
-    if (selectedPackage) {
-      setPackages((prev) => prev.filter((p) => p.id !== selectedPackage.id));
+  const handleDelete = async () => {
+    if (!selectedPackage) return;
+    setIsSubmitting(true);
+    try {
+      await packageService.delete(selectedPackage.id);
+      toast({ title: "Thành công", description: "Đã xóa gói" });
       setIsDeleteDialogOpen(false);
       setSelectedPackage(null);
+      fetchPackages();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể xóa gói",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (pkg: PackageType) => {
-    setPackages((prev) =>
-      prev.map((p) => (p.id === pkg.id ? { ...p, isActive: !p.isActive } : p))
-    );
+  const handleToggleStatus = async (pkg: PackageType) => {
+    try {
+      await packageService.toggleStatus(pkg.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${pkg.isActive ? "tạm dừng" : "kích hoạt"} gói`,
+      });
+      fetchPackages();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,12 +232,20 @@ export default function PackagesPage() {
     }));
   };
 
-  const handleFeatureChange = (feature: string, checked: boolean) => {
+  const handleFeatureChange = (feature: keyof PackageFeatures, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
       features: { ...prev.features, [feature]: checked },
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -283,7 +266,7 @@ export default function PackagesPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              Danh sách gói ({filteredPackages.length})
+              Danh sách gói ({packages.length})
             </CardTitle>
             <div className="relative w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -310,7 +293,7 @@ export default function PackagesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPackages.map((pkg) => (
+              {packages.map((pkg) => (
                 <TableRow key={pkg.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -340,15 +323,15 @@ export default function PackagesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {Object.entries(pkg.features)
+                      {pkg.features && Object.entries(pkg.features)
                         .filter(([, value]) => value)
                         .slice(0, 3)
                         .map(([key]) => (
                           <Badge key={key} variant="outline" className="text-xs">
-                            {featureLabels[key]}
+                            {featureLabels[key as keyof PackageFeatures] || key}
                           </Badge>
                         ))}
-                      {Object.entries(pkg.features).filter(([, v]) => v).length > 3 && (
+                      {pkg.features && Object.entries(pkg.features).filter(([, v]) => v).length > 3 && (
                         <Badge variant="outline" className="text-xs">
                           +{Object.entries(pkg.features).filter(([, v]) => v).length - 3}
                         </Badge>
@@ -392,7 +375,7 @@ export default function PackagesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredPackages.length === 0 && (
+              {packages.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
                     Không tìm thấy gói nào
@@ -491,7 +474,7 @@ export default function PackagesPage() {
               <div className="space-y-3">
                 <Label>Tính năng</Label>
                 <div className="grid grid-cols-2 gap-3">
-                  {Object.keys(featureLabels).map((feature) => (
+                  {(Object.keys(featureLabels) as Array<keyof PackageFeatures>).map((feature) => (
                     <div
                       key={feature}
                       className="flex items-center justify-between rounded-lg border p-3"
@@ -530,7 +513,8 @@ export default function PackagesPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedPackage ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
@@ -558,7 +542,8 @@ export default function PackagesPage() {
             >
               Hủy
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Xóa
             </Button>
           </DialogFooter>

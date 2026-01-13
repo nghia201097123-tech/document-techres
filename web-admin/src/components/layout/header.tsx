@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Settings, User } from "lucide-react";
+import { Bell, LogOut, Settings, User, Search, Command, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,21 +13,60 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { QuickCreateDropdown } from "@/components/ui/quick-create-dropdown";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import { useAuthStore } from "@/stores/auth-store";
+import { authService } from "@/services/auth-service";
 
 interface HeaderProps {
   user?: {
+    id: string;
     name: string;
     email: string;
     role: string;
   };
+  onOpenCommandPalette?: () => void;
+  onCreateItem?: (type: string) => void;
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, onOpenCommandPalette, onCreateItem }: HeaderProps) {
   const router = useRouter();
+  const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
+  const logout = useAuthStore((state) => state.logout);
 
-  const handleLogout = () => {
-    // TODO: Implement logout logic
+  const handleLogout = async () => {
+    try {
+      // Call API to invalidate token on server
+      await authService.logout();
+    } catch (error) {
+      // Continue with logout even if API call fails
+      console.error("Logout API error:", error);
+    }
+
+    // Clear local auth state
+    logout();
+
+    // Redirect to login page
     router.push("/login");
+  };
+
+  const handleCreateItem = (type: string) => {
+    if (onCreateItem) {
+      onCreateItem(type);
+    } else {
+      // Default behavior: navigate to the respective page with create action
+      const routes: Record<string, string> = {
+        company: "/companies?action=create",
+        brand: "/brands?action=create",
+        branch: "/branches?action=create",
+        category: "/categories?action=create",
+        package: "/packages?action=create",
+        admin: "/admins?action=create",
+      };
+      if (routes[type]) {
+        router.push(routes[type]);
+      }
+    }
   };
 
   return (
@@ -35,7 +75,22 @@ export function Header({ user }: HeaderProps) {
         <h1 className="text-lg font-semibold">Web Admin</h1>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {/* Search Bar / Command Palette Trigger */}
+        <button
+          onClick={onOpenCommandPalette}
+          className="flex h-9 w-64 items-center gap-2 rounded-lg border bg-muted/50 px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Search className="h-4 w-4" />
+          <span className="flex-1 text-left">Tìm kiếm...</span>
+          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium sm:flex">
+            <Command className="h-3 w-3" />K
+          </kbd>
+        </button>
+
+        {/* Quick Create Dropdown */}
+        <QuickCreateDropdown onCreateItem={handleCreateItem} />
+
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
@@ -75,6 +130,10 @@ export function Header({ user }: HeaderProps) {
               <User className="mr-2 h-4 w-4" />
               Thông tin cá nhân
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowChangePasswordDialog(true)}>
+              <Lock className="mr-2 h-4 w-4" />
+              Đổi mật khẩu
+            </DropdownMenuItem>
             <DropdownMenuItem>
               <Settings className="mr-2 h-4 w-4" />
               Cài đặt
@@ -90,6 +149,12 @@ export function Header({ user }: HeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Change Password Dialog */}
+      <ChangePasswordDialog
+        open={showChangePasswordDialog}
+        onOpenChange={setShowChangePasswordDialog}
+      />
     </header>
   );
 }

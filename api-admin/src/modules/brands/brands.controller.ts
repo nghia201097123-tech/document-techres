@@ -9,11 +9,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BrandsService } from './brands.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { BrandListDto } from './dto/brand-list.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Brands')
@@ -31,12 +31,8 @@ export class BrandsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all brands with pagination' })
-  @ApiQuery({ name: 'companyId', required: false })
-  findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query('companyId') companyId?: string,
-  ) {
-    return this.brandsService.findAll({ ...paginationDto, companyId });
+  findAll(@Query() query: BrandListDto) {
+    return this.brandsService.findAll(query);
   }
 
   @Get(':id')

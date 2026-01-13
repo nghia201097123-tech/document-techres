@@ -7,8 +7,18 @@ import {
   Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
   Eye,
+  Loader2,
+  Power,
+  Zap,
+  Files,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,59 +43,43 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
+import { companyService } from "@/services/company-service";
+import { useToast } from "@/hooks/use-toast";
+import { CompanyWizard } from "@/components/company-wizard";
+import { QuickCreateDialog } from "@/components/quick-create-dialog";
+import { CloneCompanyDialog } from "@/components/clone-company-dialog";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
+import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
+import { ImageUpload } from "@/components/ui/image-upload";
 
-// Mock data - replace with API call
-const mockCompanies: Company[] = [
-  {
-    id: "1",
-    name: "Công ty TNHH ABC Food",
-    code: "ABC001",
-    taxCode: "0123456789",
-    address: "123 Nguyễn Văn Linh, Quận 7, TP.HCM",
-    phone: "028 1234 5678",
-    email: "contact@abcfood.vn",
-    representative: "Nguyễn Văn A",
-    isActive: true,
-    createdAt: "2024-01-15T10:30:00Z",
-    updatedAt: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "2",
-    name: "Công ty Cổ phần XYZ Restaurant",
-    code: "XYZ002",
-    taxCode: "0987654321",
-    address: "456 Lê Lợi, Quận 1, TP.HCM",
-    phone: "028 8765 4321",
-    email: "info@xyzrestaurant.vn",
-    representative: "Trần Thị B",
-    isActive: true,
-    createdAt: "2024-02-20T14:45:00Z",
-    updatedAt: "2024-02-20T14:45:00Z",
-  },
-  {
-    id: "3",
-    name: "Công ty TNHH DEF Beverages",
-    code: "DEF003",
-    taxCode: "1122334455",
-    address: "789 Trần Hưng Đạo, Quận 5, TP.HCM",
-    phone: "028 1122 3344",
-    email: "hello@defbeverages.vn",
-    representative: "Lê Văn C",
-    isActive: false,
-    createdAt: "2024-03-10T09:15:00Z",
-    updatedAt: "2024-03-10T09:15:00Z",
-  },
+// Default column configuration
+const defaultColumns: ColumnConfig[] = [
+  { key: "company", label: "Công ty", visible: true, locked: true },
+  { key: "taxCode", label: "Mã số thuế", visible: true },
+  { key: "representative", label: "Người đại diện", visible: true },
+  { key: "contact", label: "Liên hệ", visible: true },
+  { key: "isActive", label: "Trạng thái", visible: true },
+  { key: "createdAt", label: "Ngày tạo", visible: true },
 ];
 
 interface CompanyFormData {
   name: string;
   code: string;
+  logo: string;
   taxCode: string;
   address: string;
   phone: string;
@@ -96,6 +90,7 @@ interface CompanyFormData {
 const initialFormData: CompanyFormData = {
   name: "",
   code: "",
+  logo: "",
   taxCode: "",
   address: "",
   phone: "",
@@ -103,26 +98,148 @@ const initialFormData: CompanyFormData = {
   representative: "",
 };
 
+// Sorting types
+type SortDirection = "asc" | "desc" | null;
+type SortableColumn = "name" | "code" | "taxCode" | "representative" | "isActive" | "createdAt";
+
 export default function CompaniesPage() {
-  const [companies, setCompanies] = React.useState<Company[]>(mockCompanies);
+  const [companies, setCompanies] = React.useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = React.useState(false);
+  const [isCloneOpen, setIsCloneOpen] = React.useState(false);
+  const [companyToClone, setCompanyToClone] = React.useState<Company | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
   const [formData, setFormData] = React.useState<CompanyFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { toast } = useToast();
 
-  const filteredCompanies = companies.filter(
-    (company) =>
-      company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      company.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = React.useState<SortableColumn | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>(null);
+
+  // Column configuration
+  const {
+    columns,
+    toggleColumn,
+    resetToDefault,
+    isColumnVisible,
+  } = useColumnConfig({
+    storageKey: "companies-table-columns",
+    defaultColumns,
+  });
+
+  // Fetch companies from API
+  const fetchCompanies = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await companyService.getList({ search: searchQuery });
+      setCompanies(response.data);
+    } catch (error: any) {
+      console.error("Error fetching companies:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách công ty",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, toast]);
+
+  // Initial fetch
+  React.useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
+
+  // Sorting logic
+  const sortedCompanies = React.useMemo(() => {
+    if (!sortColumn || !sortDirection) return companies;
+
+    return [...companies].sort((a, b) => {
+      let aValue: any = a[sortColumn];
+      let bValue: any = b[sortColumn];
+
+      // Handle null/undefined
+      if (aValue == null) aValue = "";
+      if (bValue == null) bValue = "";
+
+      // Handle boolean
+      if (typeof aValue === "boolean") {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      }
+
+      // Handle dates
+      if (sortColumn === "createdAt") {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      // Compare
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [companies, sortColumn, sortDirection]);
+
+  const filteredCompanies = sortedCompanies;
+
+  // Handle column sort
+  const handleSort = (column: SortableColumn) => {
+    if (sortColumn === column) {
+      // Cycle: asc -> desc -> null
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  // Render sort icon
+  const renderSortIcon = (column: SortableColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortDirection === "asc") {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
+  // Reset to page 1 when search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCompanies.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredCompanies.length);
+  const paginatedCompanies = React.useMemo(() => {
+    return filteredCompanies.slice(startIndex, endIndex);
+  }, [filteredCompanies, startIndex, endIndex]);
 
   const handleOpenCreate = () => {
-    setSelectedCompany(null);
-    setFormData(initialFormData);
-    setIsViewMode(false);
-    setIsDialogOpen(true);
+    setIsWizardOpen(true);
+  };
+
+  const handleWizardSuccess = () => {
+    fetchCompanies();
   };
 
   const handleOpenEdit = (company: Company) => {
@@ -130,6 +247,7 @@ export default function CompaniesPage() {
     setFormData({
       name: company.name,
       code: company.code,
+      logo: company.logo || "",
       taxCode: company.taxCode || "",
       address: company.address || "",
       phone: company.phone || "",
@@ -145,6 +263,7 @@ export default function CompaniesPage() {
     setFormData({
       name: company.name,
       code: company.code,
+      logo: company.logo || "",
       taxCode: company.taxCode || "",
       address: company.address || "",
       phone: company.phone || "",
@@ -155,50 +274,55 @@ export default function CompaniesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleOpenDelete = (company: Company) => {
-    setSelectedCompany(company);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedCompany) {
-      // Update
-      setCompanies((prev) =>
-        prev.map((c) =>
-          c.id === selectedCompany.id
-            ? { ...c, ...formData, updatedAt: new Date().toISOString() }
-            : c
-        )
-      );
-    } else {
-      // Create
-      const newCompany: Company = {
-        id: String(Date.now()),
-        ...formData,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setCompanies((prev) => [newCompany, ...prev]);
+    setIsSubmitting(true);
+    try {
+      if (selectedCompany) {
+        // Update
+        await companyService.update(selectedCompany.id, formData);
+        toast({
+          title: "Thành công",
+          description: "Cập nhật công ty thành công",
+        });
+      } else {
+        // Create
+        await companyService.create(formData);
+        toast({
+          title: "Thành công",
+          description: "Tạo công ty mới thành công",
+        });
+      }
+      setIsDialogOpen(false);
+      fetchCompanies(); // Refresh list
+    } catch (error: any) {
+      console.error("Error saving company:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể lưu công ty",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
-    if (selectedCompany) {
-      setCompanies((prev) => prev.filter((c) => c.id !== selectedCompany.id));
-      setIsDeleteDialogOpen(false);
-      setSelectedCompany(null);
+  const handleToggleStatus = async (company: Company) => {
+    try {
+      await companyService.toggleStatus(company.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${company.isActive ? "tạm dừng" : "kích hoạt"} công ty`,
+      });
+      fetchCompanies(); // Refresh list
+    } catch (error: any) {
+      console.error("Error toggling status:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể thay đổi trạng thái",
+      });
     }
-  };
-
-  const handleToggleStatus = (company: Company) => {
-    setCompanies((prev) =>
-      prev.map((c) =>
-        c.id === company.id ? { ...c, isActive: !c.isActive } : c
-      )
-    );
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,10 +341,31 @@ export default function CompaniesPage() {
             Quản lý danh sách các công ty trong hệ thống
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm công ty
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsQuickCreateOpen(true)}>
+            <Zap className="mr-2 h-4 w-4 text-yellow-500" />
+            Tạo nhanh
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm công ty
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleOpenCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Tạo theo wizard (4 bước)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsQuickCreateOpen(true)}>
+                <Zap className="mr-2 h-4 w-4 text-yellow-500" />
+                Tạo nhanh (1 bước)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <Card>
@@ -229,13 +374,20 @@ export default function CompaniesPage() {
             <CardTitle className="text-lg">
               Danh sách công ty ({filteredCompanies.length})
             </CardTitle>
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm theo tên, mã..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+            <div className="flex items-center gap-2">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm theo tên, mã..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <ColumnConfigDialog
+                columns={columns}
+                onToggle={toggleColumn}
+                onReset={resetToDefault}
               />
             </div>
           </div>
@@ -244,51 +396,129 @@ export default function CompaniesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Công ty</TableHead>
-                <TableHead>Mã số thuế</TableHead>
-                <TableHead>Người đại diện</TableHead>
-                <TableHead>Liên hệ</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Ngày tạo</TableHead>
+                {isColumnVisible("company") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("name")}
+                    >
+                      Công ty
+                      {renderSortIcon("name")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("taxCode") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("taxCode")}
+                    >
+                      Mã số thuế
+                      {renderSortIcon("taxCode")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("representative") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("representative")}
+                    >
+                      Người đại diện
+                      {renderSortIcon("representative")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("contact") && <TableHead>Liên hệ</TableHead>}
+                {isColumnVisible("isActive") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("isActive")}
+                    >
+                      Trạng thái
+                      {renderSortIcon("isActive")}
+                    </Button>
+                  </TableHead>
+                )}
+                {isColumnVisible("createdAt") && (
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 -ml-2 hover:bg-transparent"
+                      onClick={() => handleSort("createdAt")}
+                    >
+                      Ngày tạo
+                      {renderSortIcon("createdAt")}
+                    </Button>
+                  </TableHead>
+                )}
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCompanies.map((company) => (
+              {!isLoading && paginatedCompanies.map((company) => (
                 <TableRow key={company.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Building2 className="h-5 w-5 text-primary" />
+                  {isColumnVisible("company") && (
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {company.logo ? (
+                          <img
+                            src={company.logo}
+                            alt={company.name}
+                            className="h-10 w-10 rounded-lg object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ${company.logo ? 'hidden' : ''}`}>
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{company.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {company.code}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{company.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {company.code}
-                        </p>
+                    </TableCell>
+                  )}
+                  {isColumnVisible("taxCode") && (
+                    <TableCell>{company.taxCode || "-"}</TableCell>
+                  )}
+                  {isColumnVisible("representative") && (
+                    <TableCell>{company.representative || "-"}</TableCell>
+                  )}
+                  {isColumnVisible("contact") && (
+                    <TableCell>
+                      <div className="text-sm">
+                        <p>{company.phone}</p>
+                        <p className="text-muted-foreground">{company.email}</p>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{company.taxCode || "-"}</TableCell>
-                  <TableCell>{company.representative || "-"}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <p>{company.phone}</p>
-                      <p className="text-muted-foreground">{company.email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={company.isActive ? "success" : "secondary"}
-                      className="cursor-pointer"
-                      onClick={() => handleToggleStatus(company)}
-                    >
-                      {company.isActive ? "Hoạt động" : "Tạm dừng"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(company.createdAt)}
-                  </TableCell>
+                    </TableCell>
+                  )}
+                  {isColumnVisible("isActive") && (
+                    <TableCell>
+                      <Badge
+                        variant={company.isActive ? "success" : "secondary"}
+                        className="cursor-pointer"
+                        onClick={() => handleToggleStatus(company)}
+                      >
+                        {company.isActive ? "Hoạt động" : "Tạm dừng"}
+                      </Badge>
+                    </TableCell>
+                  )}
+                  {isColumnVisible("createdAt") && (
+                    <TableCell className="text-muted-foreground">
+                      {formatDateTime(company.createdAt)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -305,27 +535,105 @@ export default function CompaniesPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(company)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => {
+                          setCompanyToClone(company);
+                          setIsCloneOpen(true);
+                        }}>
+                          <Files className="mr-2 h-4 w-4 text-blue-500" />
+                          Nhân bản
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {company.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredCompanies.length === 0 && (
+              {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={columns.filter(c => c.visible).length + 1} className="h-24 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      Đang tải...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && filteredCompanies.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={columns.filter(c => c.visible).length + 1} className="h-24 text-center">
                     Không tìm thấy công ty nào
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {!isLoading && filteredCompanies.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Hiển thị {startIndex + 1}-{endIndex} / {filteredCompanies.length} công ty</span>
+                <span className="text-muted-foreground/50">|</span>
+                <div className="flex items-center gap-2">
+                  <span>Số dòng:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Đầu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Trang {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Cuối
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -374,6 +682,16 @@ export default function CompaniesPage() {
                   />
                 </div>
               </div>
+              <ImageUpload
+                value={formData.logo}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logo: value }))}
+                disabled={isViewMode}
+                label="Logo công ty"
+                folder="companies"
+                aspectRatio={1}
+                maxWidth={400}
+                maxHeight={400}
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="taxCode">Mã số thuế</Label>
@@ -444,7 +762,8 @@ export default function CompaniesPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedCompany ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
@@ -454,30 +773,27 @@ export default function CompaniesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn xóa công ty{" "}
-              <span className="font-medium">{selectedCompany?.name}</span>? Hành
-              động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Xóa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Company Wizard */}
+      <CompanyWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        onSuccess={handleWizardSuccess}
+      />
+
+      {/* Quick Create Dialog */}
+      <QuickCreateDialog
+        open={isQuickCreateOpen}
+        onOpenChange={setIsQuickCreateOpen}
+        onSuccess={handleWizardSuccess}
+      />
+
+      {/* Clone Company Dialog */}
+      <CloneCompanyDialog
+        open={isCloneOpen}
+        onOpenChange={setIsCloneOpen}
+        sourceCompany={companyToClone}
+        onSuccess={handleWizardSuccess}
+      />
     </div>
   );
 }

@@ -7,11 +7,19 @@ import {
   Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
   Eye,
   Store,
   Clock,
   Phone,
+  Loader2,
+  Power,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Zap,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,109 +55,18 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Branch } from "@/types";
+import type { Branch, Brand } from "@/types";
 import { formatDateTime } from "@/lib/utils";
-
-// Mock data
-const mockBranches: Branch[] = [
-  {
-    id: "1",
-    brandId: "1",
-    brandName: "Coffee House ABC",
-    companyName: "Công ty TNHH ABC Food",
-    name: "Chi nhánh Quận 1",
-    code: "CHABC-Q1",
-    address: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-    phone: "028 1234 5678",
-    email: "q1@coffeehouse.vn",
-    manager: "Nguyễn Văn A",
-    openTime: "07:00",
-    closeTime: "22:00",
-    packageId: "3",
-    packageName: "Premium",
-    isActive: true,
-    createdAt: "2024-01-20T10:30:00Z",
-    updatedAt: "2024-01-20T10:30:00Z",
-  },
-  {
-    id: "2",
-    brandId: "1",
-    brandName: "Coffee House ABC",
-    companyName: "Công ty TNHH ABC Food",
-    name: "Chi nhánh Quận 7",
-    code: "CHABC-Q7",
-    address: "456 Nguyễn Văn Linh, Quận 7, TP.HCM",
-    phone: "028 7654 3210",
-    email: "q7@coffeehouse.vn",
-    manager: "Trần Thị B",
-    openTime: "08:00",
-    closeTime: "23:00",
-    packageId: "2",
-    packageName: "Standard",
-    isActive: true,
-    createdAt: "2024-02-15T14:45:00Z",
-    updatedAt: "2024-02-15T14:45:00Z",
-  },
-  {
-    id: "3",
-    brandId: "3",
-    brandName: "Nhà hàng XYZ Premium",
-    companyName: "Công ty Cổ phần XYZ Restaurant",
-    name: "Chi nhánh Thủ Đức",
-    code: "XYZPM-TD",
-    address: "789 Võ Văn Ngân, Thủ Đức, TP.HCM",
-    phone: "028 3456 7890",
-    email: "thuduc@xyzpremium.vn",
-    manager: "Lê Văn C",
-    openTime: "10:00",
-    closeTime: "22:00",
-    packageId: "4",
-    packageName: "Enterprise",
-    isActive: true,
-    createdAt: "2024-03-10T09:15:00Z",
-    updatedAt: "2024-03-10T09:15:00Z",
-  },
-  {
-    id: "4",
-    brandId: "2",
-    brandName: "Trà Sữa ABC",
-    companyName: "Công ty TNHH ABC Food",
-    name: "Chi nhánh Bình Thạnh",
-    code: "TSABC-BT",
-    address: "321 Xô Viết Nghệ Tĩnh, Bình Thạnh, TP.HCM",
-    phone: "028 9876 5432",
-    email: "binhthanh@trasua.vn",
-    manager: "Phạm Thị D",
-    openTime: "09:00",
-    closeTime: "21:00",
-    packageId: "1",
-    packageName: "Basic",
-    isActive: false,
-    createdAt: "2024-03-20T11:00:00Z",
-    updatedAt: "2024-03-20T11:00:00Z",
-  },
-];
-
-// Mock brands for select
-const mockBrands = [
-  { id: "1", name: "Coffee House ABC", companyName: "Công ty TNHH ABC Food" },
-  { id: "2", name: "Trà Sữa ABC", companyName: "Công ty TNHH ABC Food" },
-  { id: "3", name: "Nhà hàng XYZ Premium", companyName: "Công ty Cổ phần XYZ Restaurant" },
-  { id: "4", name: "XYZ Express", companyName: "Công ty Cổ phần XYZ Restaurant" },
-];
-
-// Mock packages for select
-const mockPackages = [
-  { id: "1", name: "Basic", maxBranches: 3 },
-  { id: "2", name: "Standard", maxBranches: 10 },
-  { id: "3", name: "Premium", maxBranches: 30 },
-  { id: "4", name: "Enterprise", maxBranches: -1 },
-];
+import { branchService } from "@/services/branch-service";
+import { brandService } from "@/services/brand-service";
+import { useToast } from "@/hooks/use-toast";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 interface BranchFormData {
   brandId: string;
   name: string;
   code: string;
+  logoUrl: string;
   address: string;
   phone: string;
   email: string;
@@ -163,6 +80,7 @@ const initialFormData: BranchFormData = {
   brandId: "",
   name: "",
   code: "",
+  logoUrl: "",
   address: "",
   phone: "",
   email: "",
@@ -172,24 +90,141 @@ const initialFormData: BranchFormData = {
   packageId: "",
 };
 
+// Sorting types
+type SortDirection = "asc" | "desc" | null;
+type SortableColumn = "name" | "code" | "brandName" | "phone" | "isActive" | "createdAt";
+
 export default function BranchesPage() {
-  const [branches, setBranches] = React.useState<Branch[]>(mockBranches);
+  const [branches, setBranches] = React.useState<Branch[]>([]);
+  const [brands, setBrands] = React.useState<Brand[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterBrand, setFilterBrand] = React.useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = React.useState(false);
   const [selectedBranch, setSelectedBranch] = React.useState<Branch | null>(null);
   const [formData, setFormData] = React.useState<BranchFormData>(initialFormData);
   const [isViewMode, setIsViewMode] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isDuplicating, setIsDuplicating] = React.useState(false);
+  const { toast } = useToast();
 
-  const filteredBranches = branches.filter((branch) => {
-    const matchesSearch =
-      branch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      branch.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (branch.address?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    const matchesBrand = filterBrand === "all" || branch.brandId === filterBrand;
-    return matchesSearch && matchesBrand;
-  });
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500];
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = React.useState<SortableColumn | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>(null);
+
+  // Fetch branches from API
+  const fetchBranches = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const params: { search?: string; brandId?: string } = {};
+      if (searchQuery) params.search = searchQuery;
+      if (filterBrand !== "all") params.brandId = filterBrand;
+
+      const response = await branchService.getList(params);
+      setBranches(response.data);
+    } catch (error: any) {
+      console.error("Error fetching branches:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách chi nhánh",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, filterBrand, toast]);
+
+  // Fetch brands for dropdown
+  const fetchBrands = React.useCallback(async () => {
+    try {
+      const response = await brandService.getList({ limit: 100 });
+      setBrands(response.data);
+    } catch (error: any) {
+      console.error("Error fetching brands:", error);
+    }
+  }, []);
+
+  // Initial fetch
+  React.useEffect(() => {
+    fetchBrands();
+  }, [fetchBrands]);
+
+  React.useEffect(() => {
+    fetchBranches();
+  }, [fetchBranches]);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterBrand]);
+
+  // Sorting logic
+  const sortedBranches = React.useMemo(() => {
+    if (!sortColumn || !sortDirection) return branches;
+
+    return [...branches].sort((a, b) => {
+      let aValue: any = a[sortColumn];
+      let bValue: any = b[sortColumn];
+
+      if (aValue == null) aValue = "";
+      if (bValue == null) bValue = "";
+
+      if (typeof aValue === "boolean") {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      }
+
+      if (sortColumn === "createdAt") {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [branches, sortColumn, sortDirection]);
+
+  // Handle column sort
+  const handleSort = (column: SortableColumn) => {
+    if (sortColumn === column) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  // Render sort icon
+  const renderSortIcon = (column: SortableColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortDirection === "asc") {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedBranches.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, sortedBranches.length);
+  const paginatedBranches = React.useMemo(() => {
+    return sortedBranches.slice(startIndex, endIndex);
+  }, [sortedBranches, startIndex, endIndex]);
 
   const handleOpenCreate = () => {
     setSelectedBranch(null);
@@ -204,6 +239,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
+      logoUrl: branch.logo || "", // Read from 'logo', send as 'logoUrl'
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -222,6 +258,7 @@ export default function BranchesPage() {
       brandId: branch.brandId,
       name: branch.name,
       code: branch.code,
+      logoUrl: branch.logo || "", // Read from 'logo', send as 'logoUrl'
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -234,59 +271,53 @@ export default function BranchesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleOpenDelete = (branch: Branch) => {
-    setSelectedBranch(branch);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const brand = mockBrands.find((b) => b.id === formData.brandId);
-    const pkg = mockPackages.find((p) => p.id === formData.packageId);
-
-    if (selectedBranch) {
-      setBranches((prev) =>
-        prev.map((b) =>
-          b.id === selectedBranch.id
-            ? {
-                ...b,
-                ...formData,
-                brandName: brand?.name || "",
-                companyName: brand?.companyName || "",
-                packageName: pkg?.name,
-                updatedAt: new Date().toISOString(),
-              }
-            : b
-        )
-      );
-    } else {
-      const newBranch: Branch = {
-        id: String(Date.now()),
-        ...formData,
-        brandName: brand?.name || "",
-        companyName: brand?.companyName || "",
-        packageName: pkg?.name,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setBranches((prev) => [newBranch, ...prev]);
-    }
-    setIsDialogOpen(false);
-  };
-
-  const handleDelete = () => {
-    if (selectedBranch) {
-      setBranches((prev) => prev.filter((b) => b.id !== selectedBranch.id));
-      setIsDeleteDialogOpen(false);
-      setSelectedBranch(null);
+    setIsSubmitting(true);
+    try {
+      if (selectedBranch) {
+        await branchService.update(selectedBranch.id, formData);
+        toast({
+          title: "Thành công",
+          description: "Cập nhật chi nhánh thành công",
+        });
+      } else {
+        await branchService.create(formData);
+        toast({
+          title: "Thành công",
+          description: "Tạo chi nhánh mới thành công",
+        });
+      }
+      setIsDialogOpen(false);
+      fetchBranches();
+    } catch (error: any) {
+      console.error("Error saving branch:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể lưu chi nhánh",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (branch: Branch) => {
-    setBranches((prev) =>
-      prev.map((b) => (b.id === branch.id ? { ...b, isActive: !b.isActive } : b))
-    );
+  const handleToggleStatus = async (branch: Branch) => {
+    try {
+      await branchService.toggleStatus(branch.id);
+      toast({
+        title: "Thành công",
+        description: `Đã ${branch.isActive ? "tạm dừng" : "kích hoạt"} chi nhánh`,
+      });
+      fetchBranches();
+    } catch (error: any) {
+      console.error("Error toggling status:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể thay đổi trạng thái",
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,28 +327,96 @@ export default function BranchesPage() {
     }));
   };
 
+  // Quick create handler
+  const handleQuickCreate = () => {
+    setFormData(initialFormData);
+    setSelectedBranch(null);
+    setIsQuickCreateOpen(true);
+  };
+
+  const handleQuickCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await branchService.create(formData);
+      toast({
+        title: "Thành công",
+        description: "Tạo chi nhánh mới thành công",
+      });
+      setIsQuickCreateOpen(false);
+      fetchBranches();
+    } catch (error: any) {
+      console.error("Error creating branch:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tạo chi nhánh",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Duplicate handler
+  const handleDuplicate = async (branch: Branch) => {
+    setIsDuplicating(true);
+    try {
+      const duplicateData = {
+        brandId: branch.brandId,
+        name: `${branch.name} (Bản sao)`,
+        code: `${branch.code}_COPY`,
+        address: branch.address || "",
+        phone: branch.phone || "",
+        email: branch.email || "",
+        manager: branch.manager || "",
+        openTime: branch.openTime || "08:00",
+        closeTime: branch.closeTime || "22:00",
+        packageId: branch.packageId || "",
+      };
+      await branchService.create(duplicateData);
+      toast({
+        title: "Thành công",
+        description: `Đã nhân bản chi nhánh "${branch.name}"`,
+      });
+      fetchBranches();
+    } catch (error: any) {
+      console.error("Error duplicating branch:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể nhân bản chi nhánh",
+      });
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Quản lý Chi nhánh
-          </h2>
+          <h2 className="text-2xl font-bold tracking-tight">Quản lý Chi nhánh</h2>
           <p className="text-muted-foreground">
             Quản lý danh sách chi nhánh theo thương hiệu
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm chi nhánh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleQuickCreate}>
+            <Zap className="mr-2 h-4 w-4" />
+            Tạo nhanh
+          </Button>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm chi nhánh
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-lg">
-              Danh sách chi nhánh ({filteredBranches.length})
+              Danh sách chi nhánh ({branches.length})
             </CardTitle>
             <div className="flex gap-2">
               <Select value={filterBrand} onValueChange={setFilterBrand}>
@@ -326,7 +425,7 @@ export default function BranchesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả thương hiệu</SelectItem>
-                  {mockBrands.map((brand) => (
+                  {brands.map((brand) => (
                     <SelectItem key={brand.id} value={brand.id}>
                       {brand.name}
                     </SelectItem>
@@ -349,22 +448,69 @@ export default function BranchesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Chi nhánh</TableHead>
-                <TableHead>Thương hiệu</TableHead>
-                <TableHead>Liên hệ</TableHead>
-                <TableHead>Giờ mở cửa</TableHead>
-                <TableHead>Gói</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("name")}
+                  >
+                    Chi nhánh
+                    {renderSortIcon("name")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("brandName")}
+                  >
+                    Thương hiệu
+                    {renderSortIcon("brandName")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("phone")}
+                  >
+                    Liên hệ
+                    {renderSortIcon("phone")}
+                  </Button>
+                </TableHead>
+                <TableHead>Giờ hoạt động</TableHead>
+                <TableHead>Gói dịch vụ</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 -ml-2 hover:bg-transparent"
+                    onClick={() => handleSort("isActive")}
+                  >
+                    Trạng thái
+                    {renderSortIcon("isActive")}
+                  </Button>
+                </TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBranches.map((branch) => (
+              {!isLoading && paginatedBranches.map((branch) => (
                 <TableRow key={branch.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                        <MapPin className="h-5 w-5 text-blue-500" />
+                      {branch.logo ? (
+                        <img
+                          src={branch.logo}
+                          alt={branch.name}
+                          className="h-10 w-10 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 ${branch.logo ? 'hidden' : ''}`}>
+                        <MapPin className="h-5 w-5 text-orange-500" />
                       </div>
                       <div>
                         <p className="font-medium">{branch.name}</p>
@@ -388,22 +534,22 @@ export default function BranchesPage() {
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center gap-1 text-sm">
-                        <Phone className="h-3 w-3 text-muted-foreground" />
+                        <Phone className="h-3 w-3" />
                         {branch.phone || "-"}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {branch.manager || "Chưa có quản lý"}
+                      <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                        {branch.address || "-"}
                       </p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <Clock className="h-3 w-3" />
                       {branch.openTime} - {branch.closeTime}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{branch.packageName || "-"}</Badge>
+                    <Badge variant="outline">{branch.packageName || "Chưa gán"}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -430,19 +576,30 @@ export default function BranchesPage() {
                           <Pencil className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(branch)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
+                        <DropdownMenuItem onClick={() => handleDuplicate(branch)} disabled={isDuplicating}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          Nhân bản
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleStatus(branch)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {branch.isActive ? "Tạm ngưng" : "Kích hoạt"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredBranches.length === 0 && (
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      Đang tải...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && branches.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
                     Không tìm thấy chi nhánh nào
@@ -451,12 +608,74 @@ export default function BranchesPage() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {!isLoading && branches.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Hiển thị {startIndex + 1}-{endIndex} / {branches.length} chi nhánh</span>
+                <span className="text-muted-foreground/50">|</span>
+                <div className="flex items-center gap-2">
+                  <span>Số dòng:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Đầu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Trang {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Cuối
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {isViewMode
@@ -475,49 +694,26 @@ export default function BranchesPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="brandId">Thương hiệu *</Label>
-                  <Select
-                    value={formData.brandId}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, brandId: value }))
-                    }
-                    disabled={isViewMode}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn thương hiệu" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockBrands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="packageId">Gói App Food</Label>
-                  <Select
-                    value={formData.packageId}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, packageId: value }))
-                    }
-                    disabled={isViewMode}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn gói" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockPackages.map((pkg) => (
-                        <SelectItem key={pkg.id} value={pkg.id}>
-                          {pkg.name} ({pkg.maxBranches === -1 ? "Unlimited" : `${pkg.maxBranches} chi nhánh`})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="brandId">Thương hiệu *</Label>
+                <Select
+                  value={formData.brandId}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, brandId: value }))
+                  }
+                  disabled={isViewMode}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn thương hiệu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name} ({brand.companyName})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -543,6 +739,16 @@ export default function BranchesPage() {
                   />
                 </div>
               </div>
+              <ImageUpload
+                value={formData.logoUrl}
+                onChange={(value) => setFormData((prev) => ({ ...prev, logoUrl: value }))}
+                disabled={isViewMode}
+                label="Logo chi nhánh"
+                folder="branches"
+                aspectRatio={1}
+                maxWidth={400}
+                maxHeight={400}
+              />
               <div className="space-y-2">
                 <Label htmlFor="address">Địa chỉ</Label>
                 <Input
@@ -576,17 +782,17 @@ export default function BranchesPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="manager">Quản lý</Label>
-                  <Input
-                    id="manager"
-                    name="manager"
-                    value={formData.manager}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="manager">Quản lý</Label>
+                <Input
+                  id="manager"
+                  name="manager"
+                  value={formData.manager}
+                  onChange={handleChange}
+                  disabled={isViewMode}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="openTime">Giờ mở cửa</Label>
                   <Input
@@ -625,7 +831,8 @@ export default function BranchesPage() {
                   >
                     Hủy
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedBranch ? "Cập nhật" : "Thêm mới"}
                   </Button>
                 </>
@@ -635,28 +842,84 @@ export default function BranchesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
+      {/* Quick Create Dialog */}
+      <Dialog open={isQuickCreateOpen} onOpenChange={setIsQuickCreateOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
+            <DialogTitle>Tạo nhanh chi nhánh</DialogTitle>
             <DialogDescription>
-              Bạn có chắc chắn muốn xóa chi nhánh{" "}
-              <span className="font-medium">{selectedBranch?.name}</span>? Hành
-              động này không thể hoàn tác.
+              Tạo chi nhánh mới với thông tin cơ bản
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Xóa
-            </Button>
-          </DialogFooter>
+          <form onSubmit={handleQuickCreateSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="quick-brandId">Thương hiệu *</Label>
+                <Select
+                  value={formData.brandId}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, brandId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn thương hiệu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-name">Tên chi nhánh *</Label>
+                <Input
+                  id="quick-name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="VD: Chi nhánh Quận 1"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-code">Mã chi nhánh *</Label>
+                <Input
+                  id="quick-code"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  placeholder="VD: CN-Q1"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-address">Địa chỉ</Label>
+                <Input
+                  id="quick-address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="VD: 123 Nguyễn Huệ, Q.1, TP.HCM"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsQuickCreateOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={isSubmitting || !formData.brandId || !formData.name || !formData.code}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Tạo chi nhánh
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

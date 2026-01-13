@@ -1,21 +1,65 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Branch, Brand } from '../../database/entities';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { BranchListDto } from './dto/branch-list.dto';
+import { DashboardSyncService } from '../../common/services/dashboard-sync.service';
 
 @Injectable()
 export class BranchesService {
+  private readonly logger = new Logger(BranchesService.name);
+
   constructor(
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
     @InjectRepository(Brand)
     private readonly brandRepository: Repository<Brand>,
+    private readonly dashboardSyncService: DashboardSyncService,
   ) {}
 
-  async create(createBranchDto: CreateBranchDto): Promise<Branch> {
+  /**
+   * Sync branch to dashboard API (non-blocking)
+   */
+  private async syncBranchToDashboard(branch: Branch): Promise<void> {
+    try {
+      await this.dashboardSyncService.syncBranch({
+        id: branch.id,
+        tenantId: branch.tenantId,
+        brandId: branch.brandId,
+        name: branch.name,
+        code: branch.code,
+        logoUrl: branch.logoUrl,
+        addressDetail: branch.addressDetail,
+        provinceCode: branch.provinceCode,
+        wardCode: branch.wardCode,
+        phone: branch.phone,
+        email: branch.email,
+        manager: branch.manager,
+        openTime: branch.openTime,
+        closeTime: branch.closeTime,
+        businessModel: branch.businessModel,
+        isActive: branch.isActive,
+      });
+    } catch (error) {
+      // Log but don't throw - sync failure shouldn't block main operation
+      this.logger.error(`Failed to sync branch ${branch.code}: ${error}`);
+    }
+  }
+
+  /**
+   * Transform branch entity to response (map logoUrl to logo)
+   */
+  private transformBranch(branch: Branch): any {
+    const { logoUrl, ...rest } = branch as any;
+    return {
+      ...rest,
+      logo: logoUrl,
+    };
+  }
+
+  async create(createBranchDto: CreateBranchDto): Promise<any> {
     const brand = await this.brandRepository.findOne({
       where: { id: createBranchDto.brandId },
     });
@@ -30,16 +74,27 @@ export class BranchesService {
       throw new ConflictException('Mã chi nhánh đã tồn tại');
     }
 
-    // Tự động set tenant_id từ brand
-    const branch = this.branchRepository.create({
-      ...createBranchDto,
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = createBranchDto as any;
+    const branchData: Partial<Branch> = {
+      ...restDto,
       tenantId: brand.tenantId,
-    });
-    return this.branchRepository.save(branch);
+    };
+    if (logo !== undefined) {
+      branchData.logoUrl = logo;
+    }
+
+    const branch = this.branchRepository.create(branchData);
+    const saved = await this.branchRepository.save(branch);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBranchToDashboard(saved);
+
+    return this.transformBranch(saved);
   }
 
-  async findAll(paginationDto: PaginationDto & { brandId?: string }) {
-    const { page = 1, limit = 10, search, brandId } = paginationDto;
+  async findAll(query: BranchListDto) {
+    const { page = 1, limit = 10, search, brandId, companyId } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.branchRepository
@@ -59,13 +114,17 @@ export class BranchesService {
       queryBuilder.andWhere('branch.brandId = :brandId', { brandId });
     }
 
+    if (companyId) {
+      queryBuilder.andWhere('brand.companyId = :companyId', { companyId });
+    }
+
     queryBuilder.orderBy('branch.createdAt', 'DESC').skip(skip).take(limit);
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
     return {
       data: data.map((branch) => ({
-        ...branch,
+        ...this.transformBranch(branch),
         brandName: branch.brand?.name,
         companyName: branch.brand?.company?.name,
         packageName: branch.package?.name,
@@ -77,7 +136,7 @@ export class BranchesService {
     };
   }
 
-  async findOne(id: string): Promise<Branch> {
+  async findOne(id: string): Promise<any> {
     const branch = await this.branchRepository.findOne({
       where: { id },
       relations: ['brand', 'brand.company', 'package'],
@@ -87,23 +146,59 @@ export class BranchesService {
       throw new NotFoundException('Không tìm thấy chi nhánh');
     }
 
-    return branch;
+    return this.transformBranch(branch);
   }
 
-  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<Branch> {
-    const branch = await this.findOne(id);
-    Object.assign(branch, updateBranchDto);
-    return this.branchRepository.save(branch);
+  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<any> {
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Không tìm thấy chi nhánh');
+    }
+
+    // Map logo from DTO to logoUrl in entity
+    const { logo, ...restDto } = updateBranchDto as any;
+    if (logo !== undefined) {
+      branch.logoUrl = logo;
+    }
+    Object.assign(branch, restDto);
+    const saved = await this.branchRepository.save(branch);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBranchToDashboard(saved);
+
+    return this.transformBranch(saved);
   }
 
   async remove(id: string): Promise<void> {
-    const branch = await this.findOne(id);
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Không tìm thấy chi nhánh');
+    }
+
     await this.branchRepository.remove(branch);
   }
 
-  async toggleStatus(id: string): Promise<Branch> {
-    const branch = await this.findOne(id);
+  async toggleStatus(id: string): Promise<any> {
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Không tìm thấy chi nhánh');
+    }
+
     branch.isActive = !branch.isActive;
-    return this.branchRepository.save(branch);
+    const saved = await this.branchRepository.save(branch);
+
+    // Sync to dashboard API (non-blocking)
+    this.syncBranchToDashboard(saved);
+
+    return this.transformBranch(saved);
   }
 }

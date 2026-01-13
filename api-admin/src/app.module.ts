@@ -4,17 +4,23 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
+// Common module
+import { CommonModule } from './common/common.module';
+
 // Entities
 import {
   Company,
   Brand,
   Branch,
+  Department,
   Package,
   TransactionCategory,
   Permission,
   PermissionGroup,
   AdminUser,
   Staff,
+  Province,
+  Ward,
 } from './database/entities';
 
 // Modules
@@ -26,6 +32,8 @@ import { PackagesModule } from './modules/packages/packages.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
+import { LocationsModule } from './modules/locations/locations.module';
+import { TransactionCategoriesModule } from './modules/transaction-categories/transaction-categories.module';
 
 @Module({
   imports: [
@@ -40,27 +48,33 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get('DB_USER'),
-        password: configService.get('DB_PASSWORD'),
-        database: configService.get('DB_NAME'),
+        host: configService.get('DB_HOST', '172.16.10.146'),
+        port: configService.get<number>('DB_PORT', 5432),
+        username: configService.get('DB_USERNAME', 'techres_master'),
+        password: configService.get('DB_PASSWORD', 'techres_master'),
+        database: configService.get('DB_DATABASE', 'techres_master'),
         entities: [
           Company,
           Brand,
           Branch,
+          Department,
           Package,
           TransactionCategory,
           Permission,
           PermissionGroup,
           AdminUser,
           Staff,
+          Province,
+          Ward,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],
     }),
+
+    // Common module (global)
+    CommonModule,
 
     // Feature modules
     AuthModule,
@@ -71,6 +85,8 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
     CategoriesModule,
     PermissionsModule,
     AdminUsersModule,
+    LocationsModule,
+    TransactionCategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
