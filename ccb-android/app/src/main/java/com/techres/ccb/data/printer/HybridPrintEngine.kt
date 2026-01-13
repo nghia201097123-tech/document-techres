@@ -255,12 +255,16 @@ object BitmapTextRenderer {
             else -> 1f
         }
 
-        // Tạo TextPaint
+        // Tạo TextPaint - disable anti-alias for crisp thermal printing
         val textPaint = TextPaint().apply {
             color = Color.BLACK
             textSize = actualFontSize
-            isAntiAlias = true
-            isSubpixelText = true
+            // Disable anti-aliasing for sharper text on thermal printers
+            // Anti-aliased text causes gray edges that don't print well
+            isAntiAlias = false
+            isSubpixelText = false
+            // Use hinting for better character shapes
+            hinting = android.graphics.Paint.HINTING_ON
 
             // Chọn typeface phù hợp
             typeface = when {
@@ -322,7 +326,10 @@ object BitmapTextRenderer {
         val textPaint = TextPaint().apply {
             color = Color.BLACK
             textSize = style.fontSize
-            isAntiAlias = true
+            // Disable anti-aliasing for sharper text on thermal printers
+            isAntiAlias = false
+            isSubpixelText = false
+            hinting = android.graphics.Paint.HINTING_ON
             typeface = if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
 
@@ -370,11 +377,32 @@ class HybridBillBuilder(
      * Initialize printer
      */
     fun init(): HybridBillBuilder {
+        // Cancel any pending print data in buffer first
+        buffer.write(EscPosCommands.CANCEL)
+
+        // Reset printer to default state (clears buffer, resets settings)
         buffer.write(EscPosCommands.INIT)
-        // Set line spacing to 0 for bitmap mode
+
+        // Wait a bit for printer to reset (add empty bytes as delay)
+        // Some printers need time to process the INIT command
+
+        // Set print area width to match paper width
+        // GS W - Set print area width
+        val widthL = (pixelWidth % 256).toByte()
+        val widthH = (pixelWidth / 256).toByte()
+        buffer.write(byteArrayOf(GS, 0x57, widthL, widthH))
+
+        // Set left margin to 0 for proper alignment
+        buffer.write(byteArrayOf(GS, 0x4C, 0x00, 0x00))
+
+        // Set line spacing to 0 for bitmap mode (prevents gaps between bitmap lines)
         if (useBitmapMode) {
             buffer.write(byteArrayOf(ESC, 0x33, 0x00)) // ESC 3 0 - Set line spacing to 0
         }
+
+        // Ensure left alignment by default
+        buffer.write(EscPosCommands.ALIGN_LEFT)
+
         return this
     }
 
@@ -397,7 +425,8 @@ class HybridBillBuilder(
         if (useBitmapMode) {
             // BITMAP MODE - Đảm bảo Vietnamese hiển thị đúng
             val bitmap = BitmapTextRenderer.renderText(text, actualStyle, pixelWidth)
-            val imageData = EscPosCommands.printRasterBitmap(bitmap)
+            // Pass pixelWidth to ensure bitmap is printed at correct size without scaling
+            val imageData = EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             buffer.write(imageData)
             bitmap.recycle()
         } else {
@@ -453,7 +482,8 @@ class HybridBillBuilder(
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
-            val imageData = EscPosCommands.printRasterBitmap(bitmap)
+            // Pass pixelWidth to ensure bitmap is printed at correct size without scaling
+            val imageData = EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             buffer.write(imageData)
             bitmap.recycle()
         } else {
@@ -475,7 +505,8 @@ class HybridBillBuilder(
     fun separator(char: Char = '-'): HybridBillBuilder {
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, baseFontSize)
-            val imageData = EscPosCommands.printRasterBitmap(bitmap)
+            // Pass pixelWidth to ensure bitmap is printed at correct size without scaling
+            val imageData = EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             buffer.write(imageData)
             bitmap.recycle()
         } else {
@@ -494,9 +525,18 @@ class HybridBillBuilder(
 
     /**
      * Feed lines
+     * Note: In bitmap mode, line spacing is set to 0, so we need to reset it before feeding
      */
     fun feed(lines: Int = 1): HybridBillBuilder {
+        if (useBitmapMode) {
+            // Reset line spacing to default before feeding (otherwise feed won't work properly)
+            buffer.write(EscPosCommands.LINE_SPACING_DEFAULT)
+        }
         buffer.write(EscPosCommands.feedLines(lines))
+        if (useBitmapMode) {
+            // Set line spacing back to 0 for subsequent bitmap prints
+            buffer.write(byteArrayOf(ESC, 0x33, 0x00))
+        }
         return this
     }
 
@@ -527,6 +567,11 @@ class HybridBillBuilder(
      * Cắt giấy
      */
     fun cut(partial: Boolean = true): HybridBillBuilder {
+        // Ensure line spacing is reset to default before cutting
+        // This ensures any previous text is properly positioned
+        if (useBitmapMode) {
+            buffer.write(EscPosCommands.LINE_SPACING_DEFAULT)
+        }
         buffer.write(if (partial) EscPosCommands.CUT_PARTIAL else EscPosCommands.CUT_FULL)
         return this
     }

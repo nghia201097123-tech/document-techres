@@ -349,18 +349,19 @@ object EscPosCommands {
 
     /**
      * Print raster bitmap (better quality for some printers)
+     * @param bitmap The bitmap to print
+     * @param targetWidth Target width in pixels (should match paper width). Default 0 means no scaling.
      */
-    fun printRasterBitmap(bitmap: Bitmap): ByteArray {
+    fun printRasterBitmap(bitmap: Bitmap, targetWidth: Int = 0): ByteArray {
         val output = ByteArrayOutputStream()
 
         val width = bitmap.width
         val height = bitmap.height
 
-        // Scale if needed
-        val maxWidth = 384
-        val scaledBitmap = if (width > maxWidth) {
-            val scale = maxWidth.toFloat() / width
-            Bitmap.createScaledBitmap(bitmap, maxWidth, (height * scale).toInt(), true)
+        // Only scale if targetWidth is specified and different from bitmap width
+        val scaledBitmap = if (targetWidth > 0 && width != targetWidth) {
+            val scale = targetWidth.toFloat() / width
+            Bitmap.createScaledBitmap(bitmap, targetWidth, (height * scale).toInt(), true)
         } else {
             bitmap
         }
@@ -380,6 +381,10 @@ object EscPosCommands {
         val pixels = IntArray(w * h)
         scaledBitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
+        // Use a higher threshold (180) for better anti-aliased text rendering
+        // This ensures text edges are crisp and not broken
+        val threshold = 180
+
         for (y in 0 until h) {
             for (xByte in 0 until widthBytes) {
                 var byte = 0
@@ -390,7 +395,8 @@ object EscPosCommands {
                         val gray = (((pixel shr 16) and 0xFF) +
                                    ((pixel shr 8) and 0xFF) +
                                    (pixel and 0xFF)) / 3
-                        if (gray < 128) {
+                        // Print as black if gray value is below threshold
+                        if (gray < threshold) {
                             byte = byte or (0x80 shr bit)
                         }
                     }
