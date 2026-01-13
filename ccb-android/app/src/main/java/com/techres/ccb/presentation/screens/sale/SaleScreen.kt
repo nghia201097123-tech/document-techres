@@ -245,7 +245,7 @@ fun SaleScreen(
             }
             ProductVariantDialog(
                 product = uiState.selectedProductForVariant!!,
-                availableNotes = uiState.availableNotes,
+                availableNotes = uiState.notesForSelectedProduct, // Use product-specific notes
                 isAddingTopping = isAddingToExistingItem,
                 existingVariants = existingVariants,
                 onDismiss = { viewModel.hideVariantDialog() },
@@ -379,13 +379,13 @@ fun SaleScreen(
             )
         }
 
-        // Note Dialog
+        // Note Dialog - use product-specific notes
         if (uiState.showNoteDialog && uiState.selectedCartItemForNote != null) {
             val selectedItem = uiState.cartItems.find { it.id == uiState.selectedCartItemForNote }
             if (selectedItem != null) {
                 NoteDialog(
                     currentNote = selectedItem.note,
-                    availableNotes = uiState.availableNotes,
+                    availableNotes = uiState.notesForSelectedProduct, // Use product-specific notes
                     onDismiss = { viewModel.hideNoteDialog() },
                     onConfirm = { note ->
                         viewModel.applyNoteToCartItem(

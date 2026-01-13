@@ -100,6 +100,7 @@ data class SaleUiState(
     val showCustomerDialog: Boolean = false,
     val showNoteDialog: Boolean = false,
     val selectedCartItemForNote: String? = null,
+    val notesForSelectedProduct: List<ProductNoteEntity> = emptyList(), // Notes for the product being edited
     val selectedCartItemForTopping: String? = null, // For adding toppings to existing cart item
 
     // Messages
@@ -1672,11 +1673,19 @@ class SaleViewModel @Inject constructor(
     // ===== VARIANT DIALOG =====
 
     fun showVariantDialog(product: Product) {
-        _uiState.update { state ->
-            state.copy(
-                showVariantDialog = true,
-                selectedProductForVariant = product
-            )
+        viewModelScope.launch {
+            // Load notes for this specific product
+            val productNotes = withContext(Dispatchers.IO) {
+                productNoteDao.getNotesForProductSync(product.id)
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    showVariantDialog = true,
+                    selectedProductForVariant = product,
+                    notesForSelectedProduct = productNotes
+                )
+            }
         }
     }
 
@@ -1685,7 +1694,8 @@ class SaleViewModel @Inject constructor(
             state.copy(
                 showVariantDialog = false,
                 selectedProductForVariant = null,
-                selectedCartItemForTopping = null
+                selectedCartItemForTopping = null,
+                notesForSelectedProduct = emptyList()
             )
         }
     }
@@ -1695,12 +1705,21 @@ class SaleViewModel @Inject constructor(
      */
     fun showAddToppingDialog(cartItemId: String) {
         val cartItem = _uiState.value.cartItems.find { it.id == cartItemId } ?: return
-        _uiState.update { state ->
-            state.copy(
-                showVariantDialog = true,
-                selectedProductForVariant = cartItem.product,
-                selectedCartItemForTopping = cartItemId
-            )
+
+        viewModelScope.launch {
+            // Load notes for this specific product
+            val productNotes = withContext(Dispatchers.IO) {
+                productNoteDao.getNotesForProductSync(cartItem.product.id)
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    showVariantDialog = true,
+                    selectedProductForVariant = cartItem.product,
+                    selectedCartItemForTopping = cartItemId,
+                    notesForSelectedProduct = productNotes
+                )
+            }
         }
     }
 
@@ -1757,11 +1776,27 @@ class SaleViewModel @Inject constructor(
     // ===== NOTE DIALOG =====
 
     fun showNoteDialog(cartItemId: String) {
-        _uiState.update { state ->
-            state.copy(
-                showNoteDialog = true,
-                selectedCartItemForNote = cartItemId
-            )
+        viewModelScope.launch {
+            // Find the cart item to get its product ID
+            val cartItem = _uiState.value.cartItems.find { it.id == cartItemId }
+            val productId = cartItem?.product?.id
+
+            // Load notes for this specific product
+            val productNotes = if (productId != null) {
+                withContext(Dispatchers.IO) {
+                    productNoteDao.getNotesForProductSync(productId)
+                }
+            } else {
+                emptyList()
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    showNoteDialog = true,
+                    selectedCartItemForNote = cartItemId,
+                    notesForSelectedProduct = productNotes
+                )
+            }
         }
     }
 
@@ -1769,7 +1804,8 @@ class SaleViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 showNoteDialog = false,
-                selectedCartItemForNote = null
+                selectedCartItemForNote = null,
+                notesForSelectedProduct = emptyList()
             )
         }
     }
