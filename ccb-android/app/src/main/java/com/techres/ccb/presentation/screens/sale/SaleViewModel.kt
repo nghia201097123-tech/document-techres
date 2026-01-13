@@ -1092,38 +1092,87 @@ class SaleViewModel @Inject constructor(
     /**
      * Áp dụng giảm giá hóa đơn (số tiền cố định)
      * Giới hạn giảm giá để tổng không bị âm
+     * Lưu discount vào database nếu có order đang hoạt động
      */
     fun applyDiscount(amount: Long, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
-        _uiState.update { state ->
-            // Số tiền tối đa có thể giảm = orderSubtotal - itemDiscountTotal - couponDiscount
-            val maxBillDiscount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
-            val finalAmount = amount.coerceAtMost(maxBillDiscount)
-            Log.d(TAG, "applyDiscount - requested: $amount, maxAllowed: $maxBillDiscount, applied: $finalAmount")
-            state.copy(
+        val state = _uiState.value
+        val maxBillDiscount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
+        val finalAmount = amount.coerceAtMost(maxBillDiscount)
+        Log.d(TAG, "applyDiscount - requested: $amount, maxAllowed: $maxBillDiscount, applied: $finalAmount")
+
+        // Update UI state
+        _uiState.update { s ->
+            s.copy(
                 billDiscountAmount = finalAmount,
                 billDiscountDescription = reason
             )
         }
+
+        // Lưu vào database nếu có currentOrder
+        saveOrderDiscountToDatabase(finalAmount, reason)
     }
 
     /**
      * Áp dụng giảm giá hóa đơn theo phần trăm
      * Tính % trên số tiền còn lại sau khi đã trừ giảm giá món và coupon
      * Giới hạn giảm giá để tổng không bị âm
+     * Lưu discount vào database nếu có order đang hoạt động
      */
     fun applyPercentDiscount(percent: Int, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
-        _uiState.update { state ->
-            // Số tiền còn lại sau khi trừ giảm giá món và coupon
-            val remainingAmount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
-            // Tính % giảm giá trên số tiền còn lại (không phải trên subtotal gốc)
-            val discountAmount = (remainingAmount * percent / 100)
-            Log.d(TAG, "applyPercentDiscount - percent: $percent%, subtotal: $orderSubtotal, remaining: $remainingAmount, calculated: $discountAmount")
-            state.copy(
+        val state = _uiState.value
+        // Số tiền còn lại sau khi trừ giảm giá món và coupon
+        val remainingAmount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
+        // Tính % giảm giá trên số tiền còn lại (không phải trên subtotal gốc)
+        val discountAmount = (remainingAmount * percent / 100)
+        Log.d(TAG, "applyPercentDiscount - percent: $percent%, subtotal: $orderSubtotal, remaining: $remainingAmount, calculated: $discountAmount")
+
+        // Update UI state
+        _uiState.update { s ->
+            s.copy(
                 billDiscountAmount = discountAmount,
                 billDiscountDescription = reason
             )
+        }
+
+        // Lưu vào database nếu có currentOrder
+        saveOrderDiscountToDatabase(discountAmount, reason)
+    }
+
+    /**
+     * Lưu bill discount và total discount vào order trong database
+     */
+    private fun saveOrderDiscountToDatabase(billDiscountAmount: Long, reason: String?) {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+
+        viewModelScope.launch {
+            try {
+                val now = getCurrentTimestamp()
+                // Total discount = item discounts + bill discount + coupon discount
+                val totalDiscount = state.itemDiscountTotal + billDiscountAmount + state.totalCouponDiscount
+
+                val updatedOrder = currentOrder.copy(
+                    discountAmount = totalDiscount.toDouble(),
+                    discountReason = reason,
+                    totalAmount = (currentOrder.subtotal - totalDiscount).coerceAtLeast(0.0),
+                    updatedAt = now
+                )
+
+                withContext(Dispatchers.IO) {
+                    orderRepository.updateOrder(updatedOrder)
+                }
+
+                Log.d(TAG, "saveOrderDiscountToDatabase - Saved: billDiscount=$billDiscountAmount, totalDiscount=$totalDiscount")
+
+                // Update currentOrder trong UI state
+                _uiState.update { s ->
+                    s.copy(currentOrder = updatedOrder)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "saveOrderDiscountToDatabase - Error: ${e.message}", e)
+            }
         }
     }
 
@@ -1169,37 +1218,74 @@ class SaleViewModel @Inject constructor(
     /**
      * Áp dụng giảm giá cho một món cụ thể
      * Giới hạn giảm giá không vượt quá giá của món và tổng đơn hàng
+     * Lưu discount vào database nếu item thuộc order đã tồn tại
      */
     fun applyItemDiscount(itemId: String, amount: Long) {
         val orderSubtotal = getOrderSubtotal()
-        _uiState.update { state ->
-            // Tìm giá của món từ cartItems hoặc currentOrderItems
-            val itemPrice = state.cartItems.find { it.id == itemId }?.totalPrice
-                ?: state.currentOrderItems.find { it.id == itemId }?.totalPrice?.toLong()
-                ?: 0L
+        val state = _uiState.value
 
-            // Tính tổng giảm giá các món khác (không bao gồm món hiện tại)
-            val otherItemDiscounts = state.itemDiscounts
-                .filterKeys { it != itemId }
-                .values.sum()
+        // Tìm giá của món từ cartItems hoặc currentOrderItems
+        val itemPrice = state.cartItems.find { it.id == itemId }?.totalPrice
+            ?: state.currentOrderItems.find { it.id == itemId }?.totalPrice?.toLong()
+            ?: 0L
 
-            // Số tiền tối đa có thể giảm cho món này
-            // = min(giá món, orderSubtotal - otherItemDiscounts - billDiscount - couponDiscount)
-            val maxItemDiscount = minOf(
-                itemPrice,
-                (orderSubtotal - otherItemDiscounts - state.billDiscountAmount - state.totalCouponDiscount).coerceAtLeast(0L)
-            )
+        // Tính tổng giảm giá các món khác (không bao gồm món hiện tại)
+        val otherItemDiscounts = state.itemDiscounts
+            .filterKeys { it != itemId }
+            .values.sum()
 
-            val finalAmount = amount.coerceAtMost(maxItemDiscount)
-            Log.d(TAG, "applyItemDiscount - itemId: $itemId, requested: $amount, itemPrice: $itemPrice, maxAllowed: $maxItemDiscount, applied: $finalAmount")
+        // Số tiền tối đa có thể giảm cho món này
+        // = min(giá món, orderSubtotal - otherItemDiscounts - billDiscount - couponDiscount)
+        val maxItemDiscount = minOf(
+            itemPrice,
+            (orderSubtotal - otherItemDiscounts - state.billDiscountAmount - state.totalCouponDiscount).coerceAtLeast(0L)
+        )
 
-            val newItemDiscounts = state.itemDiscounts.toMutableMap()
+        val finalAmount = amount.coerceAtMost(maxItemDiscount)
+        Log.d(TAG, "applyItemDiscount - itemId: $itemId, requested: $amount, itemPrice: $itemPrice, maxAllowed: $maxItemDiscount, applied: $finalAmount")
+
+        // Update UI state
+        _uiState.update { s ->
+            val newItemDiscounts = s.itemDiscounts.toMutableMap()
             if (finalAmount > 0) {
                 newItemDiscounts[itemId] = finalAmount
             } else {
                 newItemDiscounts.remove(itemId)
             }
-            state.copy(itemDiscounts = newItemDiscounts)
+            s.copy(itemDiscounts = newItemDiscounts)
+        }
+
+        // Lưu discount vào database nếu item thuộc currentOrderItems (order đã tồn tại)
+        val orderItem = state.currentOrderItems.find { it.id == itemId }
+        if (orderItem != null) {
+            viewModelScope.launch {
+                try {
+                    val now = getCurrentTimestamp()
+                    val updatedItem = orderItem.copy(
+                        discountAmount = finalAmount.toDouble(),
+                        updatedAt = now
+                    )
+                    withContext(Dispatchers.IO) {
+                        orderRepository.updateOrderItem(updatedItem)
+                    }
+                    Log.d(TAG, "applyItemDiscount - Saved item discount to database: $itemId = $finalAmount")
+
+                    // Update currentOrderItems với discount mới
+                    _uiState.update { s ->
+                        s.copy(
+                            currentOrderItems = s.currentOrderItems.map {
+                                if (it.id == itemId) updatedItem else it
+                            }
+                        )
+                    }
+
+                    // Cập nhật total discount trong order
+                    val updatedState = _uiState.value
+                    saveOrderDiscountToDatabase(updatedState.billDiscountAmount, updatedState.billDiscountDescription)
+                } catch (e: Exception) {
+                    Log.e(TAG, "applyItemDiscount - Error saving to database: ${e.message}", e)
+                }
+            }
         }
     }
 
