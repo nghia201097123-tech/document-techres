@@ -252,15 +252,9 @@ fun PaymentDialog(
                             // Quick suggestions - 1 tap to select
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                             ) {
-                                val suggestions = listOf(
-                                    totalAmount to "Đủ",
-                                    roundUp(totalAmount, 50000) to null,
-                                    roundUp(totalAmount, 100000) to null,
-                                    roundUp(totalAmount, 200000) to null,
-                                    500000L to "500k"
-                                ).filter { it.first >= totalAmount }.distinctBy { it.first }.take(5)
+                                val suggestions = buildQuickAmountSuggestions(totalAmount)
 
                                 suggestions.forEach { (amount, label) ->
                                     val isActive = receivedAmount == amount
@@ -1327,4 +1321,70 @@ fun NumPadCompact(
 
 private fun roundUp(amount: Long, unit: Long): Long {
     return ((amount + unit - 1) / unit) * unit
+}
+
+/**
+ * Tạo danh sách gợi ý số tiền nhanh dựa trên tổng tiền
+ * Gợi ý các mệnh giá phổ biến và làm tròn hợp lý
+ */
+private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, String?>> {
+    val suggestions = mutableListOf<Pair<Long, String?>>()
+
+    // 1. Số tiền chính xác (Đủ)
+    suggestions.add(totalAmount to "Đủ")
+
+    // 2. Làm tròn lên các mốc nhỏ (nếu khác totalAmount)
+    val smallRoundUps = listOf(10000L, 20000L, 50000L, 100000L)
+    smallRoundUps.forEach { unit ->
+        val rounded = roundUp(totalAmount, unit)
+        if (rounded > totalAmount && rounded !in suggestions.map { it.first }) {
+            suggestions.add(rounded to null)
+        }
+    }
+
+    // 3. Các mệnh giá tiền phổ biến (làm tròn lên)
+    val commonDenominations = listOf(
+        100000L, 200000L, 500000L,
+        1000000L, 1500000L, 2000000L,
+        3000000L, 5000000L, 10000000L
+    )
+    commonDenominations.forEach { denom ->
+        if (denom >= totalAmount && denom !in suggestions.map { it.first }) {
+            val label = when {
+                denom >= 1000000L -> "${denom / 1000000}M"
+                else -> "${denom / 1000}k"
+            }
+            suggestions.add(denom to label)
+        }
+    }
+
+    // 4. Thêm các mốc tiền lẻ hữu ích cho số tiền lớn (VD: 1M + 100k, 1M + 200k)
+    if (totalAmount > 500000L) {
+        val baseAmounts = listOf(1000000L, 2000000L, 5000000L)
+        val additions = listOf(100000L, 200000L, 500000L)
+        baseAmounts.forEach { base ->
+            additions.forEach { add ->
+                val combined = base + add
+                if (combined > totalAmount && combined !in suggestions.map { it.first }) {
+                    val label = when {
+                        combined == 1100000L -> "1.1M"
+                        combined == 1200000L -> "1.2M"
+                        combined == 1500000L -> "1.5M"
+                        combined == 2100000L -> "2.1M"
+                        combined == 2200000L -> "2.2M"
+                        combined == 2500000L -> "2.5M"
+                        combined >= 1000000L -> "${combined / 1000}k"
+                        else -> "${combined / 1000}k"
+                    }
+                    suggestions.add(combined to label)
+                }
+            }
+        }
+    }
+
+    // Sắp xếp theo số tiền và lấy tối đa 8 gợi ý
+    return suggestions
+        .distinctBy { it.first }
+        .sortedBy { it.first }
+        .take(8)
 }
