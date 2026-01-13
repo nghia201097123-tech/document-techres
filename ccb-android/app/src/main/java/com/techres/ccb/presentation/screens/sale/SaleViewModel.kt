@@ -1440,18 +1440,25 @@ class SaleViewModel @Inject constructor(
                 val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
 
                 // Lấy tất cả coupon có thể áp dụng (cả auto và manual) để hiển thị
-                val allApplicableCoupons = withContext(Dispatchers.IO) {
-                    couponDao.getApplicableCoupons(branchId, currentDate, orderAmount)
+                val allApplicableCoupons = try {
+                    withContext(Dispatchers.IO) {
+                        couponDao.getApplicableCoupons(branchId, currentDate, orderAmount)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "loadAutoCoupons - Error fetching coupons: ${e.message}", e)
+                    emptyList()
                 }
 
                 // Lọc chỉ auto coupon để tự động áp dụng
-                val autoCoupons = allApplicableCoupons.filter { it.activationType == "auto" }
+                val autoCoupons = allApplicableCoupons.filter {
+                    it.activationType == "auto" && it.minOrderAmount <= orderAmount
+                }
 
                 // Áp dụng auto coupons
                 val appliedDiscounts = mutableListOf<AppliedDiscount>()
                 var totalDiscount = 0L
 
-                for (coupon in autoCoupons.filter { it.minOrderAmount <= orderAmount }) {
+                for (coupon in autoCoupons) {
                     // Kiểm tra combinable
                     if (!coupon.isCombinable && appliedDiscounts.isNotEmpty()) {
                         continue
@@ -1492,6 +1499,10 @@ class SaleViewModel @Inject constructor(
                 Log.d(TAG, "loadAutoCoupons - Applied ${appliedDiscounts.size} auto coupons, showing ${allApplicableCoupons.size} available coupons")
             } catch (e: Exception) {
                 Log.e(TAG, "loadAutoCoupons - Error: ${e.message}", e)
+                // Đảm bảo state được reset khi có lỗi
+                _uiState.update { s ->
+                    s.copy(availableCoupons = emptyList())
+                }
             }
         }
     }
