@@ -1768,7 +1768,10 @@ class SaleViewModel @Inject constructor(
 
                     // 5. Print bill (always print on payment completion)
                     try {
+                        Log.d(TAG, "completeOrder - Attempting to print bill, branchId: $branchId")
                         val printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
+                        Log.d(TAG, "completeOrder - printerConfig: ${printerConfig?.id}, isActive: ${printerConfig?.isActive}, ip: ${printerConfig?.printerIp}")
+
                         if (printerConfig != null && printerConfig.isActive) {
                             // Get template (from printer config or default for branch)
                             val template = if (printerConfig.templateId != null) {
@@ -1776,6 +1779,7 @@ class SaleViewModel @Inject constructor(
                             } else {
                                 billTemplateDao.getDefaultByBranch(branchId)
                             }
+                            Log.d(TAG, "completeOrder - template: ${template?.id}, isActive: ${template?.isActive}")
 
                             if (template != null && template.isActive) {
                                 // Build bill data from order
@@ -1804,14 +1808,15 @@ class SaleViewModel @Inject constructor(
                                     }
                                 }
                             } else {
-                                Log.w(TAG, "completeOrder - No active bill template found")
+                                Log.w(TAG, "completeOrder - No active bill template found, templateId: ${printerConfig.templateId}")
                             }
                         } else {
-                            Log.d(TAG, "completeOrder - Auto print disabled or no printer configured")
+                            Log.w(TAG, "completeOrder - No printer configured or printer not active for branch: $branchId")
                         }
                     } catch (e: Exception) {
                         // Don't fail the payment if printing fails
                         Log.e(TAG, "completeOrder - Bill print error: ${e.message}", e)
+                        e.printStackTrace()
                     }
                 }
 
