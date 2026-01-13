@@ -1,5 +1,10 @@
 package com.techres.ccb.data.printer
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.Log
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
@@ -7,6 +12,7 @@ import com.techres.ccb.data.local.entity.BillTemplateType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -630,6 +636,7 @@ data class BillTopping(
 
 /**
  * Bill Builder - Helper class to build ESC/POS commands
+ * Hỗ trợ in tiếng Việt có dấu
  */
 class BillBuilder(paperWidth: Int) {
     private val buffer = mutableListOf<Byte>()
@@ -651,7 +658,25 @@ class BillBuilder(paperWidth: Int) {
     private val OPEN_DRAWER = byteArrayOf(0x1B, 0x70, 0x00, 0x19, 0x78)
     private val BEEP = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
 
-    fun init() = apply { buffer.addAll(INIT.toList()) }
+    // Vietnamese/UTF-8 Character Set Commands
+    // ESC t n - Select character code table
+    private val CODEPAGE_UTF8 = byteArrayOf(0x1B, 0x74, 0xFF.toByte())  // UTF-8 mode (some printers)
+    private val CODEPAGE_WPC1252 = byteArrayOf(0x1B, 0x74, 0x10)       // Windows-1252 (Latin-1)
+    // FS . - Cancel Chinese character mode (ensure ASCII/UTF-8 mode)
+    private val CANCEL_CHINESE = byteArrayOf(0x1C, 0x2E)
+    // FS & - Select Kanji character mode (enables multibyte)
+    private val ENABLE_MULTIBYTE = byteArrayOf(0x1C, 0x26)
+    // ESC R n - Select international character set
+    private val CHARSET_VIETNAM = byteArrayOf(0x1B, 0x52, 0x00)        // USA (base for UTF-8)
+
+    fun init() = apply {
+        buffer.addAll(INIT.toList())
+        // Enable Vietnamese/UTF-8 support
+        // Order matters: cancel Chinese mode first, then set UTF-8 codepage
+        buffer.addAll(CANCEL_CHINESE.toList())
+        buffer.addAll(CODEPAGE_UTF8.toList())
+        buffer.addAll(CHARSET_VIETNAM.toList())
+    }
     fun alignLeft() = apply { buffer.addAll(ALIGN_LEFT.toList()) }
     fun alignCenter() = apply { buffer.addAll(ALIGN_CENTER.toList()) }
     fun alignRight() = apply { buffer.addAll(ALIGN_RIGHT.toList()) }
@@ -721,6 +746,79 @@ class BillBuilder(paperWidth: Int) {
         buffer.addAll(byteArrayOf(0x1D, 0x48, 0x02).toList()) // HRI below barcode
         buffer.addAll(byteArrayOf(0x1D, 0x6B, 0x49, content.length.toByte()).toList())
         buffer.addAll(content.toByteArray(Charsets.UTF_8).toList())
+    }
+
+    /**
+     * In text tiếng Việt dưới dạng hình ảnh (bitmap)
+     * Dùng khi máy in không hỗ trợ UTF-8 Vietnamese
+     */
+    fun lineAsBitmap(text: String, fontSize: Float = 24f, bold: Boolean = false) = apply {
+        val bitmap = textToBitmap(text, fontSize, bold)
+        printBitmap(bitmap)
+        bitmap.recycle()
+    }
+
+    /**
+     * Convert text thành bitmap để in
+     */
+    private fun textToBitmap(text: String, fontSize: Float, bold: Boolean): Bitmap {
+        val paint = Paint().apply {
+            color = Color.BLACK
+            textSize = fontSize
+            isAntiAlias = true
+            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+
+        // Calculate width based on paper (58mm ~ 384px, 80mm ~ 576px)
+        val maxWidth = if (lineWidth <= 32) 384 else 576
+        val textWidth = paint.measureText(text).toInt()
+        val width = minOf(textWidth + 10, maxWidth)
+        val height = (fontSize * 1.5f).toInt()
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+        canvas.drawText(text, 5f, fontSize, paint)
+
+        return bitmap
+    }
+
+    /**
+     * Print bitmap as ESC/POS raster image
+     */
+    private fun printBitmap(bitmap: Bitmap) {
+        val width = bitmap.width
+        val height = bitmap.height
+        val bytesPerLine = (width + 7) / 8
+
+        // Convert to monochrome
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        // GS v 0 - Print raster bit image
+        buffer.addAll(byteArrayOf(0x1D, 0x76, 0x30, 0x00).toList())
+        buffer.add((bytesPerLine and 0xFF).toByte())
+        buffer.add(((bytesPerLine shr 8) and 0xFF).toByte())
+        buffer.add((height and 0xFF).toByte())
+        buffer.add(((height shr 8) and 0xFF).toByte())
+
+        // Convert pixels to monochrome bytes
+        for (y in 0 until height) {
+            for (x in 0 until bytesPerLine) {
+                var byte = 0
+                for (bit in 0 until 8) {
+                    val px = x * 8 + bit
+                    if (px < width) {
+                        val pixel = pixels[y * width + px]
+                        val gray = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3
+                        if (gray < 128) { // Dark pixel
+                            byte = byte or (0x80 shr bit)
+                        }
+                    }
+                }
+                buffer.add(byte.toByte())
+            }
+        }
     }
 
     fun build(): ByteArray = buffer.toByteArray()
