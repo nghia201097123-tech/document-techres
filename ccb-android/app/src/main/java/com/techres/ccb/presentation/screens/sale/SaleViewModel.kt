@@ -889,13 +889,32 @@ class SaleViewModel @Inject constructor(
                 // Determine order type based on table
                 val orderType = if (selectedTable != null) OrderType.DINE_IN else OrderType.TAKE_AWAY
 
+                // Restore item discounts from order items
+                val restoredItemDiscounts = orderItems
+                    .filter { it.discountAmount > 0 }
+                    .associate { it.id to it.discountAmount.toLong() }
+
+                // Calculate total item discount
+                val totalItemDiscount = restoredItemDiscounts.values.sum()
+
+                // Calculate bill discount (total discount - item discounts)
+                // Note: order.discountAmount có thể bao gồm cả item discount và bill discount
+                val restoredBillDiscount = (order.discountAmount - totalItemDiscount).coerceAtLeast(0.0).toLong()
+
+                Log.d(TAG, "loadExistingOrder - Restoring discounts: totalDiscount=${order.discountAmount}, " +
+                    "itemDiscounts=$totalItemDiscount, billDiscount=$restoredBillDiscount")
+
                 _uiState.update { state ->
                     state.copy(
                         currentOrder = order,
                         currentOrderItems = orderItems,
                         selectedTable = selectedTable,
                         orderType = orderType,
-                        cartItems = emptyList() // Clear cart when loading existing order
+                        cartItems = emptyList(), // Clear cart when loading existing order
+                        // Restore discount states
+                        itemDiscounts = restoredItemDiscounts,
+                        billDiscountAmount = restoredBillDiscount,
+                        billDiscountDescription = order.discountReason
                     )
                 }
 
@@ -974,6 +993,29 @@ class SaleViewModel @Inject constructor(
                 emptyList()
             }
 
+            // Restore discount states from order/items
+            val restoredItemDiscounts: Map<String, Long>
+            val restoredBillDiscount: Long
+            val restoredBillDescription: String?
+
+            if (activeOrder != null) {
+                // Build item discounts map from order items
+                restoredItemDiscounts = orderItems
+                    .filter { it.discountAmount > 0 }
+                    .associate { it.id to it.discountAmount.toLong() }
+
+                val totalItemDiscount = restoredItemDiscounts.values.sum()
+                restoredBillDiscount = (activeOrder.discountAmount - totalItemDiscount).coerceAtLeast(0.0).toLong()
+                restoredBillDescription = activeOrder.discountReason
+
+                Log.d(TAG, "selectTable - Restoring discounts: total=${activeOrder.discountAmount}, " +
+                    "items=$totalItemDiscount, bill=$restoredBillDiscount")
+            } else {
+                restoredItemDiscounts = emptyMap()
+                restoredBillDiscount = 0L
+                restoredBillDescription = null
+            }
+
             Log.d(TAG, "selectTable - table: ${table.name}, activeOrder: ${activeOrder?.orderNumber}, items: ${orderItems.size}")
 
             _uiState.update { state ->
@@ -985,7 +1027,11 @@ class SaleViewModel @Inject constructor(
                     // Clear cart when switching tables with active order
                     cartItems = if (activeOrder != null) emptyList() else state.cartItems,
                     // Reset temp bill print count when switching tables
-                    tempBillPrintCount = 0
+                    tempBillPrintCount = 0,
+                    // Restore discount states
+                    itemDiscounts = restoredItemDiscounts,
+                    billDiscountAmount = restoredBillDiscount,
+                    billDiscountDescription = restoredBillDescription
                 )
             }
         }
@@ -1063,18 +1109,19 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Áp dụng giảm giá hóa đơn theo phần trăm
+     * Tính % trên số tiền còn lại sau khi đã trừ giảm giá món và coupon
      * Giới hạn giảm giá để tổng không bị âm
      */
     fun applyPercentDiscount(percent: Int, reason: String?) {
         val orderSubtotal = getOrderSubtotal()
-        val discountAmount = (orderSubtotal * percent / 100)
         _uiState.update { state ->
-            // Số tiền tối đa có thể giảm = orderSubtotal - itemDiscountTotal - couponDiscount
-            val maxBillDiscount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
-            val finalAmount = discountAmount.coerceAtMost(maxBillDiscount)
-            Log.d(TAG, "applyPercentDiscount - percent: $percent%, calculated: $discountAmount, maxAllowed: $maxBillDiscount, applied: $finalAmount")
+            // Số tiền còn lại sau khi trừ giảm giá món và coupon
+            val remainingAmount = (orderSubtotal - state.itemDiscountTotal - state.totalCouponDiscount).coerceAtLeast(0L)
+            // Tính % giảm giá trên số tiền còn lại (không phải trên subtotal gốc)
+            val discountAmount = (remainingAmount * percent / 100)
+            Log.d(TAG, "applyPercentDiscount - percent: $percent%, subtotal: $orderSubtotal, remaining: $remainingAmount, calculated: $discountAmount")
             state.copy(
-                billDiscountAmount = finalAmount,
+                billDiscountAmount = discountAmount,
                 billDiscountDescription = reason
             )
         }
