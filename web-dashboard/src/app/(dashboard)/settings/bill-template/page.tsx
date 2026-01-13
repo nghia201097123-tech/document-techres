@@ -1543,87 +1543,226 @@ export default function BillTemplatePage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xem trước mẫu bill</DialogTitle>
-            <DialogDescription>{previewTemplate?.name}</DialogDescription>
+            <DialogDescription>{previewTemplate?.name} - {previewTemplate?.paperWidth}mm</DialogDescription>
           </DialogHeader>
           {previewTemplate && (
-            <div className="bg-white p-4 border rounded-lg font-mono text-sm" style={{ width: previewTemplate.paperWidth === 58 ? "200px" : "280px" }}>
-              {/* Simulated bill preview */}
-              <div className="text-center space-y-1">
-                {previewTemplate.showLogo && (
-                  <div className="text-xs text-muted-foreground">[LOGO]</div>
+            <ScrollArea className="max-h-[70vh]">
+              <div className="bg-white p-4 border rounded-lg font-mono text-sm mx-auto" style={{ width: previewTemplate.paperWidth <= 58 ? "200px" : previewTemplate.paperWidth <= 80 ? "280px" : "350px" }}>
+                {/* ============ HEADER ============ */}
+                <div className="text-center space-y-1">
+                  {previewTemplate.showLogo && (
+                    <div className="text-xs text-muted-foreground border border-dashed p-2">[LOGO]</div>
+                  )}
+                  <p className="font-bold text-base">{previewTemplate.storeName}</p>
+                  {previewTemplate.storeAddress && (
+                    <p className="text-xs">{previewTemplate.storeAddress}</p>
+                  )}
+                  {previewTemplate.storePhone && (
+                    <p className="text-xs">ĐT: {previewTemplate.storePhone}</p>
+                  )}
+                  {previewTemplate.taxCode && (
+                    <p className="text-xs">MST: {previewTemplate.taxCode}</p>
+                  )}
+                  {previewTemplate.headerText && (
+                    <p className="text-xs">{previewTemplate.headerText}</p>
+                  )}
+                </div>
+
+                {/* ============ BILL TITLE ============ */}
+                <div className="my-2 border-t-2 border-double" />
+                <p className="text-center font-bold">{previewTemplate.billTitle}</p>
+                <div className="my-2 border-t-2 border-double" />
+
+                {/* ============ ORDER INFO ============ */}
+                {previewTemplate.showOrderNumber && <p>Mã đơn: #123456</p>}
+                {previewTemplate.showTableName && <p>Bàn: A01</p>}
+                {previewTemplate.showStaffName && <p>NV: Nguyễn Văn A</p>}
+                {previewTemplate.showCustomerName && <p>Khách hàng: Trần Văn B</p>}
+                {previewTemplate.showDateTime && <p>Giờ: 15:30 01/01/2024</p>}
+
+                <div className="my-2 border-t border-dashed" />
+
+                {/* ============ ITEMS ============ */}
+                <div className="space-y-2">
+                  {/* Item 1 */}
+                  <div>
+                    <p>Phở bò tái nạm</p>
+                    {(previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
+                      <div className="flex justify-between text-xs">
+                        <span className="pl-2">
+                          {previewTemplate.showQuantity && "2"}
+                          {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
+                          {previewTemplate.showUnitPrice && "25,000"}
+                        </span>
+                        <span>50,000</span>
+                      </div>
+                    )}
+                    {previewTemplate.showItemCode && (
+                      <p className="text-xs pl-2 text-muted-foreground">Mã: PHO01</p>
+                    )}
+                    {previewTemplate.showItemNote && (
+                      <p className="text-xs pl-2 italic">Ghi chú: Ít hành</p>
+                    )}
+                  </div>
+
+                  {/* Item 2 */}
+                  <div>
+                    <p>Trà đá</p>
+                    {(previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
+                      <div className="flex justify-between text-xs">
+                        <span className="pl-2">
+                          {previewTemplate.showQuantity && "1"}
+                          {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
+                          {previewTemplate.showUnitPrice && "5,000"}
+                        </span>
+                        <span>5,000</span>
+                      </div>
+                    )}
+                    {previewTemplate.showItemCode && (
+                      <p className="text-xs pl-2 text-muted-foreground">Mã: TRA01</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="my-2 border-t border-dashed" />
+
+                {/* ============ TOTALS ============ */}
+                {previewTemplate.showSubtotal && (
+                  <div className="flex justify-between">
+                    <span>Tạm tính:</span>
+                    <span>55,000</span>
+                  </div>
                 )}
-                <p className="font-bold">{previewTemplate.storeName}</p>
-                {previewTemplate.storeAddress && (
-                  <p className="text-xs">{previewTemplate.storeAddress}</p>
+
+                {previewTemplate.showDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>
+                      Giảm giá{previewTemplate.showDiscountPercent && " (10%)"}:
+                    </span>
+                    <span>-5,500</span>
+                  </div>
                 )}
-                {previewTemplate.storePhone && (
-                  <p className="text-xs">ĐT: {previewTemplate.storePhone}</p>
+
+                {previewTemplate.showServiceFee && (
+                  <div className="flex justify-between">
+                    <span>Phí dịch vụ:</span>
+                    <span>5,000</span>
+                  </div>
                 )}
-                {previewTemplate.taxCode && (
-                  <p className="text-xs">MST: {previewTemplate.taxCode}</p>
+
+                {/* ============ VAT INFO ============ */}
+                {previewTemplate.showVatDetails && (
+                  <>
+                    {previewTemplate.showPriceBeforeVat && (
+                      <div className="flex justify-between">
+                        <span>{previewTemplate.priceBeforeVatLabel || "Giá trước thuế"}:</span>
+                        <span>49,545</span>
+                      </div>
+                    )}
+                    {previewTemplate.showVat && (
+                      <div className="flex justify-between">
+                        <span>{previewTemplate.vatLabel || "VAT"} (10%):</span>
+                        <span>4,955</span>
+                      </div>
+                    )}
+                    {previewTemplate.showPriceAfterVat && (
+                      <div className="flex justify-between">
+                        <span>{previewTemplate.priceAfterVatLabel || "Giá sau thuế"}:</span>
+                        <span>54,500</span>
+                      </div>
+                    )}
+                  </>
                 )}
+                {!previewTemplate.showVatDetails && previewTemplate.showVat && (
+                  <div className="flex justify-between">
+                    <span>{previewTemplate.vatLabel || "VAT"} (10%):</span>
+                    <span>4,955</span>
+                  </div>
+                )}
+
+                <div className="my-2 border-t-2 border-double" />
+
+                {/* ============ TOTAL ============ */}
+                <div className="flex justify-between font-bold text-lg">
+                  <span>TỔNG:</span>
+                  <span>54,500đ</span>
+                </div>
+
+                {/* ============ PAYMENT INFO ============ */}
+                {previewTemplate.showPaymentMethod && (
+                  <div className="flex justify-between text-sm">
+                    <span>Thanh toán:</span>
+                    <span>Tiền mặt</span>
+                  </div>
+                )}
+                {previewTemplate.showReceivedAmount && (
+                  <div className="flex justify-between text-sm">
+                    <span>Tiền khách:</span>
+                    <span>100,000</span>
+                  </div>
+                )}
+                {previewTemplate.showChangeAmount && (
+                  <div className="flex justify-between text-sm">
+                    <span>Tiền thừa:</span>
+                    <span>45,500</span>
+                  </div>
+                )}
+
+                {/* ============ QR CODE ============ */}
+                {previewTemplate.showQrCode && (
+                  <div className="text-center my-3">
+                    <div className="inline-block border border-dashed p-4">
+                      <div className="text-xs text-muted-foreground">[QR CODE]</div>
+                      <div className="text-xs text-muted-foreground">
+                        {previewTemplate.qrCodeType === "order_id" && "Mã đơn hàng"}
+                        {previewTemplate.qrCodeType === "payment" && "Thanh toán"}
+                        {previewTemplate.qrCodeType === "review" && "Đánh giá"}
+                        {previewTemplate.qrCodeType === "custom" && "Tùy chỉnh"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ============ BARCODE ============ */}
+                {previewTemplate.showBarcode && (
+                  <div className="text-center my-2">
+                    <div className="inline-block border border-dashed px-4 py-2">
+                      <div className="text-xs text-muted-foreground">||||| BARCODE |||||</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ============ WIFI INFO ============ */}
+                {previewTemplate.showWifiInfo && previewTemplate.wifiName && (
+                  <>
+                    <div className="my-2 border-t border-dashed" />
+                    <p className="text-xs text-center">
+                      WiFi: {previewTemplate.wifiName} / {previewTemplate.wifiPassword || "********"}
+                    </p>
+                  </>
+                )}
+
+                {/* ============ FOOTER ============ */}
+                <div className="my-2 border-t border-dashed" />
+                <div className="text-center space-y-1">
+                  <p>{previewTemplate.thankYouMessage}</p>
+                  <p className="text-xs">{previewTemplate.comebackMessage}</p>
+                  {previewTemplate.footerText && (
+                    <p className="text-xs text-muted-foreground">{previewTemplate.footerText}</p>
+                  )}
+                </div>
+
+                {/* ============ PRINTER ACTIONS INFO ============ */}
+                <div className="mt-4 pt-2 border-t text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-2">
+                    {previewTemplate.cutPaper && <span className="bg-gray-100 px-1 rounded">✂️ Cắt giấy</span>}
+                    {previewTemplate.openCashDrawer && <span className="bg-gray-100 px-1 rounded">💰 Mở két</span>}
+                    {previewTemplate.beepAfterPrint && <span className="bg-gray-100 px-1 rounded">🔔 Beep</span>}
+                    {previewTemplate.numberOfCopies > 1 && <span className="bg-gray-100 px-1 rounded">📄 x{previewTemplate.numberOfCopies}</span>}
+                  </div>
+                </div>
               </div>
-              <div className="my-2 border-t border-dashed" style={{ borderTopWidth: "1px" }} />
-              <p className="text-center font-bold">{previewTemplate.billTitle}</p>
-              <div className="my-2 border-t border-dashed" />
-              {previewTemplate.showOrderNumber && <p>Mã đơn: #123456</p>}
-              {previewTemplate.showTableName && <p>Bàn: A01</p>}
-              {previewTemplate.showStaffName && <p>NV: Nguyễn Văn A</p>}
-              {previewTemplate.showDateTime && <p>Giờ: 15:30 01/01/2024</p>}
-              <div className="my-2 border-t border-dashed" />
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span>Phở bò</span>
-                  <span>50,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Trà đá</span>
-                  <span>5,000</span>
-                </div>
-              </div>
-              <div className="my-2 border-t border-dashed" />
-              {previewTemplate.showSubtotal && (
-                <div className="flex justify-between">
-                  <span>Tạm tính:</span>
-                  <span>55,000</span>
-                </div>
-              )}
-              {previewTemplate.showPriceBeforeVat && (
-                <div className="flex justify-between">
-                  <span>{previewTemplate.priceBeforeVatLabel}:</span>
-                  <span>50,000</span>
-                </div>
-              )}
-              {previewTemplate.showVat && (
-                <div className="flex justify-between">
-                  <span>{previewTemplate.vatLabel} (10%):</span>
-                  <span>5,000</span>
-                </div>
-              )}
-              {previewTemplate.showPriceAfterVat && (
-                <div className="flex justify-between font-bold">
-                  <span>{previewTemplate.priceAfterVatLabel}:</span>
-                  <span>55,000</span>
-                </div>
-              )}
-              <div className="my-2 border-t border-double" style={{ borderTopWidth: "3px" }} />
-              <div className="flex justify-between font-bold text-lg">
-                <span>TỔNG:</span>
-                <span>55,000đ</span>
-              </div>
-              {previewTemplate.showPaymentMethod && <p className="text-xs">Thanh toán: Tiền mặt</p>}
-              <div className="my-2 border-t border-dashed" />
-              {previewTemplate.showQrCode && (
-                <div className="text-center text-xs text-muted-foreground my-2">[QR CODE]</div>
-              )}
-              {previewTemplate.showWifiInfo && previewTemplate.wifiName && (
-                <p className="text-xs text-center">
-                  WiFi: {previewTemplate.wifiName} / {previewTemplate.wifiPassword}
-                </p>
-              )}
-              <p className="text-center mt-2">{previewTemplate.thankYouMessage}</p>
-              <p className="text-center text-xs">{previewTemplate.comebackMessage}</p>
-            </div>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>
