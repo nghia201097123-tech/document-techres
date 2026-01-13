@@ -310,8 +310,22 @@ object BitmapTextRenderer {
         paperWidth: Int = PAPER_WIDTH_80MM,
         fontSize: Float = 24f
     ): Bitmap {
-        val charCount = (paperWidth / (fontSize * 0.6f)).toInt()
-        return renderText(char.toString().repeat(charCount), BitmapTextStyle(fontSize = fontSize), paperWidth)
+        // Create a paint to measure actual character width
+        val measurePaint = TextPaint().apply {
+            textSize = fontSize
+            isAntiAlias = false
+            typeface = Typeface.DEFAULT
+        }
+
+        // Measure actual width of the character
+        val charWidth = measurePaint.measureText(char.toString())
+
+        // Calculate how many characters fit in the paper width with some margin
+        // Leave ~5% margin on each side to prevent wrapping
+        val availableWidth = paperWidth * 0.9f
+        val charCount = (availableWidth / charWidth).toInt().coerceAtLeast(10)
+
+        return renderText(char.toString().repeat(charCount), BitmapTextStyle(fontSize = fontSize, centerAlign = true), paperWidth)
     }
 
     /**
