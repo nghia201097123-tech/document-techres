@@ -10,9 +10,30 @@ import {
 } from 'typeorm';
 import { Branch } from './branch.entity';
 
-export enum PrintMode {
-  INDIVIDUAL = 'individual', // In từng món riêng lẻ
-  LIST = 'list', // In danh sách món
+/**
+ * Chế độ in của bếp
+ * - TICKET: In phiếu bếp (nhiều món trên 1 tờ)
+ * - LABEL: In tem (1 tem cho mỗi món/ly)
+ * - BOTH: In cả phiếu và tem
+ */
+export enum KitchenPrintMode {
+  TICKET = 'TICKET',
+  LABEL = 'LABEL',
+  BOTH = 'BOTH',
+}
+
+/**
+ * Loại bếp
+ */
+export enum KitchenType {
+  KITCHEN = 'kitchen',     // Bếp chính
+  BAR = 'bar',             // Quầy bar/đồ uống
+  GRILL = 'grill',         // Bếp nướng
+  DESSERT = 'dessert',     // Tráng miệng
+  SEAFOOD = 'seafood',     // Hải sản
+  HOTPOT = 'hotpot',       // Lẩu
+  BAKERY = 'bakery',       // Bánh
+  OTHER = 'other',         // Khác
 }
 
 @Entity('kitchens')
@@ -35,6 +56,15 @@ export class Kitchen {
   @Column()
   name: string;
 
+  @Column({
+    name: 'kitchen_type',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+    default: KitchenType.KITCHEN,
+  })
+  kitchenType: string;
+
   @Column({ name: 'printer_name', nullable: true })
   printerName: string;
 
@@ -44,16 +74,16 @@ export class Kitchen {
   @Column({ name: 'printer_port', type: 'int', nullable: true, default: 9100 })
   printerPort: number;
 
-  @Column({ name: 'paper_size', type: 'varchar', length: 50, nullable: true, default: '80mm' })
-  paperSize: string;
+  @Column({ name: 'paper_width', type: 'int', nullable: true, default: 80 })
+  paperWidth: number;
 
   @Column({
     name: 'print_mode',
-    type: 'enum',
-    enum: PrintMode,
-    default: PrintMode.LIST,
+    type: 'varchar',
+    length: 20,
+    default: KitchenPrintMode.TICKET,
   })
-  printMode: PrintMode;
+  printMode: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
