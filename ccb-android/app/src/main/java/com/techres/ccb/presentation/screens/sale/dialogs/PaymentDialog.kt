@@ -370,7 +370,7 @@ fun PaymentDialog(
                                     Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
                                 }
 
-                                // === GIẢM GIÁ (nếu có) - gộp chung 1 dòng ===
+                                // === GIẢM GIÁ (nếu có) - hiển thị tổng ===
                                 if (discountAmount > 0) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Row(
@@ -378,35 +378,13 @@ fun PaymentDialog(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("Giảm giá", style = MaterialTheme.typography.bodySmall, color = Success)
-                                            // Hiển thị loại giảm giá: Món, HĐ, Coupon
-                                            val discountTypes = mutableListOf<String>()
-                                            if (itemDiscountTotal > 0) discountTypes.add("Món")
-                                            if (billDiscountTotal > 0) {
-                                                val desc = billDiscountDescription?.replace("Giảm ", "") ?: "HĐ"
-                                                discountTypes.add(desc)
-                                            }
-                                            if (appliedDiscounts.isNotEmpty()) discountTypes.add("Coupon")
-                                            if (discountTypes.isNotEmpty()) {
-                                                Text(
-                                                    " (${discountTypes.joinToString(", ")})",
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.outline
-                                                )
-                                            }
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                "-${formatCurrency(discountAmount)}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Success,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                            IconButton(onClick = onClearDiscount, modifier = Modifier.size(20.dp)) {
-                                                Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                                            }
-                                        }
+                                        Text("Giảm giá", style = MaterialTheme.typography.bodySmall, color = Success)
+                                        Text(
+                                            "-${formatCurrency(discountAmount)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Success,
+                                            fontWeight = FontWeight.Medium
+                                        )
                                     }
                                 }
 
@@ -455,22 +433,6 @@ fun PaymentDialog(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text("Giảm giá", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                        if (discountAmount > 0) {
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            // Show count of discount types applied: Món, HĐ, Coupon
-                                            val discountCount = listOfNotNull(
-                                                if (itemDiscountTotal > 0) "Món" else null,
-                                                if (billDiscountTotal > 0) "HĐ" else null,
-                                                if (appliedDiscounts.isNotEmpty()) "Coupon" else null
-                                            )
-                                            if (discountCount.isNotEmpty()) {
-                                                Text(
-                                                    text = "(${discountCount.joinToString(", ")})",
-                                                    fontSize = 9.sp,
-                                                    color = MaterialTheme.colorScheme.outline
-                                                )
-                                            }
-                                        }
                                     }
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (discountAmount > 0) {
@@ -487,42 +449,105 @@ fun PaymentDialog(
                                     }
                                 }
 
-                                // Applied discounts - always show when exists
-                                if (appliedDiscounts.isNotEmpty()) {
+                                // === DISCOUNT BREAKDOWN - hiển thị chi tiết từng loại ===
+                                if (discountAmount > 0) {
+                                    // Tính toán để hiển thị ký tự tree đúng
+                                    val hasItemDiscount = itemDiscountTotal > 0
+                                    val hasBillDiscount = billDiscountTotal > 0
+                                    val hasCoupon = appliedDiscounts.isNotEmpty()
+
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp)
                                             .padding(bottom = 8.dp)
                                     ) {
-                                        appliedDiscounts.forEach { discount ->
+                                        // 1. Item discounts - Giảm giá theo món
+                                        if (hasItemDiscount) {
+                                            val isLastItem = !hasBillDiscount && !hasCoupon
                                             Card(
                                                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                                colors = CardDefaults.cardColors(containerColor = Success.copy(alpha = 0.1f)),
+                                                colors = CardDefaults.cardColors(containerColor = Success.copy(alpha = 0.08f)),
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
                                                 Row(
-                                                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Icon(Icons.Default.CheckCircle, null, Modifier.size(14.dp), tint = Success)
-                                                            Spacer(modifier = Modifier.width(4.dp))
-                                                            Text(discount.code, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                        Text(if (isLastItem) "└" else "├", color = MaterialTheme.colorScheme.outline, fontSize = 12.sp)
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("Theo món", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    }
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text("-${formatCurrency(itemDiscountTotal)}", color = Success, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                        IconButton(onClick = onClearItemDiscounts, modifier = Modifier.size(24.dp)) {
+                                                            Icon(Icons.Default.Close, "Xóa giảm giá món", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                                                         }
-                                                        // Show discount target
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 2. Bill discounts - Giảm giá hóa đơn
+                                        if (hasBillDiscount) {
+                                            val isLastBill = !hasCoupon
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Success.copy(alpha = 0.08f)),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                        Text(if (isLastBill) "└" else "├", color = MaterialTheme.colorScheme.outline, fontSize = 12.sp)
+                                                        Spacer(modifier = Modifier.width(6.dp))
                                                         Text(
-                                                            text = "Áp dụng: ${discount.targetName ?: discount.target.displayName}",
-                                                            fontSize = 10.sp,
-                                                            color = MaterialTheme.colorScheme.outline
+                                                            "Hóa đơn${billDiscountDescription?.let { " ($it)" } ?: ""}",
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
                                                         )
                                                     }
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text("-${formatCurrency(billDiscountTotal)}", color = Success, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                        IconButton(onClick = onClearBillDiscount, modifier = Modifier.size(24.dp)) {
+                                                            Icon(Icons.Default.Close, "Xóa giảm giá HĐ", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 3. Coupon discounts - Mã giảm giá
+                                        appliedDiscounts.forEachIndexed { index, discount ->
+                                            val isLastCoupon = index == appliedDiscounts.lastIndex
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Success.copy(alpha = 0.08f)),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                        Text(if (isLastCoupon) "└" else "├", color = MaterialTheme.colorScheme.outline, fontSize = 12.sp)
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Icon(Icons.Default.LocalOffer, null, Modifier.size(14.dp), tint = Success)
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(discount.code, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                                         Text("-${formatCurrency(discount.discountAmount)}", color = Success, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                                        IconButton(onClick = { onRemoveDiscount(discount.couponId) }, modifier = Modifier.size(20.dp)) {
-                                                            Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                                                        IconButton(onClick = { onRemoveDiscount(discount.couponId) }, modifier = Modifier.size(24.dp)) {
+                                                            Icon(Icons.Default.Close, "Xóa coupon", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                                                         }
                                                     }
                                                 }
