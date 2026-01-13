@@ -735,11 +735,11 @@ fun PaymentDialog(
                                                             }
 
                                                             AnimatedVisibility(visible = expanded) {
-                                                                Column(modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)) {
+                                                                Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
                                                                     // Preset percentage chips
                                                                     Text("Giảm %:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                                                     Spacer(modifier = Modifier.height(2.dp))
-                                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                                                         listOf(5, 10, 20, 50).forEach { percent ->
                                                                             FilterChip(
                                                                                 selected = false,
@@ -747,17 +747,18 @@ fun PaymentDialog(
                                                                                     onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
                                                                                     expanded = false
                                                                                 },
-                                                                                label = { Text("$percent%", fontSize = 9.sp) },
+                                                                                label = { Text("$percent%", fontSize = 10.sp) },
                                                                                 modifier = Modifier.height(28.dp)
                                                                             )
                                                                         }
                                                                     }
 
-                                                                    // Custom percentage input
+                                                                    // Custom percentage input - same as bill discount
                                                                     Spacer(modifier = Modifier.height(4.dp))
                                                                     Row(
-                                                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        modifier = Modifier.fillMaxWidth()
                                                                     ) {
                                                                         OutlinedTextField(
                                                                             value = customItemPercentText,
@@ -771,8 +772,8 @@ fun PaymentDialog(
                                                                                     }
                                                                                 }
                                                                             },
-                                                                            placeholder = { Text("Nhập %", fontSize = 10.sp) },
-                                                                            modifier = Modifier.width(100.dp).height(40.dp),
+                                                                            placeholder = { Text("Nhập %", fontSize = 11.sp) },
+                                                                            modifier = Modifier.weight(1f).height(48.dp),
                                                                             singleLine = true,
                                                                             textStyle = MaterialTheme.typography.bodySmall,
                                                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -786,7 +787,7 @@ fun PaymentDialog(
                                                                                     }
                                                                                 }
                                                                             ),
-                                                                            suffix = { Text("%", fontSize = 10.sp) }
+                                                                            suffix = { Text("%", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline) }
                                                                         )
                                                                         Button(
                                                                             onClick = {
@@ -798,10 +799,10 @@ fun PaymentDialog(
                                                                                 }
                                                                             },
                                                                             enabled = customItemPercentText.toIntOrNull()?.let { it in 1..100 } == true,
-                                                                            contentPadding = PaddingValues(horizontal = 8.dp),
-                                                                            modifier = Modifier.height(40.dp)
+                                                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                                            modifier = Modifier.height(48.dp)
                                                                         ) {
-                                                                            Text("OK", fontSize = 10.sp)
+                                                                            Text("Áp dụng", fontSize = 11.sp)
                                                                         }
                                                                     }
 
@@ -809,7 +810,7 @@ fun PaymentDialog(
                                                                     Spacer(modifier = Modifier.height(6.dp))
                                                                     Text("Giảm tiền:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                                                     Spacer(modifier = Modifier.height(2.dp))
-                                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                                                         listOf(5000L, 10000L, 20000L).forEach { amount ->
                                                                             FilterChip(
                                                                                 selected = false,
@@ -819,18 +820,19 @@ fun PaymentDialog(
                                                                                         expanded = false
                                                                                     }
                                                                                 },
-                                                                                label = { Text("${amount/1000}k", fontSize = 9.sp) },
+                                                                                label = { Text("${amount/1000}k", fontSize = 10.sp) },
                                                                                 modifier = Modifier.height(28.dp),
                                                                                 enabled = amount <= item.totalPrice
                                                                             )
                                                                         }
                                                                     }
 
-                                                                    // Custom amount input
+                                                                    // Custom amount input - same as bill discount
                                                                     Spacer(modifier = Modifier.height(4.dp))
                                                                     Row(
-                                                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        modifier = Modifier.fillMaxWidth()
                                                                     ) {
                                                                         OutlinedTextField(
                                                                             value = customItemAmountText,
@@ -841,8 +843,8 @@ fun PaymentDialog(
                                                                                     itemDiscountType = 2
                                                                                 }
                                                                             },
-                                                                            placeholder = { Text("Nhập tiền", fontSize = 10.sp) },
-                                                                            modifier = Modifier.width(120.dp).height(40.dp),
+                                                                            placeholder = { Text("Nhập số tiền", fontSize = 11.sp) },
+                                                                            modifier = Modifier.weight(1f).height(48.dp),
                                                                             singleLine = true,
                                                                             textStyle = MaterialTheme.typography.bodySmall,
                                                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -856,7 +858,7 @@ fun PaymentDialog(
                                                                                     }
                                                                                 }
                                                                             ),
-                                                                            suffix = { Text("đ", fontSize = 10.sp) }
+                                                                            suffix = { Text("đ", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline) }
                                                                         )
                                                                         Button(
                                                                             onClick = {
@@ -868,10 +870,10 @@ fun PaymentDialog(
                                                                                 }
                                                                             },
                                                                             enabled = customItemAmountText.toLongOrNull()?.let { it > 0 && it <= item.totalPrice } == true,
-                                                                            contentPadding = PaddingValues(horizontal = 8.dp),
-                                                                            modifier = Modifier.height(40.dp)
+                                                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                                            modifier = Modifier.height(48.dp)
                                                                         ) {
-                                                                            Text("OK", fontSize = 10.sp)
+                                                                            Text("Áp dụng", fontSize = 11.sp)
                                                                         }
                                                                     }
                                                                 }
