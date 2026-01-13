@@ -33,6 +33,11 @@ fun ProductVariantDialog(
     onDismiss: () -> Unit,
     onConfirm: (List<SelectedVariant>, String?) -> Unit
 ) {
+    // Sắp xếp variant groups: nhóm bắt buộc lên trước (giống web dashboard)
+    val sortedVariants = remember(product.variants) {
+        product.variants.sortedByDescending { it.isRequired }
+    }
+
     // State for selected variants
     val selectedOptions = remember {
         mutableStateMapOf<String, MutableList<String>>().apply {
@@ -162,7 +167,7 @@ fun ProductVariantDialog(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    product.variants.forEach { group ->
+                    sortedVariants.forEach { group ->
                         VariantGroupSection(
                             group = group,
                             selectedIds = selectedOptions[group.id] ?: emptyList(),
@@ -333,9 +338,9 @@ fun ProductVariantDialog(
 
                         Button(
                             onClick = {
-                                // Build selected variants list
+                                // Build selected variants list (giữ thứ tự đã sắp xếp)
                                 val variants = mutableListOf<SelectedVariant>()
-                                product.variants.forEach { group ->
+                                sortedVariants.forEach { group ->
                                     val selectedIds = selectedOptions[group.id] ?: emptyList()
                                     group.options.filter { it.id in selectedIds }.forEach { option ->
                                         variants.add(
