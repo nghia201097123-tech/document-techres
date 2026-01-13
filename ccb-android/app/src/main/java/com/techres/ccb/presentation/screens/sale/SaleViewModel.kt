@@ -1766,10 +1766,10 @@ class SaleViewModel @Inject constructor(
                         )
                     }
 
-                    // 5. Print bill (if auto-print is enabled)
+                    // 5. Print bill (always print on payment completion)
                     try {
                         val printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
-                        if (printerConfig != null && printerConfig.isActive && printerConfig.autoPrintOnPayment) {
+                        if (printerConfig != null && printerConfig.isActive) {
                             // Get template (from printer config or default for branch)
                             val template = if (printerConfig.templateId != null) {
                                 billTemplateDao.getById(printerConfig.templateId)
