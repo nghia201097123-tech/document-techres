@@ -1178,9 +1178,8 @@ fun PaymentDialog(
 
                                             2 -> {
                                                 // Coupon section
-                                                Column(
-                                                    modifier = Modifier.verticalScroll(rememberScrollState())
-                                                ) {
+                                                // Note: Không dùng verticalScroll ở đây vì parent Column đã có verticalScroll rồi
+                                                Column {
                                                     // Nhập mã coupon
                                                     Text("Nhập mã giảm giá:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                                     Spacer(modifier = Modifier.height(4.dp))
