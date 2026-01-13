@@ -31,7 +31,11 @@ data class PosOrder(
     val orderNumber: Int,
     val isPrinted: Boolean = false,
     val items: List<OrderItemEntity> = emptyList(), // Danh sách món để hiển thị
-    val orderType: String = "dine_in" // dine_in, takeaway, delivery
+    val orderType: String = "dine_in", // dine_in, takeaway, delivery
+    // Discount fields
+    val subtotal: Long = 0, // Tổng tiền trước giảm giá
+    val discountAmount: Long = 0, // Tổng tiền giảm giá
+    val discountReason: String? = null // Mô tả giảm giá
 )
 
 enum class PosOrderStatus(val displayName: String, val color: Long) {
@@ -175,7 +179,11 @@ class DashboardViewModel @Inject constructor(
                                 orderNumber = parseOrderNumber(entity.orderNumber),
                                 isPrinted = entity.isPrinted,
                                 items = orderItems, // Thêm items để hiển thị
-                                orderType = entity.orderType // dine_in, takeaway, delivery
+                                orderType = entity.orderType, // dine_in, takeaway, delivery
+                                // Discount fields
+                                subtotal = entity.subtotal.toLong(),
+                                discountAmount = entity.discountAmount.toLong(),
+                                discountReason = entity.discountReason
                             )
                         }
 
@@ -367,6 +375,137 @@ class DashboardViewModel @Inject constructor(
                 Log.d(TAG, "cancelPosOrder - Cancelled with full sync: $orderId")
             } catch (e: Exception) {
                 Log.e(TAG, "cancelPosOrder - Error: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Update order discount (from PaymentDialog)
+     * Cập nhật giảm giá cho order từ màn hình thanh toán
+     */
+    fun updateOrderDiscount(
+        orderId: String,
+        itemDiscounts: Map<String, Long>,
+        billDiscountAmount: Long,
+        billDiscountDescription: String?
+    ) {
+        viewModelScope.launch {
+            try {
+                val now = java.time.Instant.now().toString()
+                val orderEntity = orderRepository.getOrderById(orderId) ?: return@launch
+                val orderItems = orderRepository.getOrderItemsSync(orderId)
+
+                // Update item discounts
+                orderItems.forEach { item ->
+                    val newDiscount = itemDiscounts[item.id] ?: 0L
+                    if (newDiscount != item.discountAmount.toLong()) {
+                        val updatedItem = item.copy(
+                            discountAmount = newDiscount.toDouble(),
+                            updatedAt = now
+                        )
+                        orderRepository.updateOrderItem(updatedItem)
+                    }
+                }
+
+                // Calculate total discount
+                val itemDiscountTotal = itemDiscounts.values.sum()
+                val totalDiscount = itemDiscountTotal + billDiscountAmount
+
+                // Update order
+                val newTotalAmount = (orderEntity.subtotal - totalDiscount).coerceAtLeast(0.0)
+                val updatedOrder = orderEntity.copy(
+                    discountAmount = totalDiscount.toDouble(),
+                    discountReason = billDiscountDescription,
+                    totalAmount = newTotalAmount,
+                    updatedAt = now
+                )
+                orderRepository.updateOrder(updatedOrder)
+
+                // Update UI state
+                _uiState.update { state ->
+                    state.copy(
+                        posOrders = state.posOrders.map { order ->
+                            if (order.id == orderId) {
+                                order.copy(
+                                    discountAmount = totalDiscount,
+                                    discountReason = billDiscountDescription,
+                                    totalAmount = newTotalAmount.toLong()
+                                )
+                            } else order
+                        }
+                    )
+                }
+
+                Log.d(TAG, "updateOrderDiscount - Updated: itemDiscounts=${itemDiscounts.size}, billDiscount=$billDiscountAmount")
+            } catch (e: Exception) {
+                Log.e(TAG, "updateOrderDiscount - Error: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Complete order with discount applied
+     * Hoàn tất order với giảm giá đã áp dụng
+     */
+    fun completePosOrderWithDiscount(
+        orderId: String,
+        totalDiscount: Long,
+        discountReason: String?,
+        paymentMethod: String = "cash"
+    ) {
+        viewModelScope.launch {
+            try {
+                val now = java.time.Instant.now().toString()
+                val orderEntity = orderRepository.getOrderById(orderId) ?: return@launch
+
+                // Calculate final total
+                val finalTotal = (orderEntity.subtotal - totalDiscount).coerceAtLeast(0.0)
+
+                // 1. Update order with final amounts and status
+                val completedOrder = orderEntity.copy(
+                    status = "completed",
+                    paymentStatus = "paid",
+                    paymentMethod = paymentMethod,
+                    discountAmount = totalDiscount.toDouble(),
+                    discountReason = discountReason,
+                    totalAmount = finalTotal,
+                    paidAmount = finalTotal,
+                    completedAt = now,
+                    updatedAt = now
+                )
+                orderRepository.updateOrder(completedOrder)
+
+                // 2. Update all order items status to completed
+                orderRepository.updateAllItemsStatus(orderId, "completed", now)
+
+                // 3. Update table status to available
+                orderEntity.tableId?.let { tableId ->
+                    tableRepository.updateTableStatus(tableId, "available", null, now)
+                }
+
+                // 4. Update shift statistics
+                orderEntity.shiftId?.let { shiftId ->
+                    shiftRepository.addOrderRevenue(
+                        shiftId = shiftId,
+                        orderTotal = finalTotal,
+                        discountAmount = totalDiscount.toDouble(),
+                        paymentMethod = paymentMethod,
+                        updatedAt = now
+                    )
+                }
+
+                _uiState.update { state ->
+                    state.copy(
+                        posOrders = state.posOrders.filter { it.id != orderId },
+                        todayRevenue = state.todayRevenue + finalTotal.toLong(),
+                        todayOrderCount = state.todayOrderCount + 1
+                    )
+                }
+                recalculateCounts()
+
+                Log.d(TAG, "completePosOrderWithDiscount - Completed: $orderId, discount=$totalDiscount, total=$finalTotal")
+            } catch (e: Exception) {
+                Log.e(TAG, "completePosOrderWithDiscount - Error: ${e.message}", e)
             }
         }
     }

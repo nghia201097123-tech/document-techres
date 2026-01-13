@@ -349,13 +349,39 @@ fun DashboardScreen(
     // Payment Dialog - Sử dụng PaymentDialog giống như SaleScreen
     if (showQuickPaymentDialog && orderForPayment != null) {
         val order = orderForPayment!!
+
+        // Local state for managing discounts
+        // Khởi tạo item discounts từ order items
+        var itemDiscounts by remember(order.id) {
+            mutableStateOf(
+                order.items
+                    .filter { it.discountAmount > 0 }
+                    .associate { it.id to it.discountAmount.toLong() }
+            )
+        }
+
+        // Tính item discount total từ order items
+        val initialItemDiscountTotal = order.items.sumOf { it.discountAmount.toLong() }
+        // Bill discount = total discount - item discount
+        val initialBillDiscount = (order.discountAmount - initialItemDiscountTotal).coerceAtLeast(0L)
+
+        var billDiscountAmount by remember(order.id) { mutableStateOf(initialBillDiscount) }
+        var billDiscountDescription by remember(order.id) { mutableStateOf(order.discountReason) }
+
+        // Calculated values
+        val subtotal = order.subtotal
+        val itemDiscountTotal = itemDiscounts.values.sum()
+        val totalDiscountAmount = itemDiscountTotal + billDiscountAmount
+        val totalAmount = (subtotal - totalDiscountAmount).coerceAtLeast(0L)
+
         // Tính VAT từ items (mỗi item có vatRate riêng)
         val vatAmount = order.items.sumOf { item ->
             val itemTotal = item.totalPrice
             val vatRate = item.vatRate
             (itemTotal - itemTotal / (1 + vatRate / 100)).toLong()
         }
-        // Convert OrderItemEntity to PaymentOrderItem
+
+        // Convert OrderItemEntity to PaymentOrderItem with discounts
         val paymentOrderItems = order.items.map { item ->
             PaymentOrderItem(
                 id = item.id,
@@ -363,39 +389,84 @@ fun DashboardScreen(
                 quantity = item.quantity,
                 unitPrice = item.unitPrice.toLong(),
                 totalPrice = item.totalPrice.toLong(),
-                discountAmount = 0
+                discountAmount = itemDiscounts[item.id] ?: item.discountAmount.toLong()
             )
         }
 
         PaymentDialog(
-            totalAmount = order.totalAmount,
-            subtotal = order.totalAmount,
-            discountAmount = 0,
+            totalAmount = totalAmount,
+            subtotal = subtotal,
+            discountAmount = totalDiscountAmount,
             vatAmount = vatAmount,
             appliedDiscounts = emptyList(),
             couponCode = "",
             couponError = null,
             isApplyingCoupon = false,
             orderItems = paymentOrderItems,
-            itemDiscountTotal = 0,
-            billDiscountTotal = 0,
-            billDiscountDescription = null,
+            itemDiscountTotal = itemDiscountTotal,
+            billDiscountTotal = billDiscountAmount,
+            billDiscountDescription = billDiscountDescription,
             onCouponCodeChange = {},
             onApplyCoupon = {},
             onRemoveDiscount = {},
-            onApplyManualDiscount = { _, _ -> },
-            onApplyPercentDiscount = { _, _ -> },
-            onApplyItemDiscount = { _, _ -> },
-            onClearDiscount = {},
-            onClearItemDiscounts = {},
-            onClearBillDiscount = {},
+            onApplyManualDiscount = { amount, reason ->
+                // Số tiền còn lại có thể giảm
+                val maxDiscount = (subtotal - itemDiscountTotal).coerceAtLeast(0L)
+                billDiscountAmount = amount.coerceAtMost(maxDiscount)
+                billDiscountDescription = reason
+                // Update order trong database
+                viewModel.updateOrderDiscount(order.id, itemDiscounts, billDiscountAmount, reason)
+            },
+            onApplyPercentDiscount = { percent, reason ->
+                // Tính % trên số tiền còn lại sau item discounts
+                val remainingAmount = (subtotal - itemDiscountTotal).coerceAtLeast(0L)
+                billDiscountAmount = (remainingAmount * percent / 100)
+                billDiscountDescription = reason
+                // Update order trong database
+                viewModel.updateOrderDiscount(order.id, itemDiscounts, billDiscountAmount, reason)
+            },
+            onApplyItemDiscount = { itemId, amount ->
+                val item = order.items.find { it.id == itemId }
+                val itemPrice = item?.totalPrice?.toLong() ?: 0L
+                val otherItemDiscounts = itemDiscounts.filterKeys { it != itemId }.values.sum()
+                val maxDiscount = minOf(
+                    itemPrice,
+                    (subtotal - otherItemDiscounts - billDiscountAmount).coerceAtLeast(0L)
+                )
+                val newItemDiscounts = itemDiscounts.toMutableMap()
+                val finalAmount = amount.coerceAtMost(maxDiscount)
+                if (finalAmount > 0) {
+                    newItemDiscounts[itemId] = finalAmount
+                } else {
+                    newItemDiscounts.remove(itemId)
+                }
+                itemDiscounts = newItemDiscounts
+                // Update order trong database
+                viewModel.updateOrderDiscount(order.id, itemDiscounts, billDiscountAmount, billDiscountDescription)
+            },
+            onClearDiscount = {
+                itemDiscounts = emptyMap()
+                billDiscountAmount = 0
+                billDiscountDescription = null
+                viewModel.updateOrderDiscount(order.id, emptyMap(), 0, null)
+            },
+            onClearItemDiscounts = {
+                itemDiscounts = emptyMap()
+                viewModel.updateOrderDiscount(order.id, emptyMap(), billDiscountAmount, billDiscountDescription)
+            },
+            onClearBillDiscount = {
+                billDiscountAmount = 0
+                billDiscountDescription = null
+                viewModel.updateOrderDiscount(order.id, itemDiscounts, 0, null)
+            },
             onPrintTemporaryBill = {},
             onDismiss = {
                 showQuickPaymentDialog = false
                 orderForPayment = null
             },
             onPaymentComplete = { payments ->
-                viewModel.completePosOrder(order.id)
+                // Hoàn tất order với discount đã áp dụng
+                viewModel.completePosOrderWithDiscount(order.id, totalDiscountAmount, billDiscountDescription)
                 showQuickPaymentDialog = false
                 orderForPayment = null
                 // Also close detail dialog if open
