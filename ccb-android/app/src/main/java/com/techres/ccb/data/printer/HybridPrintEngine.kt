@@ -162,9 +162,52 @@ data class BitmapTextStyle(
 object BitmapTextRenderer {
     private const val TAG = "BitmapTextRenderer"
 
-    // Paper width in pixels (203 DPI)
-    const val PAPER_WIDTH_58MM = 384
-    const val PAPER_WIDTH_80MM = 576
+    // Paper width in pixels (203 DPI = 8 dots/mm)
+    // Printable width thường nhỏ hơn paper width khoảng 8-10mm do margins
+    const val PAPER_WIDTH_32MM = 176   // 22mm printable
+    const val PAPER_WIDTH_44MM = 272   // 34mm printable
+    const val PAPER_WIDTH_48MM = 304   // 38mm printable
+    const val PAPER_WIDTH_57MM = 376   // 47mm printable
+    const val PAPER_WIDTH_58MM = 384   // 48mm printable
+    const val PAPER_WIDTH_76MM = 528   // 66mm printable
+    const val PAPER_WIDTH_80MM = 576   // 72mm printable
+    const val PAPER_WIDTH_110MM = 800  // 100mm printable
+    const val PAPER_WIDTH_112MM = 816  // 102mm printable
+
+    /**
+     * Chuyển đổi paper width (mm) thành pixel width
+     */
+    fun getPixelWidth(paperWidthMm: Int): Int = when (paperWidthMm) {
+        32 -> PAPER_WIDTH_32MM
+        44 -> PAPER_WIDTH_44MM
+        48 -> PAPER_WIDTH_48MM
+        57 -> PAPER_WIDTH_57MM
+        58 -> PAPER_WIDTH_58MM
+        76 -> PAPER_WIDTH_76MM
+        80 -> PAPER_WIDTH_80MM
+        110 -> PAPER_WIDTH_110MM
+        112 -> PAPER_WIDTH_112MM
+        else -> {
+            // Tính toán cho kích thước không chuẩn (8 dots/mm, trừ ~10mm margin)
+            ((paperWidthMm - 10) * 8).coerceAtLeast(176)
+        }
+    }
+
+    /**
+     * Tính số ký tự trên một dòng dựa trên paper width
+     */
+    fun getLineWidth(paperWidthMm: Int): Int = when (paperWidthMm) {
+        32 -> 16
+        44 -> 24
+        48 -> 26
+        57 -> 30
+        58 -> 32
+        76 -> 42
+        80 -> 48
+        110 -> 64
+        112 -> 66
+        else -> ((paperWidthMm - 10) * 8 / 12).coerceAtLeast(16) // ~12 pixels per char
+    }
 
     /**
      * Render text thành bitmap với Vietnamese support
@@ -276,15 +319,16 @@ object BitmapTextRenderer {
  * Ưu tiên:
  * 1. Nếu máy in hỗ trợ UTF-8 Vietnamese → dùng text (nhanh)
  * 2. Nếu không → dùng bitmap (chắc chắn đúng)
+ *
+ * Hỗ trợ các khổ giấy: 32mm, 44mm, 48mm, 57mm, 58mm, 76mm, 80mm, 110mm, 112mm
  */
 class HybridBillBuilder(
-    private val paperWidth: Int = 80, // 58 hoặc 80mm
+    private val paperWidth: Int = 80, // Khổ giấy (mm): 32, 44, 48, 57, 58, 76, 80, 110, 112
     private val useBitmapMode: Boolean = true // Mặc định dùng bitmap để đảm bảo
 ) {
     private val buffer = ByteArrayOutputStream()
-    private val pixelWidth = if (paperWidth == 58) BitmapTextRenderer.PAPER_WIDTH_58MM
-                            else BitmapTextRenderer.PAPER_WIDTH_80MM
-    val lineWidth = if (paperWidth == 58) 32 else 48
+    private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
+    val lineWidth = BitmapTextRenderer.getLineWidth(paperWidth)
 
     // ESC/POS Commands
     private val ESC = 0x1B.toByte()

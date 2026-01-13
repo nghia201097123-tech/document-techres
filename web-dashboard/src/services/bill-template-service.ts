@@ -382,8 +382,15 @@ export const QR_CODE_TYPE_LABELS: Record<string, string> = {
 };
 
 export const PAPER_WIDTH_OPTIONS = [
-  { value: 58, label: '58mm' },
-  { value: 80, label: '80mm' },
+  { value: 32, label: '32mm (1.25 inch) - Máy in nhãn nhỏ' },
+  { value: 44, label: '44mm (1.75 inch) - Máy in di động nhỏ' },
+  { value: 48, label: '48mm (1.9 inch) - Máy in di động' },
+  { value: 57, label: '57mm (2.25 inch) - Máy in di động' },
+  { value: 58, label: '58mm (2.25 inch) - Máy in POS nhỏ' },
+  { value: 76, label: '76mm (3 inch) - Máy in POS trung' },
+  { value: 80, label: '80mm (3.15 inch) - Máy in POS chuẩn' },
+  { value: 110, label: '110mm (4.3 inch) - Máy in khổ rộng' },
+  { value: 112, label: '112mm (4.4 inch) - Máy in khổ rộng' },
 ];
 
 export const FONT_SIZE_OPTIONS = [
