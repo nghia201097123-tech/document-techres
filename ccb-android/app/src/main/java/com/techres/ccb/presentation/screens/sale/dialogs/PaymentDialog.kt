@@ -541,6 +541,7 @@ fun PaymentDialog(
                                                                 if (filtered.isNotEmpty()) {
                                                                     customAmountText = ""
                                                                     selectedAmountValue = null
+                                                                    selectedPercentValue = null // Clear chip selection
                                                                 }
                                                             }
                                                         },
@@ -557,10 +558,10 @@ fun PaymentDialog(
                                                                 customPercentText.toIntOrNull()?.let { percent ->
                                                                     if (percent in 1..100) {
                                                                         selectedDiscountType = 1
-                                                                        selectedPercentValue = percent
+                                                                        selectedPercentValue = null // Custom value, not from chips
                                                                         selectedAmountValue = null
                                                                         onApplyPercentDiscount(percent, "Giảm $percent%")
-                                                                        customPercentText = ""
+                                                                        // Keep the value visible - don't clear
                                                                     }
                                                                 }
                                                             }
@@ -572,11 +573,11 @@ fun PaymentDialog(
                                                             customPercentText.toIntOrNull()?.let { percent ->
                                                                 if (percent in 1..100) {
                                                                     selectedDiscountType = 1
-                                                                    selectedPercentValue = percent
+                                                                    selectedPercentValue = null // Custom value, not from chips
                                                                     selectedAmountValue = null
                                                                     customAmountText = ""
                                                                     onApplyPercentDiscount(percent, "Giảm $percent%")
-                                                                    customPercentText = ""
+                                                                    // Keep the value visible - don't clear customPercentText
                                                                 }
                                                             }
                                                         },
@@ -604,7 +605,7 @@ fun PaymentDialog(
                                                                 // Set amount selection
                                                                 selectedDiscountType = 2
                                                                 selectedAmountValue = amount
-                                                                customAmountText = ""
+                                                                customAmountText = "" // Clear custom input when selecting chip
                                                                 onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
                                                             },
                                                             label = { Text("${amount/1000}k", fontSize = 10.sp) },
@@ -631,6 +632,7 @@ fun PaymentDialog(
                                                             if (it.isNotEmpty()) {
                                                                 customPercentText = ""
                                                                 selectedPercentValue = null
+                                                                selectedAmountValue = null // Clear chip selection
                                                             }
                                                         },
                                                         placeholder = { Text("Nhập số tiền", fontSize = 11.sp) },
@@ -646,10 +648,10 @@ fun PaymentDialog(
                                                                 customAmountText.toLongOrNull()?.let { amount ->
                                                                     if (amount > 0) {
                                                                         selectedDiscountType = 2
-                                                                        selectedAmountValue = amount
+                                                                        selectedAmountValue = null // Custom value, not from chips
                                                                         selectedPercentValue = null
                                                                         onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
-                                                                        customAmountText = ""
+                                                                        // Keep the value visible - don't clear
                                                                     }
                                                                 }
                                                             }
@@ -661,11 +663,11 @@ fun PaymentDialog(
                                                             customAmountText.toLongOrNull()?.let { amount ->
                                                                 if (amount > 0) {
                                                                     selectedDiscountType = 2
-                                                                    selectedAmountValue = amount
+                                                                    selectedAmountValue = null // Custom value, not from chips
                                                                     selectedPercentValue = null
                                                                     customPercentText = ""
                                                                     onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
-                                                                    customAmountText = ""
+                                                                    // Keep the value visible - don't clear customAmountText
                                                                 }
                                                             }
                                                         },
@@ -729,10 +731,15 @@ fun PaymentDialog(
                                                             }
 
                                                             AnimatedVisibility(visible = expanded) {
-                                                                Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
+                                                                Column(
+                                                                    modifier = Modifier
+                                                                        .fillMaxWidth()
+                                                                        .padding(start = 8.dp, end = 8.dp, bottom = 4.dp)
+                                                                ) {
                                                                     // Preset percentage chips
                                                                     Row(
-                                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                                        modifier = Modifier.fillMaxWidth()
                                                                     ) {
                                                                         listOf(5, 10, 20, 50).forEach { percent ->
                                                                             FilterChip(
@@ -750,13 +757,14 @@ fun PaymentDialog(
                                                                     Spacer(modifier = Modifier.height(4.dp))
                                                                     Row(
                                                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        modifier = Modifier.fillMaxWidth()
                                                                     ) {
                                                                         OutlinedTextField(
                                                                             value = customItemDiscountText,
                                                                             onValueChange = { customItemDiscountText = it.filter { c -> c.isDigit() } },
                                                                             placeholder = { Text("Nhập tiền", fontSize = 9.sp) },
-                                                                            modifier = Modifier.weight(1f).height(36.dp),
+                                                                            modifier = Modifier.weight(1f).height(40.dp),
                                                                             singleLine = true,
                                                                             textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                                                             keyboardOptions = KeyboardOptions(
@@ -787,10 +795,10 @@ fun PaymentDialog(
                                                                                 }
                                                                             },
                                                                             enabled = customItemDiscountText.toLongOrNull()?.let { it > 0 && it <= item.totalPrice } == true,
-                                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                                                            modifier = Modifier.height(36.dp)
+                                                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                                            modifier = Modifier.height(40.dp)
                                                                         ) {
-                                                                            Text("OK", fontSize = 9.sp)
+                                                                            Text("OK", fontSize = 10.sp)
                                                                         }
                                                                     }
                                                                 }
