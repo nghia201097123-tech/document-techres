@@ -632,13 +632,8 @@ class SaleViewModel @Inject constructor(
 
     fun addToCart(product: Product) {
         if (product.hasVariants && product.variants.isNotEmpty()) {
-            // Show variant dialog
-            _uiState.update { state ->
-                state.copy(
-                    showVariantDialog = true,
-                    selectedProductForVariant = product
-                )
-            }
+            // Show variant dialog with product-specific notes
+            showVariantDialog(product)
         } else {
             // Add directly to cart
             addItemToCart(product, emptyList(), null)
@@ -1686,6 +1681,13 @@ class SaleViewModel @Inject constructor(
             // Load notes for this specific product
             val productNotes = withContext(Dispatchers.IO) {
                 productNoteDao.getNotesForProductSync(product.id)
+            }
+
+            Log.d(TAG, "showVariantDialog - Product: ${product.name} (${product.id}), Notes found: ${productNotes.size}")
+            if (productNotes.isNotEmpty()) {
+                productNotes.forEach { note ->
+                    Log.d(TAG, "  - Note: ${note.name}")
+                }
             }
 
             _uiState.update { state ->
