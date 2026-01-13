@@ -69,26 +69,45 @@ fun ProductVariantDialog(
     val unitPrice = product.price + variantPrice
     val totalPrice = unitPrice * quantity
 
-    // Validate required groups and min/max selection
-    val validationErrors = mutableListOf<String>()
+    // Validate required groups and min/max selection - gộp thành 1 dòng để tiết kiệm không gian
+    val requiredNotSelected = mutableListOf<String>()  // Nhóm bắt buộc chưa chọn
+    val minNotMet = mutableListOf<Pair<String, Int>>() // Nhóm chưa đủ min (tên, min)
+    val maxExceeded = mutableListOf<Pair<String, Int>>() // Nhóm vượt max (tên, max)
 
     product.variants.forEach { group ->
         val selectedCount = selectedOptions[group.id]?.size ?: 0
 
-        // Check required (at least 1)
-        if (group.isRequired && selectedCount == 0) {
-            validationErrors.add("${group.name}: chưa chọn (bắt buộc)")
+        // Check required (at least 1) - chỉ khi minSelect <= 1 để tránh trùng lặp
+        if (group.isRequired && selectedCount == 0 && group.minSelect <= 1) {
+            requiredNotSelected.add(group.name)
         }
-
-        // Check minSelect
-        if (group.minSelect > 0 && selectedCount < group.minSelect) {
-            validationErrors.add("${group.name}: cần chọn tối thiểu ${group.minSelect}")
+        // Check minSelect - chỉ khi minSelect > 1 hoặc không phải required
+        else if (group.minSelect > 0 && selectedCount < group.minSelect) {
+            minNotMet.add(group.name to group.minSelect)
         }
 
         // Check maxSelect
         if (group.maxSelect < 99 && selectedCount > group.maxSelect) {
-            validationErrors.add("${group.name}: chỉ được chọn tối đa ${group.maxSelect}")
+            maxExceeded.add(group.name to group.maxSelect)
         }
+    }
+
+    // Tạo thông báo lỗi gọn gàng trên 1 dòng
+    val validationErrors = mutableListOf<String>()
+    if (requiredNotSelected.isNotEmpty()) {
+        validationErrors.add("${requiredNotSelected.joinToString(", ")}: chưa chọn (bắt buộc)")
+    }
+    if (minNotMet.isNotEmpty()) {
+        val minGroups = minNotMet.groupBy { it.second }.map { (min, groups) ->
+            "${groups.joinToString(", ") { it.first }}: tối thiểu $min"
+        }
+        validationErrors.addAll(minGroups)
+    }
+    if (maxExceeded.isNotEmpty()) {
+        val maxGroups = maxExceeded.groupBy { it.second }.map { (max, groups) ->
+            "${groups.joinToString(", ") { it.first }}: tối đa $max"
+        }
+        validationErrors.addAll(maxGroups)
     }
 
     val isValid = validationErrors.isEmpty()

@@ -3710,7 +3710,11 @@ export default function ProductsPage() {
                     </div>
                     <ScrollArea className="h-[400px] pr-4">
                       <div className="space-y-3">
-                        {allToppingGroups.map((group) => {
+                        {/* Sắp xếp: Bắt buộc lên trước, Tùy chọn xuống sau */}
+                        {[...allToppingGroups].sort((a, b) => {
+                          if (a.isRequired === b.isRequired) return 0;
+                          return a.isRequired ? -1 : 1;
+                        }).map((group) => {
                           const isAssigned = assignedGroupIds.has(group.id);
                           // Get the group data with items from toppingGroups if assigned
                           const groupWithItems = toppingGroups.find(g => g.id === group.id) || group;
