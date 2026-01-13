@@ -1310,6 +1310,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Áp dụng coupon từ mã đã nhập
+     * Tự động thay thế coupon cũ nếu có (không cần huỷ trước)
      */
     fun applyCoupon() {
         val state = _uiState.value
@@ -1320,9 +1321,9 @@ class SaleViewModel @Inject constructor(
             return
         }
 
-        // Kiểm tra coupon đã được áp dụng chưa
+        // Nếu coupon này đã được áp dụng rồi thì không làm gì
         if (state.appliedDiscounts.any { it.code.equals(code, ignoreCase = true) }) {
-            _uiState.update { it.copy(couponError = "Mã giảm giá này đã được áp dụng") }
+            _uiState.update { it.copy(couponCode = "") }
             return
         }
 
@@ -1360,26 +1361,10 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Kiểm tra combinable
-                val hasNonCombinableCoupon = state.appliedDiscounts.isNotEmpty() &&
-                    state.availableCoupons.any { c ->
-                        state.appliedDiscounts.any { d -> d.couponId == c.id } && !c.isCombinable
-                    }
-
-                if (hasNonCombinableCoupon && !coupon.isCombinable) {
-                    _uiState.update {
-                        it.copy(
-                            isApplyingCoupon = false,
-                            couponError = "Không thể kết hợp với mã giảm giá đã áp dụng"
-                        )
-                    }
-                    return@launch
-                }
-
                 // Tính số tiền giảm
                 val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
 
-                // Thêm vào danh sách đã áp dụng
+                // Tạo discount mới
                 val appliedDiscount = AppliedDiscount(
                     couponId = coupon.id,
                     code = coupon.code,
@@ -1389,8 +1374,9 @@ class SaleViewModel @Inject constructor(
                     discountAmount = discountAmount
                 )
 
-                val newAppliedDiscounts = state.appliedDiscounts + appliedDiscount
-                val totalDiscount = newAppliedDiscounts.sumOf { it.discountAmount }
+                // Thay thế tất cả coupon cũ bằng coupon mới (chỉ cho phép 1 coupon tại 1 thời điểm)
+                val newAppliedDiscounts = listOf(appliedDiscount)
+                val totalDiscount = discountAmount
 
                 // Tính VAT (trên giá sau giảm)
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
@@ -1409,7 +1395,7 @@ class SaleViewModel @Inject constructor(
                     )
                 }
 
-                Log.d(TAG, "applyCoupon - Applied coupon: ${coupon.code}, discount: $discountAmount")
+                Log.d(TAG, "applyCoupon - Applied coupon: ${coupon.code}, discount: $discountAmount (replaced previous coupons)")
             } catch (e: Exception) {
                 Log.e(TAG, "applyCoupon - Error: ${e.message}", e)
                 _uiState.update {
@@ -1445,6 +1431,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Áp dụng coupon theo ID (từ danh sách available coupons)
+     * Tự động thay thế coupon cũ nếu có (không cần huỷ trước)
      */
     fun applyCouponById(couponId: String) {
         val state = _uiState.value
@@ -1455,9 +1442,8 @@ class SaleViewModel @Inject constructor(
             return
         }
 
-        // Kiểm tra đã áp dụng chưa
+        // Nếu coupon này đã được áp dụng rồi thì không làm gì
         if (state.appliedDiscounts.any { it.couponId == couponId }) {
-            _uiState.update { it.copy(couponError = "Mã giảm giá này đã được áp dụng") }
             return
         }
 
@@ -1478,26 +1464,10 @@ class SaleViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Kiểm tra combinable
-                val hasNonCombinableCoupon = state.appliedDiscounts.isNotEmpty() &&
-                    state.availableCoupons.any { c ->
-                        state.appliedDiscounts.any { d -> d.couponId == c.id } && !c.isCombinable
-                    }
-
-                if (hasNonCombinableCoupon && !coupon.isCombinable) {
-                    _uiState.update {
-                        it.copy(
-                            isApplyingCoupon = false,
-                            couponError = "Không thể kết hợp với mã giảm giá đã áp dụng"
-                        )
-                    }
-                    return@launch
-                }
-
                 // Tính số tiền giảm
                 val discountAmount = calculateCouponDiscountAmount(coupon, orderAmount)
 
-                // Thêm vào danh sách đã áp dụng
+                // Tạo discount mới
                 val appliedDiscount = AppliedDiscount(
                     couponId = coupon.id,
                     code = coupon.code,
@@ -1507,8 +1477,9 @@ class SaleViewModel @Inject constructor(
                     discountAmount = discountAmount
                 )
 
-                val newAppliedDiscounts = state.appliedDiscounts + appliedDiscount
-                val totalDiscount = newAppliedDiscounts.sumOf { it.discountAmount }
+                // Thay thế tất cả coupon cũ bằng coupon mới (chỉ cho phép 1 coupon tại 1 thời điểm)
+                val newAppliedDiscounts = listOf(appliedDiscount)
+                val totalDiscount = discountAmount
 
                 // Tính VAT (trên giá sau giảm)
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
@@ -1525,7 +1496,7 @@ class SaleViewModel @Inject constructor(
                     )
                 }
 
-                Log.d(TAG, "applyCouponById - Applied coupon: ${coupon.code}, discount: $discountAmount")
+                Log.d(TAG, "applyCouponById - Applied coupon: ${coupon.code}, discount: $discountAmount (replaced previous coupons)")
             } catch (e: Exception) {
                 Log.e(TAG, "applyCouponById - Error: ${e.message}", e)
                 _uiState.update {
