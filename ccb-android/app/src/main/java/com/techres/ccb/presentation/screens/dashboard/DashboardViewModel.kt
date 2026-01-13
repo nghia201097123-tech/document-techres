@@ -30,7 +30,8 @@ data class PosOrder(
     val createdAt: Long,
     val orderNumber: Int,
     val isPrinted: Boolean = false,
-    val items: List<OrderItemEntity> = emptyList() // Danh sách món để hiển thị
+    val items: List<OrderItemEntity> = emptyList(), // Danh sách món để hiển thị
+    val orderType: String = "dine_in" // dine_in, takeaway, delivery
 )
 
 enum class PosOrderStatus(val displayName: String, val color: Long) {
@@ -173,7 +174,8 @@ class DashboardViewModel @Inject constructor(
                                 createdAt = parseTimestamp(entity.createdAt),
                                 orderNumber = parseOrderNumber(entity.orderNumber),
                                 isPrinted = entity.isPrinted,
-                                items = orderItems // Thêm items để hiển thị
+                                items = orderItems, // Thêm items để hiển thị
+                                orderType = entity.orderType // dine_in, takeaway, delivery
                             )
                         }
 

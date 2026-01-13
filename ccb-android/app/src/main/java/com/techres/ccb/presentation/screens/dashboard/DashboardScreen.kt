@@ -1368,6 +1368,16 @@ private fun OrderCard(
 ) {
     val statusColor = Color(order.status.color)
 
+    // Order type colors and icons
+    val orderTypeConfig = remember(order.orderType) {
+        when (order.orderType) {
+            "takeaway" -> Triple(Color(0xFFFF9800), Icons.Default.ShoppingBag, "Mang về")
+            "delivery" -> Triple(Color(0xFF9C27B0), Icons.Default.DeliveryDining, "Giao hàng")
+            else -> Triple(Color(0xFF2196F3), Icons.Default.TableBar, "Tại bàn") // dine_in
+        }
+    }
+    val (orderTypeColor, orderTypeIcon, orderTypeLabel) = orderTypeConfig
+
     // Calculate wait time
     val waitMinutes = remember(order.createdAt) {
         ((System.currentTimeMillis() - order.createdAt) / 60000).toInt()
@@ -1449,20 +1459,35 @@ private fun OrderCard(
                     }
                 }
 
-                // Center: Table + Items detail + Total
+                // Center: Order type badge + Table + Items detail + Total
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.Start,
                     verticalArrangement = Arrangement.Top
                 ) {
-                    // Table name - Large
-                    Text(
-                        text = order.tableName ?: "Mang đi",
-                        fontSize = if (isCompact) 14.sp else 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF212121),
-                        maxLines = 1
-                    )
+                    // Order type badge with icon
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(orderTypeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = orderTypeIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
+                            tint = orderTypeColor
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = if (order.orderType == "dine_in" && order.tableName != null)
+                                order.tableName else orderTypeLabel,
+                            fontSize = if (isCompact) 11.sp else 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = orderTypeColor,
+                            maxLines = 1
+                        )
+                    }
                     Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 6.dp))
 
                     // Items list - hiển thị chi tiết món (tối đa 3 món)
@@ -1833,11 +1858,26 @@ private fun OrderDetailDialog(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
-                        Text(
-                            text = order.tableName ?: "Mang đi",
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
+                        // Order type display with icon
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val (typeIcon, typeLabel) = when (order.orderType) {
+                                "takeaway" -> Icons.Default.ShoppingBag to "Mang về"
+                                "delivery" -> Icons.Default.DeliveryDining to "Giao hàng"
+                                else -> Icons.Default.TableBar to (order.tableName ?: "Tại bàn")
+                            }
+                            Icon(
+                                imageVector = typeIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White.copy(alpha = 0.9f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = typeLabel,
+                                fontSize = 14.sp,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(
