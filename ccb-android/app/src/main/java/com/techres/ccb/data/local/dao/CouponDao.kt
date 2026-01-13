@@ -147,9 +147,36 @@ interface CouponDao {
     @Query("SELECT COUNT(*) FROM coupons WHERE branch_id = :branchId AND is_active = 1")
     suspend fun countActive(branchId: String): Int
 
+    @Query("SELECT * FROM coupons WHERE branch_id = :branchId")
+    suspend fun getAllByBranch(branchId: String): List<CouponEntity>
+
+    /**
+     * Sync coupons from server while preserving local usage counts.
+     * Local usage counts are kept if they are higher than server values
+     * (meaning usage happened locally since last sync).
+     */
     @Transaction
     suspend fun syncCoupons(branchId: String, coupons: List<CouponEntity>) {
+        // Get existing coupons to preserve usage counts
+        val existingCoupons = getAllByBranch(branchId)
+        val existingMap = existingCoupons.associateBy { it.id }
+
+        // Merge server data with local usage counts
+        val mergedCoupons = coupons.map { serverCoupon ->
+            val localCoupon = existingMap[serverCoupon.id]
+            if (localCoupon != null) {
+                // Preserve local usage counts if they are higher
+                // (local usage happened after last sync)
+                serverCoupon.copy(
+                    usageCount = maxOf(serverCoupon.usageCount, localCoupon.usageCount),
+                    dailyUsageCount = maxOf(serverCoupon.dailyUsageCount, localCoupon.dailyUsageCount)
+                )
+            } else {
+                serverCoupon
+            }
+        }
+
         deleteAllByBranch(branchId)
-        insertAll(coupons)
+        insertAll(mergedCoupons)
     }
 }
