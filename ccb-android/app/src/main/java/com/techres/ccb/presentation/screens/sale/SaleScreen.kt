@@ -63,6 +63,7 @@ fun SaleScreen(
     onNavigateBack: () -> Unit,
     orderId: String? = null,
     tableId: String? = null,
+    showPaymentOnStart: Boolean = false,
     viewModel: SaleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -72,6 +73,9 @@ fun SaleScreen(
     // Determine if we're on a phone (< 600dp) or tablet
     val isCompactScreen = screenWidthDp < 600
     var showCartDialog by remember { mutableStateOf(false) }
+
+    // Track if we should auto-show payment dialog after order loads
+    var pendingShowPayment by remember { mutableStateOf(showPaymentOnStart) }
 
     // Load existing order if orderId is provided
     LaunchedEffect(orderId) {
@@ -84,6 +88,14 @@ fun SaleScreen(
     LaunchedEffect(tableId) {
         if (!tableId.isNullOrEmpty()) {
             viewModel.selectTableById(tableId)
+        }
+    }
+
+    // Auto-show payment dialog after order is loaded
+    LaunchedEffect(uiState.currentOrder, pendingShowPayment) {
+        if (pendingShowPayment && uiState.currentOrder != null) {
+            viewModel.showPaymentDialog()
+            pendingShowPayment = false
         }
     }
 

@@ -50,11 +50,12 @@ sealed class Screen(val route: String) {
 
     object Dashboard : Screen("dashboard")  // Main dashboard screen
     object Home : Screen("home")
-    object Sale : Screen("sale?orderId={orderId}&tableId={tableId}") {  // New POS Sale Screen
-        fun createRoute(orderId: String? = null, tableId: String? = null): String {
+    object Sale : Screen("sale?orderId={orderId}&tableId={tableId}&showPayment={showPayment}") {  // New POS Sale Screen
+        fun createRoute(orderId: String? = null, tableId: String? = null, showPayment: Boolean = false): String {
             val params = mutableListOf<String>()
             if (orderId != null) params.add("orderId=$orderId")
             if (tableId != null) params.add("tableId=$tableId")
+            if (showPayment) params.add("showPayment=true")
             return if (params.isEmpty()) "sale" else "sale?${params.joinToString("&")}"
         }
     }
@@ -221,6 +222,9 @@ fun CCBNavHost() {
                 onNavigateToSaleWithOrder = { orderId ->
                     navController.navigate(Screen.Sale.createRoute(orderId = orderId))
                 },
+                onNavigateToSaleForPayment = { orderId ->
+                    navController.navigate(Screen.Sale.createRoute(orderId = orderId, showPayment = true))
+                },
                 onNavigateToFoodOrders = {
                     navController.navigate(Screen.FoodOrder.route)
                 },
@@ -304,15 +308,22 @@ fun CCBNavHost() {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("showPayment") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val orderId = backStackEntry.arguments?.getString("orderId")
             val tableId = backStackEntry.arguments?.getString("tableId")
+            val showPayment = backStackEntry.arguments?.getString("showPayment") == "true"
             SaleScreen(
                 onNavigateBack = { navController.popBackStack() },
                 orderId = orderId,
-                tableId = tableId
+                tableId = tableId,
+                showPaymentOnStart = showPayment
             )
         }
 
