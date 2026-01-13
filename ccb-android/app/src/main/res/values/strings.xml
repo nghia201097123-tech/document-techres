@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CCB POS</string>
+
+    <!-- Auth -->
+    <string name="login_title">Đăng nhập thiết bị</string>
+    <string name="store_code_hint">Mã cửa hàng</string>
+    <string name="login_button">Đăng nhập</string>
+    <string name="pin_title">Nhập mã PIN</string>
+    <string name="pin_hint">Mã PIN nhân viên</string>
+    <string name="verify_pin">Xác nhận</string>
+    <string name="logout">Đăng xuất</string>
+    <string name="switch_staff">Đổi nhân viên</string>
+
+    <!-- Home -->
+    <string name="home_title">Trang chủ</string>
+    <string name="new_order">Tạo đơn mới</string>
+    <string name="active_orders">Đơn đang phục vụ</string>
+    <string name="shift_info">Thông tin ca</string>
+
+    <!-- Menu -->
+    <string name="menu_title">Thực đơn</string>
+    <string name="all_categories">Tất cả</string>
+    <string name="search_product">Tìm sản phẩm...</string>
+    <string name="no_products">Không có sản phẩm</string>
+
+    <!-- Order -->
+    <string name="order_title">Đơn hàng</string>
+    <string name="table">Bàn</string>
+    <string name="select_table">Chọn bàn</string>
+    <string name="order_items">Các món</string>
+    <string name="subtotal">Tạm tính</string>
+    <string name="discount">Giảm giá</string>
+    <string name="total">Tổng cộng</string>
+    <string name="add_item">Thêm món</string>
+    <string name="remove_item">Xóa món</string>
+    <string name="quantity">Số lượng</string>
+    <string name="note">Ghi chú</string>
+    <string name="send_to_kitchen">Gửi bếp</string>
+    <string name="pay">Thanh toán</string>
+    <string name="cancel_order">Hủy đơn</string>
+
+    <!-- Payment -->
+    <string name="payment_title">Thanh toán</string>
+    <string name="payment_method">Phương thức thanh toán</string>
+    <string name="cash">Tiền mặt</string>
+    <string name="bank_transfer">Chuyển khoản</string>
+    <string name="card">Thẻ</string>
+    <string name="received_amount">Tiền khách đưa</string>
+    <string name="change">Tiền thừa</string>
+    <string name="confirm_payment">Xác nhận thanh toán</string>
+    <string name="print_bill">In hóa đơn</string>
+
+    <!-- Shift -->
+    <string name="shift_title">Ca làm việc</string>
+    <string name="open_shift">Mở ca</string>
+    <string name="close_shift">Chốt ca</string>
+    <string name="opening_amount">Tiền đầu ca</string>
+    <string name="closing_amount">Tiền cuối ca</string>
+    <string name="total_orders">Tổng đơn</string>
+    <string name="total_revenue">Doanh thu</string>
+    <string name="cash_revenue">Tiền mặt</string>
+    <string name="bank_revenue">Chuyển khoản</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Cài đặt</string>
+    <string name="printer_settings">Cài đặt máy in</string>
+    <string name="sync_settings">Đồng bộ dữ liệu</string>
+    <string name="sync_now">Đồng bộ ngay</string>
+    <string name="last_sync">Đồng bộ lần cuối</string>
+    <string name="about">Thông tin ứng dụng</string>
+    <string name="version">Phiên bản</string>
+
+    <!-- Common -->
+    <string name="loading">Đang tải...</string>
+    <string name="error">Lỗi</string>
+    <string name="success">Thành công</string>
+    <string name="cancel">Hủy</string>
+    <string name="confirm">Xác nhận</string>
+    <string name="save">Lưu</string>
+    <string name="delete">Xóa</string>
+    <string name="edit">Sửa</string>
+    <string name="retry">Thử lại</string>
+    <string name="no_data">Không có dữ liệu</string>
+    <string name="offline_mode">Chế độ offline</string>
+    <string name="connection_lost">Mất kết nối</string>
+    <string name="connection_restored">Đã kết nối lại</string>
+
+    <!-- Format -->
+    <string name="price_format">%s đ</string>
+    <string name="quantity_format">x%d</string>
+</resources>

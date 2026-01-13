@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary colors -->
+    <color name="primary">#FF6B35</color>
+    <color name="primary_dark">#E55A24</color>
+    <color name="primary_light">#FF8A5C</color>
+
+    <!-- Secondary colors -->
+    <color name="secondary">#2E7D32</color>
+    <color name="secondary_dark">#1B5E20</color>
+    <color name="secondary_light">#4CAF50</color>
+
+    <!-- Neutral colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray_50">#FAFAFA</color>
+    <color name="gray_100">#F5F5F5</color>
+    <color name="gray_200">#EEEEEE</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="gray_400">#BDBDBD</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_600">#757575</color>
+    <color name="gray_700">#616161</color>
+    <color name="gray_800">#424242</color>
+    <color name="gray_900">#212121</color>
+
+    <!-- Semantic colors -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="error">#F44336</color>
+    <color name="info">#2196F3</color>
+
+    <!-- Table status colors -->
+    <color name="table_available">#4CAF50</color>
+    <color name="table_occupied">#FF6B35</color>
+    <color name="table_reserved">#FFC107</color>
+
+    <!-- Order status colors -->
+    <color name="order_pending">#FFC107</color>
+    <color name="order_preparing">#2196F3</color>
+    <color name="order_ready">#4CAF50</color>
+    <color name="order_completed">#9E9E9E</color>
+    <color name="order_cancelled">#F44336</color>
+
+    <!-- Launcher icon background -->
+    <color name="ic_launcher_background">#FF6B35</color>
+</resources>

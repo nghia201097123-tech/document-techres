@@ -1,0 +1,125 @@
+package com.techres.ccb.presentation.screens.settings
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.techres.ccb.BuildConfig
+import com.techres.ccb.data.local.entity.KitchenEntity
+import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.KitchenRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class KitchenPrinterUiState(
+    val kitchens: List<KitchenEntity> = emptyList(),
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null,
+    val isDebugDataInserted: Boolean = false
+)
+
+@HiltViewModel
+class KitchenPrinterViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val kitchenRepository: KitchenRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(KitchenPrinterUiState())
+    val uiState: StateFlow<KitchenPrinterUiState> = _uiState.asStateFlow()
+
+    init {
+        loadKitchens()
+    }
+
+    private fun loadKitchens() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            try {
+                val branchId = authRepository.getBranchId()
+                if (branchId.isNullOrEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Không tìm thấy chi nhánh"
+                        )
+                    }
+                    return@launch
+                }
+
+                // In DEBUG mode, always check and insert debug data if empty
+                if (BuildConfig.DEBUG) {
+                    val count = kitchenRepository.getKitchensCount(branchId)
+                    if (count == 0) {
+                        kitchenRepository.insertDebugKitchens(branchId)
+                        _uiState.update { it.copy(isDebugDataInserted = true) }
+                    }
+                }
+
+                kitchenRepository.getAllKitchens(branchId).collect { kitchens ->
+                    _uiState.update {
+                        it.copy(
+                            kitchens = kitchens,
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Lỗi tải dữ liệu"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Force insert debug kitchens (for testing)
+     */
+    fun insertDebugData() {
+        viewModelScope.launch {
+            try {
+                val branchId = authRepository.getBranchId()
+                if (!branchId.isNullOrEmpty()) {
+                    // Clear existing and insert fresh debug data
+                    kitchenRepository.clearByBranch(branchId)
+                    kitchenRepository.insertDebugKitchens(branchId)
+                    _uiState.update { it.copy(isDebugDataInserted = true) }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: "Lỗi thêm dữ liệu debug")
+                }
+            }
+        }
+    }
+
+    fun updatePrinterConfig(
+        kitchenId: String,
+        ip: String?,
+        port: Int,
+        name: String?,
+        isConnected: Boolean
+    ) {
+        viewModelScope.launch {
+            try {
+                kitchenRepository.updatePrinterConfig(kitchenId, ip, port, name, isConnected)
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: "Lỗi cập nhật cấu hình máy in")
+                }
+            }
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+}
