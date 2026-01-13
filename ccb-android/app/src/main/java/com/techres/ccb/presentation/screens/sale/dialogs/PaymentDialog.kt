@@ -132,7 +132,7 @@ fun PaymentDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.92f),
+                .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -223,31 +223,31 @@ fun PaymentDialog(
                         modifier = Modifier
                             .weight(0.55f)
                             .fillMaxHeight()
-                            .padding(16.dp)
+                            .padding(12.dp)
                     ) {
                         if (selectedMethod == PaymentMethod.CASH) {
                             Text(
                                 text = "Tiền khách đưa",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             OutlinedTextField(
                                 value = receivedAmountText,
                                 onValueChange = { receivedAmountText = it.filter { c -> c.isDigit() } },
-                                modifier = Modifier.fillMaxWidth(),
-                                textStyle = MaterialTheme.typography.headlineMedium.copy(
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                textStyle = MaterialTheme.typography.titleLarge.copy(
                                     textAlign = TextAlign.End,
                                     fontWeight = FontWeight.Bold
                                 ),
-                                suffix = { Text("đ", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.outline) },
+                                suffix = { Text("đ", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(10.dp)
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             // Quick suggestions - 1 tap to select
                             Row(
@@ -281,7 +281,7 @@ fun PaymentDialog(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             NumPadCompact(
                                 onNumberClick = { receivedAmountText += it },
@@ -345,110 +345,73 @@ fun PaymentDialog(
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // Order summary with VAT breakdown - Simplified layout
+                        // Order summary - Compact layout (không hiển thị chi tiết VAT)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
-                            // VAT rate 8% for F&B (Nghị định 174/2025)
-                            val vatRate = 0.08
-                            // Giá bán đã bao gồm VAT, tách ra để hiển thị
-                            val subtotalBeforeVat = (subtotal / (1 + vatRate)).toLong()
-                            val subtotalVat = subtotal - subtotalBeforeVat
-                            // Giảm giá cũng bao gồm VAT
-                            val discountBeforeVat = (discountAmount / (1 + vatRate)).toLong()
-                            val discountVat = discountAmount - discountBeforeVat
-                            // Tổng sau giảm giá
-                            val totalBeforeVat = (totalAmount / (1 + vatRate)).toLong()
-                            val totalVat = totalAmount - totalBeforeVat
-
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                                 // === TẠM TÍNH ===
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
+                                    Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
                                 }
-                                Text(
-                                    "  └ Chưa VAT: ${formatCurrency(subtotalBeforeVat)} + VAT: ${formatCurrency(subtotalVat)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
 
-                                // === GIẢM GIÁ (nếu có) ===
+                                // === GIẢM GIÁ (nếu có) - gộp chung 1 dòng ===
                                 if (discountAmount > 0) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // Giảm giá món
-                                    if (itemDiscountTotal > 0) {
-                                        val itemDiscountBeforeVat = (itemDiscountTotal / (1 + vatRate)).toLong()
-                                        val itemDiscountVat = itemDiscountTotal - itemDiscountBeforeVat
-                                        Row(
-                                            Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Giảm giá món:", style = MaterialTheme.typography.bodySmall, color = Success)
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("-${formatCurrency(itemDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
-                                                IconButton(onClick = onClearItemDiscounts, modifier = Modifier.size(20.dp)) {
-                                                    Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                                                }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("Giảm giá", style = MaterialTheme.typography.bodySmall, color = Success)
+                                            // Hiển thị loại giảm giá
+                                            val discountTypes = mutableListOf<String>()
+                                            if (itemDiscountTotal > 0) discountTypes.add("Món")
+                                            if (billDiscountTotal > 0) {
+                                                val desc = billDiscountDescription?.replace("Giảm ", "") ?: "HĐ"
+                                                discountTypes.add(desc)
+                                            }
+                                            if (discountTypes.isNotEmpty()) {
+                                                Text(
+                                                    " (${discountTypes.joinToString(", ")})",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.outline
+                                                )
                                             }
                                         }
-                                        Text(
-                                            "  └ Chưa VAT: ${formatCurrency(itemDiscountBeforeVat)} + VAT: ${formatCurrency(itemDiscountVat)}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-
-                                    // Giảm giá hóa đơn
-                                    if (billDiscountTotal > 0) {
-                                        val billDiscountBeforeVat = (billDiscountTotal / (1 + vatRate)).toLong()
-                                        val billDiscountVat = billDiscountTotal - billDiscountBeforeVat
-                                        if (itemDiscountTotal > 0) Spacer(modifier = Modifier.height(4.dp))
-                                        Row(
-                                            Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column {
-                                                Text("Giảm giá HĐ:", style = MaterialTheme.typography.bodySmall, color = Success)
-                                                if (billDiscountDescription != null) {
-                                                    Text("  ($billDiscountDescription)", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
-                                                }
-                                            }
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("-${formatCurrency(billDiscountTotal)}", style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.Medium)
-                                                IconButton(onClick = onClearBillDiscount, modifier = Modifier.size(20.dp)) {
-                                                    Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                                                }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                "-${formatCurrency(discountAmount)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Success,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            IconButton(onClick = onClearDiscount, modifier = Modifier.size(20.dp)) {
+                                                Icon(Icons.Default.Close, "Xóa", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                                             }
                                         }
-                                        Text(
-                                            "  └ Chưa VAT: ${formatCurrency(billDiscountBeforeVat)} + VAT: ${formatCurrency(billDiscountVat)}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
                                     }
                                 }
 
                                 // === TỔNG THANH TOÁN ===
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("TỔNG THANH TOÁN:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                    Text(formatCurrency(totalAmount), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color(0xFFFF5722))
+                                    Text("TỔNG:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                    Text(formatCurrency(totalAmount), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, color = Color(0xFFFF5722))
                                 }
-                                Text(
-                                    "  └ Chưa VAT: ${formatCurrency(totalBeforeVat)} + VAT: ${formatCurrency(totalVat)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
+                                // VAT info - 1 dòng nhỏ
+                                if (vatAmount > 0) {
+                                    Text(
+                                        "(Đã bao gồm VAT: ${formatCurrency(vatAmount)})",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
                             }
                         }
 
@@ -1254,58 +1217,58 @@ fun PaymentDialog(
                     }
                 }
 
-                // ===== FOOTER =====
-                Column(
+                // ===== FOOTER - Compact =====
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Print Temporary Bill button
+                    // Hủy button
                     OutlinedButton(
-                        onClick = onPrintTemporaryBill,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFFF9800)
-                        )
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(0.15f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
                     ) {
-                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("IN BILL TẠM", fontWeight = FontWeight.Bold)
+                        Text("Hủy", fontSize = 13.sp)
                     }
 
-                    // Cancel and Confirm buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    // In Bill Tạm button
+                    OutlinedButton(
+                        onClick = onPrintTemporaryBill,
+                        modifier = Modifier.weight(0.25f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF9800))
                     ) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(0.25f)) {
-                            Text("Hủy")
-                        }
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Bill tạm", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
 
-                        Button(
-                            onClick = {
-                                val payment = Payment(
-                                    method = selectedMethod,
-                                    amount = totalAmount,
-                                    receivedAmount = if (selectedMethod == PaymentMethod.CASH) receivedAmount else null,
-                                    changeAmount = if (selectedMethod == PaymentMethod.CASH) changeAmount else null,
-                                    status = PaymentStatus.COMPLETED
-                                )
-                                onPaymentComplete(listOf(payment))
-                            },
-                            modifier = Modifier.weight(0.75f),
-                            enabled = canComplete,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF4CAF50),
-                                disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    // Xác nhận button
+                    Button(
+                        onClick = {
+                            val payment = Payment(
+                                method = selectedMethod,
+                                amount = totalAmount,
+                                receivedAmount = if (selectedMethod == PaymentMethod.CASH) receivedAmount else null,
+                                changeAmount = if (selectedMethod == PaymentMethod.CASH) changeAmount else null,
+                                status = PaymentStatus.COMPLETED
                             )
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("XÁC NHẬN THANH TOÁN", fontWeight = FontWeight.Bold)
-                        }
+                            onPaymentComplete(listOf(payment))
+                        },
+                        modifier = Modifier.weight(0.6f),
+                        enabled = canComplete,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50),
+                            disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("THANH TOÁN", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
@@ -1326,9 +1289,9 @@ fun NumPadCompact(
         listOf("C", "0", "⌫")
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         buttons.forEach { row ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { button ->
                     Button(
                         onClick = {
@@ -1338,7 +1301,7 @@ fun NumPadCompact(
                                 else -> onNumberClick(button)
                             }
                         },
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier.weight(1f).height(44.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when (button) {
                                 "C" -> Color(0xFFFFEBEE)
@@ -1351,9 +1314,10 @@ fun NumPadCompact(
                             }
                         ),
                         shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
                     ) {
-                        Text(button, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
+                        Text(button, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                     }
                 }
             }
