@@ -1769,15 +1769,28 @@ class SaleViewModel @Inject constructor(
                     // 5. Print bill (always print on payment completion)
                     try {
                         Log.d(TAG, "completeOrder - Attempting to print bill, branchId: $branchId")
-                        val printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
+                        // Try to get default printer, fallback to first active printer
+                        var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
+                        if (printerConfig == null) {
+                            // Fallback: get first active printer for this branch
+                            val activePrinters = billPrinterConfigDao.getAllByBranchSync(branchId)
+                            printerConfig = activePrinters.firstOrNull()
+                            Log.d(TAG, "completeOrder - No default printer, using first active: ${printerConfig?.id}")
+                        }
                         Log.d(TAG, "completeOrder - printerConfig: ${printerConfig?.id}, isActive: ${printerConfig?.isActive}, ip: ${printerConfig?.printerIp}")
 
                         if (printerConfig != null && printerConfig.isActive) {
                             // Get template (from printer config or default for branch)
-                            val template = if (printerConfig.templateId != null) {
+                            var template = if (printerConfig.templateId != null) {
                                 billTemplateDao.getById(printerConfig.templateId)
                             } else {
                                 billTemplateDao.getDefaultByBranch(branchId)
+                            }
+                            // Fallback: get first active template for this branch
+                            if (template == null || !template.isActive) {
+                                val activeTemplates = billTemplateDao.getAllByBranchSync(branchId)
+                                template = activeTemplates.firstOrNull()
+                                Log.d(TAG, "completeOrder - No default template, using first active: ${template?.id}")
                             }
                             Log.d(TAG, "completeOrder - template: ${template?.id}, isActive: ${template?.isActive}")
 
