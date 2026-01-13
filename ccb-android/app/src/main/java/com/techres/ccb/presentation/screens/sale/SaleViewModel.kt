@@ -1498,6 +1498,7 @@ class SaleViewModel @Inject constructor(
                     quantity = cartItem.quantity,
                     unitPrice = cartItem.product.price.toDouble(),
                     totalPrice = cartItem.totalPrice.toDouble(),
+                    vatRate = cartItem.product.vatRate, // Copy VAT rate từ sản phẩm
                     notes = variantsAndNote,
                     status = "pending",
                     createdAt = now,
@@ -1518,6 +1519,7 @@ class SaleViewModel @Inject constructor(
                     quantity = cartItem.quantity,
                     unitPrice = cartItem.product.price.toDouble(),
                     totalPrice = cartItem.totalPrice.toDouble(),
+                    vatRate = cartItem.product.vatRate, // Copy VAT rate từ sản phẩm
                     notes = variantsAndNote,
                     status = "pending",
                     isComboParent = true,
