@@ -2052,22 +2052,33 @@ class SaleViewModel @Inject constructor(
         // Tính subtotal thực tế (tổng giá gốc các món TRƯỚC giảm giá)
         val calculatedSubtotal = billItems.sumOf { it.originalPrice * it.quantity }
 
-        // Calculate weighted average VAT rate from items
-        // Công thức: VAT_avg = sum(item.totalPrice * item.vatRate) / sum(item.totalPrice)
-        val totalPriceSum = billItems.sumOf { it.totalPrice }
-        val weightedVatRate = if (totalPriceSum > 0) {
-            billItems.sumOf { it.totalPrice * it.vatRate } / totalPriceSum
-        } else {
-            8.0 // Default VAT F&B
+        // Tính VAT cho TỪNG MÓN rồi cộng lại (mỗi món có VAT rate riêng)
+        // Giá đã bao gồm VAT (inclusive): VAT = price - price/(1 + vatRate/100)
+        var totalVatAmount = 0.0
+        var totalPriceBeforeVat = 0.0
+        billItems.forEach { item ->
+            // Tính VAT cho từng món dựa trên vatRate của món đó
+            val itemPriceBeforeVat = item.totalPrice / (1 + item.vatRate / 100)
+            val itemVat = item.totalPrice - itemPriceBeforeVat
+            totalPriceBeforeVat += itemPriceBeforeVat
+            totalVatAmount += itemVat
         }
 
         // Tính totalAmount thực tế (sau tất cả giảm giá)
-        // totalAmount = subtotal - totalItemDiscount - billDiscount
         val calculatedTotalAmount = (calculatedSubtotal - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
 
-        // Calculate VAT from totalAmount (giá đã bao gồm VAT)
-        val priceBeforeVat = calculatedTotalAmount / (1 + weightedVatRate / 100)
-        val vatAmount = calculatedTotalAmount - priceBeforeVat
+        // Nếu có giảm giá bill, VAT cũng giảm theo tỷ lệ
+        val totalItemsPrice = billItems.sumOf { it.totalPrice }
+        val discountRatio = if (totalItemsPrice > 0) calculatedTotalAmount / totalItemsPrice else 1.0
+        val vatAmount = totalVatAmount * discountRatio
+        val priceBeforeVat = totalPriceBeforeVat * discountRatio
+
+        // Tính VAT rate trung bình để hiển thị trên bill (chỉ để hiển thị)
+        val displayVatRate = if (priceBeforeVat > 0) {
+            (vatAmount / priceBeforeVat) * 100
+        } else {
+            8.0 // Default F&B
+        }
 
         // Map payment method to display text
         val paymentMethodDisplay = when (paymentMethod.lowercase()) {
@@ -2108,7 +2119,7 @@ class SaleViewModel @Inject constructor(
             discountAmount = finalBillDiscount, // Giảm giá tổng bill (order-level: coupon/voucher)
             discountPercent = orderDiscountPercent,
             serviceFee = 0.0,
-            vatRate = weightedVatRate, // VAT weighted average từ các món
+            vatRate = displayVatRate, // VAT rate trung bình (tính từ tổng VAT / tổng giá trước VAT)
             vatAmount = vatAmount,
             priceBeforeVat = priceBeforeVat,
             priceAfterVat = calculatedTotalAmount,
