@@ -275,13 +275,14 @@ object HybridBillPrintService {
             }
 
             // ============ FOOTER ============
-            feed(1)
+            separator()
             lineCenter(template.thankYouMessage)
             lineCenter(template.comebackMessage)
             template.footerText?.let { lineCenter(it) }
 
             // ============ PRINTER ACTIONS ============
-            feed(3)
+            // Feed đủ nhiều để đẩy footer ra khỏi vị trí cắt (5-6 dòng)
+            feed(6)
             if (template.cutPaper) {
                 cut()
             }
