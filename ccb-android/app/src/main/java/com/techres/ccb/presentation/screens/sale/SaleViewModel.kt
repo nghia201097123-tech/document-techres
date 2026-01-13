@@ -1427,6 +1427,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Load coupon tự động áp dụng khi mở PaymentDialog
+     * Hiển thị tất cả coupon có thể áp dụng (cả auto và manual)
      */
     fun loadAutoCoupons() {
         viewModelScope.launch {
@@ -1438,9 +1439,13 @@ class SaleViewModel @Inject constructor(
                 val state = _uiState.value
                 val orderAmount = state.currentOrder?.subtotal ?: state.subtotal.toDouble()
 
-                val autoCoupons = withContext(Dispatchers.IO) {
-                    couponDao.getAutoCoupons(branchId, currentDate)
+                // Lấy tất cả coupon có thể áp dụng (cả auto và manual) để hiển thị
+                val allApplicableCoupons = withContext(Dispatchers.IO) {
+                    couponDao.getApplicableCoupons(branchId, currentDate, orderAmount)
                 }
+
+                // Lọc chỉ auto coupon để tự động áp dụng
+                val autoCoupons = allApplicableCoupons.filter { it.activationType == "auto" }
 
                 // Áp dụng auto coupons
                 val appliedDiscounts = mutableListOf<AppliedDiscount>()
@@ -1480,11 +1485,11 @@ class SaleViewModel @Inject constructor(
                     s.copy(
                         appliedDiscounts = appliedDiscounts,
                         vatAmount = vatAmount,
-                        availableCoupons = autoCoupons
+                        availableCoupons = allApplicableCoupons  // Hiển thị tất cả coupon có thể áp dụng
                     )
                 }
 
-                Log.d(TAG, "loadAutoCoupons - Applied ${appliedDiscounts.size} auto coupons")
+                Log.d(TAG, "loadAutoCoupons - Applied ${appliedDiscounts.size} auto coupons, showing ${allApplicableCoupons.size} available coupons")
             } catch (e: Exception) {
                 Log.e(TAG, "loadAutoCoupons - Error: ${e.message}", e)
             }
