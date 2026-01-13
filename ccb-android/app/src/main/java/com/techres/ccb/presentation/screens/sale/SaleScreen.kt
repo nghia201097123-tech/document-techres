@@ -285,10 +285,12 @@ fun SaleScreen(
             val priceBeforeVat = paymentTotal / (1 + uiState.taxRate / 100.0)
             val vatAmount = (paymentTotal - priceBeforeVat).toLong()
 
-            // Tạo danh sách món cho item-level discount
+            // Tạo danh sách món cho item-level discount (exclude combo children)
             val orderItems = buildList {
-                // Thêm các món từ order đang active
-                uiState.currentOrderItems.forEach { item ->
+                // Thêm các món từ order đang active (filter combo children)
+                uiState.currentOrderItems
+                    .filter { !it.isComboChild }
+                    .forEach { item ->
                     add(PaymentOrderItem(
                         id = item.id,
                         name = item.productName,
@@ -410,7 +412,9 @@ fun PhoneLayout(
 ) {
     val cartItemCount = uiState.cartItems.sumOf { it.quantity }
     val hasActiveOrder = uiState.currentOrder != null
-    val totalBadgeCount = cartItemCount + (uiState.currentOrderItems.size)
+    // Exclude combo children from count - only count parent items
+    val orderItemCount = uiState.currentOrderItems.count { !it.isComboChild }
+    val totalBadgeCount = cartItemCount + orderItemCount
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Full screen product panel
@@ -989,9 +993,11 @@ fun CartPanel(
                     }
                 }
                 if (hasActiveOrder) {
+                    // Exclude combo children from count
+                    val parentItemCount = currentOrderItems.count { !it.isComboChild }
                     Badge(containerColor = Color(0xFF4CAF50)) {
                         Text(
-                            text = "${currentOrderItems.size} món",
+                            text = "$parentItemCount món",
                             color = Color.White
                         )
                     }
@@ -1131,6 +1137,12 @@ fun CartPanel(
             ) {
                 // Display current order items (read-only)
                 if (currentOrderItems.isNotEmpty()) {
+                    // Filter out combo children and group them by parent
+                    val parentItems = currentOrderItems.filter { !it.isComboChild }
+                    val comboChildrenMap = currentOrderItems
+                        .filter { it.isComboChild }
+                        .groupBy { it.comboParentId }
+
                     Text(
                         text = "Đã order:",
                         style = MaterialTheme.typography.labelMedium,
@@ -1138,9 +1150,12 @@ fun CartPanel(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
-                    currentOrderItems.forEach { item ->
+                    parentItems.forEach { item ->
+                        // Get combo children for this parent (if any)
+                        val comboChildren = comboChildrenMap[item.id] ?: emptyList()
                         OrderItemRow(
                             item = item,
+                            comboChildren = comboChildren,
                             onRemoveItem = onRemoveOrderItem
                             // Note: onRemoveTopping removed - only allow removing entire item, not individual toppings
                         )
@@ -1757,6 +1772,7 @@ fun VariantLineItem(variant: SelectedVariant) {
 @Composable
 fun OrderItemRow(
     item: OrderItemEntity,
+    comboChildren: List<OrderItemEntity> = emptyList(),
     onRemoveItem: ((String) -> Unit)? = null,
     onRemoveTopping: ((String, String) -> Unit)? = null
 ) {
@@ -1827,6 +1843,57 @@ fun OrderItemRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray
             )
+
+            // Row 3: Combo children (if this is a combo parent)
+            if (comboChildren.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFFFF3E0).copy(alpha = 0.5f))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "Bao gồm:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFE65100),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    comboChildren.forEach { child ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "•",
+                                fontSize = 14.sp,
+                                color = Color(0xFFFF9800),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = child.productName,
+                                fontSize = 13.sp,
+                                color = Color(0xFF424242),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Badge(
+                                containerColor = Color(0xFFFF9800).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "x${child.quantity}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFE65100),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             // Row 3: Variants/Toppings - Grab style with prices
             if (!item.notes.isNullOrEmpty()) {
