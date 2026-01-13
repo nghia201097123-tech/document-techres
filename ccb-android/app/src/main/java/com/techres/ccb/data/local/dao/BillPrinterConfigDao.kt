@@ -75,6 +75,10 @@ interface BillPrinterConfigDao {
     @Query("UPDATE bill_printer_configs SET template_id = :templateId WHERE id = :id")
     suspend fun updateTemplate(id: String, templateId: String?)
 
+    // Update paper width
+    @Query("UPDATE bill_printer_configs SET paper_width = :paperWidth WHERE id = :id")
+    suspend fun updatePaperWidth(id: String, paperWidth: Int)
+
     @Query("SELECT COUNT(*) FROM bill_printer_configs WHERE branch_id = :branchId")
     suspend fun getCount(branchId: String): Int
 

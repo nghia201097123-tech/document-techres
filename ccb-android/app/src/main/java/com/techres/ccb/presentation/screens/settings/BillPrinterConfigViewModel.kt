@@ -29,6 +29,7 @@ data class BillPrinterConfigUiState(
     val selectedConfig: BillPrinterConfigEntity? = null,
     val showEditDialog: Boolean = false,
     val showTemplateSelector: Boolean = false,
+    val showPaperWidthSelector: Boolean = false,
     val testingPrinterId: String? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null
@@ -103,6 +104,14 @@ class BillPrinterConfigViewModel @Inject constructor(
         _uiState.update { it.copy(selectedConfig = null, showTemplateSelector = false) }
     }
 
+    fun showPaperWidthSelector(config: BillPrinterConfigEntity) {
+        _uiState.update { it.copy(selectedConfig = config, showPaperWidthSelector = true) }
+    }
+
+    fun hidePaperWidthSelector() {
+        _uiState.update { it.copy(selectedConfig = null, showPaperWidthSelector = false) }
+    }
+
     fun updatePrinterAddress(configId: String, ip: String, port: Int) {
         viewModelScope.launch {
             try {
@@ -126,6 +135,20 @@ class BillPrinterConfigViewModel @Inject constructor(
                 _uiState.update { it.copy(successMessage = "Đã cập nhật mẫu bill", showTemplateSelector = false) }
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating template: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun updatePaperWidth(configId: String, paperWidth: Int) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.updatePaperWidth(configId, paperWidth)
+                }
+                _uiState.update { it.copy(successMessage = "Đã cập nhật khổ giấy: ${paperWidth}mm") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating paper width: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
             }
         }

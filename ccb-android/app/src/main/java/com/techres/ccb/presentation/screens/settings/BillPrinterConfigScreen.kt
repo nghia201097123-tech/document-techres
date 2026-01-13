@@ -73,6 +73,18 @@ fun BillPrinterConfigScreen(
         )
     }
 
+    // Paper width selector dialog
+    if (uiState.showPaperWidthSelector && uiState.selectedConfig != null) {
+        PaperWidthSelectionDialog(
+            currentPaperWidth = uiState.selectedConfig!!.paperWidth,
+            onDismiss = { viewModel.hidePaperWidthSelector() },
+            onSelect = { paperWidth ->
+                viewModel.updatePaperWidth(uiState.selectedConfig!!.id, paperWidth)
+                viewModel.hidePaperWidthSelector()
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -151,6 +163,7 @@ fun BillPrinterConfigScreen(
                         onTestClick = { viewModel.testPrinterConnection(config) },
                         onSetDefaultClick = { viewModel.setDefault(config.id) },
                         onTemplateClick = { viewModel.showTemplateSelector(config) },
+                        onPaperWidthClick = { viewModel.showPaperWidthSelector(config) },
                         onToggleAutoPrint = { viewModel.toggleAutoPrint(config) }
                     )
                 }
@@ -209,6 +222,7 @@ private fun PrinterConfigCard(
     onTestClick: () -> Unit,
     onSetDefaultClick: () -> Unit,
     onTemplateClick: () -> Unit,
+    onPaperWidthClick: () -> Unit,
     onToggleAutoPrint: () -> Unit
 ) {
     val template = templates.find { it.id == config.templateId }
@@ -370,6 +384,33 @@ private fun PrinterConfigCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Mẫu: ${template?.name ?: "Mặc định"}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+
+                    // Paper width
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onPaperWidthClick)
+                    ) {
+                        Icon(
+                            Icons.Default.Straighten,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Khổ giấy: ${config.paperWidth}mm",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                         )
@@ -653,5 +694,86 @@ private fun getTemplateTypeLabel(type: String): String {
         "detailed" -> "Chi tiết VAT"
         "premium" -> "Cao cấp"
         else -> type
+    }
+}
+
+// Paper width options
+private val PAPER_WIDTH_OPTIONS = listOf(
+    PaperWidthOption(32, "32mm (1.25 inch)", "Máy in nhãn nhỏ"),
+    PaperWidthOption(44, "44mm (1.75 inch)", "Máy in di động nhỏ"),
+    PaperWidthOption(48, "48mm (1.9 inch)", "Máy in di động"),
+    PaperWidthOption(57, "57mm (2.25 inch)", "Máy in di động"),
+    PaperWidthOption(58, "58mm (2.25 inch)", "Máy in POS nhỏ"),
+    PaperWidthOption(76, "76mm (3 inch)", "Máy in POS trung"),
+    PaperWidthOption(80, "80mm (3.15 inch)", "Máy in POS chuẩn"),
+    PaperWidthOption(110, "110mm (4.3 inch)", "Máy in khổ rộng"),
+    PaperWidthOption(112, "112mm (4.4 inch)", "Máy in khổ rộng")
+)
+
+private data class PaperWidthOption(
+    val width: Int,
+    val label: String,
+    val description: String
+)
+
+@Composable
+private fun PaperWidthSelectionDialog(
+    currentPaperWidth: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.widthIn(max = 400.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    "Chọn khổ giấy",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 400.dp)
+                ) {
+                    items(PAPER_WIDTH_OPTIONS) { option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(option.width) }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            RadioButton(
+                                selected = currentPaperWidth == option.width,
+                                onClick = { onSelect(option.width) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(option.label, fontWeight = FontWeight.Medium)
+                                Text(
+                                    option.description,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Đóng")
+                }
+            }
+        }
     }
 }
