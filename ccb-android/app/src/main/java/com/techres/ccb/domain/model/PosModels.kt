@@ -20,6 +20,7 @@ data class Product(
     val abbreviation: String? = null, // Tên viết tắt (VD: "ccdc" cho "Cơm chiên dương châu")
     val categoryId: String,
     val price: Long,
+    val vatRate: Double = 8.0,  // VAT rate của sản phẩm (%)
     val imageUrl: String? = null,
     val description: String? = null,
     val isActive: Boolean = true,
