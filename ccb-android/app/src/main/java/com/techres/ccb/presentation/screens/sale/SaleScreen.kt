@@ -1103,8 +1103,8 @@ fun CartPanel(
                     currentOrderItems.forEach { item ->
                         OrderItemRow(
                             item = item,
-                            onRemoveItem = onRemoveOrderItem,
-                            onRemoveTopping = onRemoveOrderItemTopping
+                            onRemoveItem = onRemoveOrderItem
+                            // Note: onRemoveTopping removed - only allow removing entire item, not individual toppings
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
