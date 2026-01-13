@@ -637,7 +637,8 @@ data class BillItem(
     val discountPercent: Double = 0.0,// % giảm giá (nếu có)
     val totalPrice: Double,          // Thành tiền (sau giảm)
     val note: String? = null,
-    val toppings: List<BillTopping> = emptyList()
+    val toppings: List<BillTopping> = emptyList(),
+    val vatRate: Double = 8.0        // VAT rate của món này (%)
 )
 
 data class BillTopping(

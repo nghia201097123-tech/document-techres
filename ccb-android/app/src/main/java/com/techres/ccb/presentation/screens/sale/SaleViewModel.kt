@@ -2041,17 +2041,33 @@ class SaleViewModel @Inject constructor(
                 discountPercent = itemDiscountPercent,
                 totalPrice = finalTotalPrice,
                 note = userNote,
-                toppings = toppings
+                toppings = toppings,
+                vatRate = item.vatRate // VAT rate của món này
             )
         }
 
         // Tính tổng giảm giá các MÓN (item-level discounts)
         val totalItemDiscount = billItems.sumOf { it.discountAmount }
 
-        // Calculate VAT (assuming 10% VAT rate)
-        val vatRate = 10.0
-        val priceBeforeVat = order.totalAmount / (1 + vatRate / 100)
-        val vatAmount = order.totalAmount - priceBeforeVat
+        // Tính subtotal thực tế (tổng giá gốc các món TRƯỚC giảm giá)
+        val calculatedSubtotal = billItems.sumOf { it.originalPrice * it.quantity }
+
+        // Calculate weighted average VAT rate from items
+        // Công thức: VAT_avg = sum(item.totalPrice * item.vatRate) / sum(item.totalPrice)
+        val totalPriceSum = billItems.sumOf { it.totalPrice }
+        val weightedVatRate = if (totalPriceSum > 0) {
+            billItems.sumOf { it.totalPrice * it.vatRate } / totalPriceSum
+        } else {
+            8.0 // Default VAT F&B
+        }
+
+        // Tính totalAmount thực tế (sau tất cả giảm giá)
+        // totalAmount = subtotal - totalItemDiscount - billDiscount
+        val calculatedTotalAmount = (calculatedSubtotal - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
+
+        // Calculate VAT from totalAmount (giá đã bao gồm VAT)
+        val priceBeforeVat = calculatedTotalAmount / (1 + weightedVatRate / 100)
+        val vatAmount = calculatedTotalAmount - priceBeforeVat
 
         // Map payment method to display text
         val paymentMethodDisplay = when (paymentMethod.lowercase()) {
@@ -2074,8 +2090,8 @@ class SaleViewModel @Inject constructor(
             (order.discountAmount - totalItemDiscount).coerceAtLeast(0.0)
         }
 
-        val orderDiscountPercent = if (finalBillDiscount > 0 && order.subtotal > 0) {
-            (finalBillDiscount / order.subtotal) * 100
+        val orderDiscountPercent = if (finalBillDiscount > 0 && calculatedSubtotal > 0) {
+            (finalBillDiscount / calculatedSubtotal) * 100
         } else {
             0.0
         }
@@ -2087,16 +2103,16 @@ class SaleViewModel @Inject constructor(
             staffName = staffName,
             customerName = customerName,
             items = billItems,
-            subtotal = order.subtotal, // Tạm tính từ order
+            subtotal = calculatedSubtotal, // Tạm tính (tổng giá gốc trước giảm giá)
             totalItemDiscount = totalItemDiscount, // Tổng giảm giá các món (item-level)
             discountAmount = finalBillDiscount, // Giảm giá tổng bill (order-level: coupon/voucher)
             discountPercent = orderDiscountPercent,
             serviceFee = 0.0,
-            vatRate = vatRate,
+            vatRate = weightedVatRate, // VAT weighted average từ các món
             vatAmount = vatAmount,
             priceBeforeVat = priceBeforeVat,
-            priceAfterVat = order.totalAmount,
-            totalAmount = order.totalAmount,
+            priceAfterVat = calculatedTotalAmount,
+            totalAmount = calculatedTotalAmount, // Tổng SAU tất cả giảm giá
             paymentMethod = paymentMethodDisplay,
             receivedAmount = receivedAmount,
             changeAmount = changeAmount
