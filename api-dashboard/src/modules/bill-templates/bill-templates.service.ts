@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { BillTemplate } from '../../database/entities';
+import { BillTemplate, BillPrinterConfig } from '../../database/entities';
 import { CreateBillTemplateDto, UpdateBillTemplateDto } from './dto';
 
 @Injectable()
@@ -9,6 +9,8 @@ export class BillTemplatesService {
   constructor(
     @InjectRepository(BillTemplate)
     private readonly repository: Repository<BillTemplate>,
+    @InjectRepository(BillPrinterConfig)
+    private readonly printerConfigRepository: Repository<BillPrinterConfig>,
   ) {}
 
   async findAll(tenantId: string, branchIds?: string[]) {
@@ -79,6 +81,13 @@ export class BillTemplatesService {
 
   async delete(tenantId: string, id: string) {
     const template = await this.findOne(tenantId, id);
+
+    // Clear template_id from printer configs that use this template
+    await this.printerConfigRepository.update(
+      { tenantId, templateId: id },
+      { templateId: null }
+    );
+
     await this.repository.remove(template);
     return { message: 'Đã xóa mẫu bill' };
   }
