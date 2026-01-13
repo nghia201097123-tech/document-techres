@@ -1404,47 +1404,86 @@ private fun OrderCard(
                     }
                 }
 
-                // Center: Table + Items + Total
+                // Center: Table + Items detail + Total
                 Column(
                     modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.Top
                 ) {
                     // Table name - Large
                     Text(
                         text = order.tableName ?: "Mang đi",
-                        fontSize = if (isCompact) 14.sp else 18.sp,
+                        fontSize = if (isCompact) 14.sp else 16.sp,
                         fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
                         color = Color(0xFF212121),
                         maxLines = 1
                     )
-                    Spacer(modifier = Modifier.height(if (isCompact) 2.dp else 4.dp))
-                    // Items count
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Restaurant,
-                            contentDescription = null,
-                            modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(if (isCompact) 2.dp else 4.dp))
+                    Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 6.dp))
+
+                    // Items list - hiển thị chi tiết món (tối đa 3 món)
+                    val parentItems = order.items.filter { !it.isComboChild }
+                    parentItems.take(3).forEach { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                // Tên món + số lượng
+                                Text(
+                                    text = "${item.productName} x${item.quantity}",
+                                    fontSize = if (isCompact) 10.sp else 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                // Variants/notes nếu có
+                                if (!item.notes.isNullOrBlank() && item.notes != "null") {
+                                    Text(
+                                        text = item.notes.replace("\n", ", "),
+                                        fontSize = if (isCompact) 8.sp else 9.sp,
+                                        color = Color.Gray,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            Text(
+                                text = formatCurrency(item.totalPrice.toLong()),
+                                fontSize = if (isCompact) 10.sp else 11.sp,
+                                color = Color(0xFF1976D2)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+                    // Nếu còn nhiều món hơn
+                    if (parentItems.size > 3) {
                         Text(
-                            text = "${order.itemCount} món",
-                            fontSize = if (isCompact) 11.sp else 13.sp,
-                            color = Color.Gray
+                            text = "+${parentItems.size - 3} món khác...",
+                            fontSize = if (isCompact) 9.sp else 10.sp,
+                            color = Color.Gray,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                         )
                     }
+
                     Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 6.dp))
                     // Total amount - Prominent
-                    Text(
-                        text = formatCurrency(order.totalAmount),
-                        fontSize = if (isCompact) 13.sp else 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1976D2)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Tổng:",
+                            fontSize = if (isCompact) 11.sp else 12.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = formatCurrency(order.totalAmount),
+                            fontSize = if (isCompact) 13.sp else 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1976D2)
+                        )
+                    }
                 }
 
                 // Footer: Quick action buttons

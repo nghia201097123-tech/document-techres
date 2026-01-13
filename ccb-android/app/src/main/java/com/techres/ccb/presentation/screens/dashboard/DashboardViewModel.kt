@@ -29,7 +29,8 @@ data class PosOrder(
     val status: PosOrderStatus,
     val createdAt: Long,
     val orderNumber: Int,
-    val isPrinted: Boolean = false
+    val isPrinted: Boolean = false,
+    val items: List<OrderItemEntity> = emptyList() // Danh sách món để hiển thị
 )
 
 enum class PosOrderStatus(val displayName: String, val color: Long) {
@@ -160,18 +161,19 @@ class DashboardViewModel @Inject constructor(
                     val posOrders = orderEntities
                         .filter { it.status != "completed" && it.status != "cancelled" }
                         .map { entity ->
-                            // Get item count for this order
-                            val itemCount = orderRepository.getOrderItemsSync(entity.id).size
+                            // Get items for this order
+                            val orderItems = orderRepository.getOrderItemsSync(entity.id)
                             PosOrder(
                                 id = entity.id,
                                 tableName = entity.tableName,
                                 customerName = entity.customerName,
-                                itemCount = itemCount,
+                                itemCount = orderItems.size,
                                 totalAmount = entity.totalAmount.toLong(),
                                 status = mapOrderStatus(entity.status),
                                 createdAt = parseTimestamp(entity.createdAt),
                                 orderNumber = parseOrderNumber(entity.orderNumber),
-                                isPrinted = entity.isPrinted
+                                isPrinted = entity.isPrinted,
+                                items = orderItems // Thêm items để hiển thị
                             )
                         }
 
