@@ -1232,7 +1232,8 @@ fun PaymentDialog(
                                                             CouponCard(
                                                                 coupon = coupon,
                                                                 isApplied = isAlreadyApplied,
-                                                                onApply = { onApplyCouponById(coupon.id) }
+                                                                onApply = { onApplyCouponById(coupon.id) },
+                                                                onRemove = { onRemoveDiscount(coupon.id) }
                                                             )
                                                             Spacer(modifier = Modifier.height(6.dp))
                                                         }
@@ -1435,12 +1436,14 @@ private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, Stri
 
 /**
  * Card hiển thị thông tin coupon
+ * @param onRemove Callback khi user click để bỏ chọn coupon đã áp dụng
  */
 @Composable
 private fun CouponCard(
     coupon: CouponDisplayItem,
     isApplied: Boolean,
-    onApply: () -> Unit
+    onApply: () -> Unit,
+    onRemove: () -> Unit = {}
 ) {
     val discountText = when (coupon.couponType) {
         "percentage" -> {
@@ -1458,7 +1461,12 @@ private fun CouponCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                // Toggle behavior: click để áp dụng hoặc bỏ chọn
+                if (isApplied) onRemove() else onApply()
+            },
         colors = CardDefaults.cardColors(
             containerColor = if (isApplied)
                 Success.copy(alpha = 0.1f)
@@ -1521,9 +1529,10 @@ private fun CouponCard(
             }
 
             if (isApplied) {
+                // Hiển thị checkmark và cho phép click để bỏ chọn
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Đã áp dụng",
+                    contentDescription = "Đã áp dụng - Click để bỏ chọn",
                     tint = Success,
                     modifier = Modifier.size(24.dp)
                 )
