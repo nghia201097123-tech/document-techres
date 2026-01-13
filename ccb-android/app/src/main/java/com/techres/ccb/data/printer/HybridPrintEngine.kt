@@ -358,12 +358,9 @@ class HybridBillBuilder(
     val lineWidth = BitmapTextRenderer.getLineWidth(paperWidth)
 
     // Font sizes scaled by paper width
-    private val baseFontSize = BitmapTextRenderer.getBaseFontSize(paperWidth)
-    private val titleFontSize = BitmapTextRenderer.getTitleFontSize(paperWidth)
-    private val totalFontSize = BitmapTextRenderer.getTotalFontSize(paperWidth)
-
-    // Default style với font size đã scale
-    private val defaultStyle get() = BitmapTextStyle(fontSize = baseFontSize)
+    val baseFontSize = BitmapTextRenderer.getBaseFontSize(paperWidth)
+    val titleFontSize = BitmapTextRenderer.getTitleFontSize(paperWidth)
+    val totalFontSize = BitmapTextRenderer.getTotalFontSize(paperWidth)
 
     // ESC/POS Commands
     private val ESC = 0x1B.toByte()
@@ -383,17 +380,19 @@ class HybridBillBuilder(
 
     /**
      * In text - tự động chọn bitmap hoặc text mode
-     * Sử dụng font size đã scale theo paper width
      */
-    fun line(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
+    fun line(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
         if (text.isEmpty()) {
             buffer.write(EscPosCommands.LF)
             return this
         }
 
-        // Merge với default style để có font size đã scale
-        val actualStyle = style?.copy(fontSize = style.fontSize.takeIf { it != 24f } ?: baseFontSize)
-            ?: defaultStyle
+        // Sử dụng baseFontSize nếu style dùng font mặc định (24f)
+        val actualStyle = if (style.fontSize == 24f) {
+            style.copy(fontSize = baseFontSize)
+        } else {
+            style
+        }
 
         if (useBitmapMode) {
             // BITMAP MODE - Đảm bảo Vietnamese hiển thị đúng
@@ -414,50 +413,43 @@ class HybridBillBuilder(
     /**
      * In text căn giữa
      */
-    fun lineCenter(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
-        val baseStyle = style ?: defaultStyle
-        return line(text, baseStyle.copy(centerAlign = true))
+    fun lineCenter(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return line(text, style.copy(centerAlign = true))
     }
 
     /**
      * In text căn phải
      */
-    fun lineRight(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
-        val baseStyle = style ?: defaultStyle
-        return line(text, baseStyle.copy(rightAlign = true))
+    fun lineRight(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return line(text, style.copy(rightAlign = true))
     }
 
     /**
      * In text đậm
      */
-    fun lineBold(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
-        val baseStyle = style ?: defaultStyle
-        return line(text, baseStyle.copy(bold = true))
+    fun lineBold(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return line(text, style.copy(bold = true))
     }
 
     /**
-     * In text lớn (double size) - sử dụng titleFontSize
+     * In text lớn (title) - sử dụng titleFontSize
      */
-    fun lineDouble(text: String, style: BitmapTextStyle? = null): HybridBillBuilder {
-        val titleStyle = BitmapTextStyle(
+    fun lineDouble(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return line(text, BitmapTextStyle(
             fontSize = titleFontSize,
             bold = true,
-            centerAlign = style?.centerAlign ?: false,
-            rightAlign = style?.rightAlign ?: false
-        )
-        return line(text, titleStyle)
+            centerAlign = style.centerAlign,
+            rightAlign = style.rightAlign
+        ))
     }
 
     /**
      * In key-value (ví dụ: "Tổng tiền:" và "100,000đ")
-     * Sử dụng font size đã scale
-     * Nếu bold = true, sử dụng totalFontSize (lớn hơn cho dòng tổng)
      */
-    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle? = null): HybridBillBuilder {
-        // Nếu bold thì dùng totalFontSize, không thì dùng baseFontSize
-        val fontSize = if (style?.bold == true) totalFontSize else baseFontSize
-        val actualStyle = style?.copy(fontSize = fontSize)
-            ?: defaultStyle
+    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        // Nếu bold thì dùng totalFontSize (cho dòng TỔNG)
+        val fontSize = if (style.bold) totalFontSize else baseFontSize
+        val actualStyle = BitmapTextStyle(fontSize = fontSize, bold = style.bold)
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
