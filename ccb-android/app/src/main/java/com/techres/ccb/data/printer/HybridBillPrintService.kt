@@ -147,7 +147,85 @@ object HybridBillPrintService {
         billData: BillData,
         useBitmapMode: Boolean
     ): ByteArray {
-        Log.d(TAG, "Generating bill with paperWidth: ${paperWidth}mm, useBitmapMode: $useBitmapMode")
+        // ============ DEBUG LOGGING ============
+        Log.d(TAG, "========== BILL DATA DEBUG ==========")
+        Log.d(TAG, "paperWidth: ${paperWidth}mm, useBitmapMode: $useBitmapMode")
+
+        // Order info
+        Log.d(TAG, "orderNumber: ${billData.orderNumber}")
+        Log.d(TAG, "tableName: ${billData.tableName}")
+        Log.d(TAG, "staffName: ${billData.staffName}")
+        Log.d(TAG, "customerName: ${billData.customerName}")
+        Log.d(TAG, "checkInTime: ${billData.checkInTime}")
+        Log.d(TAG, "checkOutTime: ${billData.checkOutTime}")
+
+        // Items
+        Log.d(TAG, "items count: ${billData.items.size}")
+        billData.items.forEachIndexed { index, item ->
+            Log.d(TAG, "--- Item $index ---")
+            Log.d(TAG, "  name: ${item.name}")
+            Log.d(TAG, "  code: ${item.code}")
+            Log.d(TAG, "  quantity: ${item.quantity}")
+            Log.d(TAG, "  originalPrice: ${item.originalPrice}")
+            Log.d(TAG, "  unitPrice: ${item.unitPrice}")
+            Log.d(TAG, "  totalPrice: ${item.totalPrice}")
+            Log.d(TAG, "  discountAmount: ${item.discountAmount}")
+            Log.d(TAG, "  discountPercent: ${item.discountPercent}")
+            Log.d(TAG, "  note: ${item.note}")
+            Log.d(TAG, "  variants: ${item.variants.map { "${it.name}:${it.priceAdjustment}" }}")
+            Log.d(TAG, "  toppings: ${item.toppings.map { "${it.name}:${it.price}x${it.quantity}" }}")
+        }
+
+        // Discounts
+        Log.d(TAG, "--- Discounts ---")
+        Log.d(TAG, "subtotal: ${billData.subtotal}")
+        Log.d(TAG, "itemDiscountAmount: ${billData.itemDiscountAmount}")
+        Log.d(TAG, "billDiscountAmount: ${billData.billDiscountAmount}")
+        Log.d(TAG, "billDiscountPercent: ${billData.billDiscountPercent}")
+        Log.d(TAG, "couponDiscountAmount: ${billData.couponDiscountAmount}")
+        Log.d(TAG, "couponCode: ${billData.couponCode}")
+        Log.d(TAG, "voucherDiscountAmount: ${billData.voucherDiscountAmount}")
+        Log.d(TAG, "voucherCode: ${billData.voucherCode}")
+        Log.d(TAG, "totalDiscountAmount: ${billData.totalDiscountAmount}")
+        Log.d(TAG, "totalItemDiscount (legacy): ${billData.totalItemDiscount}")
+        Log.d(TAG, "discountAmount (legacy): ${billData.discountAmount}")
+        Log.d(TAG, "discountPercent (legacy): ${billData.discountPercent}")
+
+        // VAT & Total
+        Log.d(TAG, "--- VAT & Total ---")
+        Log.d(TAG, "serviceFee: ${billData.serviceFee}")
+        Log.d(TAG, "serviceFeePercent: ${billData.serviceFeePercent}")
+        Log.d(TAG, "vatRate: ${billData.vatRate}")
+        Log.d(TAG, "vatAmount: ${billData.vatAmount}")
+        Log.d(TAG, "priceBeforeVat: ${billData.priceBeforeVat}")
+        Log.d(TAG, "priceAfterVat: ${billData.priceAfterVat}")
+        Log.d(TAG, "totalAmount: ${billData.totalAmount}")
+
+        // Payment
+        Log.d(TAG, "--- Payment ---")
+        Log.d(TAG, "paymentMethod: ${billData.paymentMethod}")
+        Log.d(TAG, "receivedAmount: ${billData.receivedAmount}")
+        Log.d(TAG, "changeAmount: ${billData.changeAmount}")
+
+        // Template config
+        Log.d(TAG, "--- Template Config ---")
+        Log.d(TAG, "showItemDiscount: ${template.showItemDiscount}")
+        Log.d(TAG, "showTotalItemDiscount: ${template.showTotalItemDiscount}")
+        Log.d(TAG, "itemDiscountLabel: ${template.itemDiscountLabel}")
+        Log.d(TAG, "showBillDiscount: ${template.showBillDiscount}")
+        Log.d(TAG, "billDiscountLabel: ${template.billDiscountLabel}")
+        Log.d(TAG, "showCouponDiscount: ${template.showCouponDiscount}")
+        Log.d(TAG, "couponDiscountLabel: ${template.couponDiscountLabel}")
+        Log.d(TAG, "showVoucherDiscount: ${template.showVoucherDiscount}")
+        Log.d(TAG, "voucherDiscountLabel: ${template.voucherDiscountLabel}")
+        Log.d(TAG, "showTotalDiscount: ${template.showTotalDiscount}")
+        Log.d(TAG, "totalDiscountLabel: ${template.totalDiscountLabel}")
+        Log.d(TAG, "showCheckInTime: ${template.showCheckInTime}")
+        Log.d(TAG, "checkInLabel: ${template.checkInLabel}")
+        Log.d(TAG, "showCheckOutTime: ${template.showCheckOutTime}")
+        Log.d(TAG, "checkOutLabel: ${template.checkOutLabel}")
+        Log.d(TAG, "========== END BILL DATA DEBUG ==========")
+
         val builder = HybridBillBuilder(paperWidth, useBitmapMode)
 
         builder.apply {
