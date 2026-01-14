@@ -1878,6 +1878,8 @@ class SaleViewModel @Inject constructor(
 
         if (comboItems.isEmpty()) {
             // Not a combo - create single order item
+            // originalPrice = giá đơn vị đầy đủ (bao gồm topping) để tính giảm giá đúng
+            val fullUnitPrice = cartItem.totalPrice.toDouble() / cartItem.quantity
             orderItems.add(
                 OrderItemEntity(
                     id = UUID.randomUUID().toString(),
@@ -1888,6 +1890,7 @@ class SaleViewModel @Inject constructor(
                     productImageUrl = cartItem.product.imageUrl,
                     quantity = cartItem.quantity,
                     unitPrice = cartItem.product.price.toDouble(),
+                    originalPrice = fullUnitPrice, // Giá đầy đủ bao gồm topping
                     totalPrice = cartItem.totalPrice.toDouble(),
                     vatRate = cartItem.product.vatRate, // Copy VAT rate từ sản phẩm
                     notes = variantsAndNote,
@@ -1899,6 +1902,7 @@ class SaleViewModel @Inject constructor(
         } else {
             // This is a combo - create combo parent item
             val parentItemId = UUID.randomUUID().toString()
+            val comboFullUnitPrice = cartItem.totalPrice.toDouble() / cartItem.quantity
             orderItems.add(
                 OrderItemEntity(
                     id = parentItemId,
@@ -1909,6 +1913,7 @@ class SaleViewModel @Inject constructor(
                     productImageUrl = cartItem.product.imageUrl,
                     quantity = cartItem.quantity,
                     unitPrice = cartItem.product.price.toDouble(),
+                    originalPrice = comboFullUnitPrice, // Giá đầy đủ bao gồm topping
                     totalPrice = cartItem.totalPrice.toDouble(),
                     vatRate = cartItem.product.vatRate, // Copy VAT rate từ sản phẩm
                     notes = variantsAndNote,
@@ -2444,7 +2449,8 @@ class SaleViewModel @Inject constructor(
             // Lấy loại giảm giá: "percent" hoặc "fixed"
             val itemDiscountType = itemDiscountTypes[item.id] ?: "fixed"
 
-            val itemOriginalPrice = if (item.originalPrice > 0) item.originalPrice else item.unitPrice
+            // Dùng originalPrice nếu có, nếu không thì tính từ totalPrice (bao gồm topping)
+            val itemOriginalPrice = if (item.originalPrice > 0) item.originalPrice else (item.totalPrice / item.quantity)
             val itemOriginalTotal = itemOriginalPrice * item.quantity
             // Chỉ tính discountPercent nếu discountType là "percent"
             val itemDiscountPercent = if (itemDiscountType == "percent" && finalItemDiscount > 0 && itemOriginalTotal > 0) {
