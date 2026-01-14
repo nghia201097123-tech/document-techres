@@ -521,14 +521,6 @@ private fun OrderTableRow(
     }
 }
 
-private fun formatCurrencyShort(amount: Long): String {
-    return if (amount == 0L) {
-        "0"
-    } else {
-        NumberFormat.getNumberInstance(Locale("vi", "VN")).format(amount)
-    }
-}
-
 @Composable
 private fun PaginationControls(
     currentPage: Int,
@@ -1098,11 +1090,10 @@ private fun formatCurrency(amount: Long): String {
 }
 
 private fun formatCurrencyShort(amount: Long): String {
-    return when {
-        amount >= 1_000_000_000 -> "${amount / 1_000_000_000}B"
-        amount >= 1_000_000 -> "${amount / 1_000_000}M"
-        amount >= 1_000 -> "${amount / 1_000}K"
-        else -> "${amount}đ"
+    return if (amount == 0L) {
+        "0"
+    } else {
+        NumberFormat.getNumberInstance(Locale("vi", "VN")).format(amount)
     }
 }
 
