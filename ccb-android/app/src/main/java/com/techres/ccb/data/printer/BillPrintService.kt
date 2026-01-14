@@ -583,6 +583,7 @@ data class BillItem(
     val originalPrice: Double = 0.0,
     val discountAmount: Double = 0.0,
     val discountPercent: Double = 0.0,
+    val discountType: String = "fixed", // "fixed" (tiền mặt) hoặc "percent" (phần trăm)
     val totalPrice: Double,
     val note: String? = null,
     val variants: List<BillVariant> = emptyList(),

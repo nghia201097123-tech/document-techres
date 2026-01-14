@@ -87,6 +87,7 @@ data class SaleUiState(
     val isApplyingCoupon: Boolean = false,           // Đang xử lý áp dụng coupon
     val availableCoupons: List<CouponEntity> = emptyList(),     // Coupon có thể áp dụng
     val itemDiscounts: Map<String, Long> = emptyMap(),          // Giảm giá theo món: itemId -> discountAmount
+    val itemDiscountTypes: Map<String, String> = emptyMap(),    // Loại giảm giá theo món: itemId -> "percent" hoặc "fixed"
     val vatAmount: Long = 0,                         // Tiền VAT
 
     // Tax
@@ -1208,7 +1209,8 @@ class SaleViewModel @Inject constructor(
     fun clearItemDiscounts() {
         _uiState.update { state ->
             state.copy(
-                itemDiscounts = emptyMap()
+                itemDiscounts = emptyMap(),
+                itemDiscountTypes = emptyMap()
             )
         }
     }
@@ -1217,8 +1219,9 @@ class SaleViewModel @Inject constructor(
      * Áp dụng giảm giá cho một món cụ thể
      * Giới hạn giảm giá không vượt quá giá của món và tổng đơn hàng
      * Lưu discount vào database nếu item thuộc order đã tồn tại
+     * @param discountType: "percent" nếu giảm %, "fixed" nếu giảm tiền cố định
      */
-    fun applyItemDiscount(itemId: String, amount: Long) {
+    fun applyItemDiscount(itemId: String, amount: Long, discountType: String = "fixed") {
         val orderSubtotal = getOrderSubtotal()
         val state = _uiState.value
 
@@ -1240,17 +1243,20 @@ class SaleViewModel @Inject constructor(
         )
 
         val finalAmount = amount.coerceAtMost(maxItemDiscount)
-        Log.d(TAG, "applyItemDiscount - itemId: $itemId, requested: $amount, itemPrice: $itemPrice, maxAllowed: $maxItemDiscount, applied: $finalAmount")
+        Log.d(TAG, "applyItemDiscount - itemId: $itemId, requested: $amount, type: $discountType, itemPrice: $itemPrice, maxAllowed: $maxItemDiscount, applied: $finalAmount")
 
         // Update UI state
         _uiState.update { s ->
             val newItemDiscounts = s.itemDiscounts.toMutableMap()
+            val newItemDiscountTypes = s.itemDiscountTypes.toMutableMap()
             if (finalAmount > 0) {
                 newItemDiscounts[itemId] = finalAmount
+                newItemDiscountTypes[itemId] = discountType
             } else {
                 newItemDiscounts.remove(itemId)
+                newItemDiscountTypes.remove(itemId)
             }
-            s.copy(itemDiscounts = newItemDiscounts)
+            s.copy(itemDiscounts = newItemDiscounts, itemDiscountTypes = newItemDiscountTypes)
         }
 
         // Lưu discount vào database nếu item thuộc currentOrderItems (order đã tồn tại)
@@ -2141,6 +2147,7 @@ class SaleViewModel @Inject constructor(
                                 order = currentOrder,
                                 orderItems = state.currentOrderItems,
                                 itemDiscounts = state.itemDiscounts,
+                                itemDiscountTypes = state.itemDiscountTypes,
                                 billDiscountAmount = state.billDiscountAmount,
                                 appliedDiscounts = state.appliedDiscounts,
                                 tableName = state.selectedTable?.name,
@@ -2219,6 +2226,7 @@ class SaleViewModel @Inject constructor(
                 val completedOrder: OrderEntity
                 val orderItemsForPrint = state.currentOrderItems
                 val itemDiscountsForPrint = state.itemDiscounts
+                val itemDiscountTypesForPrint = state.itemDiscountTypes  // Loại giảm giá: "percent" hoặc "fixed"
                 val billDiscountForPrint = state.billDiscountAmount
                 val appliedDiscountsForPrint = state.appliedDiscounts  // Coupon/Voucher đã áp dụng
                 val tableNameForPrint = state.selectedTable?.name
@@ -2326,6 +2334,7 @@ class SaleViewModel @Inject constructor(
                                     order = completedOrder,
                                     orderItems = orderItemsForPrint,
                                     itemDiscounts = itemDiscountsForPrint,
+                                    itemDiscountTypes = itemDiscountTypesForPrint,
                                     billDiscountAmount = billDiscountForPrint,
                                     appliedDiscounts = appliedDiscountsForPrint,
                                     tableName = tableNameForPrint,
@@ -2372,12 +2381,14 @@ class SaleViewModel @Inject constructor(
     /**
      * Build BillData from order for printing
      * @param itemDiscounts Map of itemId -> discount amount (from UI state)
+     * @param itemDiscountTypes Map of itemId -> discount type ("percent" or "fixed")
      * @param billDiscountAmount Giảm giá tổng bill (từ giảm giá thủ công hoặc %)
      */
     private fun buildBillData(
         order: OrderEntity,
         orderItems: List<OrderItemEntity>,
         itemDiscounts: Map<String, Long> = emptyMap(),
+        itemDiscountTypes: Map<String, String> = emptyMap(),
         billDiscountAmount: Long = 0,
         appliedDiscounts: List<AppliedDiscount> = emptyList(),
         tableName: String?,
@@ -2430,9 +2441,13 @@ class SaleViewModel @Inject constructor(
             val itemDiscountFromEntity = item.discountAmount
             val finalItemDiscount = if (itemDiscountFromState > 0) itemDiscountFromState else itemDiscountFromEntity
 
+            // Lấy loại giảm giá: "percent" hoặc "fixed"
+            val itemDiscountType = itemDiscountTypes[item.id] ?: "fixed"
+
             val itemOriginalPrice = if (item.originalPrice > 0) item.originalPrice else item.unitPrice
             val itemOriginalTotal = itemOriginalPrice * item.quantity
-            val itemDiscountPercent = if (finalItemDiscount > 0 && itemOriginalTotal > 0) {
+            // Chỉ tính discountPercent nếu discountType là "percent"
+            val itemDiscountPercent = if (itemDiscountType == "percent" && finalItemDiscount > 0 && itemOriginalTotal > 0) {
                 (finalItemDiscount / itemOriginalTotal) * 100
             } else {
                 0.0
@@ -2453,6 +2468,7 @@ class SaleViewModel @Inject constructor(
                 originalPrice = itemOriginalPrice,
                 discountAmount = finalItemDiscount,
                 discountPercent = itemDiscountPercent,
+                discountType = itemDiscountType,  // "percent" hoặc "fixed"
                 totalPrice = finalTotalPrice,
                 note = userNote,
                 variants = variants,  // Variants with • prefix (size, ice level, etc.)

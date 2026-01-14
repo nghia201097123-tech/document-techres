@@ -171,6 +171,7 @@ object HybridBillPrintService {
             Log.d(TAG, "  totalPrice: ${item.totalPrice}")
             Log.d(TAG, "  discountAmount: ${item.discountAmount}")
             Log.d(TAG, "  discountPercent: ${item.discountPercent}")
+            Log.d(TAG, "  discountType: ${item.discountType}")
             Log.d(TAG, "  note: ${item.note}")
             Log.d(TAG, "  variants: ${item.variants.map { "${it.name}:${it.priceAdjustment}" }}")
             Log.d(TAG, "  toppings: ${item.toppings.map { "${it.name}:${it.price}x${it.quantity}" }}")
@@ -337,10 +338,11 @@ object HybridBillPrintService {
                 // 7. Giảm giá trên món (nếu có)
                 val hasItemDiscount = item.discountAmount > 0
                 if (hasItemDiscount && template.showItemDiscount) {
-                    val discountLabel = if (item.discountPercent > 0) {
+                    // discountType = "percent" thì hiển thị %, còn lại hiển thị số tiền
+                    val discountLabel = if (item.discountType == "percent" && item.discountPercent > 0) {
                         "→ Giảm ${item.discountPercent.toInt()}%:"
                     } else {
-                        "→ Giảm:"
+                        "→ Giảm ${formatCurrency(item.discountAmount)}:"
                     }
                     lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
                 }

@@ -122,7 +122,7 @@ fun PaymentDialog(
     // Manual discount callbacks
     onApplyManualDiscount: (amount: Long, reason: String?) -> Unit = { _, _ -> },
     onApplyPercentDiscount: (percent: Int, reason: String?) -> Unit = { _, _ -> },
-    onApplyItemDiscount: (itemId: String, amount: Long) -> Unit = { _, _ -> },
+    onApplyItemDiscount: (itemId: String, amount: Long, discountType: String) -> Unit = { _, _, _ -> },
     onApplyCategoryDiscount: (categoryId: String, percent: Int) -> Unit = { _, _ -> },
     onClearDiscount: () -> Unit = {},
     onClearItemDiscounts: () -> Unit = {},
@@ -895,7 +895,7 @@ fun PaymentDialog(
                                                                                 fontWeight = FontWeight.Bold
                                                                             )
                                                                             IconButton(
-                                                                                onClick = { onApplyItemDiscount(item.id, 0) },
+                                                                                onClick = { onApplyItemDiscount(item.id, 0, "fixed") },
                                                                                 modifier = Modifier.size(18.dp)
                                                                             ) {
                                                                                 Icon(
@@ -982,7 +982,7 @@ fun PaymentDialog(
                                                                             Text("-${formatCurrency(item.discountAmount)}", fontSize = 9.sp, color = Color.White)
                                                                         }
                                                                         IconButton(
-                                                                            onClick = { onApplyItemDiscount(item.id, 0) },
+                                                                            onClick = { onApplyItemDiscount(item.id, 0, "fixed") },
                                                                             modifier = Modifier.size(20.dp)
                                                                         ) {
                                                                             Icon(
@@ -1018,7 +1018,7 @@ fun PaymentDialog(
                                                                                     itemDiscountType = 1
                                                                                     selectedItemPercentValue = percent
                                                                                     customItemPercentText = percent.toString()
-                                                                                    onApplyItemDiscount(item.id, discountForPercent)
+                                                                                    onApplyItemDiscount(item.id, discountForPercent, "percent")
                                                                                 },
                                                                                 label = { Text("$percent%", fontSize = 10.sp) },
                                                                                 modifier = Modifier.height(28.dp),
@@ -1062,7 +1062,7 @@ fun PaymentDialog(
                                                                                         if (percent in 1..100) {
                                                                                             selectedItemPercentValue = null
                                                                                             selectedItemAmountValue = null
-                                                                                            onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
+                                                                                            onApplyItemDiscount(item.id, item.totalPrice * percent / 100, "percent")
                                                                                         }
                                                                                     }
                                                                                 }
@@ -1075,7 +1075,7 @@ fun PaymentDialog(
                                                                                     if (percent in 1..100) {
                                                                                         selectedItemPercentValue = null
                                                                                         selectedItemAmountValue = null
-                                                                                        onApplyItemDiscount(item.id, item.totalPrice * percent / 100)
+                                                                                        onApplyItemDiscount(item.id, item.totalPrice * percent / 100, "percent")
                                                                                     }
                                                                                 }
                                                                             },
@@ -1104,7 +1104,7 @@ fun PaymentDialog(
                                                                                         itemDiscountType = 2
                                                                                         selectedItemAmountValue = amount
                                                                                         customItemAmountText = amount.toString()
-                                                                                        onApplyItemDiscount(item.id, amount)
+                                                                                        onApplyItemDiscount(item.id, amount, "fixed")
                                                                                     }
                                                                                 },
                                                                                 label = { Text("${amount/1000}k", fontSize = 10.sp) },
@@ -1147,7 +1147,7 @@ fun PaymentDialog(
                                                                                         if (amount > 0 && amount <= item.totalPrice) {
                                                                                             selectedItemPercentValue = null
                                                                                             selectedItemAmountValue = null
-                                                                                            onApplyItemDiscount(item.id, amount)
+                                                                                            onApplyItemDiscount(item.id, amount, "fixed")
                                                                                         }
                                                                                     }
                                                                                 }
@@ -1160,7 +1160,7 @@ fun PaymentDialog(
                                                                                     if (amount > 0 && amount <= item.totalPrice) {
                                                                                         selectedItemPercentValue = null
                                                                                         selectedItemAmountValue = null
-                                                                                        onApplyItemDiscount(item.id, amount)
+                                                                                        onApplyItemDiscount(item.id, amount, "fixed")
                                                                                     }
                                                                                 }
                                                                             },
