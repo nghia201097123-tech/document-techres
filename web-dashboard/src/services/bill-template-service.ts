@@ -197,6 +197,12 @@ export interface CreateBillTemplateDto {
   showDateTime?: boolean;
   dateFormat?: string;
 
+  // Time tracking
+  showCheckInTime?: boolean;
+  showCheckOutTime?: boolean;
+  checkInLabel?: string;
+  checkOutLabel?: string;
+
   // Items
   showItemCode?: boolean;
   showItemNote?: boolean;
@@ -205,8 +211,25 @@ export interface CreateBillTemplateDto {
 
   // Price
   showSubtotal?: boolean;
-  showItemDiscount?: boolean;       // Hiển thị giảm giá trên từng món
+
+  // Discount config (4 loại giảm giá)
+  showItemDiscount?: boolean;       // 1. Hiển thị giảm giá trên từng món
   showTotalItemDiscount?: boolean;  // Hiển thị tổng giảm giá các món
+  itemDiscountLabel?: string;       // Nhãn giảm giá món
+
+  showBillDiscount?: boolean;       // 2. Hiển thị giảm giá hóa đơn
+  billDiscountLabel?: string;       // Nhãn giảm giá hóa đơn
+
+  showCouponDiscount?: boolean;     // 3. Hiển thị giảm giá coupon
+  couponDiscountLabel?: string;     // Nhãn coupon
+
+  showVoucherDiscount?: boolean;    // 4. Hiển thị giảm giá voucher
+  voucherDiscountLabel?: string;    // Nhãn voucher
+
+  showTotalDiscount?: boolean;      // Tổng giảm giá
+  totalDiscountLabel?: string;      // Nhãn tổng giảm giá
+
+  // Legacy
   showDiscount?: boolean;
   showDiscountPercent?: boolean;
   showServiceFee?: boolean;
@@ -443,13 +466,30 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   showCustomerName: true,
   showDateTime: true,
   dateFormat: 'dd/MM/yyyy HH:mm',
+  // Time tracking
+  showCheckInTime: false,
+  showCheckOutTime: false,
+  checkInLabel: 'Giờ vào',
+  checkOutLabel: 'Giờ ra',
+  // Items
   showItemCode: false,
   showItemNote: true,
   showUnitPrice: true,
   showQuantity: true,
   showSubtotal: true,
+  // Discount config (4 loại)
   showItemDiscount: true,
   showTotalItemDiscount: true,
+  itemDiscountLabel: 'Giảm giá món',
+  showBillDiscount: true,
+  billDiscountLabel: 'Giảm giá hóa đơn',
+  showCouponDiscount: true,
+  couponDiscountLabel: 'Mã giảm giá',
+  showVoucherDiscount: true,
+  voucherDiscountLabel: 'Voucher',
+  showTotalDiscount: true,
+  totalDiscountLabel: 'Tổng giảm giá',
+  // Legacy
   showDiscount: true,
   showDiscountPercent: true,
   showServiceFee: true,
