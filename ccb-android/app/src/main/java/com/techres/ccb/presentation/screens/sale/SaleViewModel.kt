@@ -26,6 +26,7 @@ import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.printer.BillData
 import com.techres.ccb.data.printer.BillItem
 import com.techres.ccb.data.printer.BillTopping
+import com.techres.ccb.data.printer.BillVariant
 import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
@@ -2392,26 +2393,32 @@ class SaleViewModel @Inject constructor(
         val filteredItems = orderItems.filter { !it.isComboChild }
 
         val billItems = filteredItems.map { item ->
-            // Parse toppings from notes field "Topping1:price1, Topping2:price2 | User note"
+            // Parse variants from notes field "Variant1:price1, Variant2:price2 | User note"
+            // Format: "NHIỀU:0, Size L:10000 | Ghi chú: Ít đường"
             val parts = item.notes?.split(" | ") ?: emptyList()
             val variantsPart = parts.firstOrNull()?.takeIf { it.isNotEmpty() && !it.startsWith("Ghi chú:") } ?: ""
             val userNote = parts.getOrNull(1)?.removePrefix("Ghi chú: ")
                 ?: parts.firstOrNull()?.takeIf { it.startsWith("Ghi chú:") }?.removePrefix("Ghi chú: ")
 
-            val toppings = variantsPart.split(",")
+            // Parse as variants (shown with • prefix on bill)
+            val variants = variantsPart.split(",")
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
-                .map { variant ->
-                    val colonIndex = variant.lastIndexOf(":")
+                .map { variantStr ->
+                    val colonIndex = variantStr.lastIndexOf(":")
                     if (colonIndex > 0) {
-                        BillTopping(
-                            name = variant.substring(0, colonIndex),
-                            price = variant.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0
+                        BillVariant(
+                            name = variantStr.substring(0, colonIndex),
+                            priceAdjustment = variantStr.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0
                         )
                     } else {
-                        BillTopping(name = variant, price = 0.0)
+                        BillVariant(name = variantStr, priceAdjustment = 0.0)
                     }
                 }
+
+            // Toppings - currently not stored separately, will be empty
+            // In future, toppings can be stored in a separate field if needed
+            val toppings = emptyList<BillTopping>()
 
             // Lấy giảm giá món từ UI state (itemDiscounts) hoặc từ OrderItemEntity
             val itemDiscountFromState = itemDiscounts[item.id]?.toDouble() ?: 0.0
@@ -2443,7 +2450,8 @@ class SaleViewModel @Inject constructor(
                 discountPercent = itemDiscountPercent,
                 totalPrice = finalTotalPrice,
                 note = userNote,
-                toppings = toppings,
+                variants = variants,  // Variants with • prefix (size, ice level, etc.)
+                toppings = toppings,  // Toppings with + prefix (add-ons)
                 vatRate = item.vatRate // VAT rate của món này
             )
         }
@@ -2509,6 +2517,9 @@ class SaleViewModel @Inject constructor(
             0.0
         }
 
+        // Tính tổng giảm giá (tất cả loại)
+        val totalDiscountAmount = totalItemDiscount + finalBillDiscount
+
         return BillData(
             orderNumber = order.orderNumber,
             orderDate = orderDate,
@@ -2517,15 +2528,28 @@ class SaleViewModel @Inject constructor(
             customerName = customerName,
             items = billItems,
             subtotal = calculatedSubtotal, // Tạm tính (tổng giá gốc trước giảm giá)
-            totalItemDiscount = totalItemDiscount, // Tổng giảm giá các món (item-level)
-            discountAmount = finalBillDiscount, // Giảm giá tổng bill (order-level: coupon/voucher)
+            // 4 loại giảm giá mới
+            itemDiscountAmount = totalItemDiscount, // 1. Giảm giá món
+            billDiscountAmount = finalBillDiscount, // 2. Giảm giá hóa đơn
+            billDiscountPercent = orderDiscountPercent,
+            couponDiscountAmount = 0.0, // 3. Coupon (sẽ được tách riêng nếu có)
+            couponCode = order.couponCode, // Mã coupon
+            voucherDiscountAmount = 0.0, // 4. Voucher (sẽ được tách riêng nếu có)
+            voucherCode = null,
+            totalDiscountAmount = totalDiscountAmount, // Tổng tất cả giảm giá
+            // Legacy fields (để tương thích)
+            totalItemDiscount = totalItemDiscount,
+            discountAmount = finalBillDiscount,
             discountPercent = orderDiscountPercent,
+            // Phí và thuế
             serviceFee = 0.0,
+            serviceFeePercent = 0.0,
             vatRate = displayVatRate, // VAT rate trung bình (tính từ tổng VAT / tổng giá trước VAT)
             vatAmount = vatAmount,
             priceBeforeVat = priceBeforeVat,
             priceAfterVat = calculatedTotalAmount,
             totalAmount = calculatedTotalAmount, // Tổng SAU tất cả giảm giá
+            // Thanh toán
             paymentMethod = paymentMethodDisplay,
             receivedAmount = receivedAmount,
             changeAmount = changeAmount
