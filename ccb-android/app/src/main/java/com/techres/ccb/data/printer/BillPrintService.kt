@@ -1,10 +1,5 @@
 package com.techres.ccb.data.printer
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Typeface
 import android.util.Log
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
@@ -19,24 +14,41 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Bill Print Service - In bill theo đúng mẫu cấu hình trên web-dashboard
+ * Bill Print Service - In bill CHÍNH XÁC theo mẫu preview trên web-dashboard
  *
- * Format bill giống y hệt preview trên web:
- * 1. HEADER: Logo, tên cửa hàng, địa chỉ, SĐT, MST, header text
- * 2. TIÊU ĐỀ: Bill title với đường kẻ đôi
- * 3. THÔNG TIN ĐƠN: Mã đơn, bàn, NV, khách hàng, giờ, giờ vào/ra
- * 4. DANH SÁCH MÓN: Tên + SL, giá gốc, variants, toppings, ghi chú, giảm giá món, thành tiền
- * 5. TỔNG TIỀN: Tạm tính, 4 loại giảm giá, phí dịch vụ, VAT, tổng cộng
- * 6. THANH TOÁN: Phương thức, tiền khách, tiền thừa
- * 7. FOOTER: QR, barcode, WiFi, lời cảm ơn
+ * Format giống y chang web preview:
+ * 1. HEADER: [LOGO], tên cửa hàng, địa chỉ, SĐT, MST
+ * 2. TIÊU ĐỀ: ═══ HÓA ĐƠN BÁN HÀNG ═══
+ * 3. THÔNG TIN: Mã đơn, Bàn, NV, Khách hàng, Giờ
+ * 4. DANH SÁCH MÓN:
+ *    - Tên món                    x1
+ *    - Giá gốc: 54,000
+ *    - • NHIỀU
+ *    - • Size L              +10,000
+ *    - Mã: OLM01
+ *    - Ghi chú: Ít đường
+ *    - → Giảm 20%:           -36,000
+ *    - Thành tiền:            64,000
+ * 5. TỔNG:
+ *    - Tạm tính (3 món):     254,000
+ *    - Giảm giá món:         -36,000
+ *    - Giảm giá hóa đơn (10%): -21,800
+ *    - Mã giảm giá (MUAXUAN20): -20,000
+ *    - Voucher (VIP50K):     -50,000
+ *    - Tổng giảm giá:       -127,800
+ *    - Phí dịch vụ (5%):      6,310
+ *    - Giá trước thuế:      120,463
+ *    - VAT (10%):            12,046
+ *    - Giá sau thuế:        132,509
+ *    ═══════════════════════════════
+ *    TỔNG CỘNG:           132,500đ
+ * 6. THANH TOÁN: Phương thức, Tiền khách, Tiền thừa
+ * 7. FOOTER: QR, Barcode, WiFi, Lời cảm ơn
  */
 object BillPrintService {
     private const val TAG = "BillPrintService"
     private val currencyFormat = DecimalFormat("#,###")
 
-    /**
-     * In bill với template và config được cấu hình
-     */
     suspend fun printBill(
         printerConfig: BillPrinterConfigEntity,
         template: BillTemplateEntity,
@@ -45,7 +57,6 @@ object BillPrintService {
         return withContext(Dispatchers.IO) {
             var lastError: String? = null
 
-            // Retry logic
             repeat(printerConfig.retryCount) { attempt ->
                 val result = when (printerConfig.connectionType) {
                     "network" -> printViaNetwork(printerConfig, template, billData)
@@ -69,9 +80,6 @@ object BillPrintService {
         }
     }
 
-    /**
-     * In bill qua Network (TCP/IP)
-     */
     private suspend fun printViaNetwork(
         config: BillPrinterConfigEntity,
         template: BillTemplateEntity,
@@ -87,12 +95,10 @@ object BillPrintService {
             socket.connect(InetSocketAddress(ip, config.printerPort), config.connectionTimeoutMs)
             outputStream = socket.getOutputStream()
 
-            // Generate and send bill content
             val billContent = generateBill(template, billData)
             outputStream.write(billContent)
             outputStream.flush()
 
-            // Print multiple copies if configured
             repeat(config.numberOfCopies - 1) {
                 delay(500)
                 outputStream.write(billContent)
@@ -113,352 +119,415 @@ object BillPrintService {
         }
     }
 
-    /**
-     * In bill qua Sunmi built-in printer
-     */
     private fun printViaSunmi(template: BillTemplateEntity, billData: BillData): PrinterResult {
-        // TODO: Implement Sunmi printing via AIDL
         return PrinterResult.Error("Sunmi printer chưa được hỗ trợ")
     }
 
     /**
-     * Generate bill content - format giống y hệt preview trên web-dashboard
+     * Generate bill - CHÍNH XÁC theo web preview
      */
     private fun generateBill(template: BillTemplateEntity, billData: BillData): ByteArray {
-        val builder = BillBuilder(template.paperWidth)
-        val sep = template.separatorChar.repeat(builder.lineWidth)
-        val doubleSep = template.doubleSeparatorChar.repeat(builder.lineWidth)
+        val b = EscPosBillBuilder(template.paperWidth)
 
-        builder.apply {
-            init()
+        b.init()
 
-            // ============ 1. HEADER ============
-            alignCenter()
+        // ==================== 1. HEADER ====================
+        b.center()
 
-            // Logo
-            if (template.showLogo && template.logoUrl != null) {
-                line("[LOGO]")
+        // [LOGO]
+        if (template.showLogo) {
+            b.text("[LOGO]")
+        }
+
+        // Tên cửa hàng (to, đậm)
+        b.doubleSize()
+        b.bold()
+        b.text(template.storeName)
+        b.normal()
+
+        // Địa chỉ
+        template.storeAddress?.let { b.text(it) }
+
+        // SĐT
+        template.storePhone?.let { b.text("ĐT: $it") }
+
+        // MST
+        template.taxCode?.let { b.text("MST: $it") }
+
+        // Header text tùy chỉnh
+        template.headerText?.let { b.text(it) }
+
+        // ==================== 2. TIÊU ĐỀ ====================
+        b.doubleLine()
+        b.doubleHeight()
+        b.bold()
+        b.text(template.billTitle)
+        b.normal()
+        b.doubleLine()
+
+        // ==================== 3. THÔNG TIN ĐƠN ====================
+        b.left()
+
+        if (template.showOrderNumber) {
+            b.text("Mã đơn: #${billData.orderNumber}")
+        }
+
+        if (template.showTableName && billData.tableName != null) {
+            b.text("Bàn: ${billData.tableName}")
+        }
+
+        if (template.showStaffName && billData.staffName != null) {
+            b.text("NV: ${billData.staffName}")
+        }
+
+        if (template.showCustomerName && billData.customerName != null) {
+            b.text("Khách hàng: ${billData.customerName}")
+        }
+
+        if (template.showDateTime) {
+            val df = SimpleDateFormat(template.dateFormat, Locale.getDefault())
+            b.text("Giờ: ${df.format(billData.orderDate)}")
+        }
+
+        // Giờ vào/ra
+        if (template.showCheckInTime && billData.checkInTime != null) {
+            val tf = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+            b.text("${template.checkInLabel}: ${tf.format(billData.checkInTime)}")
+        }
+
+        if (template.showCheckOutTime && billData.checkOutTime != null) {
+            val tf = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+            b.text("${template.checkOutLabel}: ${tf.format(billData.checkOutTime)}")
+        }
+
+        b.line()
+
+        // ==================== 4. DANH SÁCH MÓN ====================
+        billData.items.forEach { item ->
+            // Tên món + badge số lượng (giống web: "Ô long macchiato    x1")
+            if (template.showQuantity) {
+                b.row(item.name, "x${item.quantity}")
+            } else {
+                b.bold()
+                b.text(item.name)
+                b.normal()
             }
 
-            // Tên cửa hàng (in đậm, to)
-            textDoubleSize()
-            bold()
-            line(template.storeName)
-            normalSize()
-            boldOff()
-
-            // Địa chỉ
-            if (template.storeAddress != null) {
-                line(template.storeAddress)
+            // Giá gốc
+            if (template.showUnitPrice && item.basePrice > 0) {
+                b.text("Giá gốc: ${fmt(item.basePrice)}")
             }
 
-            // Số điện thoại
-            if (template.storePhone != null) {
-                line("ĐT: ${template.storePhone}")
-            }
-
-            // Mã số thuế
-            if (template.taxCode != null) {
-                line("MST: ${template.taxCode}")
-            }
-
-            // Header text tùy chỉnh
-            if (template.headerText != null) {
-                line(template.headerText)
-            }
-
-            // ============ 2. TIÊU ĐỀ BILL ============
-            line(doubleSep)
-            textDoubleHeight()
-            bold()
-            line(template.billTitle)
-            normalSize()
-            boldOff()
-            line(doubleSep)
-
-            // ============ 3. THÔNG TIN ĐƠN HÀNG ============
-            alignLeft()
-
-            // Mã đơn
-            if (template.showOrderNumber) {
-                line("Mã đơn: #${billData.orderNumber}")
-            }
-
-            // Tên bàn
-            if (template.showTableName && billData.tableName != null) {
-                line("Bàn: ${billData.tableName}")
-            }
-
-            // Nhân viên
-            if (template.showStaffName && billData.staffName != null) {
-                line("NV: ${billData.staffName}")
-            }
-
-            // Khách hàng
-            if (template.showCustomerName && billData.customerName != null) {
-                line("Khách hàng: ${billData.customerName}")
-            }
-
-            // Ngày giờ
-            if (template.showDateTime) {
-                val dateFormat = SimpleDateFormat(template.dateFormat, Locale.getDefault())
-                line("Giờ: ${dateFormat.format(billData.orderDate)}")
-            }
-
-            // Giờ vào (check-in)
-            if (template.showCheckInTime && billData.checkInTime != null) {
-                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
-                line("${template.checkInLabel}: ${timeFormat.format(billData.checkInTime)}")
-            }
-
-            // Giờ ra (check-out)
-            if (template.showCheckOutTime && billData.checkOutTime != null) {
-                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
-                line("${template.checkOutLabel}: ${timeFormat.format(billData.checkOutTime)}")
-            }
-
-            line(sep)
-
-            // ============ 4. DANH SÁCH MÓN ============
-            billData.items.forEach { item ->
-                // Tên món + số lượng
-                val itemHeader = if (template.showQuantity) {
-                    "${item.name} x${item.quantity}"
+            // Variants (• NHIỀU, • Size L +10,000)
+            item.variants.forEach { v ->
+                if (v.priceAdjustment > 0) {
+                    b.row("• ${v.name}", "+${fmt(v.priceAdjustment)}")
                 } else {
-                    item.name
+                    b.text("• ${v.name}")
                 }
-                bold()
-                line(itemHeader)
-                boldOff()
-
-                // Giá gốc
-                if (template.showUnitPrice && item.basePrice > 0) {
-                    line("  Giá gốc: ${formatCurrency(item.basePrice)}")
-                }
-
-                // Variants (Size, Đá, Đường...)
-                item.variants.forEach { variant ->
-                    if (variant.priceAdjustment > 0) {
-                        lineKeyValue("  • ${variant.name}", "+${formatCurrency(variant.priceAdjustment)}")
-                    } else {
-                        line("  • ${variant.name}")
-                    }
-                }
-
-                // Toppings (thêm)
-                item.toppings.forEach { topping ->
-                    val toppingQty = if (topping.quantity > 1) " x${topping.quantity}" else ""
-                    lineKeyValue("  + ${topping.name}$toppingQty", "+${formatCurrency(topping.price * topping.quantity)}")
-                }
-
-                // Mã món
-                if (template.showItemCode && item.code != null) {
-                    line("  Mã: ${item.code}")
-                }
-
-                // Ghi chú món
-                if (template.showItemNote && item.note != null) {
-                    line("  Ghi chú: ${item.note}")
-                }
-
-                // Giảm giá món (nếu có)
-                if (template.showItemDiscount && item.discountAmount > 0) {
-                    val discountText = if (item.discountPercent > 0) {
-                        "  → ${template.itemDiscountLabel} (${item.discountPercent.toInt()}%)"
-                    } else {
-                        "  → ${template.itemDiscountLabel}"
-                    }
-                    lineKeyValue(discountText, "-${formatCurrency(item.discountAmount)}")
-                }
-
-                // Thành tiền
-                line("  " + "-".repeat(lineWidth - 4))
-                bold()
-                lineKeyValue("  Thành tiền:", formatCurrency(item.totalPrice))
-                boldOff()
-
-                line("")  // Dòng trống giữa các món
             }
 
-            line(sep)
-
-            // ============ 5. TỔNG TIỀN ============
-            alignRight()
-
-            // Tạm tính
-            if (template.showSubtotal) {
-                lineKeyValue("Tạm tính (${billData.items.size} món):", formatCurrency(billData.subtotal))
+            // Toppings (+ Trân châu +5,000)
+            item.toppings.forEach { t ->
+                val qty = if (t.quantity > 1) " x${t.quantity}" else ""
+                b.row("+ ${t.name}$qty", "+${fmt(t.price * t.quantity)}")
             }
 
-            // --- 4 LOẠI GIẢM GIÁ (theo đúng thứ tự trên web) ---
-
-            // 1. Giảm giá món (tổng)
-            if (template.showTotalItemDiscount && billData.itemDiscountAmount > 0) {
-                lineKeyValue("${template.itemDiscountLabel}:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            // Mã món
+            if (template.showItemCode && item.code != null) {
+                b.text("Mã: ${item.code}")
             }
 
-            // 2. Giảm giá hóa đơn
-            if (template.showBillDiscount && billData.billDiscountAmount > 0) {
-                val label = if (template.showDiscountPercent && billData.billDiscountPercent > 0) {
-                    "${template.billDiscountLabel} (${billData.billDiscountPercent.toInt()}%)"
+            // Ghi chú
+            if (template.showItemNote && item.note != null) {
+                b.text("Ghi chú: ${item.note}")
+            }
+
+            // Giảm giá món (→ Giảm 20%: -36,000)
+            if (template.showItemDiscount && item.discountAmount > 0) {
+                val discountLabel = if (item.discountPercent > 0) {
+                    "→ Giảm ${item.discountPercent.toInt()}%:"
                 } else {
-                    template.billDiscountLabel
+                    "→ ${template.itemDiscountLabel}:"
                 }
-                lineKeyValue("$label:", "-${formatCurrency(billData.billDiscountAmount)}")
+                b.row(discountLabel, "-${fmt(item.discountAmount)}")
             }
 
-            // 3. Mã giảm giá (Coupon)
-            if (template.showCouponDiscount && billData.couponDiscountAmount > 0) {
-                val label = if (billData.couponCode != null) {
-                    "${template.couponDiscountLabel} (${billData.couponCode})"
-                } else {
-                    template.couponDiscountLabel
-                }
-                lineKeyValue("$label:", "-${formatCurrency(billData.couponDiscountAmount)}")
+            // Thành tiền (có thể hiện phép tính nếu SL > 1)
+            val subtotalLabel = if (item.quantity > 1 && item.discountAmount > 0) {
+                val unitAfterDiscount = item.totalPrice / item.quantity
+                "Thành tiền (${item.quantity} x ${fmt(unitAfterDiscount)}):"
+            } else {
+                "Thành tiền:"
             }
+            b.row(subtotalLabel, fmt(item.totalPrice))
 
-            // 4. Voucher
-            if (template.showVoucherDiscount && billData.voucherDiscountAmount > 0) {
-                val label = if (billData.voucherCode != null) {
-                    "${template.voucherDiscountLabel} (${billData.voucherCode})"
-                } else {
-                    template.voucherDiscountLabel
-                }
-                lineKeyValue("$label:", "-${formatCurrency(billData.voucherDiscountAmount)}")
+            b.empty()
+        }
+
+        b.line()
+
+        // ==================== 5. TỔNG TIỀN ====================
+
+        // Tạm tính (3 món)
+        if (template.showSubtotal) {
+            b.row("Tạm tính (${billData.items.size} món):", fmt(billData.subtotal))
+        }
+
+        // 1. Giảm giá món
+        if (template.showTotalItemDiscount && billData.itemDiscountAmount > 0) {
+            b.row("${template.itemDiscountLabel}:", "-${fmt(billData.itemDiscountAmount)}")
+        }
+
+        // 2. Giảm giá hóa đơn (10%)
+        if (template.showBillDiscount && billData.billDiscountAmount > 0) {
+            val label = if (template.showDiscountPercent && billData.billDiscountPercent > 0) {
+                "${template.billDiscountLabel} (${billData.billDiscountPercent.toInt()}%):"
+            } else {
+                "${template.billDiscountLabel}:"
             }
+            b.row(label, "-${fmt(billData.billDiscountAmount)}")
+        }
 
-            // Tổng giảm giá (nếu có nhiều loại)
-            if (template.showTotalDiscount && billData.totalDiscountAmount > 0) {
-                val discountCount = listOf(
-                    billData.itemDiscountAmount,
-                    billData.billDiscountAmount,
-                    billData.couponDiscountAmount,
-                    billData.voucherDiscountAmount
-                ).count { it > 0 }
-
-                if (discountCount > 1) {
-                    line("-".repeat(lineWidth / 2))
-                    bold()
-                    lineKeyValue("${template.totalDiscountLabel}:", "-${formatCurrency(billData.totalDiscountAmount)}")
-                    boldOff()
-                }
+        // 3. Mã giảm giá (MUAXUAN20)
+        if (template.showCouponDiscount && billData.couponDiscountAmount > 0) {
+            val label = if (billData.couponCode != null) {
+                "${template.couponDiscountLabel} (${billData.couponCode}):"
+            } else {
+                "${template.couponDiscountLabel}:"
             }
+            b.row(label, "-${fmt(billData.couponDiscountAmount)}")
+        }
 
-            // Phí dịch vụ
-            if (template.showServiceFee && billData.serviceFee > 0) {
-                lineKeyValue("Phí dịch vụ:", formatCurrency(billData.serviceFee))
+        // 4. Voucher (VIP50K)
+        if (template.showVoucherDiscount && billData.voucherDiscountAmount > 0) {
+            val label = if (billData.voucherCode != null) {
+                "${template.voucherDiscountLabel} (${billData.voucherCode}):"
+            } else {
+                "${template.voucherDiscountLabel}:"
             }
+            b.row(label, "-${fmt(billData.voucherDiscountAmount)}")
+        }
 
-            // VAT (chi tiết hoặc đơn giản)
-            if (template.showVatDetails) {
-                if (template.showPriceBeforeVat) {
-                    lineKeyValue("${template.priceBeforeVatLabel}:", formatCurrency(billData.priceBeforeVat))
-                }
-                if (template.showVat && billData.vatAmount > 0) {
-                    lineKeyValue("${template.vatLabel} (${billData.vatRate.toInt()}%):", formatCurrency(billData.vatAmount))
-                }
-                if (template.showPriceAfterVat) {
-                    lineKeyValue("${template.priceAfterVatLabel}:", formatCurrency(billData.priceAfterVat))
-                }
-            } else if (template.showVat && billData.vatAmount > 0) {
-                lineKeyValue("${template.vatLabel} (${billData.vatRate.toInt()}%):", formatCurrency(billData.vatAmount))
-            }
-
-            line(doubleSep)
-
-            // TỔNG CỘNG (in to, đậm)
-            textDoubleSize()
-            bold()
-            lineKeyValue("TỔNG CỘNG:", formatCurrency(billData.totalAmount))
-            normalSize()
-            boldOff()
-
-            line(doubleSep)
-
-            // ============ 6. THANH TOÁN ============
-            if (template.showPaymentMethod) {
-                lineKeyValue("Thanh toán:", billData.paymentMethod)
-            }
-            if (template.showReceivedAmount && billData.receivedAmount > 0) {
-                lineKeyValue("Tiền khách:", formatCurrency(billData.receivedAmount))
-            }
-            if (template.showChangeAmount && billData.changeAmount > 0) {
-                lineKeyValue("Tiền thừa:", formatCurrency(billData.changeAmount))
-            }
-
-            line(sep)
-
-            // ============ 7. FOOTER ============
-            alignCenter()
-
-            // QR Code
-            if (template.showQrCode) {
-                feed(1)
-                val qrContent = when (template.qrCodeType) {
-                    "order_id" -> billData.orderNumber
-                    "custom" -> template.qrCodeContent ?: billData.orderNumber
-                    else -> billData.orderNumber
-                }
-                qrCode(qrContent)
-            }
-
-            // Barcode
-            if (template.showBarcode) {
-                feed(1)
-                barcode(billData.orderNumber)
-            }
-
-            // WiFi
-            if (template.showWifiInfo && template.wifiName != null) {
-                line(sep)
-                line("WiFi: ${template.wifiName}")
-                if (template.wifiPassword != null) {
-                    line("Pass: ${template.wifiPassword}")
-                }
-            }
-
-            // Lời cảm ơn
-            feed(1)
-            line(template.thankYouMessage)
-            line(template.comebackMessage)
-            if (template.footerText != null) {
-                line(template.footerText)
-            }
-
-            // Cắt giấy
-            feed(3)
-            if (template.cutPaper) {
-                cut()
-            }
-
-            // Mở két tiền
-            if (template.openCashDrawer) {
-                openDrawer()
-            }
-
-            // Beep
-            if (template.beepAfterPrint) {
-                beep()
+        // Tổng giảm giá (nếu có nhiều loại)
+        if (template.showTotalDiscount && billData.totalDiscountAmount > 0) {
+            val count = listOf(
+                billData.itemDiscountAmount,
+                billData.billDiscountAmount,
+                billData.couponDiscountAmount,
+                billData.voucherDiscountAmount
+            ).count { it > 0 }
+            if (count > 1) {
+                b.row("${template.totalDiscountLabel}:", "-${fmt(billData.totalDiscountAmount)}")
             }
         }
 
-        return builder.build()
+        // Phí dịch vụ (5%)
+        if (template.showServiceFee && billData.serviceFee > 0) {
+            val feeLabel = if (billData.serviceFeePercent > 0) {
+                "Phí dịch vụ (${billData.serviceFeePercent.toInt()}%):"
+            } else {
+                "Phí dịch vụ:"
+            }
+            b.row(feeLabel, fmt(billData.serviceFee))
+        }
+
+        // VAT chi tiết
+        if (template.showVatDetails) {
+            // Giá trước thuế
+            if (template.showPriceBeforeVat) {
+                b.row("${template.priceBeforeVatLabel}:", fmt(billData.priceBeforeVat))
+            }
+            // VAT (10%)
+            if (template.showVat && billData.vatAmount > 0) {
+                b.row("${template.vatLabel} (${billData.vatRate.toInt()}%):", fmt(billData.vatAmount))
+            }
+            // Giá sau thuế
+            if (template.showPriceAfterVat) {
+                b.row("${template.priceAfterVatLabel}:", fmt(billData.priceAfterVat))
+            }
+        } else if (template.showVat && billData.vatAmount > 0) {
+            b.row("${template.vatLabel} (${billData.vatRate.toInt()}%):", fmt(billData.vatAmount))
+        }
+
+        b.doubleLine()
+
+        // TỔNG CỘNG (to, đậm)
+        b.doubleSize()
+        b.bold()
+        b.row("TỔNG CỘNG:", fmt(billData.totalAmount))
+        b.normal()
+
+        b.doubleLine()
+
+        // ==================== 6. THANH TOÁN ====================
+        if (template.showPaymentMethod) {
+            b.row("Thanh toán:", billData.paymentMethod)
+        }
+
+        if (template.showReceivedAmount && billData.receivedAmount > 0) {
+            b.row("Tiền khách:", fmt(billData.receivedAmount))
+        }
+
+        if (template.showChangeAmount && billData.changeAmount > 0) {
+            b.row("Tiền thừa:", fmt(billData.changeAmount))
+        }
+
+        b.line()
+
+        // ==================== 7. FOOTER ====================
+        b.center()
+
+        // QR Code
+        if (template.showQrCode) {
+            b.feed(1)
+            b.text("[QR CODE]")
+            when (template.qrCodeType) {
+                "order_id" -> b.text("Mã đơn hàng")
+                "payment" -> b.text("Thanh toán")
+                "review" -> b.text("Đánh giá")
+                "custom" -> b.text("Tùy chỉnh")
+            }
+            b.qrCode(template.qrCodeContent ?: billData.orderNumber)
+        }
+
+        // Barcode
+        if (template.showBarcode) {
+            b.feed(1)
+            b.text("||||| BARCODE |||||")
+            b.barcode(billData.orderNumber)
+        }
+
+        // WiFi
+        if (template.showWifiInfo && template.wifiName != null) {
+            b.line()
+            val wifiText = "WiFi: ${template.wifiName} / ${template.wifiPassword ?: "********"}"
+            b.text(wifiText)
+        }
+
+        // Lời cảm ơn
+        b.feed(1)
+        b.bold()
+        b.text(template.thankYouMessage)
+        b.normal()
+        b.text(template.comebackMessage)
+        template.footerText?.let { b.text(it) }
+
+        // Cắt giấy, mở két, beep
+        b.feed(3)
+        if (template.cutPaper) b.cut()
+        if (template.openCashDrawer) b.openDrawer()
+        if (template.beepAfterPrint) b.beep()
+
+        return b.build()
     }
 
-    /**
-     * Format currency (VND)
-     */
-    private fun formatCurrency(amount: Double): String {
-        return "${currencyFormat.format(amount)}đ"
-    }
-
-    private fun formatCurrency(amount: Long): String {
-        return "${currencyFormat.format(amount)}đ"
-    }
+    private fun fmt(amount: Double): String = "${currencyFormat.format(amount.toLong())}"
+    private fun fmt(amount: Long): String = "${currencyFormat.format(amount)}"
 }
 
 /**
- * Bill Data - Dữ liệu hóa đơn để in
+ * ESC/POS Bill Builder - Tạo lệnh in ESC/POS
+ */
+class EscPosBillBuilder(paperWidth: Int) {
+    private val buf = mutableListOf<Byte>()
+    private val width = if (paperWidth == 58) 32 else 48
+    private val sep = "-".repeat(width)
+    private val doubleSep = "=".repeat(width)
+
+    // ESC/POS Commands
+    private val CMD_INIT = byteArrayOf(0x1B, 0x40)
+    private val CMD_LEFT = byteArrayOf(0x1B, 0x61, 0x00)
+    private val CMD_CENTER = byteArrayOf(0x1B, 0x61, 0x01)
+    private val CMD_RIGHT = byteArrayOf(0x1B, 0x61, 0x02)
+    private val CMD_NORMAL = byteArrayOf(0x1B, 0x21, 0x00)
+    private val CMD_DOUBLE_H = byteArrayOf(0x1B, 0x21, 0x10)
+    private val CMD_DOUBLE_W = byteArrayOf(0x1B, 0x21, 0x20)
+    private val CMD_DOUBLE = byteArrayOf(0x1B, 0x21, 0x30)
+    private val CMD_BOLD_ON = byteArrayOf(0x1B, 0x45, 0x01)
+    private val CMD_BOLD_OFF = byteArrayOf(0x1B, 0x45, 0x00)
+    private val CMD_LF = byteArrayOf(0x0A)
+    private val CMD_CUT = byteArrayOf(0x1D, 0x56, 0x42, 0x00)
+    private val CMD_DRAWER = byteArrayOf(0x1B, 0x70, 0x00, 0x19, 0x78)
+    private val CMD_BEEP = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
+    private val CMD_UTF8 = byteArrayOf(0x1B, 0x74, 0xFF.toByte())
+    private val CMD_CANCEL_CN = byteArrayOf(0x1C, 0x2E)
+
+    fun init() = apply {
+        buf.addAll(CMD_INIT.toList())
+        buf.addAll(CMD_CANCEL_CN.toList())
+        buf.addAll(CMD_UTF8.toList())
+    }
+
+    fun left() = apply { buf.addAll(CMD_LEFT.toList()) }
+    fun center() = apply { buf.addAll(CMD_CENTER.toList()) }
+    fun right() = apply { buf.addAll(CMD_RIGHT.toList()) }
+
+    fun normal() = apply {
+        buf.addAll(CMD_NORMAL.toList())
+        buf.addAll(CMD_BOLD_OFF.toList())
+    }
+
+    fun bold() = apply { buf.addAll(CMD_BOLD_ON.toList()) }
+    fun doubleHeight() = apply { buf.addAll(CMD_DOUBLE_H.toList()) }
+    fun doubleWidth() = apply { buf.addAll(CMD_DOUBLE_W.toList()) }
+    fun doubleSize() = apply { buf.addAll(CMD_DOUBLE.toList()) }
+
+    fun text(s: String) = apply {
+        buf.addAll(s.toByteArray(Charsets.UTF_8).toList())
+        buf.addAll(CMD_LF.toList())
+    }
+
+    fun empty() = apply { buf.addAll(CMD_LF.toList()) }
+
+    fun feed(n: Int) = apply { repeat(n) { buf.addAll(CMD_LF.toList()) } }
+
+    fun line() = apply { text(sep) }
+
+    fun doubleLine() = apply { text(doubleSep) }
+
+    /**
+     * In 2 cột: key bên trái, value bên phải
+     */
+    fun row(key: String, value: String) = apply {
+        val spaces = width - key.length - value.length
+        val line = if (spaces > 0) {
+            key + " ".repeat(spaces) + value
+        } else {
+            "$key $value"
+        }
+        buf.addAll(line.toByteArray(Charsets.UTF_8).toList())
+        buf.addAll(CMD_LF.toList())
+    }
+
+    fun cut() = apply { buf.addAll(CMD_CUT.toList()) }
+    fun openDrawer() = apply { buf.addAll(CMD_DRAWER.toList()) }
+    fun beep() = apply { buf.addAll(CMD_BEEP.toList()) }
+
+    fun qrCode(content: String, size: Int = 6) = apply {
+        buf.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00).toList())
+        buf.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size.toByte()).toList())
+        buf.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31).toList())
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        val len = bytes.size + 3
+        buf.addAll(byteArrayOf(0x1D, 0x28, 0x6B, (len and 0xFF).toByte(), ((len shr 8) and 0xFF).toByte(), 0x31, 0x50, 0x30).toList())
+        buf.addAll(bytes.toList())
+        buf.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30).toList())
+    }
+
+    fun barcode(content: String) = apply {
+        buf.addAll(byteArrayOf(0x1D, 0x68, 0x50).toList())
+        buf.addAll(byteArrayOf(0x1D, 0x77, 0x02).toList())
+        buf.addAll(byteArrayOf(0x1D, 0x48, 0x02).toList())
+        buf.addAll(byteArrayOf(0x1D, 0x6B, 0x49, content.length.toByte()).toList())
+        buf.addAll(content.toByteArray(Charsets.UTF_8).toList())
+    }
+
+    fun build(): ByteArray = buf.toByteArray()
+}
+
+/**
+ * Bill Data - Dữ liệu hóa đơn
  */
 data class BillData(
     val orderNumber: String,
@@ -479,6 +548,7 @@ data class BillData(
     val totalDiscountAmount: Double = 0.0,
     // Phí và thuế
     val serviceFee: Double = 0.0,
+    val serviceFeePercent: Double = 0.0,
     val vatRate: Double = 10.0,
     val vatAmount: Double,
     val priceBeforeVat: Double,
@@ -490,42 +560,28 @@ data class BillData(
     val changeAmount: Double = 0.0,
     // Time tracking
     val checkInTime: Date? = null,
-    val checkOutTime: Date? = null,
-    // Legacy support
-    val discountAmount: Double = 0.0,
-    val discountPercent: Double = 0.0,
-    val totalItemDiscount: Double = 0.0,
-    // Temporary bill
-    val isTemporaryBill: Boolean = false,
-    val printCount: Int = 0,
-    val printTime: Date? = null
+    val checkOutTime: Date? = null
 )
 
 /**
- * Bill Item - Thông tin món trong hóa đơn
+ * Bill Item - Thông tin món
  */
 data class BillItem(
     val code: String? = null,
     val name: String,
     val quantity: Int,
     val unitPrice: Double,
-    val originalPrice: Double = 0.0,
     val basePrice: Double = 0.0,
     val discountAmount: Double = 0.0,
     val discountPercent: Double = 0.0,
     val totalPrice: Double,
     val note: String? = null,
     val variants: List<BillVariant> = emptyList(),
-    val toppings: List<BillTopping> = emptyList(),
-    val vatRate: Double = 8.0
+    val toppings: List<BillTopping> = emptyList()
 )
 
-/**
- * Bill Variant - Các lựa chọn biến thể (Size, Ice, Sugar...)
- */
 data class BillVariant(
     val name: String,
-    val groupName: String? = null,
     val priceAdjustment: Double = 0.0
 )
 
@@ -534,99 +590,3 @@ data class BillTopping(
     val price: Double,
     val quantity: Int = 1
 )
-
-/**
- * Bill Builder - Helper class to build ESC/POS commands
- */
-class BillBuilder(paperWidth: Int) {
-    private val buffer = mutableListOf<Byte>()
-    val lineWidth = if (paperWidth == 58) 32 else 48
-
-    // ESC/POS Commands
-    private val INIT = byteArrayOf(0x1B, 0x40)
-    private val ALIGN_LEFT = byteArrayOf(0x1B, 0x61, 0x00)
-    private val ALIGN_CENTER = byteArrayOf(0x1B, 0x61, 0x01)
-    private val ALIGN_RIGHT = byteArrayOf(0x1B, 0x61, 0x02)
-    private val TEXT_NORMAL = byteArrayOf(0x1B, 0x21, 0x00)
-    private val TEXT_DOUBLE_HEIGHT = byteArrayOf(0x1B, 0x21, 0x10)
-    private val TEXT_DOUBLE_WIDTH = byteArrayOf(0x1B, 0x21, 0x20)
-    private val TEXT_DOUBLE = byteArrayOf(0x1B, 0x21, 0x30)
-    private val BOLD_ON = byteArrayOf(0x1B, 0x45, 0x01)
-    private val BOLD_OFF = byteArrayOf(0x1B, 0x45, 0x00)
-    private val LINE_FEED = byteArrayOf(0x0A)
-    private val CUT_PAPER = byteArrayOf(0x1D, 0x56, 0x42, 0x00)
-    private val OPEN_DRAWER = byteArrayOf(0x1B, 0x70, 0x00, 0x19, 0x78)
-    private val BEEP = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
-
-    // Vietnamese/UTF-8 Character Set Commands
-    private val CODEPAGE_UTF8 = byteArrayOf(0x1B, 0x74, 0xFF.toByte())
-    private val CANCEL_CHINESE = byteArrayOf(0x1C, 0x2E)
-    private val CHARSET_VIETNAM = byteArrayOf(0x1B, 0x52, 0x00)
-
-    fun init() = apply {
-        buffer.addAll(INIT.toList())
-        buffer.addAll(CANCEL_CHINESE.toList())
-        buffer.addAll(CODEPAGE_UTF8.toList())
-        buffer.addAll(CHARSET_VIETNAM.toList())
-    }
-
-    fun alignLeft() = apply { buffer.addAll(ALIGN_LEFT.toList()) }
-    fun alignCenter() = apply { buffer.addAll(ALIGN_CENTER.toList()) }
-    fun alignRight() = apply { buffer.addAll(ALIGN_RIGHT.toList()) }
-    fun normalSize() = apply { buffer.addAll(TEXT_NORMAL.toList()) }
-    fun textDoubleHeight() = apply { buffer.addAll(TEXT_DOUBLE_HEIGHT.toList()) }
-    fun textDoubleWidth() = apply { buffer.addAll(TEXT_DOUBLE_WIDTH.toList()) }
-    fun textDoubleSize() = apply { buffer.addAll(TEXT_DOUBLE.toList()) }
-    fun bold() = apply { buffer.addAll(BOLD_ON.toList()) }
-    fun boldOff() = apply { buffer.addAll(BOLD_OFF.toList()) }
-    fun cut() = apply { buffer.addAll(CUT_PAPER.toList()) }
-    fun openDrawer() = apply { buffer.addAll(OPEN_DRAWER.toList()) }
-    fun beep() = apply { buffer.addAll(BEEP.toList()) }
-
-    fun feed(lines: Int) = apply {
-        repeat(lines) { buffer.addAll(LINE_FEED.toList()) }
-    }
-
-    fun line(text: String) = apply {
-        buffer.addAll(text.toByteArray(Charsets.UTF_8).toList())
-        buffer.addAll(LINE_FEED.toList())
-    }
-
-    fun lineKeyValue(key: String, value: String) = apply {
-        val spaces = lineWidth - key.length - value.length
-        val line = if (spaces > 0) {
-            key + " ".repeat(spaces) + value
-        } else {
-            "$key $value"
-        }
-        buffer.addAll(line.toByteArray(Charsets.UTF_8).toList())
-        buffer.addAll(LINE_FEED.toList())
-    }
-
-    fun qrCode(content: String, size: Int = 6) = apply {
-        // QR Code model
-        buffer.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00).toList())
-        // QR Code size
-        buffer.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size.toByte()).toList())
-        // QR Code error correction
-        buffer.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31).toList())
-        // Store QR Code data
-        val contentBytes = content.toByteArray(Charsets.UTF_8)
-        val len = contentBytes.size + 3
-        buffer.addAll(byteArrayOf(0x1D, 0x28, 0x6B, (len and 0xFF).toByte(), ((len shr 8) and 0xFF).toByte(), 0x31, 0x50, 0x30).toList())
-        buffer.addAll(contentBytes.toList())
-        // Print QR Code
-        buffer.addAll(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30).toList())
-    }
-
-    fun barcode(content: String) = apply {
-        // CODE128 barcode
-        buffer.addAll(byteArrayOf(0x1D, 0x68, 0x50).toList()) // Height
-        buffer.addAll(byteArrayOf(0x1D, 0x77, 0x02).toList()) // Width
-        buffer.addAll(byteArrayOf(0x1D, 0x48, 0x02).toList()) // HRI below barcode
-        buffer.addAll(byteArrayOf(0x1D, 0x6B, 0x49, content.length.toByte()).toList())
-        buffer.addAll(content.toByteArray(Charsets.UTF_8).toList())
-    }
-
-    fun build(): ByteArray = buffer.toByteArray()
-}
