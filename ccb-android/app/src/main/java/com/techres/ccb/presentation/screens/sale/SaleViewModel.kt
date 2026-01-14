@@ -2512,9 +2512,9 @@ class SaleViewModel @Inject constructor(
         // 2. Giảm giá hóa đơn thủ công (Bill Discount) - từ billDiscountAmount
         val manualBillDiscount = billDiscountAmount.toDouble()
 
-        // 3. Coupon - lọc từ appliedDiscounts (type = COUPON hoặc có couponId)
+        // 3. Coupon - lọc từ appliedDiscounts (target = BILL là coupon áp dụng cho toàn bộ hóa đơn)
         val couponDiscounts = appliedDiscounts.filter {
-            it.target == DiscountTarget.BILL || it.target == DiscountTarget.ORDER
+            it.target == DiscountTarget.BILL
         }
         val firstCoupon = couponDiscounts.firstOrNull()
         val couponDiscountTotal = couponDiscounts.sumOf { it.discountAmount.toDouble() }
