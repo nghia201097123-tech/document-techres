@@ -48,7 +48,14 @@ data class OrderHistoryItem(
     val completedAt: Long?,
     val cancelledAt: Long?,
     val cancelReason: String?,
-    val staffName: String?
+    val staffName: String?,
+    // Thêm cho hiển thị bảng chi tiết
+    val subtotal: Long = 0,           // Tạm tính
+    val vatAmount: Long = 0,          // VAT
+    val discountAmount: Long = 0,     // Giảm giá
+    val couponCode: String? = null,   // Mã coupon
+    val paidAmount: Long = 0,         // Tiền thanh toán
+    val guestCount: Int = 1           // Số khách
 )
 
 data class OrderHistoryUiState(
@@ -172,7 +179,14 @@ class OrderHistoryViewModel @Inject constructor(
                             completedAt = entity.completedAt?.let { parseTimestamp(it) },
                             cancelledAt = entity.cancelledAt?.let { parseTimestamp(it) },
                             cancelReason = entity.cancelReason,
-                            staffName = entity.staffName
+                            staffName = entity.staffName,
+                            // Thêm thông tin chi tiết
+                            subtotal = entity.subtotal.toLong(),
+                            vatAmount = entity.vatAmount.toLong(),
+                            discountAmount = entity.discountAmount.toLong(),
+                            couponCode = entity.couponCode,
+                            paidAmount = entity.paidAmount.toLong(),
+                            guestCount = entity.guestCount
                         )
                     }
 

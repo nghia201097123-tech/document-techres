@@ -15,8 +15,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -58,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -155,18 +161,53 @@ fun OrderHistoryScreen(
                     }
                 }
             } else {
-                LazyColumn(
+                // Table-style order list with horizontal scroll
+                val scrollState = rememberScrollState()
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .fillMaxWidth()
                 ) {
-                    items(uiState.orders) { order ->
-                        CompactOrderCard(
-                            order = order,
-                            onClick = { viewModel.showOrderDetail(order.id) }
-                        )
+                    // Table Header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(scrollState)
+                            .background(Color(0xFFF5F5F5))
+                            .padding(vertical = 10.dp, horizontal = 8.dp)
+                    ) {
+                        TableHeaderCell("STT", 45.dp)
+                        TableHeaderCell("MÃ ĐƠN", 100.dp)
+                        TableHeaderCell("BÀN", 60.dp)
+                        TableHeaderCell("NHÂN VIÊN", 100.dp)
+                        TableHeaderCell("TẠM TÍNH", 85.dp)
+                        TableHeaderCell("VAT", 70.dp)
+                        TableHeaderCell("GIẢM GIÁ", 80.dp)
+                        TableHeaderCell("COUPON", 80.dp)
+                        TableHeaderCell("SỐ KHÁCH", 70.dp)
+                        TableHeaderCell("THANH TOÁN", 90.dp)
+                    }
+
+                    Divider(color = Color.LightGray)
+
+                    // Table Body
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        itemsIndexed(uiState.orders) { index, order ->
+                            val startIndex = (uiState.currentPage - 1) * uiState.pageSize
+                            OrderTableRow(
+                                index = startIndex + index + 1,
+                                order = order,
+                                scrollState = scrollState,
+                                onClick = { viewModel.showOrderDetail(order.id) }
+                            )
+                            if (index < uiState.orders.size - 1) {
+                                Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                            }
+                        }
                     }
                 }
             }
@@ -349,6 +390,142 @@ private fun CompactOrderCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TableHeaderCell(
+    text: String,
+    width: Dp
+) {
+    Text(
+        text = text,
+        modifier = Modifier.width(width),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color(0xFF666666),
+        textAlign = TextAlign.Center,
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun OrderTableRow(
+    index: Int,
+    order: OrderHistoryItem,
+    scrollState: ScrollState,
+    onClick: () -> Unit
+) {
+    val isCompleted = order.status == "completed"
+    val rowBackground = if (index % 2 == 0) Color.White else Color(0xFFFAFAFA)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .background(rowBackground)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // STT
+        Text(
+            text = index.toString(),
+            modifier = Modifier.width(45.dp),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
+
+        // Mã đơn
+        Text(
+            text = order.orderNumber.takeLast(5),
+            modifier = Modifier.width(100.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center
+        )
+
+        // Bàn
+        Text(
+            text = order.tableName ?: "---",
+            modifier = Modifier.width(60.dp),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Nhân viên
+        Text(
+            text = order.staffName ?: "---",
+            modifier = Modifier.width(100.dp),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Tạm tính
+        Text(
+            text = formatCurrencyShort(order.subtotal),
+            modifier = Modifier.width(85.dp),
+            fontSize = 12.sp,
+            textAlign = TextAlign.End
+        )
+
+        // VAT
+        Text(
+            text = formatCurrencyShort(order.vatAmount),
+            modifier = Modifier.width(70.dp),
+            fontSize = 12.sp,
+            textAlign = TextAlign.End
+        )
+
+        // Giảm giá
+        Text(
+            text = formatCurrencyShort(order.discountAmount),
+            modifier = Modifier.width(80.dp),
+            fontSize = 12.sp,
+            color = if (order.discountAmount > 0) Color(0xFF4CAF50) else Color.Unspecified,
+            textAlign = TextAlign.End
+        )
+
+        // Coupon
+        Text(
+            text = order.couponCode?.take(8) ?: "0",
+            modifier = Modifier.width(80.dp),
+            fontSize = 12.sp,
+            color = if (!order.couponCode.isNullOrEmpty()) Color(0xFF2196F3) else Color.Unspecified,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Số khách
+        Text(
+            text = order.guestCount.toString(),
+            modifier = Modifier.width(70.dp),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
+
+        // Thanh toán (tổng tiền)
+        Text(
+            text = formatCurrencyShort(order.totalAmount),
+            modifier = Modifier.width(90.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray,
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+private fun formatCurrencyShort(amount: Long): String {
+    return if (amount == 0L) {
+        "0"
+    } else {
+        NumberFormat.getNumberInstance(Locale("vi", "VN")).format(amount)
     }
 }
 
