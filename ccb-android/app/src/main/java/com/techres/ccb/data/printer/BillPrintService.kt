@@ -458,14 +458,6 @@ object BillPrintService {
 }
 
 /**
- * Printer Result
- */
-sealed class PrinterResult {
-    data class Success(val message: String) : PrinterResult()
-    data class Error(val message: String) : PrinterResult()
-}
-
-/**
  * Bill Data - Dữ liệu hóa đơn để in
  */
 data class BillData(
