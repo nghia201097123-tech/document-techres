@@ -1173,6 +1173,39 @@ export class DatabaseMigrationService implements OnModuleInit {
         }
       }
 
+      // 42. Add time tracking and discount config columns to bill_templates table
+      if (hasBillTemplatesTable[0].exists) {
+        const hasShowCheckInTime = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_templates' AND column_name = 'show_check_in_time'
+          );
+        `);
+
+        if (!hasShowCheckInTime[0].exists) {
+          this.logger.log('Adding time tracking and discount config columns to bill_templates table...');
+          await queryRunner.query(`
+            ALTER TABLE bill_templates
+            -- Time tracking columns
+            ADD COLUMN IF NOT EXISTS show_check_in_time BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS show_check_out_time BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS check_in_label VARCHAR(50) DEFAULT 'Giờ vào',
+            ADD COLUMN IF NOT EXISTS check_out_label VARCHAR(50) DEFAULT 'Giờ ra',
+            -- Discount labels and config columns
+            ADD COLUMN IF NOT EXISTS item_discount_label VARCHAR(50) DEFAULT 'Giảm giá món',
+            ADD COLUMN IF NOT EXISTS show_bill_discount BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS bill_discount_label VARCHAR(50) DEFAULT 'Giảm giá hóa đơn',
+            ADD COLUMN IF NOT EXISTS show_coupon_discount BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS coupon_discount_label VARCHAR(50) DEFAULT 'Mã giảm giá',
+            ADD COLUMN IF NOT EXISTS show_voucher_discount BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS voucher_discount_label VARCHAR(50) DEFAULT 'Voucher',
+            ADD COLUMN IF NOT EXISTS show_total_discount BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS total_discount_label VARCHAR(50) DEFAULT 'Tổng giảm giá'
+          `);
+          this.logger.log('Time tracking and discount config columns added to bill_templates table');
+        }
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
