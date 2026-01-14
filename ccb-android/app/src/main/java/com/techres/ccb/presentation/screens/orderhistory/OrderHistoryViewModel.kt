@@ -11,6 +11,7 @@ import com.techres.ccb.data.printer.BillData
 import com.techres.ccb.data.printer.BillItem
 import com.techres.ccb.data.printer.BillVariant
 import com.techres.ccb.data.printer.HybridBillPrintService
+import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -309,8 +310,17 @@ class OrderHistoryViewModel @Inject constructor(
 
             try {
                 withContext(Dispatchers.IO) {
+                    // Get current branch ID
+                    val branchId = authRepository.getCurrentBranchId()
+                    if (branchId.isNullOrEmpty()) {
+                        _uiState.update {
+                            it.copy(isPrinting = false, printMessage = "Không tìm thấy chi nhánh")
+                        }
+                        return@withContext
+                    }
+
                     // Get printer config
-                    val printerConfig = printerConfigDao.getActivePrinter(branchId)
+                    val printerConfig = printerConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
                         _uiState.update {
                             it.copy(isPrinting = false, printMessage = "Không tìm thấy máy in")
@@ -342,8 +352,8 @@ class OrderHistoryViewModel @Inject constructor(
                     // Print
                     val result = HybridBillPrintService.printBill(printerConfig, template, billData)
                     val message = when (result) {
-                        is HybridBillPrintService.PrintResult.Success -> "In lại bill thành công!"
-                        is HybridBillPrintService.PrintResult.Error -> "Lỗi in: ${result.message}"
+                        is PrinterResult.Success -> "In lại bill thành công!"
+                        is PrinterResult.Error -> "Lỗi in: ${result.message}"
                     }
                     _uiState.update { it.copy(isPrinting = false, printMessage = message) }
                 }
