@@ -19,6 +19,7 @@ import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceProductEntity
 import com.techres.ccb.presentation.screens.sale.dialogs.AppliedDiscount
+import com.techres.ccb.presentation.screens.sale.dialogs.DiscountTarget
 import com.techres.ccb.util.DiscountCalculator
 import com.techres.ccb.util.OrderItemForDiscount
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
@@ -2141,6 +2142,7 @@ class SaleViewModel @Inject constructor(
                                 orderItems = state.currentOrderItems,
                                 itemDiscounts = state.itemDiscounts,
                                 billDiscountAmount = state.billDiscountAmount,
+                                appliedDiscounts = state.appliedDiscounts,
                                 tableName = state.selectedTable?.name,
                                 staffName = currentOrder.staffName,
                                 customerName = currentOrder.customerName,
@@ -2218,6 +2220,7 @@ class SaleViewModel @Inject constructor(
                 val orderItemsForPrint = state.currentOrderItems
                 val itemDiscountsForPrint = state.itemDiscounts
                 val billDiscountForPrint = state.billDiscountAmount
+                val appliedDiscountsForPrint = state.appliedDiscounts  // Coupon/Voucher đã áp dụng
                 val tableNameForPrint = state.selectedTable?.name
 
                 withContext(Dispatchers.IO) {
@@ -2324,6 +2327,7 @@ class SaleViewModel @Inject constructor(
                                     orderItems = orderItemsForPrint,
                                     itemDiscounts = itemDiscountsForPrint,
                                     billDiscountAmount = billDiscountForPrint,
+                                    appliedDiscounts = appliedDiscountsForPrint,
                                     tableName = tableNameForPrint,
                                     staffName = completedOrder.staffName,
                                     customerName = completedOrder.customerName,
@@ -2375,6 +2379,7 @@ class SaleViewModel @Inject constructor(
         orderItems: List<OrderItemEntity>,
         itemDiscounts: Map<String, Long> = emptyMap(),
         billDiscountAmount: Long = 0,
+        appliedDiscounts: List<AppliedDiscount> = emptyList(),
         tableName: String?,
         staffName: String?,
         customerName: String?,
@@ -2501,33 +2506,35 @@ class SaleViewModel @Inject constructor(
             else -> paymentMethod
         }
 
-        // Giảm giá tổng bill (từ giảm giá thủ công/% hoặc coupon)
-        // Ưu tiên: billDiscountAmount từ UI state > order.discountAmount - totalItemDiscount
-        val orderLevelDiscount = if (billDiscountAmount > 0) {
-            billDiscountAmount.toDouble()
+        // ============ PHÂN TÁCH 4 LOẠI GIẢM GIÁ TỪ appliedDiscounts ============
+        // 1. Giảm giá món (Item Discount) - đã tính ở trên: totalItemDiscount
+
+        // 2. Giảm giá hóa đơn thủ công (Bill Discount) - từ billDiscountAmount
+        val manualBillDiscount = billDiscountAmount.toDouble()
+
+        // 3. Coupon - lọc từ appliedDiscounts (type = COUPON hoặc có couponId)
+        val couponDiscounts = appliedDiscounts.filter {
+            it.target == DiscountTarget.BILL || it.target == DiscountTarget.ORDER
+        }
+        val firstCoupon = couponDiscounts.firstOrNull()
+        val couponDiscountTotal = couponDiscounts.sumOf { it.discountAmount.toDouble() }
+        val couponCodeValue = firstCoupon?.code
+
+        // 4. Voucher - hiện tại chưa có trong appliedDiscounts, để dành cho tương lai
+        val voucherDiscountTotal = 0.0
+        val voucherCodeValue: String? = null
+
+        // Tính bill discount percent (chỉ hiển thị nếu là giảm %)
+        val billDiscountPercentValue = firstCoupon?.let {
+            if (it.discountType == "percentage") it.discountValue else 0.0
+        } ?: if (order.discountType == "percent" && order.discountValue > 0) {
+            order.discountValue
         } else {
-            // order.discountAmount có thể bao gồm cả item discount và bill discount
-            // Nên chỉ lấy phần bill discount (order.discountAmount - totalItemDiscount)
-            (order.discountAmount - totalItemDiscount).coerceAtLeast(0.0)
+            0.0
         }
 
-        // Phân biệt giảm giá từ coupon vs giảm giá thủ công (bill discount)
-        // Nếu có couponCode thì discount là từ coupon, ngược lại là bill discount
-        val hasCoupon = order.couponCode != null && order.couponCode.isNotEmpty()
-        val couponDiscount = if (hasCoupon) orderLevelDiscount else 0.0
-        val billDiscount = if (hasCoupon) 0.0 else orderLevelDiscount
-
-        // Chỉ tính % nếu discount type là "percent", không tính cho "fixed"
-        // order.discountType: "percent" hoặc "fixed"
-        val isPercentDiscount = order.discountType == "percent"
-        val billDiscountPercentValue = if (isPercentDiscount && order.discountValue > 0) {
-            order.discountValue // Lấy % trực tiếp từ discountValue
-        } else {
-            0.0 // Không hiển thị % nếu là giảm tiền mặt (fixed)
-        }
-
-        // Tính tổng giảm giá (tất cả loại)
-        val totalDiscountAmount = totalItemDiscount + orderLevelDiscount
+        // Tổng giảm giá tất cả loại
+        val totalDiscountAmount = totalItemDiscount + manualBillDiscount + couponDiscountTotal + voucherDiscountTotal
 
         return BillData(
             orderNumber = order.orderNumber,
@@ -2539,16 +2546,16 @@ class SaleViewModel @Inject constructor(
             subtotal = calculatedSubtotal, // Tạm tính (tổng giá gốc trước giảm giá)
             // 4 loại giảm giá mới
             itemDiscountAmount = totalItemDiscount, // 1. Giảm giá món
-            billDiscountAmount = billDiscount, // 2. Giảm giá hóa đơn (không từ coupon)
-            billDiscountPercent = billDiscountPercentValue, // Chỉ > 0 nếu là giảm %
-            couponDiscountAmount = couponDiscount, // 3. Coupon discount
-            couponCode = order.couponCode, // Mã coupon
-            voucherDiscountAmount = 0.0, // 4. Voucher (chưa implement)
-            voucherCode = null,
+            billDiscountAmount = manualBillDiscount, // 2. Giảm giá hóa đơn thủ công
+            billDiscountPercent = billDiscountPercentValue, // % nếu có
+            couponDiscountAmount = couponDiscountTotal, // 3. Coupon từ appliedDiscounts
+            couponCode = couponCodeValue, // Mã coupon đầu tiên
+            voucherDiscountAmount = voucherDiscountTotal, // 4. Voucher (chưa implement)
+            voucherCode = voucherCodeValue,
             totalDiscountAmount = totalDiscountAmount, // Tổng tất cả giảm giá
             // Legacy fields (để tương thích)
             totalItemDiscount = totalItemDiscount,
-            discountAmount = orderLevelDiscount,
+            discountAmount = manualBillDiscount + couponDiscountTotal, // Total order-level discount
             discountPercent = billDiscountPercentValue,
             // Phí và thuế
             serviceFee = 0.0,
