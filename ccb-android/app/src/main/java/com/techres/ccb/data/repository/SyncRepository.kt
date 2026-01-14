@@ -551,6 +551,11 @@ class SyncRepository @Inject constructor(
                 showCustomerName = dto.showCustomerName,
                 showDateTime = dto.showDateTime,
                 dateFormat = dto.dateFormat,
+                // Time tracking config
+                showCheckInTime = dto.showCheckInTime,
+                showCheckOutTime = dto.showCheckOutTime,
+                checkInLabel = dto.checkInLabel,
+                checkOutLabel = dto.checkOutLabel,
                 // Items config
                 showItemCode = dto.showItemCode,
                 showItemNote = dto.showItemNote,
@@ -558,6 +563,18 @@ class SyncRepository @Inject constructor(
                 showQuantity = dto.showQuantity,
                 // Price config
                 showSubtotal = dto.showSubtotal,
+                // Discount config (4 loại giảm giá)
+                showItemDiscount = dto.showItemDiscount,
+                showTotalItemDiscount = dto.showTotalItemDiscount,
+                itemDiscountLabel = dto.itemDiscountLabel,
+                showBillDiscount = dto.showBillDiscount,
+                billDiscountLabel = dto.billDiscountLabel,
+                showCouponDiscount = dto.showCouponDiscount,
+                couponDiscountLabel = dto.couponDiscountLabel,
+                showVoucherDiscount = dto.showVoucherDiscount,
+                voucherDiscountLabel = dto.voucherDiscountLabel,
+                showTotalDiscount = dto.showTotalDiscount,
+                totalDiscountLabel = dto.totalDiscountLabel,
                 showDiscount = dto.showDiscount,
                 showDiscountPercent = dto.showDiscountPercent,
                 showServiceFee = dto.showServiceFee,

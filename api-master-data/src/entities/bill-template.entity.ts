@@ -103,6 +103,19 @@ export class BillTemplate {
   @Column({ name: 'date_format', length: 50, default: 'dd/MM/yyyy HH:mm' })
   dateFormat: string;
 
+  // ============ TIME TRACKING CONFIG ============
+  @Column({ name: 'show_check_in_time', default: false })
+  showCheckInTime: boolean; // Giờ vào
+
+  @Column({ name: 'show_check_out_time', default: false })
+  showCheckOutTime: boolean; // Giờ ra
+
+  @Column({ name: 'check_in_label', length: 50, default: 'Giờ vào' })
+  checkInLabel: string;
+
+  @Column({ name: 'check_out_label', length: 50, default: 'Giờ ra' })
+  checkOutLabel: string;
+
   // ============ ITEMS CONFIG ============
   @Column({ name: 'show_item_code', default: false })
   showItemCode: boolean;
@@ -120,8 +133,44 @@ export class BillTemplate {
   @Column({ name: 'show_subtotal', default: true })
   showSubtotal: boolean;
 
-  @Column({ name: 'show_discount', default: true })
-  showDiscount: boolean;
+  // ============ DISCOUNT CONFIG (4 loại giảm giá) ============
+  // 1. Giảm giá món (Item Discount) - ưu tiên 1
+  @Column({ name: 'show_item_discount', default: true })
+  showItemDiscount: boolean; // Hiển thị giảm giá trên từng món
+
+  @Column({ name: 'show_total_item_discount', default: true })
+  showTotalItemDiscount: boolean; // Hiển thị tổng giảm giá các món
+
+  @Column({ name: 'item_discount_label', length: 50, default: 'Giảm giá món' })
+  itemDiscountLabel: string;
+
+  // 2. Giảm giá hóa đơn (Bill Discount) - ưu tiên 2
+  @Column({ name: 'show_bill_discount', default: true })
+  showBillDiscount: boolean;
+
+  @Column({ name: 'bill_discount_label', length: 50, default: 'Giảm giá hóa đơn' })
+  billDiscountLabel: string;
+
+  // 3. Coupon - ưu tiên 3
+  @Column({ name: 'show_coupon_discount', default: true })
+  showCouponDiscount: boolean;
+
+  @Column({ name: 'coupon_discount_label', length: 50, default: 'Mã giảm giá' })
+  couponDiscountLabel: string;
+
+  // 4. Voucher - ưu tiên 4
+  @Column({ name: 'show_voucher_discount', default: true })
+  showVoucherDiscount: boolean;
+
+  @Column({ name: 'voucher_discount_label', length: 50, default: 'Voucher' })
+  voucherDiscountLabel: string;
+
+  // Tổng giảm giá (hiển thị tổng tất cả loại giảm giá)
+  @Column({ name: 'show_total_discount', default: true })
+  showTotalDiscount: boolean;
+
+  @Column({ name: 'total_discount_label', length: 50, default: 'Tổng giảm giá' })
+  totalDiscountLabel: string;
 
   @Column({ name: 'show_discount_percent', default: true })
   showDiscountPercent: boolean;
@@ -191,10 +240,7 @@ export class BillTemplate {
   @Column({ name: 'wifi_password', length: 100, nullable: true })
   wifiPassword: string;
 
-  // ============ STYLE CONFIG ============
-  @Column({ name: 'paper_width', type: 'int', default: 80 })
-  paperWidth: number; // 58 hoặc 80mm
-
+  // ============ STYLE CONFIG (Content styling) ============
   @Column({ name: 'font_size', type: 'varchar', length: 20, default: 'normal' })
   fontSize: string; // 'small', 'normal', 'large'
 
@@ -204,17 +250,23 @@ export class BillTemplate {
   @Column({ name: 'double_separator_char', type: 'char', length: 1, default: '=' })
   doubleSeparatorChar: string;
 
+  // ============ HARDWARE CONFIG (deprecated - use BillPrinterConfig) ============
+  // Note: Các config phần cứng nên đặt ở BillPrinterConfig thay vì ở đây
+  // Giữ lại để tương thích ngược với các bản cũ
+  @Column({ name: 'paper_width', type: 'int', default: 80 })
+  paperWidth: number; // 58 hoặc 80mm - nên dùng BillPrinterConfig.paperWidth
+
   @Column({ name: 'cut_paper', default: true })
-  cutPaper: boolean;
+  cutPaper: boolean; // Nên dùng BillPrinterConfig.cutPaper
 
   @Column({ name: 'open_cash_drawer', default: false })
-  openCashDrawer: boolean;
+  openCashDrawer: boolean; // Nên dùng BillPrinterConfig.openCashDrawer
 
   @Column({ name: 'beep_after_print', default: false })
-  beepAfterPrint: boolean;
+  beepAfterPrint: boolean; // Nên dùng BillPrinterConfig.beepAfterPrint
 
   @Column({ name: 'number_of_copies', type: 'int', default: 1 })
-  numberOfCopies: number;
+  numberOfCopies: number; // Nên dùng BillPrinterConfig.numberOfCopies
 
   // ============ STATUS ============
   @Column({ name: 'is_default', default: false })

@@ -713,6 +713,11 @@ data class BillTemplateDto(
     @SerializedName("showCustomerName") val showCustomerName: Boolean = true,
     @SerializedName("showDateTime") val showDateTime: Boolean = true,
     @SerializedName("dateFormat") val dateFormat: String = "dd/MM/yyyy HH:mm",
+    // Time tracking config
+    @SerializedName("showCheckInTime") val showCheckInTime: Boolean = false,
+    @SerializedName("showCheckOutTime") val showCheckOutTime: Boolean = false,
+    @SerializedName("checkInLabel") val checkInLabel: String = "Giờ vào",
+    @SerializedName("checkOutLabel") val checkOutLabel: String = "Giờ ra",
     // Items config
     @SerializedName("showItemCode") val showItemCode: Boolean = false,
     @SerializedName("showItemNote") val showItemNote: Boolean = true,
@@ -720,7 +725,19 @@ data class BillTemplateDto(
     @SerializedName("showQuantity") val showQuantity: Boolean = true,
     // Price config
     @SerializedName("showSubtotal") val showSubtotal: Boolean = true,
-    @SerializedName("showDiscount") val showDiscount: Boolean = true,
+    // Discount config (4 loại giảm giá)
+    @SerializedName("showItemDiscount") val showItemDiscount: Boolean = true,
+    @SerializedName("showTotalItemDiscount") val showTotalItemDiscount: Boolean = true,
+    @SerializedName("itemDiscountLabel") val itemDiscountLabel: String = "Giảm giá món",
+    @SerializedName("showBillDiscount") val showBillDiscount: Boolean = true,
+    @SerializedName("billDiscountLabel") val billDiscountLabel: String = "Giảm giá hóa đơn",
+    @SerializedName("showCouponDiscount") val showCouponDiscount: Boolean = true,
+    @SerializedName("couponDiscountLabel") val couponDiscountLabel: String = "Mã giảm giá",
+    @SerializedName("showVoucherDiscount") val showVoucherDiscount: Boolean = true,
+    @SerializedName("voucherDiscountLabel") val voucherDiscountLabel: String = "Voucher",
+    @SerializedName("showTotalDiscount") val showTotalDiscount: Boolean = true,
+    @SerializedName("totalDiscountLabel") val totalDiscountLabel: String = "Tổng giảm giá",
+    @SerializedName("showDiscount") val showDiscount: Boolean = true, // Deprecated
     @SerializedName("showDiscountPercent") val showDiscountPercent: Boolean = true,
     @SerializedName("showServiceFee") val showServiceFee: Boolean = true,
     @SerializedName("showVat") val showVat: Boolean = true,

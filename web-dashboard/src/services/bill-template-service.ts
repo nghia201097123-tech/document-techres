@@ -49,6 +49,12 @@ export interface BillTemplate {
   showDateTime: boolean;
   dateFormat: string;
 
+  // Time tracking config
+  showCheckInTime?: boolean;
+  showCheckOutTime?: boolean;
+  checkInLabel?: string;
+  checkOutLabel?: string;
+
   // Items config
   showItemCode: boolean;
   showItemNote: boolean;
@@ -57,9 +63,25 @@ export interface BillTemplate {
 
   // Price config
   showSubtotal: boolean;
-  showItemDiscount: boolean;       // Hiển thị giảm giá trên từng món
-  showTotalItemDiscount: boolean;  // Hiển thị tổng giảm giá các món
-  showDiscount: boolean;
+
+  // Discount config (4 loại giảm giá)
+  showItemDiscount: boolean;         // 1. Hiển thị giảm giá trên từng món
+  showTotalItemDiscount: boolean;    // Hiển thị tổng giảm giá các món
+  itemDiscountLabel?: string;        // Nhãn giảm giá món
+
+  showBillDiscount?: boolean;        // 2. Hiển thị giảm giá hóa đơn
+  billDiscountLabel?: string;        // Nhãn giảm giá hóa đơn
+
+  showCouponDiscount?: boolean;      // 3. Hiển thị giảm giá coupon
+  couponDiscountLabel?: string;      // Nhãn coupon
+
+  showVoucherDiscount?: boolean;     // 4. Hiển thị giảm giá voucher
+  voucherDiscountLabel?: string;     // Nhãn voucher
+
+  showTotalDiscount?: boolean;       // Tổng giảm giá
+  totalDiscountLabel?: string;       // Nhãn tổng giảm giá
+
+  showDiscount: boolean;             // Deprecated - giữ lại để tương thích ngược
   showDiscountPercent: boolean;
   showServiceFee: boolean;
   showVat: boolean;

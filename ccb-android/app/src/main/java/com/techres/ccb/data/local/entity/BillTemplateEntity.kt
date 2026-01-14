@@ -84,6 +84,19 @@ data class BillTemplateEntity(
     @ColumnInfo(name = "date_format")
     val dateFormat: String = "dd/MM/yyyy HH:mm",
 
+    // ============ TIME TRACKING CONFIG ============
+    @ColumnInfo(name = "show_check_in_time")
+    val showCheckInTime: Boolean = false, // Giờ vào
+
+    @ColumnInfo(name = "show_check_out_time")
+    val showCheckOutTime: Boolean = false, // Giờ ra
+
+    @ColumnInfo(name = "check_in_label")
+    val checkInLabel: String = "Giờ vào",
+
+    @ColumnInfo(name = "check_out_label")
+    val checkOutLabel: String = "Giờ ra",
+
     // ============ ITEMS CONFIG ============
     @ColumnInfo(name = "show_item_code")
     val showItemCode: Boolean = false,
@@ -101,12 +114,46 @@ data class BillTemplateEntity(
     @ColumnInfo(name = "show_subtotal")
     val showSubtotal: Boolean = true,
 
+    // ============ DISCOUNT CONFIG (4 loại giảm giá) ============
+    // 1. Giảm giá món (Item Discount) - ưu tiên 1
     @ColumnInfo(name = "show_item_discount")
     val showItemDiscount: Boolean = true, // Hiển thị giảm giá trên từng món
 
     @ColumnInfo(name = "show_total_item_discount")
     val showTotalItemDiscount: Boolean = true, // Hiển thị tổng giảm giá các món
 
+    @ColumnInfo(name = "item_discount_label")
+    val itemDiscountLabel: String = "Giảm giá món",
+
+    // 2. Giảm giá hóa đơn (Bill Discount) - ưu tiên 2
+    @ColumnInfo(name = "show_bill_discount")
+    val showBillDiscount: Boolean = true,
+
+    @ColumnInfo(name = "bill_discount_label")
+    val billDiscountLabel: String = "Giảm giá hóa đơn",
+
+    // 3. Coupon - ưu tiên 3
+    @ColumnInfo(name = "show_coupon_discount")
+    val showCouponDiscount: Boolean = true,
+
+    @ColumnInfo(name = "coupon_discount_label")
+    val couponDiscountLabel: String = "Mã giảm giá",
+
+    // 4. Voucher - ưu tiên 4
+    @ColumnInfo(name = "show_voucher_discount")
+    val showVoucherDiscount: Boolean = true,
+
+    @ColumnInfo(name = "voucher_discount_label")
+    val voucherDiscountLabel: String = "Voucher",
+
+    // Tổng giảm giá (hiển thị tổng tất cả loại giảm giá)
+    @ColumnInfo(name = "show_total_discount")
+    val showTotalDiscount: Boolean = true,
+
+    @ColumnInfo(name = "total_discount_label")
+    val totalDiscountLabel: String = "Tổng giảm giá",
+
+    // Deprecated - giữ lại để tương thích ngược
     @ColumnInfo(name = "show_discount")
     val showDiscount: Boolean = true,
 

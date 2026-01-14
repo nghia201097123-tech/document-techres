@@ -881,7 +881,41 @@ export default function BillTemplatePage() {
                       />
                       <Label>Hiển thị ngày giờ</Label>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={templateForm.showCheckInTime || false}
+                        onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showCheckInTime: checked })}
+                      />
+                      <Label>Hiển thị giờ vào</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={templateForm.showCheckOutTime || false}
+                        onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showCheckOutTime: checked })}
+                      />
+                      <Label>Hiển thị giờ ra</Label>
+                    </div>
                   </div>
+                  {(templateForm.showCheckInTime || templateForm.showCheckOutTime) && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Nhãn giờ vào</Label>
+                        <Input
+                          value={templateForm.checkInLabel || "Giờ vào"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, checkInLabel: e.target.value })}
+                          placeholder="Giờ vào"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Nhãn giờ ra</Label>
+                        <Input
+                          value={templateForm.checkOutLabel || "Giờ ra"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, checkOutLabel: e.target.value })}
+                          placeholder="Giờ ra"
+                        />
+                      </div>
+                    </div>
+                  )}
                   {templateForm.showDateTime && (
                     <div className="space-y-2">
                       <Label>Định dạng ngày giờ</Label>
@@ -957,39 +991,131 @@ export default function BillTemplatePage() {
                   </div>
 
                   <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3">Cấu hình giảm giá</h4>
+                    <h4 className="font-medium mb-3">Cấu hình giảm giá (4 loại)</h4>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Giảm giá món: Giảm giá áp dụng trực tiếp trên từng món ăn<br/>
-                      Giảm giá bill: Giảm giá áp dụng trên tổng hóa đơn (coupon, voucher)
+                      Có 4 loại giảm giá: Giảm giá món (ưu tiên 1) → Giảm giá hóa đơn (ưu tiên 2) → Coupon (ưu tiên 3) → Voucher (ưu tiên 4)
                     </p>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={templateForm.showItemDiscount ?? true}
-                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showItemDiscount: checked })}
-                        />
-                        <Label>Hiển thị giảm giá từng món</Label>
+
+                    {/* 1. Giảm giá món */}
+                    <div className="border rounded-lg p-3 mb-3">
+                      <h5 className="text-sm font-medium mb-2 text-orange-600">1. Giảm giá món (Item Discount)</h5>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={templateForm.showItemDiscount ?? true}
+                            onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showItemDiscount: checked })}
+                          />
+                          <Label>Hiển thị giảm giá từng món</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={templateForm.showTotalItemDiscount ?? true}
+                            onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showTotalItemDiscount: checked })}
+                          />
+                          <Label>Hiển thị tổng giảm giá các món</Label>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={templateForm.showTotalItemDiscount ?? true}
-                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showTotalItemDiscount: checked })}
+                      <div className="mt-2">
+                        <Label className="text-xs">Nhãn hiển thị</Label>
+                        <Input
+                          value={templateForm.itemDiscountLabel || "Giảm giá món"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, itemDiscountLabel: e.target.value })}
+                          placeholder="Giảm giá món"
+                          className="mt-1"
                         />
-                        <Label>Hiển thị tổng giảm giá các món</Label>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={templateForm.showDiscount || false}
-                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscount: checked })}
-                        />
-                        <Label>Hiển thị giảm giá tổng bill</Label>
+                    </div>
+
+                    {/* 2. Giảm giá hóa đơn */}
+                    <div className="border rounded-lg p-3 mb-3">
+                      <h5 className="text-sm font-medium mb-2 text-blue-600">2. Giảm giá hóa đơn (Bill Discount)</h5>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={templateForm.showBillDiscount ?? true}
+                            onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showBillDiscount: checked })}
+                          />
+                          <Label>Hiển thị giảm giá hóa đơn</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={templateForm.showDiscountPercent || false}
+                            onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscountPercent: checked })}
+                          />
+                          <Label>Hiển thị % giảm giá</Label>
+                        </div>
                       </div>
+                      <div className="mt-2">
+                        <Label className="text-xs">Nhãn hiển thị</Label>
+                        <Input
+                          value={templateForm.billDiscountLabel || "Giảm giá hóa đơn"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, billDiscountLabel: e.target.value })}
+                          placeholder="Giảm giá hóa đơn"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3. Coupon */}
+                    <div className="border rounded-lg p-3 mb-3">
+                      <h5 className="text-sm font-medium mb-2 text-green-600">3. Coupon</h5>
                       <div className="flex items-center gap-2">
                         <Switch
-                          checked={templateForm.showDiscountPercent || false}
-                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showDiscountPercent: checked })}
+                          checked={templateForm.showCouponDiscount ?? true}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showCouponDiscount: checked })}
                         />
-                        <Label>Hiển thị % giảm giá</Label>
+                        <Label>Hiển thị giảm giá coupon</Label>
+                      </div>
+                      <div className="mt-2">
+                        <Label className="text-xs">Nhãn hiển thị</Label>
+                        <Input
+                          value={templateForm.couponDiscountLabel || "Mã giảm giá"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, couponDiscountLabel: e.target.value })}
+                          placeholder="Mã giảm giá"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 4. Voucher */}
+                    <div className="border rounded-lg p-3 mb-3">
+                      <h5 className="text-sm font-medium mb-2 text-purple-600">4. Voucher</h5>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showVoucherDiscount ?? true}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showVoucherDiscount: checked })}
+                        />
+                        <Label>Hiển thị giảm giá voucher</Label>
+                      </div>
+                      <div className="mt-2">
+                        <Label className="text-xs">Nhãn hiển thị</Label>
+                        <Input
+                          value={templateForm.voucherDiscountLabel || "Voucher"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, voucherDiscountLabel: e.target.value })}
+                          placeholder="Voucher"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tổng giảm giá */}
+                    <div className="border rounded-lg p-3 bg-muted/30">
+                      <h5 className="text-sm font-medium mb-2">Tổng giảm giá</h5>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showTotalDiscount ?? true}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showTotalDiscount: checked })}
+                        />
+                        <Label>Hiển thị tổng tất cả giảm giá</Label>
+                      </div>
+                      <div className="mt-2">
+                        <Label className="text-xs">Nhãn hiển thị</Label>
+                        <Input
+                          value={templateForm.totalDiscountLabel || "Tổng giảm giá"}
+                          onChange={(e) => setTemplateForm({ ...templateForm, totalDiscountLabel: e.target.value })}
+                          placeholder="Tổng giảm giá"
+                          className="mt-1"
+                        />
                       </div>
                     </div>
                   </div>
