@@ -2561,7 +2561,17 @@ class SaleViewModel @Inject constructor(
             // Thanh toán
             paymentMethod = paymentMethodDisplay,
             receivedAmount = receivedAmount,
-            changeAmount = changeAmount
+            // Tự tính tiền thừa nếu chưa có (receivedAmount - totalAmount)
+            changeAmount = if (changeAmount > 0) changeAmount else (receivedAmount - calculatedTotalAmount).coerceAtLeast(0.0),
+            // Time tracking - sử dụng createdAt làm giờ vào, completedAt làm giờ ra
+            checkInTime = try {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(order.createdAt)
+            } catch (e: Exception) { null },
+            checkOutTime = order.completedAt?.let {
+                try {
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(it)
+                } catch (e: Exception) { null }
+            }
         )
     }
 
