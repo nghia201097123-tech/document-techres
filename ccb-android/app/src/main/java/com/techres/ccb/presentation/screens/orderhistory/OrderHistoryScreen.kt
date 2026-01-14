@@ -1024,14 +1024,29 @@ private fun OrderDetailDialog(
                                     }
                                 }
 
-                                // Discount detail
+                                // Discount detail - làm rõ loại giảm giá
                                 if (item.discountAmount > 0) {
-                                    val label = if (item.discountType == "percent" && item.discountValue > 0) "Giảm ${item.discountValue.toInt()}%" else "Giảm giá"
+                                    val discountLabel = when {
+                                        item.discountType == "percent" && item.discountValue > 0 -> "Giảm ${item.discountValue.toInt()}%"
+                                        item.discountType == "amount" || item.discountType == "cash" -> "Giảm tiền mặt"
+                                        else -> "Giảm giá"
+                                    }
+                                    val discountTypeText = when (item.discountType) {
+                                        "percent" -> "(Phần trăm)"
+                                        "amount", "cash" -> "(Tiền mặt)"
+                                        else -> ""
+                                    }
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("→ $label", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
+                                        Row {
+                                            Text("→ $discountLabel", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
+                                            if (discountTypeText.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(discountTypeText, fontSize = 10.sp, color = Color(0xFF81C784))
+                                            }
+                                        }
                                         Text("-${formatCurrency(item.discountAmount.toLong())}", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
                                     }
                                 }
