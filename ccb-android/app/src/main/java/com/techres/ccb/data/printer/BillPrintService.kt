@@ -483,21 +483,21 @@ object BillPrintService {
             feed(1)
             line("─".repeat(builder.lineWidth))
 
-            // Totals - with 4 discount types
+            // Totals - with 4 discount types (condensed labels for compact mode)
             alignRight()
 
-            // 4 discount types (condensed)
-            if (billData.itemDiscountAmount > 0) {
-                lineKeyValue("Giảm món:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            // 4 discount types - respect template config
+            if (template.showTotalItemDiscount && billData.itemDiscountAmount > 0) {
+                lineKeyValue("${template.itemDiscountLabel}:", "-${formatCurrency(billData.itemDiscountAmount)}")
             }
-            if (billData.billDiscountAmount > 0) {
-                lineKeyValue("Giảm bill:", "-${formatCurrency(billData.billDiscountAmount)}")
+            if (template.showBillDiscount && billData.billDiscountAmount > 0) {
+                lineKeyValue("${template.billDiscountLabel}:", "-${formatCurrency(billData.billDiscountAmount)}")
             }
-            if (billData.couponDiscountAmount > 0) {
-                lineKeyValue("Coupon:", "-${formatCurrency(billData.couponDiscountAmount)}")
+            if (template.showCouponDiscount && billData.couponDiscountAmount > 0) {
+                lineKeyValue("${template.couponDiscountLabel}:", "-${formatCurrency(billData.couponDiscountAmount)}")
             }
-            if (billData.voucherDiscountAmount > 0) {
-                lineKeyValue("Voucher:", "-${formatCurrency(billData.voucherDiscountAmount)}")
+            if (template.showVoucherDiscount && billData.voucherDiscountAmount > 0) {
+                lineKeyValue("${template.voucherDiscountLabel}:", "-${formatCurrency(billData.voucherDiscountAmount)}")
             }
 
             // Legacy support
@@ -674,37 +674,37 @@ object BillPrintService {
             alignRight()
             lineKeyValue("Tạm tính:", formatCurrency(billData.subtotal))
 
-            // 4 discount types (detailed)
-            if (billData.itemDiscountAmount > 0) {
-                lineKeyValue("Giảm giá món:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            // 4 discount types (detailed) - sử dụng template config
+            if (template.showTotalItemDiscount && billData.itemDiscountAmount > 0) {
+                lineKeyValue("${template.itemDiscountLabel}:", "-${formatCurrency(billData.itemDiscountAmount)}")
             }
-            if (billData.billDiscountAmount > 0) {
-                val billDiscountText = if (billData.billDiscountPercent > 0) {
-                    "Giảm giá hóa đơn (${billData.billDiscountPercent.toInt()}%):"
+            if (template.showBillDiscount && billData.billDiscountAmount > 0) {
+                val billDiscountText = if (template.showDiscountPercent && billData.billDiscountPercent > 0) {
+                    "${template.billDiscountLabel} (${billData.billDiscountPercent.toInt()}%):"
                 } else {
-                    "Giảm giá hóa đơn:"
+                    "${template.billDiscountLabel}:"
                 }
                 lineKeyValue(billDiscountText, "-${formatCurrency(billData.billDiscountAmount)}")
             }
-            if (billData.couponDiscountAmount > 0) {
+            if (template.showCouponDiscount && billData.couponDiscountAmount > 0) {
                 val couponText = if (billData.couponCode != null) {
-                    "Mã giảm giá (${billData.couponCode}):"
+                    "${template.couponDiscountLabel} (${billData.couponCode}):"
                 } else {
-                    "Mã giảm giá:"
+                    "${template.couponDiscountLabel}:"
                 }
                 lineKeyValue(couponText, "-${formatCurrency(billData.couponDiscountAmount)}")
             }
-            if (billData.voucherDiscountAmount > 0) {
+            if (template.showVoucherDiscount && billData.voucherDiscountAmount > 0) {
                 val voucherText = if (billData.voucherCode != null) {
-                    "Voucher (${billData.voucherCode}):"
+                    "${template.voucherDiscountLabel} (${billData.voucherCode}):"
                 } else {
-                    "Voucher:"
+                    "${template.voucherDiscountLabel}:"
                 }
                 lineKeyValue(voucherText, "-${formatCurrency(billData.voucherDiscountAmount)}")
             }
 
             // Total discount
-            if (billData.totalDiscountAmount > 0) {
+            if (template.showTotalDiscount && billData.totalDiscountAmount > 0) {
                 val discountCount = listOf(
                     billData.itemDiscountAmount,
                     billData.billDiscountAmount,
@@ -714,7 +714,7 @@ object BillPrintService {
 
                 if (discountCount > 1) {
                     bold()
-                    lineKeyValue("Tổng giảm giá:", "-${formatCurrency(billData.totalDiscountAmount)}")
+                    lineKeyValue("${template.totalDiscountLabel}:", "-${formatCurrency(billData.totalDiscountAmount)}")
                     boldOff()
                 }
             }
