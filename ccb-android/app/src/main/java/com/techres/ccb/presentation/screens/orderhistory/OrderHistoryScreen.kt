@@ -39,9 +39,13 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -693,6 +697,9 @@ private fun OrderDetailDialog(
     var showCancelDialog by remember { mutableStateOf(false) }
     var cancelReason by remember { mutableStateOf("") }
 
+    // State for expandable items (collapsed by default)
+    val expandedItems = remember { mutableStateMapOf<String, Boolean>() }
+
     // Cancel confirmation dialog
     if (showCancelDialog) {
         AlertDialog(
@@ -740,631 +747,361 @@ private fun OrderDetailDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f)
                 .padding(8.dp),
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                // Header with close button
+            Column(modifier = Modifier.fillMaxSize()) {
+                // ========== HEADER ==========
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5))
+                        .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    // Title + Order number
+                    Column {
                         Text(
                             text = "Chi tiết đơn hàng",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "#${order.orderNumber}",
-                            fontSize = 13.sp,
+                            text = "#${order.orderNumber.takeLast(8)}",
+                            fontSize = 12.sp,
                             color = Color.Gray
                         )
                     }
+
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Sync button - show sync status indicator
-                        val syncStatusInfo = when (order.syncStatus) {
-                            "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
-                            "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang đồng bộ")
-                            "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi")
-                            else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ") // pending
-                        }
-                        Button(
-                            onClick = onSyncOrder,
-                            enabled = !isSyncing && order.syncStatus != "synced",
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = syncStatusInfo.second.copy(alpha = 0.9f),
-                                disabledContainerColor = syncStatusInfo.second.copy(alpha = 0.5f)
-                            ),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                            modifier = Modifier.height(36.dp)
-                        ) {
-                            Icon(
-                                syncStatusInfo.first,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isSyncing) "Đang..." else syncStatusInfo.third,
-                                fontSize = 10.sp
-                            )
-                        }
-
-                        // Reprint button (only for completed orders)
-                        if (isCompleted) {
-                            Button(
-                                onClick = onReprintBill,
-                                enabled = !isPrinting,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2196F3)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Print,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    if (isPrinting) "Đang in..." else "In lại bill",
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
-                        // Cancel button (only for completed orders)
-                        if (isCompleted) {
-                            Button(
-                                onClick = { showCancelDialog = true },
-                                enabled = !isCancelling,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFf44336)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Cancel,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    if (isCancelling) "Đang huỷ..." else "Huỷ đơn",
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
                         // Status badge
                         Box(
                             modifier = Modifier
-                                .background(
-                                    color = statusColor.copy(alpha = 0.1f),
-                                    shape = RoundedCornerShape(6.dp)
-                                )
+                                .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(
-                                text = statusText,
-                                color = statusColor,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 11.sp
-                            )
+                            Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         }
 
                         // Close button
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Đóng",
-                                tint = Color.Gray
-                            )
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, "Đóng", tint = Color.Gray)
                         }
                     }
                 }
 
-                // Print message
-                if (!printMessage.isNullOrEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = if (printMessage.contains("thành công")) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = printMessage,
-                            fontSize = 12.sp,
-                            color = if (printMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
-                        )
-                    }
-                }
-
-                // Sync message
-                if (!syncMessage.isNullOrEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = if (syncMessage.contains("Lỗi")) Color(0xFFFFEBEE) else Color(0xFFFFF3E0),
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .padding(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (syncMessage.contains("Lỗi")) Icons.Default.CloudOff else Icons.Default.Cloud,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = if (syncMessage.contains("Lỗi")) Color(0xFFC62828) else Color(0xFFE65100)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = syncMessage,
-                                fontSize = 12.sp,
-                                color = if (syncMessage.contains("Lỗi")) Color(0xFFC62828) else Color(0xFFE65100)
-                            )
-                        }
-                    }
-                }
-
-                // Cancel message
-                if (!cancelMessage.isNullOrEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = if (cancelMessage.contains("thành công")) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .padding(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Cancel,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = if (cancelMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = cancelMessage,
-                                fontSize = 12.sp,
-                                color = if (cancelMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Order Info - 2 columns like web
+                // ========== ACTION BUTTONS (compact row) ==========
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Left column
-                    Column(modifier = Modifier.weight(1f)) {
-                        InfoRowCompact(label = "Mã đơn", value = order.orderNumber.takeLast(8))
-                        InfoRowCompact(label = "Bàn", value = order.tableName ?: "---")
-                        InfoRowCompact(label = "Giờ vào", value = formatDateTime(parseTimestamp(order.createdAt)))
-                        if (!order.notes.isNullOrEmpty()) {
-                            InfoRowCompact(label = "Ghi chú", value = order.notes)
+                    // Sync status icon (compact)
+                    val syncInfo = when (order.syncStatus) {
+                        "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
+                        "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang...")
+                        "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi")
+                        else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ")
+                    }
+                    IconButton(
+                        onClick = onSyncOrder,
+                        enabled = !isSyncing && order.syncStatus != "synced",
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(syncInfo.second.copy(alpha = 0.1f), CircleShape)
+                    ) {
+                        Icon(syncInfo.first, syncInfo.third, tint = syncInfo.second, modifier = Modifier.size(18.dp))
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Reprint button (compact)
+                    if (isCompleted) {
+                        OutlinedButton(
+                            onClick = onReprintBill,
+                            enabled = !isPrinting,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isPrinting) "Đang in..." else "In lại", fontSize = 12.sp)
                         }
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    // Right column
-                    Column(modifier = Modifier.weight(1f)) {
-                        InfoRowCompact(label = "Thu ngân", value = order.staffName ?: "---")
-                        InfoRowCompact(label = "Số khách", value = "${order.guestCount} khách")
-                        order.completedAt?.let {
-                            InfoRowCompact(label = "Giờ ra", value = formatDateTime(parseTimestamp(it)))
-                        }
-                        if (!order.paymentMethod.isNullOrEmpty()) {
-                            InfoRowCompact(label = "Thanh toán", value = getPaymentMethodName(order.paymentMethod))
+
+                    // Cancel button (compact)
+                    if (isCompleted) {
+                        OutlinedButton(
+                            onClick = { showCancelDialog = true },
+                            enabled = !isCancelling,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFf44336)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(Icons.Default.Cancel, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isCancelling) "Đang..." else "Huỷ đơn", fontSize = 12.sp)
                         }
                     }
                 }
 
-                if (!isCompleted && !order.cancelReason.isNullOrEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Lý do hủy: ${order.cancelReason}",
-                        fontSize = 12.sp,
-                        color = Color(0xFFf44336),
-                        fontStyle = FontStyle.Italic
-                    )
+                // ========== MESSAGES ==========
+                Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    listOf(
+                        printMessage to (printMessage?.contains("thành công") == true),
+                        syncMessage to (syncMessage?.contains("Lỗi") != true),
+                        cancelMessage to (cancelMessage?.contains("thành công") == true)
+                    ).forEach { (msg, isSuccess) ->
+                        if (!msg.isNullOrEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 4.dp)
+                                    .background(
+                                        if (isSuccess) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(8.dp)
+                            ) {
+                                Text(msg, fontSize = 12.sp, color = if (isSuccess) Color(0xFF2E7D32) else Color(0xFFC62828))
+                            }
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(12.dp))
+                Divider(color = Color.LightGray.copy(alpha = 0.5f))
 
-                // Items List - filter out combo children (they're shown under their parent)
-                val parentItems = orderItems.filter { !it.isComboChild }
-                val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
-
-                Text(
-                    text = "Danh sách món (${parentItems.size})",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // ========== SCROLLABLE CONTENT ==========
                 LazyColumn(
-                    modifier = Modifier.height(250.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
                 ) {
+                    // Order Info - Compact grid
+                    item {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                CompactInfo("Bàn", order.tableName ?: "---")
+                                CompactInfo("Thu ngân", order.staffName ?: "---")
+                                CompactInfo("Giờ vào", formatDateTime(parseTimestamp(order.createdAt)))
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                CompactInfo("Số khách", "${order.guestCount}")
+                                CompactInfo("Thanh toán", getPaymentMethodName(order.paymentMethod))
+                                order.completedAt?.let { CompactInfo("Giờ ra", formatDateTime(parseTimestamp(it))) }
+                            }
+                        }
+
+                        if (!isCompleted && !order.cancelReason.isNullOrEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Lý do hủy: ${order.cancelReason}", fontSize = 12.sp, color = Color(0xFFf44336), fontStyle = FontStyle.Italic)
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Items header
+                    item {
+                        Text("Danh sách món (${orderItems.filter { !it.isComboChild }.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Items List - Collapsible
+                    val parentItems = orderItems.filter { !it.isComboChild }
+                    val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
+
                     items(parentItems) { item ->
                         val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
-                        // Grab-style order item display
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            // Row 1: Quantity badge + Product name + Total price
+                        val hasDetails = !item.notes.isNullOrBlank() || comboChildren.isNotEmpty() || item.discountAmount > 0
+                        val isExpanded = expandedItems[item.id] ?: false
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFFAFAFA))
+                                .clickable(enabled = hasDetails) { expandedItems[item.id] = !isExpanded }
+                                .padding(8.dp)
+                        ) {
+                            // Main row: Qty + Name + Price
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.Top
-                                ) {
+                                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                     // Quantity badge
                                     Box(
                                         modifier = Modifier
-                                            .size(22.dp)
+                                            .size(24.dp)
                                             .background(Color(0xFFE3F2FD), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
+                                        Text(item.quantity.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2))
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(item.productName, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                        Text(formatCurrency(item.unitPrice.toLong()), fontSize = 11.sp, color = Color.Gray)
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        formatCurrency(item.totalPrice.toLong()),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1976D2)
+                                    )
+                                    if (item.discountAmount > 0) {
                                         Text(
-                                            text = item.quantity.toString(),
+                                            "-${formatCurrency(item.discountAmount.toLong())}",
                                             fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF1976D2)
+                                            color = Color(0xFF4CAF50)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = item.productName,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                                Text(
-                                    text = formatCurrency(item.totalPrice.toLong()),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1976D2)
-                                )
-                            }
-
-                            // Row 2: Unit price
-                            Text(
-                                text = formatCurrency(item.unitPrice.toLong()),
-                                fontSize = 12.sp,
-                                color = Color.Gray,
-                                modifier = Modifier.padding(start = 32.dp, top = 2.dp)
-                            )
-
-                            // Row 3: Variants/Toppings - Grab style with prices
-                            if (!item.notes.isNullOrBlank()) {
-                                // Split variants from user note by " | "
-                                val parts = item.notes.split(" | ")
-                                val variantsPart = parts.firstOrNull() ?: ""
-                                val userNote = parts.getOrNull(1)
-
-                                // Parse variants: "Kiwi:10000, Size S:10000"
-                                val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
-                                if (variants.isNotEmpty()) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 32.dp, top = 6.dp)
-                                    ) {
-                                        variants.forEach { variant ->
-                                            // Parse "Name:Price" format
-                                            val colonIndex = variant.lastIndexOf(":")
-                                            val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
-                                            val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
-
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 2.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.weight(1f),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = "•",
-                                                        fontSize = 13.sp,
-                                                        color = Color.Gray,
-                                                        modifier = Modifier.padding(end = 8.dp)
-                                                    )
-                                                    Text(
-                                                        text = name,
-                                                        fontSize = 13.sp,
-                                                        color = Color(0xFF424242)
-                                                    )
-                                                }
-                                                if (price > 0) {
-                                                    Text(
-                                                        text = "+${formatCurrency(price)}",
-                                                        fontSize = 12.sp,
-                                                        color = Color.Gray
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
 
-                                // Row 4: User note (if any)
-                                if (!userNote.isNullOrBlank()) {
-                                    Text(
-                                        text = userNote,
-                                        fontSize = 12.sp,
-                                        fontStyle = FontStyle.Italic,
-                                        color = Color(0xFF666666),
-                                        modifier = Modifier.padding(start = 32.dp, top = 4.dp)
+                                // Expand icon
+                                if (hasDetails) {
+                                    Icon(
+                                        if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = Color.Gray
                                     )
                                 }
                             }
 
-                            // Show combo children if this is a combo parent
-                            if (comboChildren.isNotEmpty()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 32.dp, top = 8.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFFFFF3E0).copy(alpha = 0.5f))
-                                        .padding(8.dp)
-                                ) {
-                                    Text(
-                                        text = "Bao gồm:",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFFE65100),
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    comboChildren.forEach { child ->
+                            // Expandable details
+                            if (isExpanded && hasDetails) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Divider(color = Color.LightGray.copy(alpha = 0.3f))
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Variants/Toppings
+                                if (!item.notes.isNullOrBlank()) {
+                                    val parts = item.notes.split(" | ")
+                                    val variantsPart = parts.firstOrNull() ?: ""
+                                    val userNote = parts.getOrNull(1)
+
+                                    val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
+                                    variants.forEach { variant ->
+                                        val colonIndex = variant.lastIndexOf(":")
+                                        val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
+                                        val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
+
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text(
-                                                    text = "•",
-                                                    fontSize = 14.sp,
-                                                    color = Color(0xFFFF9800),
-                                                    modifier = Modifier.padding(end = 8.dp)
-                                                )
-                                                Text(
-                                                    text = child.productName,
-                                                    fontSize = 13.sp,
-                                                    color = Color(0xFF424242)
-                                                )
-                                            }
-                                            Badge(
-                                                containerColor = Color(0xFFFF9800).copy(alpha = 0.2f)
-                                            ) {
-                                                Text(
-                                                    text = "x${child.quantity}",
-                                                    fontSize = 11.sp,
-                                                    color = Color(0xFFE65100)
-                                                )
-                                            }
+                                            Text("• $name", fontSize = 12.sp, color = Color(0xFF616161))
+                                            if (price > 0) Text("+${formatCurrency(price)}", fontSize = 12.sp, color = Color.Gray)
                                         }
                                     }
-                                }
-                            }
 
-                            // Show item discount if any
-                            if (item.discountAmount > 0) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 32.dp, top = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Show discount label based on type
-                                    val discountLabel = if (item.discountType == "percent" && item.discountValue > 0) {
-                                        "→ Giảm ${item.discountValue.toInt()}%"
-                                    } else {
-                                        "→ Giảm giá"
+                                    if (!userNote.isNullOrBlank()) {
+                                        Text(userNote, fontSize = 11.sp, fontStyle = FontStyle.Italic, color = Color(0xFF757575), modifier = Modifier.padding(top = 4.dp))
                                     }
-                                    Text(
-                                        text = discountLabel,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF4CAF50),
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "-${formatCurrency(item.discountAmount.toLong())}",
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF4CAF50),
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                }
+
+                                // Combo children
+                                if (comboChildren.isNotEmpty()) {
+                                    Text("Bao gồm:", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE65100), modifier = Modifier.padding(top = 4.dp))
+                                    comboChildren.forEach { child ->
+                                        Text("  • ${child.productName} x${child.quantity}", fontSize = 12.sp, color = Color(0xFF616161))
+                                    }
+                                }
+
+                                // Discount detail
+                                if (item.discountAmount > 0) {
+                                    val label = if (item.discountType == "percent" && item.discountValue > 0) "Giảm ${item.discountValue.toInt()}%" else "Giảm giá"
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("→ $label", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
+                                        Text("-${formatCurrency(item.discountAmount.toLong())}", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
+                                    }
                                 }
                             }
                         }
                     }
+
+                    // Spacer before summary
+                    item { Spacer(modifier = Modifier.height(12.dp)) }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // ========== SUMMARY FOOTER ==========
                 Divider()
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Calculate discount breakdown
-                val itemDiscountTotal = orderItems.sumOf { it.discountAmount }
-                val totalDiscount = order.discountAmount
-                val billDiscount = (totalDiscount - itemDiscountTotal).coerceAtLeast(0.0)
-
-                // Parse coupon info from appliedCouponsJson if available
-                val couponCode = order.couponCode
-                val hasCoupon = !couponCode.isNullOrEmpty()
-
-                // VAT calculation (assuming prices include VAT at 8% for F&B)
-                val vatRate = 8.0
-                val priceAfterDiscount = order.subtotal - totalDiscount
-                val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
-                val vatAmount = priceAfterDiscount - priceBeforeVat
-
-                // Totals - Always show subtotal
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5))
+                        .padding(12.dp)
                 ) {
-                    Text("Tạm tính", color = Color.Gray)
-                    Text(formatCurrency(order.subtotal.toLong()))
-                }
+                    // Calculate discount breakdown
+                    val itemDiscountTotal = orderItems.sumOf { it.discountAmount }
+                    val totalDiscount = order.discountAmount
+                    val billDiscount = (totalDiscount - itemDiscountTotal).coerceAtLeast(0.0)
+                    val couponCode = order.couponCode
+                    val hasCoupon = !couponCode.isNullOrEmpty()
+                    val vatRate = 8.0
+                    val priceAfterDiscount = order.subtotal - totalDiscount
+                    val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
+                    val vatAmount = priceAfterDiscount - priceBeforeVat
 
-                // Show item discount if > 0
-                if (itemDiscountTotal > 0) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Giảm giá món", color = Color(0xFF4CAF50), fontSize = 14.sp)
-                        Text("-${formatCurrency(itemDiscountTotal.toLong())}", color = Color(0xFF4CAF50), fontSize = 14.sp)
+                    // Subtotal
+                    SummaryRow("Tạm tính", formatCurrency(order.subtotal.toLong()))
+
+                    // Discounts
+                    if (itemDiscountTotal > 0) {
+                        SummaryRow("Giảm giá món", "-${formatCurrency(itemDiscountTotal.toLong())}", Color(0xFF4CAF50))
                     }
-                }
-
-                // Show bill discount if > 0
-                if (billDiscount > 0 && !hasCoupon) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Giảm giá hóa đơn", color = Color(0xFF4CAF50), fontSize = 14.sp)
-                        Text("-${formatCurrency(billDiscount.toLong())}", color = Color(0xFF4CAF50), fontSize = 14.sp)
+                    if (billDiscount > 0) {
+                        val label = if (hasCoupon) "Coupon ($couponCode)" else "Giảm giá HĐ"
+                        SummaryRow(label, "-${formatCurrency(billDiscount.toLong())}", if (hasCoupon) Color(0xFF2196F3) else Color(0xFF4CAF50))
                     }
-                }
 
-                // Show coupon discount if coupon was applied
-                if (hasCoupon && billDiscount > 0) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Mã giảm giá ($couponCode)", color = Color(0xFF2196F3), fontSize = 14.sp)
-                        Text("-${formatCurrency(billDiscount.toLong())}", color = Color(0xFF2196F3), fontSize = 14.sp)
-                    }
-                }
+                    // VAT
+                    SummaryRow("VAT (${vatRate.toInt()}%)", formatCurrency(vatAmount.toLong()), Color.Gray)
 
-                // Show total discount if there are multiple discount types
-                if (totalDiscount > 0 && (itemDiscountTotal > 0 && billDiscount > 0)) {
                     Spacer(modifier = Modifier.height(4.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Total
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Tổng giảm giá", fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                        Text("-${formatCurrency(totalDiscount.toLong())}", color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        Text("TỔNG CỘNG", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(
+                            formatCurrency(order.totalAmount.toLong()),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray
+                        )
                     }
-                }
 
-                // VAT info
-                Spacer(modifier = Modifier.height(8.dp))
-                Divider(color = Color.LightGray.copy(alpha = 0.5f))
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Giá trước VAT", color = Color.Gray, fontSize = 13.sp)
-                    Text(formatCurrency(priceBeforeVat.toLong()), fontSize = 13.sp)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("VAT (${vatRate.toInt()}%)", color = Color.Gray, fontSize = 13.sp)
-                    Text(formatCurrency(vatAmount.toLong()), fontSize = 13.sp)
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Tổng cộng",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = formatCurrency(order.totalAmount.toLong()),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray
-                    )
-                }
-
-                // Show payment info if completed
-                if (isCompleted && order.paidAmount > 0) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Tiền khách đưa", color = Color.Gray, fontSize = 13.sp)
-                        Text(formatCurrency(order.paidAmount.toLong()), fontSize = 13.sp)
-                    }
-                    if (order.changeAmount > 0) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Tiền thừa", color = Color.Gray, fontSize = 13.sp)
-                            Text(formatCurrency(order.changeAmount.toLong()), fontSize = 13.sp)
+                    // Payment info
+                    if (isCompleted && order.paidAmount > 0) {
+                        SummaryRow("Khách đưa", formatCurrency(order.paidAmount.toLong()))
+                        if (order.changeAmount > 0) {
+                            SummaryRow("Tiền thừa", formatCurrency(order.changeAmount.toLong()))
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Close Button
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Đóng")
                 }
             }
         }
@@ -1418,6 +1155,25 @@ private fun InfoRowCompact(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+private fun CompactInfo(label: String, value: String) {
+    Row(modifier = Modifier.padding(vertical = 2.dp)) {
+        Text(label, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.width(70.dp))
+        Text(value, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun SummaryRow(label: String, value: String, color: Color = Color.Unspecified) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, fontSize = 13.sp, color = if (color != Color.Unspecified) color else Color.Gray)
+        Text(value, fontSize = 13.sp, color = if (color != Color.Unspecified) color else Color.Unspecified)
     }
 }
 
