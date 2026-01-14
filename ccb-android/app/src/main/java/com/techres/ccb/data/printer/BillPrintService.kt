@@ -546,6 +546,10 @@ data class BillData(
     val voucherDiscountAmount: Double = 0.0,
     val voucherCode: String? = null,
     val totalDiscountAmount: Double = 0.0,
+    // Legacy discount fields (for HybridBillPrintService)
+    val discountAmount: Double = 0.0,
+    val discountPercent: Double = 0.0,
+    val totalItemDiscount: Double = 0.0,
     // Phí và thuế
     val serviceFee: Double = 0.0,
     val serviceFeePercent: Double = 0.0,
@@ -560,7 +564,11 @@ data class BillData(
     val changeAmount: Double = 0.0,
     // Time tracking
     val checkInTime: Date? = null,
-    val checkOutTime: Date? = null
+    val checkOutTime: Date? = null,
+    // Temporary bill
+    val isTemporaryBill: Boolean = false,
+    val printCount: Int = 0,
+    val printTime: Date? = null
 )
 
 /**
@@ -572,6 +580,7 @@ data class BillItem(
     val quantity: Int,
     val unitPrice: Double,
     val basePrice: Double = 0.0,
+    val originalPrice: Double = 0.0,
     val discountAmount: Double = 0.0,
     val discountPercent: Double = 0.0,
     val totalPrice: Double,
