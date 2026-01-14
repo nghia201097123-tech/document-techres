@@ -96,7 +96,10 @@ data class OrderHistoryUiState(
     val printMessage: String? = null,
     // Syncing
     val isSyncing: Boolean = false,
-    val syncMessage: String? = null
+    val syncMessage: String? = null,
+    // Cancelling
+    val isCancelling: Boolean = false,
+    val cancelMessage: String? = null
 )
 
 @HiltViewModel
@@ -500,6 +503,57 @@ class OrderHistoryViewModel @Inject constructor(
                     it.copy(
                         isSyncing = false,
                         syncMessage = "Lỗi đồng bộ: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearCancelMessage() {
+        _uiState.update { it.copy(cancelMessage = null) }
+    }
+
+    /**
+     * Cancel a completed order
+     */
+    fun cancelOrder(reason: String) {
+        val order = _uiState.value.selectedOrder ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCancelling = true, cancelMessage = null) }
+
+            try {
+                withContext(Dispatchers.IO) {
+                    val now = java.time.Instant.now().toString()
+
+                    // Update order status to cancelled
+                    val cancelledOrder = order.copy(
+                        status = "cancelled",
+                        cancelReason = reason,
+                        cancelledAt = now,
+                        updatedAt = now,
+                        syncStatus = "pending" // Mark for re-sync
+                    )
+
+                    orderRepository.updateOrder(cancelledOrder)
+
+                    Log.d(TAG, "cancelOrder - Order ${order.orderNumber} cancelled with reason: $reason")
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isCancelling = false,
+                        cancelMessage = "Huỷ đơn hàng thành công!",
+                        showOrderDetail = false, // Close dialog after cancel
+                        selectedOrder = null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "cancelOrder - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isCancelling = false,
+                        cancelMessage = "Lỗi huỷ đơn: ${e.message}"
                     )
                 }
             }

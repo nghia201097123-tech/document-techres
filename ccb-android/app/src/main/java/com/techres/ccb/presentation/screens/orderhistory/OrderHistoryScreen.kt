@@ -34,10 +34,14 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -242,10 +246,14 @@ fun OrderHistoryScreen(
                 printMessage = uiState.printMessage,
                 isSyncing = uiState.isSyncing,
                 syncMessage = uiState.syncMessage,
+                isCancelling = uiState.isCancelling,
+                cancelMessage = uiState.cancelMessage,
                 onReprintBill = { viewModel.reprintBill() },
                 onClearPrintMessage = { viewModel.clearPrintMessage() },
                 onSyncOrder = { viewModel.syncOrder() },
                 onClearSyncMessage = { viewModel.clearSyncMessage() },
+                onCancelOrder = { reason -> viewModel.cancelOrder(reason) },
+                onClearCancelMessage = { viewModel.clearCancelMessage() },
                 onDismiss = { viewModel.hideOrderDetail() }
             )
         }
@@ -667,15 +675,63 @@ private fun OrderDetailDialog(
     printMessage: String? = null,
     isSyncing: Boolean = false,
     syncMessage: String? = null,
+    isCancelling: Boolean = false,
+    cancelMessage: String? = null,
     onReprintBill: () -> Unit = {},
     onClearPrintMessage: () -> Unit = {},
     onSyncOrder: () -> Unit = {},
     onClearSyncMessage: () -> Unit = {},
+    onCancelOrder: (String) -> Unit = {},
+    onClearCancelMessage: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val isCompleted = order.status == "completed"
     val statusColor = if (isCompleted) Color(0xFF4CAF50) else Color(0xFFf44336)
     val statusText = if (isCompleted) "Hoàn tất" else "Đã hủy"
+
+    // State for cancel confirmation dialog
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var cancelReason by remember { mutableStateOf("") }
+
+    // Cancel confirmation dialog
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            title = { Text("Huỷ đơn hàng", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Bạn có chắc muốn huỷ đơn hàng #${order.orderNumber.takeLast(8)}?")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = cancelReason,
+                        onValueChange = { cancelReason = it },
+                        label = { Text("Lý do huỷ đơn") },
+                        placeholder = { Text("Nhập lý do huỷ đơn...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onCancelOrder(cancelReason.ifEmpty { "Huỷ từ lịch sử đơn hàng" })
+                        showCancelDialog = false
+                        cancelReason = ""
+                    },
+                    enabled = !isCancelling,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFf44336))
+                ) {
+                    Text(if (isCancelling) "Đang huỷ..." else "Xác nhận huỷ")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showCancelDialog = false }) {
+                    Text("Đóng")
+                }
+            }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -691,7 +747,7 @@ private fun OrderDetailDialog(
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
-                // Header with status badge and reprint button
+                // Header with close button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -710,7 +766,7 @@ private fun OrderDetailDialog(
                         )
                     }
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Sync button - show sync status indicator
@@ -727,7 +783,7 @@ private fun OrderDetailDialog(
                                 containerColor = syncStatusInfo.second.copy(alpha = 0.9f),
                                 disabledContainerColor = syncStatusInfo.second.copy(alpha = 0.5f)
                             ),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             modifier = Modifier.height(36.dp)
                         ) {
                             Icon(
@@ -738,7 +794,7 @@ private fun OrderDetailDialog(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (isSyncing) "Đang..." else syncStatusInfo.third,
-                                fontSize = 11.sp
+                                fontSize = 10.sp
                             )
                         }
 
@@ -750,7 +806,7 @@ private fun OrderDetailDialog(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF2196F3)
                                 ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 modifier = Modifier.height(36.dp)
                             ) {
                                 Icon(
@@ -761,10 +817,35 @@ private fun OrderDetailDialog(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     if (isPrinting) "Đang in..." else "In lại bill",
-                                    fontSize = 12.sp
+                                    fontSize = 11.sp
                                 )
                             }
                         }
+
+                        // Cancel button (only for completed orders)
+                        if (isCompleted) {
+                            Button(
+                                onClick = { showCancelDialog = true },
+                                enabled = !isCancelling,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFf44336)
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Cancel,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    if (isCancelling) "Đang huỷ..." else "Huỷ đơn",
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
                         // Status badge
                         Box(
                             modifier = Modifier
@@ -772,13 +853,25 @@ private fun OrderDetailDialog(
                                     color = statusColor.copy(alpha = 0.1f),
                                     shape = RoundedCornerShape(6.dp)
                                 )
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = statusText,
                                 color = statusColor,
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 12.sp
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        // Close button
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Đóng",
+                                tint = Color.Gray
                             )
                         }
                     }
@@ -828,6 +921,35 @@ private fun OrderDetailDialog(
                                 text = syncMessage,
                                 fontSize = 12.sp,
                                 color = if (syncMessage.contains("Lỗi")) Color(0xFFC62828) else Color(0xFFE65100)
+                            )
+                        }
+                    }
+                }
+
+                // Cancel message
+                if (!cancelMessage.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = if (cancelMessage.contains("thành công")) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Cancel,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (cancelMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = cancelMessage,
+                                fontSize = 12.sp,
+                                color = if (cancelMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
                             )
                         }
                     }
