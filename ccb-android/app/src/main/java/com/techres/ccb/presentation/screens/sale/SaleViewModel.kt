@@ -2503,7 +2503,7 @@ class SaleViewModel @Inject constructor(
 
         // Giảm giá tổng bill (từ giảm giá thủ công/% hoặc coupon)
         // Ưu tiên: billDiscountAmount từ UI state > order.discountAmount - totalItemDiscount
-        val finalBillDiscount = if (billDiscountAmount > 0) {
+        val orderLevelDiscount = if (billDiscountAmount > 0) {
             billDiscountAmount.toDouble()
         } else {
             // order.discountAmount có thể bao gồm cả item discount và bill discount
@@ -2511,14 +2511,23 @@ class SaleViewModel @Inject constructor(
             (order.discountAmount - totalItemDiscount).coerceAtLeast(0.0)
         }
 
-        val orderDiscountPercent = if (finalBillDiscount > 0 && calculatedSubtotal > 0) {
-            (finalBillDiscount / calculatedSubtotal) * 100
+        // Phân biệt giảm giá từ coupon vs giảm giá thủ công (bill discount)
+        // Nếu có couponCode thì discount là từ coupon, ngược lại là bill discount
+        val hasCoupon = order.couponCode != null && order.couponCode.isNotEmpty()
+        val couponDiscount = if (hasCoupon) orderLevelDiscount else 0.0
+        val billDiscount = if (hasCoupon) 0.0 else orderLevelDiscount
+
+        // Chỉ tính % nếu discount type là "percent", không tính cho "fixed"
+        // order.discountType: "percent" hoặc "fixed"
+        val isPercentDiscount = order.discountType == "percent"
+        val billDiscountPercentValue = if (isPercentDiscount && order.discountValue > 0) {
+            order.discountValue // Lấy % trực tiếp từ discountValue
         } else {
-            0.0
+            0.0 // Không hiển thị % nếu là giảm tiền mặt (fixed)
         }
 
         // Tính tổng giảm giá (tất cả loại)
-        val totalDiscountAmount = totalItemDiscount + finalBillDiscount
+        val totalDiscountAmount = totalItemDiscount + orderLevelDiscount
 
         return BillData(
             orderNumber = order.orderNumber,
@@ -2530,17 +2539,17 @@ class SaleViewModel @Inject constructor(
             subtotal = calculatedSubtotal, // Tạm tính (tổng giá gốc trước giảm giá)
             // 4 loại giảm giá mới
             itemDiscountAmount = totalItemDiscount, // 1. Giảm giá món
-            billDiscountAmount = finalBillDiscount, // 2. Giảm giá hóa đơn
-            billDiscountPercent = orderDiscountPercent,
-            couponDiscountAmount = 0.0, // 3. Coupon (sẽ được tách riêng nếu có)
+            billDiscountAmount = billDiscount, // 2. Giảm giá hóa đơn (không từ coupon)
+            billDiscountPercent = billDiscountPercentValue, // Chỉ > 0 nếu là giảm %
+            couponDiscountAmount = couponDiscount, // 3. Coupon discount
             couponCode = order.couponCode, // Mã coupon
-            voucherDiscountAmount = 0.0, // 4. Voucher (sẽ được tách riêng nếu có)
+            voucherDiscountAmount = 0.0, // 4. Voucher (chưa implement)
             voucherCode = null,
             totalDiscountAmount = totalDiscountAmount, // Tổng tất cả giảm giá
             // Legacy fields (để tương thích)
             totalItemDiscount = totalItemDiscount,
-            discountAmount = finalBillDiscount,
-            discountPercent = orderDiscountPercent,
+            discountAmount = orderLevelDiscount,
+            discountPercent = billDiscountPercentValue,
             // Phí và thuế
             serviceFee = 0.0,
             serviceFeePercent = 0.0,
