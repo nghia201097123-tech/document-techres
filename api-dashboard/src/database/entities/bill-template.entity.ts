@@ -93,6 +93,19 @@ export class BillTemplate {
   @Column({ name: 'date_format', length: 50, default: 'dd/MM/yyyy HH:mm' })
   dateFormat: string;
 
+  // ============ TIME TRACKING CONFIG ============
+  @Column({ name: 'show_check_in_time', default: false })
+  showCheckInTime: boolean;
+
+  @Column({ name: 'show_check_out_time', default: false })
+  showCheckOutTime: boolean;
+
+  @Column({ name: 'check_in_label', length: 50, default: 'Giờ vào' })
+  checkInLabel: string;
+
+  @Column({ name: 'check_out_label', length: 50, default: 'Giờ ra' })
+  checkOutLabel: string;
+
   // ============ ITEMS CONFIG ============
   @Column({ name: 'show_item_code', default: false })
   showItemCode: boolean;
@@ -110,12 +123,46 @@ export class BillTemplate {
   @Column({ name: 'show_subtotal', default: true })
   showSubtotal: boolean;
 
+  // ============ DISCOUNT CONFIG (4 loại giảm giá) ============
+  // 1. Giảm giá món (Item Discount) - ưu tiên 1
   @Column({ name: 'show_item_discount', default: true })
-  showItemDiscount: boolean; // Hiển thị giảm giá trên từng món
+  showItemDiscount: boolean;
 
   @Column({ name: 'show_total_item_discount', default: true })
-  showTotalItemDiscount: boolean; // Hiển thị tổng giảm giá các món
+  showTotalItemDiscount: boolean;
 
+  @Column({ name: 'item_discount_label', length: 50, default: 'Giảm giá món' })
+  itemDiscountLabel: string;
+
+  // 2. Giảm giá hóa đơn (Bill Discount) - ưu tiên 2
+  @Column({ name: 'show_bill_discount', default: true })
+  showBillDiscount: boolean;
+
+  @Column({ name: 'bill_discount_label', length: 50, default: 'Giảm giá hóa đơn' })
+  billDiscountLabel: string;
+
+  // 3. Coupon - ưu tiên 3
+  @Column({ name: 'show_coupon_discount', default: true })
+  showCouponDiscount: boolean;
+
+  @Column({ name: 'coupon_discount_label', length: 50, default: 'Mã giảm giá' })
+  couponDiscountLabel: string;
+
+  // 4. Voucher - ưu tiên 4
+  @Column({ name: 'show_voucher_discount', default: true })
+  showVoucherDiscount: boolean;
+
+  @Column({ name: 'voucher_discount_label', length: 50, default: 'Voucher' })
+  voucherDiscountLabel: string;
+
+  // Tổng giảm giá (hiển thị tổng tất cả loại giảm giá)
+  @Column({ name: 'show_total_discount', default: true })
+  showTotalDiscount: boolean;
+
+  @Column({ name: 'total_discount_label', length: 50, default: 'Tổng giảm giá' })
+  totalDiscountLabel: string;
+
+  // Deprecated - giữ lại để tương thích ngược
   @Column({ name: 'show_discount', default: true })
   showDiscount: boolean;
 

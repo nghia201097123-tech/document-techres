@@ -93,6 +93,27 @@ export class CreateBillTemplateDto {
   @IsString()
   dateFormat?: string;
 
+  // Time tracking
+  @ApiPropertyOptional({ description: 'Hiển thị giờ vào' })
+  @IsOptional()
+  @IsBoolean()
+  showCheckInTime?: boolean;
+
+  @ApiPropertyOptional({ description: 'Hiển thị giờ ra' })
+  @IsOptional()
+  @IsBoolean()
+  showCheckOutTime?: boolean;
+
+  @ApiPropertyOptional({ description: 'Nhãn giờ vào' })
+  @IsOptional()
+  @IsString()
+  checkInLabel?: string;
+
+  @ApiPropertyOptional({ description: 'Nhãn giờ ra' })
+  @IsOptional()
+  @IsString()
+  checkOutLabel?: string;
+
   // Items
   @ApiPropertyOptional()
   @IsOptional()
@@ -120,6 +141,8 @@ export class CreateBillTemplateDto {
   @IsBoolean()
   showSubtotal?: boolean;
 
+  // Discount config (4 loại giảm giá)
+  // 1. Item Discount
   @ApiPropertyOptional({ description: 'Hiển thị giảm giá trên từng món' })
   @IsOptional()
   @IsBoolean()
@@ -130,6 +153,56 @@ export class CreateBillTemplateDto {
   @IsBoolean()
   showTotalItemDiscount?: boolean;
 
+  @ApiPropertyOptional({ description: 'Nhãn giảm giá món' })
+  @IsOptional()
+  @IsString()
+  itemDiscountLabel?: string;
+
+  // 2. Bill Discount
+  @ApiPropertyOptional({ description: 'Hiển thị giảm giá hóa đơn' })
+  @IsOptional()
+  @IsBoolean()
+  showBillDiscount?: boolean;
+
+  @ApiPropertyOptional({ description: 'Nhãn giảm giá hóa đơn' })
+  @IsOptional()
+  @IsString()
+  billDiscountLabel?: string;
+
+  // 3. Coupon
+  @ApiPropertyOptional({ description: 'Hiển thị giảm giá coupon' })
+  @IsOptional()
+  @IsBoolean()
+  showCouponDiscount?: boolean;
+
+  @ApiPropertyOptional({ description: 'Nhãn giảm giá coupon' })
+  @IsOptional()
+  @IsString()
+  couponDiscountLabel?: string;
+
+  // 4. Voucher
+  @ApiPropertyOptional({ description: 'Hiển thị giảm giá voucher' })
+  @IsOptional()
+  @IsBoolean()
+  showVoucherDiscount?: boolean;
+
+  @ApiPropertyOptional({ description: 'Nhãn giảm giá voucher' })
+  @IsOptional()
+  @IsString()
+  voucherDiscountLabel?: string;
+
+  // Total Discount
+  @ApiPropertyOptional({ description: 'Hiển thị tổng giảm giá' })
+  @IsOptional()
+  @IsBoolean()
+  showTotalDiscount?: boolean;
+
+  @ApiPropertyOptional({ description: 'Nhãn tổng giảm giá' })
+  @IsOptional()
+  @IsString()
+  totalDiscountLabel?: string;
+
+  // Legacy (backwards compatibility)
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
