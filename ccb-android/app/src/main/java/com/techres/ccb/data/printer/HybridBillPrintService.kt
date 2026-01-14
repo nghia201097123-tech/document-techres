@@ -214,72 +214,79 @@ object HybridBillPrintService {
 
             separator()
 
-            // ============ ITEMS ============
+            // ============ ITEMS (theo đúng format web-dashboard preview) ============
             billData.items.forEach { item ->
-                // Main item name - IN ĐẬM để nổi bật
-                lineBold(item.name)
+                // 1. Dòng đầu: Tên món + badge số lượng bên phải (ví dụ: "Ô long macchiato" "x3")
+                lineKeyValue(item.name, "x${item.quantity}", BitmapTextStyle(bold = true))
 
-                // Variants - hiển thị trước giá (ví dụ: • Size L, • Đá ít)
+                // 2. Giá gốc (trước khi tính variant/discount)
+                line("Giá gốc: ${formatCurrency(item.originalPrice)}")
+
+                // 3. Variants - dùng "•" prefix, chỉ hiện giá nếu != 0
                 if (item.variants.isNotEmpty()) {
                     item.variants.forEach { variant ->
                         if (variant.priceAdjustment != 0.0) {
                             val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
-                            line("  • ${variant.name} (${adjustSign}${formatCurrency(variant.priceAdjustment)})")
+                            lineKeyValue("• ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
                         } else {
-                            line("  • ${variant.name}")
+                            line("• ${variant.name}")
                         }
                     }
                 }
 
-                // Kiểm tra có giảm giá trên món hay không
-                val hasItemDiscount = item.discountAmount > 0 && item.originalPrice > 0
-
-                if (hasItemDiscount && template.showItemDiscount) {
-                    // Hiển thị giá gốc (gạch ngang) và giá sau giảm
-                    val discountInfo = if (item.discountPercent > 0) {
-                        " (-${item.discountPercent.toInt()}%)"
-                    } else {
-                        ""
-                    }
-                    // Dòng 1: Số lượng x Giá gốc
-                    line("  ${item.quantity} x ${formatCurrency(item.originalPrice)}$discountInfo")
-                    // Dòng 2: Giảm và thành tiền
-                    lineKeyValue("  → Giảm: -${formatCurrency(item.discountAmount)}", formatCurrency(item.totalPrice))
-                } else {
-                    // Không có giảm giá - hiển thị bình thường
-                    lineKeyValue("  ${item.quantity} x ${formatCurrency(item.unitPrice)}", formatCurrency(item.totalPrice))
-                }
-
-                // Item code (optional)
+                // 4. Item code (optional)
                 if (template.showItemCode && item.code != null) {
-                    line("  Mã: ${item.code}")
+                    line("Mã: ${item.code}")
                 }
 
-                // Item note (optional)
+                // 5. Item note (optional)
                 if (template.showItemNote && item.note != null) {
-                    line("  Ghi chú: ${item.note}")
+                    line("Ghi chú: ${item.note}")
                 }
 
-                // Toppings - thụt vào nhiều hơn, dùng ký hiệu khác
+                // 6. Toppings - dùng "+" prefix
                 if (item.toppings.isNotEmpty()) {
                     item.toppings.forEach { topping ->
-                        // Dùng "+ " để thể hiện đây là topping
                         val toppingPrice = topping.price * topping.quantity
                         if (topping.quantity > 1) {
-                            lineKeyValue("  + ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
+                            lineKeyValue("+ ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
                         } else {
-                            lineKeyValue("  + ${topping.name}", "+${formatCurrency(toppingPrice)}")
+                            lineKeyValue("+ ${topping.name}", "+${formatCurrency(toppingPrice)}")
                         }
                     }
                 }
+
+                // 7. Giảm giá trên món (nếu có)
+                val hasItemDiscount = item.discountAmount > 0
+                if (hasItemDiscount && template.showItemDiscount) {
+                    val discountLabel = if (item.discountPercent > 0) {
+                        "→ Giảm ${item.discountPercent.toInt()}%:"
+                    } else {
+                        "→ Giảm:"
+                    }
+                    lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
+                }
+
+                // 8. Thành tiền (cuối mỗi món)
+                if (item.quantity > 1) {
+                    // Hiển thị chi tiết: "Thành tiền (3 x 48,000): 144,000"
+                    val unitPriceAfterDiscount = item.totalPrice / item.quantity
+                    lineKeyValue("Thành tiền (${item.quantity} x ${formatCurrency(unitPriceAfterDiscount)}):", formatCurrency(item.totalPrice))
+                } else {
+                    lineKeyValue("Thành tiền:", formatCurrency(item.totalPrice))
+                }
+
+                // Dòng trống giữa các món
+                line("")
             }
 
             separator()
 
             // ============ TOTALS - TỔNG KẾT ============
-            // 1. Tạm tính (tổng giá gốc các món)
+            // 1. Tạm tính với số lượng món
             if (template.showSubtotal) {
-                lineKeyValue("Tạm tính:", formatCurrency(billData.subtotal))
+                val itemCount = billData.items.size
+                lineKeyValue("Tạm tính ($itemCount món):", formatCurrency(billData.subtotal))
             }
 
             // ============ 4 LOẠI GIẢM GIÁ (theo đúng config web-dashboard) ============
