@@ -188,31 +188,48 @@ object BillPrintService {
                 line("Khách hàng: ${billData.customerName}")
             }
 
-            line(sep)
-
-            // Items header
-            if (template.showQuantity && template.showUnitPrice) {
-                lineColumns("Tên món", "SL", "Đ.Giá", "T.Tiền")
-            } else {
-                lineColumns("Tên món", "SL", "T.Tiền")
+            // Time tracking (giờ vào/ra)
+            if (template.showCheckInTime && billData.checkInTime != null) {
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                line("${template.checkInLabel}: ${timeFormat.format(billData.checkInTime)}")
             }
+            if (template.showCheckOutTime && billData.checkOutTime != null) {
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                line("${template.checkOutLabel}: ${timeFormat.format(billData.checkOutTime)}")
+            }
+
             line(sep)
 
-            // Items
+            // Items - Detailed format matching CCB Offline
             billData.items.forEach { item ->
-                if (template.showQuantity && template.showUnitPrice) {
-                    lineColumns(
-                        item.name,
-                        item.quantity.toString(),
-                        formatCurrency(item.unitPrice),
-                        formatCurrency(item.totalPrice)
-                    )
+                // Product name with quantity badge
+                val nameWithQty = if (template.showQuantity) {
+                    "${item.name} x${item.quantity}"
                 } else {
-                    lineColumns(
-                        item.name,
-                        item.quantity.toString(),
-                        formatCurrency(item.totalPrice)
-                    )
+                    item.name
+                }
+                bold()
+                line(nameWithQty)
+                boldOff()
+
+                // Base price (giá gốc)
+                if (template.showUnitPrice && item.basePrice > 0) {
+                    line("  Giá gốc: ${formatCurrency(item.basePrice)}")
+                }
+
+                // Variants (Size, Ice, Sugar, etc.)
+                item.variants.forEach { variant ->
+                    if (variant.priceAdjustment > 0) {
+                        lineKeyValue("  • ${variant.name}", "+${formatCurrency(variant.priceAdjustment)}")
+                    } else {
+                        line("  • ${variant.name}")
+                    }
+                }
+
+                // Toppings (extra items)
+                item.toppings.forEach { topping ->
+                    val toppingQty = if (topping.quantity > 1) " x${topping.quantity}" else ""
+                    lineKeyValue("  + ${topping.name}$toppingQty", "+${formatCurrency(topping.price * topping.quantity)}")
                 }
 
                 // Item note
@@ -220,10 +237,23 @@ object BillPrintService {
                     line("  -> ${item.note}")
                 }
 
-                // Toppings
-                item.toppings.forEach { topping ->
-                    line("  + ${topping.name}: ${formatCurrency(topping.price)}")
+                // Item discount (nếu có)
+                if (template.showItemDiscount && item.discountAmount > 0) {
+                    val discountText = if (item.discountPercent > 0) {
+                        "  Giảm giá (${item.discountPercent.toInt()}%)"
+                    } else {
+                        "  Giảm giá"
+                    }
+                    lineKeyValue(discountText, "-${formatCurrency(item.discountAmount)}")
                 }
+
+                // Subtotal per item (thành tiền)
+                line("  ".repeat(1) + "-".repeat(lineWidth - 2))
+                bold()
+                lineKeyValue("  Thành tiền:", formatCurrency(item.totalPrice))
+                boldOff()
+
+                line("")  // Empty line between items
             }
 
             line(sep)
@@ -235,9 +265,64 @@ object BillPrintService {
                 lineKeyValue("Tạm tính:", formatCurrency(billData.subtotal))
             }
 
-            if (template.showDiscount && billData.discountAmount > 0) {
+            // ============ 4 LOẠI GIẢM GIÁ (theo thứ tự ưu tiên) ============
+
+            // 1. Giảm giá món (tổng)
+            if (template.showTotalItemDiscount && billData.itemDiscountAmount > 0) {
+                lineKeyValue("${template.itemDiscountLabel}:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            }
+
+            // 2. Giảm giá hóa đơn
+            if (template.showBillDiscount && billData.billDiscountAmount > 0) {
+                val billDiscountText = if (template.showDiscountPercent && billData.billDiscountPercent > 0) {
+                    "${template.billDiscountLabel} (${billData.billDiscountPercent.toInt()}%):"
+                } else {
+                    "${template.billDiscountLabel}:"
+                }
+                lineKeyValue(billDiscountText, "-${formatCurrency(billData.billDiscountAmount)}")
+            }
+
+            // 3. Coupon
+            if (template.showCouponDiscount && billData.couponDiscountAmount > 0) {
+                val couponText = if (billData.couponCode != null) {
+                    "${template.couponDiscountLabel} (${billData.couponCode}):"
+                } else {
+                    "${template.couponDiscountLabel}:"
+                }
+                lineKeyValue(couponText, "-${formatCurrency(billData.couponDiscountAmount)}")
+            }
+
+            // 4. Voucher
+            if (template.showVoucherDiscount && billData.voucherDiscountAmount > 0) {
+                val voucherText = if (billData.voucherCode != null) {
+                    "${template.voucherDiscountLabel} (${billData.voucherCode}):"
+                } else {
+                    "${template.voucherDiscountLabel}:"
+                }
+                lineKeyValue(voucherText, "-${formatCurrency(billData.voucherDiscountAmount)}")
+            }
+
+            // Tổng giảm giá (nếu có nhiều loại)
+            if (template.showTotalDiscount && billData.totalDiscountAmount > 0) {
+                val hasMultipleDiscounts = listOf(
+                    billData.itemDiscountAmount,
+                    billData.billDiscountAmount,
+                    billData.couponDiscountAmount,
+                    billData.voucherDiscountAmount
+                ).count { it > 0 } > 1
+
+                if (hasMultipleDiscounts) {
+                    line("-".repeat(lineWidth / 2))
+                    bold()
+                    lineKeyValue("${template.totalDiscountLabel}:", "-${formatCurrency(billData.totalDiscountAmount)}")
+                    boldOff()
+                }
+            }
+
+            // Legacy discount support (tương thích ngược)
+            if (template.showDiscount && billData.discountAmount > 0 && billData.totalDiscountAmount == 0.0) {
                 val discountText = if (template.showDiscountPercent && billData.discountPercent > 0) {
-                    "Giảm giá (${billData.discountPercent}%):"
+                    "Giảm giá (${billData.discountPercent.toInt()}%):"
                 } else {
                     "Giảm giá:"
                 }
@@ -254,7 +339,7 @@ object BillPrintService {
             }
 
             if (template.showVat && billData.vatAmount > 0) {
-                lineKeyValue("${template.vatLabel} (${billData.vatRate}%):", formatCurrency(billData.vatAmount))
+                lineKeyValue("${template.vatLabel} (${billData.vatRate.toInt()}%):", formatCurrency(billData.vatAmount))
             }
 
             if (template.showVatDetails && template.showPriceAfterVat) {
@@ -366,25 +451,60 @@ object BillPrintService {
 
             feed(1)
 
-            // Items - clean format
+            // Items - clean format with details
             billData.items.forEach { item ->
+                bold()
                 lineColumns(
                     "${item.quantity}x ${item.name}",
                     formatCurrency(item.totalPrice)
                 )
+                boldOff()
+
+                // Variants with price adjustment
+                item.variants.forEach { variant ->
+                    if (variant.priceAdjustment > 0) {
+                        lineColumns("   • ${variant.name}", "+${formatCurrency(variant.priceAdjustment)}")
+                    } else {
+                        line("   • ${variant.name}")
+                    }
+                }
+
+                // Toppings
                 item.toppings.forEach { topping ->
-                    line("   + ${topping.name}")
+                    lineColumns("   + ${topping.name}", "+${formatCurrency(topping.price)}")
+                }
+
+                // Item discount
+                if (item.discountAmount > 0) {
+                    lineColumns("   Giảm", "-${formatCurrency(item.discountAmount)}")
                 }
             }
 
             feed(1)
             line("─".repeat(builder.lineWidth))
 
-            // Totals - minimal
+            // Totals - with 4 discount types
             alignRight()
-            if (billData.discountAmount > 0) {
+
+            // 4 discount types (condensed)
+            if (billData.itemDiscountAmount > 0) {
+                lineKeyValue("Giảm món:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            }
+            if (billData.billDiscountAmount > 0) {
+                lineKeyValue("Giảm bill:", "-${formatCurrency(billData.billDiscountAmount)}")
+            }
+            if (billData.couponDiscountAmount > 0) {
+                lineKeyValue("Coupon:", "-${formatCurrency(billData.couponDiscountAmount)}")
+            }
+            if (billData.voucherDiscountAmount > 0) {
+                lineKeyValue("Voucher:", "-${formatCurrency(billData.voucherDiscountAmount)}")
+            }
+
+            // Legacy support
+            if (billData.discountAmount > 0 && billData.totalDiscountAmount == 0.0) {
                 lineKeyValue("Giảm:", "-${formatCurrency(billData.discountAmount)}")
             }
+
             if (template.showVat && billData.vatAmount > 0) {
                 lineKeyValue("VAT:", formatCurrency(billData.vatAmount))
             }
@@ -506,29 +626,107 @@ object BillPrintService {
                     line("  Mã: ${item.code}")
                 }
 
-                val itemBeforeVat = item.totalPrice / (1 + billData.vatRate / 100)
+                // Base price
+                if (item.basePrice > 0) {
+                    line("  Giá gốc: ${formatCurrency(item.basePrice)}")
+                }
+
+                // Variants with price adjustment
+                item.variants.forEach { variant ->
+                    if (variant.priceAdjustment > 0) {
+                        lineKeyValue("  • ${variant.name}", "+${formatCurrency(variant.priceAdjustment)}")
+                    } else {
+                        line("  • ${variant.name}")
+                    }
+                }
+
+                // Toppings
+                item.toppings.forEach { topping ->
+                    val toppingQty = if (topping.quantity > 1) " x${topping.quantity}" else ""
+                    lineKeyValue("  + ${topping.name}$toppingQty", "+${formatCurrency(topping.price * topping.quantity)}")
+                }
+
+                // Item discount
+                if (item.discountAmount > 0) {
+                    val discountText = if (item.discountPercent > 0) {
+                        "  Giảm giá (${item.discountPercent.toInt()}%)"
+                    } else {
+                        "  Giảm giá"
+                    }
+                    lineKeyValue(discountText, "-${formatCurrency(item.discountAmount)}")
+                }
+
+                val itemBeforeVat = item.totalPrice / (1 + item.vatRate / 100)
                 val itemVat = item.totalPrice - itemBeforeVat
                 totalBeforeVat += itemBeforeVat
                 totalVat += itemVat
 
-                line("  Đơn giá: ${formatCurrency(item.unitPrice)}")
                 line("  Giá trước VAT: ${formatCurrency(itemBeforeVat)}")
-                line("  VAT (${billData.vatRate}%): ${formatCurrency(itemVat)}")
+                line("  VAT (${item.vatRate.toInt()}%): ${formatCurrency(itemVat)}")
+                bold()
                 line("  Thành tiền: ${formatCurrency(item.totalPrice)}")
-
-                item.toppings.forEach { topping ->
-                    line("  + ${topping.name}: ${formatCurrency(topping.price)}")
-                }
+                boldOff()
 
                 line(sep)
             }
 
-            // Summary with full VAT breakdown
+            // Summary with full breakdown
             alignRight()
             lineKeyValue("Tạm tính:", formatCurrency(billData.subtotal))
 
-            if (billData.discountAmount > 0) {
-                lineKeyValue("Giảm giá (${billData.discountPercent}%):", "-${formatCurrency(billData.discountAmount)}")
+            // 4 discount types (detailed)
+            if (billData.itemDiscountAmount > 0) {
+                lineKeyValue("Giảm giá món:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            }
+            if (billData.billDiscountAmount > 0) {
+                val billDiscountText = if (billData.billDiscountPercent > 0) {
+                    "Giảm giá hóa đơn (${billData.billDiscountPercent.toInt()}%):"
+                } else {
+                    "Giảm giá hóa đơn:"
+                }
+                lineKeyValue(billDiscountText, "-${formatCurrency(billData.billDiscountAmount)}")
+            }
+            if (billData.couponDiscountAmount > 0) {
+                val couponText = if (billData.couponCode != null) {
+                    "Mã giảm giá (${billData.couponCode}):"
+                } else {
+                    "Mã giảm giá:"
+                }
+                lineKeyValue(couponText, "-${formatCurrency(billData.couponDiscountAmount)}")
+            }
+            if (billData.voucherDiscountAmount > 0) {
+                val voucherText = if (billData.voucherCode != null) {
+                    "Voucher (${billData.voucherCode}):"
+                } else {
+                    "Voucher:"
+                }
+                lineKeyValue(voucherText, "-${formatCurrency(billData.voucherDiscountAmount)}")
+            }
+
+            // Total discount
+            if (billData.totalDiscountAmount > 0) {
+                val discountCount = listOf(
+                    billData.itemDiscountAmount,
+                    billData.billDiscountAmount,
+                    billData.couponDiscountAmount,
+                    billData.voucherDiscountAmount
+                ).count { it > 0 }
+
+                if (discountCount > 1) {
+                    bold()
+                    lineKeyValue("Tổng giảm giá:", "-${formatCurrency(billData.totalDiscountAmount)}")
+                    boldOff()
+                }
+            }
+
+            // Legacy support
+            if (billData.discountAmount > 0 && billData.totalDiscountAmount == 0.0) {
+                val discountText = if (billData.discountPercent > 0) {
+                    "Giảm giá (${billData.discountPercent.toInt()}%):"
+                } else {
+                    "Giảm giá:"
+                }
+                lineKeyValue(discountText, "-${formatCurrency(billData.discountAmount)}")
             }
 
             if (billData.serviceFee > 0) {
@@ -607,8 +805,17 @@ data class BillData(
     val items: List<BillItem>,
     val subtotal: Double,                    // Tạm tính (tổng giá gốc các món)
     val totalItemDiscount: Double = 0.0,     // Tổng giảm giá các món
-    val discountAmount: Double = 0.0,        // Giảm giá đơn hàng (coupon/voucher)
-    val discountPercent: Double = 0.0,       // % giảm giá đơn hàng
+    val discountAmount: Double = 0.0,        // Giảm giá đơn hàng (deprecated - dùng 4 loại bên dưới)
+    val discountPercent: Double = 0.0,       // % giảm giá đơn hàng (deprecated)
+    // ============ 4 LOẠI GIẢM GIÁ ============
+    val itemDiscountAmount: Double = 0.0,    // 1. Giảm giá món (tổng tất cả item)
+    val billDiscountAmount: Double = 0.0,    // 2. Giảm giá hóa đơn
+    val billDiscountPercent: Double = 0.0,   // % giảm giá hóa đơn
+    val couponDiscountAmount: Double = 0.0,  // 3. Giảm giá từ coupon
+    val couponCode: String? = null,          // Mã coupon (nếu có)
+    val voucherDiscountAmount: Double = 0.0, // 4. Giảm giá từ voucher
+    val voucherCode: String? = null,         // Mã voucher (nếu có)
+    val totalDiscountAmount: Double = 0.0,   // Tổng tất cả giảm giá
     val serviceFee: Double = 0.0,
     val vatRate: Double = 10.0,
     val vatAmount: Double,
@@ -618,6 +825,9 @@ data class BillData(
     val paymentMethod: String = "Tiền mặt",
     val receivedAmount: Double = 0.0,
     val changeAmount: Double = 0.0,
+    // ============ TIME TRACKING ============
+    val checkInTime: Date? = null,           // Giờ vào
+    val checkOutTime: Date? = null,          // Giờ ra
     // ============ TEMPORARY BILL (Bill tạm) ============
     val isTemporaryBill: Boolean = false,    // Đánh dấu là bill tạm
     val printCount: Int = 0,                  // Số lần in (lần thứ mấy)
@@ -631,19 +841,31 @@ data class BillItem(
     val code: String? = null,
     val name: String,
     val quantity: Int,
-    val unitPrice: Double,           // Đơn giá sau giảm
-    val originalPrice: Double = 0.0, // Đơn giá gốc (trước giảm)
+    val unitPrice: Double,           // Đơn giá sau giảm (basePrice + variants)
+    val originalPrice: Double = 0.0, // Đơn giá gốc (trước giảm, trước variants)
+    val basePrice: Double = 0.0,     // Giá gốc (không có variant)
     val discountAmount: Double = 0.0,// Số tiền giảm trên món này
     val discountPercent: Double = 0.0,// % giảm giá (nếu có)
     val totalPrice: Double,          // Thành tiền (sau giảm)
     val note: String? = null,
-    val toppings: List<BillTopping> = emptyList(),
+    val variants: List<BillVariant> = emptyList(),  // Variants (Size, Ice, Sugar...)
+    val toppings: List<BillTopping> = emptyList(),   // Toppings (extra items)
     val vatRate: Double = 8.0        // VAT rate của món này (%)
+)
+
+/**
+ * Bill Variant - Các lựa chọn biến thể (Size, Ice, Sugar...)
+ */
+data class BillVariant(
+    val name: String,                // Tên variant (VD: "Size L", "NHIỀU", "30%")
+    val groupName: String? = null,   // Nhóm (VD: "Size", "Đá", "Đường")
+    val priceAdjustment: Double = 0.0 // Điều chỉnh giá (+10,000 hoặc 0)
 )
 
 data class BillTopping(
     val name: String,
-    val price: Double
+    val price: Double,
+    val quantity: Int = 1
 )
 
 /**
