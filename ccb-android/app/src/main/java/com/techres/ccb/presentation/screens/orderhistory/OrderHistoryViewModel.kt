@@ -4,7 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.dao.BillTemplateDao
-import com.techres.ccb.data.local.dao.PrinterConfigDao
+import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.printer.BillData
@@ -102,7 +102,7 @@ data class OrderHistoryUiState(
 class OrderHistoryViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val orderRepository: OrderRepository,
-    private val printerConfigDao: PrinterConfigDao,
+    private val printerConfigDao: BillPrinterConfigDao,
     private val billTemplateDao: BillTemplateDao
 ) : ViewModel() {
 
