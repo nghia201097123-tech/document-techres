@@ -581,6 +581,19 @@ export class BillTemplateDto {
   @ApiProperty({ description: 'Định dạng ngày giờ' })
   dateFormat: string;
 
+  // Time tracking config
+  @ApiProperty({ description: 'Hiển thị giờ vào' })
+  showCheckInTime: boolean;
+
+  @ApiProperty({ description: 'Hiển thị giờ ra' })
+  showCheckOutTime: boolean;
+
+  @ApiProperty({ description: 'Nhãn giờ vào' })
+  checkInLabel: string;
+
+  @ApiProperty({ description: 'Nhãn giờ ra' })
+  checkOutLabel: string;
+
   // Items config
   @ApiProperty()
   showItemCode: boolean;
@@ -598,6 +611,41 @@ export class BillTemplateDto {
   @ApiProperty()
   showSubtotal: boolean;
 
+  // Discount config (4 loại giảm giá)
+  @ApiProperty({ description: 'Hiển thị giảm giá trên từng món' })
+  showItemDiscount: boolean;
+
+  @ApiProperty({ description: 'Hiển thị tổng giảm giá các món' })
+  showTotalItemDiscount: boolean;
+
+  @ApiProperty({ description: 'Nhãn giảm giá món' })
+  itemDiscountLabel: string;
+
+  @ApiProperty({ description: 'Hiển thị giảm giá hóa đơn' })
+  showBillDiscount: boolean;
+
+  @ApiProperty({ description: 'Nhãn giảm giá hóa đơn' })
+  billDiscountLabel: string;
+
+  @ApiProperty({ description: 'Hiển thị giảm giá coupon' })
+  showCouponDiscount: boolean;
+
+  @ApiProperty({ description: 'Nhãn giảm giá coupon' })
+  couponDiscountLabel: string;
+
+  @ApiProperty({ description: 'Hiển thị giảm giá voucher' })
+  showVoucherDiscount: boolean;
+
+  @ApiProperty({ description: 'Nhãn giảm giá voucher' })
+  voucherDiscountLabel: string;
+
+  @ApiProperty({ description: 'Hiển thị tổng giảm giá' })
+  showTotalDiscount: boolean;
+
+  @ApiProperty({ description: 'Nhãn tổng giảm giá' })
+  totalDiscountLabel: string;
+
+  // Legacy discount (backwards compatibility)
   @ApiProperty()
   showDiscount: boolean;
 
