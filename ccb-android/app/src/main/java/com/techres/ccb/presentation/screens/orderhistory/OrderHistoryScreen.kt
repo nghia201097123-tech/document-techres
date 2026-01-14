@@ -1067,6 +1067,36 @@ private fun OrderDetailDialog(
                                     }
                                 }
                             }
+
+                            // Show item discount if any
+                            if (item.discountAmount > 0) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 32.dp, top = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Show discount label based on type
+                                    val discountLabel = if (item.discountType == "percent" && item.discountValue > 0) {
+                                        "→ Giảm ${item.discountValue.toInt()}%"
+                                    } else {
+                                        "→ Giảm giá"
+                                    }
+                                    Text(
+                                        text = discountLabel,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF4CAF50),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "-${formatCurrency(item.discountAmount.toLong())}",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF4CAF50),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
                         }
                     }
                 }
