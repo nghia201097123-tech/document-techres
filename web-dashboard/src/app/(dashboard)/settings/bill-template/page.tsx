@@ -1735,73 +1735,85 @@ export default function BillTemplatePage() {
                 <div className="my-2 border-t border-dashed" />
 
                 {/* ============ ITEMS ============ */}
-                <div className="space-y-2">
-                  {/* Item 1 - Không giảm giá */}
+                <div className="space-y-3">
+                  {/* Item 1 - Có variant/topping, không giảm giá */}
                   <div>
-                    <p className="font-bold">Phở bò tái nạm</p>
-                    {(previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
-                      <div className="flex justify-between text-xs">
-                        <span className="pl-2">
-                          {previewTemplate.showQuantity && "2"}
-                          {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
-                          {previewTemplate.showUnitPrice && "25,000"}
-                        </span>
-                        <span>50,000</span>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold">Ô long macchiato</span>
+                      {previewTemplate.showQuantity && <span className="text-xs bg-gray-200 px-1 rounded">x1</span>}
+                    </div>
+                    {previewTemplate.showUnitPrice && (
+                      <p className="text-xs text-muted-foreground pl-2">Giá gốc: 54,000</p>
                     )}
+                    {/* Variants */}
+                    <div className="text-xs pl-2 space-y-0.5">
+                      <p>• NHIỀU</p>
+                      <div className="flex justify-between">
+                        <span>• Size L</span>
+                        <span className="text-orange-600">+10,000</span>
+                      </div>
+                    </div>
                     {previewTemplate.showItemCode && (
-                      <p className="text-xs pl-2 text-muted-foreground">Mã: PHO01</p>
+                      <p className="text-xs pl-2 text-muted-foreground">Mã: OLM01</p>
                     )}
                     {previewTemplate.showItemNote && (
-                      <p className="text-xs pl-2 italic">Ghi chú: Ít hành</p>
+                      <p className="text-xs pl-2 italic text-blue-600">Ghi chú: Ít đường</p>
                     )}
+                    {/* Thành tiền */}
+                    <div className="flex justify-between text-xs font-medium border-t border-dotted mt-1 pt-1">
+                      <span className="pl-2">Thành tiền:</span>
+                      <span>64,000</span>
+                    </div>
                   </div>
 
-                  {/* Item 2 - Có giảm giá món */}
+                  {/* Item 2 - Có variant, có giảm giá món */}
                   <div>
-                    <p className="font-bold">Cơm gà xào sả ớt</p>
-                    {previewTemplate.showItemDiscount ? (
-                      <>
-                        <div className="text-xs pl-2">
-                          {previewTemplate.showQuantity && "1"}
-                          {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
-                          {previewTemplate.showUnitPrice && "35,000"} (-20%)
-                        </div>
-                        <div className="flex justify-between text-xs text-green-600">
-                          <span className="pl-2">→ Giảm: -7,000</span>
-                          <span>28,000</span>
-                        </div>
-                      </>
-                    ) : (
-                      (previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
-                        <div className="flex justify-between text-xs">
-                          <span className="pl-2">
-                            {previewTemplate.showQuantity && "1"}
-                            {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
-                            {previewTemplate.showUnitPrice && "28,000"}
-                          </span>
-                          <span>28,000</span>
-                        </div>
-                      )
+                    <div className="flex justify-between">
+                      <span className="font-bold">Lục trà macchiato</span>
+                      {previewTemplate.showQuantity && <span className="text-xs bg-gray-200 px-1 rounded">x3</span>}
+                    </div>
+                    {previewTemplate.showUnitPrice && (
+                      <p className="text-xs text-muted-foreground pl-2">Giá gốc: 50,000</p>
                     )}
-                  </div>
-
-                  {/* Item 3 - Không giảm giá */}
-                  <div>
-                    <p className="font-bold">Trà đá</p>
-                    {(previewTemplate.showQuantity || previewTemplate.showUnitPrice) && (
-                      <div className="flex justify-between text-xs">
-                        <span className="pl-2">
-                          {previewTemplate.showQuantity && "1"}
-                          {previewTemplate.showQuantity && previewTemplate.showUnitPrice && " x "}
-                          {previewTemplate.showUnitPrice && "5,000"}
-                        </span>
-                        <span>5,000</span>
+                    {/* Variants */}
+                    <div className="text-xs pl-2 space-y-0.5">
+                      <p>• NHIỀU</p>
+                      <div className="flex justify-between">
+                        <span>• Size L</span>
+                        <span className="text-orange-600">+10,000</span>
                       </div>
+                    </div>
+                    {/* Giảm giá món (nếu có) */}
+                    {previewTemplate.showItemDiscount && (
+                      <div className="flex justify-between text-xs text-green-600 pl-2">
+                        <span>→ Giảm 20%:</span>
+                        <span>-36,000</span>
+                      </div>
+                    )}
+                    {/* Thành tiền */}
+                    <div className="flex justify-between text-xs font-medium border-t border-dotted mt-1 pt-1">
+                      <span className="pl-2">Thành tiền (3 x 48,000):</span>
+                      <span>{previewTemplate.showItemDiscount ? "144,000" : "180,000"}</span>
+                    </div>
+                  </div>
+
+                  {/* Item 3 - Đơn giản, không variant */}
+                  <div>
+                    <div className="flex justify-between">
+                      <span className="font-bold">Trà đá</span>
+                      {previewTemplate.showQuantity && <span className="text-xs bg-gray-200 px-1 rounded">x2</span>}
+                    </div>
+                    {previewTemplate.showUnitPrice && (
+                      <p className="text-xs text-muted-foreground pl-2">Giá: 5,000</p>
                     )}
                     {previewTemplate.showItemCode && (
                       <p className="text-xs pl-2 text-muted-foreground">Mã: TRA01</p>
                     )}
+                    {/* Thành tiền */}
+                    <div className="flex justify-between text-xs font-medium border-t border-dotted mt-1 pt-1">
+                      <span className="pl-2">Thành tiền:</span>
+                      <span>10,000</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1810,31 +1822,57 @@ export default function BillTemplatePage() {
                 {/* ============ TOTALS ============ */}
                 {previewTemplate.showSubtotal && (
                   <div className="flex justify-between">
-                    <span>Tạm tính:</span>
-                    <span>90,000</span>
+                    <span>Tạm tính (3 món):</span>
+                    <span>254,000</span>
                   </div>
                 )}
 
+                {/* 1. Giảm giá món */}
                 {previewTemplate.showTotalItemDiscount && (
                   <div className="flex justify-between text-green-600">
-                    <span>Giảm giá món:</span>
-                    <span>-7,000</span>
+                    <span>{previewTemplate.itemDiscountLabel || "Giảm giá món"}:</span>
+                    <span>-36,000</span>
                   </div>
                 )}
 
-                {previewTemplate.showDiscount && (
+                {/* 2. Giảm giá hóa đơn */}
+                {previewTemplate.showBillDiscount && (
                   <div className="flex justify-between text-green-600">
                     <span>
-                      Giảm giá bill{previewTemplate.showDiscountPercent && " (10%)"}:
+                      {previewTemplate.billDiscountLabel || "Giảm giá hóa đơn"}{previewTemplate.showDiscountPercent && " (10%)"}:
                     </span>
-                    <span>-8,300</span>
+                    <span>-21,800</span>
+                  </div>
+                )}
+
+                {/* 3. Coupon */}
+                {previewTemplate.showCouponDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{previewTemplate.couponDiscountLabel || "Mã giảm giá"} (MUAXUAN20):</span>
+                    <span>-20,000</span>
+                  </div>
+                )}
+
+                {/* 4. Voucher */}
+                {previewTemplate.showVoucherDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{previewTemplate.voucherDiscountLabel || "Voucher"} (VIP50K):</span>
+                    <span>-50,000</span>
+                  </div>
+                )}
+
+                {/* Tổng giảm giá */}
+                {previewTemplate.showTotalDiscount && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>{previewTemplate.totalDiscountLabel || "Tổng giảm giá"}:</span>
+                    <span>-127,800</span>
                   </div>
                 )}
 
                 {previewTemplate.showServiceFee && (
                   <div className="flex justify-between">
-                    <span>Phí dịch vụ:</span>
-                    <span>5,000</span>
+                    <span>Phí dịch vụ (5%):</span>
+                    <span>6,310</span>
                   </div>
                 )}
 
@@ -1844,19 +1882,19 @@ export default function BillTemplatePage() {
                     {previewTemplate.showPriceBeforeVat && (
                       <div className="flex justify-between">
                         <span>{previewTemplate.priceBeforeVatLabel || "Giá trước thuế"}:</span>
-                        <span>49,545</span>
+                        <span>120,463</span>
                       </div>
                     )}
                     {previewTemplate.showVat && (
                       <div className="flex justify-between">
                         <span>{previewTemplate.vatLabel || "VAT"} (10%):</span>
-                        <span>4,955</span>
+                        <span>12,046</span>
                       </div>
                     )}
                     {previewTemplate.showPriceAfterVat && (
                       <div className="flex justify-between">
                         <span>{previewTemplate.priceAfterVatLabel || "Giá sau thuế"}:</span>
-                        <span>54,500</span>
+                        <span>132,509</span>
                       </div>
                     )}
                   </>
@@ -1864,7 +1902,7 @@ export default function BillTemplatePage() {
                 {!previewTemplate.showVatDetails && previewTemplate.showVat && (
                   <div className="flex justify-between">
                     <span>{previewTemplate.vatLabel || "VAT"} (10%):</span>
-                    <span>4,955</span>
+                    <span>12,046</span>
                   </div>
                 )}
 
@@ -1872,8 +1910,8 @@ export default function BillTemplatePage() {
 
                 {/* ============ TOTAL ============ */}
                 <div className="flex justify-between font-bold text-lg">
-                  <span>TỔNG:</span>
-                  <span>54,500đ</span>
+                  <span>TỔNG CỘNG:</span>
+                  <span>132,500đ</span>
                 </div>
 
                 {/* ============ PAYMENT INFO ============ */}
