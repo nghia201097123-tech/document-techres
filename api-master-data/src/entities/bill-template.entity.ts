@@ -172,6 +172,10 @@ export class BillTemplate {
   @Column({ name: 'total_discount_label', length: 50, default: 'Tổng giảm giá' })
   totalDiscountLabel: string;
 
+  // Deprecated - giữ lại để tương thích ngược
+  @Column({ name: 'show_discount', default: true })
+  showDiscount: boolean;
+
   @Column({ name: 'show_discount_percent', default: true })
   showDiscountPercent: boolean;
 

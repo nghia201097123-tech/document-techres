@@ -862,6 +862,11 @@ export class SyncService {
       showCustomerName: bt.showCustomerName,
       showDateTime: bt.showDateTime,
       dateFormat: bt.dateFormat,
+      // Time tracking config
+      showCheckInTime: bt.showCheckInTime,
+      showCheckOutTime: bt.showCheckOutTime,
+      checkInLabel: bt.checkInLabel,
+      checkOutLabel: bt.checkOutLabel,
       // Items config
       showItemCode: bt.showItemCode,
       showItemNote: bt.showItemNote,
@@ -869,6 +874,19 @@ export class SyncService {
       showQuantity: bt.showQuantity,
       // Price config
       showSubtotal: bt.showSubtotal,
+      // Discount config (4 loại giảm giá)
+      showItemDiscount: bt.showItemDiscount,
+      showTotalItemDiscount: bt.showTotalItemDiscount,
+      itemDiscountLabel: bt.itemDiscountLabel,
+      showBillDiscount: bt.showBillDiscount,
+      billDiscountLabel: bt.billDiscountLabel,
+      showCouponDiscount: bt.showCouponDiscount,
+      couponDiscountLabel: bt.couponDiscountLabel,
+      showVoucherDiscount: bt.showVoucherDiscount,
+      voucherDiscountLabel: bt.voucherDiscountLabel,
+      showTotalDiscount: bt.showTotalDiscount,
+      totalDiscountLabel: bt.totalDiscountLabel,
+      // Legacy discount (backwards compatibility)
       showDiscount: bt.showDiscount,
       showDiscountPercent: bt.showDiscountPercent,
       showServiceFee: bt.showServiceFee,
