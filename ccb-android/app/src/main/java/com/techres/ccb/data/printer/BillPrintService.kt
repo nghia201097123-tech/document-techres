@@ -568,7 +568,11 @@ data class BillData(
     // Temporary bill
     val isTemporaryBill: Boolean = false,
     val printCount: Int = 0,
-    val printTime: Date? = null
+    val printTime: Date? = null,
+    // Reprint marker - để đánh dấu bill được in lại (tránh gian lận)
+    val isReprint: Boolean = false,
+    val reprintTime: Date? = null,
+    val reprintReason: String? = null
 )
 
 /**

@@ -257,6 +257,25 @@ object HybridBillPrintService {
                 lineCenter("(Chưa thanh toán)")
 
                 separator()
+            } else if (billData.isReprint) {
+                // Bill in lại - đánh dấu rõ ràng để tránh gian lận
+                lineDouble("*** BẢN SAO ***", BitmapTextStyle(centerAlign = true))
+                lineDouble("*** IN LẠI ***", BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+
+                // Hiển thị thời gian in lại
+                billData.reprintTime?.let { reprintTime ->
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    lineCenter("Thời gian in lại: ${timeFormat.format(reprintTime)}")
+                }
+                billData.reprintReason?.let { reason ->
+                    lineCenter("Lý do: $reason")
+                }
+                lineCenter("(Đây không phải bill gốc)")
+
+                separator()
+                lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
             } else {
                 // Bill chính thức
                 lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))

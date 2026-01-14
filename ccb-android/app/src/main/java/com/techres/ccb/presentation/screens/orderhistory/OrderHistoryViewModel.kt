@@ -461,7 +461,11 @@ class OrderHistoryViewModel @Inject constructor(
             receivedAmount = order.paidAmount,
             changeAmount = order.changeAmount,
             checkInTime = checkInTime,
-            checkOutTime = checkOutTime
+            checkOutTime = checkOutTime,
+            // Đánh dấu đây là bill in lại (tránh gian lận nhân viên)
+            isReprint = true,
+            reprintTime = Date(),
+            reprintReason = "In lại từ lịch sử đơn hàng"
         )
     }
 
