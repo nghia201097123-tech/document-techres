@@ -319,8 +319,13 @@ class OrderHistoryViewModel @Inject constructor(
                         return@withContext
                     }
 
-                    // Get printer config
-                    val printerConfig = printerConfigDao.getDefaultByBranch(branchId)
+                    // Get printer config - try default first, then any active printer
+                    var printerConfig = printerConfigDao.getDefaultByBranch(branchId)
+                    if (printerConfig == null) {
+                        // Fallback to first active printer
+                        val activePrinters = printerConfigDao.getAllByBranchSync(branchId)
+                        printerConfig = activePrinters.firstOrNull()
+                    }
                     if (printerConfig == null) {
                         _uiState.update {
                             it.copy(isPrinting = false, printMessage = "Không tìm thấy máy in")
