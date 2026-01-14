@@ -285,6 +285,9 @@ export class DatabaseMigrationService implements OnModuleInit {
       // Create bill_templates table
       await this.createBillTemplatesTable(queryRunner);
 
+      // Add time tracking and discount config columns to bill_templates
+      await this.addBillTemplateTimeTrackingAndDiscountColumns(queryRunner);
+
       // Create bill_printer_configs table
       await this.createBillPrinterConfigsTable(queryRunner);
 
@@ -490,6 +493,54 @@ export class DatabaseMigrationService implements OnModuleInit {
       `);
       this.logger.log('bill_templates table created successfully');
     }
+  }
+
+  /**
+   * Add time tracking and discount config columns to bill_templates table
+   * These columns support:
+   * - Time tracking: show_check_in_time, show_check_out_time, check_in_label, check_out_label
+   * - Item discount: show_item_discount, show_total_item_discount, item_discount_label
+   * - Bill discount: show_bill_discount, bill_discount_label
+   * - Coupon discount: show_coupon_discount, coupon_discount_label
+   * - Voucher discount: show_voucher_discount, voucher_discount_label
+   * - Total discount: show_total_discount, total_discount_label
+   */
+  private async addBillTemplateTimeTrackingAndDiscountColumns(queryRunner: any): Promise<void> {
+    const exists = await this.tableExists(queryRunner, 'bill_templates');
+    if (!exists) {
+      return; // Table doesn't exist yet, will be created with all columns
+    }
+
+    this.logger.log('Adding time tracking and discount config columns to bill_templates...');
+
+    // Time tracking columns
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_check_in_time', 'BOOLEAN DEFAULT false');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_check_out_time', 'BOOLEAN DEFAULT false');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'check_in_label', "VARCHAR(50) DEFAULT 'Giờ vào'");
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'check_out_label', "VARCHAR(50) DEFAULT 'Giờ ra'");
+
+    // Item discount columns
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_item_discount', 'BOOLEAN DEFAULT true');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_total_item_discount', 'BOOLEAN DEFAULT true');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'item_discount_label', "VARCHAR(50) DEFAULT 'Giảm giá món'");
+
+    // Bill discount columns
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_bill_discount', 'BOOLEAN DEFAULT true');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'bill_discount_label', "VARCHAR(50) DEFAULT 'Giảm giá hóa đơn'");
+
+    // Coupon discount columns
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_coupon_discount', 'BOOLEAN DEFAULT true');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'coupon_discount_label', "VARCHAR(50) DEFAULT 'Mã giảm giá'");
+
+    // Voucher discount columns
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_voucher_discount', 'BOOLEAN DEFAULT true');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'voucher_discount_label', "VARCHAR(50) DEFAULT 'Voucher'");
+
+    // Total discount columns
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_total_discount', 'BOOLEAN DEFAULT true');
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'total_discount_label', "VARCHAR(50) DEFAULT 'Tổng giảm giá'");
+
+    this.logger.log('Time tracking and discount config columns added to bill_templates');
   }
 
   private async createBillPrinterConfigsTable(queryRunner: any): Promise<void> {
