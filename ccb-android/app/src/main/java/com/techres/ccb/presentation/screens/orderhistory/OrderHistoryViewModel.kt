@@ -311,7 +311,7 @@ class OrderHistoryViewModel @Inject constructor(
             try {
                 withContext(Dispatchers.IO) {
                     // Get current branch ID
-                    val branchId = authRepository.getCurrentBranchId()
+                    val branchId = authRepository.getBranchId()
                     if (branchId.isNullOrEmpty()) {
                         _uiState.update {
                             it.copy(isPrinting = false, printMessage = "Không tìm thấy chi nhánh")
