@@ -746,23 +746,98 @@ private fun OrderDetailDialog(
                 Divider()
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Totals
-                if (order.discountAmount > 0) {
+                // Calculate discount breakdown
+                val itemDiscountTotal = orderItems.sumOf { it.discountAmount }
+                val totalDiscount = order.discountAmount
+                val billDiscount = (totalDiscount - itemDiscountTotal).coerceAtLeast(0.0)
+
+                // Parse coupon info from appliedCouponsJson if available
+                val couponCode = order.couponCode
+                val hasCoupon = !couponCode.isNullOrEmpty()
+
+                // VAT calculation (assuming prices include VAT at 8% for F&B)
+                val vatRate = 8.0
+                val priceAfterDiscount = order.subtotal - totalDiscount
+                val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
+                val vatAmount = priceAfterDiscount - priceBeforeVat
+
+                // Totals - Always show subtotal
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Tạm tính", color = Color.Gray)
+                    Text(formatCurrency(order.subtotal.toLong()))
+                }
+
+                // Show item discount if > 0
+                if (itemDiscountTotal > 0) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Tạm tính", color = Color.Gray)
-                        Text(formatCurrency(order.subtotal.toLong()))
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Giảm giá", color = Color(0xFF4CAF50))
-                        Text("-${formatCurrency(order.discountAmount.toLong())}", color = Color(0xFF4CAF50))
+                        Text("Giảm giá món", color = Color(0xFF4CAF50), fontSize = 14.sp)
+                        Text("-${formatCurrency(itemDiscountTotal.toLong())}", color = Color(0xFF4CAF50), fontSize = 14.sp)
                     }
                 }
+
+                // Show bill discount if > 0
+                if (billDiscount > 0 && !hasCoupon) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Giảm giá hóa đơn", color = Color(0xFF4CAF50), fontSize = 14.sp)
+                        Text("-${formatCurrency(billDiscount.toLong())}", color = Color(0xFF4CAF50), fontSize = 14.sp)
+                    }
+                }
+
+                // Show coupon discount if coupon was applied
+                if (hasCoupon && billDiscount > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Mã giảm giá ($couponCode)", color = Color(0xFF2196F3), fontSize = 14.sp)
+                        Text("-${formatCurrency(billDiscount.toLong())}", color = Color(0xFF2196F3), fontSize = 14.sp)
+                    }
+                }
+
+                // Show total discount if there are multiple discount types
+                if (totalDiscount > 0 && (itemDiscountTotal > 0 && billDiscount > 0)) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Tổng giảm giá", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        Text("-${formatCurrency(totalDiscount.toLong())}", color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    }
+                }
+
+                // VAT info
+                Spacer(modifier = Modifier.height(8.dp))
+                Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Giá trước VAT", color = Color.Gray, fontSize = 13.sp)
+                    Text(formatCurrency(priceBeforeVat.toLong()), fontSize = 13.sp)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("VAT (${vatRate.toInt()}%)", color = Color.Gray, fontSize = 13.sp)
+                    Text(formatCurrency(vatAmount.toLong()), fontSize = 13.sp)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -779,6 +854,26 @@ private fun OrderDetailDialog(
                         fontSize = 16.sp,
                         color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray
                     )
+                }
+
+                // Show payment info if completed
+                if (isCompleted && order.paidAmount > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Tiền khách đưa", color = Color.Gray, fontSize = 13.sp)
+                        Text(formatCurrency(order.paidAmount.toLong()), fontSize = 13.sp)
+                    }
+                    if (order.changeAmount > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Tiền thừa", color = Color.Gray, fontSize = 13.sp)
+                            Text(formatCurrency(order.changeAmount.toLong()), fontSize = 13.sp)
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
