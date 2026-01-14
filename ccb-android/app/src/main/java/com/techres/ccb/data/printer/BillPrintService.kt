@@ -240,9 +240,9 @@ object BillPrintService {
                 // Item discount (nếu có)
                 if (template.showItemDiscount && item.discountAmount > 0) {
                     val discountText = if (item.discountPercent > 0) {
-                        "  Giảm giá (${item.discountPercent.toInt()}%)"
+                        "  ${template.itemDiscountLabel} (${item.discountPercent.toInt()}%)"
                     } else {
-                        "  Giảm giá"
+                        "  ${template.itemDiscountLabel}"
                     }
                     lineKeyValue(discountText, "-${formatCurrency(item.discountAmount)}")
                 }
@@ -475,8 +475,8 @@ object BillPrintService {
                 }
 
                 // Item discount
-                if (item.discountAmount > 0) {
-                    lineColumns("   Giảm", "-${formatCurrency(item.discountAmount)}")
+                if (template.showItemDiscount && item.discountAmount > 0) {
+                    lineColumns("   ${template.itemDiscountLabel}", "-${formatCurrency(item.discountAmount)}")
                 }
             }
 
@@ -647,11 +647,11 @@ object BillPrintService {
                 }
 
                 // Item discount
-                if (item.discountAmount > 0) {
+                if (template.showItemDiscount && item.discountAmount > 0) {
                     val discountText = if (item.discountPercent > 0) {
-                        "  Giảm giá (${item.discountPercent.toInt()}%)"
+                        "  ${template.itemDiscountLabel} (${item.discountPercent.toInt()}%)"
                     } else {
-                        "  Giảm giá"
+                        "  ${template.itemDiscountLabel}"
                     }
                     lineKeyValue(discountText, "-${formatCurrency(item.discountAmount)}")
                 }

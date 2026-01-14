@@ -41,7 +41,7 @@ import com.techres.ccb.data.local.entity.*
         BillTemplateEntity::class,
         BillPrinterConfigEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {

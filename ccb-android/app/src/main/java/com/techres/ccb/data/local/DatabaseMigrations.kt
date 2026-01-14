@@ -433,6 +433,130 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 14 to 15
+     * Adds time tracking and 4 discount types columns to bill_templates table
+     */
+    val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 14 to 15...")
+
+            // ============ TIME TRACKING CONFIG ============
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_check_in_time INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added show_check_in_time column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_check_in_time column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_check_out_time INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added show_check_out_time column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_check_out_time column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN check_in_label TEXT NOT NULL DEFAULT 'Giờ vào'")
+                Log.d(TAG, "Added check_in_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "check_in_label column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN check_out_label TEXT NOT NULL DEFAULT 'Giờ ra'")
+                Log.d(TAG, "Added check_out_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "check_out_label column may already exist: ${e.message}")
+            }
+
+            // ============ DISCOUNT CONFIG (4 loại giảm giá) ============
+            // 1. Giảm giá món (Item Discount)
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_item_discount INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added show_item_discount column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_item_discount column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_total_item_discount INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added show_total_item_discount column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_total_item_discount column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN item_discount_label TEXT NOT NULL DEFAULT 'Giảm giá món'")
+                Log.d(TAG, "Added item_discount_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "item_discount_label column may already exist: ${e.message}")
+            }
+
+            // 2. Giảm giá hóa đơn (Bill Discount)
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_bill_discount INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added show_bill_discount column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_bill_discount column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN bill_discount_label TEXT NOT NULL DEFAULT 'Giảm giá hóa đơn'")
+                Log.d(TAG, "Added bill_discount_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "bill_discount_label column may already exist: ${e.message}")
+            }
+
+            // 3. Coupon
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_coupon_discount INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added show_coupon_discount column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_coupon_discount column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN coupon_discount_label TEXT NOT NULL DEFAULT 'Mã giảm giá'")
+                Log.d(TAG, "Added coupon_discount_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "coupon_discount_label column may already exist: ${e.message}")
+            }
+
+            // 4. Voucher
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_voucher_discount INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added show_voucher_discount column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_voucher_discount column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN voucher_discount_label TEXT NOT NULL DEFAULT 'Voucher'")
+                Log.d(TAG, "Added voucher_discount_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "voucher_discount_label column may already exist: ${e.message}")
+            }
+
+            // Tổng giảm giá
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN show_total_discount INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added show_total_discount column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "show_total_discount column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE bill_templates ADD COLUMN total_discount_label TEXT NOT NULL DEFAULT 'Tổng giảm giá'")
+                Log.d(TAG, "Added total_discount_label column to bill_templates")
+            } catch (e: Exception) {
+                Log.d(TAG, "total_discount_label column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 14 to 15 complete - Added time tracking and discount config columns to bill_templates")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -440,6 +564,7 @@ object DatabaseMigrations {
         MIGRATION_10_11,
         MIGRATION_11_12,
         MIGRATION_12_13,
-        MIGRATION_13_14
+        MIGRATION_13_14,
+        MIGRATION_14_15
     )
 }
