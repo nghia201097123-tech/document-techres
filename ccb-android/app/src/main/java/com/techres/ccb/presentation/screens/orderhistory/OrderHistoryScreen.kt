@@ -86,6 +86,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
+import com.techres.ccb.util.AppliedCouponInfo
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1069,24 +1072,49 @@ private fun OrderDetailDialog(
                     // Calculate discount breakdown
                     val itemDiscountTotal = orderItems.sumOf { it.discountAmount }
                     val totalDiscount = order.discountAmount
-                    val billDiscount = (totalDiscount - itemDiscountTotal).coerceAtLeast(0.0)
-                    val couponCode = order.couponCode
-                    val hasCoupon = !couponCode.isNullOrEmpty()
                     val vatRate = 8.0
                     val priceAfterDiscount = order.subtotal - totalDiscount
                     val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
                     val vatAmount = priceAfterDiscount - priceBeforeVat
 
+                    // Parse applied coupons from JSON
+                    val appliedCoupons: List<AppliedCouponInfo> = try {
+                        if (!order.appliedCouponsJson.isNullOrEmpty()) {
+                            val type = object : TypeToken<List<AppliedCouponInfo>>() {}.type
+                            Gson().fromJson(order.appliedCouponsJson, type)
+                        } else emptyList()
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+
+                    // Calculate coupon discount total
+                    val couponDiscountTotal = appliedCoupons.sumOf { it.discountAmount }
+                    // Bill discount (excluding items and coupons)
+                    val billDiscount = (totalDiscount - itemDiscountTotal - couponDiscountTotal).coerceAtLeast(0.0)
+
                     // Subtotal
                     SummaryRow("Tạm tính", formatCurrency(order.subtotal.toLong()))
 
-                    // Discounts
+                    // Item discounts
                     if (itemDiscountTotal > 0) {
                         SummaryRow("Giảm giá món", "-${formatCurrency(itemDiscountTotal.toLong())}", Color(0xFF4CAF50))
                     }
+
+                    // Coupon discounts - hiển thị từng coupon riêng biệt
+                    appliedCoupons.forEach { coupon ->
+                        val couponLabel = buildString {
+                            append("Coupon: ${coupon.code}")
+                            when (coupon.discountType) {
+                                "percentage" -> append(" (${coupon.discountValue.toInt()}%)")
+                                "fixed" -> append(" (Tiền mặt)")
+                            }
+                        }
+                        SummaryRow(couponLabel, "-${formatCurrency(coupon.discountAmount.toLong())}", Color(0xFF2196F3))
+                    }
+
+                    // Bill discount (if any remaining after coupons)
                     if (billDiscount > 0) {
-                        val label = if (hasCoupon) "Coupon ($couponCode)" else "Giảm giá HĐ"
-                        SummaryRow(label, "-${formatCurrency(billDiscount.toLong())}", if (hasCoupon) Color(0xFF2196F3) else Color(0xFF4CAF50))
+                        SummaryRow("Giảm giá HĐ", "-${formatCurrency(billDiscount.toLong())}", Color(0xFF4CAF50))
                     }
 
                     // VAT
