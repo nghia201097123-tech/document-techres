@@ -3,11 +3,18 @@ package com.techres.ccb.presentation.screens.orderhistory
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.BillTemplateDao
+import com.techres.ccb.data.local.dao.PrinterConfigDao
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
+import com.techres.ccb.data.printer.BillData
+import com.techres.ccb.data.printer.BillItem
+import com.techres.ccb.data.printer.BillVariant
+import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,9 +22,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Date
+import java.util.Locale
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
@@ -75,13 +86,18 @@ data class OrderHistoryUiState(
     // Pagination
     val currentPage: Int = 1,
     val pageSize: Int = 10,
-    val totalPages: Int = 1
+    val totalPages: Int = 1,
+    // Printing
+    val isPrinting: Boolean = false,
+    val printMessage: String? = null
 )
 
 @HiltViewModel
 class OrderHistoryViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val orderRepository: OrderRepository
+    private val orderRepository: OrderRepository,
+    private val printerConfigDao: PrinterConfigDao,
+    private val billTemplateDao: BillTemplateDao
 ) : ViewModel() {
 
     companion object {
@@ -265,9 +281,161 @@ class OrderHistoryViewModel @Inject constructor(
             it.copy(
                 selectedOrder = null,
                 selectedOrderItems = emptyList(),
-                showOrderDetail = false
+                showOrderDetail = false,
+                printMessage = null
             )
         }
+    }
+
+    fun clearPrintMessage() {
+        _uiState.update { it.copy(printMessage = null) }
+    }
+
+    fun reprintBill() {
+        val order = _uiState.value.selectedOrder ?: return
+        val orderItems = _uiState.value.selectedOrderItems
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPrinting = true, printMessage = null) }
+
+            try {
+                withContext(Dispatchers.IO) {
+                    // Get printer config
+                    val printerConfig = printerConfigDao.getActivePrinter(branchId)
+                    if (printerConfig == null) {
+                        _uiState.update {
+                            it.copy(isPrinting = false, printMessage = "Không tìm thấy máy in")
+                        }
+                        return@withContext
+                    }
+
+                    // Get bill template
+                    var template = if (printerConfig.templateId != null) {
+                        billTemplateDao.getById(printerConfig.templateId)
+                    } else {
+                        billTemplateDao.getDefaultByBranch(branchId)
+                    }
+                    if (template == null || !template.isActive) {
+                        val activeTemplates = billTemplateDao.getAllByBranchSync(branchId)
+                        template = activeTemplates.firstOrNull()
+                    }
+
+                    if (template == null) {
+                        _uiState.update {
+                            it.copy(isPrinting = false, printMessage = "Không tìm thấy mẫu in")
+                        }
+                        return@withContext
+                    }
+
+                    // Build BillData from order
+                    val billData = buildBillDataFromOrder(order, orderItems)
+
+                    // Print
+                    val result = HybridBillPrintService.printBill(printerConfig, template, billData)
+                    val message = when (result) {
+                        is HybridBillPrintService.PrintResult.Success -> "In lại bill thành công!"
+                        is HybridBillPrintService.PrintResult.Error -> "Lỗi in: ${result.message}"
+                    }
+                    _uiState.update { it.copy(isPrinting = false, printMessage = message) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "reprintBill - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(isPrinting = false, printMessage = "Lỗi: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun buildBillDataFromOrder(order: OrderEntity, orderItems: List<OrderItemEntity>): BillData {
+        val orderDate = try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(order.createdAt) ?: Date()
+        } catch (e: Exception) {
+            Date()
+        }
+
+        val checkInTime = orderDate
+        val checkOutTime = order.completedAt?.let {
+            try { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(it) } catch (e: Exception) { null }
+        }
+
+        val billItems = orderItems.filter { !it.isComboChild }.map { item ->
+            // Parse variants
+            val variants = if (!item.notes.isNullOrBlank()) {
+                val parts = item.notes.split(" | ")
+                val variantsPart = parts.firstOrNull() ?: ""
+                variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }.map { variant ->
+                    val colonIndex = variant.lastIndexOf(":")
+                    if (colonIndex > 0) {
+                        BillVariant(variant.substring(0, colonIndex), variant.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0)
+                    } else {
+                        BillVariant(variant, 0.0)
+                    }
+                }
+            } else emptyList()
+
+            val userNote = if (!item.notes.isNullOrBlank()) {
+                val parts = item.notes.split(" | ")
+                parts.getOrNull(1)
+            } else null
+
+            BillItem(
+                code = item.productCode,
+                name = item.productName,
+                quantity = item.quantity,
+                unitPrice = item.unitPrice,
+                originalPrice = if (item.originalPrice > 0) item.originalPrice else item.unitPrice,
+                discountAmount = item.discountAmount,
+                discountPercent = 0.0,
+                discountType = "fixed",
+                totalPrice = item.totalPrice,
+                note = userNote,
+                variants = variants,
+                toppings = emptyList(),
+                vatRate = item.vatRate
+            )
+        }
+
+        val subtotal = order.subtotal
+        val totalItemDiscount = billItems.sumOf { it.discountAmount }
+        val billDiscount = (order.discountAmount - totalItemDiscount).coerceAtLeast(0.0)
+        val vatRate = 8.0
+        val priceAfterDiscount = subtotal - order.discountAmount
+        val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
+        val vatAmount = priceAfterDiscount - priceBeforeVat
+
+        return BillData(
+            orderNumber = order.orderNumber,
+            orderDate = orderDate,
+            tableName = order.tableName,
+            staffName = order.staffName,
+            customerName = order.customerName,
+            items = billItems,
+            subtotal = subtotal,
+            itemDiscountAmount = totalItemDiscount,
+            billDiscountAmount = billDiscount,
+            billDiscountPercent = 0.0,
+            couponDiscountAmount = 0.0,
+            couponCode = order.couponCode,
+            voucherDiscountAmount = 0.0,
+            voucherCode = null,
+            totalDiscountAmount = order.discountAmount,
+            totalItemDiscount = totalItemDiscount,
+            discountAmount = billDiscount,
+            discountPercent = 0.0,
+            serviceFee = 0.0,
+            serviceFeePercent = 0.0,
+            vatRate = vatRate,
+            vatAmount = vatAmount,
+            priceBeforeVat = priceBeforeVat,
+            priceAfterVat = priceAfterDiscount,
+            totalAmount = order.totalAmount,
+            paymentMethod = order.paymentMethod ?: "Tiền mặt",
+            receivedAmount = order.paidAmount,
+            changeAmount = order.changeAmount,
+            checkInTime = checkInTime,
+            checkOutTime = checkOutTime
+        )
     }
 
     fun clearError() {

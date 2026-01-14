@@ -32,8 +32,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -230,6 +233,10 @@ fun OrderHistoryScreen(
             OrderDetailDialog(
                 order = uiState.selectedOrder!!,
                 orderItems = uiState.selectedOrderItems,
+                isPrinting = uiState.isPrinting,
+                printMessage = uiState.printMessage,
+                onReprintBill = { viewModel.reprintBill() },
+                onClearPrintMessage = { viewModel.clearPrintMessage() },
                 onDismiss = { viewModel.hideOrderDetail() }
             )
         }
@@ -628,6 +635,10 @@ private fun PaginationControls(
 private fun OrderDetailDialog(
     order: OrderEntity,
     orderItems: List<OrderItemEntity>,
+    isPrinting: Boolean = false,
+    printMessage: String? = null,
+    onReprintBill: () -> Unit = {},
+    onClearPrintMessage: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val isCompleted = order.status == "completed"
@@ -640,84 +651,143 @@ private fun OrderDetailDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
+                .fillMaxWidth(0.95f)
+                .padding(8.dp),
+            shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
-                modifier = Modifier.padding(20.dp)
+                modifier = Modifier.padding(16.dp)
             ) {
-                // Header
+                // Header with status badge and reprint button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Chi tiết đơn hàng",
-                            fontSize = 18.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "#${order.orderNumber}",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = Color.Gray
                         )
                     }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Reprint button (only for completed orders)
+                        if (isCompleted) {
+                            Button(
+                                onClick = onReprintBill,
+                                enabled = !isPrinting,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2196F3)
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Print,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    if (isPrinting) "Đang in..." else "In lại bill",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        // Status badge
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = statusColor.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = statusText,
+                                color = statusColor,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                // Print message
+                if (!printMessage.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Box(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .background(
-                                color = statusColor.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (printMessage.contains("thành công")) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                shape = RoundedCornerShape(6.dp)
                             )
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(8.dp)
                     ) {
                         Text(
-                            text = statusText,
-                            color = statusColor,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
+                            text = printMessage,
+                            fontSize = 12.sp,
+                            color = if (printMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Divider()
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Order Info
-                if (!order.tableName.isNullOrEmpty()) {
-                    InfoRow(label = "Bàn", value = order.tableName)
-                }
-                if (!order.customerName.isNullOrEmpty()) {
-                    InfoRow(label = "Khách hàng", value = order.customerName)
-                }
-                if (!order.staffName.isNullOrEmpty()) {
-                    InfoRow(label = "Nhân viên", value = order.staffName)
-                }
-                InfoRow(label = "Thời gian tạo", value = formatDateTime(parseTimestamp(order.createdAt)))
-
-                if (isCompleted && !order.paymentMethod.isNullOrEmpty()) {
-                    InfoRow(label = "Thanh toán", value = getPaymentMethodName(order.paymentMethod))
-                    order.completedAt?.let {
-                        InfoRow(label = "Hoàn tất lúc", value = formatDateTime(parseTimestamp(it)))
+                // Order Info - 2 columns like web
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Left column
+                    Column(modifier = Modifier.weight(1f)) {
+                        InfoRowCompact(label = "Mã đơn", value = order.orderNumber.takeLast(8))
+                        InfoRowCompact(label = "Bàn", value = order.tableName ?: "---")
+                        InfoRowCompact(label = "Giờ vào", value = formatDateTime(parseTimestamp(order.createdAt)))
+                        if (!order.notes.isNullOrEmpty()) {
+                            InfoRowCompact(label = "Ghi chú", value = order.notes)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    // Right column
+                    Column(modifier = Modifier.weight(1f)) {
+                        InfoRowCompact(label = "Thu ngân", value = order.staffName ?: "---")
+                        InfoRowCompact(label = "Số khách", value = "${order.guestCount} khách")
+                        order.completedAt?.let {
+                            InfoRowCompact(label = "Giờ ra", value = formatDateTime(parseTimestamp(it)))
+                        }
+                        if (!order.paymentMethod.isNullOrEmpty()) {
+                            InfoRowCompact(label = "Thanh toán", value = getPaymentMethodName(order.paymentMethod))
+                        }
                     }
                 }
 
-                if (!isCompleted) {
-                    order.cancelledAt?.let {
-                        InfoRow(label = "Hủy lúc", value = formatDateTime(parseTimestamp(it)))
-                    }
-                    if (!order.cancelReason.isNullOrEmpty()) {
-                        InfoRow(label = "Lý do hủy", value = order.cancelReason, valueColor = Color(0xFFf44336))
-                    }
+                if (!isCompleted && !order.cancelReason.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Lý do hủy: ${order.cancelReason}",
+                        fontSize = 12.sp,
+                        color = Color(0xFFf44336),
+                        fontStyle = FontStyle.Italic
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Divider()
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Items List - filter out combo children (they're shown under their parent)
                 val parentItems = orderItems.filter { !it.isComboChild }
@@ -1080,6 +1150,31 @@ private fun InfoRow(
             text = value,
             fontSize = 13.sp,
             color = if (valueColor != Color.Unspecified) valueColor else Color.Unspecified
+        )
+    }
+}
+
+@Composable
+private fun InfoRowCompact(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.padding(vertical = 2.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = Color.Gray,
+            modifier = Modifier.width(60.dp)
+        )
+        Text(
+            text = value,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
