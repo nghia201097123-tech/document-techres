@@ -34,6 +34,10 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -189,6 +193,7 @@ fun OrderHistoryScreen(
                         TableHeaderCell("COUPON", 80.dp)
                         TableHeaderCell("SỐ KHÁCH", 70.dp)
                         TableHeaderCell("THANH TOÁN", 90.dp)
+                        TableHeaderCell("ĐỒNG BỘ", 60.dp)
                     }
 
                     Divider(color = Color.LightGray)
@@ -235,8 +240,12 @@ fun OrderHistoryScreen(
                 orderItems = uiState.selectedOrderItems,
                 isPrinting = uiState.isPrinting,
                 printMessage = uiState.printMessage,
+                isSyncing = uiState.isSyncing,
+                syncMessage = uiState.syncMessage,
                 onReprintBill = { viewModel.reprintBill() },
                 onClearPrintMessage = { viewModel.clearPrintMessage() },
+                onSyncOrder = { viewModel.syncOrder() },
+                onClearSyncMessage = { viewModel.clearSyncMessage() },
                 onDismiss = { viewModel.hideOrderDetail() }
             )
         }
@@ -525,6 +534,25 @@ private fun OrderTableRow(
             color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray,
             textAlign = TextAlign.End
         )
+
+        // Đồng bộ (Sync status)
+        Box(
+            modifier = Modifier.width(60.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val (syncIcon, syncColor, syncDesc) = when (order.syncStatus) {
+                "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
+                "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang đồng bộ")
+                "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi đồng bộ")
+                else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ đồng bộ") // pending
+            }
+            Icon(
+                imageVector = syncIcon,
+                contentDescription = syncDesc,
+                modifier = Modifier.size(18.dp),
+                tint = syncColor
+            )
+        }
     }
 }
 
@@ -637,8 +665,12 @@ private fun OrderDetailDialog(
     orderItems: List<OrderItemEntity>,
     isPrinting: Boolean = false,
     printMessage: String? = null,
+    isSyncing: Boolean = false,
+    syncMessage: String? = null,
     onReprintBill: () -> Unit = {},
     onClearPrintMessage: () -> Unit = {},
+    onSyncOrder: () -> Unit = {},
+    onClearSyncMessage: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val isCompleted = order.status == "completed"
@@ -681,6 +713,35 @@ private fun OrderDetailDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Sync button - show sync status indicator
+                        val syncStatusInfo = when (order.syncStatus) {
+                            "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
+                            "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang đồng bộ")
+                            "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi")
+                            else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ") // pending
+                        }
+                        Button(
+                            onClick = onSyncOrder,
+                            enabled = !isSyncing && order.syncStatus != "synced",
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = syncStatusInfo.second.copy(alpha = 0.9f),
+                                disabledContainerColor = syncStatusInfo.second.copy(alpha = 0.5f)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Icon(
+                                syncStatusInfo.first,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isSyncing) "Đang..." else syncStatusInfo.third,
+                                fontSize = 11.sp
+                            )
+                        }
+
                         // Reprint button (only for completed orders)
                         if (isCompleted) {
                             Button(
@@ -740,6 +801,35 @@ private fun OrderDetailDialog(
                             fontSize = 12.sp,
                             color = if (printMessage.contains("thành công")) Color(0xFF2E7D32) else Color(0xFFC62828)
                         )
+                    }
+                }
+
+                // Sync message
+                if (!syncMessage.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = if (syncMessage.contains("Lỗi")) Color(0xFFFFEBEE) else Color(0xFFFFF3E0),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (syncMessage.contains("Lỗi")) Icons.Default.CloudOff else Icons.Default.Cloud,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (syncMessage.contains("Lỗi")) Color(0xFFC62828) else Color(0xFFE65100)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = syncMessage,
+                                fontSize = 12.sp,
+                                color = if (syncMessage.contains("Lỗi")) Color(0xFFC62828) else Color(0xFFE65100)
+                            )
+                        }
                     }
                 }
 

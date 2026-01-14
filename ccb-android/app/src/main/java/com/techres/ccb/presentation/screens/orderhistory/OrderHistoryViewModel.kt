@@ -66,7 +66,10 @@ data class OrderHistoryItem(
     val discountAmount: Long = 0,     // Giảm giá
     val couponCode: String? = null,   // Mã coupon
     val paidAmount: Long = 0,         // Tiền thanh toán
-    val guestCount: Int = 1           // Số khách
+    val guestCount: Int = 1,          // Số khách
+    // Sync status
+    val syncStatus: String = "pending", // pending, syncing, synced, failed
+    val syncError: String? = null
 )
 
 data class OrderHistoryUiState(
@@ -89,7 +92,10 @@ data class OrderHistoryUiState(
     val totalPages: Int = 1,
     // Printing
     val isPrinting: Boolean = false,
-    val printMessage: String? = null
+    val printMessage: String? = null,
+    // Syncing
+    val isSyncing: Boolean = false,
+    val syncMessage: String? = null
 )
 
 @HiltViewModel
@@ -202,7 +208,10 @@ class OrderHistoryViewModel @Inject constructor(
                             discountAmount = entity.discountAmount.toLong(),
                             couponCode = entity.couponCode,
                             paidAmount = entity.paidAmount.toLong(),
-                            guestCount = entity.guestCount
+                            guestCount = entity.guestCount,
+                            // Sync status
+                            syncStatus = entity.syncStatus,
+                            syncError = entity.syncError
                         )
                     }
 
@@ -440,6 +449,46 @@ class OrderHistoryViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearSyncMessage() {
+        _uiState.update { it.copy(syncMessage = null) }
+    }
+
+    /**
+     * Sync order to cloud
+     * TODO: Implement actual cloud sync logic when ready
+     */
+    fun syncOrder() {
+        val order = _uiState.value.selectedOrder ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSyncing = true, syncMessage = null) }
+
+            try {
+                // TODO: Implement actual sync logic here
+                // For now, just simulate a sync delay and show placeholder message
+                kotlinx.coroutines.delay(1500)
+
+                // Placeholder: Update sync status locally (in real implementation, this would be done after successful API call)
+                // orderRepository.updateOrderSyncStatus(order.id, "synced")
+
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncMessage = "Tính năng đồng bộ đang được phát triển. Vui lòng thử lại sau!"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "syncOrder - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncMessage = "Lỗi đồng bộ: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 
     fun setPage(page: Int) {
