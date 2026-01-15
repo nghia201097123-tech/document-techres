@@ -85,6 +85,16 @@ class TableViewModel @Inject constructor(
         // Also cache grid columns to avoid SharedPreferences read
         @Volatile
         private var cachedGridColumns: Int? = null
+
+        /**
+         * Invalidate cache - gọi khi table status thay đổi từ bên ngoài (VD: đặt món, thanh toán)
+         * Giúp TableScreen refresh ngay lập tức thay vì đợi cache hết hạn
+         */
+        fun invalidateCache() {
+            cachedState = null
+            cacheTimestamp = 0L
+            Log.d(TAG, "Cache invalidated")
+        }
     }
 
     // Check cache validity synchronously in the initializer

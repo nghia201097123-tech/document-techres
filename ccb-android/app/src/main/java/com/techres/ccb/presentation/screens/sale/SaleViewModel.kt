@@ -36,6 +36,7 @@ import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
+import com.techres.ccb.presentation.screens.table.TableViewModel
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -2030,6 +2031,9 @@ class SaleViewModel @Inject constructor(
                     }
                 }
 
+                // Invalidate TableViewModel cache để TableScreen refresh ngay lập tức
+                TableViewModel.invalidateCache()
+
                 Log.d(TAG, "placeOrder - Created order: $orderNumber with ${orderItems.size} items")
 
                 // Update UI state
@@ -2257,6 +2261,8 @@ class SaleViewModel @Inject constructor(
                     // 3. Update table status back to available
                     state.selectedTable?.let { table ->
                         tableRepository.updateTableStatus(table.id, "available", null, now)
+                        // Invalidate TableViewModel cache để TableScreen refresh ngay lập tức
+                        TableViewModel.invalidateCache()
                     }
 
                     // 4. Update shift statistics with correct discount
@@ -2632,6 +2638,8 @@ class SaleViewModel @Inject constructor(
                     // 3. Update table status back to available
                     state.selectedTable?.let { table ->
                         tableRepository.updateTableStatus(table.id, "available", null, now)
+                        // Invalidate TableViewModel cache để TableScreen refresh ngay lập tức
+                        TableViewModel.invalidateCache()
                     }
 
                     // 4. Update shift cancelled count
