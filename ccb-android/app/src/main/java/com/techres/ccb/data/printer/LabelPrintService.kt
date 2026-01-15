@@ -125,19 +125,21 @@ object LabelPrintService {
                         PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
                     }
 
-                    // Retry logic
+                    // Retry logic - use run block to properly break on success
                     var success = false
-                    repeat(3) { attempt ->
-                        val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
-                        when (result) {
-                            is PrinterResult.Success -> {
-                                success = true
-                                return@repeat
-                            }
-                            is PrinterResult.Error -> {
-                                lastError = result.message
-                                Log.w(TAG, "Label $i part ${partIndex + 1} attempt ${attempt + 1} failed: ${result.message}")
-                                if (attempt < 2) delay(1000)
+                    run retryLoop@{
+                        repeat(3) { attempt ->
+                            val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
+                            when (result) {
+                                is PrinterResult.Success -> {
+                                    success = true
+                                    return@retryLoop // Break out of retry loop on success
+                                }
+                                is PrinterResult.Error -> {
+                                    lastError = result.message
+                                    Log.w(TAG, "Label $i part ${partIndex + 1} attempt ${attempt + 1} failed: ${result.message}")
+                                    if (attempt < 2) delay(1000)
+                                }
                             }
                         }
                     }
