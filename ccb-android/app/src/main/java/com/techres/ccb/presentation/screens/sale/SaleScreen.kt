@@ -2169,31 +2169,21 @@ fun OrderItemRow(
                 // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
                 val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
                 if (variants.isNotEmpty()) {
-                    // Local state for this item's toppings
-                    // Default: expanded for active items, collapsed for cancelled items
-                    var toppingsExpanded by remember { mutableStateOf(!isCancelled) }
-
-                    // Sync with global forceExpanded when it changes
-                    LaunchedEffect(forceExpanded) {
-                        if (forceExpanded != null) {
-                            toppingsExpanded = forceExpanded
-                        }
-                    }
+                    // Use forceExpanded directly - no local state to avoid LazyColumn recycling issues
+                    val toppingsExpanded = forceExpanded ?: !isCancelled
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Collapsible header - click always works to toggle
+                    // Header showing topping count
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { toppingsExpanded = !toppingsExpanded }
                             .padding(vertical = 2.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (toppingsExpanded) "Thu gọn" else "Mở rộng",
+                            contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = Color.Gray
                         )
@@ -2205,12 +2195,8 @@ fun OrderItemRow(
                         )
                     }
 
-                    // Variants list - collapsible (use expandVertically for smooth in-place animation)
-                    AnimatedVisibility(
-                        visible = toppingsExpanded,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
+                    // Variants list - show/hide based on forceExpanded (no animation to prevent scroll jank)
+                    if (toppingsExpanded) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
