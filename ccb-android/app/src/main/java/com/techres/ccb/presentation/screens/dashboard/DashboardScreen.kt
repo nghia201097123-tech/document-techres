@@ -1291,176 +1291,168 @@ private fun OrdersTabBar(
     var showSortMenu by remember { mutableStateOf(false) }
 
     Surface(color = Color.White) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Row 1: Tabs and Grid columns
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = if (isCompact) 12.dp else 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Tabs
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
-                ) {
-                    TabChip(
-                        label = "Đơn Quầy",
-                        count = posCount,
-                        isSelected = selectedTab == 0,
-                        color = Color(0xFF1976D2),
-                        onClick = { onTabSelected(0) },
-                        isCompact = isCompact
-                    )
-                    TabChip(
-                        label = "Đơn App",
-                        count = appCount,
-                        isSelected = selectedTab == 1,
-                        color = Color(0xFFE91E63),
-                        onClick = { onTabSelected(1) },
-                        isCompact = isCompact
-                    )
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (isCompact) 8.dp else 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isCompact) 6.dp else 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Tabs
+            TabChip(
+                label = "Đơn Quầy",
+                count = posCount,
+                isSelected = selectedTab == 0,
+                color = Color(0xFF1976D2),
+                onClick = { onTabSelected(0) },
+                isCompact = isCompact
+            )
+            TabChip(
+                label = "Đơn App",
+                count = appCount,
+                isSelected = selectedTab == 1,
+                color = Color(0xFFE91E63),
+                onClick = { onTabSelected(1) },
+                isCompact = isCompact
+            )
 
-                // Grid Column Selector
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            // Search input - flexible width
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(if (isCompact) 40.dp else 44.dp),
+                placeholder = {
+                    Text(
+                        if (isCompact) "Tìm..." else "Tìm theo số đơn, bàn, món...",
+                        fontSize = if (isCompact) 11.sp else 13.sp,
+                        maxLines = 1
+                    )
+                },
+                leadingIcon = {
                     Icon(
-                        Icons.Default.GridView,
+                        Icons.Default.Search,
                         contentDescription = null,
                         modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
                         tint = Color.Gray
                     )
-                    columnOptions.forEach { cols ->
-                        FilterChip(
-                            selected = gridColumns == cols,
-                            onClick = { onGridColumnsChanged(cols) },
-                            label = { Text("$cols", fontSize = if (isCompact) 11.sp else 12.sp) },
-                            modifier = Modifier.height(if (isCompact) 28.dp else 32.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF1976D2),
-                                selectedLabelColor = Color.White
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { onSearchQueryChange("") },
+                            modifier = Modifier.size(if (isCompact) 20.dp else 24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Xóa",
+                                modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                                tint = Color.Gray
                             )
+                        }
+                    }
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = if (isCompact) 11.sp else 13.sp),
+                shape = RoundedCornerShape(if (isCompact) 8.dp else 10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF1976D2),
+                    unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
+                ),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            )
+
+            // Sort dropdown - compact
+            Box {
+                Surface(
+                    onClick = { showSortMenu = true },
+                    shape = RoundedCornerShape(if (isCompact) 8.dp else 10.dp),
+                    color = Color(0xFFF5F5F5),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = if (isCompact) 8.dp else 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Sort,
+                            contentDescription = null,
+                            modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                            tint = Color(0xFF1976D2)
+                        )
+                        if (!isCompact) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = sortType.displayName,
+                                fontSize = 12.sp,
+                                color = Color(0xFF1976D2),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                            tint = Color(0xFF1976D2)
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false }
+                ) {
+                    OrderSortType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (type == sortType) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color(0xFF1976D2)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text(
+                                        type.displayName,
+                                        fontWeight = if (type == sortType) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (type == sortType) Color(0xFF1976D2) else Color.Unspecified
+                                    )
+                                }
+                            },
+                            onClick = {
+                                onSortTypeChange(type)
+                                showSortMenu = false
+                            }
                         )
                     }
                 }
             }
 
-            // Row 2: Search and Sort
+            // Grid Column Selector
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = if (isCompact) 12.dp else 16.dp)
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Search input
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(if (isCompact) 44.dp else 48.dp),
-                    placeholder = { Text("Tìm theo số đơn, bàn, món...", fontSize = if (isCompact) 12.sp else 14.sp) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(if (isCompact) 18.dp else 20.dp),
-                            tint = Color.Gray
-                        )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = { onSearchQueryChange("") },
-                                modifier = Modifier.size(if (isCompact) 24.dp else 28.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Xóa",
-                                    modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
-                                    tint = Color.Gray
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = if (isCompact) 12.sp else 14.sp),
-                    shape = RoundedCornerShape(if (isCompact) 10.dp else 12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF1976D2),
-                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
-                    )
+                Icon(
+                    Icons.Default.GridView,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                    tint = Color.Gray
                 )
-
-                // Sort dropdown
-                Box {
-                    Surface(
-                        onClick = { showSortMenu = true },
-                        shape = RoundedCornerShape(if (isCompact) 10.dp else 12.dp),
-                        color = Color(0xFFF5F5F5),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = if (isCompact) 10.dp else 12.dp, vertical = if (isCompact) 10.dp else 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Sort,
-                                contentDescription = null,
-                                modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
-                                tint = Color(0xFF1976D2)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = sortType.displayName,
-                                fontSize = if (isCompact) 11.sp else 13.sp,
-                                color = Color(0xFF1976D2),
-                                fontWeight = FontWeight.Medium
-                            )
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
-                                tint = Color(0xFF1976D2)
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
-                    ) {
-                        OrderSortType.entries.forEach { type ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (type == sortType) {
-                                            Icon(
-                                                Icons.Default.Check,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                                tint = Color(0xFF1976D2)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        }
-                                        Text(
-                                            type.displayName,
-                                            fontWeight = if (type == sortType) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (type == sortType) Color(0xFF1976D2) else Color.Unspecified
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    onSortTypeChange(type)
-                                    showSortMenu = false
-                                }
-                            )
-                        }
-                    }
+                columnOptions.forEach { cols ->
+                    FilterChip(
+                        selected = gridColumns == cols,
+                        onClick = { onGridColumnsChanged(cols) },
+                        label = { Text("$cols", fontSize = if (isCompact) 10.sp else 11.sp) },
+                        modifier = Modifier.height(if (isCompact) 26.dp else 30.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF1976D2),
+                            selectedLabelColor = Color.White
+                        )
+                    )
                 }
             }
         }
