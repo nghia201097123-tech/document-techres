@@ -1840,12 +1840,36 @@ class SaleViewModel @Inject constructor(
     ): List<OrderItemEntity> {
         val orderItems = mutableListOf<OrderItemEntity>()
 
-        // Build variants string with prices: "Kiwi:10000, Size S:10000"
+        // Build variants string with group names for proper parsing
+        // Format: "Size: L, Đường: NHIỀU, + Trân châu (+10000)"
+        // - Options use "GroupName: Value" format
+        // - Toppings start with "+"
         val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
-            if (variant.price > 0) {
-                "${variant.name}:${variant.price}"
+            val groupNameLower = variant.groupName.lowercase()
+            val isToppingGroup = groupNameLower.contains("topping") ||
+                                 groupNameLower.contains("addon") ||
+                                 groupNameLower.contains("thêm")
+
+            if (isToppingGroup) {
+                // Toppings use "+" prefix
+                if (variant.price > 0) {
+                    "+ ${variant.name} (+${variant.price})"
+                } else {
+                    "+ ${variant.name}"
+                }
             } else {
-                variant.name
+                // Options use "GroupName: Value" format
+                val displayGroupName = when (groupNameLower) {
+                    "size", "kích thước" -> "Size"
+                    "đường", "sugar", "độ đường" -> "Đường"
+                    "đá", "ice", "độ đá" -> "Đá"
+                    else -> variant.groupName
+                }
+                if (variant.price > 0) {
+                    "$displayGroupName: ${variant.name} (+${variant.price})"
+                } else {
+                    "$displayGroupName: ${variant.name}"
+                }
             }
         }
 

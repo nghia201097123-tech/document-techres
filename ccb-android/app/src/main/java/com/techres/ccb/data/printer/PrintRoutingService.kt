@@ -105,7 +105,17 @@ object PrintRoutingService {
 
         Log.d(TAG, "Grouped into ${kitchenItemsMap.size} kitchens")
 
-        // 2. In song song đến các bếp
+        // 2. Find FIRST kitchen that can print labels (to print labels only once)
+        // Labels are for customer identification, not kitchen coordination
+        // So we only need to print labels once, not for each kitchen
+        val labelPrintKitchenId = kitchenItemsMap.keys.firstOrNull { kitchenId ->
+            val kitchen = kitchens.find { it.id == kitchenId }
+            kitchen != null && kitchen.isActive && kitchen.shouldPrintLabel()
+        }
+
+        Log.d(TAG, "Label print kitchen: ${labelPrintKitchenId ?: "NONE"}")
+
+        // 3. In song song đến các bếp
         val results = kitchenItemsMap.map { (kitchenId, items) ->
             async {
                 val kitchen = kitchens.find { it.id == kitchenId }
@@ -119,11 +129,14 @@ object PrintRoutingService {
                     )
                 }
 
-                printToKitchen(kitchen, order, items)
+                // Only print labels for the designated label kitchen
+                // Other kitchens only print tickets
+                val shouldPrintLabels = kitchenId == labelPrintKitchenId
+                printToKitchen(kitchen, order, items, printLabelsOverride = shouldPrintLabels)
             }
         }.awaitAll()
 
-        // 3. Tổng hợp kết quả
+        // 4. Tổng hợp kết quả
         val successfulKitchens = results.count { result ->
             (result.ticketResult as? PrinterResult.Success) != null ||
             (result.labelResult as? PrinterResult.Success) != null
@@ -167,17 +180,27 @@ object PrintRoutingService {
 
     /**
      * In đến 1 bếp cụ thể (cả ticket và/hoặc label)
+     *
+     * @param kitchen Bếp cần in
+     * @param order Thông tin order
+     * @param items Danh sách items
+     * @param printLabelsOverride Override label printing decision:
+     *        - true: print labels (if kitchen supports it)
+     *        - false: skip labels even if kitchen supports it
+     *        - Used to ensure labels are printed only once across all kitchens
      */
     private suspend fun printToKitchen(
         kitchen: KitchenEntity,
         order: OrderPrintData,
-        items: List<OrderItem>
+        items: List<OrderItem>,
+        printLabelsOverride: Boolean = true
     ): KitchenPrintResult {
         Log.d(TAG, "=== printToKitchen START ===")
         Log.d(TAG, "Kitchen: ${kitchen.name} (${kitchen.id})")
         Log.d(TAG, "  printMode: '${kitchen.printMode}'")
         Log.d(TAG, "  shouldPrintTicket(): ${kitchen.shouldPrintTicket()}")
         Log.d(TAG, "  shouldPrintLabel(): ${kitchen.shouldPrintLabel()}")
+        Log.d(TAG, "  printLabelsOverride: $printLabelsOverride")
         Log.d(TAG, "  printerIp: ${kitchen.printerIp}:${kitchen.printerPort}")
         Log.d(TAG, "  printerProtocol: ${kitchen.printerProtocol}")
         Log.d(TAG, "  items count: ${items.size}")
@@ -194,13 +217,19 @@ object PrintRoutingService {
             Log.d(TAG, ">>> Skipping TICKET (shouldPrintTicket=false)")
         }
 
-        // In LABEL nếu cần
-        if (kitchen.shouldPrintLabel()) {
-            Log.d(TAG, ">>> Printing LABELS...")
+        // In LABEL nếu cần VÀ được phép (printLabelsOverride)
+        // Labels are printed only once per order (not per kitchen) to avoid duplicates
+        val shouldPrintLabels = kitchen.shouldPrintLabel() && printLabelsOverride
+        if (shouldPrintLabels) {
+            Log.d(TAG, ">>> Printing LABELS (this is the designated label kitchen)...")
             labelResult = printLabelsToKitchen(kitchen, order, items)
             Log.d(TAG, "<<< Label result: ${labelResult is PrinterResult.Success}")
         } else {
-            Log.d(TAG, ">>> Skipping LABELS (shouldPrintLabel=false)")
+            if (!kitchen.shouldPrintLabel()) {
+                Log.d(TAG, ">>> Skipping LABELS (kitchen doesn't support label printing)")
+            } else {
+                Log.d(TAG, ">>> Skipping LABELS (not the designated label kitchen)")
+            }
         }
 
         return KitchenPrintResult(

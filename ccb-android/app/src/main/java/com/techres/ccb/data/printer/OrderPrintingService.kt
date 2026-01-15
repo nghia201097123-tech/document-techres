@@ -246,7 +246,8 @@ object OrderPrintingService {
 
     /**
      * Parse notes field từ OrderItemEntity
-     * Notes format: "Size: L, Đường: 70%, + Trân châu, + Thạch, Ghi chú: Ít đá"
+     * New format: "Size: L (+10000), Đường: NHIỀU, + Trân châu (+10000), Ghi chú: Ít đá"
+     * Old format (backward compat): "Size L:10000, NHIỀU"
      * Returns: Triple(options, toppings, note)
      */
     private fun parseNotesField(notes: String?): Triple<Map<String, String>, List<PrintRoutingService.ToppingInfo>, String?> {
@@ -258,38 +259,96 @@ object OrderPrintingService {
         val toppings = mutableListOf<PrintRoutingService.ToppingInfo>()
         var note: String? = null
 
+        // Common sugar/ice option names for backward compatibility
+        val sugarOptions = setOf("nhiều", "bình thường", "ít", "không", "30%", "50%", "70%", "100%", "0%")
+        val iceOptions = setOf("đá bình thường", "ít đá", "không đá", "full đá", "đá riêng")
+
         try {
+            // Check for pipe separator (user note section)
+            val mainPart: String
+            val userNotePart: String?
+            if (notes.contains(" | ")) {
+                val parts = notes.split(" | ", limit = 2)
+                mainPart = parts[0]
+                userNotePart = if (parts.size > 1 && parts[1].startsWith("Ghi chú:")) {
+                    parts[1].removePrefix("Ghi chú:").trim()
+                } else if (parts.size > 1) {
+                    parts[1].trim()
+                } else null
+            } else {
+                mainPart = notes
+                userNotePart = null
+            }
+
             // Split by comma and process each part
-            notes.split(",").map { it.trim() }.forEach { part ->
+            mainPart.split(",").map { it.trim() }.forEach { part ->
                 when {
                     // Toppings start with "+"
                     part.startsWith("+") -> {
-                        val toppingName = part.removePrefix("+").trim()
-                        if (toppingName.isNotBlank()) {
-                            toppings.add(PrintRoutingService.ToppingInfo(name = toppingName, price = 0.0))
+                        // Format: "+ Trân châu (+10000)" or "+ Trân châu"
+                        var toppingText = part.removePrefix("+").trim()
+                        var toppingPrice = 0.0
+
+                        // Extract price if present: "(+10000)"
+                        val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)$").find(toppingText)
+                        if (priceMatch != null) {
+                            toppingPrice = priceMatch.groupValues[1].toDoubleOrNull() ?: 0.0
+                            toppingText = toppingText.replace(priceMatch.value, "").trim()
+                        }
+
+                        if (toppingText.isNotBlank()) {
+                            toppings.add(PrintRoutingService.ToppingInfo(name = toppingText, price = toppingPrice))
                         }
                     }
-                    // Options with format "Key: Value"
+                    // Options with format "Key: Value" or "Key: Value (+price)"
                     part.contains(":") -> {
                         val colonIndex = part.indexOf(":")
                         val key = part.substring(0, colonIndex).trim()
-                        val value = part.substring(colonIndex + 1).trim()
+                        var value = part.substring(colonIndex + 1).trim()
+
+                        // Remove price suffix like "(+10000)" from value
+                        val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)$").find(value)
+                        if (priceMatch != null) {
+                            value = value.replace(priceMatch.value, "").trim()
+                        }
 
                         when (key.lowercase()) {
                             "ghi chú", "note", "ghi chu" -> note = value
                             else -> options[key] = value
                         }
                     }
-                    // Plain text is treated as note
+                    // Plain text - try to detect type for backward compatibility
                     part.isNotBlank() && !part.startsWith("[") -> {
-                        // Skip combo markers like "[Combo: ...]"
-                        if (note == null) {
-                            note = part
-                        } else {
-                            note = "$note, $part"
+                        val partLower = part.lowercase()
+
+                        // Check if it's a size option (old format: "Size L:10000")
+                        val sizeMatch = Regex("^(Size\\s*)(\\w+):(\\d+)$", RegexOption.IGNORE_CASE).find(part)
+                        if (sizeMatch != null) {
+                            options["Size"] = sizeMatch.groupValues[2]
+                        }
+                        // Check if it's a common sugar option
+                        else if (sugarOptions.any { partLower.contains(it) }) {
+                            options["Đường"] = part
+                        }
+                        // Check if it's a common ice option
+                        else if (iceOptions.any { partLower.contains(it) }) {
+                            options["Đá"] = part
+                        }
+                        // Otherwise treat as note
+                        else {
+                            if (note == null) {
+                                note = part
+                            } else {
+                                note = "$note, $part"
+                            }
                         }
                     }
                 }
+            }
+
+            // Add user note from pipe separator
+            if (!userNotePart.isNullOrBlank()) {
+                note = if (note.isNullOrBlank()) userNotePart else "$note | $userNotePart"
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing notes: ${e.message}")
