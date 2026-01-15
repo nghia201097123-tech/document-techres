@@ -271,15 +271,19 @@ object PrintRoutingService {
 
         val ticketItems = items.map { item ->
             Log.d(TAG, "  Converting item: ${item.productName}")
-            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { it.name }}")
+            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})" }}")
             Log.d(TAG, "    - options: ${item.options}")
             Log.d(TAG, "    - note: ${item.note}")
+
+            // Build toppingPrices giống như trong labels
+            val toppingPrices = item.toppings.map { Pair(it.name, it.price) }
 
             KitchenTicketPrintService.KitchenItem(
                 name = item.productName,
                 quantity = item.quantity,
                 note = item.note,
                 toppings = item.toppings.map { it.name },
+                toppingPrices = toppingPrices, // Pass topping prices giống như tem
                 options = item.options
             )
         }

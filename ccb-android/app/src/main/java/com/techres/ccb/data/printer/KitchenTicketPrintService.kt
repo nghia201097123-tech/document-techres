@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -20,6 +21,14 @@ import java.util.*
  */
 object KitchenTicketPrintService {
     private const val TAG = "KitchenTicketPrint"
+    private val priceFormatter = DecimalFormat("#,###")
+
+    /**
+     * Format price in VND format (e.g., 35,000đ)
+     */
+    private fun formatPrice(price: Double): String {
+        return if (price > 0) "${priceFormatter.format(price.toLong())}đ" else "0đ"
+    }
 
     /**
      * Data class cho món trong phiếu bếp
@@ -28,7 +37,8 @@ object KitchenTicketPrintService {
         val name: String,               // Tên món
         val quantity: Int,              // Số lượng
         val note: String? = null,       // Ghi chú riêng cho món
-        val toppings: List<String> = emptyList(), // Topping
+        val toppings: List<String> = emptyList(), // Topping names
+        val toppingPrices: List<Pair<String, Double>> = emptyList(), // Topping với giá (giống tem)
         val options: Map<String, String> = emptyMap() // Tùy chọn (Size, Đá, Đường...)
     )
 
@@ -207,11 +217,24 @@ object KitchenTicketPrintService {
                     line("   $key: $value")
                 }
 
-                // Topping - hiển thị tất cả toppings
-                if (item.toppings.isNotEmpty()) {
-                    Log.d(TAG, "  Printing ${item.toppings.size} toppings for ${item.name}")
-                    item.toppings.forEach { topping ->
-                        line("   + $topping")
+                // Topping - hiển thị tất cả toppings giống như in tem
+                if (item.toppings.isNotEmpty() || item.toppingPrices.isNotEmpty()) {
+                    val toppingCount = if (item.toppingPrices.isNotEmpty()) item.toppingPrices.size else item.toppings.size
+                    Log.d(TAG, "  Printing $toppingCount toppings for ${item.name}")
+
+                    // Hiển thị topping với giá nếu có (giống tem)
+                    if (item.toppingPrices.isNotEmpty()) {
+                        item.toppingPrices.forEach { (toppingName, toppingPrice) ->
+                            if (toppingPrice > 0) {
+                                lineKeyValue("   + $toppingName", "+${formatPrice(toppingPrice)}")
+                            } else {
+                                line("   + $toppingName")
+                            }
+                        }
+                    } else {
+                        item.toppings.forEach { topping ->
+                            line("   + $topping")
+                        }
                     }
                 }
 
