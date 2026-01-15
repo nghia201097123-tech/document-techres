@@ -53,7 +53,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -708,9 +707,6 @@ private fun OrderDetailDialog(
     var showCancelDialog by remember { mutableStateOf(false) }
     var cancelReason by remember { mutableStateOf("") }
 
-    // State for expandable items (collapsed by default)
-    val expandedItems = remember { mutableStateMapOf<String, Boolean>() }
-
     // Cancel confirmation dialog
     if (showCancelDialog) {
         AlertDialog(
@@ -965,12 +961,19 @@ private fun OrderDetailDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // Items List - Collapsible, sorted with cancelled items at bottom
+                    // Items List - Match Dashboard design
                     items(parentItems) { item ->
                         val isCancelled = item.status == "cancelled"
                         val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
-                        val hasDetails = !item.notes.isNullOrBlank() || comboChildren.isNotEmpty() || item.discountAmount > 0 || isCancelled
-                        val isExpanded = expandedItems[item.id] ?: false
+
+                        // Parse variants from notes
+                        val parts = item.notes?.split(" | ") ?: emptyList()
+                        val variantsPart = parts.firstOrNull() ?: ""
+                        val userNote = parts.getOrNull(1)
+                        val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
+
+                        // Toppings expanded state - use allToppingsExpanded from parent
+                        val toppingsExpanded = if (isCancelled) false else allToppingsExpanded
 
                         Column(
                             modifier = Modifier
@@ -978,16 +981,15 @@ private fun OrderDetailDialog(
                                 .padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (isCancelled) Color(0xFFFFEBEE) else Color(0xFFFAFAFA))
-                                .clickable(enabled = hasDetails) { expandedItems[item.id] = !isExpanded }
-                                .padding(8.dp)
+                                .padding(12.dp)
                         ) {
-                            // Main row: Qty + Name + Price
+                            // Row 1: Quantity badge + Product name + Total Price
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.Top) {
                                     // Quantity badge
                                     Box(
                                         modifier = Modifier
@@ -1005,232 +1007,201 @@ private fun OrderDetailDialog(
                                             color = if (isCancelled) Color(0xFFf44336) else Color(0xFF1976D2)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                item.productName,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = if (isCancelled) Color(0xFFf44336) else Color.Unspecified,
-                                                textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
-                                            )
-                                            if (isCancelled) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    "ĐÃ HUỶ",
-                                                    fontSize = 10.sp,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier
-                                                        .background(Color(0xFFf44336), RoundedCornerShape(4.dp))
-                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    // Product name with cancelled badge
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
-                                            formatCurrency(item.unitPrice.toLong()),
-                                            fontSize = 11.sp,
-                                            color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color.Gray,
+                                            item.productName,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isCancelled) Color(0xFFf44336) else Color.Unspecified,
                                             textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                                         )
-                                    }
-                                }
-
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        formatCurrency(item.totalPrice.toLong()),
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color(0xFF1976D2),
-                                        textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
-                                    )
-                                    if (item.discountAmount > 0 && !isCancelled) {
-                                        Text(
-                                            "-${formatCurrency(item.discountAmount.toLong())}",
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF4CAF50)
-                                        )
-                                    }
-                                }
-
-                                // Expand icon
-                                if (hasDetails) {
-                                    Icon(
-                                        if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
-                                        tint = Color.Gray
-                                    )
-                                }
-                            }
-
-                            // Expandable details
-                            if (isExpanded && hasDetails) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Divider(color = Color.LightGray.copy(alpha = 0.3f))
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Cancel reason (if cancelled)
-                                if (isCancelled && !item.cancelReason.isNullOrBlank()) {
-                                    Text(
-                                        "Lý do huỷ: ${item.cancelReason}",
-                                        fontSize = 12.sp,
-                                        color = Color(0xFFf44336),
-                                        fontStyle = FontStyle.Italic,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                }
-
-                                // Variants/Toppings - with collapsible UI
-                                if (!item.notes.isNullOrBlank()) {
-                                    val parts = item.notes.split(" | ")
-                                    val variantsPart = parts.firstOrNull() ?: ""
-                                    val userNote = parts.getOrNull(1)
-
-                                    val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
-
-                                    if (variants.isNotEmpty()) {
-                                        // Use allToppingsExpanded directly - no local state to avoid scroll issues
-                                        val toppingsExpanded = if (isCancelled) false else allToppingsExpanded
-
-                                        Spacer(modifier = Modifier.height(6.dp))
-
-                                        // Header showing topping count
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 2.dp, horizontal = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                                tint = Color.Gray
-                                            )
+                                        if (isCancelled) {
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
-                                                fontSize = 12.sp,
-                                                color = Color.Gray,
-                                                modifier = Modifier.padding(start = 4.dp)
+                                                "ĐÃ HUỶ",
+                                                fontSize = 10.sp,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .background(Color(0xFFf44336), RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
                                             )
                                         }
+                                    }
+                                }
+                                Text(
+                                    formatCurrency(item.totalPrice.toLong()),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color(0xFF1976D2),
+                                    textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                )
+                            }
 
-                                        // Variants list - show/hide based on allToppingsExpanded (no animation)
-                                        if (toppingsExpanded) {
-                                            Column(
+                            // Row 2: Base price (indented under product name)
+                            Text(
+                                formatCurrency(item.unitPrice.toLong()),
+                                fontSize = 13.sp,
+                                color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color.Gray,
+                                textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                                modifier = Modifier.padding(start = 36.dp, top = 2.dp)
+                            )
+
+                            // Row 3: Discount indicator (if has discount)
+                            if (item.discountAmount > 0 && !isCancelled) {
+                                Text(
+                                    "-${formatCurrency(item.discountAmount.toLong())}",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF4CAF50),
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(start = 36.dp, top = 2.dp)
+                                )
+                            }
+
+                            // Row 4: Toppings header - ALWAYS visible when has variants (like Dashboard)
+                            if (variants.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Header showing topping count - always visible
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 36.dp, top = 2.dp, bottom = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.5f) else Color.Gray
+                                    )
+                                    Text(
+                                        text = if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
+                                        fontSize = 12.sp,
+                                        color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.5f) else Color.Gray,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+
+                                // Row 5: Expanded toppings list
+                                if (toppingsExpanded) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 36.dp, top = 4.dp)
+                                    ) {
+                                        variants.forEach { variant ->
+                                            // Parse variant format
+                                            var displayName = variant
+                                            var price = 0L
+
+                                            // Extract price from "(+xxxxx)" suffix
+                                            val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
+                                            if (priceMatch != null) {
+                                                price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
+                                                displayName = variant.replace(priceMatch.value, "").trim()
+                                            } else {
+                                                // Try old format "name:price"
+                                                val colonIndex = variant.lastIndexOf(":")
+                                                if (colonIndex > 0) {
+                                                    displayName = variant.substring(0, colonIndex)
+                                                    price = variant.substring(colonIndex + 1).toLongOrNull() ?: 0L
+                                                }
+                                            }
+
+                                            // For toppings starting with "+", remove the "+" prefix
+                                            if (displayName.startsWith("+")) {
+                                                displayName = displayName.removePrefix("+").trim()
+                                            }
+                                            // For options with "GroupName: Value" format, show only VALUE
+                                            else if (displayName.contains(":")) {
+                                                val colonIdx = displayName.indexOf(":")
+                                                val value = displayName.substring(colonIdx + 1).trim()
+                                                if (value.isNotEmpty()) {
+                                                    displayName = value
+                                                }
+                                            }
+
+                                            Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(start = 4.dp)
+                                                    .padding(vertical = 3.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                variants.forEach { variant ->
-                                                    // Parse variant format
-                                                    var displayName = variant
-                                                    var price = 0L
-
-                                                    // Extract price from "(+xxxxx)" suffix
-                                                    val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
-                                                    if (priceMatch != null) {
-                                                        price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
-                                                        displayName = variant.replace(priceMatch.value, "").trim()
-                                                    } else {
-                                                        // Try old format "name:price"
-                                                        val colonIndex = variant.lastIndexOf(":")
-                                                        if (colonIndex > 0) {
-                                                            displayName = variant.substring(0, colonIndex)
-                                                            price = variant.substring(colonIndex + 1).toLongOrNull() ?: 0L
-                                                        }
-                                                    }
-
-                                                    // For toppings starting with "+", remove the "+" prefix
-                                                    if (displayName.startsWith("+")) {
-                                                        displayName = displayName.removePrefix("+").trim()
-                                                    }
-                                                    // For options with "GroupName: Value" format, show only VALUE
-                                                    else if (displayName.contains(":")) {
-                                                        val colonIdx = displayName.indexOf(":")
-                                                        val value = displayName.substring(colonIdx + 1).trim()
-                                                        if (value.isNotEmpty()) {
-                                                            displayName = value
-                                                        }
-                                                    }
-
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(vertical = 2.dp),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            modifier = Modifier.weight(1f)
-                                                        ) {
-                                                            Text(
-                                                                text = "•",
-                                                                fontSize = 14.sp,
-                                                                color = Color.Gray,
-                                                                modifier = Modifier.padding(end = 8.dp)
-                                                            )
-                                                            Text(
-                                                                text = displayName,
-                                                                fontSize = 12.sp,
-                                                                color = Color(0xFF616161)
-                                                            )
-                                                        }
-                                                        if (price > 0) {
-                                                            Text(
-                                                                "+${formatCurrency(price)}",
-                                                                fontSize = 12.sp,
-                                                                color = Color.Gray
-                                                            )
-                                                        }
-                                                    }
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Text(
+                                                        text = "•",
+                                                        fontSize = 14.sp,
+                                                        color = Color.Gray,
+                                                        modifier = Modifier.padding(end = 8.dp)
+                                                    )
+                                                    Text(
+                                                        text = displayName,
+                                                        fontSize = 14.sp,
+                                                        color = Color(0xFF424242)
+                                                    )
+                                                }
+                                                if (price > 0) {
+                                                    Text(
+                                                        text = "+${formatCurrency(price)}",
+                                                        fontSize = 14.sp,
+                                                        color = Color(0xFF1976D2),
+                                                        fontWeight = FontWeight.Medium
+                                                    )
                                                 }
                                             }
                                         }
                                     }
-
-                                    if (!userNote.isNullOrBlank()) {
-                                        Text(userNote, fontSize = 11.sp, fontStyle = FontStyle.Italic, color = Color(0xFF757575), modifier = Modifier.padding(top = 4.dp))
-                                    }
                                 }
+                            }
 
-                                // Combo children
-                                if (comboChildren.isNotEmpty()) {
-                                    Text("Bao gồm:", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE65100), modifier = Modifier.padding(top = 4.dp))
-                                    comboChildren.forEach { child ->
-                                        Text("  • ${child.productName} x${child.quantity}", fontSize = 12.sp, color = Color(0xFF616161))
-                                    }
-                                }
+                            // User note (always visible if exists)
+                            if (!userNote.isNullOrBlank()) {
+                                Text(
+                                    userNote,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF1976D2),
+                                    fontStyle = FontStyle.Italic,
+                                    modifier = Modifier.padding(start = 36.dp, top = 4.dp)
+                                )
+                            }
 
-                                // Discount detail - làm rõ loại giảm giá
-                                if (item.discountAmount > 0) {
-                                    val discountLabel = when {
-                                        item.discountType == "percent" && item.discountValue > 0 -> "Giảm ${item.discountValue.toInt()}%"
-                                        item.discountType == "amount" || item.discountType == "cash" -> "Giảm tiền mặt"
-                                        else -> "Giảm giá"
-                                    }
-                                    val discountTypeText = when (item.discountType) {
-                                        "percent" -> "(Phần trăm)"
-                                        "amount", "cash" -> "(Tiền mặt)"
-                                        else -> ""
-                                    }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row {
-                                            Text("→ $discountLabel", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
-                                            if (discountTypeText.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(discountTypeText, fontSize = 10.sp, color = Color(0xFF81C784))
-                                            }
-                                        }
-                                        Text("-${formatCurrency(item.discountAmount.toLong())}", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
-                                    }
+                            // Combo children (always visible if combo)
+                            if (comboChildren.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Bao gồm:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFE65100),
+                                    modifier = Modifier.padding(start = 36.dp)
+                                )
+                                comboChildren.forEach { child ->
+                                    Text(
+                                        "  • ${child.productName} x${child.quantity}",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF616161),
+                                        modifier = Modifier.padding(start = 36.dp)
+                                    )
                                 }
+                            }
+
+                            // Cancel reason (show if cancelled)
+                            if (isCancelled && !item.cancelReason.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Lý do huỷ: ${item.cancelReason}",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFf44336),
+                                    fontStyle = FontStyle.Italic,
+                                    modifier = Modifier.padding(start = 36.dp)
+                                )
                             }
                         }
                     }
