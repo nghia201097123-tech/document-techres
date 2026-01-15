@@ -892,25 +892,33 @@ class SaleViewModel @Inject constructor(
 
     /**
      * In lại tem cho món (1 món hoặc tất cả)
+     * Async: Hiển thị thành công ngay, in ngầm trong background
      * @param itemId ID món cần in, null = in tất cả
      */
     fun reprintLabels(itemId: String? = null) {
         val state = _uiState.value
         val currentOrder = state.currentOrder ?: return
 
+        val itemsToReprint = if (itemId != null) {
+            state.currentOrderItems.filter { it.id == itemId && !it.isComboChild }
+        } else {
+            state.currentOrderItems.filter { !it.isComboChild }
+        }
+
+        if (itemsToReprint.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = "Không có món nào để in lại tem") }
+            hideReprintMenu()
+            return
+        }
+
+        // Show success immediately (async printing)
+        val count = if (itemId != null) 1 else itemsToReprint.size
+        _uiState.update { it.copy(successMessage = "Đang in lại $count tem...") }
+        hideReprintMenu()
+
+        // Print in background - don't wait for result
         viewModelScope.launch {
             try {
-                val itemsToReprint = if (itemId != null) {
-                    state.currentOrderItems.filter { it.id == itemId && !it.isComboChild }
-                } else {
-                    state.currentOrderItems.filter { !it.isComboChild }
-                }
-
-                if (itemsToReprint.isEmpty()) {
-                    _uiState.update { it.copy(errorMessage = "Không có món nào để in lại tem") }
-                    return@launch
-                }
-
                 val kitchens = withContext(Dispatchers.IO) {
                     kitchenRepository.getAllKitchensSync(branchId)
                 }
@@ -918,7 +926,7 @@ class SaleViewModel @Inject constructor(
                 // Find kitchen that can print labels
                 val labelKitchen = kitchens.find { it.isActive && it.shouldPrintLabel() }
                 if (labelKitchen == null) {
-                    _uiState.update { it.copy(errorMessage = "Không có máy in tem nào được cấu hình") }
+                    Log.w(TAG, "reprintLabels: No label printer configured")
                     return@launch
                 }
 
@@ -945,52 +953,57 @@ class SaleViewModel @Inject constructor(
 
                 val result = com.techres.ccb.data.printer.LabelPrintService.printMultipleLabels(labelKitchen, labels)
 
+                // Log result only (async - user already notified)
                 when (result) {
                     is PrinterResult.Success -> {
-                        val count = if (itemId != null) 1 else itemsToReprint.size
-                        _uiState.update { it.copy(successMessage = "Đã in lại $count tem") }
+                        Log.d(TAG, "reprintLabels: Successfully printed $count labels")
                     }
                     is PrinterResult.Error -> {
-                        _uiState.update { it.copy(errorMessage = "Lỗi in tem: ${result.message}") }
+                        Log.e(TAG, "reprintLabels: Print error - ${result.message}")
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "reprintLabels error: ${e.message}", e)
-                _uiState.update { it.copy(errorMessage = "Lỗi in lại tem: ${e.message}") }
-            } finally {
-                hideReprintMenu()
             }
         }
     }
 
     /**
      * In lại phiếu bếp cho món (1 món hoặc tất cả)
+     * Async: Hiển thị thành công ngay, in ngầm trong background
      * @param itemId ID món cần in, null = in tất cả
      */
     fun reprintKitchenTickets(itemId: String? = null) {
         val state = _uiState.value
         val currentOrder = state.currentOrder ?: return
 
+        val itemsToReprint = if (itemId != null) {
+            state.currentOrderItems.filter { it.id == itemId && !it.isComboChild }
+        } else {
+            state.currentOrderItems.filter { !it.isComboChild }
+        }
+
+        if (itemsToReprint.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = "Không có món nào để in lại") }
+            hideReprintMenu()
+            return
+        }
+
+        // Show success immediately (async printing)
+        val count = if (itemId != null) 1 else itemsToReprint.size
+        _uiState.update { it.copy(successMessage = "Đang in lại $count phiếu bếp...") }
+        hideReprintMenu()
+
+        // Print in background - don't wait for result
         viewModelScope.launch {
             try {
-                val itemsToReprint = if (itemId != null) {
-                    state.currentOrderItems.filter { it.id == itemId && !it.isComboChild }
-                } else {
-                    state.currentOrderItems.filter { !it.isComboChild }
-                }
-
-                if (itemsToReprint.isEmpty()) {
-                    _uiState.update { it.copy(errorMessage = "Không có món nào để in lại") }
-                    return@launch
-                }
-
                 val kitchens = withContext(Dispatchers.IO) {
                     kitchenRepository.getAllKitchensSync(branchId)
                 }
                 val products = productEntityMap.values.toList()
 
                 if (kitchens.isEmpty() || products.isEmpty()) {
-                    _uiState.update { it.copy(errorMessage = "Không có bếp nào được cấu hình") }
+                    Log.w(TAG, "reprintKitchenTickets: No kitchens or products configured")
                     return@launch
                 }
 
@@ -1001,17 +1014,14 @@ class SaleViewModel @Inject constructor(
                     products = products
                 )
 
+                // Log result only (async - user already notified)
                 if (result.success) {
-                    val count = if (itemId != null) 1 else itemsToReprint.size
-                    _uiState.update { it.copy(successMessage = "Đã in lại $count món - ${result.message}") }
+                    Log.d(TAG, "reprintKitchenTickets: Success - ${result.message}")
                 } else {
-                    _uiState.update { it.copy(errorMessage = "Lỗi in lại: ${result.message}") }
+                    Log.e(TAG, "reprintKitchenTickets: Failed - ${result.message}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "reprintKitchenTickets error: ${e.message}", e)
-                _uiState.update { it.copy(errorMessage = "Lỗi in lại món: ${e.message}") }
-            } finally {
-                hideReprintMenu()
             }
         }
     }
