@@ -681,7 +681,7 @@ fun ShiftsTable(shifts: List<ShiftEntity>) {
 @Composable
 fun OrdersTable(orders: List<OrderEntity>) {
     DataTable(
-        headers = listOf("ID", "Số đơn", "Bàn", "Trạng thái", "Thanh toán", "Tổng tiền", "Tạo lúc", "Sync"),
+        headers = listOf("ID", "Số đơn", "Loại", "Bàn", "Trạng thái", "Thanh toán", "Tổng tiền", "Giảm giá", "Lý do huỷ", "Tạo lúc", "Hoàn tất", "Sync"),
         data = orders,
         rowContent = { order ->
             val statusText = when (order.status) {
@@ -706,14 +706,24 @@ fun OrdersTable(orders: List<OrderEntity>) {
                 "failed" -> "❌"
                 else -> order.syncStatus
             }
+            val orderTypeText = when (order.orderType) {
+                "dine_in" -> "🍽️ Tại bàn"
+                "takeaway" -> "🛍️ Mang về"
+                "delivery" -> "🛵 Giao hàng"
+                else -> order.orderType
+            }
             listOf(
                 order.id.take(8) + "...",
                 order.orderNumber,
+                orderTypeText,
                 order.tableName ?: "-",
                 statusText,
                 paymentText,
                 "%,.0f".format(order.totalAmount),
+                if (order.discountAmount > 0) "%,.0f".format(order.discountAmount) else "-",
+                order.cancelReason ?: "-",
                 order.createdAt.take(19).replace("T", " "),
+                order.completedAt?.take(19)?.replace("T", " ") ?: "-",
                 syncText
             )
         }
@@ -723,7 +733,7 @@ fun OrdersTable(orders: List<OrderEntity>) {
 @Composable
 fun OrderItemsTable(orderItems: List<OrderItemEntity>) {
     DataTable(
-        headers = listOf("ID", "Order ID", "Sản phẩm", "SL", "Đơn giá", "Tổng", "Trạng thái", "Ghi chú"),
+        headers = listOf("ID", "Order ID", "Sản phẩm", "SL", "Đơn giá", "Giảm giá", "Loại GG", "Tổng", "Trạng thái", "Lý do huỷ", "Combo", "Ghi chú"),
         data = orderItems,
         rowContent = { item ->
             val statusText = when (item.status) {
@@ -731,18 +741,33 @@ fun OrderItemsTable(orderItems: List<OrderItemEntity>) {
                 "preparing" -> "👨‍🍳 Đang làm"
                 "ready" -> "🍽️ Sẵn sàng"
                 "served" -> "✅ Đã phục vụ"
+                "completed" -> "✅ Hoàn tất"
                 "cancelled" -> "❌ Hủy"
                 else -> item.status
+            }
+            val discountTypeText = when {
+                item.discountType == "percent" -> "${item.discountValue.toInt()}%"
+                item.discountType == "amount" || item.discountType == "cash" -> "Tiền"
+                else -> "-"
+            }
+            val comboText = when {
+                item.isComboParent -> "📦 Parent"
+                item.isComboChild -> "🔗 Child"
+                else -> "-"
             }
             listOf(
                 item.id.take(8) + "...",
                 item.orderId.take(8) + "...",
-                item.productName,
+                item.productName.take(15),
                 item.quantity.toString(),
                 "%,.0f".format(item.unitPrice),
+                if (item.discountAmount > 0) "%,.0f".format(item.discountAmount) else "-",
+                discountTypeText,
                 "%,.0f".format(item.totalPrice),
                 statusText,
-                item.notes ?: "-"
+                item.cancelReason ?: "-",
+                comboText,
+                (item.notes ?: "-").take(20)
             )
         }
     )

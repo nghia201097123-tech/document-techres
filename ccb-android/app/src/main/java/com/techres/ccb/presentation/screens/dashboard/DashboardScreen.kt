@@ -1528,11 +1528,9 @@ private fun OrderCard(
     val (orderTypeColor, orderTypeIcon, orderTypeLabel) = orderTypeConfig
 
     // Calculate wait time - using passed currentTimeMillis for real-time updates
-    val waitMinutes = remember(order.createdAt, currentTimeMillis) {
-        val diff = currentTimeMillis - order.createdAt
-        // Handle negative time (server clock issues) - show 0 minutes
-        if (diff < 0) 0 else (diff / 60000).toInt()
-    }
+    // Don't use remember here to ensure recomposition when currentTimeMillis changes
+    val diff = currentTimeMillis - order.createdAt
+    val waitMinutes = if (diff < 0) 0 else (diff / 60000).toInt()
     val isUrgent = waitMinutes > 15
     val borderColor = if (isUrgent) Color(0xFFF44336) else statusColor
 
