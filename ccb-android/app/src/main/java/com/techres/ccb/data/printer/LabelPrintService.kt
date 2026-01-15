@@ -517,7 +517,8 @@ object LabelPrintService {
 
     /**
      * Convert bitmap to TSPL BITMAP command
-     * Ensures white background (0) and black text (1)
+     * XPRINTER TSPL: bit=1 means NO PRINT (white), bit=0 means PRINT (black)
+     * This is INVERTED from standard TSPL!
      */
     private fun bitmapToTspl(x: Int, y: Int, bitmap: Bitmap): ByteArray {
         val output = ByteArrayOutputStream()
@@ -534,8 +535,9 @@ object LabelPrintService {
         val header = "BITMAP $x,$y,$widthBytes,$height,0,"
         output.write(header.toByteArray())
 
-        // Convert to monochrome: WHITE background (0), BLACK text (1)
-        val threshold = 180 // Higher threshold = more black (better for text)
+        // Convert to monochrome for XPRINTER
+        // XPRINTER uses INVERTED logic: bit=1 = white (no print), bit=0 = black (print)
+        val threshold = 128 // Standard threshold for better contrast
         for (row in 0 until height) {
             for (byteIndex in 0 until widthBytes) {
                 var byte = 0
@@ -549,12 +551,12 @@ object LabelPrintService {
                         val b = pixel and 0xFF
                         val gray = (r + g + b) / 3
 
-                        // Black text on white background
-                        // If gray < threshold, it's dark (text) -> set bit to 1
-                        if (gray < threshold) {
+                        // INVERTED for XPRINTER:
+                        // Light pixels (background) -> bit = 1 (no print = white)
+                        // Dark pixels (text) -> bit = 0 (print = black)
+                        if (gray >= threshold) {
                             byte = byte or (0x80 shr bit)
                         }
-                        // White background -> bit stays 0
                     }
                 }
                 output.write(byte)
