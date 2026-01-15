@@ -135,6 +135,20 @@ fun DashboardScreen(
                 }
             }
         ) {
+            // Time ticker for mobile (every 30 seconds)
+            var mobileCurrentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(30_000)
+                    mobileCurrentTimeMillis = System.currentTimeMillis()
+                }
+            }
+
+            // Get filtered and sorted orders for mobile
+            val mobileFilteredOrders = remember(uiState.posOrders, uiState.searchQuery, uiState.sortType) {
+                viewModel.getFilteredAndSortedOrders()
+            }
+
             // Mobile Main Content
             MobileDashboardContent(
                 uiState = uiState,
@@ -158,7 +172,11 @@ fun DashboardScreen(
                     // Navigate to SaleScreen with PaymentDialog auto-shown
                     onNavigateToSaleForPayment(order.id)
                 },
-                isCompactScreen = true
+                isCompactScreen = true,
+                filteredOrders = mobileFilteredOrders,
+                onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                onSortTypeChange = { viewModel.setSortType(it) },
+                currentTimeMillis = mobileCurrentTimeMillis
             )
         }
     } else {
@@ -205,14 +223,32 @@ fun DashboardScreen(
                     foodAppCount = uiState.foodAppOrderCount
                 )
 
-                // Tab Bar & Grid Controls
+                // Time ticker for real-time order time updates (every 30 seconds)
+                var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        kotlinx.coroutines.delay(30_000) // Update every 30 seconds
+                        currentTimeMillis = System.currentTimeMillis()
+                    }
+                }
+
+                // Get filtered and sorted orders
+                val filteredOrders = remember(uiState.posOrders, uiState.searchQuery, uiState.sortType) {
+                    viewModel.getFilteredAndSortedOrders()
+                }
+
+                // Tab Bar & Grid Controls with Search/Sort
                 OrdersTabBar(
                     selectedTab = selectedTab,
                     onTabSelected = { selectedTab = it },
-                    posCount = uiState.posOrders.size,
+                    posCount = filteredOrders.size,
                     appCount = uiState.foodAppOrderCount,
                     gridColumns = gridColumns,
-                    onGridColumnsChanged = { viewModel.setGridColumns(it) }
+                    onGridColumnsChanged = { viewModel.setGridColumns(it) },
+                    searchQuery = uiState.searchQuery,
+                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                    sortType = uiState.sortType,
+                    onSortTypeChange = { viewModel.setSortType(it) }
                 )
 
                 // Orders Grid
@@ -227,8 +263,16 @@ fun DashboardScreen(
                             }
                         }
                         selectedTab == 0 -> {
-                            if (uiState.posOrders.isEmpty()) {
-                                EmptyOrdersState()
+                            if (filteredOrders.isEmpty()) {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    EmptyOrdersState(
+                                        icon = Icons.Default.SearchOff,
+                                        message = "Không tìm thấy",
+                                        subMessage = "Thử tìm kiếm với từ khóa khác"
+                                    )
+                                } else {
+                                    EmptyOrdersState()
+                                }
                             } else {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(gridColumns),
@@ -237,7 +281,7 @@ fun DashboardScreen(
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    items(uiState.posOrders, key = { it.id }) { order ->
+                                    items(filteredOrders, key = { it.id }) { order ->
                                         OrderCard(
                                             order = order,
                                             onClick = {
@@ -251,7 +295,8 @@ fun DashboardScreen(
                                             onComplete = {
                                                 // Navigate to SaleScreen with PaymentDialog auto-shown
                                                 onNavigateToSaleForPayment(order.id)
-                                            }
+                                            },
+                                            currentTimeMillis = currentTimeMillis
                                         )
                                     }
                                     // Bottom spacing
@@ -632,7 +677,12 @@ private fun MobileDashboardContent(
     onOrderClick: (PosOrder) -> Unit,
     onConfirmOrder: (String) -> Unit,
     onCompleteOrder: (PosOrder) -> Unit,
-    isCompactScreen: Boolean
+    isCompactScreen: Boolean,
+    // Search and Sort
+    filteredOrders: List<PosOrder> = emptyList(),
+    onSearchQueryChange: (String) -> Unit = {},
+    onSortTypeChange: (OrderSortType) -> Unit = {},
+    currentTimeMillis: Long = System.currentTimeMillis()
 ) {
     Scaffold(
         topBar = {
@@ -756,15 +806,19 @@ private fun MobileDashboardContent(
                 )
             }
 
-            // Tab Bar
+            // Tab Bar with Search/Sort
             OrdersTabBar(
                 selectedTab = selectedTab,
                 onTabSelected = onTabSelected,
-                posCount = uiState.posOrders.size,
+                posCount = filteredOrders.size,
                 appCount = uiState.foodAppOrderCount,
                 gridColumns = gridColumns,
                 onGridColumnsChanged = onGridColumnsChanged,
-                isCompact = true
+                isCompact = true,
+                searchQuery = uiState.searchQuery,
+                onSearchQueryChange = onSearchQueryChange,
+                sortType = uiState.sortType,
+                onSortTypeChange = onSortTypeChange
             )
 
             // Orders Grid
@@ -779,8 +833,16 @@ private fun MobileDashboardContent(
                         }
                     }
                     selectedTab == 0 -> {
-                        if (uiState.posOrders.isEmpty()) {
-                            EmptyOrdersState()
+                        if (filteredOrders.isEmpty()) {
+                            if (uiState.searchQuery.isNotEmpty()) {
+                                EmptyOrdersState(
+                                    icon = Icons.Default.SearchOff,
+                                    message = "Không tìm thấy",
+                                    subMessage = "Thử tìm kiếm với từ khóa khác"
+                                )
+                            } else {
+                                EmptyOrdersState()
+                            }
                         } else {
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(gridColumns),
@@ -789,13 +851,14 @@ private fun MobileDashboardContent(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(uiState.posOrders, key = { it.id }) { order ->
+                                items(filteredOrders, key = { it.id }) { order ->
                                     OrderCard(
                                         order = order,
                                         onClick = { onOrderClick(order) },
                                         onConfirm = { onConfirmOrder(order.id) },
                                         onComplete = { onCompleteOrder(order) },
-                                        isCompact = true
+                                        isCompact = true,
+                                        currentTimeMillis = currentTimeMillis
                                     )
                                 }
                                 // Bottom spacing for FAB
@@ -1217,62 +1280,187 @@ private fun OrdersTabBar(
     appCount: Int,
     gridColumns: Int,
     onGridColumnsChanged: (Int) -> Unit,
-    isCompact: Boolean = false
+    isCompact: Boolean = false,
+    // Search and Sort
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
+    sortType: OrderSortType = OrderSortType.TIME_DESC,
+    onSortTypeChange: (OrderSortType) -> Unit = {}
 ) {
     val columnOptions = if (isCompact) listOf(1, 2, 3) else listOf(3, 4, 5, 6)
+    var showSortMenu by remember { mutableStateOf(false) }
 
     Surface(color = Color.White) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = if (isCompact) 12.dp else 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Tabs
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Row 1: Tabs and Grid columns
             Row(
-                horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
-            ) {
-                TabChip(
-                    label = "Đơn Quầy",
-                    count = posCount,
-                    isSelected = selectedTab == 0,
-                    color = Color(0xFF1976D2),
-                    onClick = { onTabSelected(0) },
-                    isCompact = isCompact
-                )
-                TabChip(
-                    label = "Đơn App",
-                    count = appCount,
-                    isSelected = selectedTab == 1,
-                    color = Color(0xFFE91E63),
-                    onClick = { onTabSelected(1) },
-                    isCompact = isCompact
-                )
-            }
-
-            // Grid Column Selector
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (isCompact) 12.dp else 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.GridView,
-                    contentDescription = null,
-                    modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
-                    tint = Color.Gray
-                )
-                columnOptions.forEach { cols ->
-                    FilterChip(
-                        selected = gridColumns == cols,
-                        onClick = { onGridColumnsChanged(cols) },
-                        label = { Text("$cols", fontSize = if (isCompact) 11.sp else 12.sp) },
-                        modifier = Modifier.height(if (isCompact) 28.dp else 32.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF1976D2),
-                            selectedLabelColor = Color.White
-                        )
+                // Tabs
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
+                ) {
+                    TabChip(
+                        label = "Đơn Quầy",
+                        count = posCount,
+                        isSelected = selectedTab == 0,
+                        color = Color(0xFF1976D2),
+                        onClick = { onTabSelected(0) },
+                        isCompact = isCompact
                     )
+                    TabChip(
+                        label = "Đơn App",
+                        count = appCount,
+                        isSelected = selectedTab == 1,
+                        color = Color(0xFFE91E63),
+                        onClick = { onTabSelected(1) },
+                        isCompact = isCompact
+                    )
+                }
+
+                // Grid Column Selector
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.GridView,
+                        contentDescription = null,
+                        modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
+                        tint = Color.Gray
+                    )
+                    columnOptions.forEach { cols ->
+                        FilterChip(
+                            selected = gridColumns == cols,
+                            onClick = { onGridColumnsChanged(cols) },
+                            label = { Text("$cols", fontSize = if (isCompact) 11.sp else 12.sp) },
+                            modifier = Modifier.height(if (isCompact) 28.dp else 32.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF1976D2),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Row 2: Search and Sort
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (isCompact) 12.dp else 16.dp)
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Search input
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(if (isCompact) 44.dp else 48.dp),
+                    placeholder = { Text("Tìm theo số đơn, bàn, món...", fontSize = if (isCompact) 12.sp else 14.sp) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(if (isCompact) 18.dp else 20.dp),
+                            tint = Color.Gray
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { onSearchQueryChange("") },
+                                modifier = Modifier.size(if (isCompact) 24.dp else 28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Xóa",
+                                    modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
+                                    tint = Color.Gray
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = if (isCompact) 12.sp else 14.sp),
+                    shape = RoundedCornerShape(if (isCompact) 10.dp else 12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF1976D2),
+                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
+                    )
+                )
+
+                // Sort dropdown
+                Box {
+                    Surface(
+                        onClick = { showSortMenu = true },
+                        shape = RoundedCornerShape(if (isCompact) 10.dp else 12.dp),
+                        color = Color(0xFFF5F5F5),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = if (isCompact) 10.dp else 12.dp, vertical = if (isCompact) 10.dp else 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Sort,
+                                contentDescription = null,
+                                modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
+                                tint = Color(0xFF1976D2)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = sortType.displayName,
+                                fontSize = if (isCompact) 11.sp else 13.sp,
+                                color = Color(0xFF1976D2),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
+                                tint = Color(0xFF1976D2)
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false }
+                    ) {
+                        OrderSortType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (type == sortType) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = Color(0xFF1976D2)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        Text(
+                                            type.displayName,
+                                            fontWeight = if (type == sortType) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (type == sortType) Color(0xFF1976D2) else Color.Unspecified
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onSortTypeChange(type)
+                                    showSortMenu = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1327,7 +1515,8 @@ private fun OrderCard(
     onClick: () -> Unit = {},
     onConfirm: () -> Unit = {},
     onComplete: () -> Unit = {},
-    isCompact: Boolean = false
+    isCompact: Boolean = false,
+    currentTimeMillis: Long = System.currentTimeMillis() // Passed from parent for real-time updates
 ) {
     val statusColor = Color(order.status.color)
 
@@ -1341,9 +1530,11 @@ private fun OrderCard(
     }
     val (orderTypeColor, orderTypeIcon, orderTypeLabel) = orderTypeConfig
 
-    // Calculate wait time
-    val waitMinutes = remember(order.createdAt) {
-        ((System.currentTimeMillis() - order.createdAt) / 60000).toInt()
+    // Calculate wait time - using passed currentTimeMillis for real-time updates
+    val waitMinutes = remember(order.createdAt, currentTimeMillis) {
+        val diff = currentTimeMillis - order.createdAt
+        // Handle negative time (server clock issues) - show 0 minutes
+        if (diff < 0) 0 else (diff / 60000).toInt()
     }
     val isUrgent = waitMinutes > 15
     val borderColor = if (isUrgent) Color(0xFFF44336) else statusColor

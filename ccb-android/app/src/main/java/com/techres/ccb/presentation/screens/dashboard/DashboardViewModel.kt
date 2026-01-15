@@ -44,6 +44,15 @@ enum class PosOrderStatus(val displayName: String, val color: Long) {
     COMPLETED("Hoàn tất", 0xFF4CAF50)
 }
 
+// Sort options for orders
+enum class OrderSortType(val displayName: String) {
+    TIME_ASC("Cũ nhất"),
+    TIME_DESC("Mới nhất"),
+    AMOUNT_ASC("Giá thấp"),
+    AMOUNT_DESC("Giá cao"),
+    ORDER_NUMBER("Số đơn")
+}
+
 data class DashboardUiState(
     val isLoading: Boolean = false,
     val branchName: String = "",
@@ -64,6 +73,10 @@ data class DashboardUiState(
 
     // Grid settings
     val gridColumns: Int = 4,
+
+    // Search and Sort
+    val searchQuery: String = "",
+    val sortType: OrderSortType = OrderSortType.TIME_DESC,
 
     // Error
     val error: String? = null
@@ -234,6 +247,50 @@ class DashboardViewModel @Inject constructor(
             val saved = sharedPreferences.edit().putInt(KEY_DASHBOARD_GRID_COLUMNS, columns).commit()
             Log.d(TAG, "setGridColumns - Saved to SharedPreferences: $saved")
         }
+    }
+
+    /**
+     * Update search query for filtering orders
+     */
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    /**
+     * Update sort type for ordering
+     */
+    fun setSortType(sortType: OrderSortType) {
+        _uiState.update { it.copy(sortType = sortType) }
+    }
+
+    /**
+     * Get filtered and sorted orders based on current search query and sort type
+     */
+    fun getFilteredAndSortedOrders(): List<PosOrder> {
+        val state = _uiState.value
+        var orders = state.posOrders
+
+        // Apply search filter
+        if (state.searchQuery.isNotBlank()) {
+            val query = state.searchQuery.lowercase()
+            orders = orders.filter { order ->
+                order.orderNumber.toString().contains(query) ||
+                order.tableName?.lowercase()?.contains(query) == true ||
+                order.customerName?.lowercase()?.contains(query) == true ||
+                order.items.any { it.productName.lowercase().contains(query) }
+            }
+        }
+
+        // Apply sorting
+        orders = when (state.sortType) {
+            OrderSortType.TIME_ASC -> orders.sortedBy { it.createdAt }
+            OrderSortType.TIME_DESC -> orders.sortedByDescending { it.createdAt }
+            OrderSortType.AMOUNT_ASC -> orders.sortedBy { it.totalAmount }
+            OrderSortType.AMOUNT_DESC -> orders.sortedByDescending { it.totalAmount }
+            OrderSortType.ORDER_NUMBER -> orders.sortedBy { it.orderNumber }
+        }
+
+        return orders
     }
 
     fun confirmPosOrder(orderId: String) {
