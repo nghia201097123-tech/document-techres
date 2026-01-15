@@ -220,17 +220,31 @@ object LabelPrintService {
         items: List<LabelData>
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
+            Log.d(TAG, "=== printMultipleLabels ===")
+            Log.d(TAG, "Received ${items.size} label items")
+            items.forEachIndexed { index, item ->
+                Log.d(TAG, "  [$index] ${item.itemName} qty=${item.quantity}")
+            }
+
             var totalPrinted = 0
             var lastError: String? = null
 
             items.forEach { item ->
+                Log.d(TAG, "Printing label for: ${item.itemName} x${item.quantity}")
                 val result = printLabels(kitchen, item)
                 when (result) {
-                    is PrinterResult.Success -> totalPrinted += item.quantity
-                    is PrinterResult.Error -> lastError = result.message
+                    is PrinterResult.Success -> {
+                        totalPrinted += item.quantity
+                        Log.d(TAG, "  -> Success, total printed so far: $totalPrinted")
+                    }
+                    is PrinterResult.Error -> {
+                        lastError = result.message
+                        Log.e(TAG, "  -> Error: ${result.message}")
+                    }
                 }
             }
 
+            Log.d(TAG, "=== printMultipleLabels DONE: $totalPrinted labels ===")
             if (totalPrinted > 0) {
                 PrinterResult.Success("Đã in $totalPrinted tem")
             } else {

@@ -114,9 +114,16 @@ object PrintRoutingService {
             // Find first kitchen that can print labels
             val labelKitchen = kitchens.find { it.isActive && it.shouldPrintLabel() }
             if (labelKitchen != null) {
-                // Get unique items (deduplicated by productId to avoid duplicate labels)
+                // Get unique items (deduplicated by productId + note to avoid duplicate labels)
                 val uniqueItems = order.items.distinctBy { "${it.productId}_${it.note}" }
-                Log.d(TAG, "Printing ${uniqueItems.size} labels to ${labelKitchen.name} (from ${order.items.size} total items)")
+                Log.d(TAG, "=== LABEL PRINTING DEBUG ===")
+                Log.d(TAG, "order.items.size = ${order.items.size}")
+                Log.d(TAG, "uniqueItems.size = ${uniqueItems.size}")
+                uniqueItems.forEachIndexed { index, item ->
+                    Log.d(TAG, "  Item $index: ${item.productName} qty=${item.quantity}")
+                }
+                Log.d(TAG, "Label kitchen: ${labelKitchen.name} (${labelKitchen.id})")
+                Log.d(TAG, "=== END DEBUG ===")
                 labelResult = printLabelsToKitchen(labelKitchen, order, uniqueItems)
                 Log.d(TAG, "Label print result: ${labelResult is PrinterResult.Success}")
             } else {
@@ -287,7 +294,10 @@ object PrintRoutingService {
         order: OrderPrintData,
         items: List<OrderItem>
     ): PrinterResult {
+        Log.d(TAG, "printLabelsToKitchen: ${items.size} items to print")
+
         val labelDataList = items.map { item ->
+            Log.d(TAG, "  Creating label for: ${item.productName} qty=${item.quantity}")
             LabelPrintService.LabelData(
                 itemName = item.productName,
                 itemCode = item.productCode,
@@ -304,6 +314,7 @@ object PrintRoutingService {
             )
         }
 
+        Log.d(TAG, "printLabelsToKitchen: Created ${labelDataList.size} label data, calling LabelPrintService")
         return LabelPrintService.printMultipleLabels(kitchen, labelDataList)
     }
 

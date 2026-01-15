@@ -62,6 +62,12 @@ object OrderPrintingService {
         }
 
         // Convert order items sang PrintRoutingService.OrderItem
+        Log.d(TAG, "=== Order Items Input ===")
+        Log.d(TAG, "Total orderItems: ${orderItems.size}")
+        orderItems.forEachIndexed { index, item ->
+            Log.d(TAG, "  [$index] ${item.productName} qty=${item.quantity} isComboParent=${item.isComboParent} isComboChild=${item.isComboChild}")
+        }
+
         val routingItems = orderItems
             .filter { !it.isComboParent } // Bỏ qua combo parent, chỉ in combo children
             .map { item ->
