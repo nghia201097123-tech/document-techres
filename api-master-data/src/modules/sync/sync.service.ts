@@ -365,7 +365,13 @@ export class SyncService {
         }
         productKitchenMap.get(pk.productId)!.push(pk.kitchenId);
       }
+      console.log(`[SyncService.getFullSync] Query productKitchens with tenantId="${tenantId}"`);
       console.log(`[SyncService.getFullSync] Product-kitchen mappings: ${productKitchens.length}, unique products: ${productKitchenMap.size}`);
+      if (productKitchens.length > 0) {
+        console.log(`[SyncService.getFullSync] Sample productKitchens:`, JSON.stringify(productKitchens.slice(0, 3)));
+      } else {
+        console.log(`[SyncService.getFullSync] WARNING: No product-kitchen mappings found for tenantId="${tenantId}"`);
+      }
 
       // Log branchProducts info for debugging
       console.log(`[SyncService.getFullSync] branchProducts count: ${branchProducts.length}`);
