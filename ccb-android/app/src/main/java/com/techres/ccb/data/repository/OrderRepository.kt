@@ -100,6 +100,13 @@ class OrderRepository @Inject constructor(
     }
 
     /**
+     * Update all items status except cancelled items (when completing payment)
+     */
+    suspend fun updateAllItemsStatusExcludeCancelled(orderId: String, status: String, updatedAt: String) {
+        orderItemDao.updateAllItemsStatusExcludeCancelled(orderId, status, updatedAt)
+    }
+
+    /**
      * Update order cancel reason
      */
     suspend fun updateOrderCancelReason(orderId: String, cancelReason: String, updatedAt: String) {

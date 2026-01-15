@@ -2596,8 +2596,8 @@ class SaleViewModel @Inject constructor(
                     )
                     orderRepository.updateOrder(completedOrder)
 
-                    // 2. Update all order items status to completed
-                    orderRepository.updateAllItemsStatus(currentOrder.id, "completed", now)
+                    // 2. Update all order items status to completed (except cancelled items)
+                    orderRepository.updateAllItemsStatusExcludeCancelled(currentOrder.id, "completed", now)
 
                     // 3. Update table status back to available
                     state.selectedTable?.let { table ->

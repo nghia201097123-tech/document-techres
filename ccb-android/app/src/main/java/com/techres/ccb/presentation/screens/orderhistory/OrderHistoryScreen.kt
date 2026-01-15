@@ -913,9 +913,18 @@ private fun OrderDetailDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // Items header
+                    // Items header - exclude cancelled items from count
+                    val activeParentItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }
+                    val cancelledParentItems = orderItems.filter { !it.isComboChild && it.status == "cancelled" }
+
                     item {
-                        Text("Danh sách món (${orderItems.filter { !it.isComboChild }.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Danh sách món (${activeParentItems.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            if (cancelledParentItems.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("(${cancelledParentItems.size} đã huỷ)", fontSize = 12.sp, color = Color(0xFFf44336))
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
@@ -924,8 +933,9 @@ private fun OrderDetailDialog(
                     val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
 
                     items(parentItems) { item ->
+                        val isCancelled = item.status == "cancelled"
                         val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
-                        val hasDetails = !item.notes.isNullOrBlank() || comboChildren.isNotEmpty() || item.discountAmount > 0
+                        val hasDetails = !item.notes.isNullOrBlank() || comboChildren.isNotEmpty() || item.discountAmount > 0 || isCancelled
                         val isExpanded = expandedItems[item.id] ?: false
 
                         Column(
@@ -933,7 +943,7 @@ private fun OrderDetailDialog(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFFAFAFA))
+                                .background(if (isCancelled) Color(0xFFFFEBEE) else Color(0xFFFAFAFA))
                                 .clickable(enabled = hasDetails) { expandedItems[item.id] = !isExpanded }
                                 .padding(8.dp)
                         ) {
@@ -948,15 +958,48 @@ private fun OrderDetailDialog(
                                     Box(
                                         modifier = Modifier
                                             .size(24.dp)
-                                            .background(Color(0xFFE3F2FD), CircleShape),
+                                            .background(
+                                                if (isCancelled) Color(0xFFFFCDD2) else Color(0xFFE3F2FD),
+                                                CircleShape
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(item.quantity.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2))
+                                        Text(
+                                            item.quantity.toString(),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isCancelled) Color(0xFFf44336) else Color(0xFF1976D2)
+                                        )
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(item.productName, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                        Text(formatCurrency(item.unitPrice.toLong()), fontSize = 11.sp, color = Color.Gray)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                item.productName,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (isCancelled) Color(0xFFf44336) else Color.Unspecified,
+                                                textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                            )
+                                            if (isCancelled) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    "ĐÃ HUỶ",
+                                                    fontSize = 10.sp,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier
+                                                        .background(Color(0xFFf44336), RoundedCornerShape(4.dp))
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            formatCurrency(item.unitPrice.toLong()),
+                                            fontSize = 11.sp,
+                                            color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color.Gray,
+                                            textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                        )
                                     }
                                 }
 
@@ -965,9 +1008,10 @@ private fun OrderDetailDialog(
                                         formatCurrency(item.totalPrice.toLong()),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1976D2)
+                                        color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color(0xFF1976D2),
+                                        textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                                     )
-                                    if (item.discountAmount > 0) {
+                                    if (item.discountAmount > 0 && !isCancelled) {
                                         Text(
                                             "-${formatCurrency(item.discountAmount.toLong())}",
                                             fontSize = 11.sp,
@@ -992,6 +1036,17 @@ private fun OrderDetailDialog(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Divider(color = Color.LightGray.copy(alpha = 0.3f))
                                 Spacer(modifier = Modifier.height(8.dp))
+
+                                // Cancel reason (if cancelled)
+                                if (isCancelled && !item.cancelReason.isNullOrBlank()) {
+                                    Text(
+                                        "Lý do huỷ: ${item.cancelReason}",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFf44336),
+                                        fontStyle = FontStyle.Italic,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
 
                                 // Variants/Toppings
                                 if (!item.notes.isNullOrBlank()) {
@@ -1069,8 +1124,9 @@ private fun OrderDetailDialog(
                         .background(Color(0xFFF5F5F5))
                         .padding(12.dp)
                 ) {
-                    // Calculate discount breakdown
-                    val itemDiscountTotal = orderItems.sumOf { it.discountAmount }
+                    // Calculate discount breakdown (exclude cancelled items)
+                    val activeOrderItems = orderItems.filter { it.status != "cancelled" }
+                    val itemDiscountTotal = activeOrderItems.sumOf { it.discountAmount }
                     val totalDiscount = order.discountAmount
                     val vatRate = 8.0
                     val priceAfterDiscount = order.subtotal - totalDiscount
