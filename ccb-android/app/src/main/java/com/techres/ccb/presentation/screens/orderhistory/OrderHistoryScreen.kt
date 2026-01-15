@@ -42,6 +42,14 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -913,23 +921,49 @@ private fun OrderDetailDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
+                    // Global expand/collapse state for toppings
+                    var allToppingsExpanded by remember { mutableStateOf(true) }
+
                     // Items header - exclude cancelled items from count
                     val activeParentItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }
                     val cancelledParentItems = orderItems.filter { !it.isComboChild && it.status == "cancelled" }
 
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Danh sách món (${activeParentItems.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            if (cancelledParentItems.isNotEmpty()) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("(${cancelledParentItems.size} đã huỷ)", fontSize = 12.sp, color = Color(0xFFf44336))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Danh sách món (${activeParentItems.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                if (cancelledParentItems.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("(${cancelledParentItems.size} đã huỷ)", fontSize = 12.sp, color = Color(0xFFf44336))
+                                }
+                            }
+                            // Expand/Collapse all button
+                            TextButton(
+                                onClick = { allToppingsExpanded = !allToppingsExpanded },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (allToppingsExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (allToppingsExpanded) "Thu gọn" else "Mở rộng",
+                                    fontSize = 12.sp
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // Items List - Collapsible
-                    val parentItems = orderItems.filter { !it.isComboChild }
+                    // Items List - Collapsible, sorted with cancelled items at bottom
+                    val parentItems = orderItems.filter { !it.isComboChild }.sortedBy { it.status == "cancelled" }
                     val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
 
                     items(parentItems) { item ->
@@ -1048,24 +1082,124 @@ private fun OrderDetailDialog(
                                     )
                                 }
 
-                                // Variants/Toppings
+                                // Variants/Toppings - with collapsible UI
                                 if (!item.notes.isNullOrBlank()) {
                                     val parts = item.notes.split(" | ")
                                     val variantsPart = parts.firstOrNull() ?: ""
                                     val userNote = parts.getOrNull(1)
 
                                     val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
-                                    variants.forEach { variant ->
-                                        val colonIndex = variant.lastIndexOf(":")
-                                        val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
-                                        val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
 
+                                    if (variants.isNotEmpty()) {
+                                        // Local state for toppings expand/collapse
+                                        var toppingsExpanded by remember { mutableStateOf(!isCancelled) }
+
+                                        // Sync with global allToppingsExpanded when it changes
+                                        LaunchedEffect(allToppingsExpanded) {
+                                            toppingsExpanded = allToppingsExpanded
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        // Collapsible header - click to toggle
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .clickable { toppingsExpanded = !toppingsExpanded }
+                                                .padding(vertical = 2.dp, horizontal = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("• $name", fontSize = 12.sp, color = Color(0xFF616161))
-                                            if (price > 0) Text("+${formatCurrency(price)}", fontSize = 12.sp, color = Color.Gray)
+                                            Icon(
+                                                imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = if (toppingsExpanded) "Thu gọn" else "Mở rộng",
+                                                modifier = Modifier.size(16.dp),
+                                                tint = Color.Gray
+                                            )
+                                            Text(
+                                                text = if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
+                                                fontSize = 12.sp,
+                                                color = Color.Gray,
+                                                modifier = Modifier.padding(start = 4.dp)
+                                            )
+                                        }
+
+                                        // Variants list - collapsible
+                                        AnimatedVisibility(
+                                            visible = toppingsExpanded,
+                                            enter = fadeIn() + slideInVertically(),
+                                            exit = fadeOut() + slideOutVertically()
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 4.dp)
+                                            ) {
+                                                variants.forEach { variant ->
+                                                    // Parse variant format
+                                                    var displayName = variant
+                                                    var price = 0L
+
+                                                    // Extract price from "(+xxxxx)" suffix
+                                                    val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
+                                                    if (priceMatch != null) {
+                                                        price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
+                                                        displayName = variant.replace(priceMatch.value, "").trim()
+                                                    } else {
+                                                        // Try old format "name:price"
+                                                        val colonIndex = variant.lastIndexOf(":")
+                                                        if (colonIndex > 0) {
+                                                            displayName = variant.substring(0, colonIndex)
+                                                            price = variant.substring(colonIndex + 1).toLongOrNull() ?: 0L
+                                                        }
+                                                    }
+
+                                                    // For toppings starting with "+", remove the "+" prefix
+                                                    if (displayName.startsWith("+")) {
+                                                        displayName = displayName.removePrefix("+").trim()
+                                                    }
+                                                    // For options with "GroupName: Value" format, show only VALUE
+                                                    else if (displayName.contains(":")) {
+                                                        val colonIdx = displayName.indexOf(":")
+                                                        val value = displayName.substring(colonIdx + 1).trim()
+                                                        if (value.isNotEmpty()) {
+                                                            displayName = value
+                                                        }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(vertical = 2.dp),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Text(
+                                                                text = "•",
+                                                                fontSize = 14.sp,
+                                                                color = Color.Gray,
+                                                                modifier = Modifier.padding(end = 8.dp)
+                                                            )
+                                                            Text(
+                                                                text = displayName,
+                                                                fontSize = 12.sp,
+                                                                color = Color(0xFF616161)
+                                                            )
+                                                        }
+                                                        if (price > 0) {
+                                                            Text(
+                                                                "+${formatCurrency(price)}",
+                                                                fontSize = 12.sp,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
 
