@@ -45,10 +45,10 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
@@ -1124,11 +1124,11 @@ private fun OrderDetailDialog(
                                             )
                                         }
 
-                                        // Variants list - collapsible
+                                        // Variants list - collapsible (use expandVertically for smooth animation)
                                         AnimatedVisibility(
                                             visible = toppingsExpanded,
-                                            enter = fadeIn() + slideInVertically(),
-                                            exit = fadeOut() + slideOutVertically()
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut()
                                         ) {
                                             Column(
                                                 modifier = Modifier

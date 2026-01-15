@@ -1,10 +1,10 @@
 package com.techres.ccb.presentation.screens.sale
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -2205,11 +2205,11 @@ fun OrderItemRow(
                         )
                     }
 
-                    // Variants list - collapsible
+                    // Variants list - collapsible (use expandVertically for smooth in-place animation)
                     AnimatedVisibility(
                         visible = toppingsExpanded,
-                        enter = fadeIn() + slideInVertically(),
-                        exit = fadeOut() + slideOutVertically()
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
                     ) {
                         Column(
                             modifier = Modifier
@@ -2399,11 +2399,11 @@ fun CancelledItemRowCompact(item: OrderItemEntity) {
             }
         }
 
-        // Expanded details: toppings and cancel reason
+        // Expanded details: toppings and cancel reason (use expandVertically for smooth animation)
         AnimatedVisibility(
             visible = showDetails,
-            enter = fadeIn() + slideInVertically(),
-            exit = fadeOut() + slideOutVertically()
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
             Column(
                 modifier = Modifier
