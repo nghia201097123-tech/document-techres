@@ -60,14 +60,15 @@ object OrderPrintingService {
             .filter { !it.isComboParent } // Bỏ qua combo parent, chỉ in combo children
             .map { item ->
                 val product = products.find { it.id == item.productId }
+                val (options, toppings, note) = parseNotesField(item.notes)
                 PrintRoutingService.OrderItem(
-                    productId = item.productId,
+                    productId = item.productId ?: "",
                     productName = item.productName,
                     productCode = item.productCode,
                     quantity = item.quantity,
-                    note = item.note,
-                    toppings = parseToppings(item.toppingsJson),
-                    options = parseOptions(item),
+                    note = note,
+                    toppings = toppings,
+                    options = options,
                     kitchenIds = product?.getKitchenIdList() ?: inferKitchenFromProduct(product, activeKitchens)
                 )
             }
@@ -130,14 +131,15 @@ object OrderPrintingService {
             .filter { !it.isComboParent }
             .map { item ->
                 val product = products.find { it.id == item.productId }
+                val (options, toppings, note) = parseNotesField(item.notes)
                 PrintRoutingService.OrderItem(
-                    productId = item.productId,
+                    productId = item.productId ?: "",
                     productName = item.productName,
                     productCode = item.productCode,
                     quantity = item.quantity,
-                    note = item.note,
-                    toppings = parseToppings(item.toppingsJson),
-                    options = parseOptions(item),
+                    note = note,
+                    toppings = toppings,
+                    options = options,
                     kitchenIds = product?.getKitchenIdList() ?: inferKitchenFromProduct(product, activeKitchens)
                 )
             }
@@ -235,46 +237,57 @@ object OrderPrintingService {
     }
 
     /**
-     * Parse toppings từ JSON string
+     * Parse notes field từ OrderItemEntity
+     * Notes format: "Size: L, Đường: 70%, + Trân châu, + Thạch, Ghi chú: Ít đá"
+     * Returns: Triple(options, toppings, note)
      */
-    private fun parseToppings(toppingsJson: String?): List<PrintRoutingService.ToppingInfo> {
-        if (toppingsJson.isNullOrBlank()) return emptyList()
-
-        return try {
-            // Simple parse: giả sử format là "[{\"name\":\"Trân châu\",\"price\":5000}]"
-            val regex = """"name"\s*:\s*"([^"]+)"""".toRegex()
-            regex.findAll(toppingsJson).map { match ->
-                PrintRoutingService.ToppingInfo(
-                    name = match.groupValues[1],
-                    price = 0.0
-                )
-            }.toList()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing toppings: ${e.message}")
-            emptyList()
+    private fun parseNotesField(notes: String?): Triple<Map<String, String>, List<PrintRoutingService.ToppingInfo>, String?> {
+        if (notes.isNullOrBlank()) {
+            return Triple(emptyMap(), emptyList(), null)
         }
-    }
 
-    /**
-     * Parse options từ OrderItemEntity
-     */
-    private fun parseOptions(item: OrderItemEntity): Map<String, String> {
         val options = mutableMapOf<String, String>()
+        val toppings = mutableListOf<PrintRoutingService.ToppingInfo>()
+        var note: String? = null
 
-        // Parse từ variantsJson nếu có
-        item.variantsJson?.let { json ->
-            try {
-                // Simple parse cho format {"Size":"L","Đường":"70%"}
-                val regex = """"([^"]+)"\s*:\s*"([^"]+)"""".toRegex()
-                regex.findAll(json).forEach { match ->
-                    options[match.groupValues[1]] = match.groupValues[2]
+        try {
+            // Split by comma and process each part
+            notes.split(",").map { it.trim() }.forEach { part ->
+                when {
+                    // Toppings start with "+"
+                    part.startsWith("+") -> {
+                        val toppingName = part.removePrefix("+").trim()
+                        if (toppingName.isNotBlank()) {
+                            toppings.add(PrintRoutingService.ToppingInfo(name = toppingName, price = 0.0))
+                        }
+                    }
+                    // Options with format "Key: Value"
+                    part.contains(":") -> {
+                        val colonIndex = part.indexOf(":")
+                        val key = part.substring(0, colonIndex).trim()
+                        val value = part.substring(colonIndex + 1).trim()
+
+                        when (key.lowercase()) {
+                            "ghi chú", "note", "ghi chu" -> note = value
+                            else -> options[key] = value
+                        }
+                    }
+                    // Plain text is treated as note
+                    part.isNotBlank() && !part.startsWith("[") -> {
+                        // Skip combo markers like "[Combo: ...]"
+                        if (note == null) {
+                            note = part
+                        } else {
+                            note = "$note, $part"
+                        }
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing variants: ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing notes: ${e.message}")
         }
 
-        return options
+        return Triple(options, toppings, note)
     }
 
     /**
