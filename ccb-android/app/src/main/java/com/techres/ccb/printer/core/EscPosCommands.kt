@@ -287,10 +287,16 @@ object EscPosCommands {
     // ==================== IMAGE / BITMAP ====================
 
     /**
-     * Convert Bitmap to ESC/POS format
-     * Supports monochrome printing
+     * Convert Bitmap to ESC/POS format using ESC * command
+     * Compatible with XPRINTER and most Chinese thermal printers
+     *
+     * ESC * m nL nH - Select bit image mode
+     * m = 0: 8-dot single-density (max 256 dots)
+     * m = 1: 8-dot double-density (max 512 dots)
+     * m = 32: 24-dot single-density
+     * m = 33: 24-dot double-density (best quality, recommended)
      */
-    fun printBitmap(bitmap: Bitmap, align: Int = 1): ByteArray {
+    fun printBitmap(bitmap: Bitmap, align: Int = 0): ByteArray {
         val output = ByteArrayOutputStream()
 
         // Align
@@ -299,8 +305,9 @@ object EscPosCommands {
         val width = bitmap.width
         val height = bitmap.height
 
-        // Resize if too wide (max 384 dots for 58mm, 576 for 80mm)
-        val maxWidth = 384
+        // Max width depends on paper size, don't scale down unnecessarily
+        // 80mm paper = 576 dots, 58mm paper = 384 dots
+        val maxWidth = 576
         val scaledBitmap = if (width > maxWidth) {
             val scale = maxWidth.toFloat() / width
             Bitmap.createScaledBitmap(bitmap, maxWidth, (height * scale).toInt(), true)
@@ -311,34 +318,56 @@ object EscPosCommands {
         val w = scaledBitmap.width
         val h = scaledBitmap.height
 
-        // Convert to monochrome
+        // Convert to monochrome with higher threshold for better text
         val pixels = IntArray(w * h)
         scaledBitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+        val threshold = 180
 
-        // ESC * - Bit image mode
-        val widthBytes = (w + 7) / 8
+        // Set line spacing to 0 for bitmap printing (no gaps between lines)
+        output.write(byteArrayOf(0x1B, 0x33, 0x00))
 
-        for (y in 0 until h) {
-            output.write(byteArrayOf(0x1B, 0x2A, 0x00, (widthBytes).toByte(), 0x00))
+        // Use 24-dot mode (m=33) for better quality and wider support
+        // Print 24 rows at a time
+        val rowsPerStrip = 24
+        var y = 0
 
-            for (xByte in 0 until widthBytes) {
-                var byte = 0
-                for (bit in 0 until 8) {
-                    val x = xByte * 8 + bit
-                    if (x < w) {
-                        val pixel = pixels[y * w + x]
-                        val gray = (((pixel shr 16) and 0xFF) +
-                                   ((pixel shr 8) and 0xFF) +
-                                   (pixel and 0xFF)) / 3
-                        if (gray < 128) {
-                            byte = byte or (0x80 shr bit)
+        while (y < h) {
+            val stripHeight = minOf(rowsPerStrip, h - y)
+
+            // ESC * 33 nL nH - 24-dot double-density
+            // nL = width % 256, nH = width / 256
+            val nL = (w % 256).toByte()
+            val nH = (w / 256).toByte()
+            output.write(byteArrayOf(0x1B, 0x2A, 33, nL, nH))
+
+            // Send pixel data for this strip
+            // Each column needs 3 bytes (24 bits) in 24-dot mode
+            for (x in 0 until w) {
+                for (k in 0 until 3) { // 3 bytes per column
+                    var columnByte = 0
+                    for (b in 0 until 8) {
+                        val row = y + k * 8 + b
+                        if (row < h) {
+                            val pixel = pixels[row * w + x]
+                            val gray = (((pixel shr 16) and 0xFF) +
+                                       ((pixel shr 8) and 0xFF) +
+                                       (pixel and 0xFF)) / 3
+                            if (gray < threshold) {
+                                columnByte = columnByte or (0x80 shr b)
+                            }
                         }
                     }
+                    output.write(columnByte)
                 }
-                output.write(byte)
             }
+
+            // Line feed after each strip
             output.write(LF)
+            y += rowsPerStrip
         }
+
+        // Restore default line spacing
+        output.write(byteArrayOf(0x1B, 0x32))
 
         if (scaledBitmap != bitmap) {
             scaledBitmap.recycle()
