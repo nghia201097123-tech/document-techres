@@ -434,13 +434,13 @@ fun SaleScreen(
             )
         }
 
-        // Remove Order Item Confirmation Dialog
+        // Remove Order Item Confirmation Dialog (huỷ món với lý do)
         val itemToRemove = uiState.itemToRemove
         if (uiState.showRemoveItemDialog && itemToRemove != null) {
             RemoveOrderItemConfirmationDialog(
                 item = itemToRemove,
                 onDismiss = { viewModel.hideRemoveItemConfirmation() },
-                onConfirm = { viewModel.confirmRemoveOrderItem() }
+                onConfirm = { reason -> viewModel.confirmCancelOrderItem(reason) }
             )
         }
 
@@ -1875,10 +1875,16 @@ fun OrderItemRow(
     onRemoveTopping: ((String, String) -> Unit)? = null,
     onReprint: ((String) -> Unit)? = null // Callback for reprint
 ) {
+    val isCancelled = item.status == "cancelled"
+
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = if (isCancelled) {
+                Color(0xFFFFEBEE) // Light red background for cancelled items
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
         )
     ) {
         Column(
@@ -1886,6 +1892,38 @@ fun OrderItemRow(
                 .fillMaxWidth()
                 .padding(10.dp)
         ) {
+            // Cancelled badge
+            if (isCancelled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Badge(
+                        containerColor = Color(0xFFF44336)
+                    ) {
+                        Text(
+                            text = "ĐÃ HUỶ",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
+                    item.cancelReason?.let { reason ->
+                        Text(
+                            text = " - $reason",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFF44336),
+                            fontStyle = FontStyle.Italic,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
             // Row 1: Product name + Quantity badge + Price + Delete button
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1894,10 +1932,13 @@ fun OrderItemRow(
             ) {
                 Text(
                     text = item.productName,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                    ),
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    color = if (isCancelled) Color.Gray else Color.Unspecified,
                     modifier = Modifier.weight(1f)
                 )
                 Row(
@@ -1905,22 +1946,25 @@ fun OrderItemRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Badge(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        containerColor = if (isCancelled) Color.Gray.copy(alpha = 0.3f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                     ) {
                         Text(
                             text = "x${item.quantity}",
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (isCancelled) Color.Gray else MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Text(
                         text = formatCurrency(item.totalPrice.toLong()),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            textDecoration = if (isCancelled) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                        ),
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (isCancelled) Color.Gray else MaterialTheme.colorScheme.primary
                     )
-                    // Reprint item button
-                    if (onReprint != null) {
+                    // Reprint item button - hide for cancelled items
+                    if (onReprint != null && !isCancelled) {
                         IconButton(
                             onClick = { onReprint(item.id) },
                             modifier = Modifier.size(28.dp)
@@ -1933,15 +1977,15 @@ fun OrderItemRow(
                             )
                         }
                     }
-                    // Delete item button
-                    if (onRemoveItem != null) {
+                    // Delete item button - hide for cancelled items
+                    if (onRemoveItem != null && !isCancelled) {
                         IconButton(
                             onClick = { onRemoveItem(item.id) },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Xóa món",
+                                contentDescription = "Huỷ món",
                                 tint = Color(0xFFF44336),
                                 modifier = Modifier.size(18.dp)
                             )
@@ -2186,19 +2230,22 @@ fun CancelOrderConfirmationDialog(
 }
 
 /**
- * Dialog xác nhận xoá món trong đơn hàng
+ * Dialog xác nhận huỷ món trong đơn hàng
+ * Món sẽ được đánh dấu là "cancelled" thay vì xoá để còn báo cáo
  */
 @Composable
 fun RemoveOrderItemConfirmationDialog(
     item: OrderItemEntity,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: (String) -> Unit // reason parameter
 ) {
+    var reason by remember { mutableStateOf("") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
-                imageVector = Icons.Default.Delete,
+                imageVector = Icons.Default.Cancel,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(48.dp)
@@ -2206,14 +2253,14 @@ fun RemoveOrderItemConfirmationDialog(
         },
         title = {
             Text(
-                text = "Xác nhận xoá món",
+                text = "Xác nhận huỷ món",
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
             Column {
                 Text(
-                    text = "Bạn có chắc chắn muốn xoá món này khỏi đơn hàng?",
+                    text = "Món sẽ được đánh dấu huỷ để lưu báo cáo.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -2239,16 +2286,26 @@ fun RemoveOrderItemConfirmationDialog(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Lý do huỷ") },
+                    placeholder = { Text("Nhập lý do huỷ món...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 3
+                )
             }
         },
         confirmButton = {
             Button(
-                onClick = onConfirm,
+                onClick = { onConfirm(reason) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text("XOÁ MÓN")
+                Text("HUỶ MÓN")
             }
         },
         dismissButton = {

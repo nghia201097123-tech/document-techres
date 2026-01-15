@@ -3030,12 +3030,13 @@ class SaleViewModel @Inject constructor(
     }
 
     /**
-     * Confirm and remove the order item
+     * Cancel an order item (mark as cancelled instead of deleting for reporting)
+     * Món sẽ được đánh dấu huỷ thay vì xoá để còn lưu báo cáo
      */
-    fun confirmRemoveOrderItem() {
+    fun confirmCancelOrderItem(reason: String) {
         val state = _uiState.value
         val currentOrder = state.currentOrder ?: return
-        val itemToRemove = state.itemToRemove ?: return
+        val itemToCancel = state.itemToRemove ?: return
 
         hideRemoveItemConfirmation()
 
@@ -3046,12 +3047,23 @@ class SaleViewModel @Inject constructor(
                     .format(Date())
 
                 withContext(Dispatchers.IO) {
-                    // Delete the item from database
-                    orderRepository.deleteOrderItem(itemToRemove)
+                    // Update the item status to cancelled (instead of deleting)
+                    val cancelledItem = itemToCancel.copy(
+                        status = "cancelled",
+                        cancelledAt = now,
+                        cancelReason = reason.ifBlank { null },
+                        updatedAt = now
+                    )
+                    orderRepository.updateOrderItem(cancelledItem)
 
-                    // Calculate new order totals
-                    val remainingItems = state.currentOrderItems.filter { it.id != itemToRemove.id }
-                    val newSubtotal = remainingItems.sumOf { it.totalPrice }
+                    // Update items list with cancelled item
+                    val updatedItems = state.currentOrderItems.map {
+                        if (it.id == itemToCancel.id) cancelledItem else it
+                    }
+
+                    // Calculate new order totals (exclude cancelled items)
+                    val activeItems = updatedItems.filter { it.status != "cancelled" }
+                    val newSubtotal = activeItems.sumOf { it.totalPrice }
                     val newTotal = newSubtotal // TODO: Apply discount/tax if needed
 
                     // Update order totals
@@ -3065,16 +3077,16 @@ class SaleViewModel @Inject constructor(
                     _uiState.update { s ->
                         s.copy(
                             currentOrder = updatedOrder,
-                            currentOrderItems = remainingItems,
-                            successMessage = "Đã xóa ${itemToRemove.productName}"
+                            currentOrderItems = updatedItems,
+                            successMessage = "Đã huỷ ${itemToCancel.productName}"
                         )
                     }
                 }
 
-                Log.d(TAG, "confirmRemoveOrderItem - Removed item: ${itemToRemove.productName}")
+                Log.d(TAG, "confirmCancelOrderItem - Cancelled item: ${itemToCancel.productName}, reason: $reason")
             } catch (e: Exception) {
-                Log.e(TAG, "confirmRemoveOrderItem - Error: ${e.message}", e)
-                _uiState.update { it.copy(errorMessage = "Lỗi xóa món: ${e.message}") }
+                Log.e(TAG, "confirmCancelOrderItem - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi huỷ món: ${e.message}") }
             }
         }
     }
