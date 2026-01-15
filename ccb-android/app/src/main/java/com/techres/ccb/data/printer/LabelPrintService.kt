@@ -520,6 +520,9 @@ object LabelPrintService {
                         if (gray >= threshold) {
                             byte = byte or (0x80 shr bit)
                         }
+                    } else {
+                        // Padding bits (outside bitmap) should be WHITE (bit = 1)
+                        byte = byte or (0x80 shr bit)
                     }
                 }
                 output.write(byte)
