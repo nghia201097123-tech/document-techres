@@ -80,7 +80,32 @@ object KitchenTicketPrintService {
     }
 
     /**
-     * Generate nội dung phiếu bếp
+     * Generate nội dung phiếu bếp - Thiết kế chuyên nghiệp
+     *
+     * Layout:
+     * ┌─────────────────────────────────┐
+     * │         *** BẾP BAR ***         │  ← Tên bếp (TO, ĐẬM)
+     * │═════════════════════════════════│
+     * │ !!! GẤP !!!                     │  ← Đơn gấp (nếu có)
+     * │─────────────────────────────────│
+     * │ BÀN: BÀN 5                      │  ← Tên bàn (TO, ĐẬM)
+     * │ #GF-472          14:30 15/01    │  ← Mã đơn + Thời gian
+     * │ NV: Nguyễn Văn A                │  ← Nhân viên
+     * │═════════════════════════════════│
+     * │                                 │
+     * │ 1. Trà sữa trân châu      x2    │  ← Món + SL
+     * │    Size: L                      │
+     * │    Đá: 50%                      │
+     * │    + Trân châu đen              │  ← Topping
+     * │    >> Ít đường                  │  ← Ghi chú món
+     * │                                 │
+     * │ 2. Cà phê sữa đá          x1    │
+     * │    >> Không đá                  │
+     * │─────────────────────────────────│
+     * │ GHI CHÚ: Mang đi                │  ← Ghi chú chung
+     * │═════════════════════════════════│
+     * │ TỔNG: 3 MÓN                     │
+     * └─────────────────────────────────┘
      */
     private fun generateTicketContent(
         kitchen: KitchenEntity,
@@ -88,12 +113,10 @@ object KitchenTicketPrintService {
     ): ByteArray {
         val paperWidth = kitchen.paperWidth
         val useBitmapMode = true
-        val useRasterBitmap = false // ESC * cho XPRINTER
+        val useRasterBitmap = false
 
         Log.d(TAG, "Generating ticket content:")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
-        Log.d(TAG, "  - Bitmap mode: $useBitmapMode")
-        Log.d(TAG, "  - Raster bitmap: $useRasterBitmap (false = ESC *, true = GS v 0)")
         Log.d(TAG, "  - Kitchen: ${ticket.kitchenName}")
         Log.d(TAG, "  - Items count: ${ticket.items.size}")
 
@@ -102,62 +125,73 @@ object KitchenTicketPrintService {
         builder.apply {
             init()
 
-            // ========== HEADER - TÊN BẾP ==========
-            // Tên bếp TO, ĐẬM, GIỮA
-            lineDouble(ticket.kitchenName.uppercase(), BitmapTextStyle(centerAlign = true))
+            // ═══════════════════════════════════════════
+            // SECTION 1: HEADER - TÊN BẾP
+            // ═══════════════════════════════════════════
+            val kitchenHeader = "*** ${ticket.kitchenName.uppercase()} ***"
+            lineDouble(kitchenHeader, BitmapTextStyle(centerAlign = true))
 
-            // Loại phiếu (NEW, MODIFIED, CANCELLED)
+            // Loại phiếu (SỬA ĐƠN, HỦY ĐƠN)
             when (ticket.ticketType) {
                 "MODIFIED" -> {
-                    doubleSeparator()
-                    lineBold("*** SỬA ĐƠN ***", BitmapTextStyle(centerAlign = true))
-                    doubleSeparator()
+                    separator('=')
+                    lineDouble("SỬA ĐƠN", BitmapTextStyle(centerAlign = true))
+                    separator('=')
                 }
                 "CANCELLED" -> {
-                    doubleSeparator()
-                    lineBold("*** HỦY ĐƠN ***", BitmapTextStyle(centerAlign = true))
-                    doubleSeparator()
+                    separator('=')
+                    lineDouble("HỦY ĐƠN", BitmapTextStyle(centerAlign = true))
+                    separator('=')
                 }
                 else -> {
-                    doubleSeparator()
+                    separator('=')
                 }
             }
 
-            // Đánh dấu đơn gấp
+            // Đơn gấp
             if (ticket.isUrgent) {
-                lineBold("!!! GẤP !!!", BitmapTextStyle(centerAlign = true))
-                separator()
+                lineDouble("!!! GẤP !!!", BitmapTextStyle(centerAlign = true))
+                separator('-')
             }
 
-            // ========== THÔNG TIN ĐƠN ==========
-            // Mã đơn + Thời gian
-            val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
-            lineKeyValue("Đơn:", "#${ticket.orderNumber}")
-            lineKeyValue("Giờ:", timeFormat.format(ticket.orderTime))
-
-            // Bàn (nếu có)
+            // ═══════════════════════════════════════════
+            // SECTION 2: THÔNG TIN ĐƠN HÀNG
+            // ═══════════════════════════════════════════
+            // Tên bàn (TO, ĐẬM, nổi bật)
             ticket.tableName?.let {
-                lineBold("Bàn: $it")
+                lineDouble("BÀN: $it", BitmapTextStyle(centerAlign = false))
             }
 
-            // Nhân viên (nếu có)
+            // Mã đơn + Thời gian (trên cùng 1 dòng)
+            val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
+            lineKeyValue("#${ticket.orderNumber}", timeFormat.format(ticket.orderTime))
+
+            // Nhân viên
             ticket.staffName?.let {
                 line("NV: $it")
             }
 
-            separator()
+            separator('=')
 
-            // ========== DANH SÁCH MÓN ==========
+            // ═══════════════════════════════════════════
+            // SECTION 3: DANH SÁCH MÓN
+            // ═══════════════════════════════════════════
             ticket.items.forEachIndexed { index, item ->
-                // Số thứ tự + Tên món + Số lượng
-                val itemLine = "${index + 1}. ${item.name}"
-                lineBold(itemLine)
+                // Dòng trống trước mỗi món (trừ món đầu)
+                if (index > 0) {
+                    line("")
+                }
 
-                // Số lượng (nổi bật nếu > 1)
+                // Số thứ tự + Tên món + Số lượng
+                val qtyText = "x${item.quantity}"
+                val itemLine = "${index + 1}. ${item.name}"
+
+                // In tên món và số lượng trên cùng dòng
                 if (item.quantity > 1) {
-                    lineBold("   SL: ${item.quantity}", BitmapTextStyle(bold = true))
+                    // Số lượng > 1: in đậm cả dòng
+                    lineKeyValueBold(itemLine, qtyText)
                 } else {
-                    line("   SL: ${item.quantity}")
+                    lineKeyValue(itemLine, qtyText, BitmapTextStyle(bold = true))
                 }
 
                 // Tùy chọn (Size, Đá, Đường...)
@@ -170,37 +204,34 @@ object KitchenTicketPrintService {
                     line("   + $topping")
                 }
 
-                // Ghi chú riêng cho món
+                // Ghi chú riêng cho món (nổi bật)
                 item.note?.let {
                     lineBold("   >> $it")
                 }
-
-                // Khoảng cách giữa các món
-                if (index < ticket.items.size - 1) {
-                    line("")
-                }
             }
 
-            // ========== GHI CHÚ CHUNG ==========
+            // ═══════════════════════════════════════════
+            // SECTION 4: GHI CHÚ CHUNG
+            // ═══════════════════════════════════════════
             ticket.note?.let {
-                separator()
-                lineBold("Ghi chú:")
-                line(it)
+                separator('-')
+                lineBold("GHI CHÚ: $it")
             }
 
-            // ========== FOOTER ==========
-            doubleSeparator()
+            // ═══════════════════════════════════════════
+            // SECTION 5: FOOTER
+            // ═══════════════════════════════════════════
+            separator('=')
 
             // Tổng số món
             val totalItems = ticket.items.sumOf { it.quantity }
-            lineKeyValue("Tổng:", "$totalItems món")
+            lineBold("TỔNG: $totalItems MÓN", BitmapTextStyle(centerAlign = true))
 
-            // ========== FEED, BEEP & CUT ==========
+            // ═══════════════════════════════════════════
+            // FEED, BEEP & CUT
+            // ═══════════════════════════════════════════
             feed(4)
-
-            // Beep để thông báo cho bếp
             beep()
-
             cut()
         }
 

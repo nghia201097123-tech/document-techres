@@ -528,6 +528,36 @@ class HybridBillBuilder(
     }
 
     /**
+     * In key-value đậm (cho danh sách món với số lượng > 1)
+     */
+    fun lineKeyValueBold(key: String, value: String): HybridBillBuilder {
+        val actualStyle = BitmapTextStyle(fontSize = totalFontSize, bold = true)
+
+        if (useBitmapMode) {
+            val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
+            val imageData = if (useRasterBitmap) {
+                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            } else {
+                EscPosCommands.printBitmap(bitmap, 0)
+            }
+            buffer.write(imageData)
+            bitmap.recycle()
+        } else {
+            applyTextStyle(actualStyle)
+            val spaces = lineWidth - key.length - value.length
+            val line = if (spaces > 0) {
+                key + " ".repeat(spaces) + value
+            } else {
+                "$key $value"
+            }
+            buffer.write(line.toByteArray(Charsets.UTF_8))
+            buffer.write(EscPosCommands.LF)
+            resetTextStyle()
+        }
+        return this
+    }
+
+    /**
      * In separator (đường kẻ ngang)
      */
     fun separator(char: Char = '-'): HybridBillBuilder {
