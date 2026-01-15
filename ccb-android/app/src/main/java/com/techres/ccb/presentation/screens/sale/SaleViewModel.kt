@@ -112,6 +112,10 @@ data class SaleUiState(
     // Cancel order confirmation dialog
     val showCancelOrderDialog: Boolean = false,
 
+    // Remove order item confirmation dialog
+    val showRemoveItemDialog: Boolean = false,
+    val itemToRemove: OrderItemEntity? = null, // Item pending removal
+
     // Reprint menu
     val showReprintMenu: Boolean = false,
     val reprintItemId: String? = null, // null = all items, specific ID = single item
@@ -3011,12 +3015,29 @@ class SaleViewModel @Inject constructor(
     // ===== ORDER ITEM MANAGEMENT =====
 
     /**
-     * Remove an order item from the current order
+     * Show confirmation dialog before removing an order item
      */
-    fun removeOrderItem(itemId: String) {
+    fun showRemoveItemConfirmation(itemId: String) {
+        val item = _uiState.value.currentOrderItems.find { it.id == itemId } ?: return
+        _uiState.update { it.copy(showRemoveItemDialog = true, itemToRemove = item) }
+    }
+
+    /**
+     * Hide remove item confirmation dialog
+     */
+    fun hideRemoveItemConfirmation() {
+        _uiState.update { it.copy(showRemoveItemDialog = false, itemToRemove = null) }
+    }
+
+    /**
+     * Confirm and remove the order item
+     */
+    fun confirmRemoveOrderItem() {
         val state = _uiState.value
         val currentOrder = state.currentOrder ?: return
-        val itemToRemove = state.currentOrderItems.find { it.id == itemId } ?: return
+        val itemToRemove = state.itemToRemove ?: return
+
+        hideRemoveItemConfirmation()
 
         viewModelScope.launch {
             try {
@@ -3029,7 +3050,7 @@ class SaleViewModel @Inject constructor(
                     orderRepository.deleteOrderItem(itemToRemove)
 
                     // Calculate new order totals
-                    val remainingItems = state.currentOrderItems.filter { it.id != itemId }
+                    val remainingItems = state.currentOrderItems.filter { it.id != itemToRemove.id }
                     val newSubtotal = remainingItems.sumOf { it.totalPrice }
                     val newTotal = newSubtotal // TODO: Apply discount/tax if needed
 
@@ -3050,9 +3071,9 @@ class SaleViewModel @Inject constructor(
                     }
                 }
 
-                Log.d(TAG, "removeOrderItem - Removed item: ${itemToRemove.productName}")
+                Log.d(TAG, "confirmRemoveOrderItem - Removed item: ${itemToRemove.productName}")
             } catch (e: Exception) {
-                Log.e(TAG, "removeOrderItem - Error: ${e.message}", e)
+                Log.e(TAG, "confirmRemoveOrderItem - Error: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi xóa món: ${e.message}") }
             }
         }

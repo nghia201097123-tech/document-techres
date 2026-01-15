@@ -434,6 +434,15 @@ fun SaleScreen(
             )
         }
 
+        // Remove Order Item Confirmation Dialog
+        if (uiState.showRemoveItemDialog && uiState.itemToRemove != null) {
+            RemoveOrderItemConfirmationDialog(
+                item = uiState.itemToRemove,
+                onDismiss = { viewModel.hideRemoveItemConfirmation() },
+                onConfirm = { viewModel.confirmRemoveOrderItem() }
+            )
+        }
+
         // Reprint Menu Dialog
         if (uiState.showReprintMenu) {
             ReprintMenuDialog(
@@ -606,7 +615,7 @@ fun TabletLayout(
             onAddItemsToOrder = viewModel::addItemsToOrder,
             onCheckout = { viewModel.showPaymentDialog() },
             onCancelOrder = { viewModel.showCancelOrderConfirmation() },
-            onRemoveOrderItem = viewModel::removeOrderItem,
+            onRemoveOrderItem = viewModel::showRemoveItemConfirmation,
             onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
             onRemoveCartItemVariant = viewModel::removeCartItemVariant,
             onAddToppingToCartItem = viewModel::showAddToppingDialog,
@@ -711,7 +720,7 @@ fun CartDialog(
                     },
                     onCheckout = { viewModel.showPaymentDialog() },
                     onCancelOrder = { viewModel.showCancelOrderConfirmation() },
-                    onRemoveOrderItem = viewModel::removeOrderItem,
+                    onRemoveOrderItem = viewModel::showRemoveItemConfirmation,
                     onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
                     onRemoveCartItemVariant = viewModel::removeCartItemVariant,
                     onAddToppingToCartItem = viewModel::showAddToppingDialog,
@@ -2165,6 +2174,80 @@ fun CancelOrderConfirmationDialog(
                 )
             ) {
                 Text("XÁC NHẬN HUỶ")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("ĐÓNG")
+            }
+        }
+    )
+}
+
+/**
+ * Dialog xác nhận xoá món trong đơn hàng
+ */
+@Composable
+fun RemoveOrderItemConfirmationDialog(
+    item: OrderItemEntity,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Xác nhận xoá món",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Bạn có chắc chắn muốn xoá món này khỏi đơn hàng?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                // Show item info
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Text(
+                            text = item.productName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Số lượng: ${item.quantity}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("XOÁ MÓN")
             }
         },
         dismissButton = {
