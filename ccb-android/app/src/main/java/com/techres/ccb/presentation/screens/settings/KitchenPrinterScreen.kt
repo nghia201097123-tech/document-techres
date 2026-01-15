@@ -29,6 +29,9 @@ import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
+import com.techres.ccb.data.printer.KitchenTicketPrintService
+import com.techres.ccb.data.printer.LabelPrintService
+import java.util.Date
 
 /**
  * Get icon for kitchen based on type
@@ -613,6 +616,15 @@ private fun PrinterConfigDialog(
     }
 }
 
+/**
+ * Loại in thử
+ */
+private enum class TestPrintType {
+    CONNECTION,  // Test kết nối
+    TICKET,      // In phiếu bếp
+    LABEL        // In tem
+}
+
 @Composable
 private fun TestPrintDialog(
     kitchen: KitchenEntity,
@@ -620,11 +632,14 @@ private fun TestPrintDialog(
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
+    var selectedPrintType by remember { mutableStateOf<TestPrintType?>(null) }
     var printState by remember { mutableStateOf<PrintState>(PrintState.Idle) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Real print process using PrinterService
-    LaunchedEffect(Unit) {
+    // Execute print when type is selected
+    LaunchedEffect(selectedPrintType) {
+        if (selectedPrintType == null) return@LaunchedEffect
+
         if (kitchen.printerIp.isNullOrBlank()) {
             printState = PrintState.Error
             errorMessage = "Chưa cấu hình địa chỉ IP"
@@ -633,7 +648,7 @@ private fun TestPrintDialog(
 
         // Step 1: Connecting
         printState = PrintState.Connecting
-        delay(300) // Small delay for UI feedback
+        delay(300)
 
         // Step 2: Test connection first
         val connectionResult = PrinterService.testConnection(
@@ -652,15 +667,76 @@ private fun TestPrintDialog(
             }
         }
 
-        // Step 3: Sending print data
+        // Step 3: Sending print data based on type
         printState = PrintState.Sending
 
-        val printResult = PrinterService.printTestPage(
-            ip = kitchen.printerIp!!,
-            port = kitchen.printerPort,
-            kitchenName = kitchen.name,
-            printerName = kitchen.printerName
-        )
+        val printResult = when (selectedPrintType) {
+            TestPrintType.CONNECTION -> {
+                // Just test connection page
+                PrinterService.printTestPage(
+                    ip = kitchen.printerIp!!,
+                    port = kitchen.printerPort,
+                    kitchenName = kitchen.name,
+                    printerName = kitchen.printerName
+                )
+            }
+            TestPrintType.TICKET -> {
+                // Print kitchen ticket
+                val ticketData = KitchenTicketPrintService.KitchenTicketData(
+                    kitchenName = kitchen.name,
+                    orderNumber = "TEST${System.currentTimeMillis() % 10000}",
+                    tableName = "Bàn 1",
+                    orderTime = Date(),
+                    staffName = "Nhân viên test",
+                    items = listOf(
+                        KitchenTicketPrintService.KitchenItem(
+                            name = "Cà phê sữa đá",
+                            quantity = 2,
+                            note = "Ít đường",
+                            toppings = listOf("Trân châu đen"),
+                            options = mapOf("Size" to "L", "Đá" to "Ít đá")
+                        ),
+                        KitchenTicketPrintService.KitchenItem(
+                            name = "Trà sữa ô long",
+                            quantity = 1,
+                            note = null,
+                            toppings = listOf("Thạch dừa", "Pudding"),
+                            options = mapOf("Size" to "M", "Đường" to "50%")
+                        ),
+                        KitchenTicketPrintService.KitchenItem(
+                            name = "Bánh mì thịt nướng",
+                            quantity = 3,
+                            note = "Không hành",
+                            toppings = emptyList(),
+                            options = emptyMap()
+                        )
+                    ),
+                    note = "Đơn hàng test - Vui lòng kiểm tra",
+                    isUrgent = false,
+                    ticketType = "NEW"
+                )
+                KitchenTicketPrintService.printTicket(kitchen, ticketData)
+            }
+            TestPrintType.LABEL -> {
+                // Print label
+                val labelData = LabelPrintService.LabelData(
+                    itemName = "Trà sữa trân châu đường đen",
+                    itemCode = "TS001",
+                    quantity = 2,
+                    size = "L",
+                    sugar = "70%",
+                    ice = "Ít đá",
+                    toppings = listOf("Trân châu đen", "Thạch dừa"),
+                    note = "Không hành - Test tem",
+                    tableName = "Bàn 5",
+                    orderNumber = "TEST${System.currentTimeMillis() % 10000}",
+                    orderTime = Date(),
+                    staffName = "Nhân viên test"
+                )
+                LabelPrintService.printLabels(kitchen, labelData)
+            }
+            null -> PrinterResult.Error("Chưa chọn loại in")
+        }
 
         // Step 4: Handle result
         when (printResult) {
@@ -674,152 +750,381 @@ private fun TestPrintDialog(
         }
     }
 
-    Dialog(onDismissRequest = { if (printState != PrintState.Connecting && printState != PrintState.Sending) onDismiss() }) {
+    Dialog(onDismissRequest = {
+        if (printState != PrintState.Connecting && printState != PrintState.Sending) onDismiss()
+    }) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
             Column(
                 modifier = Modifier
-                    .width(320.dp)
+                    .width(340.dp)
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Icon based on state
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when (printState) {
-                                PrintState.Success -> Color(0xFFE8F5E9)
-                                PrintState.Error -> Color(0xFFFFEBEE)
-                                else -> color.copy(alpha = 0.1f)
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    when (printState) {
-                        PrintState.Idle, PrintState.Connecting, PrintState.Sending -> {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(40.dp),
-                                color = color,
-                                strokeWidth = 3.dp
-                            )
-                        }
-                        PrintState.Success -> {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = Color(0xFF4CAF50)
-                            )
-                        }
-                        PrintState.Error -> {
-                            Icon(
-                                Icons.Default.Error,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = Color(0xFFE53935)
-                            )
-                        }
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(color.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Print,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = color
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "In thử",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = kitchen.name,
+                            fontSize = 14.sp,
+                            color = color
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Title
-                Text(
-                    text = when (printState) {
-                        PrintState.Idle -> "Chuẩn bị in..."
-                        PrintState.Connecting -> "Đang kết nối máy in..."
-                        PrintState.Sending -> "Đang gửi lệnh in..."
-                        PrintState.Success -> "In thử thành công!"
-                        PrintState.Error -> "Lỗi kết nối"
-                    },
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                // Show menu or printing state
+                if (selectedPrintType == null) {
+                    // Menu selection
+                    Text(
+                        text = "Chọn loại in thử:",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                // Subtitle
-                Text(
-                    text = when (printState) {
-                        PrintState.Success -> "Kiểm tra máy in ${kitchen.name}\n(${kitchen.printerIp})"
-                        PrintState.Error -> errorMessage ?: "Không thể kết nối đến ${kitchen.printerIp}"
-                        else -> "${kitchen.printerName ?: "Máy in"}\n${kitchen.printerIp ?: "Chưa cấu hình"}:${kitchen.printerPort}"
-                    },
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
+                    // Test connection button
+                    PrintOptionButton(
+                        icon = Icons.Default.Wifi,
+                        title = "Test kết nối",
+                        subtitle = "Kiểm tra kết nối máy in",
+                        color = Color(0xFF2196F3),
+                        onClick = { selectedPrintType = TestPrintType.CONNECTION }
+                    )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // Test print content preview
-                if (printState == PrintState.Success) {
-                    Card(
+                    // Print ticket button
+                    PrintOptionButton(
+                        icon = Icons.Default.Receipt,
+                        title = "In phiếu bếp (Ticket)",
+                        subtitle = "In danh sách món cho bếp",
+                        color = Color(0xFFFF5722),
+                        onClick = { selectedPrintType = TestPrintType.TICKET }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Print label button
+                    PrintOptionButton(
+                        icon = Icons.Default.LocalOffer,
+                        title = "In tem (Label)",
+                        subtitle = "In tem dán ly/món ăn",
+                        color = Color(0xFF9C27B0),
+                        onClick = { selectedPrintType = TestPrintType.LABEL }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFFAFAFA)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "--- IN THỬ ---",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
-                            Text(
-                                text = kitchen.name.uppercase(),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
-                            Text(
-                                text = "IP: ${kitchen.printerIp}",
-                                fontSize = 11.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
-                            Text(
-                                text = "Port: ${kitchen.printerPort}",
-                                fontSize = 11.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
-                            Text(
-                                text = "----------------",
-                                fontSize = 11.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
+                        Text("Hủy")
+                    }
+                } else {
+                    // Printing state UI
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (printState) {
+                                    PrintState.Success -> Color(0xFFE8F5E9)
+                                    PrintState.Error -> Color(0xFFFFEBEE)
+                                    else -> color.copy(alpha = 0.1f)
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when (printState) {
+                            PrintState.Idle, PrintState.Connecting, PrintState.Sending -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(40.dp),
+                                    color = color,
+                                    strokeWidth = 3.dp
+                                )
+                            }
+                            PrintState.Success -> {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = Color(0xFF4CAF50)
+                                )
+                            }
+                            PrintState.Error -> {
+                                Icon(
+                                    Icons.Default.Error,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = Color(0xFFE53935)
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                // Close button
-                if (printState == PrintState.Success || printState == PrintState.Error) {
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (printState == PrintState.Success) Color(0xFF4CAF50) else color
-                        )
-                    ) {
-                        Text("Đóng")
+                    // Title
+                    Text(
+                        text = when (printState) {
+                            PrintState.Idle -> "Chuẩn bị in..."
+                            PrintState.Connecting -> "Đang kết nối máy in..."
+                            PrintState.Sending -> when (selectedPrintType) {
+                                TestPrintType.TICKET -> "Đang in phiếu bếp..."
+                                TestPrintType.LABEL -> "Đang in tem..."
+                                else -> "Đang gửi lệnh in..."
+                            }
+                            PrintState.Success -> when (selectedPrintType) {
+                                TestPrintType.TICKET -> "In phiếu bếp thành công!"
+                                TestPrintType.LABEL -> "In tem thành công!"
+                                else -> "In thử thành công!"
+                            }
+                            PrintState.Error -> "Lỗi kết nối"
+                        },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Subtitle
+                    Text(
+                        text = when (printState) {
+                            PrintState.Success -> "Kiểm tra máy in ${kitchen.name}\n(${kitchen.printerIp})"
+                            PrintState.Error -> errorMessage ?: "Không thể kết nối đến ${kitchen.printerIp}"
+                            else -> "${kitchen.printerName ?: "Máy in"}\n${kitchen.printerIp ?: "Chưa cấu hình"}:${kitchen.printerPort}"
+                        },
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Print preview info
+                    if (printState == PrintState.Success && selectedPrintType != TestPrintType.CONNECTION) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFFAFAFA)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                when (selectedPrintType) {
+                                    TestPrintType.TICKET -> {
+                                        Text(
+                                            text = "═══ PHIẾU BẾP ═══",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = kitchen.name.uppercase(),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "Bàn: Bàn 1",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "1. Cà phê sữa đá x2",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "2. Trà sữa ô long x1",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "3. Bánh mì thịt nướng x3",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                    }
+                                    TestPrintType.LABEL -> {
+                                        Text(
+                                            text = "╔══════════════╗",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "║ TRÀ SỮA      ║",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "║ Size: L      ║",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "║ Đường: 70%   ║",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "║ Bàn: Bàn 5   ║",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "║ (1/2, 2/2)   ║",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "╚══════════════╝",
+                                            fontSize = 11.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                    }
+                                    else -> {}
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    // Close/Retry buttons
+                    if (printState == PrintState.Success || printState == PrintState.Error) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (printState == PrintState.Error) {
+                                OutlinedButton(
+                                    onClick = {
+                                        printState = PrintState.Idle
+                                        errorMessage = null
+                                        selectedPrintType = null
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Thử lại")
+                                }
+                            }
+
+                            Button(
+                                onClick = onDismiss,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (printState == PrintState.Success) Color(0xFF4CAF50) else color
+                                )
+                            ) {
+                                Text("Đóng")
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PrintOptionButton(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.08f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = color
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
