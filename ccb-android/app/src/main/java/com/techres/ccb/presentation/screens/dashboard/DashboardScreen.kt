@@ -1317,29 +1317,28 @@ private fun OrdersTabBar(
             )
 
             // Search input - flexible width
+            val searchIconSize = if (isCompact) 16.dp else 18.dp
+            val clearIconSize = if (isCompact) 14.dp else 16.dp
+            val searchPlaceholder = if (isCompact) "Tìm..." else "Tìm theo số đơn, bàn, món..."
+            val searchFontSize = if (isCompact) 11.sp else 13.sp
+
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
                 modifier = Modifier
                     .weight(1f)
                     .height(if (isCompact) 40.dp else 44.dp),
-                placeholder = {
-                    Text(
-                        if (isCompact) "Tìm..." else "Tìm theo số đơn, bàn, món...",
-                        fontSize = if (isCompact) 11.sp else 13.sp,
-                        maxLines = 1
-                    )
-                },
+                placeholder = { Text(searchPlaceholder, fontSize = searchFontSize, maxLines = 1) },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = null,
-                        modifier = Modifier.size(if (isCompact) 16.dp else 18.dp),
+                        modifier = Modifier.size(searchIconSize),
                         tint = Color.Gray
                     )
                 },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
+                trailingIcon = if (searchQuery.isNotEmpty()) {
+                    {
                         IconButton(
                             onClick = { onSearchQueryChange("") },
                             modifier = Modifier.size(if (isCompact) 20.dp else 24.dp)
@@ -1347,20 +1346,19 @@ private fun OrdersTabBar(
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = "Xóa",
-                                modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                                modifier = Modifier.size(clearIconSize),
                                 tint = Color.Gray
                             )
                         }
                     }
-                },
+                } else null,
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = if (isCompact) 11.sp else 13.sp),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = searchFontSize),
                 shape = RoundedCornerShape(if (isCompact) 8.dp else 10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF1976D2),
                     unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
-                ),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                )
             )
 
             // Sort dropdown - compact
