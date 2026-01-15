@@ -32,10 +32,12 @@ import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
+import com.techres.ccb.data.repository.KitchenRepository
 import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
+import com.techres.ccb.data.printer.OrderPrintingService
 import com.techres.ccb.presentation.screens.table.TableViewModel
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -221,6 +223,7 @@ class SaleViewModel @Inject constructor(
     private val tableRepository: TableRepository,
     private val orderRepository: OrderRepository,
     private val shiftRepository: ShiftRepository,
+    private val kitchenRepository: KitchenRepository,
     private val productToppingDao: ProductToppingDao,
     private val comboItemDao: ComboItemDao,
     private val productNoteDao: ProductNoteDao,
@@ -2022,13 +2025,41 @@ class SaleViewModel @Inject constructor(
 
                 Log.d(TAG, "placeOrder - Created order: $orderNumber with ${orderItems.size} items")
 
+                // Print to kitchens - in tem/in món
+                var printResultMessage = ""
+                try {
+                    val kitchens = withContext(Dispatchers.IO) {
+                        kitchenRepository.getAllKitchensSync(branchId)
+                    }
+                    val products = productEntityMap.values.toList()
+
+                    if (kitchens.isNotEmpty() && products.isNotEmpty()) {
+                        val printResult = OrderPrintingService.printOrderToKitchens(
+                            order = orderEntity,
+                            orderItems = orderItems,
+                            kitchens = kitchens,
+                            products = products
+                        )
+                        Log.d(TAG, "placeOrder - Print result: ${printResult.success}, ${printResult.message}")
+                        if (printResult.success) {
+                            printResultMessage = " - ${printResult.message}"
+                        } else if (printResult.message.isNotBlank()) {
+                            Log.w(TAG, "placeOrder - Print warning: ${printResult.message}")
+                        }
+                    } else {
+                        Log.d(TAG, "placeOrder - Skipping print: kitchens=${kitchens.size}, products=${products.size}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "placeOrder - Print error (non-blocking): ${e.message}", e)
+                }
+
                 // Update UI state
                 _uiState.update { s ->
                     s.copy(
                         cartItems = emptyList(),
                         currentOrder = orderEntity,
                         currentOrderItems = orderItems,
-                        successMessage = "Đặt món thành công! $orderNumber"
+                        successMessage = "Đặt món thành công! $orderNumber$printResultMessage"
                     )
                 }
 
@@ -2084,12 +2115,38 @@ class SaleViewModel @Inject constructor(
 
                 Log.d(TAG, "addItemsToOrder - Added ${newItems.size} items to order ${currentOrder.orderNumber}")
 
+                // Print new items to kitchens - only print newly added items
+                var printResultMessage = ""
+                try {
+                    val kitchens = withContext(Dispatchers.IO) {
+                        kitchenRepository.getAllKitchensSync(branchId)
+                    }
+                    val products = productEntityMap.values.toList()
+
+                    if (kitchens.isNotEmpty() && products.isNotEmpty() && newItems.isNotEmpty()) {
+                        // Create a temporary order for printing new items only
+                        val printOrder = currentOrder.copy(updatedAt = now)
+                        val printResult = OrderPrintingService.printOrderToKitchens(
+                            order = printOrder,
+                            orderItems = newItems,
+                            kitchens = kitchens,
+                            products = products
+                        )
+                        Log.d(TAG, "addItemsToOrder - Print result: ${printResult.success}, ${printResult.message}")
+                        if (printResult.success) {
+                            printResultMessage = " - ${printResult.message}"
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "addItemsToOrder - Print error (non-blocking): ${e.message}", e)
+                }
+
                 _uiState.update { s ->
                     s.copy(
                         cartItems = emptyList(),
                         currentOrder = currentOrder.copy(subtotal = newSubtotal, totalAmount = newTotal, updatedAt = now),
                         currentOrderItems = allItems,
-                        successMessage = "Đã thêm ${newItems.size} món"
+                        successMessage = "Đã thêm ${newItems.size} món$printResultMessage"
                     )
                 }
 

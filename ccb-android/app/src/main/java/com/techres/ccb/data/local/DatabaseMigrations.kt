@@ -622,6 +622,26 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 16 to 17
+     * Adds kitchen_ids column to products table for kitchen routing
+     */
+    val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 16 to 17...")
+
+            // Add kitchen_ids column to products (comma-separated list of kitchen IDs)
+            try {
+                db.execSQL("ALTER TABLE products ADD COLUMN kitchen_ids TEXT DEFAULT NULL")
+                Log.d(TAG, "Added kitchen_ids column to products")
+            } catch (e: Exception) {
+                Log.d(TAG, "kitchen_ids column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 16 to 17 complete - Added kitchen_ids to products for kitchen routing")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -631,6 +651,7 @@ object DatabaseMigrations {
         MIGRATION_12_13,
         MIGRATION_13_14,
         MIGRATION_14_15,
-        MIGRATION_15_16
+        MIGRATION_15_16,
+        MIGRATION_16_17
     )
 }

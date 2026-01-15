@@ -87,6 +87,11 @@ data class ProductEntity(
     @ColumnInfo(name = "print_to_bar")
     val printToBar: Boolean = false,
 
+    // Kitchen IDs - comma-separated list of kitchen IDs for routing print
+    // Synced from web dashboard
+    @ColumnInfo(name = "kitchen_ids")
+    val kitchenIds: String? = null,
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 
@@ -102,4 +107,12 @@ data class ProductEntity(
 
     @ColumnInfo(name = "version")
     val version: Int = 1
-)
+) {
+    /**
+     * Parse kitchen IDs from comma-separated string
+     * Returns empty list if null or empty
+     */
+    fun getKitchenIdList(): List<String> {
+        return kitchenIds?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+    }
+}
