@@ -109,6 +109,13 @@ data class SaleUiState(
     val notesForSelectedProduct: List<ProductNoteEntity> = emptyList(), // Notes for the product being edited
     val selectedCartItemForTopping: String? = null, // For adding toppings to existing cart item
 
+    // Cancel order confirmation dialog
+    val showCancelOrderDialog: Boolean = false,
+
+    // Reprint menu
+    val showReprintMenu: Boolean = false,
+    val reprintItemId: String? = null, // null = all items, specific ID = single item
+
     // Messages
     val successMessage: String? = null,
     val errorMessage: String? = null
@@ -837,6 +844,220 @@ class SaleViewModel @Inject constructor(
                 selectedCustomer = null
             )
         }
+    }
+
+    /**
+     * Huỷ thêm món - xoá giỏ hàng khi đang ở chế độ thêm món vào order
+     */
+    fun cancelAddingItems() {
+        _uiState.update { state ->
+            state.copy(
+                cartItems = emptyList(),
+                billDiscountAmount = 0,
+                billDiscountDescription = null,
+                itemDiscounts = emptyMap()
+            )
+        }
+        Log.d(TAG, "cancelAddingItems - Cart cleared")
+    }
+
+    // ===== CANCEL ORDER CONFIRMATION =====
+
+    fun showCancelOrderConfirmation() {
+        _uiState.update { it.copy(showCancelOrderDialog = true) }
+    }
+
+    fun hideCancelOrderConfirmation() {
+        _uiState.update { it.copy(showCancelOrderDialog = false) }
+    }
+
+    fun confirmCancelOrder(reason: String = "") {
+        hideCancelOrderConfirmation()
+        cancelOrder(reason)
+    }
+
+    // ===== REPRINT MENU =====
+
+    fun showReprintMenuForItem(itemId: String) {
+        _uiState.update { it.copy(showReprintMenu = true, reprintItemId = itemId) }
+    }
+
+    fun showReprintMenuForAllItems() {
+        _uiState.update { it.copy(showReprintMenu = true, reprintItemId = null) }
+    }
+
+    fun hideReprintMenu() {
+        _uiState.update { it.copy(showReprintMenu = false, reprintItemId = null) }
+    }
+
+    /**
+     * In lại tem cho món (1 món hoặc tất cả)
+     * @param itemId ID món cần in, null = in tất cả
+     */
+    fun reprintLabels(itemId: String? = null) {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+
+        viewModelScope.launch {
+            try {
+                val itemsToReprint = if (itemId != null) {
+                    state.currentOrderItems.filter { it.id == itemId && !it.isComboChild }
+                } else {
+                    state.currentOrderItems.filter { !it.isComboChild }
+                }
+
+                if (itemsToReprint.isEmpty()) {
+                    _uiState.update { it.copy(errorMessage = "Không có món nào để in lại tem") }
+                    return@launch
+                }
+
+                val kitchens = withContext(Dispatchers.IO) {
+                    kitchenRepository.getAllKitchensSync(branchId)
+                }
+
+                // Find kitchen that can print labels
+                val labelKitchen = kitchens.find { it.isActive && it.shouldPrintLabel() }
+                if (labelKitchen == null) {
+                    _uiState.update { it.copy(errorMessage = "Không có máy in tem nào được cấu hình") }
+                    return@launch
+                }
+
+                // Build label data
+                val labels = itemsToReprint.map { item ->
+                    val (options, toppings, note) = parseItemNotes(item.notes)
+                    com.techres.ccb.data.printer.LabelPrintService.LabelData(
+                        itemName = item.productName,
+                        itemCode = item.productCode,
+                        quantity = item.quantity,
+                        size = options["Size"],
+                        sugar = options["Đường"],
+                        ice = options["Đá"],
+                        toppings = toppings,
+                        note = note,
+                        tableName = currentOrder.tableName,
+                        orderNumber = currentOrder.orderNumber,
+                        orderTime = try {
+                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                                .parse(currentOrder.createdAt) ?: Date()
+                        } catch (e: Exception) { Date() }
+                    )
+                }
+
+                val result = com.techres.ccb.data.printer.LabelPrintService.printMultipleLabels(labelKitchen, labels)
+
+                when (result) {
+                    is PrinterResult.Success -> {
+                        val count = if (itemId != null) 1 else itemsToReprint.size
+                        _uiState.update { it.copy(successMessage = "Đã in lại $count tem") }
+                    }
+                    is PrinterResult.Error -> {
+                        _uiState.update { it.copy(errorMessage = "Lỗi in tem: ${result.message}") }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "reprintLabels error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi in lại tem: ${e.message}") }
+            } finally {
+                hideReprintMenu()
+            }
+        }
+    }
+
+    /**
+     * In lại phiếu bếp cho món (1 món hoặc tất cả)
+     * @param itemId ID món cần in, null = in tất cả
+     */
+    fun reprintKitchenTickets(itemId: String? = null) {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+
+        viewModelScope.launch {
+            try {
+                val itemsToReprint = if (itemId != null) {
+                    state.currentOrderItems.filter { it.id == itemId && !it.isComboChild }
+                } else {
+                    state.currentOrderItems.filter { !it.isComboChild }
+                }
+
+                if (itemsToReprint.isEmpty()) {
+                    _uiState.update { it.copy(errorMessage = "Không có món nào để in lại") }
+                    return@launch
+                }
+
+                val kitchens = withContext(Dispatchers.IO) {
+                    kitchenRepository.getAllKitchensSync(branchId)
+                }
+                val products = productEntityMap.values.toList()
+
+                if (kitchens.isEmpty() || products.isEmpty()) {
+                    _uiState.update { it.copy(errorMessage = "Không có bếp nào được cấu hình") }
+                    return@launch
+                }
+
+                val result = OrderPrintingService.reprintOrderToKitchens(
+                    order = currentOrder,
+                    orderItems = itemsToReprint,
+                    kitchens = kitchens,
+                    products = products
+                )
+
+                if (result.success) {
+                    val count = if (itemId != null) 1 else itemsToReprint.size
+                    _uiState.update { it.copy(successMessage = "Đã in lại $count món - ${result.message}") }
+                } else {
+                    _uiState.update { it.copy(errorMessage = "Lỗi in lại: ${result.message}") }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "reprintKitchenTickets error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi in lại món: ${e.message}") }
+            } finally {
+                hideReprintMenu()
+            }
+        }
+    }
+
+    /**
+     * Parse item notes để lấy options và toppings
+     */
+    private fun parseItemNotes(notes: String?): Triple<Map<String, String>, List<String>, String?> {
+        if (notes.isNullOrBlank()) return Triple(emptyMap(), emptyList(), null)
+
+        val options = mutableMapOf<String, String>()
+        val toppings = mutableListOf<String>()
+        var note: String? = null
+
+        try {
+            val mainPart = if (notes.contains(" | ")) notes.split(" | ")[0] else notes
+
+            mainPart.split(",").map { it.trim() }.forEach { part ->
+                when {
+                    part.startsWith("+") -> {
+                        var toppingText = part.removePrefix("+").trim()
+                        // Remove price suffix
+                        toppingText = toppingText.replace(Regex("\\s*\\(\\+?\\d+\\)$"), "")
+                        if (toppingText.isNotBlank()) toppings.add(toppingText)
+                    }
+                    part.contains(":") -> {
+                        val colonIndex = part.indexOf(":")
+                        val key = part.substring(0, colonIndex).trim()
+                        var value = part.substring(colonIndex + 1).trim()
+                        value = value.replace(Regex("\\s*\\(\\+?\\d+\\)$"), "")
+                        when (key.lowercase()) {
+                            "ghi chú", "note" -> note = value
+                            else -> options[key] = value
+                        }
+                    }
+                }
+            }
+
+            if (notes.contains(" | Ghi chú:")) {
+                note = notes.split(" | Ghi chú:").getOrNull(1)?.trim()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "parseItemNotes error: ${e.message}")
+        }
+
+        return Triple(options, toppings, note)
     }
 
     fun updateCartItemNote(cartItemId: String, note: String?) {

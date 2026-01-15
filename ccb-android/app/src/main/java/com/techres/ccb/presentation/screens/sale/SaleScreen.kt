@@ -418,6 +418,24 @@ fun SaleScreen(
                 )
             }
         }
+
+        // Cancel Order Confirmation Dialog
+        if (uiState.showCancelOrderDialog) {
+            CancelOrderConfirmationDialog(
+                onDismiss = { viewModel.hideCancelOrderConfirmation() },
+                onConfirm = { reason -> viewModel.confirmCancelOrder(reason) }
+            )
+        }
+
+        // Reprint Menu Dialog
+        if (uiState.showReprintMenu) {
+            ReprintMenuDialog(
+                itemId = uiState.reprintItemId,
+                onDismiss = { viewModel.hideReprintMenu() },
+                onReprintLabels = { viewModel.reprintLabels(uiState.reprintItemId) },
+                onReprintKitchenTickets = { viewModel.reprintKitchenTickets(uiState.reprintItemId) }
+            )
+        }
     }
 }
 
@@ -580,11 +598,14 @@ fun TabletLayout(
             onPlaceOrder = viewModel::placeOrder,
             onAddItemsToOrder = viewModel::addItemsToOrder,
             onCheckout = { viewModel.showPaymentDialog() },
-            onCancelOrder = { viewModel.cancelOrder() },
+            onCancelOrder = { viewModel.showCancelOrderConfirmation() },
             onRemoveOrderItem = viewModel::removeOrderItem,
             onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
             onRemoveCartItemVariant = viewModel::removeCartItemVariant,
-            onAddToppingToCartItem = viewModel::showAddToppingDialog
+            onAddToppingToCartItem = viewModel::showAddToppingDialog,
+            onCancelAddingItems = viewModel::cancelAddingItems,
+            onReprintItem = viewModel::showReprintMenuForItem,
+            onReprintAllItems = viewModel::showReprintMenuForAllItems
         )
     }
 }
@@ -682,14 +703,14 @@ fun CartDialog(
                         onDismiss()
                     },
                     onCheckout = { viewModel.showPaymentDialog() },
-                    onCancelOrder = {
-                        viewModel.cancelOrder()
-                        onDismiss()
-                    },
+                    onCancelOrder = { viewModel.showCancelOrderConfirmation() },
                     onRemoveOrderItem = viewModel::removeOrderItem,
                     onRemoveOrderItemTopping = viewModel::removeOrderItemTopping,
                     onRemoveCartItemVariant = viewModel::removeCartItemVariant,
                     onAddToppingToCartItem = viewModel::showAddToppingDialog,
+                    onCancelAddingItems = viewModel::cancelAddingItems,
+                    onReprintItem = viewModel::showReprintMenuForItem,
+                    onReprintAllItems = viewModel::showReprintMenuForAllItems,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -976,6 +997,9 @@ fun CartPanel(
     onRemoveOrderItemTopping: (String, String) -> Unit = { _, _ -> },
     onRemoveCartItemVariant: (String, String, String) -> Unit = { _, _, _ -> }, // (cartItemId, groupId, optionId)
     onAddToppingToCartItem: (String) -> Unit = {}, // cartItemId
+    onCancelAddingItems: () -> Unit = {}, // Cancel adding more items
+    onReprintItem: (String) -> Unit = {}, // Reprint single item
+    onReprintAllItems: () -> Unit = {}, // Reprint all items menu
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1178,8 +1202,8 @@ fun CartPanel(
                         OrderItemRow(
                             item = item,
                             comboChildren = comboChildren,
-                            onRemoveItem = onRemoveOrderItem
-                            // Note: onRemoveTopping removed - only allow removing entire item, not individual toppings
+                            onRemoveItem = onRemoveOrderItem,
+                            onReprint = onReprintItem
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
@@ -1339,19 +1363,51 @@ fun CartPanel(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Add more items button (if cart has items)
-                if (cartItems.isNotEmpty()) {
-                    Button(
-                        onClick = onAddItemsToOrder,
+                // Reprint all items button (if there are order items)
+                if (currentOrderItems.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = onReprintAllItems,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = canPlaceOrder,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2196F3)
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF9C27B0)
                         )
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("THÊM ${cartItems.size} MÓN", fontWeight = FontWeight.Bold)
+                        Text("IN LẠI TẤT CẢ", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Add more items button with cancel button (if cart has items)
+                if (cartItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Cancel adding items button
+                        OutlinedButton(
+                            onClick = onCancelAddingItems,
+                            modifier = Modifier.weight(0.25f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Huỷ thêm", modifier = Modifier.size(18.dp))
+                        }
+
+                        // Add items button
+                        Button(
+                            onClick = onAddItemsToOrder,
+                            modifier = Modifier.weight(0.75f),
+                            enabled = canPlaceOrder,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2196F3)
+                            )
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("THÊM ${cartItems.size} MÓN", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
@@ -1796,7 +1852,8 @@ fun OrderItemRow(
     item: OrderItemEntity,
     comboChildren: List<OrderItemEntity> = emptyList(),
     onRemoveItem: ((String) -> Unit)? = null,
-    onRemoveTopping: ((String, String) -> Unit)? = null
+    onRemoveTopping: ((String, String) -> Unit)? = null,
+    onReprint: ((String) -> Unit)? = null // Callback for reprint
 ) {
     Card(
         shape = RoundedCornerShape(8.dp),
@@ -1842,6 +1899,20 @@ fun OrderItemRow(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    // Reprint item button
+                    if (onReprint != null) {
+                        IconButton(
+                            onClick = { onReprint(item.id) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Print,
+                                contentDescription = "In lại",
+                                tint = Color(0xFF9C27B0),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                     // Delete item button
                     if (onRemoveItem != null) {
                         IconButton(
@@ -2007,6 +2078,151 @@ fun OrderItemRow(
             }
         }
     }
+}
+
+// ===== DIALOGS =====
+
+/**
+ * Dialog xác nhận huỷ bill
+ */
+@Composable
+fun CancelOrderConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var reason by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Xác nhận huỷ đơn",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Bạn có chắc chắn muốn huỷ đơn hàng này?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Lý do huỷ (tùy chọn)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(reason) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("XÁC NHẬN HUỶ")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("ĐÓNG")
+            }
+        }
+    )
+}
+
+/**
+ * Menu dialog cho in lại tem/món
+ */
+@Composable
+fun ReprintMenuDialog(
+    itemId: String?, // null = all items
+    onDismiss: () -> Unit,
+    onReprintLabels: () -> Unit,
+    onReprintKitchenTickets: () -> Unit
+) {
+    val title = if (itemId != null) "In lại món" else "In lại tất cả"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Print,
+                contentDescription = null,
+                tint = Color(0xFF9C27B0),
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Chọn loại in lại:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // Reprint Labels button
+                OutlinedButton(
+                    onClick = onReprintLabels,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF9C27B0)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Label,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("IN LẠI TEM", fontWeight = FontWeight.Bold)
+                }
+
+                // Reprint Kitchen Tickets button
+                OutlinedButton(
+                    onClick = onReprintKitchenTickets,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFFF9800)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Restaurant,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("IN LẠI PHIẾU BẾP", fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("ĐÓNG")
+            }
+        }
+    )
 }
 
 // ===== UTILITY FUNCTIONS =====
