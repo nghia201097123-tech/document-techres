@@ -1168,7 +1168,7 @@ fun CartPanel(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // Order Items (current order + cart)
+        // Order Items (current order + cart) - Optimized with LazyColumn
         if (cartItems.isEmpty() && currentOrderItems.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -1192,77 +1192,162 @@ fun CartPanel(
                 }
             }
         } else {
-            Column(
+            // Global state for expand/collapse all toppings
+            var allToppingsExpanded by remember { mutableStateOf(true) }
+            var showCancelledItems by remember { mutableStateOf(false) }
+
+            // Prepare data
+            val comboChildrenMap = currentOrderItems
+                .filter { it.isComboChild }
+                .groupBy { it.comboParentId }
+            val activeItems = currentOrderItems.filter { !it.isComboChild && it.status != "cancelled" }
+            val cancelledItems = currentOrderItems.filter { !it.isComboChild && it.status == "cancelled" }
+
+            androidx.compose.foundation.lazy.LazyColumn(
                 modifier = Modifier
                     .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Display current order items (read-only)
-                if (currentOrderItems.isNotEmpty()) {
-                    // Filter out combo children and group them by parent
-                    // Sort: active items first, cancelled items at bottom
-                    val parentItems = currentOrderItems
-                        .filter { !it.isComboChild }
-                        .sortedBy { if (it.status == "cancelled") 1 else 0 }
-                    val comboChildrenMap = currentOrderItems
-                        .filter { it.isComboChild }
-                        .groupBy { it.comboParentId }
+                // Active order items section
+                if (activeItems.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Đã order (${activeItems.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            // Expand/Collapse all button
+                            TextButton(
+                                onClick = { allToppingsExpanded = !allToppingsExpanded },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (allToppingsExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (allToppingsExpanded) "Thu gọn" else "Mở rộng",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
 
-                    // Count active items (not cancelled)
-                    val activeItemCount = parentItems.count { it.status != "cancelled" }
-                    val cancelledItemCount = parentItems.count { it.status == "cancelled" }
-
-                    Text(
-                        text = "Đã order:" + if (cancelledItemCount > 0) " ($activeItemCount món, $cancelledItemCount huỷ)" else "",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                    parentItems.forEach { item ->
-                        // Get combo children for this parent (if any)
+                    items(activeItems.size, key = { activeItems[it].id }) { index ->
+                        val item = activeItems[index]
                         val comboChildren = comboChildrenMap[item.id] ?: emptyList()
                         OrderItemRow(
                             item = item,
                             comboChildren = comboChildren,
                             onRemoveItem = onRemoveOrderItem,
-                            onReprint = onReprintItem
+                            onReprint = onReprintItem,
+                            forceExpanded = allToppingsExpanded
                         )
+                    }
+                }
+
+                // Cancelled items section - collapsible
+                if (cancelledItems.isNotEmpty()) {
+                    item {
                         Spacer(modifier = Modifier.height(4.dp))
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showCancelledItems = !showCancelledItems },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFFFEBEE)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Cancel,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF44336),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Đã huỷ (${cancelledItems.size} món)",
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 14.sp,
+                                        color = Color(0xFFF44336)
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (showCancelledItems) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF44336),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
 
-                    if (cartItems.isNotEmpty()) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    // Cancelled items list (compact) - only show when expanded
+                    if (showCancelledItems) {
+                        items(cancelledItems.size, key = { "cancelled_${cancelledItems[it].id}" }) { index ->
+                            val item = cancelledItems[index]
+                            CancelledItemRowCompact(item = item)
+                        }
+                    }
+                }
+
+                // New cart items section
+                if (cartItems.isNotEmpty()) {
+                    item {
+                        if (currentOrderItems.isNotEmpty()) {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        }
                         Text(
-                            text = "Thêm mới:",
+                            text = "Thêm mới (${cartItems.size})",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color(0xFF2196F3),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
+
+                    items(cartItems.size, key = { "cart_${cartItems[it].id}" }) { index ->
+                        val item = cartItems[index]
+                        val missingGroups = cartItemsWithMissingRequiredToppings
+                            .find { it.first == item.id }
+                            ?.second ?: emptyList()
+
+                        CartItemRow(
+                            item = item,
+                            onIncrease = { onIncreaseQuantity(item.id) },
+                            onDecrease = { onDecreaseQuantity(item.id) },
+                            onRemove = { onRemoveItem(item.id) },
+                            onEditNote = { onEditNote(item.id) },
+                            onRemoveVariant = onRemoveCartItemVariant,
+                            onAddTopping = { onAddToppingToCartItem(item.id) },
+                            missingRequiredGroups = missingGroups
+                        )
+                    }
                 }
 
-                // Display new cart items (editable)
-                cartItems.forEach { item ->
-                    // Check if this item is missing required toppings
-                    val missingGroups = cartItemsWithMissingRequiredToppings
-                        .find { it.first == item.id }
-                        ?.second ?: emptyList()
-
-                    CartItemRow(
-                        item = item,
-                        onIncrease = { onIncreaseQuantity(item.id) },
-                        onDecrease = { onDecreaseQuantity(item.id) },
-                        onRemove = { onRemoveItem(item.id) },
-                        onEditNote = { onEditNote(item.id) },
-                        onRemoveVariant = onRemoveCartItemVariant,
-                        onAddTopping = { onAddToppingToCartItem(item.id) },
-                        missingRequiredGroups = missingGroups
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+                // Bottom padding
+                item { Spacer(modifier = Modifier.height(8.dp)) }
             }
         }
 
@@ -1880,7 +1965,8 @@ fun OrderItemRow(
     comboChildren: List<OrderItemEntity> = emptyList(),
     onRemoveItem: ((String) -> Unit)? = null,
     onRemoveTopping: ((String, String) -> Unit)? = null,
-    onReprint: ((String) -> Unit)? = null // Callback for reprint
+    onReprint: ((String) -> Unit)? = null, // Callback for reprint
+    forceExpanded: Boolean? = null // null = use local state, true/false = force state
 ) {
     val isCancelled = item.status == "cancelled"
 
@@ -2069,17 +2155,19 @@ fun OrderItemRow(
                 // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
                 val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
                 if (variants.isNotEmpty()) {
+                    // Use forceExpanded if provided, otherwise use local state
                     // Default: expanded for active items, collapsed for cancelled items
-                    var toppingsExpanded by remember { mutableStateOf(!isCancelled) }
+                    var localExpanded by remember { mutableStateOf(!isCancelled) }
+                    val toppingsExpanded = forceExpanded ?: localExpanded
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Collapsible header - click to toggle
+                    // Collapsible header - click to toggle (only if not forced)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(4.dp))
-                            .clickable { toppingsExpanded = !toppingsExpanded }
+                            .clickable { if (forceExpanded == null) localExpanded = !localExpanded }
                             .padding(vertical = 2.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -2202,6 +2290,65 @@ fun OrderItemRow(
                         modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Compact row for cancelled items - minimal display
+ * Shows: [Name] x[Qty] [Price] - [Reason]
+ */
+@Composable
+fun CancelledItemRowCompact(item: OrderItemEntity) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = item.productName,
+                fontSize = 13.sp,
+                color = Color.Gray,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                ),
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "x${item.quantity}",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = formatCurrency(item.totalPrice.toLong()),
+                fontSize = 13.sp,
+                color = Color.Gray,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                )
+            )
+            item.cancelReason?.let { reason ->
+                Text(
+                    text = reason,
+                    fontSize = 11.sp,
+                    color = Color(0xFFF44336),
+                    fontStyle = FontStyle.Italic,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
