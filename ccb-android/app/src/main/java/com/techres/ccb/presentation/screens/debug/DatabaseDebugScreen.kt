@@ -678,18 +678,17 @@ fun CouponsTable(coupons: List<CouponEntity>) {
 @Composable
 fun KitchensTable(kitchens: List<KitchenEntity>) {
     DataTable(
-        headers = listOf("ID", "Tên bếp", "Mô tả", "Loại", "Thứ tự", "Active", "Sync", "Cập nhật"),
+        headers = listOf("ID", "Tên bếp", "Loại", "PrintMode", "PrinterIP", "Protocol", "Active"),
         data = kitchens,
         rowContent = { kitchen ->
             listOf(
                 kitchen.id.take(8) + "...",
                 kitchen.name,
-                kitchen.description ?: "-",
                 kitchen.kitchenType ?: "-",
-                kitchen.sortOrder.toString(),
-                if (kitchen.isActive) "✓" else "✗",
-                kitchen.syncStatus,
-                kitchen.updatedAt.take(19).replace("T", " ")
+                kitchen.printMode,
+                "${kitchen.printerIp ?: "-"}:${kitchen.printerPort}",
+                kitchen.printerProtocol,
+                if (kitchen.isActive) "✓" else "✗"
             )
         }
     )
