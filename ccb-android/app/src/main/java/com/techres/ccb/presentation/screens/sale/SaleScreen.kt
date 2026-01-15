@@ -435,9 +435,10 @@ fun SaleScreen(
         }
 
         // Remove Order Item Confirmation Dialog
-        if (uiState.showRemoveItemDialog && uiState.itemToRemove != null) {
+        val itemToRemove = uiState.itemToRemove
+        if (uiState.showRemoveItemDialog && itemToRemove != null) {
             RemoveOrderItemConfirmationDialog(
-                item = uiState.itemToRemove,
+                item = itemToRemove,
                 onDismiss = { viewModel.hideRemoveItemConfirmation() },
                 onConfirm = { viewModel.confirmRemoveOrderItem() }
             )
