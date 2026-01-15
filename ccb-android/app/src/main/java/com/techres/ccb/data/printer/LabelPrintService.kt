@@ -1,14 +1,22 @@
 package com.techres.ccb.data.printer
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Typeface
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import android.util.Log
 import com.techres.ccb.data.local.entity.KitchenEntity
+import com.techres.ccb.data.local.entity.LabelSize
+import com.techres.ccb.data.local.entity.PrinterProtocol
 import com.techres.ccb.printer.core.EscPosCommands
 import com.techres.ccb.printer.core.TsplCommands
-import com.techres.ccb.printer.core.TsplLabelBuilder
-import com.techres.ccb.printer.core.TsplBitmapRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -19,22 +27,17 @@ import java.util.*
  * Label Print Service - In tem/sticker cho đồ uống, trà sữa, cà phê
  *
  * Hỗ trợ 2 loại máy in:
- * 1. ESC/POS receipt printers (EPSON, etc.)
- * 2. TSPL label printers (XPRINTER, TSC, etc.)
+ * 1. ESC/POS receipt printers (EPSON, BIXOLON, etc.)
+ * 2. TSPL label printers (XPRINTER, TSC, GAINSCHA, etc.)
  *
- * Mỗi ly/món sẽ in 1 tem riêng biệt
- * Tem chứa: Tên món, Size, Topping, Ghi chú, Bàn, Mã đơn
+ * Đảm bảo: Nền trắng, chữ đen cho tất cả các loại máy in
  */
 object LabelPrintService {
     private const val TAG = "LabelPrintService"
 
-    /**
-     * Printer type enum
-     */
-    enum class PrinterType {
-        ESCPOS,     // ESC/POS receipt printers
-        TSPL        // TSPL/TSC label printers (XPRINTER, etc.)
-    }
+    // DPI for most thermal printers
+    private const val DPI = 203
+    private const val DOTS_PER_MM = 8 // 203 DPI ≈ 8 dots/mm
 
     /**
      * Data class cho thông tin in tem
@@ -58,15 +61,18 @@ object LabelPrintService {
 
     /**
      * In tem cho 1 item (có thể in nhiều tem nếu quantity > 1)
+     * Tự động detect protocol từ KitchenEntity
      */
     suspend fun printLabels(
         kitchen: KitchenEntity,
-        labelData: LabelData,
-        printerType: PrinterType = PrinterType.TSPL // Default to TSPL for label printers
+        labelData: LabelData
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             val ip = kitchen.printerIp
                 ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in cho ${kitchen.name}")
+
+            val protocol = kitchen.getPrinterProtocolEnum()
+            Log.d(TAG, "Printing with protocol: $protocol")
 
             var lastError: String? = null
 
@@ -77,15 +83,15 @@ object LabelPrintService {
                     totalLabels = labelData.quantity
                 )
 
-                val labelContent = when (printerType) {
-                    PrinterType.TSPL -> generateTsplLabelContent(kitchen, currentLabel)
-                    PrinterType.ESCPOS -> generateEscPosLabelContent(kitchen, currentLabel)
+                val labelContent = when (protocol) {
+                    PrinterProtocol.TSPL -> generateTsplLabel(kitchen, currentLabel)
+                    PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
                 }
 
                 // Retry logic
                 var success = false
                 repeat(3) { attempt ->
-                    val result = printViaNetworkChunked(ip, kitchen.printerPort, labelContent)
+                    val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
                     when (result) {
                         is PrinterResult.Success -> {
                             success = true
@@ -116,19 +122,18 @@ object LabelPrintService {
     }
 
     /**
-     * In nhiều items (mỗi item có thể có quantity > 1)
+     * In nhiều items
      */
     suspend fun printMultipleLabels(
         kitchen: KitchenEntity,
-        items: List<LabelData>,
-        printerType: PrinterType = PrinterType.TSPL
+        items: List<LabelData>
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             var totalPrinted = 0
             var lastError: String? = null
 
             items.forEach { item ->
-                val result = printLabels(kitchen, item, printerType)
+                val result = printLabels(kitchen, item)
                 when (result) {
                     is PrinterResult.Success -> totalPrinted += item.quantity
                     is PrinterResult.Error -> lastError = result.message
@@ -146,98 +151,95 @@ object LabelPrintService {
     // ==================== TSPL LABEL GENERATION ====================
 
     /**
-     * Generate TSPL label content for XPRINTER and TSC label printers
+     * Generate TSPL label - Nền trắng, chữ đen
      */
-    private fun generateTsplLabelContent(
+    private fun generateTsplLabel(
         kitchen: KitchenEntity,
         label: LabelData
     ): ByteArray {
-        Log.d(TAG, "Generating TSPL label content:")
-        Log.d(TAG, "  - Paper width: ${kitchen.paperWidth}mm")
-        Log.d(TAG, "  - Printer type: TSPL")
+        val labelSize = kitchen.getLabelSize()
+        val density = kitchen.printDensity
+
+        Log.d(TAG, "Generating TSPL label:")
+        Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
+        Log.d(TAG, "  - Gap: ${labelSize.gapMm}mm")
+        Log.d(TAG, "  - Density: $density")
         Log.d(TAG, "  - Item: ${label.itemName}")
 
-        val output = java.io.ByteArrayOutputStream()
+        val output = ByteArrayOutputStream()
 
-        // Label size: 72mm x 30mm (from self-test printout)
-        val labelWidth = 72
-        val labelHeight = 30
+        // Label dimensions in dots
+        val widthDots = labelSize.widthMm * DOTS_PER_MM
+        val heightDots = labelSize.heightMm * DOTS_PER_MM
 
-        // DPI = 203, so 8 dots per mm
-        val dotsPerMm = 8
-
-        // Setup commands
-        output.write("SIZE $labelWidth mm, $labelHeight mm\r\n".toByteArray())
-        output.write("GAP 3 mm, 0 mm\r\n".toByteArray())
+        // ========== SETUP COMMANDS ==========
+        output.write("SIZE ${labelSize.widthMm} mm, ${labelSize.heightMm} mm\r\n".toByteArray())
+        output.write("GAP ${labelSize.gapMm} mm, 0 mm\r\n".toByteArray())
         output.write("DIRECTION 0\r\n".toByteArray())
-        output.write("CLS\r\n".toByteArray())
-        output.write("DENSITY 8\r\n".toByteArray())
+        output.write("CLS\r\n".toByteArray()) // Clear buffer - ensures white background
+        output.write("DENSITY $density\r\n".toByteArray())
         output.write("SPEED 4\r\n".toByteArray())
 
-        // Calculate positions
-        val labelWidthDots = labelWidth * dotsPerMm  // 576 dots
-        val labelHeightDots = labelHeight * dotsPerMm // 240 dots
-
-        var yPos = 8 // Start Y position in dots
+        var yPos = 8
 
         // ========== TÊN MÓN (BITMAP for Vietnamese) ==========
-        val itemNameBitmap = TsplBitmapRenderer.renderText(
+        val itemNameBitmap = renderTextBitmap(
             text = label.itemName,
-            width = labelWidthDots - 16,
-            fontSize = 28f,
+            width = widthDots - 16,
+            fontSize = calculateFontSize(labelSize, 1.2f),
             bold = true,
             centerAlign = true
         )
-        output.write(TsplCommands.bitmap(8, yPos, itemNameBitmap))
+        output.write(bitmapToTspl(8, yPos, itemNameBitmap))
         yPos += itemNameBitmap.height + 4
         itemNameBitmap.recycle()
 
-        // ========== SIZE (if available) ==========
+        // ========== SIZE ==========
         label.size?.let { size ->
-            val sizeBitmap = TsplBitmapRenderer.renderText(
+            val sizeBitmap = renderTextBitmap(
                 text = "Size: $size",
-                width = labelWidthDots - 16,
-                fontSize = 20f,
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.9f),
                 bold = true,
                 centerAlign = true
             )
-            output.write(TsplCommands.bitmap(8, yPos, sizeBitmap))
+            output.write(bitmapToTspl(8, yPos, sizeBitmap))
             yPos += sizeBitmap.height + 2
             sizeBitmap.recycle()
         }
 
         // ========== LINE SEPARATOR ==========
-        output.write("BAR 8,$yPos,${labelWidthDots - 16},2\r\n".toByteArray())
+        output.write("BAR 8,$yPos,${widthDots - 16},2\r\n".toByteArray())
         yPos += 6
 
         // ========== TABLE NAME ==========
         label.tableName?.let { table ->
-            val tableBitmap = TsplBitmapRenderer.renderText(
-                text = "Ban: $table",
-                width = labelWidthDots - 16,
-                fontSize = 18f,
+            val tableBitmap = renderTextBitmap(
+                text = "Bàn: $table",
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.85f),
                 bold = true,
                 centerAlign = false
             )
-            output.write(TsplCommands.bitmap(8, yPos, tableBitmap))
+            output.write(bitmapToTspl(8, yPos, tableBitmap))
             yPos += tableBitmap.height + 2
             tableBitmap.recycle()
         }
 
-        // ========== SUGAR & ICE OPTIONS ==========
+        // ========== SUGAR & ICE ==========
         if (label.sugar != null || label.ice != null) {
             val optionsText = buildString {
-                label.sugar?.let { append("Duong: $it  ") }
-                label.ice?.let { append("Da: $it") }
+                label.sugar?.let { append("Đường: $it  ") }
+                label.ice?.let { append("Đá: $it") }
             }
-            val optionsBitmap = TsplBitmapRenderer.renderText(
+            val optionsBitmap = renderTextBitmap(
                 text = optionsText,
-                width = labelWidthDots - 16,
-                fontSize = 16f,
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.75f),
                 bold = false,
                 centerAlign = false
             )
-            output.write(TsplCommands.bitmap(8, yPos, optionsBitmap))
+            output.write(bitmapToTspl(8, yPos, optionsBitmap))
             yPos += optionsBitmap.height + 2
             optionsBitmap.recycle()
         }
@@ -245,28 +247,28 @@ object LabelPrintService {
         // ========== TOPPINGS ==========
         if (label.toppings.isNotEmpty()) {
             val toppingText = "Topping: " + label.toppings.joinToString(", ")
-            val toppingBitmap = TsplBitmapRenderer.renderText(
+            val toppingBitmap = renderTextBitmap(
                 text = toppingText,
-                width = labelWidthDots - 16,
-                fontSize = 14f,
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.7f),
                 bold = false,
                 centerAlign = false
             )
-            output.write(TsplCommands.bitmap(8, yPos, toppingBitmap))
+            output.write(bitmapToTspl(8, yPos, toppingBitmap))
             yPos += toppingBitmap.height + 2
             toppingBitmap.recycle()
         }
 
         // ========== NOTE ==========
         label.note?.let { note ->
-            val noteBitmap = TsplBitmapRenderer.renderText(
-                text = "Ghi chu: $note",
-                width = labelWidthDots - 16,
-                fontSize = 14f,
+            val noteBitmap = renderTextBitmap(
+                text = "Ghi chú: $note",
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.7f),
                 bold = false,
                 centerAlign = false
             )
-            output.write(TsplCommands.bitmap(8, yPos, noteBitmap))
+            output.write(bitmapToTspl(8, yPos, noteBitmap))
             yPos += noteBitmap.height + 2
             noteBitmap.recycle()
         }
@@ -279,42 +281,145 @@ object LabelPrintService {
             "#${label.orderNumber} - ${timeFormat.format(label.orderTime)}"
         }
 
-        // Put order info at bottom of label
-        val orderBitmap = TsplBitmapRenderer.renderText(
+        val orderBitmap = renderTextBitmap(
             text = orderInfo,
-            width = labelWidthDots - 16,
-            fontSize = 14f,
+            width = widthDots - 16,
+            fontSize = calculateFontSize(labelSize, 0.65f),
             bold = false,
             centerAlign = true
         )
-        val orderYPos = labelHeightDots - orderBitmap.height - 8
-        output.write(TsplCommands.bitmap(8, orderYPos, orderBitmap))
+        val orderYPos = heightDots - orderBitmap.height - 8
+        output.write(bitmapToTspl(8, orderYPos, orderBitmap))
         orderBitmap.recycle()
 
-        // ========== PRINT COMMAND ==========
+        // ========== PRINT ==========
         output.write("PRINT 1,1\r\n".toByteArray())
 
         val content = output.toByteArray()
-        Log.d(TAG, "TSPL label content generated: ${content.size} bytes")
+        Log.d(TAG, "TSPL label generated: ${content.size} bytes")
         return content
     }
 
     /**
-     * Generate ESC/POS label content (for receipt printers)
+     * Calculate font size based on label size
      */
-    private fun generateEscPosLabelContent(
+    private fun calculateFontSize(labelSize: LabelSize, scale: Float = 1.0f): Float {
+        // Base font size for 72x30mm label
+        val baseFontSize = when {
+            labelSize.heightMm <= 30 -> 18f
+            labelSize.heightMm <= 50 -> 22f
+            else -> 26f
+        }
+        return baseFontSize * scale
+    }
+
+    /**
+     * Convert bitmap to TSPL BITMAP command
+     * Ensures white background (0) and black text (1)
+     */
+    private fun bitmapToTspl(x: Int, y: Int, bitmap: Bitmap): ByteArray {
+        val output = ByteArrayOutputStream()
+
+        val width = bitmap.width
+        val height = bitmap.height
+        val widthBytes = (width + 7) / 8
+
+        // Get pixels
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        // BITMAP command header
+        val header = "BITMAP $x,$y,$widthBytes,$height,0,"
+        output.write(header.toByteArray())
+
+        // Convert to monochrome: WHITE background (0), BLACK text (1)
+        val threshold = 180 // Higher threshold = more black (better for text)
+        for (row in 0 until height) {
+            for (byteIndex in 0 until widthBytes) {
+                var byte = 0
+                for (bit in 0 until 8) {
+                    val col = byteIndex * 8 + bit
+                    if (col < width) {
+                        val pixel = pixels[row * width + col]
+                        // Calculate grayscale value
+                        val r = (pixel shr 16) and 0xFF
+                        val g = (pixel shr 8) and 0xFF
+                        val b = pixel and 0xFF
+                        val gray = (r + g + b) / 3
+
+                        // Black text on white background
+                        // If gray < threshold, it's dark (text) -> set bit to 1
+                        if (gray < threshold) {
+                            byte = byte or (0x80 shr bit)
+                        }
+                        // White background -> bit stays 0
+                    }
+                }
+                output.write(byte)
+            }
+        }
+
+        output.write("\r\n".toByteArray())
+        return output.toByteArray()
+    }
+
+    /**
+     * Render text to bitmap - WHITE background, BLACK text
+     */
+    private fun renderTextBitmap(
+        text: String,
+        width: Int,
+        fontSize: Float = 20f,
+        bold: Boolean = false,
+        centerAlign: Boolean = false
+    ): Bitmap {
+        if (text.isEmpty()) {
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(Color.WHITE)
+            }
+        }
+
+        val paint = TextPaint().apply {
+            color = Color.BLACK  // BLACK text
+            textSize = fontSize
+            isAntiAlias = false  // No anti-aliasing for crisp thermal print
+            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+
+        val alignment = if (centerAlign) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL
+
+        val layout = StaticLayout.Builder
+            .obtain(text, 0, text.length, paint, width)
+            .setAlignment(alignment)
+            .setLineSpacing(0f, 1.0f)
+            .setIncludePad(true)
+            .build()
+
+        val height = layout.height.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)  // WHITE background
+        layout.draw(canvas)
+
+        return bitmap
+    }
+
+    // ==================== ESC/POS LABEL GENERATION ====================
+
+    /**
+     * Generate ESC/POS label for receipt printers
+     */
+    private fun generateEscPosLabel(
         kitchen: KitchenEntity,
         label: LabelData
     ): ByteArray {
         val paperWidth = kitchen.paperWidth
-        val useBitmapMode = true
-        val useRasterBitmap = false
 
-        Log.d(TAG, "Generating ESC/POS label content:")
+        Log.d(TAG, "Generating ESC/POS label:")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
         Log.d(TAG, "  - Item: ${label.itemName}")
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap)
+        val builder = HybridBillBuilder(paperWidth, true, false)
 
         builder.apply {
             init()
@@ -365,117 +470,107 @@ object LabelPrintService {
         return builder.build()
     }
 
-    // ==================== SIMPLE TEST FUNCTIONS ====================
+    // ==================== TEST FUNCTIONS ====================
 
     /**
-     * Simple TSPL test - Test if XPRINTER can receive TSPL commands
+     * Test print - Auto detect protocol
      */
-    suspend fun printTsplSimpleTest(
+    suspend fun printSimpleTest(
         ip: String,
-        port: Int = 9100
+        port: Int = 9100,
+        protocol: PrinterProtocol = PrinterProtocol.TSPL,
+        labelSize: LabelSize = LabelSize.SIZE_72x30
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
-            Log.d(TAG, "=== TSPL SIMPLE TEST ===")
+            Log.d(TAG, "=== SIMPLE TEST ===")
+            Log.d(TAG, "Protocol: $protocol")
             Log.d(TAG, "Target: $ip:$port")
 
-            val content = buildTsplSimpleTestContent()
-            Log.d(TAG, "TSPL test content size: ${content.size} bytes")
-            Log.d(TAG, "TSPL commands:\n${String(content)}")
+            val content = when (protocol) {
+                PrinterProtocol.TSPL -> buildTsplTestContent(labelSize)
+                PrinterProtocol.ESCPOS -> buildEscPosTestContent()
+            }
 
-            printViaNetworkChunked(ip, port, content)
+            Log.d(TAG, "Test content size: ${content.size} bytes")
+            printViaNetwork(ip, port, content)
         }
     }
 
     /**
-     * Build TSPL simple test content
+     * Build TSPL test content
      */
-    private fun buildTsplSimpleTestContent(): ByteArray {
-        val output = java.io.ByteArrayOutputStream()
+    private fun buildTsplTestContent(labelSize: LabelSize): ByteArray {
+        val output = ByteArrayOutputStream()
 
-        // Label size 72mm x 30mm (from self-test)
-        output.write("SIZE 72 mm, 30 mm\r\n".toByteArray())
-        output.write("GAP 3 mm, 0 mm\r\n".toByteArray())
+        output.write("SIZE ${labelSize.widthMm} mm, ${labelSize.heightMm} mm\r\n".toByteArray())
+        output.write("GAP ${labelSize.gapMm} mm, 0 mm\r\n".toByteArray())
         output.write("DIRECTION 0\r\n".toByteArray())
         output.write("CLS\r\n".toByteArray())
         output.write("DENSITY 8\r\n".toByteArray())
 
-        // Print text using built-in fonts (no Vietnamese - ASCII only)
+        // ASCII text using built-in fonts
         output.write("TEXT 50,20,\"3\",0,1,1,\"XPRINTER TEST\"\r\n".toByteArray())
         output.write("TEXT 50,60,\"2\",0,1,1,\"Label Printer OK!\"\r\n".toByteArray())
         output.write("TEXT 50,100,\"1\",0,1,1,\"1234567890\"\r\n".toByteArray())
-        output.write("TEXT 50,130,\"1\",0,1,1,\"ABCDEFGHIJ\"\r\n".toByteArray())
 
-        // Draw a box
-        output.write("BOX 20,10,550,220,2\r\n".toByteArray())
+        // Box outline
+        val widthDots = labelSize.widthMm * DOTS_PER_MM
+        val heightDots = labelSize.heightMm * DOTS_PER_MM
+        output.write("BOX 10,10,${widthDots - 10},${heightDots - 10},2\r\n".toByteArray())
 
-        // Draw a line
-        output.write("BAR 20,160,530,2\r\n".toByteArray())
+        // Line
+        output.write("BAR 10,140,${widthDots - 20},2\r\n".toByteArray())
 
-        // Print date/time
+        // Date/time
         val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-        output.write("TEXT 50,180,\"1\",0,1,1,\"$dateStr\"\r\n".toByteArray())
+        output.write("TEXT 50,160,\"1\",0,1,1,\"$dateStr\"\r\n".toByteArray())
 
-        // Print 1 copy
         output.write("PRINT 1,1\r\n".toByteArray())
-
         return output.toByteArray()
     }
 
     /**
-     * Simple ESC/POS text test - No bitmap, just text commands
+     * Build ESC/POS test content
      */
-    suspend fun printSimpleTest(
-        ip: String,
-        port: Int = 9100
-    ): PrinterResult {
-        return withContext(Dispatchers.IO) {
-            Log.d(TAG, "=== SIMPLE TEXT TEST ===")
-            Log.d(TAG, "Target: $ip:$port")
-
-            // Try TSPL first (since we know it's a label printer)
-            Log.d(TAG, "Trying TSPL commands...")
-            val tsplResult = printTsplSimpleTest(ip, port)
-
-            if (tsplResult is PrinterResult.Success) {
-                return@withContext tsplResult
-            }
-
-            // If TSPL fails, try ESC/POS
-            Log.d(TAG, "TSPL failed, trying ESC/POS...")
-            val escPosContent = buildEscPosSimpleTestContent()
-            printViaNetworkChunked(ip, port, escPosContent)
-        }
-    }
-
-    /**
-     * Build ESC/POS simple test content
-     */
-    private fun buildEscPosSimpleTestContent(): ByteArray {
-        val output = java.io.ByteArrayOutputStream()
+    private fun buildEscPosTestContent(): ByteArray {
+        val output = ByteArrayOutputStream()
 
         output.write(EscPosCommands.INIT)
         output.write(EscPosCommands.ALIGN_CENTER)
-        output.write("=== XPRINTER TEST ===\n".toByteArray())
+        output.write("=== PRINTER TEST ===\n".toByteArray())
         output.write("--------------------\n".toByteArray())
         output.write("Printer is working!\n".toByteArray())
-        output.write("IP: Connected OK\n".toByteArray())
         output.write("--------------------\n".toByteArray())
         output.write("1234567890\n".toByteArray())
         output.write("ABCDEFGHIJ\n".toByteArray())
-        output.write("abcdefghij\n".toByteArray())
         output.write("--------------------\n".toByteArray())
+
+        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        output.write("$dateStr\n".toByteArray())
+
         output.write(EscPosCommands.feedLines(4))
         output.write(EscPosCommands.CUT_PARTIAL)
 
         return output.toByteArray()
     }
 
-    // ==================== NETWORK PRINT ====================
+    /**
+     * Test TSPL protocol specifically
+     */
+    suspend fun printTsplSimpleTest(
+        ip: String,
+        port: Int = 9100,
+        labelSize: LabelSize = LabelSize.SIZE_72x30
+    ): PrinterResult {
+        return printSimpleTest(ip, port, PrinterProtocol.TSPL, labelSize)
+    }
+
+    // ==================== NETWORK ====================
 
     /**
-     * In qua mạng với chunked data
+     * Print via network with chunked data
      */
-    private suspend fun printViaNetworkChunked(
+    private suspend fun printViaNetwork(
         ip: String,
         port: Int,
         content: ByteArray,
@@ -484,9 +579,9 @@ object LabelPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
-        Log.d(TAG, "=== START CHUNKED PRINT ===")
+        Log.d(TAG, "=== PRINT ===")
         Log.d(TAG, "Target: $ip:$port")
-        Log.d(TAG, "Content size: ${content.size} bytes, chunk size: $chunkSize")
+        Log.d(TAG, "Size: ${content.size} bytes")
 
         return try {
             socket = Socket().apply {
@@ -502,34 +597,28 @@ object LabelPrintService {
 
             outputStream = socket.getOutputStream()
 
-            // Send data in chunks
+            // Send in chunks
             var offset = 0
-            var chunkNum = 0
             while (offset < content.size) {
                 val remaining = content.size - offset
                 val currentChunkSize = minOf(chunkSize, remaining)
 
                 outputStream.write(content, offset, currentChunkSize)
                 outputStream.flush()
-
-                chunkNum++
                 offset += currentChunkSize
 
-                Log.d(TAG, "Sent chunk $chunkNum: $currentChunkSize bytes (total: $offset/${content.size})")
-
-                // Small delay between chunks
                 if (offset < content.size) {
-                    delay(50)
+                    delay(30)
                 }
             }
 
-            Log.d(TAG, "All chunks sent, waiting for printer...")
+            Log.d(TAG, "All data sent")
             delay(500)
 
-            Log.d(TAG, "=== PRINT SUCCESS ===")
+            Log.d(TAG, "=== SUCCESS ===")
             PrinterResult.Success("OK")
         } catch (e: Exception) {
-            Log.e(TAG, "=== PRINT FAILED ===", e)
+            Log.e(TAG, "=== FAILED ===", e)
             PrinterResult.Error("Lỗi in: ${e.message}")
         } finally {
             try {
@@ -538,7 +627,6 @@ object LabelPrintService {
                 delay(100)
                 outputStream?.close()
                 socket?.close()
-                Log.d(TAG, "Connection closed")
             } catch (e: Exception) {
                 Log.e(TAG, "Close error: ${e.message}")
             }

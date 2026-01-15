@@ -37,6 +37,32 @@ interface KitchenDao {
     @Query("UPDATE kitchens SET printer_ip = :ip, printer_port = :port, printer_name = :name, is_printer_connected = :isConnected WHERE id = :kitchenId")
     suspend fun updatePrinterConfig(kitchenId: String, ip: String?, port: Int, name: String?, isConnected: Boolean)
 
+    @Query("""
+        UPDATE kitchens SET
+            printer_ip = :ip,
+            printer_port = :port,
+            printer_name = :name,
+            is_printer_connected = :isConnected,
+            printer_protocol = :protocol,
+            label_width_mm = :labelWidthMm,
+            label_height_mm = :labelHeightMm,
+            label_gap_mm = :labelGapMm,
+            print_density = :printDensity
+        WHERE id = :kitchenId
+    """)
+    suspend fun updateFullPrinterConfig(
+        kitchenId: String,
+        ip: String?,
+        port: Int,
+        name: String?,
+        isConnected: Boolean,
+        protocol: String,
+        labelWidthMm: Int,
+        labelHeightMm: Int,
+        labelGapMm: Int,
+        printDensity: Int
+    )
+
     @Transaction
     suspend fun syncKitchens(branchId: String, kitchens: List<KitchenEntity>) {
         // Get existing printer configs before syncing
@@ -44,7 +70,7 @@ interface KitchenDao {
 
         deleteAllByBranch(branchId)
 
-        // Preserve printer config from existing kitchens
+        // Preserve all printer config from existing kitchens
         val kitchensWithPrinterConfig = kitchens.map { kitchen ->
             val existing = existingKitchens[kitchen.id]
             if (existing != null) {
@@ -52,7 +78,12 @@ interface KitchenDao {
                     printerIp = existing.printerIp,
                     printerPort = existing.printerPort,
                     printerName = existing.printerName,
-                    isPrinterConnected = existing.isPrinterConnected
+                    isPrinterConnected = existing.isPrinterConnected,
+                    printerProtocol = existing.printerProtocol,
+                    labelWidthMm = existing.labelWidthMm,
+                    labelHeightMm = existing.labelHeightMm,
+                    labelGapMm = existing.labelGapMm,
+                    printDensity = existing.printDensity
                 )
             } else {
                 kitchen

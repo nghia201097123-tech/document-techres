@@ -119,6 +119,43 @@ class KitchenPrinterViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Update full printer config including protocol and label size
+     */
+    fun updateFullPrinterConfig(
+        kitchenId: String,
+        ip: String?,
+        port: Int,
+        name: String?,
+        isConnected: Boolean,
+        protocol: String,
+        labelWidthMm: Int,
+        labelHeightMm: Int,
+        labelGapMm: Int,
+        printDensity: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                kitchenRepository.updateFullPrinterConfig(
+                    kitchenId = kitchenId,
+                    ip = ip,
+                    port = port,
+                    name = name,
+                    isConnected = isConnected,
+                    protocol = protocol,
+                    labelWidthMm = labelWidthMm,
+                    labelHeightMm = labelHeightMm,
+                    labelGapMm = labelGapMm,
+                    printDensity = printDensity
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: "Lỗi cập nhật cấu hình máy in")
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }

@@ -15,6 +15,56 @@ enum class KitchenPrintMode {
 }
 
 /**
+ * Loại máy in / Protocol
+ */
+enum class PrinterProtocol(val displayName: String) {
+    ESCPOS("ESC/POS (Receipt)"),     // Máy in hóa đơn: EPSON, BIXOLON, etc.
+    TSPL("TSPL (Label)");            // Máy in tem: XPRINTER, TSC, GAINSCHA, etc.
+
+    companion object {
+        fun fromString(value: String?): PrinterProtocol {
+            return entries.find { it.name == value } ?: ESCPOS
+        }
+    }
+}
+
+/**
+ * Kích thước tem (cho máy in TSPL)
+ */
+data class LabelSize(
+    val widthMm: Int,
+    val heightMm: Int,
+    val gapMm: Int = 3
+) {
+    val displayName: String get() = "${widthMm}x${heightMm}mm"
+
+    companion object {
+        // Common label sizes
+        val SIZE_40x30 = LabelSize(40, 30, 3)
+        val SIZE_50x30 = LabelSize(50, 30, 3)
+        val SIZE_60x40 = LabelSize(60, 40, 3)
+        val SIZE_72x30 = LabelSize(72, 30, 3)   // XPRINTER default
+        val SIZE_80x50 = LabelSize(80, 50, 3)
+        val SIZE_100x50 = LabelSize(100, 50, 3)
+        val SIZE_100x80 = LabelSize(100, 80, 3)
+
+        val ALL_SIZES = listOf(
+            SIZE_40x30,
+            SIZE_50x30,
+            SIZE_60x40,
+            SIZE_72x30,
+            SIZE_80x50,
+            SIZE_100x50,
+            SIZE_100x80
+        )
+
+        fun fromDimensions(width: Int, height: Int, gap: Int = 3): LabelSize {
+            return LabelSize(width, height, gap)
+        }
+    }
+}
+
+/**
  * Loại bếp
  */
 enum class KitchenType(val value: String) {
@@ -78,6 +128,24 @@ data class KitchenEntity(
     @ColumnInfo(name = "is_printer_connected")
     val isPrinterConnected: Boolean = false,
 
+    // ========== PRINTER PROTOCOL ==========
+    @ColumnInfo(name = "printer_protocol")
+    val printerProtocol: String = PrinterProtocol.ESCPOS.name, // ESCPOS or TSPL
+
+    // ========== LABEL SIZE (for TSPL printers) ==========
+    @ColumnInfo(name = "label_width_mm")
+    val labelWidthMm: Int = 72, // Default 72mm (XPRINTER)
+
+    @ColumnInfo(name = "label_height_mm")
+    val labelHeightMm: Int = 30, // Default 30mm
+
+    @ColumnInfo(name = "label_gap_mm")
+    val labelGapMm: Int = 3, // Gap between labels
+
+    // ========== PRINT DENSITY ==========
+    @ColumnInfo(name = "print_density")
+    val printDensity: Int = 8, // 0-15 for TSPL, affects darkness
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 
@@ -126,5 +194,33 @@ data class KitchenEntity(
     fun shouldPrintLabel(): Boolean {
         val mode = getPrintModeEnum()
         return mode == KitchenPrintMode.LABEL || mode == KitchenPrintMode.BOTH
+    }
+
+    /**
+     * Lấy PrinterProtocol enum
+     */
+    fun getPrinterProtocolEnum(): PrinterProtocol {
+        return PrinterProtocol.fromString(printerProtocol)
+    }
+
+    /**
+     * Kiểm tra máy in TSPL (label printer)
+     */
+    fun isTsplPrinter(): Boolean {
+        return getPrinterProtocolEnum() == PrinterProtocol.TSPL
+    }
+
+    /**
+     * Kiểm tra máy in ESC/POS (receipt printer)
+     */
+    fun isEscPosPrinter(): Boolean {
+        return getPrinterProtocolEnum() == PrinterProtocol.ESCPOS
+    }
+
+    /**
+     * Lấy kích thước tem
+     */
+    fun getLabelSize(): LabelSize {
+        return LabelSize(labelWidthMm, labelHeightMm, labelGapMm)
     }
 }

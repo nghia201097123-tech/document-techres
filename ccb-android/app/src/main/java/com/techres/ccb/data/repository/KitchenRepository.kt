@@ -36,6 +36,27 @@ class KitchenRepository @Inject constructor(
         kitchenDao.updatePrinterConfig(kitchenId, ip, port, name, isConnected)
     }
 
+    /**
+     * Update full printer config including protocol and label size
+     */
+    suspend fun updateFullPrinterConfig(
+        kitchenId: String,
+        ip: String?,
+        port: Int,
+        name: String?,
+        isConnected: Boolean,
+        protocol: String,
+        labelWidthMm: Int,
+        labelHeightMm: Int,
+        labelGapMm: Int,
+        printDensity: Int
+    ) {
+        kitchenDao.updateFullPrinterConfig(
+            kitchenId, ip, port, name, isConnected,
+            protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity
+        )
+    }
+
     suspend fun getKitchensCount(branchId: String): Int {
         return kitchenDao.getCount(branchId)
     }
