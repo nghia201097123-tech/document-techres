@@ -270,10 +270,13 @@ fun SaleScreen(
 
         if (uiState.showPaymentDialog) {
             // Tính toán các giá trị cho PaymentDialog
+            // CHỈ tính toán cho các món đã order, KHÔNG bao gồm cart items chưa thêm
             val currentOrder = uiState.currentOrder
             val subtotal = if (currentOrder != null) {
-                currentOrder.subtotal.toLong() + uiState.subtotal
+                // Chỉ sử dụng subtotal của order hiện tại, KHÔNG cộng cart items
+                currentOrder.subtotal.toLong()
             } else {
+                // Nếu chưa có order, sử dụng cart items (đang tạo order mới)
                 uiState.subtotal
             }
 
@@ -285,33 +288,37 @@ fun SaleScreen(
             val priceBeforeVat = paymentTotal / (1 + uiState.taxRate / 100.0)
             val vatAmount = (paymentTotal - priceBeforeVat).toLong()
 
-            // Tạo danh sách món cho item-level discount (exclude combo children)
+            // Tạo danh sách món cho item-level discount
+            // CHỈ bao gồm món đã order, KHÔNG bao gồm cart items chưa thêm
             val orderItems = buildList {
-                // Thêm các món từ order đang active (filter combo children)
-                uiState.currentOrderItems
-                    .filter { !it.isComboChild }
-                    .forEach { item ->
-                    add(PaymentOrderItem(
-                        id = item.id,
-                        name = item.productName,
-                        quantity = item.quantity,
-                        unitPrice = item.unitPrice.toLong(),
-                        totalPrice = item.totalPrice.toLong(),
-                        discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
-                        categoryId = null
-                    ))
-                }
-                // Thêm các món từ giỏ hàng hiện tại
-                uiState.cartItems.forEach { item ->
-                    add(PaymentOrderItem(
-                        id = item.id,
-                        name = item.product.name,
-                        quantity = item.quantity,
-                        unitPrice = item.product.price.toLong(),
-                        totalPrice = item.totalPrice,
-                        discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
-                        categoryId = item.product.categoryId
-                    ))
+                if (currentOrder != null) {
+                    // Có order đang active - chỉ lấy món từ order (filter combo children)
+                    uiState.currentOrderItems
+                        .filter { !it.isComboChild }
+                        .forEach { item ->
+                            add(PaymentOrderItem(
+                                id = item.id,
+                                name = item.productName,
+                                quantity = item.quantity,
+                                unitPrice = item.unitPrice.toLong(),
+                                totalPrice = item.totalPrice.toLong(),
+                                discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
+                                categoryId = null
+                            ))
+                        }
+                } else {
+                    // Chưa có order - lấy từ giỏ hàng (đang tạo order mới)
+                    uiState.cartItems.forEach { item ->
+                        add(PaymentOrderItem(
+                            id = item.id,
+                            name = item.product.name,
+                            quantity = item.quantity,
+                            unitPrice = item.product.price.toLong(),
+                            totalPrice = item.totalPrice,
+                            discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
+                            categoryId = item.product.categoryId
+                        ))
+                    }
                 }
             }
 
@@ -1380,43 +1387,46 @@ fun CartPanel(
 
                 // Add more items button with cancel button (if cart has items)
                 if (cartItems.isNotEmpty()) {
+                    // Hiển thị nút thêm món và huỷ thêm
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Cancel adding items button
+                        // Huỷ thêm món - với text rõ ràng hơn
                         OutlinedButton(
                             onClick = onCancelAddingItems,
-                            modifier = Modifier.weight(0.25f),
+                            modifier = Modifier.weight(0.35f),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
+                                contentColor = Color(0xFFFF5722)
                             )
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Huỷ thêm", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("BỎ THÊM", fontWeight = FontWeight.Medium, fontSize = 13.sp)
                         }
 
-                        // Add items button
+                        // Add items button - nổi bật
                         Button(
                             onClick = onAddItemsToOrder,
-                            modifier = Modifier.weight(0.75f),
+                            modifier = Modifier.weight(0.65f),
                             enabled = canPlaceOrder,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF2196F3)
                             )
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text("THÊM ${cartItems.size} MÓN", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Payment and Cancel buttons
+                // Payment and Cancel order buttons (luôn hiện khi có order)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Cancel button
+                    // Huỷ đơn button
                     OutlinedButton(
                         onClick = onCancelOrder,
                         modifier = Modifier.weight(0.35f),
@@ -1424,9 +1434,9 @@ fun CartPanel(
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("HUỶ", fontWeight = FontWeight.Bold)
+                        Text("HUỶ ĐƠN", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
 
                     // Checkout button
@@ -1437,8 +1447,8 @@ fun CartPanel(
                             containerColor = Color(0xFF4CAF50)
                         )
                     ) {
-                        Icon(Icons.Default.Payment, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text("THANH TOÁN", fontWeight = FontWeight.Bold)
                     }
                 }
