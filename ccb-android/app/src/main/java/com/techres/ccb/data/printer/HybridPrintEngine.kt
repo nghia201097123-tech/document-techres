@@ -658,19 +658,23 @@ object HybridPrintService {
             var lastError: String? = null
 
             repeat(maxRetries) { attempt ->
+                var socket: Socket? = null
+                var outputStream: java.io.OutputStream? = null
                 try {
-                    val socket = Socket().apply {
+                    socket = Socket().apply {
                         reuseAddress = true
+                        keepAlive = true
                         tcpNoDelay = true
+                        setSoLinger(true, 2)
                     }
                     socket.connect(InetSocketAddress(ip, port), CONNECTION_TIMEOUT)
 
-                    val outputStream = socket.getOutputStream()
+                    outputStream = socket.getOutputStream()
                     outputStream.write(billContent)
                     outputStream.flush()
 
-                    outputStream.close()
-                    socket.close()
+                    // Đợi máy in xử lý xong bitmap data
+                    kotlinx.coroutines.delay(300)
 
                     return@withContext PrinterResult.Success("In thành công!")
 
@@ -680,6 +684,15 @@ object HybridPrintService {
 
                     if (attempt < maxRetries - 1) {
                         kotlinx.coroutines.delay(500L * (attempt + 1))
+                    }
+                } finally {
+                    try {
+                        outputStream?.flush()
+                        socket?.shutdownOutput()
+                        outputStream?.close()
+                        socket?.close()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Close error: ${e.message}")
                     }
                 }
             }
