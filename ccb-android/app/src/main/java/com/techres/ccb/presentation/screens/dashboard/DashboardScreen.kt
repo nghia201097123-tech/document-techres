@@ -1,5 +1,10 @@
 package com.techres.ccb.presentation.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -2009,6 +2014,8 @@ private fun OrderDetailDialog(
  */
 @Composable
 private fun OrderItemRow(item: OrderItemEntity, comboChildren: List<OrderItemEntity> = emptyList()) {
+    var toppingsExpanded by remember { mutableStateOf(true) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -2061,64 +2068,118 @@ private fun OrderItemRow(item: OrderItemEntity, comboChildren: List<OrderItemEnt
             modifier = Modifier.padding(start = 36.dp, top = 2.dp)
         )
 
-        // Row 3: Variants/Toppings - Grab style with prices
+        // Row 3: Variants/Toppings - Collapsible with correct parsing
         if (!item.notes.isNullOrBlank()) {
             // Split by " | " to separate variants from user note
             val parts = item.notes.split(" | ")
             val variantsPart = parts.firstOrNull() ?: ""
             val userNote = parts.getOrNull(1)
 
-            // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
+            // Parse variants
             val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
             if (variants.isNotEmpty()) {
-                Column(
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Collapsible header
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 36.dp, top = 6.dp)
+                        .padding(start = 36.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { toppingsExpanded = !toppingsExpanded }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    variants.forEach { variant ->
-                        // Parse "Name:Price" format
-                        val colonIndex = variant.lastIndexOf(":")
-                        val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
-                        val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
+                    Icon(
+                        imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.Gray
+                    )
+                    Text(
+                        text = if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 3.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "•",
-                                    fontSize = 14.sp,
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                                Text(
-                                    text = name,
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF424242)
-                                )
+                // Variants list - collapsible
+                AnimatedVisibility(
+                    visible = toppingsExpanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 36.dp, top = 4.dp)
+                    ) {
+                        variants.forEach { variant ->
+                            // Parse variant format:
+                            // Options: "Size: L (+10000)" or "Size: L" or "Đường: NHIỀU"
+                            // Toppings: "+ Trân châu cam (+10000)" or "+ Trân châu cam"
+                            var displayName = variant
+                            var price = 0L
+
+                            // Extract price from "(+xxxxx)" suffix
+                            val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
+                            if (priceMatch != null) {
+                                price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
+                                displayName = variant.replace(priceMatch.value, "").trim()
                             }
-                            if (price > 0) {
-                                Text(
-                                    text = "+${formatCurrency(price)}",
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF1976D2),
-                                    fontWeight = FontWeight.Medium
-                                )
+
+                            // For toppings starting with "+", remove the "+" prefix
+                            if (displayName.startsWith("+")) {
+                                displayName = displayName.removePrefix("+").trim()
+                            }
+                            // For options with "GroupName: Value" format, show only VALUE
+                            else if (displayName.contains(":")) {
+                                val colonIdx = displayName.indexOf(":")
+                                val value = displayName.substring(colonIdx + 1).trim()
+                                if (value.isNotEmpty()) {
+                                    displayName = value
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "•",
+                                        fontSize = 14.sp,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Text(
+                                        text = displayName,
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF424242)
+                                    )
+                                }
+                                if (price > 0) {
+                                    Text(
+                                        text = "+${formatCurrency(price)}",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF1976D2),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Show user note if exists
+            // Show user note if exists (always visible)
             if (userNote != null && userNote.isNotEmpty()) {
                 Text(
                     text = userNote,
