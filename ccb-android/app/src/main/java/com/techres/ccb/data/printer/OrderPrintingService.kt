@@ -262,6 +262,9 @@ object OrderPrintingService {
             return Triple(emptyMap(), emptyList(), null)
         }
 
+        Log.d(TAG, "=== parseNotesField START ===")
+        Log.d(TAG, "  Input notes: $notes")
+
         val options = mutableMapOf<String, String>()
         val toppings = mutableListOf<PrintRoutingService.ToppingInfo>()
         var note: String? = null
@@ -287,16 +290,22 @@ object OrderPrintingService {
                 userNotePart = null
             }
 
+            Log.d(TAG, "  mainPart: $mainPart")
+
             // Split by comma and process each part
-            mainPart.split(",").map { it.trim() }.forEach { part ->
+            val splitParts = mainPart.split(",").map { it.trim() }
+            Log.d(TAG, "  Split into ${splitParts.size} parts")
+
+            splitParts.forEach { part ->
+                Log.d(TAG, "    Processing part: '$part'")
                 when {
-                    // Toppings start with "+"
-                    part.startsWith("+") -> {
-                        // Format: "+ Trân châu (+10000)" or "+ Trân châu"
+                    // Toppings start with "+" (including "+" with space or without)
+                    part.startsWith("+") || part.startsWith("+ ") -> {
+                        // Format: "+ Trân châu (+10000)" or "+ Trân châu" or "+Trân châu"
                         var toppingText = part.removePrefix("+").trim()
                         var toppingPrice = 0.0
 
-                        // Extract price if present: "(+10000)"
+                        // Extract price if present: "(+10000)" or "(10000)"
                         val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)$").find(toppingText)
                         if (priceMatch != null) {
                             toppingPrice = priceMatch.groupValues[1].toDoubleOrNull() ?: 0.0
@@ -304,6 +313,7 @@ object OrderPrintingService {
                         }
 
                         if (toppingText.isNotBlank()) {
+                            Log.d(TAG, "      -> TOPPING: '$toppingText' price=$toppingPrice")
                             toppings.add(PrintRoutingService.ToppingInfo(name = toppingText, price = toppingPrice))
                         }
                     }
@@ -340,13 +350,37 @@ object OrderPrintingService {
                             }
                         }
 
-                        when (key.lowercase()) {
-                            "ghi chú", "note", "ghi chu" -> note = value
-                            // Recognize ice level variants
-                            "mức đá", "muc da", "đá", "da", "ice", "độ đá" -> options["Đá"] = value
-                            // Recognize sugar level variants
-                            "mức đường", "đường", "sugar", "độ đường" -> options["Đường"] = value
-                            else -> options[key] = value
+                        // Check if this is a topping group (e.g., "Topping: Trân châu")
+                        val isToppingKey = keyLower.contains("topping") ||
+                                           keyLower.contains("addon") ||
+                                           keyLower.contains("thêm") ||
+                                           keyLower.contains("phần ăn kèm")
+
+                        if (isToppingKey && value.isNotBlank()) {
+                            // This is a topping in "Key: Value" format
+                            Log.d(TAG, "      -> TOPPING (from key): '$value'")
+                            toppings.add(PrintRoutingService.ToppingInfo(name = value, price = 0.0))
+                        } else {
+                            when (key.lowercase()) {
+                                "ghi chú", "note", "ghi chu" -> {
+                                    note = value
+                                    Log.d(TAG, "      -> NOTE: '$value'")
+                                }
+                                // Recognize ice level variants
+                                "mức đá", "muc da", "đá", "da", "ice", "độ đá" -> {
+                                    options["Đá"] = value
+                                    Log.d(TAG, "      -> OPTION Đá: '$value'")
+                                }
+                                // Recognize sugar level variants
+                                "mức đường", "đường", "sugar", "độ đường" -> {
+                                    options["Đường"] = value
+                                    Log.d(TAG, "      -> OPTION Đường: '$value'")
+                                }
+                                else -> {
+                                    options[key] = value
+                                    Log.d(TAG, "      -> OPTION $key: '$value'")
+                                }
+                            }
                         }
                     }
                     // Plain text - try to detect type for backward compatibility
@@ -357,14 +391,17 @@ object OrderPrintingService {
                         val sizeMatch = Regex("^(Size\\s*)(\\w+):(\\d+)$", RegexOption.IGNORE_CASE).find(part)
                         if (sizeMatch != null) {
                             options["Size"] = sizeMatch.groupValues[2]
+                            Log.d(TAG, "      -> OPTION Size: '${sizeMatch.groupValues[2]}'")
                         }
                         // Check if it's a common sugar option
                         else if (sugarOptions.any { partLower.contains(it) }) {
                             options["Đường"] = part
+                            Log.d(TAG, "      -> OPTION Đường (inferred): '$part'")
                         }
                         // Check if it's a common ice option
                         else if (iceOptions.any { partLower.contains(it) }) {
                             options["Đá"] = part
+                            Log.d(TAG, "      -> OPTION Đá (inferred): '$part'")
                         }
                         // Otherwise treat as note
                         else {
@@ -373,6 +410,7 @@ object OrderPrintingService {
                             } else {
                                 note = "$note, $part"
                             }
+                            Log.d(TAG, "      -> NOTE (inferred): '$part'")
                         }
                     }
                 }
@@ -385,6 +423,11 @@ object OrderPrintingService {
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing notes: ${e.message}")
         }
+
+        Log.d(TAG, "=== parseNotesField RESULT ===")
+        Log.d(TAG, "  Options: $options")
+        Log.d(TAG, "  Toppings (${toppings.size}): ${toppings.map { "${it.name}(${it.price})" }}")
+        Log.d(TAG, "  Note: $note")
 
         return Triple(options, toppings, note)
     }

@@ -169,13 +169,27 @@ object LabelPrintService {
 
     /**
      * Split label into multiple parts if too many toppings
+     * Mỗi phần sẽ có tối đa MAX_TOPPINGS_PER_LABEL topping
+     *
+     * Ví dụ: 10 toppings -> 3 phần (4 + 4 + 2)
+     * - Phần 1: toppings 1-4, có đầy đủ thông tin (size, đá, đường, giá)
+     * - Phần 2: toppings 5-8, chỉ có tên món + toppings
+     * - Phần 3: toppings 9-10, chỉ có tên món + toppings
      */
     private fun splitLabelIfNeeded(labelData: LabelData, labelSize: LabelSize): List<LabelData> {
         val toppings = labelData.toppings
         val toppingPrices = labelData.toppingPrices
 
+        Log.d(TAG, "=== splitLabelIfNeeded ===")
+        Log.d(TAG, "  Item: ${labelData.itemName}")
+        Log.d(TAG, "  Total toppings: ${toppings.size}")
+        Log.d(TAG, "  Toppings: $toppings")
+        Log.d(TAG, "  ToppingPrices: ${toppingPrices.map { "${it.first}(${it.second})" }}")
+        Log.d(TAG, "  MAX_TOPPINGS_PER_LABEL: $MAX_TOPPINGS_PER_LABEL")
+
         // Nếu ít topping, không cần split
         if (toppings.size <= MAX_TOPPINGS_PER_LABEL) {
+            Log.d(TAG, "  -> No split needed (${toppings.size} <= $MAX_TOPPINGS_PER_LABEL)")
             return listOf(labelData)
         }
 
@@ -187,10 +201,15 @@ object LabelPrintService {
             toppingChunks.map { emptyList() }
         }
 
+        val totalParts = toppingChunks.size
+        Log.d(TAG, "  -> Splitting into $totalParts parts")
+
         toppingChunks.forEachIndexed { index, chunk ->
             val isContinuation = index > 0
             val priceChunk = toppingPriceChunks.getOrElse(index) { emptyList() }
             val chunkTotalPrice = priceChunk.sumOf { it.second }
+
+            Log.d(TAG, "  Part ${index + 1}/$totalParts: ${chunk.size} toppings: $chunk")
 
             parts.add(
                 labelData.copy(
@@ -198,6 +217,8 @@ object LabelPrintService {
                     toppingPrices = priceChunk,
                     totalToppingPrice = if (index == 0) labelData.totalToppingPrice else chunkTotalPrice,
                     isContinuation = isContinuation,
+                    partIndex = index + 1,
+                    totalParts = totalParts,
                     // Chỉ hiện giá đầy đủ ở tem đầu tiên
                     unitPrice = if (isContinuation) 0.0 else labelData.unitPrice,
                     totalPrice = if (isContinuation) 0.0 else labelData.totalPrice,
@@ -211,6 +232,7 @@ object LabelPrintService {
             )
         }
 
+        Log.d(TAG, "  -> Created ${parts.size} label parts")
         return parts
     }
 
@@ -259,7 +281,7 @@ object LabelPrintService {
 
     /**
      * Generate TSPL label - Theo mẫu chuẩn
-     * Layout:
+     * Layout for normal label:
      * ┌─────────────────────────────┐
      * │ Store Name                  │
      * │ GF-472                  3/6 │
@@ -274,6 +296,20 @@ object LabelPrintService {
      * │ ─────────────────────────── │
      * │ 02/01/2026 14:53            │
      * └─────────────────────────────┘
+     *
+     * Layout for continuation label (split):
+     * ┌─────────────────────────────┐
+     * │ ** TIẾP - PHẦN 2/3 **       │
+     * │ GF-472                  3/6 │
+     * │ ─────────────────────────── │
+     * │ Tên món (BOLD)              │
+     * │ +Topping 5                  │
+     * │ +Topping 6                  │
+     * │ +Topping 7                  │
+     * │ +Topping 8                  │
+     * │ ─────────────────────────── │
+     * │ 02/01/2026 14:53            │
+     * └─────────────────────────────┘
      */
     private fun generateTsplLabel(
         kitchen: KitchenEntity,
@@ -282,10 +318,14 @@ object LabelPrintService {
         val labelSize = kitchen.getLabelSize()
         val density = kitchen.printDensity
 
-        Log.d(TAG, "Generating TSPL label:")
+        Log.d(TAG, "=== Generating TSPL label ===")
         Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
         Log.d(TAG, "  - Density: $density")
         Log.d(TAG, "  - Item: ${label.itemName}")
+        Log.d(TAG, "  - labelIndex: ${label.labelIndex}/${label.totalLabels}")
+        Log.d(TAG, "  - partIndex: ${label.partIndex}/${label.totalParts}")
+        Log.d(TAG, "  - isContinuation: ${label.isContinuation}")
+        Log.d(TAG, "  - toppings: ${label.toppings}")
 
         val output = ByteArrayOutputStream()
 
@@ -310,22 +350,41 @@ object LabelPrintService {
 
         var yPos = 4
 
-        // ========== LINE 1: STORE NAME (nếu có) ==========
-        label.storeName?.let { store ->
-            val storeBitmap = renderTextBitmap(
-                text = store,
+        // ========== LINE 1: CONTINUATION INDICATOR or STORE NAME ==========
+        if (label.isContinuation && label.totalParts > 1) {
+            // Show continuation indicator for split labels
+            val continuationText = "** TIẾP - PHẦN ${label.partIndex}/${label.totalParts} **"
+            val continuationBitmap = renderTextBitmap(
+                text = continuationText,
                 width = contentWidth,
                 fontSize = fontSmall,
-                bold = false,
-                centerAlign = false
+                bold = true,
+                centerAlign = true
             )
-            output.write(bitmapToTspl(margin, yPos, storeBitmap))
-            yPos += storeBitmap.height
-            storeBitmap.recycle()
+            output.write(bitmapToTspl(margin, yPos, continuationBitmap))
+            yPos += continuationBitmap.height
+            continuationBitmap.recycle()
+        } else {
+            label.storeName?.let { store ->
+                val storeBitmap = renderTextBitmap(
+                    text = store,
+                    width = contentWidth,
+                    fontSize = fontSmall,
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(margin, yPos, storeBitmap))
+                yPos += storeBitmap.height
+                storeBitmap.recycle()
+            }
         }
 
         // ========== LINE 2: ORDER NUMBER + INDEX ==========
-        val indexText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+        // Show both quantity index (x/y) and part index (a/b) if split
+        val labelCountText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+        val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
+        val indexText = "$labelCountText $partText".trim()
+
         val orderHeaderBitmap = renderTwoColumnText(
             label.orderNumber,
             indexText,
@@ -630,6 +689,7 @@ object LabelPrintService {
 
     /**
      * Generate ESC/POS label for receipt printers
+     * Supports split labels when there are many toppings
      */
     private fun generateEscPosLabel(
         kitchen: KitchenEntity,
@@ -637,22 +697,31 @@ object LabelPrintService {
     ): ByteArray {
         val paperWidth = kitchen.paperWidth
 
-        Log.d(TAG, "Generating ESC/POS label:")
+        Log.d(TAG, "=== Generating ESC/POS label ===")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
         Log.d(TAG, "  - Item: ${label.itemName}")
+        Log.d(TAG, "  - labelIndex: ${label.labelIndex}/${label.totalLabels}")
+        Log.d(TAG, "  - partIndex: ${label.partIndex}/${label.totalParts}")
+        Log.d(TAG, "  - isContinuation: ${label.isContinuation}")
+        Log.d(TAG, "  - toppings (${label.toppings.size}): ${label.toppings}")
 
         val builder = HybridBillBuilder(paperWidth, true, false)
 
         builder.apply {
             init()
 
-            // Nếu là tem tiếp theo (continuation), thêm indicator
+            // Nếu là tem tiếp theo (continuation), thêm indicator nổi bật
             if (label.isContinuation && label.totalParts > 1) {
-                lineCenter("(Tiếp - Phần ${label.partIndex}/${label.totalParts})")
-                separator('-')
+                lineBold("** TIẾP - PHẦN ${label.partIndex}/${label.totalParts} **", BitmapTextStyle(centerAlign = true))
+                separator('=')
             }
 
             lineDouble(label.itemName, BitmapTextStyle(centerAlign = true))
+
+            // Hiển thị phần x/y ở tem đầu tiên nếu có nhiều phần
+            if (!label.isContinuation && label.totalParts > 1) {
+                lineCenter("(Phần ${label.partIndex}/${label.totalParts})")
+            }
 
             label.size?.let {
                 lineBold("Size: $it", BitmapTextStyle(centerAlign = true))
@@ -671,7 +740,7 @@ object LabelPrintService {
 
             if (label.toppings.isNotEmpty()) {
                 separator('-')
-                line("Topping:")
+                line("Topping (${label.toppings.size}):")
                 // Hiển thị topping với giá nếu có
                 if (label.toppingPrices.isNotEmpty()) {
                     label.toppingPrices.forEach { (toppingName, toppingPrice) ->
@@ -714,8 +783,10 @@ object LabelPrintService {
             val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
             val orderInfo = "#${label.orderNumber} - ${timeFormat.format(label.orderTime)}"
 
-            if (label.totalLabels > 1) {
-                lineKeyValue(orderInfo, "${label.labelIndex}/${label.totalLabels}")
+            // Show both label count and part info
+            val labelCount = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+            if (labelCount.isNotEmpty()) {
+                lineKeyValue(orderInfo, labelCount)
             } else {
                 lineCenter(orderInfo)
             }

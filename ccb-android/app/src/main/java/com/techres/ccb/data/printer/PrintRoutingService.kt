@@ -257,47 +257,73 @@ object PrintRoutingService {
 
     /**
      * In phiếu bếp (ticket)
+     * Tất cả toppings sẽ được in ra trên phiếu bếp
      */
     private suspend fun printTicketToKitchen(
         kitchen: KitchenEntity,
         order: OrderPrintData,
         items: List<OrderItem>
     ): PrinterResult {
+        Log.d(TAG, "=== printTicketToKitchen START ===")
+        Log.d(TAG, "  Kitchen: ${kitchen.name}")
+        Log.d(TAG, "  Order: ${order.orderNumber}")
+        Log.d(TAG, "  Items count: ${items.size}")
+
+        val ticketItems = items.map { item ->
+            Log.d(TAG, "  Converting item: ${item.productName}")
+            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { it.name }}")
+            Log.d(TAG, "    - options: ${item.options}")
+            Log.d(TAG, "    - note: ${item.note}")
+
+            KitchenTicketPrintService.KitchenItem(
+                name = item.productName,
+                quantity = item.quantity,
+                note = item.note,
+                toppings = item.toppings.map { it.name },
+                options = item.options
+            )
+        }
+
         val ticketData = KitchenTicketPrintService.KitchenTicketData(
             kitchenName = kitchen.name,
             orderNumber = order.orderNumber,
             tableName = order.tableName,
             orderTime = order.orderTime,
             staffName = order.staffName,
-            items = items.map { item ->
-                KitchenTicketPrintService.KitchenItem(
-                    name = item.productName,
-                    quantity = item.quantity,
-                    note = item.note,
-                    toppings = item.toppings.map { it.name },
-                    options = item.options
-                )
-            },
+            items = ticketItems,
             note = order.note,
             isUrgent = order.isUrgent,
             ticketType = order.ticketType
         )
 
+        Log.d(TAG, "=== printTicketToKitchen calling KitchenTicketPrintService ===")
         return KitchenTicketPrintService.printTicket(kitchen, ticketData)
     }
 
     /**
      * In tem (labels) - mỗi item với quantity > 1 sẽ in nhiều tem
+     * Tự động split nếu có quá nhiều topping (MAX_TOPPINGS_PER_LABEL = 4)
      */
     private suspend fun printLabelsToKitchen(
         kitchen: KitchenEntity,
         order: OrderPrintData,
         items: List<OrderItem>
     ): PrinterResult {
-        Log.d(TAG, "printLabelsToKitchen: ${items.size} items to print")
+        Log.d(TAG, "=== printLabelsToKitchen START ===")
+        Log.d(TAG, "  Kitchen: ${kitchen.name}")
+        Log.d(TAG, "  Items count: ${items.size}")
 
         val labelDataList = items.map { item ->
-            Log.d(TAG, "  Creating label for: ${item.productName} qty=${item.quantity}")
+            Log.d(TAG, "  Creating label for: ${item.productName}")
+            Log.d(TAG, "    - quantity: ${item.quantity}")
+            Log.d(TAG, "    - options: ${item.options}")
+            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})" }}")
+            Log.d(TAG, "    - note: ${item.note}")
+
+            // Build toppingPrices list from toppings
+            val toppingPrices = item.toppings.map { Pair(it.name, it.price) }
+            val totalToppingPrice = item.toppings.sumOf { it.price }
+
             LabelPrintService.LabelData(
                 itemName = item.productName,
                 itemCode = item.productCode,
@@ -306,6 +332,8 @@ object PrintRoutingService {
                 sugar = item.options["Đường"] ?: item.options["sugar"],
                 ice = item.options["Đá"] ?: item.options["ice"],
                 toppings = item.toppings.map { it.name },
+                toppingPrices = toppingPrices, // Pass topping prices for proper label generation
+                totalToppingPrice = totalToppingPrice,
                 note = item.note,
                 tableName = order.tableName,
                 orderNumber = order.orderNumber,
@@ -314,7 +342,7 @@ object PrintRoutingService {
             )
         }
 
-        Log.d(TAG, "printLabelsToKitchen: Created ${labelDataList.size} label data, calling LabelPrintService")
+        Log.d(TAG, "=== printLabelsToKitchen: Calling LabelPrintService with ${labelDataList.size} items ===")
         return LabelPrintService.printMultipleLabels(kitchen, labelDataList)
     }
 

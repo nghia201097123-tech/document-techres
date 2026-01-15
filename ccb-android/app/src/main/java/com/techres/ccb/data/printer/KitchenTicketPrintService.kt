@@ -97,6 +97,7 @@ object KitchenTicketPrintService {
      * │    Size: L                      │
      * │    Đá: 50%                      │
      * │    + Trân châu đen              │  ← Topping
+     * │    + Thạch dừa                  │  ← Topping (tất cả)
      * │    >> Ít đường                  │  ← Ghi chú món
      * │                                 │
      * │ 2. Cà phê sữa đá          x1    │
@@ -115,10 +116,17 @@ object KitchenTicketPrintService {
         val useBitmapMode = true
         val useRasterBitmap = false
 
-        Log.d(TAG, "Generating ticket content:")
+        Log.d(TAG, "=== Generating ticket content ===")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
         Log.d(TAG, "  - Kitchen: ${ticket.kitchenName}")
         Log.d(TAG, "  - Items count: ${ticket.items.size}")
+        ticket.items.forEachIndexed { index, item ->
+            Log.d(TAG, "  Item $index: ${item.name}")
+            Log.d(TAG, "    - quantity: ${item.quantity}")
+            Log.d(TAG, "    - options: ${item.options}")
+            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings}")
+            Log.d(TAG, "    - note: ${item.note}")
+        }
 
         val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap)
 
@@ -199,9 +207,12 @@ object KitchenTicketPrintService {
                     line("   $key: $value")
                 }
 
-                // Topping
-                item.toppings.forEach { topping ->
-                    line("   + $topping")
+                // Topping - hiển thị tất cả toppings
+                if (item.toppings.isNotEmpty()) {
+                    Log.d(TAG, "  Printing ${item.toppings.size} toppings for ${item.name}")
+                    item.toppings.forEach { topping ->
+                        line("   + $topping")
+                    }
                 }
 
                 // Ghi chú riêng cho món (nổi bật)
