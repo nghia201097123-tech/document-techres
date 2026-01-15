@@ -164,6 +164,7 @@ class SyncRepository @Inject constructor(
                 preparationTime = dto.preparationTime,
                 printToKitchen = dto.printToKitchen,
                 printToBar = dto.printToBar,
+                kitchenIds = dto.kitchenIds,
                 createdAt = dto.createdAt,
                 updatedAt = dto.updatedAt,
                 syncStatus = "synced",
