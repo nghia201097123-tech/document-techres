@@ -2025,46 +2025,47 @@ class SaleViewModel @Inject constructor(
 
                 Log.d(TAG, "placeOrder - Created order: $orderNumber with ${orderItems.size} items")
 
-                // Print to kitchens - in tem/in món
-                var printResultMessage = ""
-                try {
-                    val kitchens = withContext(Dispatchers.IO) {
-                        kitchenRepository.getAllKitchensSync(branchId)
-                    }
-                    val products = productEntityMap.values.toList()
-
-                    if (kitchens.isNotEmpty() && products.isNotEmpty()) {
-                        val printResult = OrderPrintingService.printOrderToKitchens(
-                            order = orderEntity,
-                            orderItems = orderItems,
-                            kitchens = kitchens,
-                            products = products
-                        )
-                        Log.d(TAG, "placeOrder - Print result: ${printResult.success}, ${printResult.message}")
-                        if (printResult.success) {
-                            printResultMessage = " - ${printResult.message}"
-                        } else if (printResult.message.isNotBlank()) {
-                            Log.w(TAG, "placeOrder - Print warning: ${printResult.message}")
-                        }
-                    } else {
-                        Log.d(TAG, "placeOrder - Skipping print: kitchens=${kitchens.size}, products=${products.size}")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "placeOrder - Print error (non-blocking): ${e.message}", e)
-                }
-
-                // Update UI state
+                // Update UI state immediately - don't wait for printing
                 _uiState.update { s ->
                     s.copy(
                         cartItems = emptyList(),
                         currentOrder = orderEntity,
                         currentOrderItems = orderItems,
-                        successMessage = "Đặt món thành công! $orderNumber$printResultMessage"
+                        successMessage = "Đặt món thành công! $orderNumber"
                     )
                 }
 
                 // Refresh tables to show updated status
                 refreshTables()
+
+                // Print to kitchens in background - don't block success message
+                val orderToPrint = orderEntity
+                val itemsToPrint = orderItems.toList()
+                viewModelScope.launch {
+                    try {
+                        val kitchens = withContext(Dispatchers.IO) {
+                            kitchenRepository.getAllKitchensSync(branchId)
+                        }
+                        val products = productEntityMap.values.toList()
+
+                        if (kitchens.isNotEmpty() && products.isNotEmpty()) {
+                            val printResult = OrderPrintingService.printOrderToKitchens(
+                                order = orderToPrint,
+                                orderItems = itemsToPrint,
+                                kitchens = kitchens,
+                                products = products
+                            )
+                            Log.d(TAG, "placeOrder - Background print result: ${printResult.success}, ${printResult.message}")
+                            if (!printResult.success && printResult.message.isNotBlank()) {
+                                Log.w(TAG, "placeOrder - Print warning: ${printResult.message}")
+                            }
+                        } else {
+                            Log.d(TAG, "placeOrder - Skipping print: kitchens=${kitchens.size}, products=${products.size}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "placeOrder - Background print error: ${e.message}", e)
+                    }
+                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "placeOrder - Error: ${e.message}", e)
@@ -2115,39 +2116,41 @@ class SaleViewModel @Inject constructor(
 
                 Log.d(TAG, "addItemsToOrder - Added ${newItems.size} items to order ${currentOrder.orderNumber}")
 
-                // Print new items to kitchens - only print newly added items
-                var printResultMessage = ""
-                try {
-                    val kitchens = withContext(Dispatchers.IO) {
-                        kitchenRepository.getAllKitchensSync(branchId)
-                    }
-                    val products = productEntityMap.values.toList()
-
-                    if (kitchens.isNotEmpty() && products.isNotEmpty() && newItems.isNotEmpty()) {
-                        // Create a temporary order for printing new items only
-                        val printOrder = currentOrder.copy(updatedAt = now)
-                        val printResult = OrderPrintingService.printOrderToKitchens(
-                            order = printOrder,
-                            orderItems = newItems,
-                            kitchens = kitchens,
-                            products = products
-                        )
-                        Log.d(TAG, "addItemsToOrder - Print result: ${printResult.success}, ${printResult.message}")
-                        if (printResult.success) {
-                            printResultMessage = " - ${printResult.message}"
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "addItemsToOrder - Print error (non-blocking): ${e.message}", e)
-                }
-
+                // Update UI immediately - don't wait for printing
                 _uiState.update { s ->
                     s.copy(
                         cartItems = emptyList(),
                         currentOrder = currentOrder.copy(subtotal = newSubtotal, totalAmount = newTotal, updatedAt = now),
                         currentOrderItems = allItems,
-                        successMessage = "Đã thêm ${newItems.size} món$printResultMessage"
+                        successMessage = "Đã thêm ${newItems.size} món"
                     )
+                }
+
+                // Print new items to kitchens in background - don't block success message
+                val printOrder = currentOrder.copy(updatedAt = now)
+                val itemsToPrint = newItems.toList()
+                viewModelScope.launch {
+                    try {
+                        val kitchens = withContext(Dispatchers.IO) {
+                            kitchenRepository.getAllKitchensSync(branchId)
+                        }
+                        val products = productEntityMap.values.toList()
+
+                        if (kitchens.isNotEmpty() && products.isNotEmpty() && itemsToPrint.isNotEmpty()) {
+                            val printResult = OrderPrintingService.printOrderToKitchens(
+                                order = printOrder,
+                                orderItems = itemsToPrint,
+                                kitchens = kitchens,
+                                products = products
+                            )
+                            Log.d(TAG, "addItemsToOrder - Background print result: ${printResult.success}, ${printResult.message}")
+                            if (!printResult.success && printResult.message.isNotBlank()) {
+                                Log.w(TAG, "addItemsToOrder - Print warning: ${printResult.message}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "addItemsToOrder - Background print error: ${e.message}", e)
+                    }
                 }
 
             } catch (e: Exception) {
