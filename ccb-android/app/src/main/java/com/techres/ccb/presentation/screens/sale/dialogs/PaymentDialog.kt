@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -128,11 +129,16 @@ fun PaymentDialog(
     onClearItemDiscounts: () -> Unit = {},
     onClearBillDiscount: () -> Unit = {},
     onPrintTemporaryBill: () -> Unit = {}, // In bill tạm (sau khi đã áp dụng giảm giá)
+    lastPaymentMethod: PaymentMethod = PaymentMethod.CASH, // Phương thức thanh toán gần nhất
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
-    var selectedMethod by remember { mutableStateOf(PaymentMethod.CASH) }
-    var receivedAmountText by remember { mutableStateOf("") }
+    // Auto-select last used payment method
+    var selectedMethod by remember { mutableStateOf(lastPaymentMethod) }
+    // Auto-fill with total amount
+    var receivedAmountText by remember { mutableStateOf(totalAmount.toString()) }
+    // Track if first click on input field (to clear on first click)
+    var isFirstClickOnInput by remember { mutableStateOf(true) }
 
     // Discount section state
     var showDiscountSection by remember { mutableStateOf(false) }
@@ -265,7 +271,15 @@ fun PaymentDialog(
                             OutlinedTextField(
                                 value = receivedAmountText,
                                 onValueChange = { receivedAmountText = it.filter { c -> c.isDigit() } },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused && isFirstClickOnInput) {
+                                            receivedAmountText = ""
+                                            isFirstClickOnInput = false
+                                        }
+                                    },
                                 textStyle = MaterialTheme.typography.titleLarge.copy(
                                     textAlign = TextAlign.End,
                                     fontWeight = FontWeight.Bold
