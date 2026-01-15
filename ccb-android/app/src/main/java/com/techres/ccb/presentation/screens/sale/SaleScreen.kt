@@ -2018,17 +2018,17 @@ fun OrderItemRow(
                                 displayName = variant.replace(priceMatch.value, "").trim()
                             }
 
-                            // For options with "GroupName: Value" format, show "Value" only
+                            // For toppings starting with "+", remove the "+" prefix
+                            if (displayName.startsWith("+")) {
+                                displayName = displayName.removePrefix("+").trim()
+                            }
+                            // For options with "GroupName: Value" format, show only VALUE
                             // e.g., "Size: L" -> "L", "Đường: NHIỀU" -> "NHIỀU"
-                            if (!displayName.startsWith("+") && displayName.contains(":")) {
+                            else if (displayName.contains(":")) {
                                 val colonIdx = displayName.indexOf(":")
-                                val groupName = displayName.substring(0, colonIdx).trim()
                                 val value = displayName.substring(colonIdx + 1).trim()
-                                // Show as "GroupName: Value" or just "Value" if value is different from group
-                                displayName = if (value.isNotEmpty() && !value.equals(groupName, ignoreCase = true)) {
-                                    "$groupName: $value"
-                                } else {
-                                    groupName
+                                if (value.isNotEmpty()) {
+                                    displayName = value
                                 }
                             }
 
