@@ -37,7 +37,7 @@ class KitchenRepository @Inject constructor(
     }
 
     /**
-     * Update full printer config including protocol and label size
+     * Update full printer config including protocol, label size, paper width and print mode
      */
     suspend fun updateFullPrinterConfig(
         kitchenId: String,
@@ -49,11 +49,14 @@ class KitchenRepository @Inject constructor(
         labelWidthMm: Int,
         labelHeightMm: Int,
         labelGapMm: Int,
-        printDensity: Int
+        printDensity: Int,
+        paperWidth: Int,
+        printMode: String
     ) {
         kitchenDao.updateFullPrinterConfig(
             kitchenId, ip, port, name, isConnected,
-            protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity
+            protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity,
+            paperWidth, printMode
         )
     }
 

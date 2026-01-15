@@ -47,7 +47,9 @@ interface KitchenDao {
             label_width_mm = :labelWidthMm,
             label_height_mm = :labelHeightMm,
             label_gap_mm = :labelGapMm,
-            print_density = :printDensity
+            print_density = :printDensity,
+            paper_width = :paperWidth,
+            print_mode = :printMode
         WHERE id = :kitchenId
     """)
     suspend fun updateFullPrinterConfig(
@@ -60,7 +62,9 @@ interface KitchenDao {
         labelWidthMm: Int,
         labelHeightMm: Int,
         labelGapMm: Int,
-        printDensity: Int
+        printDensity: Int,
+        paperWidth: Int,
+        printMode: String
     )
 
     @Transaction
@@ -83,7 +87,9 @@ interface KitchenDao {
                     labelWidthMm = existing.labelWidthMm,
                     labelHeightMm = existing.labelHeightMm,
                     labelGapMm = existing.labelGapMm,
-                    printDensity = existing.printDensity
+                    printDensity = existing.printDensity,
+                    paperWidth = existing.paperWidth,
+                    printMode = existing.printMode
                 )
             } else {
                 kitchen

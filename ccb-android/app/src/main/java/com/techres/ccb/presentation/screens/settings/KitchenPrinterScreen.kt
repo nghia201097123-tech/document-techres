@@ -29,6 +29,7 @@ import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.PrinterProtocol
 import com.techres.ccb.data.local.entity.LabelSize
+import com.techres.ccb.data.local.entity.KitchenPrintMode
 import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.printer.KitchenTicketPrintService
@@ -244,7 +245,7 @@ fun KitchenPrinterScreen(
         PrinterConfigDialog(
             kitchen = selectedKitchen!!,
             onDismiss = { showPrinterDialog = false },
-            onSave = { ip, port, name, protocol, labelSize, printDensity ->
+            onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode ->
                 viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
                     ip = ip.ifBlank { null },
@@ -255,7 +256,9 @@ fun KitchenPrinterScreen(
                     labelWidthMm = labelSize.widthMm,
                     labelHeightMm = labelSize.heightMm,
                     labelGapMm = labelSize.gapMm,
-                    printDensity = printDensity
+                    printDensity = printDensity,
+                    paperWidth = paperWidth,
+                    printMode = printMode.name
                 )
                 showPrinterDialog = false
             }
@@ -400,6 +403,14 @@ private fun KitchenPrinterCard(
                         PrinterInfoRow("Địa chỉ IP", kitchen.printerIp!!)
                         PrinterInfoRow("Cổng", kitchen.printerPort.toString())
                         PrinterInfoRow("Protocol", kitchen.getPrinterProtocolEnum().displayName)
+                        PrinterInfoRow("Chế độ in", when (kitchen.getPrintModeEnum()) {
+                            KitchenPrintMode.TICKET -> "Phiếu bếp"
+                            KitchenPrintMode.LABEL -> "Tem"
+                            KitchenPrintMode.BOTH -> "Phiếu + Tem"
+                        })
+                        if (kitchen.getPrinterProtocolEnum() == PrinterProtocol.ESCPOS) {
+                            PrinterInfoRow("Khổ giấy", "${kitchen.paperWidth}mm")
+                        }
                         if (kitchen.getPrinterProtocolEnum() == PrinterProtocol.TSPL) {
                             PrinterInfoRow("Kích thước tem", kitchen.getLabelSize().displayName)
                         }
@@ -486,7 +497,7 @@ private fun PrinterInfoRow(label: String, value: String) {
 private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
     onDismiss: () -> Unit,
-    onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int) -> Unit
+    onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode) -> Unit
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
@@ -496,9 +507,16 @@ private fun PrinterConfigDialog(
     var selectedProtocol by remember { mutableStateOf(kitchen.getPrinterProtocolEnum()) }
     var selectedLabelSize by remember { mutableStateOf(kitchen.getLabelSize()) }
     var printDensity by remember { mutableStateOf(kitchen.printDensity) }
+    var selectedPaperWidth by remember { mutableStateOf(kitchen.paperWidth) }
+    var selectedPrintMode by remember { mutableStateOf(kitchen.getPrintModeEnum()) }
 
     var protocolExpanded by remember { mutableStateOf(false) }
     var labelSizeExpanded by remember { mutableStateOf(false) }
+    var paperWidthExpanded by remember { mutableStateOf(false) }
+    var printModeExpanded by remember { mutableStateOf(false) }
+
+    // Paper width options
+    val paperWidthOptions = listOf(58, 80)
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -659,6 +677,143 @@ private fun PrinterConfigDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Print Mode Selection
+                Text(
+                    text = "Chế độ in",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = printModeExpanded,
+                    onExpandedChange = { printModeExpanded = !printModeExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = when (selectedPrintMode) {
+                            KitchenPrintMode.TICKET -> "Phiếu bếp (Ticket)"
+                            KitchenPrintMode.LABEL -> "Tem (Label)"
+                            KitchenPrintMode.BOTH -> "Cả hai (Phiếu + Tem)"
+                        },
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = printModeExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = color,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = printModeExpanded,
+                        onDismissRequest = { printModeExpanded = false }
+                    ) {
+                        KitchenPrintMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = when (mode) {
+                                                KitchenPrintMode.TICKET -> "Phiếu bếp (Ticket)"
+                                                KitchenPrintMode.LABEL -> "Tem (Label)"
+                                                KitchenPrintMode.BOTH -> "Cả hai (Phiếu + Tem)"
+                                            },
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = when (mode) {
+                                                KitchenPrintMode.TICKET -> "In danh sách món trên 1 tờ"
+                                                KitchenPrintMode.LABEL -> "In tem riêng cho từng món"
+                                                KitchenPrintMode.BOTH -> "In cả phiếu và tem"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedPrintMode = mode
+                                    printModeExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (mode) {
+                                            KitchenPrintMode.TICKET -> Icons.Default.Receipt
+                                            KitchenPrintMode.LABEL -> Icons.Default.LocalOffer
+                                            KitchenPrintMode.BOTH -> Icons.Default.Layers
+                                        },
+                                        contentDescription = null,
+                                        tint = if (selectedPrintMode == mode) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // ESC/POS-specific settings (Paper width)
+                if (selectedProtocol == PrinterProtocol.ESCPOS) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Khổ giấy",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    ExposedDropdownMenuBox(
+                        expanded = paperWidthExpanded,
+                        onExpandedChange = { paperWidthExpanded = !paperWidthExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = "${selectedPaperWidth}mm",
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = paperWidthExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = paperWidthExpanded,
+                            onDismissRequest = { paperWidthExpanded = false }
+                        ) {
+                            paperWidthOptions.forEach { width ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = "${width}mm",
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    },
+                                    onClick = {
+                                        selectedPaperWidth = width
+                                        paperWidthExpanded = false
+                                    },
+                                    trailingIcon = {
+                                        if (selectedPaperWidth == width) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = color
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // TSPL-specific settings
                 if (selectedProtocol == PrinterProtocol.TSPL) {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -762,7 +917,9 @@ private fun PrinterConfigDialog(
                                 printerName,
                                 selectedProtocol,
                                 selectedLabelSize,
-                                printDensity
+                                printDensity,
+                                selectedPaperWidth,
+                                selectedPrintMode
                             )
                         },
                         modifier = Modifier.weight(1f),

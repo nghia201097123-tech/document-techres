@@ -120,7 +120,7 @@ class KitchenPrinterViewModel @Inject constructor(
     }
 
     /**
-     * Update full printer config including protocol and label size
+     * Update full printer config including protocol, label size, paper width and print mode
      */
     fun updateFullPrinterConfig(
         kitchenId: String,
@@ -132,7 +132,9 @@ class KitchenPrinterViewModel @Inject constructor(
         labelWidthMm: Int,
         labelHeightMm: Int,
         labelGapMm: Int,
-        printDensity: Int
+        printDensity: Int,
+        paperWidth: Int,
+        printMode: String
     ) {
         viewModelScope.launch {
             try {
@@ -146,7 +148,9 @@ class KitchenPrinterViewModel @Inject constructor(
                     labelWidthMm = labelWidthMm,
                     labelHeightMm = labelHeightMm,
                     labelGapMm = labelGapMm,
-                    printDensity = printDensity
+                    printDensity = printDensity,
+                    paperWidth = paperWidth,
+                    printMode = printMode
                 )
             } catch (e: Exception) {
                 _uiState.update {
