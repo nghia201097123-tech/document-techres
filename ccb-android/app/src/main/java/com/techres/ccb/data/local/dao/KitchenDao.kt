@@ -74,28 +74,24 @@ interface KitchenDao {
 
         deleteAllByBranch(branchId)
 
-        // Preserve all printer config from existing kitchens
-        val kitchensWithPrinterConfig = kitchens.map { kitchen ->
+        // Smart merge: preserve LOCAL device settings, use API for business settings
+        val kitchensWithConfig = kitchens.map { kitchen ->
             val existing = existingKitchens[kitchen.id]
             if (existing != null) {
                 kitchen.copy(
-                    printerIp = existing.printerIp,
-                    printerPort = existing.printerPort,
-                    printerName = existing.printerName,
-                    isPrinterConnected = existing.isPrinterConnected,
-                    printerProtocol = existing.printerProtocol,
-                    labelWidthMm = existing.labelWidthMm,
-                    labelHeightMm = existing.labelHeightMm,
-                    labelGapMm = existing.labelGapMm,
-                    printDensity = existing.printDensity,
-                    paperWidth = existing.paperWidth,
-                    printMode = existing.printMode
+                    // LOCAL device settings - preserve from local (configured on device)
+                    printerIp = existing.printerIp ?: kitchen.printerIp,
+                    printerPort = if (existing.printerIp != null) existing.printerPort else kitchen.printerPort,
+                    printerName = existing.printerName ?: kitchen.printerName,
+                    isPrinterConnected = existing.isPrinterConnected
+                    // BUSINESS settings - use API value (configured on dashboard)
+                    // printMode, printerProtocol, paperWidth, label settings come from kitchen (API)
                 )
             } else {
                 kitchen
             }
         }
 
-        insertAll(kitchensWithPrinterConfig)
+        insertAll(kitchensWithConfig)
     }
 }
