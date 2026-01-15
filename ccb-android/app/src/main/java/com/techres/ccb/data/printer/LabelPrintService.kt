@@ -132,8 +132,15 @@ object LabelPrintService {
     ): ByteArray {
         val paperWidth = kitchen.paperWidth
         val useBitmapMode = true // Luôn dùng bitmap cho tiếng Việt
+        val useRasterBitmap = false // ESC * cho XPRINTER
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode)
+        Log.d(TAG, "Generating label content:")
+        Log.d(TAG, "  - Paper width: ${paperWidth}mm")
+        Log.d(TAG, "  - Bitmap mode: $useBitmapMode")
+        Log.d(TAG, "  - Raster bitmap: $useRasterBitmap (false = ESC *, true = GS v 0)")
+        Log.d(TAG, "  - Item: ${label.itemName}")
+
+        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap)
 
         builder.apply {
             init()
@@ -191,7 +198,9 @@ object LabelPrintService {
             cut()
         }
 
-        return builder.build()
+        val content = builder.build()
+        Log.d(TAG, "Label content generated: ${content.size} bytes")
+        return content
     }
 
     /**
@@ -205,32 +214,51 @@ object LabelPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
+        Log.d(TAG, "=== START PRINT ===")
+        Log.d(TAG, "Target: $ip:$port")
+        Log.d(TAG, "Content size: ${content.size} bytes")
+
         return try {
+            Log.d(TAG, "Creating socket...")
             socket = Socket().apply {
                 reuseAddress = true
                 keepAlive = true
                 tcpNoDelay = true
                 setSoLinger(true, 2)
             }
+
+            Log.d(TAG, "Connecting to $ip:$port...")
             socket.connect(InetSocketAddress(ip, port), 5000)
+            Log.d(TAG, "Connected successfully!")
+
             outputStream = socket.getOutputStream()
+            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
             outputStream.write(content)
+            Log.d(TAG, "Write completed, flushing...")
             outputStream.flush()
+            Log.d(TAG, "Flush completed!")
 
             // Đợi máy in xử lý xong bitmap data
-            delay(300)
+            Log.d(TAG, "Waiting 500ms for printer to process...")
+            delay(500)
 
+            Log.d(TAG, "=== PRINT SUCCESS ===")
             PrinterResult.Success("OK")
         } catch (e: Exception) {
-            Log.e(TAG, "Print error: ${e.message}")
+            Log.e(TAG, "=== PRINT FAILED ===")
+            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Error message: ${e.message}")
+            Log.e(TAG, "Stack trace:", e)
             PrinterResult.Error("Lỗi in: ${e.message}")
         } finally {
             try {
+                Log.d(TAG, "Closing connection...")
                 outputStream?.flush()
-                socket?.shutdownOutput() // Đóng output trước để đảm bảo data được gửi hết
+                socket?.shutdownOutput()
                 outputStream?.close()
                 socket?.close()
+                Log.d(TAG, "Connection closed")
             } catch (e: Exception) {
                 Log.e(TAG, "Close error: ${e.message}")
             }

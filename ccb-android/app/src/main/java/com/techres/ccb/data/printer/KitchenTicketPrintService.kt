@@ -88,8 +88,16 @@ object KitchenTicketPrintService {
     ): ByteArray {
         val paperWidth = kitchen.paperWidth
         val useBitmapMode = true
+        val useRasterBitmap = false // ESC * cho XPRINTER
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode)
+        Log.d(TAG, "Generating ticket content:")
+        Log.d(TAG, "  - Paper width: ${paperWidth}mm")
+        Log.d(TAG, "  - Bitmap mode: $useBitmapMode")
+        Log.d(TAG, "  - Raster bitmap: $useRasterBitmap (false = ESC *, true = GS v 0)")
+        Log.d(TAG, "  - Kitchen: ${ticket.kitchenName}")
+        Log.d(TAG, "  - Items count: ${ticket.items.size}")
+
+        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap)
 
         builder.apply {
             init()
@@ -196,7 +204,9 @@ object KitchenTicketPrintService {
             cut()
         }
 
-        return builder.build()
+        val content = builder.build()
+        Log.d(TAG, "Ticket content generated: ${content.size} bytes")
+        return content
     }
 
     /**
@@ -210,32 +220,51 @@ object KitchenTicketPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
+        Log.d(TAG, "=== START PRINT TICKET ===")
+        Log.d(TAG, "Target: $ip:$port")
+        Log.d(TAG, "Content size: ${content.size} bytes")
+
         return try {
+            Log.d(TAG, "Creating socket...")
             socket = Socket().apply {
                 reuseAddress = true
                 keepAlive = true
                 tcpNoDelay = true
                 setSoLinger(true, 2)
             }
+
+            Log.d(TAG, "Connecting to $ip:$port...")
             socket.connect(InetSocketAddress(ip, port), 5000)
+            Log.d(TAG, "Connected successfully!")
+
             outputStream = socket.getOutputStream()
+            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
             outputStream.write(content)
+            Log.d(TAG, "Write completed, flushing...")
             outputStream.flush()
+            Log.d(TAG, "Flush completed!")
 
             // Đợi máy in xử lý xong bitmap data
-            delay(300)
+            Log.d(TAG, "Waiting 500ms for printer to process...")
+            delay(500)
 
+            Log.d(TAG, "=== PRINT TICKET SUCCESS ===")
             PrinterResult.Success("In phiếu bếp thành công!")
         } catch (e: Exception) {
-            Log.e(TAG, "Print error: ${e.message}")
+            Log.e(TAG, "=== PRINT TICKET FAILED ===")
+            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Error message: ${e.message}")
+            Log.e(TAG, "Stack trace:", e)
             PrinterResult.Error("Lỗi in: ${e.message}")
         } finally {
             try {
+                Log.d(TAG, "Closing connection...")
                 outputStream?.flush()
-                socket?.shutdownOutput() // Đóng output trước để đảm bảo data được gửi hết
+                socket?.shutdownOutput()
                 outputStream?.close()
                 socket?.close()
+                Log.d(TAG, "Connection closed")
             } catch (e: Exception) {
                 Log.e(TAG, "Close error: ${e.message}")
             }
