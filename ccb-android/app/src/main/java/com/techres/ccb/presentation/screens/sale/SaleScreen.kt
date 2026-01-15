@@ -77,6 +77,13 @@ fun SaleScreen(
     // Track if we should auto-show payment dialog after order loads
     var pendingShowPayment by remember { mutableStateOf(showPaymentOnStart) }
 
+    // Set pending payment flag IMMEDIATELY to block product clicks
+    LaunchedEffect(showPaymentOnStart) {
+        if (showPaymentOnStart) {
+            viewModel.setPendingPaymentDialog(true)
+        }
+    }
+
     // Load existing order if orderId is provided
     LaunchedEffect(orderId) {
         if (!orderId.isNullOrEmpty()) {

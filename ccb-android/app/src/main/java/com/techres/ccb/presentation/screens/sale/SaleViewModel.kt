@@ -102,6 +102,7 @@ data class SaleUiState(
     val showVariantDialog: Boolean = false,
     val selectedProductForVariant: Product? = null,
     val showPaymentDialog: Boolean = false,
+    val pendingPaymentDialog: Boolean = false, // Block product clicks while waiting for payment dialog
     val showTableDialog: Boolean = false,
     val showCustomerDialog: Boolean = false,
     val showNoteDialog: Boolean = false,
@@ -649,8 +650,8 @@ class SaleViewModel @Inject constructor(
     // ===== CART OPERATIONS =====
 
     fun addToCart(product: Product) {
-        // Prevent adding to cart when payment dialog is showing
-        if (_uiState.value.showPaymentDialog) return
+        // Prevent adding to cart when payment dialog is showing or pending
+        if (_uiState.value.showPaymentDialog || _uiState.value.pendingPaymentDialog) return
 
         if (product.hasVariants && product.variants.isNotEmpty()) {
             // Show variant dialog with product-specific notes
@@ -1937,8 +1938,8 @@ class SaleViewModel @Inject constructor(
     // ===== VARIANT DIALOG =====
 
     fun showVariantDialog(product: Product) {
-        // Prevent showing variant dialog when payment dialog is showing
-        if (_uiState.value.showPaymentDialog) return
+        // Prevent showing variant dialog when payment dialog is showing or pending
+        if (_uiState.value.showPaymentDialog || _uiState.value.pendingPaymentDialog) return
 
         viewModelScope.launch {
             // Load notes for this specific product
@@ -3190,12 +3191,21 @@ class SaleViewModel @Inject constructor(
 
     // ===== PAYMENT DIALOG =====
 
+    fun setPendingPaymentDialog(pending: Boolean) {
+        _uiState.update { state ->
+            state.copy(pendingPaymentDialog = pending)
+        }
+    }
+
     fun showPaymentDialog() {
         if (_uiState.value.currentOrder != null) {
             // Load auto coupons khi mở dialog thanh toán
             loadAutoCoupons()
             _uiState.update { state ->
-                state.copy(showPaymentDialog = true)
+                state.copy(
+                    showPaymentDialog = true,
+                    pendingPaymentDialog = false // Clear pending flag when dialog is shown
+                )
             }
         }
     }
