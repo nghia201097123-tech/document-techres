@@ -2005,10 +2005,32 @@ fun OrderItemRow(
                             .padding(start = 4.dp)
                     ) {
                         variants.forEach { variant ->
-                            // Parse "Name:Price" format
-                            val colonIndex = variant.lastIndexOf(":")
-                            val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
-                            val price = if (colonIndex > 0) variant.substring(colonIndex + 1).toLongOrNull() ?: 0L else 0L
+                            // Parse variant format:
+                            // Options: "Size: L (+10000)" or "Size: L" or "Đường: NHIỀU"
+                            // Toppings: "+ Trân châu cam (+10000)" or "+ Trân châu cam"
+                            var displayName = variant
+                            var price = 0L
+
+                            // Extract price from "(+xxxxx)" suffix
+                            val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
+                            if (priceMatch != null) {
+                                price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
+                                displayName = variant.replace(priceMatch.value, "").trim()
+                            }
+
+                            // For options with "GroupName: Value" format, show "Value" only
+                            // e.g., "Size: L" -> "L", "Đường: NHIỀU" -> "NHIỀU"
+                            if (!displayName.startsWith("+") && displayName.contains(":")) {
+                                val colonIdx = displayName.indexOf(":")
+                                val groupName = displayName.substring(0, colonIdx).trim()
+                                val value = displayName.substring(colonIdx + 1).trim()
+                                // Show as "GroupName: Value" or just "Value" if value is different from group
+                                displayName = if (value.isNotEmpty() && !value.equals(groupName, ignoreCase = true)) {
+                                    "$groupName: $value"
+                                } else {
+                                    groupName
+                                }
+                            }
 
                             Row(
                                 modifier = Modifier
@@ -2028,7 +2050,7 @@ fun OrderItemRow(
                                         modifier = Modifier.padding(end = 8.dp)
                                     )
                                     Text(
-                                        text = name,
+                                        text = displayName,
                                         fontSize = 14.sp,
                                         color = Color(0xFF424242)
                                     )
@@ -2048,12 +2070,12 @@ fun OrderItemRow(
                                     // Delete topping button
                                     if (onRemoveTopping != null) {
                                         IconButton(
-                                            onClick = { onRemoveTopping(item.id, name) },
+                                            onClick = { onRemoveTopping(item.id, displayName) },
                                             modifier = Modifier.size(24.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Close,
-                                                contentDescription = "Xóa $name",
+                                                contentDescription = "Xóa $displayName",
                                                 tint = Color(0xFFF44336).copy(alpha = 0.7f),
                                                 modifier = Modifier.size(14.dp)
                                             )
