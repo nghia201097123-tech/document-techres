@@ -649,6 +649,9 @@ class SaleViewModel @Inject constructor(
     // ===== CART OPERATIONS =====
 
     fun addToCart(product: Product) {
+        // Prevent adding to cart when payment dialog is showing
+        if (_uiState.value.showPaymentDialog) return
+
         if (product.hasVariants && product.variants.isNotEmpty()) {
             // Show variant dialog with product-specific notes
             showVariantDialog(product)
@@ -1934,6 +1937,9 @@ class SaleViewModel @Inject constructor(
     // ===== VARIANT DIALOG =====
 
     fun showVariantDialog(product: Product) {
+        // Prevent showing variant dialog when payment dialog is showing
+        if (_uiState.value.showPaymentDialog) return
+
         viewModelScope.launch {
             // Load notes for this specific product
             val productNotes = withContext(Dispatchers.IO) {
