@@ -2229,16 +2229,10 @@ private fun OrderDetailDialog(
 private fun OrderItemRow(
     item: OrderItemEntity,
     comboChildren: List<OrderItemEntity> = emptyList(),
-    forceExpanded: Boolean? = null // null = use local state, true/false = sync with global
+    forceExpanded: Boolean? = null // null = default expanded, true/false = sync with global
 ) {
-    var toppingsExpanded by remember { mutableStateOf(true) }
-
-    // Sync with global forceExpanded when it changes
-    LaunchedEffect(forceExpanded) {
-        if (forceExpanded != null) {
-            toppingsExpanded = forceExpanded
-        }
-    }
+    // Use forceExpanded directly - no local state to avoid LazyColumn recycling issues
+    val toppingsExpanded = forceExpanded ?: true
 
     Column(
         modifier = Modifier
@@ -2304,14 +2298,11 @@ private fun OrderItemRow(
             if (variants.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Collapsible header
+                // Header showing topping count
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 36.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { toppingsExpanded = !toppingsExpanded }
-                        .padding(vertical = 2.dp),
+                        .padding(start = 36.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -2328,12 +2319,8 @@ private fun OrderItemRow(
                     )
                 }
 
-                // Variants list - collapsible
-                AnimatedVisibility(
-                    visible = toppingsExpanded,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
+                // Variants list - show/hide based on forceExpanded (no animation)
+                if (toppingsExpanded) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

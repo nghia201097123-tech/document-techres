@@ -1091,28 +1091,21 @@ private fun OrderDetailDialog(
                                     val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
 
                                     if (variants.isNotEmpty()) {
-                                        // Local state for toppings expand/collapse
-                                        var toppingsExpanded by remember { mutableStateOf(!isCancelled) }
-
-                                        // Sync with global allToppingsExpanded when it changes
-                                        LaunchedEffect(allToppingsExpanded) {
-                                            toppingsExpanded = allToppingsExpanded
-                                        }
+                                        // Use allToppingsExpanded directly - no local state to avoid scroll issues
+                                        val toppingsExpanded = if (isCancelled) false else allToppingsExpanded
 
                                         Spacer(modifier = Modifier.height(6.dp))
 
-                                        // Collapsible header - click to toggle
+                                        // Header showing topping count
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .clickable { toppingsExpanded = !toppingsExpanded }
                                                 .padding(vertical = 2.dp, horizontal = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
                                                 imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                contentDescription = if (toppingsExpanded) "Thu gọn" else "Mở rộng",
+                                                contentDescription = null,
                                                 modifier = Modifier.size(16.dp),
                                                 tint = Color.Gray
                                             )
@@ -1124,12 +1117,8 @@ private fun OrderDetailDialog(
                                             )
                                         }
 
-                                        // Variants list - collapsible (use expandVertically for smooth animation)
-                                        AnimatedVisibility(
-                                            visible = toppingsExpanded,
-                                            enter = expandVertically() + fadeIn(),
-                                            exit = shrinkVertically() + fadeOut()
-                                        ) {
+                                        // Variants list - show/hide based on allToppingsExpanded (no animation)
+                                        if (toppingsExpanded) {
                                             Column(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
