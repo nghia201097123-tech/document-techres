@@ -394,6 +394,13 @@ class SyncRepository @Inject constructor(
 
         // Sync kitchens
         onProgress?.invoke(SyncStepProgress(SyncStep.KITCHENS, SyncStepStatus.IN_PROGRESS))
+        Log.d("SyncRepository", "=== Syncing kitchens ===")
+        syncData.kitchens?.forEach { dto ->
+            Log.d("SyncRepository", "Kitchen from API: ${dto.name}")
+            Log.d("SyncRepository", "  printMode from API: '${dto.printMode}'")
+            Log.d("SyncRepository", "  printerIp: ${dto.printerIp}:${dto.printerPort}")
+            Log.d("SyncRepository", "  printerProtocol: ${dto.printerProtocol}")
+        }
         val kitchensList = syncData.kitchens?.map { dto ->
             KitchenEntity(
                 id = dto.id,
@@ -421,6 +428,7 @@ class SyncRepository @Inject constructor(
             )
         } ?: emptyList()
         kitchenRepository.syncKitchens(branchId, kitchensList)
+        Log.d("SyncRepository", "Synced ${kitchensList.size} kitchens")
         onProgress?.invoke(SyncStepProgress(SyncStep.KITCHENS, SyncStepStatus.COMPLETED, kitchensList.size))
 
         // Sync seasonal prices
