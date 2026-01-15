@@ -620,6 +620,7 @@ private fun PrinterConfigDialog(
  * Loại in thử
  */
 private enum class TestPrintType {
+    SIMPLE_TEXT, // Test text đơn giản (không bitmap)
     CONNECTION,  // Test kết nối
     TICKET,      // In phiếu bếp
     LABEL        // In tem
@@ -671,6 +672,13 @@ private fun TestPrintDialog(
         printState = PrintState.Sending
 
         val printResult = when (selectedPrintType) {
+            TestPrintType.SIMPLE_TEXT -> {
+                // Simple ASCII text only - no bitmap, no Vietnamese
+                LabelPrintService.printSimpleTest(
+                    ip = kitchen.printerIp!!,
+                    port = kitchen.printerPort
+                )
+            }
             TestPrintType.CONNECTION -> {
                 // Just test connection page
                 PrinterService.printTestPage(
@@ -811,6 +819,17 @@ private fun TestPrintDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Simple text test button (no bitmap) - RECOMMENDED FIRST
+                    PrintOptionButton(
+                        icon = Icons.Default.TextFields,
+                        title = "Test Text (không bitmap)",
+                        subtitle = "In chữ ASCII đơn giản để test máy in",
+                        color = Color(0xFF4CAF50),
+                        onClick = { selectedPrintType = TestPrintType.SIMPLE_TEXT }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Test connection button
                     PrintOptionButton(
                         icon = Icons.Default.Wifi,
@@ -902,11 +921,13 @@ private fun TestPrintDialog(
                             PrintState.Idle -> "Chuẩn bị in..."
                             PrintState.Connecting -> "Đang kết nối máy in..."
                             PrintState.Sending -> when (selectedPrintType) {
+                                TestPrintType.SIMPLE_TEXT -> "Đang in text đơn giản..."
                                 TestPrintType.TICKET -> "Đang in phiếu bếp..."
                                 TestPrintType.LABEL -> "Đang in tem..."
                                 else -> "Đang gửi lệnh in..."
                             }
                             PrintState.Success -> when (selectedPrintType) {
+                                TestPrintType.SIMPLE_TEXT -> "In text thành công!"
                                 TestPrintType.TICKET -> "In phiếu bếp thành công!"
                                 TestPrintType.LABEL -> "In tem thành công!"
                                 else -> "In thử thành công!"

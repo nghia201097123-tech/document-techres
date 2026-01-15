@@ -204,6 +204,129 @@ object LabelPrintService {
     }
 
     /**
+     * Simple text test - No bitmap, just ESC/POS text commands
+     * Use this to verify printer can receive any commands at all
+     */
+    suspend fun printSimpleTest(
+        ip: String,
+        port: Int = 9100
+    ): PrinterResult {
+        return withContext(Dispatchers.IO) {
+            Log.d(TAG, "=== SIMPLE TEXT TEST ===")
+            Log.d(TAG, "Target: $ip:$port")
+
+            // Build simple ESC/POS commands - NO BITMAP
+            val content = buildSimpleTestContent()
+            Log.d(TAG, "Simple test content size: ${content.size} bytes")
+
+            printViaNetworkChunked(ip, port, content)
+        }
+    }
+
+    /**
+     * Build simple test content - ASCII text only, no bitmap
+     */
+    private fun buildSimpleTestContent(): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+
+        // Initialize printer
+        output.write(EscPosCommands.INIT)
+
+        // Align center
+        output.write(EscPosCommands.ALIGN_CENTER)
+
+        // Print ASCII text (no Vietnamese characters)
+        output.write("=== XPRINTER TEST ===\n".toByteArray())
+        output.write("--------------------\n".toByteArray())
+        output.write("Printer is working!\n".toByteArray())
+        output.write("IP: Connected OK\n".toByteArray())
+        output.write("--------------------\n".toByteArray())
+        output.write("1234567890\n".toByteArray())
+        output.write("ABCDEFGHIJ\n".toByteArray())
+        output.write("abcdefghij\n".toByteArray())
+        output.write("--------------------\n".toByteArray())
+
+        // Feed and cut
+        output.write(EscPosCommands.feedLines(4))
+        output.write(EscPosCommands.CUT_PARTIAL)
+
+        return output.toByteArray()
+    }
+
+    /**
+     * In qua mạng với chunked data
+     */
+    private suspend fun printViaNetworkChunked(
+        ip: String,
+        port: Int,
+        content: ByteArray,
+        chunkSize: Int = 1024 // 1KB per chunk
+    ): PrinterResult {
+        var socket: Socket? = null
+        var outputStream: OutputStream? = null
+
+        Log.d(TAG, "=== START CHUNKED PRINT ===")
+        Log.d(TAG, "Target: $ip:$port")
+        Log.d(TAG, "Content size: ${content.size} bytes, chunk size: $chunkSize")
+
+        return try {
+            socket = Socket().apply {
+                reuseAddress = true
+                keepAlive = true
+                tcpNoDelay = true
+                setSoLinger(true, 2)
+                sendBufferSize = 4096
+            }
+
+            socket.connect(InetSocketAddress(ip, port), 5000)
+            Log.d(TAG, "Connected!")
+
+            outputStream = socket.getOutputStream()
+
+            // Send data in chunks
+            var offset = 0
+            var chunkNum = 0
+            while (offset < content.size) {
+                val remaining = content.size - offset
+                val currentChunkSize = minOf(chunkSize, remaining)
+
+                outputStream.write(content, offset, currentChunkSize)
+                outputStream.flush()
+
+                chunkNum++
+                offset += currentChunkSize
+
+                Log.d(TAG, "Sent chunk $chunkNum: $currentChunkSize bytes (total: $offset/${content.size})")
+
+                // Small delay between chunks to let printer process
+                if (offset < content.size) {
+                    delay(50)
+                }
+            }
+
+            Log.d(TAG, "All chunks sent, waiting for printer...")
+            delay(500)
+
+            Log.d(TAG, "=== PRINT SUCCESS ===")
+            PrinterResult.Success("OK")
+        } catch (e: Exception) {
+            Log.e(TAG, "=== PRINT FAILED ===", e)
+            PrinterResult.Error("Lỗi in: ${e.message}")
+        } finally {
+            try {
+                outputStream?.flush()
+                socket?.shutdownOutput()
+                delay(100)
+                outputStream?.close()
+                socket?.close()
+                Log.d(TAG, "Connection closed")
+            } catch (e: Exception) {
+                Log.e(TAG, "Close error: ${e.message}")
+            }
+        }
+    }
+
+    /**
      * In qua mạng TCP/IP
      */
     private suspend fun printViaNetwork(
@@ -211,6 +334,8 @@ object LabelPrintService {
         port: Int,
         content: ByteArray
     ): PrinterResult {
+        // Use chunked method for large content
+        return printViaNetworkChunked(ip, port, content)
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
