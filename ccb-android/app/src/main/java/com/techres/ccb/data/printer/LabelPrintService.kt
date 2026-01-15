@@ -58,6 +58,7 @@ object LabelPrintService {
         val staffName: String? = null,  // Tên nhân viên
         val labelIndex: Int = 1,        // Thứ tự tem (1/3, 2/3, 3/3)
         val totalLabels: Int = 1,       // Tổng số tem
+        val storeName: String? = null,  // Tên cửa hàng (hiển thị trên cùng)
 
         // ========== GIÁ TIỀN ==========
         val unitPrice: Double = 0.0,        // Giá đơn vị (chưa topping)
@@ -241,25 +242,21 @@ object LabelPrintService {
     // ==================== TSPL LABEL GENERATION ====================
 
     /**
-     * Generate TSPL label - Thiết kế chuyên nghiệp
+     * Generate TSPL label - Theo mẫu chuẩn
      * Layout:
      * ┌─────────────────────────────┐
-     * │      TÊN MÓN (bold)         │
-     * │        Size: L              │
-     * ├─────────────────────────────┤
-     * │ Bàn: Bàn 5                  │
-     * │ Đường: 70%  |  Đá: Ít đá    │
-     * ├─────────────────────────────┤
-     * │ Topping:                    │
-     * │  + Trân châu       5,000đ   │
-     * │  + Thạch dừa       5,000đ   │
-     * ├─────────────────────────────┤
-     * │ Đơn giá:          35,000đ   │
-     * │ Topping:         +10,000đ   │
+     * │ Store Name                  │
+     * │ GF-472                  3/6 │
      * │ ─────────────────────────── │
-     * │ THÀNH TIỀN:       45,000đ   │
-     * ├─────────────────────────────┤
-     * │    #ORD001 - 14:30 (1/2)    │
+     * │ Tên món (BOLD)              │
+     * │ +Size L                     │
+     * │ +50% Đá                     │
+     * │ +30% Đường                  │
+     * │ +Trân châu                  │
+     * │ ─────────────────────────── │
+     * │ Thành tiền:       45,000đ   │
+     * │ ─────────────────────────── │
+     * │ 02/01/2026 14:53            │
      * └─────────────────────────────┘
      */
     private fun generateTsplLabel(
@@ -271,7 +268,6 @@ object LabelPrintService {
 
         Log.d(TAG, "Generating TSPL label:")
         Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
-        Log.d(TAG, "  - Gap: ${labelSize.gapMm}mm")
         Log.d(TAG, "  - Density: $density")
         Log.d(TAG, "  - Item: ${label.itemName}")
 
@@ -280,8 +276,13 @@ object LabelPrintService {
         // Label dimensions in dots
         val widthDots = labelSize.widthMm * DOTS_PER_MM
         val heightDots = labelSize.heightMm * DOTS_PER_MM
-        val margin = 8
+        val margin = 6
         val contentWidth = widthDots - (margin * 2)
+
+        // Font sizes
+        val fontSmall = calculateFontSize(labelSize, 0.65f)
+        val fontNormal = calculateFontSize(labelSize, 0.75f)
+        val fontBold = calculateFontSize(labelSize, 0.9f)
 
         // ========== SETUP COMMANDS ==========
         output.write("SIZE ${labelSize.widthMm} mm, ${labelSize.heightMm} mm\r\n".toByteArray())
@@ -291,227 +292,170 @@ object LabelPrintService {
         output.write("DENSITY $density\r\n".toByteArray())
         output.write("SPEED 4\r\n".toByteArray())
 
-        var yPos = 6
+        var yPos = 4
 
-        // ========== BORDER BOX ==========
-        output.write("BOX $margin,4,${widthDots - margin},${heightDots - 4},2\r\n".toByteArray())
-
-        // ========== HEADER: TÊN MÓN ==========
-        val itemNameBitmap = renderTextBitmap(
-            text = label.itemName,
-            width = contentWidth - 8,
-            fontSize = calculateFontSize(labelSize, 1.1f),
-            bold = true,
-            centerAlign = true
-        )
-        output.write(bitmapToTspl(margin + 4, yPos, itemNameBitmap))
-        yPos += itemNameBitmap.height + 2
-        itemNameBitmap.recycle()
-
-        // ========== SIZE (nếu có) ==========
-        label.size?.let { size ->
-            val sizeBitmap = renderTextBitmap(
-                text = "Size: $size",
-                width = contentWidth - 8,
-                fontSize = calculateFontSize(labelSize, 0.8f),
-                bold = true,
-                centerAlign = true
-            )
-            output.write(bitmapToTspl(margin + 4, yPos, sizeBitmap))
-            yPos += sizeBitmap.height + 2
-            sizeBitmap.recycle()
-        }
-
-        // ========== SEPARATOR LINE 1 ==========
-        output.write("BAR $margin,$yPos,${contentWidth},1\r\n".toByteArray())
-        yPos += 4
-
-        // ========== TABLE NAME ==========
-        label.tableName?.let { table ->
-            val tableBitmap = renderTextBitmap(
-                text = "Bàn: $table",
-                width = contentWidth - 8,
-                fontSize = calculateFontSize(labelSize, 0.75f),
-                bold = true,
-                centerAlign = false
-            )
-            output.write(bitmapToTspl(margin + 4, yPos, tableBitmap))
-            yPos += tableBitmap.height + 1
-            tableBitmap.recycle()
-        }
-
-        // ========== SUGAR & ICE (trên cùng 1 dòng) ==========
-        if (label.sugar != null || label.ice != null) {
-            val optionsText = buildString {
-                label.sugar?.let { append("Đường: $it") }
-                if (label.sugar != null && label.ice != null) append("  ·  ")
-                label.ice?.let { append("Đá: $it") }
-            }
-            val optionsBitmap = renderTextBitmap(
-                text = optionsText,
-                width = contentWidth - 8,
-                fontSize = calculateFontSize(labelSize, 0.7f),
+        // ========== LINE 1: STORE NAME (nếu có) ==========
+        label.storeName?.let { store ->
+            val storeBitmap = renderTextBitmap(
+                text = store,
+                width = contentWidth,
+                fontSize = fontSmall,
                 bold = false,
                 centerAlign = false
             )
-            output.write(bitmapToTspl(margin + 4, yPos, optionsBitmap))
-            yPos += optionsBitmap.height + 2
-            optionsBitmap.recycle()
+            output.write(bitmapToTspl(margin, yPos, storeBitmap))
+            yPos += storeBitmap.height
+            storeBitmap.recycle()
+        }
+
+        // ========== LINE 2: ORDER NUMBER + INDEX ==========
+        val indexText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+        val orderHeaderBitmap = renderTwoColumnText(
+            label.orderNumber,
+            indexText,
+            contentWidth,
+            fontSmall,
+            bold = false
+        )
+        output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
+        yPos += orderHeaderBitmap.height
+        orderHeaderBitmap.recycle()
+
+        // ========== SEPARATOR 1 ==========
+        output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
+        yPos += 3
+
+        // ========== PRODUCT NAME (BOLD) ==========
+        val itemNameBitmap = renderTextBitmap(
+            text = label.itemName,
+            width = contentWidth,
+            fontSize = fontBold,
+            bold = true,
+            centerAlign = false
+        )
+        output.write(bitmapToTspl(margin, yPos, itemNameBitmap))
+        yPos += itemNameBitmap.height + 1
+        itemNameBitmap.recycle()
+
+        // ========== SIZE ==========
+        label.size?.let { size ->
+            val sizeBitmap = renderTextBitmap(
+                text = "+Size $size",
+                width = contentWidth,
+                fontSize = fontNormal,
+                bold = false,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, sizeBitmap))
+            yPos += sizeBitmap.height
+            sizeBitmap.recycle()
+        }
+
+        // ========== ICE ==========
+        label.ice?.let { ice ->
+            val iceBitmap = renderTextBitmap(
+                text = "+$ice",
+                width = contentWidth,
+                fontSize = fontNormal,
+                bold = false,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, iceBitmap))
+            yPos += iceBitmap.height
+            iceBitmap.recycle()
+        }
+
+        // ========== SUGAR ==========
+        label.sugar?.let { sugar ->
+            val sugarBitmap = renderTextBitmap(
+                text = "+$sugar",
+                width = contentWidth,
+                fontSize = fontNormal,
+                bold = false,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, sugarBitmap))
+            yPos += sugarBitmap.height
+            sugarBitmap.recycle()
         }
 
         // ========== TOPPINGS ==========
-        if (label.toppings.isNotEmpty()) {
-            // Separator trước topping
-            output.write("BAR $margin,$yPos,${contentWidth},1\r\n".toByteArray())
-            yPos += 3
-
-            if (label.toppingPrices.isNotEmpty()) {
-                // Có giá topping - hiển thị từng dòng
-                label.toppingPrices.forEach { (toppingName, toppingPrice) ->
-                    val toppingLine = if (toppingPrice > 0) {
-                        "+ $toppingName: ${formatVND(toppingPrice)}"
-                    } else {
-                        "+ $toppingName"
-                    }
-                    val toppingBitmap = renderTextBitmap(
-                        text = toppingLine,
-                        width = contentWidth - 8,
-                        fontSize = calculateFontSize(labelSize, 0.65f),
-                        bold = false,
-                        centerAlign = false
-                    )
-                    output.write(bitmapToTspl(margin + 4, yPos, toppingBitmap))
-                    yPos += toppingBitmap.height
-                    toppingBitmap.recycle()
-                }
-            } else {
-                // Không có giá - hiển thị gọn
-                val toppingText = label.toppings.joinToString(", ") { "+ $it" }
+        if (label.toppingPrices.isNotEmpty()) {
+            label.toppingPrices.forEach { (toppingName, _) ->
                 val toppingBitmap = renderTextBitmap(
-                    text = toppingText,
-                    width = contentWidth - 8,
-                    fontSize = calculateFontSize(labelSize, 0.65f),
+                    text = "+$toppingName",
+                    width = contentWidth,
+                    fontSize = fontNormal,
                     bold = false,
                     centerAlign = false
                 )
-                output.write(bitmapToTspl(margin + 4, yPos, toppingBitmap))
+                output.write(bitmapToTspl(margin, yPos, toppingBitmap))
                 yPos += toppingBitmap.height
                 toppingBitmap.recycle()
             }
-            yPos += 2
+        } else if (label.toppings.isNotEmpty()) {
+            label.toppings.forEach { topping ->
+                val toppingBitmap = renderTextBitmap(
+                    text = "+$topping",
+                    width = contentWidth,
+                    fontSize = fontNormal,
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(margin, yPos, toppingBitmap))
+                yPos += toppingBitmap.height
+                toppingBitmap.recycle()
+            }
         }
 
         // ========== NOTE ==========
         label.note?.let { note ->
             val noteBitmap = renderTextBitmap(
                 text = "* $note",
-                width = contentWidth - 8,
-                fontSize = calculateFontSize(labelSize, 0.65f),
+                width = contentWidth,
+                fontSize = fontSmall,
                 bold = false,
                 centerAlign = false
             )
-            output.write(bitmapToTspl(margin + 4, yPos, noteBitmap))
-            yPos += noteBitmap.height + 2
+            output.write(bitmapToTspl(margin, yPos, noteBitmap))
+            yPos += noteBitmap.height
             noteBitmap.recycle()
         }
 
-        // ========== GIÁ TIỀN (chỉ tem đầu tiên) ==========
+        // ========== PRICE SECTION (nếu có giá) ==========
         if (!label.isContinuation && label.finalPrice > 0) {
-            // Separator trước giá
-            output.write("BAR $margin,$yPos,${contentWidth},1\r\n".toByteArray())
+            yPos += 2
+            output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
             yPos += 3
 
-            // Đơn giá
-            if (label.unitPrice > 0) {
-                val priceLine1 = renderTwoColumnText(
-                    "Đơn giá:",
-                    formatVND(label.unitPrice),
-                    contentWidth - 8,
-                    calculateFontSize(labelSize, 0.65f)
-                )
-                output.write(bitmapToTspl(margin + 4, yPos, priceLine1))
-                yPos += priceLine1.height
-                priceLine1.recycle()
-            }
-
-            // Topping
-            if (label.totalToppingPrice > 0) {
-                val priceLine2 = renderTwoColumnText(
-                    "Topping:",
-                    "+${formatVND(label.totalToppingPrice)}",
-                    contentWidth - 8,
-                    calculateFontSize(labelSize, 0.65f)
-                )
-                output.write(bitmapToTspl(margin + 4, yPos, priceLine2))
-                yPos += priceLine2.height
-                priceLine2.recycle()
-            }
-
-            // Giảm giá
-            if (label.discountAmount > 0) {
-                val priceLine3 = renderTwoColumnText(
-                    "Giảm giá:",
-                    "-${formatVND(label.discountAmount)}",
-                    contentWidth - 8,
-                    calculateFontSize(labelSize, 0.65f)
-                )
-                output.write(bitmapToTspl(margin + 4, yPos, priceLine3))
-                yPos += priceLine3.height
-                priceLine3.recycle()
-            }
-
-            // THÀNH TIỀN (bold, larger)
-            val totalLine = renderTwoColumnText(
-                "THÀNH TIỀN:",
+            val priceBitmap = renderTwoColumnText(
+                "Thành tiền:",
                 formatVND(label.finalPrice),
-                contentWidth - 8,
-                calculateFontSize(labelSize, 0.75f),
+                contentWidth,
+                fontNormal,
                 bold = true
             )
-            output.write(bitmapToTspl(margin + 4, yPos, totalLine))
-            yPos += totalLine.height + 2
-            totalLine.recycle()
+            output.write(bitmapToTspl(margin, yPos, priceBitmap))
+            yPos += priceBitmap.height
+            priceBitmap.recycle()
         }
 
-        // ========== CONTINUATION INDICATOR ==========
-        if (label.isContinuation && label.totalParts > 1) {
-            val contBitmap = renderTextBitmap(
-                text = "(Tiếp theo - ${label.partIndex}/${label.totalParts})",
-                width = contentWidth - 8,
-                fontSize = calculateFontSize(labelSize, 0.6f),
-                bold = false,
-                centerAlign = true
-            )
-            output.write(bitmapToTspl(margin + 4, yPos, contBitmap))
-            yPos += contBitmap.height + 2
-            contBitmap.recycle()
-        }
-
-        // ========== FOOTER: ORDER INFO ==========
-        output.write("BAR $margin,$yPos,${contentWidth},1\r\n".toByteArray())
+        // ========== SEPARATOR BEFORE DATE ==========
+        yPos += 2
+        output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
         yPos += 3
 
-        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val orderInfo = buildString {
-            append("#${label.orderNumber}")
-            append(" · ")
-            append(timeFormat.format(label.orderTime))
-            if (label.totalLabels > 1) {
-                append(" (${label.labelIndex}/${label.totalLabels})")
-            }
-        }
-
-        val orderBitmap = renderTextBitmap(
-            text = orderInfo,
-            width = contentWidth - 8,
-            fontSize = calculateFontSize(labelSize, 0.6f),
+        // ========== DATE TIME ==========
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        val dateBitmap = renderTextBitmap(
+            text = dateFormat.format(label.orderTime),
+            width = contentWidth,
+            fontSize = fontSmall,
             bold = false,
-            centerAlign = true
+            centerAlign = false
         )
-        // Đặt order info ở cuối tem
-        val finalYPos = minOf(yPos, heightDots - orderBitmap.height - 8)
-        output.write(bitmapToTspl(margin + 4, finalYPos, orderBitmap))
-        orderBitmap.recycle()
+        output.write(bitmapToTspl(margin, yPos, dateBitmap))
+        dateBitmap.recycle()
 
         // ========== PRINT ==========
         output.write("PRINT 1,1\r\n".toByteArray())
