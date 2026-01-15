@@ -128,10 +128,20 @@ class TableViewModel @Inject constructor(
      * This allows the screen to render immediately before data is loaded
      */
     fun initializeData() {
-        // If cache is valid, no need to do anything - we already have the data
-        if (isDataLoaded) {
+        // Check if static cache was invalidated (e.g., by placing an order)
+        // If cache is null, we need to refresh even if isDataLoaded is true
+        val cacheWasInvalidated = cachedState == null
+
+        // If cache is valid and wasn't invalidated, no need to do anything
+        if (isDataLoaded && !cacheWasInvalidated) {
             Log.d(TAG, "initializeData - Using cached data, skipping load")
             return
+        }
+
+        // If cache was invalidated, force refresh
+        if (cacheWasInvalidated) {
+            Log.d(TAG, "initializeData - Cache was invalidated, forcing refresh")
+            isDataLoaded = false
         }
 
         viewModelScope.launch {

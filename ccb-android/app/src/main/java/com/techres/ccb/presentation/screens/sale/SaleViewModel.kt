@@ -959,30 +959,11 @@ class SaleViewModel @Inject constructor(
 
     fun selectTable(table: Table) {
         viewModelScope.launch {
-            // Load active order for this table
-            // First try by table_id, then fallback to table_name (in case table_id was lost during sync)
-            var activeOrder = withContext(Dispatchers.IO) {
+            // Load active order for this table by table_id only
+            // NOTE: Removed fallback by table_name because it causes bug when
+            // multiple areas have tables with same name (e.g., "Bàn 1" in both Khu A and Khu Vip)
+            val activeOrder = withContext(Dispatchers.IO) {
                 orderRepository.getActiveOrderByTable(table.id)
-            }
-
-            // Fallback: try to find by table name if not found by table_id
-            // This handles orders where table_id was set to NULL due to foreign key constraint during sync
-            if (activeOrder == null) {
-                activeOrder = withContext(Dispatchers.IO) {
-                    orderRepository.getActiveOrderByTableName(table.name)
-                }
-                if (activeOrder != null) {
-                    Log.d(TAG, "selectTable - Found order by table name: ${activeOrder.orderNumber}")
-                    // Restore the table_id to the order
-                    withContext(Dispatchers.IO) {
-                        val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                            .format(java.util.Date())
-                        orderRepository.updateTableId(activeOrder.id, table.id, table.name, now)
-                    }
-                    // Update local reference with restored table_id
-                    activeOrder = activeOrder.copy(tableId = table.id)
-                }
             }
 
             val orderItems = if (activeOrder != null) {
