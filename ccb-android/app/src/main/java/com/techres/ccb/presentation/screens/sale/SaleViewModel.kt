@@ -2098,27 +2098,38 @@ class SaleViewModel @Inject constructor(
 
         // Build variants string with group names for proper parsing
         // Format: "Size: L, Đường: NHIỀU, + Trân châu (+10000)"
-        // - Options use "GroupName: Value" format
-        // - Toppings start with "+"
+        // - Options (Size, Đường, Đá) use "GroupName: Value" format
+        // - Everything else (toppings) starts with "+"
         val variantsWithPrices = cartItem.selectedVariants.joinToString(", ") { variant ->
             val groupNameLower = variant.groupName.lowercase()
-            val isToppingGroup = groupNameLower.contains("topping") ||
-                                 groupNameLower.contains("addon") ||
-                                 groupNameLower.contains("thêm")
 
-            if (isToppingGroup) {
-                // Toppings use "+" prefix
+            // Detect if this is an OPTION (Size, Sugar, Ice) - NOT a topping
+            val isOptionGroup = groupNameLower.contains("size") ||
+                                groupNameLower.contains("kích thước") ||
+                                groupNameLower.contains("đường") ||
+                                groupNameLower.contains("sugar") ||
+                                groupNameLower.contains("độ đường") ||
+                                groupNameLower.contains("mức đường") ||
+                                groupNameLower.contains("đá") ||
+                                groupNameLower.contains("ice") ||
+                                groupNameLower.contains("độ đá") ||
+                                groupNameLower.contains("mức đá")
+
+            if (!isOptionGroup) {
+                // NOT an option -> treat as TOPPING (use "+" prefix)
                 if (variant.price > 0) {
                     "+ ${variant.name} (+${variant.price})"
                 } else {
                     "+ ${variant.name}"
                 }
             } else {
-                // Options use "GroupName: Value" format
-                val displayGroupName = when (groupNameLower) {
-                    "size", "kích thước" -> "Size"
-                    "đường", "sugar", "độ đường" -> "Đường"
-                    "đá", "ice", "độ đá" -> "Đá"
+                // This is an option (Size, Sugar, Ice) - use "GroupName: Value" format
+                val displayGroupName = when {
+                    groupNameLower.contains("size") || groupNameLower.contains("kích thước") -> "Size"
+                    groupNameLower.contains("đường") || groupNameLower.contains("sugar") ||
+                    groupNameLower.contains("độ đường") || groupNameLower.contains("mức đường") -> "Đường"
+                    groupNameLower.contains("đá") || groupNameLower.contains("ice") ||
+                    groupNameLower.contains("độ đá") || groupNameLower.contains("mức đá") -> "Đá"
                     else -> variant.groupName
                 }
                 if (variant.price > 0) {
