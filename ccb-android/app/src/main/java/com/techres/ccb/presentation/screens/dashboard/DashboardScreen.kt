@@ -2302,7 +2302,7 @@ private fun OrderItemRow(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 36.dp, vertical = 2.dp),
+                        .padding(start = 36.dp, top = 2.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
