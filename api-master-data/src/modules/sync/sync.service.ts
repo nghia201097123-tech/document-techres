@@ -634,6 +634,7 @@ export class SyncService {
       preparationTime: product.preparationTime || 0,
       printToKitchen: product.printDish ?? true,
       printToBar: product.printLabel ?? false,
+      kitchenIds: null, // No kitchen mapping for direct product (not BranchProduct)
       createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: product.updatedAt.toISOString(),
     };
