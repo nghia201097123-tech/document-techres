@@ -1317,18 +1317,25 @@ private fun OrdersTabBar(
             )
 
             // Search input - flexible width
-            val searchIconSize = if (isCompact) 16.dp else 18.dp
-            val clearIconSize = if (isCompact) 14.dp else 16.dp
+            val searchIconSize = if (isCompact) 18.dp else 20.dp
+            val clearIconSize = if (isCompact) 16.dp else 18.dp
             val searchPlaceholder = if (isCompact) "Tìm..." else "Tìm theo số đơn, bàn, món..."
-            val searchFontSize = if (isCompact) 11.sp else 13.sp
+            val searchFontSize = if (isCompact) 12.sp else 14.sp
 
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
                 modifier = Modifier
                     .weight(1f)
-                    .height(if (isCompact) 40.dp else 44.dp),
-                placeholder = { Text(searchPlaceholder, fontSize = searchFontSize, maxLines = 1) },
+                    .height(if (isCompact) 44.dp else 48.dp),
+                placeholder = {
+                    Text(
+                        searchPlaceholder,
+                        fontSize = searchFontSize,
+                        maxLines = 1,
+                        color = Color.Gray
+                    )
+                },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
@@ -1341,7 +1348,7 @@ private fun OrdersTabBar(
                     {
                         IconButton(
                             onClick = { onSearchQueryChange("") },
-                            modifier = Modifier.size(if (isCompact) 20.dp else 24.dp)
+                            modifier = Modifier.size(if (isCompact) 24.dp else 28.dp)
                         ) {
                             Icon(
                                 Icons.Default.Clear,
@@ -1353,8 +1360,8 @@ private fun OrdersTabBar(
                     }
                 } else null,
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = searchFontSize),
-                shape = RoundedCornerShape(if (isCompact) 8.dp else 10.dp),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = searchFontSize),
+                shape = RoundedCornerShape(if (isCompact) 10.dp else 12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF1976D2),
                     unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)

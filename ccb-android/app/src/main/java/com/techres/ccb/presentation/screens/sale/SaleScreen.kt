@@ -756,21 +756,28 @@ fun ProductPanel(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChanged,
-                    placeholder = { Text("Tìm sản phẩm...") },
+                    placeholder = {
+                        Text(
+                            "Tìm sản phẩm...",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                        Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { onSearchQueryChanged("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Xóa")
+                                Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = Color.Gray)
                             }
                         }
                     },
                     singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(50.dp),
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
