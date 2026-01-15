@@ -369,10 +369,15 @@ object BitmapTextRenderer {
  * 2. Nếu không → dùng bitmap (chắc chắn đúng)
  *
  * Hỗ trợ các khổ giấy: 32mm, 44mm, 48mm, 57mm, 58mm, 76mm, 80mm, 110mm, 112mm
+ *
+ * Bitmap modes:
+ * - useRasterBitmap = true: Dùng GS v 0 (raster) - tốt cho EPSON, BIXOLON
+ * - useRasterBitmap = false: Dùng ESC * (bit image) - tốt cho XPRINTER, máy in giá rẻ Trung Quốc
  */
 class HybridBillBuilder(
     private val paperWidth: Int = 80, // Khổ giấy (mm): 32, 44, 48, 57, 58, 76, 80, 110, 112
-    private val useBitmapMode: Boolean = true // Mặc định dùng bitmap để đảm bảo
+    private val useBitmapMode: Boolean = true, // Mặc định dùng bitmap để đảm bảo
+    private val useRasterBitmap: Boolean = false // false = ESC * (XPRINTER compatible), true = GS v 0 (EPSON)
 ) {
     private val buffer = ByteArrayOutputStream()
     private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
@@ -439,8 +444,14 @@ class HybridBillBuilder(
         if (useBitmapMode) {
             // BITMAP MODE - Đảm bảo Vietnamese hiển thị đúng
             val bitmap = BitmapTextRenderer.renderText(text, actualStyle, pixelWidth)
-            // Pass pixelWidth to ensure bitmap is printed at correct size without scaling
-            val imageData = EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            // Chọn chế độ in bitmap phù hợp với máy in
+            val imageData = if (useRasterBitmap) {
+                // GS v 0 - Raster bitmap (EPSON, BIXOLON, máy in cao cấp)
+                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            } else {
+                // ESC * - Bit image (XPRINTER, máy in giá rẻ Trung Quốc)
+                EscPosCommands.printBitmap(bitmap, 0) // 0 = left align
+            }
             buffer.write(imageData)
             bitmap.recycle()
         } else {
@@ -496,8 +507,11 @@ class HybridBillBuilder(
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
-            // Pass pixelWidth to ensure bitmap is printed at correct size without scaling
-            val imageData = EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            val imageData = if (useRasterBitmap) {
+                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            } else {
+                EscPosCommands.printBitmap(bitmap, 0)
+            }
             buffer.write(imageData)
             bitmap.recycle()
         } else {
@@ -519,8 +533,11 @@ class HybridBillBuilder(
     fun separator(char: Char = '-'): HybridBillBuilder {
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, baseFontSize)
-            // Pass pixelWidth to ensure bitmap is printed at correct size without scaling
-            val imageData = EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            val imageData = if (useRasterBitmap) {
+                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            } else {
+                EscPosCommands.printBitmap(bitmap, 0)
+            }
             buffer.write(imageData)
             bitmap.recycle()
         } else {
