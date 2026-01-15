@@ -349,11 +349,15 @@ class DashboardViewModel @Inject constructor(
                 val now = java.time.Instant.now().toString()
                 val orderEntity = orderRepository.getOrderById(orderId) ?: return@launch
 
-                // 1. Update order status to cancelled
+                // 1. Update order status to cancelled with reason
                 orderRepository.updateOrderStatus(orderId, "cancelled", now)
+                // Save cancel reason
+                if (reason.isNotBlank()) {
+                    orderRepository.updateOrderCancelReason(orderId, reason, now)
+                }
 
-                // 2. Update all order items status to cancelled
-                orderRepository.updateAllItemsStatus(orderId, "cancelled", now)
+                // 2. Update all order items status to cancelled with reason
+                orderRepository.updateAllItemsStatus(orderId, "cancelled", now, reason.ifBlank { null })
 
                 // 3. Update table status to available
                 orderEntity.tableId?.let { tableId ->

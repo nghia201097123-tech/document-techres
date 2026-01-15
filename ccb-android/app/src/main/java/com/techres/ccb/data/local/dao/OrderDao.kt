@@ -59,6 +59,9 @@ interface OrderDao {
     @Query("UPDATE orders SET status = :status, updated_at = :updatedAt, sync_status = 'pending' WHERE id = :orderId")
     suspend fun updateStatus(orderId: String, status: String, updatedAt: String)
 
+    @Query("UPDATE orders SET cancelled_at = :cancelledAt, cancel_reason = :cancelReason, updated_at = :updatedAt, sync_status = 'pending' WHERE id = :orderId")
+    suspend fun updateCancelReason(orderId: String, cancelledAt: String, cancelReason: String, updatedAt: String)
+
     @Query("UPDATE orders SET payment_status = :paymentStatus, payment_method = :paymentMethod, paid_amount = :paidAmount, change_amount = :changeAmount, completed_at = :completedAt, updated_at = :updatedAt, sync_status = 'pending' WHERE id = :orderId")
     suspend fun updatePayment(
         orderId: String,

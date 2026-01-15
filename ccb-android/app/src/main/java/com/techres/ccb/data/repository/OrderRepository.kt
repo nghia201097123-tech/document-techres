@@ -91,8 +91,19 @@ class OrderRepository @Inject constructor(
     /**
      * Update all items status for an order (when order completes/cancels)
      */
-    suspend fun updateAllItemsStatus(orderId: String, status: String, updatedAt: String) {
-        orderItemDao.updateAllItemsStatus(orderId, status, updatedAt)
+    suspend fun updateAllItemsStatus(orderId: String, status: String, updatedAt: String, cancelReason: String? = null) {
+        if (status == "cancelled" && cancelReason != null) {
+            orderItemDao.updateAllItemsStatusWithReason(orderId, status, updatedAt, cancelReason, updatedAt)
+        } else {
+            orderItemDao.updateAllItemsStatus(orderId, status, updatedAt)
+        }
+    }
+
+    /**
+     * Update order cancel reason
+     */
+    suspend fun updateOrderCancelReason(orderId: String, cancelReason: String, updatedAt: String) {
+        orderDao.updateCancelReason(orderId, updatedAt, cancelReason, updatedAt)
     }
 
     suspend fun addOrderItem(item: OrderItemEntity) {

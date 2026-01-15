@@ -45,6 +45,9 @@ interface OrderItemDao {
     @Query("UPDATE order_items SET status = :status, updated_at = :updatedAt WHERE order_id = :orderId")
     suspend fun updateAllItemsStatus(orderId: String, status: String, updatedAt: String)
 
+    @Query("UPDATE order_items SET status = :status, cancelled_at = :cancelledAt, cancel_reason = :cancelReason, updated_at = :updatedAt WHERE order_id = :orderId")
+    suspend fun updateAllItemsStatusWithReason(orderId: String, status: String, cancelledAt: String, cancelReason: String?, updatedAt: String)
+
     @Query("UPDATE order_items SET quantity = :quantity, total_price = :totalPrice, updated_at = :updatedAt WHERE id = :itemId")
     suspend fun updateQuantity(itemId: String, quantity: Int, totalPrice: Double, updatedAt: String)
 

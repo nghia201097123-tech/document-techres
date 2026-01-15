@@ -315,20 +315,39 @@ fun DashboardScreen(
         )
     }
 
-    // Cancel Confirm Dialog
+    // Cancel Confirm Dialog với lý do
+    var cancelReason by remember { mutableStateOf("") }
     if (showCancelConfirmDialog && selectedOrder != null) {
         AlertDialog(
-            onDismissRequest = { showCancelConfirmDialog = false },
+            onDismissRequest = {
+                showCancelConfirmDialog = false
+                cancelReason = ""
+            },
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF44336)) },
             title = { Text("Xác nhận huỷ đơn") },
-            text = { Text("Bạn có chắc chắn muốn huỷ đơn #${selectedOrder!!.orderNumber.toString().padStart(3, '0')}?") },
+            text = {
+                Column {
+                    Text("Bạn có chắc chắn muốn huỷ đơn #${selectedOrder!!.orderNumber.toString().padStart(3, '0')}?")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = cancelReason,
+                        onValueChange = { cancelReason = it },
+                        label = { Text("Lý do huỷ") },
+                        placeholder = { Text("Nhập lý do huỷ đơn...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = false,
+                        maxLines = 3
+                    )
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.cancelPosOrder(selectedOrder!!.id)
+                        viewModel.cancelPosOrder(selectedOrder!!.id, cancelReason)
                         showCancelConfirmDialog = false
                         showOrderDetailDialog = false
                         selectedOrder = null
+                        cancelReason = ""
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
                 ) {
@@ -336,7 +355,10 @@ fun DashboardScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showCancelConfirmDialog = false }) {
+                OutlinedButton(onClick = {
+                    showCancelConfirmDialog = false
+                    cancelReason = ""
+                }) {
                     Text("Quay lại")
                 }
             }
