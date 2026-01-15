@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -56,12 +57,39 @@ object LabelPrintService {
         val orderTime: Date = Date(),   // Thời gian order
         val staffName: String? = null,  // Tên nhân viên
         val labelIndex: Int = 1,        // Thứ tự tem (1/3, 2/3, 3/3)
-        val totalLabels: Int = 1        // Tổng số tem
+        val totalLabels: Int = 1,       // Tổng số tem
+
+        // ========== GIÁ TIỀN ==========
+        val unitPrice: Double = 0.0,        // Giá đơn vị (chưa topping)
+        val toppingPrices: List<Pair<String, Double>> = emptyList(), // Topping + giá
+        val totalToppingPrice: Double = 0.0, // Tổng giá topping
+        val totalPrice: Double = 0.0,       // Giá tổng (unitPrice + toppings) * quantity
+        val discountAmount: Double = 0.0,   // Giảm giá (nếu có)
+        val finalPrice: Double = 0.0,       // Giá cuối cùng sau giảm
+
+        // ========== SPLITTING INFO ==========
+        val isContinuation: Boolean = false,    // Là tem tiếp tục (khi split)
+        val partIndex: Int = 1,                 // Phần thứ mấy (1, 2, 3...)
+        val totalParts: Int = 1                 // Tổng số phần
     )
+
+    // Max toppings per label (for splitting)
+    private const val MAX_TOPPINGS_PER_LABEL = 4
+
+    // Price formatter for VND
+    private val priceFormatter = DecimalFormat("#,###")
+
+    /**
+     * Format price in VND format (e.g., 35,000đ)
+     */
+    private fun formatVND(price: Double): String {
+        return if (price > 0) "${priceFormatter.format(price.toLong())}đ" else "0đ"
+    }
 
     /**
      * In tem cho 1 item (có thể in nhiều tem nếu quantity > 1)
      * Tự động detect protocol từ KitchenEntity
+     * Tự động chia nhỏ tem nếu có quá nhiều topping
      */
     suspend fun printLabels(
         kitchen: KitchenEntity,
@@ -76,49 +104,111 @@ object LabelPrintService {
 
             var lastError: String? = null
 
+            // Split label nếu có quá nhiều topping
+            val labelParts = splitLabelIfNeeded(labelData, kitchen.getLabelSize())
+            Log.d(TAG, "Label split into ${labelParts.size} parts")
+
             // In nhiều tem nếu quantity > 1
             for (i in 1..labelData.quantity) {
-                val currentLabel = labelData.copy(
-                    labelIndex = i,
-                    totalLabels = labelData.quantity
-                )
+                // In tất cả các parts của label
+                for ((partIndex, labelPart) in labelParts.withIndex()) {
+                    val currentLabel = labelPart.copy(
+                        labelIndex = i,
+                        totalLabels = labelData.quantity,
+                        partIndex = partIndex + 1,
+                        totalParts = labelParts.size
+                    )
 
-                val labelContent = when (protocol) {
-                    PrinterProtocol.TSPL -> generateTsplLabel(kitchen, currentLabel)
-                    PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
-                }
+                    val labelContent = when (protocol) {
+                        PrinterProtocol.TSPL -> generateTsplLabel(kitchen, currentLabel)
+                        PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
+                    }
 
-                // Retry logic
-                var success = false
-                repeat(3) { attempt ->
-                    val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
-                    when (result) {
-                        is PrinterResult.Success -> {
-                            success = true
-                            return@repeat
+                    // Retry logic
+                    var success = false
+                    repeat(3) { attempt ->
+                        val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
+                        when (result) {
+                            is PrinterResult.Success -> {
+                                success = true
+                                return@repeat
+                            }
+                            is PrinterResult.Error -> {
+                                lastError = result.message
+                                Log.w(TAG, "Label $i part ${partIndex + 1} attempt ${attempt + 1} failed: ${result.message}")
+                                if (attempt < 2) delay(1000)
+                            }
                         }
-                        is PrinterResult.Error -> {
-                            lastError = result.message
-                            Log.w(TAG, "Label $i attempt ${attempt + 1} failed: ${result.message}")
-                            if (attempt < 2) delay(1000)
-                        }
+                    }
+
+                    if (!success) {
+                        return@withContext PrinterResult.Error(
+                            lastError ?: "In tem thất bại cho ${labelData.itemName}"
+                        )
+                    }
+
+                    // Delay giữa các parts
+                    if (partIndex < labelParts.size - 1) {
+                        delay(300)
                     }
                 }
 
-                if (!success) {
-                    return@withContext PrinterResult.Error(
-                        lastError ?: "In tem thất bại cho ${labelData.itemName}"
-                    )
-                }
-
-                // Delay giữa các tem
+                // Delay giữa các tem (quantity)
                 if (i < labelData.quantity) {
                     delay(500)
                 }
             }
 
-            PrinterResult.Success("Đã in ${labelData.quantity} tem cho ${labelData.itemName}")
+            val totalLabels = labelData.quantity * labelParts.size
+            PrinterResult.Success("Đã in $totalLabels tem cho ${labelData.itemName}")
         }
+    }
+
+    /**
+     * Split label into multiple parts if too many toppings
+     */
+    private fun splitLabelIfNeeded(labelData: LabelData, labelSize: LabelSize): List<LabelData> {
+        val toppings = labelData.toppings
+        val toppingPrices = labelData.toppingPrices
+
+        // Nếu ít topping, không cần split
+        if (toppings.size <= MAX_TOPPINGS_PER_LABEL) {
+            return listOf(labelData)
+        }
+
+        val parts = mutableListOf<LabelData>()
+        val toppingChunks = toppings.chunked(MAX_TOPPINGS_PER_LABEL)
+        val toppingPriceChunks = if (toppingPrices.isNotEmpty()) {
+            toppingPrices.chunked(MAX_TOPPINGS_PER_LABEL)
+        } else {
+            toppingChunks.map { emptyList() }
+        }
+
+        toppingChunks.forEachIndexed { index, chunk ->
+            val isContinuation = index > 0
+            val priceChunk = toppingPriceChunks.getOrElse(index) { emptyList() }
+            val chunkTotalPrice = priceChunk.sumOf { it.second }
+
+            parts.add(
+                labelData.copy(
+                    toppings = chunk,
+                    toppingPrices = priceChunk,
+                    totalToppingPrice = if (index == 0) labelData.totalToppingPrice else chunkTotalPrice,
+                    isContinuation = isContinuation,
+                    // Chỉ hiện giá đầy đủ ở tem đầu tiên
+                    unitPrice = if (isContinuation) 0.0 else labelData.unitPrice,
+                    totalPrice = if (isContinuation) 0.0 else labelData.totalPrice,
+                    discountAmount = if (isContinuation) 0.0 else labelData.discountAmount,
+                    finalPrice = if (isContinuation) 0.0 else labelData.finalPrice,
+                    // Options chỉ hiện ở tem đầu
+                    sugar = if (isContinuation) null else labelData.sugar,
+                    ice = if (isContinuation) null else labelData.ice,
+                    size = if (isContinuation) null else labelData.size
+                )
+            )
+        }
+
+        return parts
     }
 
     /**
@@ -244,19 +334,54 @@ object LabelPrintService {
             optionsBitmap.recycle()
         }
 
-        // ========== TOPPINGS ==========
+        // ========== TOPPINGS với giá ==========
         if (label.toppings.isNotEmpty()) {
-            val toppingText = "Topping: " + label.toppings.joinToString(", ")
-            val toppingBitmap = renderTextBitmap(
-                text = toppingText,
-                width = widthDots - 16,
-                fontSize = calculateFontSize(labelSize, 0.7f),
-                bold = false,
-                centerAlign = false
-            )
-            output.write(bitmapToTspl(8, yPos, toppingBitmap))
-            yPos += toppingBitmap.height + 2
-            toppingBitmap.recycle()
+            // Nếu có topping prices, hiển thị kèm giá
+            if (label.toppingPrices.isNotEmpty()) {
+                val toppingHeader = "Topping:"
+                val toppingHeaderBitmap = renderTextBitmap(
+                    text = toppingHeader,
+                    width = widthDots - 16,
+                    fontSize = calculateFontSize(labelSize, 0.7f),
+                    bold = true,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(8, yPos, toppingHeaderBitmap))
+                yPos += toppingHeaderBitmap.height + 1
+                toppingHeaderBitmap.recycle()
+
+                // Hiển thị từng topping với giá
+                label.toppingPrices.forEach { (toppingName, toppingPrice) ->
+                    val toppingLine = if (toppingPrice > 0) {
+                        "  + $toppingName: ${formatVND(toppingPrice)}"
+                    } else {
+                        "  + $toppingName"
+                    }
+                    val toppingLineBitmap = renderTextBitmap(
+                        text = toppingLine,
+                        width = widthDots - 16,
+                        fontSize = calculateFontSize(labelSize, 0.65f),
+                        bold = false,
+                        centerAlign = false
+                    )
+                    output.write(bitmapToTspl(8, yPos, toppingLineBitmap))
+                    yPos += toppingLineBitmap.height + 1
+                    toppingLineBitmap.recycle()
+                }
+            } else {
+                // Không có giá topping, hiển thị danh sách đơn giản
+                val toppingText = "Topping: " + label.toppings.joinToString(", ")
+                val toppingBitmap = renderTextBitmap(
+                    text = toppingText,
+                    width = widthDots - 16,
+                    fontSize = calculateFontSize(labelSize, 0.7f),
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(8, yPos, toppingBitmap))
+                yPos += toppingBitmap.height + 2
+                toppingBitmap.recycle()
+            }
         }
 
         // ========== NOTE ==========
@@ -271,6 +396,83 @@ object LabelPrintService {
             output.write(bitmapToTspl(8, yPos, noteBitmap))
             yPos += noteBitmap.height + 2
             noteBitmap.recycle()
+        }
+
+        // ========== GIÁ TIỀN (chỉ hiển thị ở tem đầu tiên, không phải continuation) ==========
+        if (!label.isContinuation && label.unitPrice > 0) {
+            output.write("BAR 8,$yPos,${widthDots - 16},1\r\n".toByteArray())
+            yPos += 4
+
+            // Giá đơn vị
+            val unitPriceText = "Đơn giá: ${formatVND(label.unitPrice)}"
+            val unitPriceBitmap = renderTextBitmap(
+                text = unitPriceText,
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.7f),
+                bold = false,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(8, yPos, unitPriceBitmap))
+            yPos += unitPriceBitmap.height + 1
+            unitPriceBitmap.recycle()
+
+            // Tổng tiền topping (nếu có)
+            if (label.totalToppingPrice > 0) {
+                val toppingPriceText = "Topping: +${formatVND(label.totalToppingPrice)}"
+                val toppingPriceBitmap = renderTextBitmap(
+                    text = toppingPriceText,
+                    width = widthDots - 16,
+                    fontSize = calculateFontSize(labelSize, 0.7f),
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(8, yPos, toppingPriceBitmap))
+                yPos += toppingPriceBitmap.height + 1
+                toppingPriceBitmap.recycle()
+            }
+
+            // Giảm giá (nếu có)
+            if (label.discountAmount > 0) {
+                val discountText = "Giảm giá: -${formatVND(label.discountAmount)}"
+                val discountBitmap = renderTextBitmap(
+                    text = discountText,
+                    width = widthDots - 16,
+                    fontSize = calculateFontSize(labelSize, 0.7f),
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(8, yPos, discountBitmap))
+                yPos += discountBitmap.height + 1
+                discountBitmap.recycle()
+            }
+
+            // Thành tiền (bold)
+            val finalPriceText = "Thành tiền: ${formatVND(label.finalPrice)}"
+            val finalPriceBitmap = renderTextBitmap(
+                text = finalPriceText,
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.85f),
+                bold = true,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(8, yPos, finalPriceBitmap))
+            yPos += finalPriceBitmap.height + 2
+            finalPriceBitmap.recycle()
+        }
+
+        // ========== CONTINUATION INDICATOR (cho tem tiếp theo) ==========
+        if (label.isContinuation && label.totalParts > 1) {
+            val contText = "(Tiếp - Phần ${label.partIndex}/${label.totalParts})"
+            val contBitmap = renderTextBitmap(
+                text = contText,
+                width = widthDots - 16,
+                fontSize = calculateFontSize(labelSize, 0.65f),
+                bold = false,
+                centerAlign = true
+            )
+            output.write(bitmapToTspl(8, yPos, contBitmap))
+            yPos += contBitmap.height + 2
+            contBitmap.recycle()
         }
 
         // ========== ORDER INFO (at bottom) ==========
@@ -423,6 +625,13 @@ object LabelPrintService {
 
         builder.apply {
             init()
+
+            // Nếu là tem tiếp theo (continuation), thêm indicator
+            if (label.isContinuation && label.totalParts > 1) {
+                lineCenter("(Tiếp - Phần ${label.partIndex}/${label.totalParts})")
+                separator('-')
+            }
+
             lineDouble(label.itemName, BitmapTextStyle(centerAlign = true))
 
             label.size?.let {
@@ -443,14 +652,42 @@ object LabelPrintService {
             if (label.toppings.isNotEmpty()) {
                 separator('-')
                 line("Topping:")
-                label.toppings.forEach { topping ->
-                    line("  + $topping")
+                // Hiển thị topping với giá nếu có
+                if (label.toppingPrices.isNotEmpty()) {
+                    label.toppingPrices.forEach { (toppingName, toppingPrice) ->
+                        if (toppingPrice > 0) {
+                            lineKeyValue("  + $toppingName", formatVND(toppingPrice))
+                        } else {
+                            line("  + $toppingName")
+                        }
+                    }
+                } else {
+                    label.toppings.forEach { topping ->
+                        line("  + $topping")
+                    }
                 }
             }
 
             label.note?.let {
                 separator('-')
                 line("Ghi chú: $it")
+            }
+
+            // ========== GIÁ TIỀN (chỉ hiển thị ở tem đầu tiên) ==========
+            if (!label.isContinuation && label.unitPrice > 0) {
+                separator('-')
+                lineKeyValue("Đơn giá:", formatVND(label.unitPrice))
+
+                if (label.totalToppingPrice > 0) {
+                    lineKeyValue("Topping:", "+${formatVND(label.totalToppingPrice)}")
+                }
+
+                if (label.discountAmount > 0) {
+                    lineKeyValue("Giảm giá:", "-${formatVND(label.discountAmount)}")
+                }
+
+                separator('-')
+                lineBold("Thành tiền: ${formatVND(label.finalPrice)}")
             }
 
             separator('-')
