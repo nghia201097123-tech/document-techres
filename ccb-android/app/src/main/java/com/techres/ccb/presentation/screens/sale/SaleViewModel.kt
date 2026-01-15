@@ -1052,8 +1052,33 @@ class SaleViewModel @Inject constructor(
                         val key = part.substring(0, colonIndex).trim()
                         var value = part.substring(colonIndex + 1).trim()
                         value = value.replace(Regex("\\s*\\(\\+?\\d+\\)$"), "")
+
+                        // Clean up redundant group name from value
+                        // e.g., "Size: Size L" -> "Size: L"
+                        val keyLower = key.lowercase()
+                        val valueLower = value.lowercase()
+                        if (valueLower.startsWith(keyLower) || valueLower.startsWith("size ")) {
+                            val prefixesToRemove = listOf(
+                                key, keyLower,
+                                "size", "Size",
+                                "đường", "Đường",
+                                "đá", "Đá",
+                                "mức đá", "Mức đá", "MỨC ĐÁ"
+                            )
+                            for (prefix in prefixesToRemove) {
+                                if (value.startsWith(prefix, ignoreCase = true)) {
+                                    value = value.substring(prefix.length).trim()
+                                    break
+                                }
+                            }
+                        }
+
                         when (key.lowercase()) {
                             "ghi chú", "note" -> note = value
+                            // Normalize ice level keys
+                            "mức đá", "muc da", "đá", "da", "ice", "độ đá" -> options["Đá"] = value
+                            // Normalize sugar level keys
+                            "mức đường", "đường", "sugar", "độ đường" -> options["Đường"] = value
                             else -> options[key] = value
                         }
                     }

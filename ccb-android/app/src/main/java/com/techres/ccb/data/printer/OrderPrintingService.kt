@@ -313,8 +313,33 @@ object OrderPrintingService {
                             value = value.replace(priceMatch.value, "").trim()
                         }
 
+                        // Clean up redundant group name from value
+                        // e.g., "Size: Size L" -> "Size: L", "Đường: Đường nhiều" -> "Đường: nhiều"
+                        val keyLower = key.lowercase()
+                        val valueLower = value.lowercase()
+                        if (valueLower.startsWith(keyLower) || valueLower.startsWith("size ")) {
+                            // Remove prefix that matches key
+                            val prefixesToRemove = listOf(
+                                key, keyLower,
+                                "size", "Size",
+                                "đường", "Đường",
+                                "đá", "Đá",
+                                "mức đá", "Mức đá", "MỨC ĐÁ"
+                            )
+                            for (prefix in prefixesToRemove) {
+                                if (value.startsWith(prefix, ignoreCase = true)) {
+                                    value = value.substring(prefix.length).trim()
+                                    break
+                                }
+                            }
+                        }
+
                         when (key.lowercase()) {
                             "ghi chú", "note", "ghi chu" -> note = value
+                            // Recognize ice level variants
+                            "mức đá", "muc da", "đá", "da", "ice", "độ đá" -> options["Đá"] = value
+                            // Recognize sugar level variants
+                            "mức đường", "đường", "sugar", "độ đường" -> options["Đường"] = value
                             else -> options[key] = value
                         }
                     }
