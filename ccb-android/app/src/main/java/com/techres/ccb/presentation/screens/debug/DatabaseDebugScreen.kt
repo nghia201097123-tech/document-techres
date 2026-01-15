@@ -35,6 +35,8 @@ import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
+import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
+import com.techres.ccb.data.local.entity.ComboItemEntity
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.CouponDao
@@ -43,6 +45,8 @@ import com.techres.ccb.data.local.dao.OrderItemDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.KitchenDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
+import com.techres.ccb.data.local.dao.BillPrinterConfigDao
+import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,6 +61,7 @@ enum class DebugTab(val title: String) {
     PRODUCTS("Sản phẩm"),
     PRODUCT_TOPPINGS("Topping"),
     PRODUCT_NOTES("Ghi chú"),
+    COMBO_ITEMS("Combo"),
     AREAS("Khu vực"),
     TABLES("Bàn"),
     STAFF("Nhân viên"),
@@ -66,7 +71,8 @@ enum class DebugTab(val title: String) {
     ORDER_ITEMS("Chi tiết đơn"),
     SEASONAL_PRICES("Giá thời vụ"),
     COUPONS("Coupon"),
-    BILL_TEMPLATES("Mẫu in bill")
+    BILL_TEMPLATES("Mẫu in bill"),
+    BILL_PRINTER_CONFIGS("Cấu hình máy in")
 }
 
 data class DebugUiState(
@@ -78,6 +84,7 @@ data class DebugUiState(
     val products: List<ProductEntity> = emptyList(),
     val productToppings: List<ProductToppingEntity> = emptyList(),
     val productNotes: List<ProductNoteEntity> = emptyList(),
+    val comboItems: List<ComboItemEntity> = emptyList(),
     val areas: List<AreaEntity> = emptyList(),
     val tables: List<TableEntity> = emptyList(),
     val staff: List<StaffEntity> = emptyList(),
@@ -88,6 +95,7 @@ data class DebugUiState(
     val seasonalPrices: List<SeasonalPriceEntity> = emptyList(),
     val coupons: List<CouponEntity> = emptyList(),
     val billTemplates: List<BillTemplateEntity> = emptyList(),
+    val billPrinterConfigs: List<BillPrinterConfigEntity> = emptyList(),
     val isLoading: Boolean = false
 )
 
@@ -102,12 +110,14 @@ class DatabaseDebugViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val productToppingDao: ProductToppingDao,
     private val productNoteDao: ProductNoteDao,
+    private val comboItemDao: ComboItemDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val couponDao: CouponDao,
     private val orderDao: OrderDao,
     private val orderItemDao: OrderItemDao,
     private val kitchenDao: KitchenDao,
-    private val billTemplateDao: BillTemplateDao
+    private val billTemplateDao: BillTemplateDao,
+    private val billPrinterConfigDao: BillPrinterConfigDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebugUiState())
@@ -267,6 +277,19 @@ class DatabaseDebugViewModel @Inject constructor(
                     _uiState.update { it.copy(billTemplates = billTemplates) }
                 }
         }
+
+        viewModelScope.launch {
+            val branchId = _uiState.value.branchId
+            billPrinterConfigDao.getAllByBranch(branchId)
+                .collect { configs ->
+                    _uiState.update { it.copy(billPrinterConfigs = configs) }
+                }
+        }
+
+        viewModelScope.launch {
+            val comboItems = comboItemDao.getAllDebug()
+            _uiState.update { it.copy(comboItems = comboItems) }
+        }
     }
 }
 
@@ -321,6 +344,7 @@ fun DatabaseDebugScreen(
                         DebugTab.PRODUCTS -> uiState.products.size
                         DebugTab.PRODUCT_TOPPINGS -> uiState.productToppings.size
                         DebugTab.PRODUCT_NOTES -> uiState.productNotes.size
+                        DebugTab.COMBO_ITEMS -> uiState.comboItems.size
                         DebugTab.AREAS -> uiState.areas.size
                         DebugTab.TABLES -> uiState.tables.size
                         DebugTab.STAFF -> uiState.staff.size
@@ -331,6 +355,7 @@ fun DatabaseDebugScreen(
                         DebugTab.SEASONAL_PRICES -> uiState.seasonalPrices.size
                         DebugTab.COUPONS -> uiState.coupons.size
                         DebugTab.BILL_TEMPLATES -> uiState.billTemplates.size
+                        DebugTab.BILL_PRINTER_CONFIGS -> uiState.billPrinterConfigs.size
                     }
                     Tab(
                         selected = uiState.selectedTab == tab,
@@ -356,6 +381,7 @@ fun DatabaseDebugScreen(
                     DebugTab.PRODUCTS -> ProductsTable(uiState.products)
                     DebugTab.PRODUCT_TOPPINGS -> ProductToppingsTable(uiState.productToppings)
                     DebugTab.PRODUCT_NOTES -> ProductNotesTable(uiState.productNotes)
+                    DebugTab.COMBO_ITEMS -> ComboItemsTable(uiState.comboItems)
                     DebugTab.AREAS -> AreasTable(uiState.areas)
                     DebugTab.TABLES -> TablesTable(uiState.tables)
                     DebugTab.STAFF -> StaffTable(uiState.staff)
@@ -366,6 +392,7 @@ fun DatabaseDebugScreen(
                     DebugTab.SEASONAL_PRICES -> SeasonalPricesTable(uiState.seasonalPrices)
                     DebugTab.COUPONS -> CouponsTable(uiState.coupons)
                     DebugTab.BILL_TEMPLATES -> BillTemplatesTable(uiState.billTemplates)
+                    DebugTab.BILL_PRINTER_CONFIGS -> BillPrinterConfigsTable(uiState.billPrinterConfigs)
                 }
             }
         }
@@ -709,6 +736,44 @@ fun BillTemplatesTable(templates: List<BillTemplateEntity>) {
                 if (template.isDefault) "✓" else "✗",
                 if (template.isActive) "✓" else "✗",
                 template.updatedAt.take(19).replace("T", " ")
+            )
+        }
+    )
+}
+
+@Composable
+fun BillPrinterConfigsTable(configs: List<BillPrinterConfigEntity>) {
+    DataTable(
+        headers = listOf("ID", "Tên máy in", "Loại kết nối", "IP:Port", "Khổ giấy", "Mặc định", "Active"),
+        data = configs,
+        rowContent = { config ->
+            listOf(
+                config.id.take(8) + "...",
+                config.name,
+                config.connectionType,
+                "${config.printerIp ?: "-"}:${config.printerPort}",
+                "${config.paperWidth}mm",
+                if (config.isDefault) "✓" else "✗",
+                if (config.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun ComboItemsTable(items: List<ComboItemEntity>) {
+    DataTable(
+        headers = listOf("ID", "Combo ID", "Product ID", "Tên SP", "SL", "Thứ tự", "Active"),
+        data = items,
+        rowContent = { item ->
+            listOf(
+                item.id.take(8) + "...",
+                item.comboId.take(8) + "...",
+                item.productId.take(8) + "...",
+                item.productName.take(20),
+                item.quantity.toString(),
+                item.sortOrder.toString(),
+                if (item.isActive) "✓" else "✗"
             )
         }
     )
