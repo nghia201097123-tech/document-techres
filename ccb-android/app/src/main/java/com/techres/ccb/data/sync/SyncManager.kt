@@ -528,6 +528,8 @@ private fun ProductDto.toEntity(branchId: String) = ProductEntity(
     preparationTime = preparationTime,
     printToKitchen = printToKitchen,
     printToBar = printToBar,
+    // Kitchen IDs for print routing - synced from web dashboard
+    kitchenIds = kitchenIds,
     createdAt = createdAt,
     updatedAt = updatedAt
 )

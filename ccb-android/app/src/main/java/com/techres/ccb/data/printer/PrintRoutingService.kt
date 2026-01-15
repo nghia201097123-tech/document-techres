@@ -173,19 +173,34 @@ object PrintRoutingService {
         order: OrderPrintData,
         items: List<OrderItem>
     ): KitchenPrintResult {
-        Log.d(TAG, "Printing to kitchen: ${kitchen.name}, mode: ${kitchen.printMode}, items: ${items.size}")
+        Log.d(TAG, "=== printToKitchen START ===")
+        Log.d(TAG, "Kitchen: ${kitchen.name} (${kitchen.id})")
+        Log.d(TAG, "  printMode: '${kitchen.printMode}'")
+        Log.d(TAG, "  shouldPrintTicket(): ${kitchen.shouldPrintTicket()}")
+        Log.d(TAG, "  shouldPrintLabel(): ${kitchen.shouldPrintLabel()}")
+        Log.d(TAG, "  printerIp: ${kitchen.printerIp}:${kitchen.printerPort}")
+        Log.d(TAG, "  printerProtocol: ${kitchen.printerProtocol}")
+        Log.d(TAG, "  items count: ${items.size}")
 
         var ticketResult: PrinterResult? = null
         var labelResult: PrinterResult? = null
 
         // In TICKET nếu cần
         if (kitchen.shouldPrintTicket()) {
+            Log.d(TAG, ">>> Printing TICKET...")
             ticketResult = printTicketToKitchen(kitchen, order, items)
+            Log.d(TAG, "<<< Ticket result: ${ticketResult is PrinterResult.Success}")
+        } else {
+            Log.d(TAG, ">>> Skipping TICKET (shouldPrintTicket=false)")
         }
 
         // In LABEL nếu cần
         if (kitchen.shouldPrintLabel()) {
+            Log.d(TAG, ">>> Printing LABELS...")
             labelResult = printLabelsToKitchen(kitchen, order, items)
+            Log.d(TAG, "<<< Label result: ${labelResult is PrinterResult.Success}")
+        } else {
+            Log.d(TAG, ">>> Skipping LABELS (shouldPrintLabel=false)")
         }
 
         return KitchenPrintResult(

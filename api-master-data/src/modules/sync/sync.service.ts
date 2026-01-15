@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, BillTemplate, BillPrinterConfig } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, ProductKitchen, BillTemplate, BillPrinterConfig } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -65,6 +65,8 @@ export class SyncService {
     private comboItemRepository: Repository<ComboItem>,
     @InjectRepository(Kitchen)
     private kitchenRepository: Repository<Kitchen>,
+    @InjectRepository(ProductKitchen)
+    private productKitchenRepository: Repository<ProductKitchen>,
     @InjectRepository(BillTemplate)
     private billTemplateRepository: Repository<BillTemplate>,
     @InjectRepository(BillPrinterConfig)
@@ -293,7 +295,7 @@ export class SyncService {
       const tenantId = branch.tenantId;
       console.log(`[SyncService.getFullSync] tenantId=${tenantId}, branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, branchProducts, areas, tables, staff, kitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff, kitchens, productKitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -323,6 +325,10 @@ export class SyncService {
           where: { branchId, isActive: true },
           order: { sortOrder: 'ASC' },
         }),
+        // Product-Kitchen mappings for print routing
+        tenantId ? this.productKitchenRepository.find({
+          where: { tenantId },
+        }) : Promise.resolve([]),
         this.seasonalPriceRepository.find({
           where: { branchId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -351,6 +357,16 @@ export class SyncService {
         }),
       ]);
 
+      // Build product-kitchen mapping (productId -> comma-separated kitchenIds)
+      const productKitchenMap = new Map<string, string[]>();
+      for (const pk of productKitchens) {
+        if (!productKitchenMap.has(pk.productId)) {
+          productKitchenMap.set(pk.productId, []);
+        }
+        productKitchenMap.get(pk.productId)!.push(pk.kitchenId);
+      }
+      console.log(`[SyncService.getFullSync] Product-kitchen mappings: ${productKitchens.length}, unique products: ${productKitchenMap.size}`);
+
       // Log branchProducts info for debugging
       console.log(`[SyncService.getFullSync] branchProducts count: ${branchProducts.length}`);
       if (branchProducts.length > 0) {
@@ -372,7 +388,7 @@ export class SyncService {
           }
           return true;
         })
-        .map(bp => this.mapBranchProduct(bp));
+        .map(bp => this.mapBranchProduct(bp, productKitchenMap));
 
       console.log(`[SyncService.getFullSync] Filtered products count: ${products.length}`);
 
@@ -618,14 +634,17 @@ export class SyncService {
       preparationTime: product.preparationTime || 0,
       printToKitchen: product.printDish ?? true,
       printToBar: product.printLabel ?? false,
+      kitchenIds: null, // No kitchen mapping for direct product (not BranchProduct)
       createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: product.updatedAt.toISOString(),
     };
   }
 
-  private mapBranchProduct(bp: BranchProduct): ProductDto {
+  private mapBranchProduct(bp: BranchProduct, productKitchenMap?: Map<string, string[]>): ProductDto {
     const product = bp.product;
     const price = bp.customPrice !== null ? Number(bp.customPrice) : Number(product.price);
+    // Get kitchen IDs for this product (comma-separated string)
+    const kitchenIds = productKitchenMap?.get(product.id)?.join(',') || null;
     return {
       id: product.id,
       categoryId: product.categoryId || null,
@@ -646,6 +665,7 @@ export class SyncService {
       preparationTime: product.preparationTime || 0,
       printToKitchen: product.printDish ?? true,
       printToBar: product.printLabel ?? false,
+      kitchenIds, // Kitchen IDs for print routing
       createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: bp.updatedAt?.toISOString() || product.updatedAt.toISOString(),
     };
@@ -697,6 +717,12 @@ export class SyncService {
     return {
       id: kitchen.id,
       name: kitchen.name,
+      kitchenType: kitchen.kitchenType || null,
+      printerName: kitchen.printerName || null,
+      printerIp: kitchen.printerIp || null,
+      printerPort: kitchen.printerPort || null,
+      paperWidth: kitchen.paperWidth || null,
+      printMode: kitchen.printMode || null,
       description: kitchen.description || null,
       sortOrder: kitchen.sortOrder || 0,
       isActive: kitchen.isActive,

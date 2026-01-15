@@ -394,6 +394,13 @@ class SyncRepository @Inject constructor(
 
         // Sync kitchens
         onProgress?.invoke(SyncStepProgress(SyncStep.KITCHENS, SyncStepStatus.IN_PROGRESS))
+        Log.d("SyncRepository", "=== Syncing kitchens ===")
+        syncData.kitchens?.forEach { dto ->
+            Log.d("SyncRepository", "Kitchen from API: ${dto.name}")
+            Log.d("SyncRepository", "  printMode from API: '${dto.printMode}'")
+            Log.d("SyncRepository", "  printerIp: ${dto.printerIp}:${dto.printerPort}")
+            Log.d("SyncRepository", "  printerProtocol: ${dto.printerProtocol}")
+        }
         val kitchensList = syncData.kitchens?.map { dto ->
             KitchenEntity(
                 id = dto.id,
@@ -401,6 +408,17 @@ class SyncRepository @Inject constructor(
                 name = dto.name ?: "",
                 description = dto.description,
                 kitchenType = dto.kitchenType,
+                // Printer config from dashboard (for new kitchens - existing ones will be preserved by syncKitchens)
+                printerName = dto.printerName,
+                printerIp = dto.printerIp,
+                printerPort = dto.printerPort ?: 9100,
+                printerProtocol = dto.printerProtocol ?: "ESCPOS",
+                paperWidth = dto.paperWidth ?: 80,
+                printMode = dto.printMode ?: "TICKET",
+                printDensity = dto.printDensity ?: 8,
+                labelWidthMm = dto.labelWidthMm ?: 50,
+                labelHeightMm = dto.labelHeightMm ?: 30,
+                labelGapMm = dto.labelGapMm ?: 3,
                 sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
                 createdAt = dto.createdAt,
@@ -410,6 +428,7 @@ class SyncRepository @Inject constructor(
             )
         } ?: emptyList()
         kitchenRepository.syncKitchens(branchId, kitchensList)
+        Log.d("SyncRepository", "Synced ${kitchensList.size} kitchens")
         onProgress?.invoke(SyncStepProgress(SyncStep.KITCHENS, SyncStepStatus.COMPLETED, kitchensList.size))
 
         // Sync seasonal prices

@@ -130,6 +130,9 @@ data class ProductDto(
     @SerializedName("preparationTime") val preparationTime: Int,
     @SerializedName("printToKitchen") val printToKitchen: Boolean,
     @SerializedName("printToBar") val printToBar: Boolean,
+    // Kitchen IDs - comma-separated list for routing print to kitchens
+    // Synced from web dashboard product-kitchen assignments
+    @SerializedName("kitchenIds") val kitchenIds: String? = null,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String,
     // Topping/Variant information
@@ -191,6 +194,17 @@ data class KitchenDto(
     @SerializedName("name") val name: String,
     @SerializedName("description") val description: String?,
     @SerializedName("kitchenType") val kitchenType: String?, // "cooking", "grill", "bar", "dessert", etc.
+    // Printer configuration from dashboard
+    @SerializedName("printerName") val printerName: String? = null,
+    @SerializedName("printerIp") val printerIp: String? = null,
+    @SerializedName("printerPort") val printerPort: Int? = null,
+    @SerializedName("printerProtocol") val printerProtocol: String? = null, // ESCPOS or TSPL
+    @SerializedName("paperWidth") val paperWidth: Int? = null, // 58 or 80
+    @SerializedName("printMode") val printMode: String? = null, // TICKET, LABEL, BOTH
+    @SerializedName("printDensity") val printDensity: Int? = null, // 0-15 for TSPL
+    @SerializedName("labelWidthMm") val labelWidthMm: Int? = null,
+    @SerializedName("labelHeightMm") val labelHeightMm: Int? = null,
+    @SerializedName("labelGapMm") val labelGapMm: Int? = null,
     @SerializedName("sortOrder") val sortOrder: Int = 0,
     @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("createdAt") val createdAt: String,

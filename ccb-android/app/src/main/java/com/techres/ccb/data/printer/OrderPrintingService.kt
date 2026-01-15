@@ -55,11 +55,19 @@ object OrderPrintingService {
         // Build product-kitchen mapping từ products
         val productKitchenMap = buildProductKitchenMap(products, activeKitchens)
 
+        // Log active kitchens and their printMode
+        Log.d(TAG, "=== Active Kitchens ===")
+        activeKitchens.forEach { k ->
+            Log.d(TAG, "  ${k.name}: printMode='${k.printMode}', ip=${k.printerIp}:${k.printerPort}")
+        }
+
         // Convert order items sang PrintRoutingService.OrderItem
         val routingItems = orderItems
             .filter { !it.isComboParent } // Bỏ qua combo parent, chỉ in combo children
             .map { item ->
                 val product = products.find { it.id == item.productId }
+                val kitchenIds = product?.getKitchenIdList() ?: inferKitchenFromProduct(product, activeKitchens)
+                Log.d(TAG, "Item: ${item.productName} -> kitchenIds: $kitchenIds (from product.kitchenIds='${product?.kitchenIds}')")
                 val (options, toppings, note) = parseNotesField(item.notes)
                 PrintRoutingService.OrderItem(
                     productId = item.productId ?: "",
@@ -69,7 +77,7 @@ object OrderPrintingService {
                     note = note,
                     toppings = toppings,
                     options = options,
-                    kitchenIds = product?.getKitchenIdList() ?: inferKitchenFromProduct(product, activeKitchens)
+                    kitchenIds = kitchenIds
                 )
             }
 
