@@ -189,7 +189,7 @@ object PrintRoutingService {
         if (kitchen.shouldPrintTicket()) {
             Log.d(TAG, ">>> Printing TICKET...")
             ticketResult = printTicketToKitchen(kitchen, order, items)
-            Log.d(TAG, "<<< Ticket result: ${ticketResult.isSuccess}")
+            Log.d(TAG, "<<< Ticket result: ${ticketResult is PrinterResult.Success}")
         } else {
             Log.d(TAG, ">>> Skipping TICKET (shouldPrintTicket=false)")
         }
@@ -198,7 +198,7 @@ object PrintRoutingService {
         if (kitchen.shouldPrintLabel()) {
             Log.d(TAG, ">>> Printing LABELS...")
             labelResult = printLabelsToKitchen(kitchen, order, items)
-            Log.d(TAG, "<<< Label result: ${labelResult.isSuccess}")
+            Log.d(TAG, "<<< Label result: ${labelResult is PrinterResult.Success}")
         } else {
             Log.d(TAG, ">>> Skipping LABELS (shouldPrintLabel=false)")
         }
