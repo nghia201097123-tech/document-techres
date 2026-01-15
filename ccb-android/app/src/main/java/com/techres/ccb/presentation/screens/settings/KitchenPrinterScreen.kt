@@ -27,6 +27,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
+import com.techres.ccb.data.local.entity.PrinterProtocol
+import com.techres.ccb.data.local.entity.LabelSize
 import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.printer.KitchenTicketPrintService
@@ -242,13 +244,18 @@ fun KitchenPrinterScreen(
         PrinterConfigDialog(
             kitchen = selectedKitchen!!,
             onDismiss = { showPrinterDialog = false },
-            onSave = { ip, port, name ->
-                viewModel.updatePrinterConfig(
+            onSave = { ip, port, name, protocol, labelSize, printDensity ->
+                viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
                     ip = ip.ifBlank { null },
                     port = port,
                     name = name.ifBlank { null },
-                    isConnected = ip.isNotBlank()
+                    isConnected = ip.isNotBlank(),
+                    protocol = protocol.name,
+                    labelWidthMm = labelSize.widthMm,
+                    labelHeightMm = labelSize.heightMm,
+                    labelGapMm = labelSize.gapMm,
+                    printDensity = printDensity
                 )
                 showPrinterDialog = false
             }
@@ -392,6 +399,10 @@ private fun KitchenPrinterCard(
                         PrinterInfoRow("Tên máy in", kitchen.printerName ?: "Chưa đặt tên")
                         PrinterInfoRow("Địa chỉ IP", kitchen.printerIp!!)
                         PrinterInfoRow("Cổng", kitchen.printerPort.toString())
+                        PrinterInfoRow("Protocol", kitchen.getPrinterProtocolEnum().displayName)
+                        if (kitchen.getPrinterProtocolEnum() == PrinterProtocol.TSPL) {
+                            PrinterInfoRow("Kích thước tem", kitchen.getLabelSize().displayName)
+                        }
                     } else {
                         Text(
                             text = "Chưa cấu hình máy in",
@@ -475,13 +486,19 @@ private fun PrinterInfoRow(label: String, value: String) {
 private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
     onDismiss: () -> Unit,
-    onSave: (ip: String, port: Int, name: String) -> Unit
+    onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int) -> Unit
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
     var printerName by remember { mutableStateOf(kitchen.printerName ?: "") }
     var printerIp by remember { mutableStateOf(kitchen.printerIp ?: "") }
     var printerPort by remember { mutableStateOf(kitchen.printerPort.toString()) }
+    var selectedProtocol by remember { mutableStateOf(kitchen.getPrinterProtocolEnum()) }
+    var selectedLabelSize by remember { mutableStateOf(kitchen.getLabelSize()) }
+    var printDensity by remember { mutableStateOf(kitchen.printDensity) }
+
+    var protocolExpanded by remember { mutableStateOf(false) }
+    var labelSizeExpanded by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -527,14 +544,14 @@ private fun PrinterConfigDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Printer name
                 OutlinedTextField(
                     value = printerName,
                     onValueChange = { printerName = it },
                     label = { Text("Tên máy in") },
-                    placeholder = { Text("VD: EPSON TM-T82") },
+                    placeholder = { Text("VD: XPRINTER, EPSON TM-T82") },
                     leadingIcon = {
                         Icon(Icons.Default.Label, contentDescription = null)
                     },
@@ -543,41 +560,186 @@ private fun PrinterConfigDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // IP Address and Port in a row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = printerIp,
+                        onValueChange = { printerIp = it },
+                        label = { Text("IP Address") },
+                        placeholder = { Text("192.168.1.100") },
+                        modifier = Modifier.weight(2f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = printerPort,
+                        onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
+                        label = { Text("Port") },
+                        placeholder = { Text("9100") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // IP Address
-                OutlinedTextField(
-                    value = printerIp,
-                    onValueChange = { printerIp = it },
-                    label = { Text("Địa chỉ IP") },
-                    placeholder = { Text("VD: 192.168.1.100") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Wifi, contentDescription = null)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp)
+                // Protocol Selection - IMPORTANT
+                Text(
+                    text = "Loại máy in (Protocol)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
+                ExposedDropdownMenuBox(
+                    expanded = protocolExpanded,
+                    onExpandedChange = { protocolExpanded = !protocolExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedProtocol.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = protocolExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = color,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = protocolExpanded,
+                        onDismissRequest = { protocolExpanded = false }
+                    ) {
+                        PrinterProtocol.entries.forEach { protocol ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = protocol.displayName,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = when (protocol) {
+                                                PrinterProtocol.ESCPOS -> "Máy in hóa đơn (EPSON, BIXOLON...)"
+                                                PrinterProtocol.TSPL -> "Máy in tem (XPRINTER, TSC, GAINSCHA...)"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedProtocol = protocol
+                                    protocolExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (protocol) {
+                                            PrinterProtocol.ESCPOS -> Icons.Default.Receipt
+                                            PrinterProtocol.TSPL -> Icons.Default.LocalOffer
+                                        },
+                                        contentDescription = null,
+                                        tint = if (selectedProtocol == protocol) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
 
-                // Port
-                OutlinedTextField(
-                    value = printerPort,
-                    onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
-                    label = { Text("Cổng (Port)") },
-                    placeholder = { Text("9100") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Router, contentDescription = null)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                // TSPL-specific settings
+                if (selectedProtocol == PrinterProtocol.TSPL) {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    // Label size selection
+                    Text(
+                        text = "Kích thước tem",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    ExposedDropdownMenuBox(
+                        expanded = labelSizeExpanded,
+                        onExpandedChange = { labelSizeExpanded = !labelSizeExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedLabelSize.displayName,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = labelSizeExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = labelSizeExpanded,
+                            onDismissRequest = { labelSizeExpanded = false }
+                        ) {
+                            LabelSize.ALL_SIZES.forEach { size ->
+                                DropdownMenuItem(
+                                    text = { Text(size.displayName) },
+                                    onClick = {
+                                        selectedLabelSize = size
+                                        labelSizeExpanded = false
+                                    },
+                                    trailingIcon = {
+                                        if (selectedLabelSize.widthMm == size.widthMm &&
+                                            selectedLabelSize.heightMm == size.heightMm) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = color
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Print density slider
+                    Text(
+                        text = "Độ đậm: $printDensity",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Slider(
+                        value = printDensity.toFloat(),
+                        onValueChange = { printDensity = it.toInt() },
+                        valueRange = 0f..15f,
+                        steps = 14,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = color,
+                            activeTrackColor = color
+                        )
+                    )
+                    Text(
+                        text = "0 = nhạt, 15 = đậm nhất",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Buttons
                 Row(
@@ -597,7 +759,10 @@ private fun PrinterConfigDialog(
                             onSave(
                                 printerIp,
                                 printerPort.toIntOrNull() ?: 9100,
-                                printerName
+                                printerName,
+                                selectedProtocol,
+                                selectedLabelSize,
+                                printDensity
                             )
                         },
                         modifier = Modifier.weight(1f),
