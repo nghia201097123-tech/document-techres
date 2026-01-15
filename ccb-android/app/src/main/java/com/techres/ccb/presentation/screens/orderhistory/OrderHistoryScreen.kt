@@ -889,6 +889,15 @@ private fun OrderDetailDialog(
 
                 Divider(color = Color.LightGray.copy(alpha = 0.5f))
 
+                // Global expand/collapse state for toppings (must be outside LazyColumn)
+                var allToppingsExpanded by remember { mutableStateOf(true) }
+
+                // Precompute items lists (must be outside LazyColumn)
+                val activeParentItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }
+                val cancelledParentItems = orderItems.filter { !it.isComboChild && it.status == "cancelled" }
+                val parentItems = orderItems.filter { !it.isComboChild }.sortedBy { it.status == "cancelled" }
+                val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
+
                 // ========== SCROLLABLE CONTENT ==========
                 LazyColumn(
                     modifier = Modifier
@@ -921,13 +930,7 @@ private fun OrderDetailDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // Global expand/collapse state for toppings
-                    var allToppingsExpanded by remember { mutableStateOf(true) }
-
-                    // Items header - exclude cancelled items from count
-                    val activeParentItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }
-                    val cancelledParentItems = orderItems.filter { !it.isComboChild && it.status == "cancelled" }
-
+                    // Items header
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -963,9 +966,6 @@ private fun OrderDetailDialog(
                     }
 
                     // Items List - Collapsible, sorted with cancelled items at bottom
-                    val parentItems = orderItems.filter { !it.isComboChild }.sortedBy { it.status == "cancelled" }
-                    val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
-
                     items(parentItems) { item ->
                         val isCancelled = item.status == "cancelled"
                         val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
