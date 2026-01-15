@@ -176,8 +176,8 @@ object PrintRoutingService {
                 productKitchenMap[item.productId] ?: emptyList()
             }
 
-            // Thêm item vào từng bếp
-            kitchenIds.forEach { kitchenId ->
+            // Thêm item vào từng bếp (distinct để tránh trùng lặp nếu kitchenIds có duplicate)
+            kitchenIds.distinct().forEach { kitchenId ->
                 result.getOrPut(kitchenId) { mutableListOf() }.add(item)
             }
         }

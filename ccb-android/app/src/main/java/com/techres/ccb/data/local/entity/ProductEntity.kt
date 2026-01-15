@@ -111,8 +111,9 @@ data class ProductEntity(
     /**
      * Parse kitchen IDs from comma-separated string
      * Returns empty list if null or empty
+     * Uses distinct() to remove duplicates
      */
     fun getKitchenIdList(): List<String> {
-        return kitchenIds?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        return kitchenIds?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.distinct() ?: emptyList()
     }
 }
