@@ -163,7 +163,8 @@ object OrderPrintingService {
             ticketType = "MODIFIED"
         )
 
-        PrintRoutingService.routeAndPrint(orderPrintData, activeKitchens, productKitchenMap)
+        // skipLabels = true: Chỉ in phiếu bếp, không in tem
+        PrintRoutingService.routeAndPrint(orderPrintData, activeKitchens, productKitchenMap, skipLabels = true)
     }
 
     /**

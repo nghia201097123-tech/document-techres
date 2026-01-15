@@ -81,11 +81,13 @@ object PrintRoutingService {
      * @param order Thông tin đơn hàng
      * @param kitchens Danh sách tất cả bếp (đã lọc active)
      * @param productKitchenMap Map<ProductId, List<KitchenId>> - mapping món -> bếp
+     * @param skipLabels Bỏ qua in tem (dùng cho in lại phiếu bếp mà không in tem)
      */
     suspend fun routeAndPrint(
         order: OrderPrintData,
         kitchens: List<KitchenEntity>,
-        productKitchenMap: Map<String, List<String>>
+        productKitchenMap: Map<String, List<String>>,
+        skipLabels: Boolean = false
     ): RoutingResult = withContext(Dispatchers.IO) {
 
         Log.d(TAG, "Routing order #${order.orderNumber} with ${order.items.size} items")
@@ -108,12 +110,17 @@ object PrintRoutingService {
         // 2. Find FIRST kitchen that can print labels (to print labels only once)
         // Labels are for customer identification, not kitchen coordination
         // So we only need to print labels once, not for each kitchen
-        val labelPrintKitchenId = kitchenItemsMap.keys.firstOrNull { kitchenId ->
-            val kitchen = kitchens.find { it.id == kitchenId }
-            kitchen != null && kitchen.isActive && kitchen.shouldPrintLabel()
+        // If skipLabels = true, don't print labels at all (for reprint kitchen tickets only)
+        val labelPrintKitchenId = if (skipLabels) {
+            null
+        } else {
+            kitchenItemsMap.keys.firstOrNull { kitchenId ->
+                val kitchen = kitchens.find { it.id == kitchenId }
+                kitchen != null && kitchen.isActive && kitchen.shouldPrintLabel()
+            }
         }
 
-        Log.d(TAG, "Label print kitchen: ${labelPrintKitchenId ?: "NONE"}")
+        Log.d(TAG, "Label print kitchen: ${labelPrintKitchenId ?: "NONE"} (skipLabels=$skipLabels)")
 
         // 3. In song song đến các bếp
         val results = kitchenItemsMap.map { (kitchenId, items) ->
