@@ -206,12 +206,20 @@ object LabelPrintService {
         var outputStream: OutputStream? = null
 
         return try {
-            socket = Socket()
+            socket = Socket().apply {
+                reuseAddress = true
+                keepAlive = true
+                tcpNoDelay = true
+                setSoLinger(true, 2)
+            }
             socket.connect(InetSocketAddress(ip, port), 5000)
             outputStream = socket.getOutputStream()
 
             outputStream.write(content)
             outputStream.flush()
+
+            // Đợi máy in xử lý xong bitmap data
+            delay(300)
 
             PrinterResult.Success("OK")
         } catch (e: Exception) {
@@ -219,6 +227,8 @@ object LabelPrintService {
             PrinterResult.Error("Lỗi in: ${e.message}")
         } finally {
             try {
+                outputStream?.flush()
+                socket?.shutdownOutput() // Đóng output trước để đảm bảo data được gửi hết
                 outputStream?.close()
                 socket?.close()
             } catch (e: Exception) {
