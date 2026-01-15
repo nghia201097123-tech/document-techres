@@ -22,20 +22,22 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface MasterDataApi {
-    @GET("sync/full")
+    // Full sync endpoint - returns all master data including kitchenIds for products
+    @GET("pos-sync/full")
     suspend fun getFullSyncData(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String
     ): Response<FullSyncResponse>
 
-    @GET("sync/categories")
+    @GET("pos-sync/categories")
     suspend fun getCategories(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,
         @Query("since") since: String? = null
     ): Response<SyncResponse<CategoryDto>>
 
-    @GET("sync/products")
+    // Products with kitchenIds for print routing
+    @GET("pos-sync/products")
     suspend fun getProducts(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,

@@ -130,6 +130,9 @@ data class ProductDto(
     @SerializedName("preparationTime") val preparationTime: Int,
     @SerializedName("printToKitchen") val printToKitchen: Boolean,
     @SerializedName("printToBar") val printToBar: Boolean,
+    // Kitchen IDs - comma-separated list for routing print to kitchens
+    // Synced from web dashboard product-kitchen assignments
+    @SerializedName("kitchenIds") val kitchenIds: String? = null,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String,
     // Topping/Variant information
