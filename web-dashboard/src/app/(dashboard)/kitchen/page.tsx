@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, ChefHat, Loader2, MoreHorizontal, Pencil, Power, Trash2, UtensilsCrossed, X, Check } from "lucide-react";
+import { Plus, ChefHat, Loader2, MoreHorizontal, Pencil, Power, Trash2, UtensilsCrossed, X, Check, CheckSquare, Square, MinusSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useBackgroundProgress } from "@/components/ui/background-progress";
 import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, KitchenTypeLabels, PrintModeLabels } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,6 +54,7 @@ type DialogMode = "create" | "edit" | "products" | null;
 
 export default function KitchenPage() {
   const { toast } = useToast();
+  const { addProgress, updateProgress, completeProgress, errorProgress } = useBackgroundProgress();
 
   // Global filter state from Redux
   const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
@@ -300,33 +302,137 @@ export default function KitchenPage() {
     });
   };
 
-  // Save product assignments
+  // Quick selection functions
+  const selectAllProducts = () => {
+    setSelectedProductIds(new Set(filteredProducts.map(p => p.id)));
+  };
+
+  const clearAllSelections = () => {
+    setSelectedProductIds(new Set());
+  };
+
+  const toggleTypeSelection = (type: string) => {
+    const typeProducts = productsByType[type] || [];
+    const typeProductIds = typeProducts.map(p => p.id);
+    const allSelected = typeProductIds.every(id => selectedProductIds.has(id));
+
+    setSelectedProductIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        // Deselect all in this type
+        typeProductIds.forEach(id => next.delete(id));
+      } else {
+        // Select all in this type
+        typeProductIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const getTypeSelectionState = (type: string): "all" | "some" | "none" => {
+    const typeProducts = productsByType[type] || [];
+    if (typeProducts.length === 0) return "none";
+    const selectedCount = typeProducts.filter(p => selectedProductIds.has(p.id)).length;
+    if (selectedCount === 0) return "none";
+    if (selectedCount === typeProducts.length) return "all";
+    return "some";
+  };
+
+  // Save product assignments (with background processing for large selections)
   const handleSaveProducts = async () => {
     if (!selectedKitchen) return;
 
+    const productIds = Array.from(selectedProductIds);
+    const BATCH_THRESHOLD = 100; // Use background processing for > 100 products
+
+    // For small selections, process directly
+    if (productIds.length <= BATCH_THRESHOLD) {
+      try {
+        setSaving(true);
+        await kitchenService.setKitchenProducts(selectedKitchen.id, productIds);
+
+        // Update kitchen product count
+        setKitchens(prev => prev.map(k =>
+          k.id === selectedKitchen.id
+            ? { ...k, productCount: productIds.length }
+            : k
+        ));
+
+        toast({ title: "Thành công", description: `Đã gán ${productIds.length} món vào bếp "${selectedKitchen.name}"` });
+        handleCloseDialog();
+      } catch (error: any) {
+        console.error("Error saving products:", error);
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Có lỗi xảy ra",
+          variant: "destructive",
+        });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // For large selections, process in background
+    const operationId = `kitchen-products-${selectedKitchen.id}-${Date.now()}`;
+    const kitchenName = selectedKitchen.name;
+    const kitchenId = selectedKitchen.id;
+
+    // Close dialog immediately
+    handleCloseDialog();
+
+    // Add progress indicator
+    addProgress({
+      id: operationId,
+      title: `Gán ${productIds.length} món vào "${kitchenName}"`,
+      current: 0,
+      total: productIds.length,
+      persistentType: "kitchen-products",
+    });
+
     try {
-      setSaving(true);
-      const productIds = Array.from(selectedProductIds);
-      await kitchenService.setKitchenProducts(selectedKitchen.id, productIds);
+      // Process in batches
+      const BATCH_SIZE = 50;
+      const totalBatches = Math.ceil(productIds.length / BATCH_SIZE);
+
+      for (let i = 0; i < totalBatches; i++) {
+        const start = i * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, productIds.length);
+        const batchIds = productIds.slice(0, end); // Send cumulative IDs
+
+        // Update progress
+        updateProgress(operationId, {
+          current: start,
+          batchNumber: i + 1,
+          totalBatches,
+        });
+
+        // Process batch (send all IDs up to current point)
+        await kitchenService.setKitchenProducts(kitchenId, batchIds);
+
+        // Small delay between batches to avoid overwhelming the server
+        if (i < totalBatches - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
 
       // Update kitchen product count
       setKitchens(prev => prev.map(k =>
-        k.id === selectedKitchen.id
+        k.id === kitchenId
           ? { ...k, productCount: productIds.length }
           : k
       ));
 
-      toast({ title: "Thành công", description: `Đã gán ${productIds.length} món vào bếp "${selectedKitchen.name}"` });
-      handleCloseDialog();
+      completeProgress(operationId, `Hoàn thành gán ${productIds.length} món`);
+      toast({ title: "Thành công", description: `Đã gán ${productIds.length} món vào bếp "${kitchenName}"` });
     } catch (error: any) {
       console.error("Error saving products:", error);
+      errorProgress(operationId, error.response?.data?.message || "Có lỗi xảy ra");
       toast({
         title: "Lỗi",
-        description: error.response?.data?.message || "Có lỗi xảy ra",
+        description: error.response?.data?.message || "Có lỗi xảy ra khi gán món",
         variant: "destructive",
       });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -650,46 +756,92 @@ export default function KitchenPage() {
               </div>
             ) : (
               <>
-                <div className="mb-4">
+                {/* Search and Quick Selection */}
+                <div className="space-y-3 mb-4">
                   <Input
                     placeholder="Tìm kiếm món ăn..."
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                   />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllProducts}
+                      className="h-8"
+                    >
+                      <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
+                      Chọn tất cả ({filteredProducts.length})
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={clearAllSelections}
+                      className="h-8"
+                      disabled={selectedProductIds.size === 0}
+                    >
+                      <Square className="mr-1.5 h-3.5 w-3.5" />
+                      Bỏ chọn tất cả
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Product List by Type */}
                 <div className="flex-1 overflow-y-auto space-y-4">
-                  {Object.entries(productsByType).map(([type, products]) => (
-                    <div key={type}>
-                      <div className="sticky top-0 bg-background py-2 mb-2">
-                        <h4 className="font-medium text-sm text-muted-foreground">
-                          {typeLabels[type] || type} ({products.length})
-                        </h4>
-                      </div>
-                      <div className="grid gap-2">
-                        {products.map((product) => (
-                          <div
-                            key={product.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                              selectedProductIds.has(product.id) ? 'border-primary bg-primary/5' : ''
-                            }`}
-                            onClick={() => toggleProductSelection(product.id)}
-                          >
-                            <Checkbox
-                              checked={selectedProductIds.has(product.id)}
-                              onCheckedChange={() => toggleProductSelection(product.id)}
-                            />
-                            <div className="flex-1">
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-xs text-muted-foreground">{product.code}</p>
-                            </div>
-                            {selectedProductIds.has(product.id) && (
-                              <Check className="h-4 w-4 text-primary" />
+                  {Object.entries(productsByType).map(([type, products]) => {
+                    const selectionState = getTypeSelectionState(type);
+                    return (
+                      <div key={type}>
+                        <div
+                          className="sticky top-0 bg-background py-2 mb-2 flex items-center gap-2 cursor-pointer hover:bg-muted/30 rounded px-1 -mx-1"
+                          onClick={() => toggleTypeSelection(type)}
+                        >
+                          <div className="flex items-center justify-center w-5 h-5">
+                            {selectionState === "all" && (
+                              <CheckSquare className="h-4 w-4 text-primary" />
+                            )}
+                            {selectionState === "some" && (
+                              <MinusSquare className="h-4 w-4 text-primary" />
+                            )}
+                            {selectionState === "none" && (
+                              <Square className="h-4 w-4 text-muted-foreground" />
                             )}
                           </div>
-                        ))}
+                          <h4 className="font-medium text-sm text-muted-foreground flex-1">
+                            {typeLabels[type] || type} ({products.length})
+                          </h4>
+                          <span className="text-xs text-muted-foreground">
+                            {products.filter(p => selectedProductIds.has(p.id)).length}/{products.length}
+                          </span>
+                        </div>
+                        <div className="grid gap-2">
+                          {products.map((product) => (
+                            <div
+                              key={product.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                                selectedProductIds.has(product.id) ? 'border-primary bg-primary/5' : ''
+                              }`}
+                              onClick={() => toggleProductSelection(product.id)}
+                            >
+                              <Checkbox
+                                checked={selectedProductIds.has(product.id)}
+                                onCheckedChange={() => toggleProductSelection(product.id)}
+                              />
+                              <div className="flex-1">
+                                <p className="font-medium">{product.name}</p>
+                                <p className="text-xs text-muted-foreground">{product.code}</p>
+                              </div>
+                              {selectedProductIds.has(product.id) && (
+                                <Check className="h-4 w-4 text-primary" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {filteredProducts.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
                       <UtensilsCrossed className="h-10 w-10 text-muted-foreground mb-4" />
@@ -697,9 +849,16 @@ export default function KitchenPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Selection Summary */}
                 <div className="pt-4 border-t mt-4">
                   <p className="text-sm text-muted-foreground">
                     Đã chọn <span className="font-medium text-foreground">{selectedProductIds.size}</span> món
+                    {selectedProductIds.size > 100 && (
+                      <span className="text-xs ml-2 text-amber-600">
+                        (Sẽ xử lý nền cho {selectedProductIds.size} món)
+                      </span>
+                    )}
                   </p>
                 </div>
               </>
