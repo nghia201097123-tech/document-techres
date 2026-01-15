@@ -18,5 +18,6 @@ export * from './product-note.entity';
 export * from './product-note-assignment.entity';
 export * from './combo-item.entity';
 export * from './kitchen.entity';
+export * from './product-kitchen.entity';
 export * from './bill-template.entity';
 export * from './bill-printer-config.entity';

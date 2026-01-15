@@ -92,6 +92,9 @@ export class ProductDto {
   @ApiProperty()
   printToBar: boolean;
 
+  @ApiProperty({ nullable: true, description: 'Comma-separated kitchen IDs for print routing' })
+  kitchenIds: string | null;
+
   @ApiProperty()
   createdAt: string;
 
@@ -505,6 +508,24 @@ export class KitchenDto {
 
   @ApiProperty({ description: 'Tên bếp' })
   name: string;
+
+  @ApiProperty({ description: 'Loại bếp', nullable: true })
+  kitchenType: string | null;
+
+  @ApiProperty({ description: 'Tên máy in', nullable: true })
+  printerName: string | null;
+
+  @ApiProperty({ description: 'IP máy in', nullable: true })
+  printerIp: string | null;
+
+  @ApiProperty({ description: 'Port máy in', nullable: true })
+  printerPort: number | null;
+
+  @ApiProperty({ description: 'Khổ giấy', nullable: true })
+  paperWidth: number | null;
+
+  @ApiProperty({ description: 'Chế độ in: TICKET, LABEL, BOTH', nullable: true })
+  printMode: string | null;
 
   @ApiProperty({ description: 'Mô tả', nullable: true })
   description: string | null;
