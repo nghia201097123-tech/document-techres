@@ -2155,19 +2155,25 @@ fun OrderItemRow(
                 // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
                 val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
                 if (variants.isNotEmpty()) {
-                    // Use forceExpanded if provided, otherwise use local state
+                    // Local state for this item's toppings
                     // Default: expanded for active items, collapsed for cancelled items
-                    var localExpanded by remember { mutableStateOf(!isCancelled) }
-                    val toppingsExpanded = forceExpanded ?: localExpanded
+                    var toppingsExpanded by remember { mutableStateOf(!isCancelled) }
+
+                    // Sync with global forceExpanded when it changes
+                    LaunchedEffect(forceExpanded) {
+                        if (forceExpanded != null) {
+                            toppingsExpanded = forceExpanded
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Collapsible header - click to toggle (only if not forced)
+                    // Collapsible header - click always works to toggle
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(4.dp))
-                            .clickable { if (forceExpanded == null) localExpanded = !localExpanded }
+                            .clickable { toppingsExpanded = !toppingsExpanded }
                             .padding(vertical = 2.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -2296,59 +2302,154 @@ fun OrderItemRow(
 }
 
 /**
- * Compact row for cancelled items - minimal display
- * Shows: [Name] x[Qty] [Price] - [Reason]
+ * Compact row for cancelled items - shows toppings in collapsible format
+ * Shows: [Name] x[Qty] [Price] with toppings collapsible
  */
 @Composable
 fun CancelledItemRowCompact(item: OrderItemEntity) {
-    Row(
+    var showDetails by remember { mutableStateOf(false) }
+
+    // Parse toppings from notes
+    val toppings = item.notes?.let { notes ->
+        val parts = notes.split(" | ")
+        val variantsPart = parts.firstOrNull() ?: ""
+        variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
+    } ?: emptyList()
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
+        // Main row - clickable to show details
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFFFFEBEE).copy(alpha = 0.5f))
+                .clickable { showDetails = !showDetails }
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = item.productName,
-                fontSize = 13.sp,
-                color = Color.Gray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                ),
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "x${item.quantity}",
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = formatCurrency(item.totalPrice.toLong()),
-                fontSize = 13.sp,
-                color = Color.Gray,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                )
-            )
-            item.cancelReason?.let { reason ->
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Expand icon if has toppings
+                if (toppings.isNotEmpty()) {
+                    Icon(
+                        imageVector = if (showDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.productName,
+                        fontSize = 13.sp,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                        )
+                    )
+                    // Show toppings count when collapsed
+                    if (toppings.isNotEmpty() && !showDetails) {
+                        Text(
+                            text = "${toppings.size} tuỳ chọn",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = reason,
-                    fontSize = 11.sp,
-                    color = Color(0xFFF44336),
-                    fontStyle = FontStyle.Italic,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = "x${item.quantity}",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(end = 8.dp)
                 )
+                Text(
+                    text = formatCurrency(item.totalPrice.toLong()),
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                    )
+                )
+            }
+        }
+
+        // Expanded details: toppings and cancel reason
+        AnimatedVisibility(
+            visible = showDetails,
+            enter = fadeIn() + slideInVertically(),
+            exit = fadeOut() + slideOutVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
+            ) {
+                // Show toppings
+                toppings.forEach { topping ->
+                    var displayName = topping
+                    var price = 0L
+
+                    // Extract price
+                    val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(topping)
+                    if (priceMatch != null) {
+                        price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
+                        displayName = topping.replace(priceMatch.value, "").trim()
+                    }
+
+                    // Clean up display name
+                    if (displayName.startsWith("+")) {
+                        displayName = displayName.removePrefix("+").trim()
+                    } else if (displayName.contains(":")) {
+                        val colonIdx = displayName.indexOf(":")
+                        val value = displayName.substring(colonIdx + 1).trim()
+                        if (value.isNotEmpty()) {
+                            displayName = value
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 1.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "• $displayName",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        if (price > 0) {
+                            Text(
+                                text = "+${formatCurrency(price)}",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                }
+
+                // Cancel reason
+                item.cancelReason?.let { reason ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Lý do: $reason",
+                        fontSize = 12.sp,
+                        color = Color(0xFFF44336),
+                        fontStyle = FontStyle.Italic
+                    )
+                }
             }
         }
     }
