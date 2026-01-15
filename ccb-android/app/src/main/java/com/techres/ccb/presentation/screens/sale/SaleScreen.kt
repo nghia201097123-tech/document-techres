@@ -1201,13 +1201,20 @@ fun CartPanel(
                 // Display current order items (read-only)
                 if (currentOrderItems.isNotEmpty()) {
                     // Filter out combo children and group them by parent
-                    val parentItems = currentOrderItems.filter { !it.isComboChild }
+                    // Sort: active items first, cancelled items at bottom
+                    val parentItems = currentOrderItems
+                        .filter { !it.isComboChild }
+                        .sortedBy { if (it.status == "cancelled") 1 else 0 }
                     val comboChildrenMap = currentOrderItems
                         .filter { it.isComboChild }
                         .groupBy { it.comboParentId }
 
+                    // Count active items (not cancelled)
+                    val activeItemCount = parentItems.count { it.status != "cancelled" }
+                    val cancelledItemCount = parentItems.count { it.status == "cancelled" }
+
                     Text(
-                        text = "Đã order:",
+                        text = "Đã order:" + if (cancelledItemCount > 0) " ($activeItemCount món, $cancelledItemCount huỷ)" else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
@@ -2052,7 +2059,7 @@ fun OrderItemRow(
                 }
             }
 
-            // Row 3: Variants/Toppings - Grab style with prices
+            // Row 3: Variants/Toppings - Grab style with prices (collapsible)
             if (!item.notes.isNullOrEmpty()) {
                 // Split by " | " to separate variants from user note
                 val parts = item.notes.split(" | ")
@@ -2062,87 +2069,121 @@ fun OrderItemRow(
                 // Parse variants (format: "Kiwi:10000, Size S:10000" or "Kiwi, Size S")
                 val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
                 if (variants.isNotEmpty()) {
+                    // Default: expanded for active items, collapsed for cancelled items
+                    var toppingsExpanded by remember { mutableStateOf(!isCancelled) }
+
                     Spacer(modifier = Modifier.height(6.dp))
-                    Column(
+
+                    // Collapsible header - click to toggle
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 4.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { toppingsExpanded = !toppingsExpanded }
+                            .padding(vertical = 2.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        variants.forEach { variant ->
-                            // Parse variant format:
-                            // Options: "Size: L (+10000)" or "Size: L" or "Đường: NHIỀU"
-                            // Toppings: "+ Trân châu cam (+10000)" or "+ Trân châu cam"
-                            var displayName = variant
-                            var price = 0L
+                        Icon(
+                            imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (toppingsExpanded) "Thu gọn" else "Mở rộng",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.Gray
+                        )
+                        Text(
+                            text = if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
 
-                            // Extract price from "(+xxxxx)" suffix
-                            val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
-                            if (priceMatch != null) {
-                                price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
-                                displayName = variant.replace(priceMatch.value, "").trim()
-                            }
+                    // Variants list - collapsible
+                    AnimatedVisibility(
+                        visible = toppingsExpanded,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut() + slideOutVertically()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 4.dp)
+                        ) {
+                            variants.forEach { variant ->
+                                // Parse variant format:
+                                // Options: "Size: L (+10000)" or "Size: L" or "Đường: NHIỀU"
+                                // Toppings: "+ Trân châu cam (+10000)" or "+ Trân châu cam"
+                                var displayName = variant
+                                var price = 0L
 
-                            // For toppings starting with "+", remove the "+" prefix
-                            if (displayName.startsWith("+")) {
-                                displayName = displayName.removePrefix("+").trim()
-                            }
-                            // For options with "GroupName: Value" format, show only VALUE
-                            // e.g., "Size: L" -> "L", "Đường: NHIỀU" -> "NHIỀU"
-                            else if (displayName.contains(":")) {
-                                val colonIdx = displayName.indexOf(":")
-                                val value = displayName.substring(colonIdx + 1).trim()
-                                if (value.isNotEmpty()) {
-                                    displayName = value
+                                // Extract price from "(+xxxxx)" suffix
+                                val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)\\s*$").find(variant)
+                                if (priceMatch != null) {
+                                    price = priceMatch.groupValues[1].toLongOrNull() ?: 0L
+                                    displayName = variant.replace(priceMatch.value, "").trim()
                                 }
-                            }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = "•",
-                                        fontSize = 14.sp,
-                                        color = Color.Gray,
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    )
-                                    Text(
-                                        text = displayName,
-                                        fontSize = 14.sp,
-                                        color = Color(0xFF424242)
-                                    )
+                                // For toppings starting with "+", remove the "+" prefix
+                                if (displayName.startsWith("+")) {
+                                    displayName = displayName.removePrefix("+").trim()
                                 }
+                                // For options with "GroupName: Value" format, show only VALUE
+                                // e.g., "Size: L" -> "L", "Đường: NHIỀU" -> "NHIỀU"
+                                else if (displayName.contains(":")) {
+                                    val colonIdx = displayName.indexOf(":")
+                                    val value = displayName.substring(colonIdx + 1).trim()
+                                    if (value.isNotEmpty()) {
+                                        displayName = value
+                                    }
+                                }
+
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (price > 0) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
                                         Text(
-                                            text = "+${formatCurrency(price)}",
+                                            text = "•",
                                             fontSize = 14.sp,
-                                            color = Color(0xFF1976D2),
-                                            fontWeight = FontWeight.Medium
+                                            color = Color.Gray,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                        Text(
+                                            text = displayName,
+                                            fontSize = 14.sp,
+                                            color = Color(0xFF424242)
                                         )
                                     }
-                                    // Delete topping button
-                                    if (onRemoveTopping != null) {
-                                        IconButton(
-                                            onClick = { onRemoveTopping(item.id, displayName) },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Xóa $displayName",
-                                                tint = Color(0xFFF44336).copy(alpha = 0.7f),
-                                                modifier = Modifier.size(14.dp)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        if (price > 0) {
+                                            Text(
+                                                text = "+${formatCurrency(price)}",
+                                                fontSize = 14.sp,
+                                                color = Color(0xFF1976D2),
+                                                fontWeight = FontWeight.Medium
                                             )
+                                        }
+                                        // Delete topping button
+                                        if (onRemoveTopping != null) {
+                                            IconButton(
+                                                onClick = { onRemoveTopping(item.id, displayName) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Xóa $displayName",
+                                                    tint = Color(0xFFF44336).copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2151,7 +2192,7 @@ fun OrderItemRow(
                     }
                 }
 
-                // Show user note if exists
+                // Show user note if exists (always visible)
                 if (userNote != null && userNote.isNotEmpty()) {
                     Text(
                         text = userNote,
