@@ -557,6 +557,71 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 15 to 16
+     * Adds printer protocol and label size columns to kitchens table for TSPL/ESC/POS support
+     */
+    val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 15 to 16...")
+
+            // ============ KITCHENS TABLE - PRINT MODE & PAPER WIDTH ============
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN print_mode TEXT NOT NULL DEFAULT 'TICKET'")
+                Log.d(TAG, "Added print_mode column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "print_mode column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN paper_width INTEGER NOT NULL DEFAULT 80")
+                Log.d(TAG, "Added paper_width column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "paper_width column may already exist: ${e.message}")
+            }
+
+            // ============ KITCHENS TABLE - PRINTER PROTOCOL ============
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN printer_protocol TEXT NOT NULL DEFAULT 'ESCPOS'")
+                Log.d(TAG, "Added printer_protocol column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "printer_protocol column may already exist: ${e.message}")
+            }
+
+            // ============ KITCHENS TABLE - LABEL SIZE (for TSPL printers) ============
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN label_width_mm INTEGER NOT NULL DEFAULT 72")
+                Log.d(TAG, "Added label_width_mm column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "label_width_mm column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN label_height_mm INTEGER NOT NULL DEFAULT 30")
+                Log.d(TAG, "Added label_height_mm column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "label_height_mm column may already exist: ${e.message}")
+            }
+
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN label_gap_mm INTEGER NOT NULL DEFAULT 3")
+                Log.d(TAG, "Added label_gap_mm column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "label_gap_mm column may already exist: ${e.message}")
+            }
+
+            // ============ KITCHENS TABLE - PRINT DENSITY ============
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN print_density INTEGER NOT NULL DEFAULT 8")
+                Log.d(TAG, "Added print_density column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "print_density column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 15 to 16 complete - Added printer protocol and label size columns to kitchens")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -565,6 +630,7 @@ object DatabaseMigrations {
         MIGRATION_11_12,
         MIGRATION_12_13,
         MIGRATION_13_14,
-        MIGRATION_14_15
+        MIGRATION_14_15,
+        MIGRATION_15_16
     )
 }
