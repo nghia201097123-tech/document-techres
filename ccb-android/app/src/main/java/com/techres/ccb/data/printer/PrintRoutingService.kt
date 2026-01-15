@@ -90,7 +90,7 @@ object PrintRoutingService {
         skipLabels: Boolean = false
     ): RoutingResult = withContext(Dispatchers.IO) {
 
-        Log.d(TAG, "Routing order #${order.orderNumber} with ${order.items.size} items")
+        Log.d(TAG, "Routing order #${order.orderNumber} with ${order.items.size} items (skipLabels=$skipLabels)")
 
         // 1. Group items theo kitchen
         val kitchenItemsMap = groupItemsByKitchen(order.items, productKitchenMap)
@@ -107,22 +107,24 @@ object PrintRoutingService {
 
         Log.d(TAG, "Grouped into ${kitchenItemsMap.size} kitchens")
 
-        // 2. Find FIRST kitchen that can print labels (to print labels only once)
-        // Labels are for customer identification, not kitchen coordination
-        // So we only need to print labels once, not for each kitchen
-        // If skipLabels = true, don't print labels at all (for reprint kitchen tickets only)
-        val labelPrintKitchenId = if (skipLabels) {
-            null
-        } else {
-            kitchenItemsMap.keys.firstOrNull { kitchenId ->
-                val kitchen = kitchens.find { it.id == kitchenId }
-                kitchen != null && kitchen.isActive && kitchen.shouldPrintLabel()
+        // 2. Print labels ONCE for ALL unique items (separate from kitchen tickets)
+        // Labels are for customer identification, printed once per item regardless of how many kitchens
+        var labelResult: PrinterResult? = null
+        if (!skipLabels) {
+            // Find first kitchen that can print labels
+            val labelKitchen = kitchens.find { it.isActive && it.shouldPrintLabel() }
+            if (labelKitchen != null) {
+                // Get unique items (deduplicated by productId to avoid duplicate labels)
+                val uniqueItems = order.items.distinctBy { "${it.productId}_${it.note}" }
+                Log.d(TAG, "Printing ${uniqueItems.size} labels to ${labelKitchen.name} (from ${order.items.size} total items)")
+                labelResult = printLabelsToKitchen(labelKitchen, order, uniqueItems)
+                Log.d(TAG, "Label print result: ${labelResult is PrinterResult.Success}")
+            } else {
+                Log.d(TAG, "No kitchen configured to print labels")
             }
         }
 
-        Log.d(TAG, "Label print kitchen: ${labelPrintKitchenId ?: "NONE"} (skipLabels=$skipLabels)")
-
-        // 3. In song song đến các bếp
+        // 3. Print TICKETS to each kitchen (no labels - they were printed above)
         val results = kitchenItemsMap.map { (kitchenId, items) ->
             async {
                 val kitchen = kitchens.find { it.id == kitchenId }
@@ -136,23 +138,21 @@ object PrintRoutingService {
                     )
                 }
 
-                // Only print labels for the designated label kitchen
-                // Other kitchens only print tickets
-                val shouldPrintLabels = kitchenId == labelPrintKitchenId
-                printToKitchen(kitchen, order, items, printLabelsOverride = shouldPrintLabels)
+                // Print only tickets, no labels (labels printed separately above)
+                printToKitchen(kitchen, order, items, printLabelsOverride = false)
             }
         }.awaitAll()
 
         // 4. Tổng hợp kết quả
         val successfulKitchens = results.count { result ->
-            (result.ticketResult as? PrinterResult.Success) != null ||
-            (result.labelResult as? PrinterResult.Success) != null
+            (result.ticketResult as? PrinterResult.Success) != null
         }
+        val labelSuccess = labelResult is PrinterResult.Success
 
-        val message = buildResultMessage(results)
+        val message = buildResultMessage(results, labelSuccess)
 
         RoutingResult(
-            success = successfulKitchens > 0,
+            success = successfulKitchens > 0 || labelSuccess,
             message = message,
             kitchenResults = results,
             totalKitchens = results.size,
@@ -310,24 +310,27 @@ object PrintRoutingService {
     /**
      * Tạo message tổng hợp
      */
-    private fun buildResultMessage(results: List<KitchenPrintResult>): String {
+    private fun buildResultMessage(results: List<KitchenPrintResult>, labelSuccess: Boolean = false): String {
         val successKitchens = mutableListOf<String>()
         val failedKitchens = mutableListOf<String>()
 
         results.forEach { result ->
             val ticketOk = result.ticketResult is PrinterResult.Success
-            val labelOk = result.labelResult is PrinterResult.Success
 
-            if (ticketOk || labelOk) {
+            if (ticketOk) {
                 successKitchens.add(result.kitchenName)
-            } else if (result.ticketResult != null || result.labelResult != null) {
+            } else if (result.ticketResult != null) {
                 failedKitchens.add(result.kitchenName)
             }
         }
 
         return buildString {
+            if (labelSuccess) {
+                append("Tem OK")
+            }
             if (successKitchens.isNotEmpty()) {
-                append("Đã in: ${successKitchens.joinToString(", ")}")
+                if (isNotEmpty()) append(", ")
+                append("Bếp: ${successKitchens.joinToString(", ")}")
             }
             if (failedKitchens.isNotEmpty()) {
                 if (isNotEmpty()) append(". ")
