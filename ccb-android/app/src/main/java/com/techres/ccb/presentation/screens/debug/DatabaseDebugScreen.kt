@@ -550,18 +550,19 @@ fun CategoriesTable(categories: List<CategoryEntity>) {
 @Composable
 fun ProductsTable(products: List<ProductEntity>) {
     DataTable(
-        headers = listOf("ID", "Name", "Code", "SearchName", "Abbrev", "Price", "VAT%", "Type", "Active"),
+        headers = listOf("ID", "Name", "Code", "Price", "Type", "In bếp", "In bar", "Bếp gán", "Active"),
         data = products,
         rowContent = { product ->
+            val kitchenCount = product.getKitchenIdList().size
             listOf(
                 product.id.take(8) + "...",
-                product.name.take(20),
+                product.name.take(15),
                 product.code,
-                product.searchName?.take(20) ?: "NULL",
-                product.abbreviation ?: "NULL",
                 "%,.0f".format(product.price),
-                "${product.vatRate.toInt()}%",
                 product.type,
+                if (product.printToKitchen) "✓" else "✗",
+                if (product.printToBar) "✓" else "✗",
+                if (kitchenCount > 0) "$kitchenCount bếp" else "-",
                 if (product.isActive) "✓" else "✗"
             )
         }
