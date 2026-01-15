@@ -45,6 +45,7 @@ import com.techres.ccb.data.local.dao.KitchenDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.repository.*
+import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -88,7 +89,8 @@ data class DebugUiState(
     val seasonalPrices: List<SeasonalPriceEntity> = emptyList(),
     val coupons: List<CouponEntity> = emptyList(),
     val billTemplates: List<BillTemplateEntity> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
 @HiltViewModel
@@ -128,145 +130,219 @@ class DatabaseDebugViewModel @Inject constructor(
     }
 
     fun loadAllData() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-        }
+        _uiState.update { it.copy(isLoading = true, error = null) }
 
         // Load brands (not branch-specific)
         viewModelScope.launch {
-            branchRepository.getAllBrandsLocal()
-                .collect { brands ->
-                    _uiState.update { it.copy(brands = brands) }
-                }
+            try {
+                branchRepository.getAllBrandsLocal()
+                    .catch { e ->
+                        Log.e(TAG, "Error loading brands", e)
+                        _uiState.update { it.copy(error = "Lỗi tải thương hiệu: ${e.message}") }
+                    }
+                    .collect { brands ->
+                        _uiState.update { it.copy(brands = brands) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading brands", e)
+                _uiState.update { it.copy(error = "Lỗi tải thương hiệu: ${e.message}") }
+            }
         }
 
         // Load branches (not branch-specific)
         viewModelScope.launch {
-            branchRepository.getAllBranchesLocal()
-                .collect { branches ->
-                    _uiState.update { it.copy(branches = branches) }
-                }
+            try {
+                branchRepository.getAllBranchesLocal()
+                    .catch { e ->
+                        Log.e(TAG, "Error loading branches", e)
+                        _uiState.update { it.copy(error = "Lỗi tải chi nhánh: ${e.message}") }
+                    }
+                    .collect { branches ->
+                        _uiState.update { it.copy(branches = branches, isLoading = false) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading branches", e)
+                _uiState.update { it.copy(error = "Lỗi tải chi nhánh: ${e.message}", isLoading = false) }
+            }
         }
 
         val branchId = _uiState.value.branchId
         if (branchId.isEmpty()) {
-            viewModelScope.launch {
-                _uiState.update { it.copy(isLoading = false) }
-            }
+            _uiState.update { it.copy(isLoading = false) }
             return
         }
 
         viewModelScope.launch {
-            // Load categories
-            categoryRepository.getAllCategories(branchId)
-                .collect { categories ->
-                    _uiState.update { it.copy(categories = categories) }
-                }
+            try {
+                categoryRepository.getAllCategories(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading categories", e) }
+                    .collect { categories ->
+                        _uiState.update { it.copy(categories = categories) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading categories", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            productRepository.getAllProducts(branchId)
-                .collect { products ->
-                    _uiState.update { it.copy(products = products) }
-                }
+            try {
+                productRepository.getAllProducts(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading products", e) }
+                    .collect { products ->
+                        _uiState.update { it.copy(products = products) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading products", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            tableRepository.getAllAreas(branchId)
-                .collect { areas ->
-                    _uiState.update { it.copy(areas = areas) }
-                }
+            try {
+                tableRepository.getAllAreas(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading areas", e) }
+                    .collect { areas ->
+                        _uiState.update { it.copy(areas = areas) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading areas", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            tableRepository.getAllTables(branchId)
-                .collect { tables ->
-                    _uiState.update { it.copy(tables = tables, isLoading = false) }
-                }
+            try {
+                tableRepository.getAllTables(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading tables", e) }
+                    .collect { tables ->
+                        _uiState.update { it.copy(tables = tables) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading tables", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            staffRepository.getAllStaff(branchId)
-                .collect { staff ->
-                    _uiState.update { it.copy(staff = staff) }
-                }
+            try {
+                staffRepository.getAllStaff(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading staff", e) }
+                    .collect { staff ->
+                        _uiState.update { it.copy(staff = staff) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading staff", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            shiftRepository.getAllShiftsByBranch(branchId)
-                .collect { shifts ->
-                    _uiState.update { it.copy(shifts = shifts) }
-                }
+            try {
+                shiftRepository.getAllShiftsByBranch(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading shifts", e) }
+                    .collect { shifts ->
+                        _uiState.update { it.copy(shifts = shifts) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading shifts", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            seasonalPriceDao.getActiveSeasonalPrices(branchId)
-                .collect { seasonalPrices ->
-                    _uiState.update { it.copy(seasonalPrices = seasonalPrices) }
-                }
+            try {
+                seasonalPriceDao.getActiveSeasonalPrices(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading seasonal prices", e) }
+                    .collect { seasonalPrices ->
+                        _uiState.update { it.copy(seasonalPrices = seasonalPrices) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading seasonal prices", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            couponDao.getActiveCoupons(branchId)
-                .collect { coupons ->
-                    _uiState.update { it.copy(coupons = coupons) }
-                }
+            try {
+                couponDao.getActiveCoupons(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading coupons", e) }
+                    .collect { coupons ->
+                        _uiState.update { it.copy(coupons = coupons) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading coupons", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            productToppingDao.getAllByBranch(branchId)
-                .collect { toppings ->
-                    _uiState.update { it.copy(productToppings = toppings) }
-                }
+            try {
+                productToppingDao.getAllByBranch(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading product toppings", e) }
+                    .collect { toppings ->
+                        _uiState.update { it.copy(productToppings = toppings) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading product toppings", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            productNoteDao.getAllNotes(branchId)
-                .collect { notes ->
-                    _uiState.update { it.copy(productNotes = notes) }
-                }
+            try {
+                productNoteDao.getAllNotes(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading product notes", e) }
+                    .collect { notes ->
+                        _uiState.update { it.copy(productNotes = notes) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading product notes", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            orderDao.getAllByBranch(branchId)
-                .collect { orders ->
-                    _uiState.update { it.copy(orders = orders) }
-                }
+            try {
+                orderDao.getAllByBranch(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading orders", e) }
+                    .collect { orders ->
+                        _uiState.update { it.copy(orders = orders) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading orders", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            orderItemDao.getAllByBranch(branchId)
-                .collect { orderItems ->
-                    _uiState.update { it.copy(orderItems = orderItems) }
-                }
+            try {
+                orderItemDao.getAllByBranch(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading order items", e) }
+                    .collect { orderItems ->
+                        _uiState.update { it.copy(orderItems = orderItems) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading order items", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            kitchenDao.getAllByBranch(branchId)
-                .collect { kitchens ->
-                    _uiState.update { it.copy(kitchens = kitchens) }
-                }
+            try {
+                kitchenDao.getAllByBranch(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading kitchens", e) }
+                    .collect { kitchens ->
+                        _uiState.update { it.copy(kitchens = kitchens) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading kitchens", e)
+            }
         }
 
         viewModelScope.launch {
-            val branchId = _uiState.value.branchId
-            billTemplateDao.getAllByBranch(branchId)
-                .collect { billTemplates ->
-                    _uiState.update { it.copy(billTemplates = billTemplates) }
-                }
+            try {
+                billTemplateDao.getAllByBranch(branchId)
+                    .catch { e -> Log.e(TAG, "Error loading bill templates", e) }
+                    .collect { billTemplates ->
+                        _uiState.update { it.copy(billTemplates = billTemplates) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading bill templates", e)
+            }
         }
+    }
+
+    companion object {
+        private const val TAG = "DatabaseDebugViewModel"
     }
 }
 
@@ -300,9 +376,22 @@ fun DatabaseDebugScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Error message
+            uiState.error?.let { error ->
+                Text(
+                    text = error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+
             // Branch info
             Text(
-                text = "Branch ID: ${uiState.branchId}",
+                text = "Branch ID: ${uiState.branchId.ifEmpty { "(không có)" }}",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
