@@ -102,4 +102,57 @@ export class KitchenController {
   ) {
     return this.kitchenService.setProductKitchens(req.user.tenantId, productId, kitchenIds || []);
   }
+
+  @Get('products/with-assignments')
+  @ApiOperation({ summary: 'Lấy danh sách món ăn với các bếp đã gán (cho dialog gán món)' })
+  @ApiQuery({ name: 'branchId', required: false })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getProductsWithKitchenAssignments(
+    @Request() req,
+    @Query('branchId') branchId?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.kitchenService.getProductsWithKitchenAssignments(
+      req.user.tenantId,
+      branchId,
+      categoryId,
+      search,
+    );
+  }
+
+  @Post(':id/products/category/:categoryId')
+  @ApiOperation({ summary: 'Thêm tất cả món ăn trong danh mục vào bếp' })
+  @ApiQuery({ name: 'branchId', required: false })
+  addCategoryProductsToKitchen(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('categoryId') categoryId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.kitchenService.addCategoryProductsToKitchen(
+      req.user.tenantId,
+      id,
+      categoryId,
+      branchId,
+    );
+  }
+
+  @Delete(':id/products/category/:categoryId')
+  @ApiOperation({ summary: 'Xóa tất cả món ăn trong danh mục khỏi bếp' })
+  @ApiQuery({ name: 'branchId', required: false })
+  removeCategoryProductsFromKitchen(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('categoryId') categoryId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.kitchenService.removeCategoryProductsFromKitchen(
+      req.user.tenantId,
+      id,
+      categoryId,
+      branchId,
+    );
+  }
 }

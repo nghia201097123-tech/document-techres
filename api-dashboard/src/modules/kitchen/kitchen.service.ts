@@ -195,4 +195,171 @@ export class KitchenService {
       productCount: countMap.get(k.id) || 0,
     }));
   }
+
+  // Get all products with their assigned kitchens
+  // Used for "Gán món ăn - Bếp" dialog to show which kitchens each product is assigned to
+  async getProductsWithKitchenAssignments(
+    tenantId: string,
+    branchId?: string,
+    categoryId?: string,
+    search?: string,
+  ) {
+    // Build product query
+    const productQuery = this.productRepository
+      .createQueryBuilder('p')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.is_active = true');
+
+    if (branchId && branchId !== 'all') {
+      productQuery.andWhere('p.branch_id = :branchId', { branchId });
+    }
+
+    if (categoryId && categoryId !== 'all') {
+      productQuery.andWhere('p.category_id = :categoryId', { categoryId });
+    }
+
+    if (search) {
+      productQuery.andWhere(
+        '(p.name ILIKE :search OR p.code ILIKE :search OR p.search_name ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    productQuery.orderBy('p.category_id', 'ASC')
+      .addOrderBy('p.sort_order', 'ASC')
+      .addOrderBy('p.name', 'ASC');
+
+    const products = await productQuery.getMany();
+
+    if (products.length === 0) {
+      return [];
+    }
+
+    // Get all product-kitchen assignments for these products
+    const productIds = products.map(p => p.id);
+    const assignments = await this.productKitchenRepository.find({
+      where: { tenantId, productId: In(productIds) },
+      relations: ['kitchen'],
+    });
+
+    // Build map of productId -> kitchens
+    const productKitchensMap = new Map<string, any[]>();
+    assignments.forEach(a => {
+      const kitchens = productKitchensMap.get(a.productId) || [];
+      kitchens.push({
+        id: a.kitchen.id,
+        name: a.kitchen.name,
+        kitchenType: a.kitchen.kitchenType,
+      });
+      productKitchensMap.set(a.productId, kitchens);
+    });
+
+    // Return products with their assigned kitchens
+    return products.map(p => ({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      categoryId: p.categoryId,
+      type: p.type,
+      imageUrl: p.imageUrl,
+      assignedKitchens: productKitchensMap.get(p.id) || [],
+    }));
+  }
+
+  // Batch assign products by category to a kitchen
+  async addCategoryProductsToKitchen(
+    tenantId: string,
+    kitchenId: string,
+    categoryId: string,
+    branchId?: string,
+  ) {
+    await this.findOne(tenantId, kitchenId); // Verify kitchen exists
+
+    // Get all products in the category
+    const productQuery = this.productRepository
+      .createQueryBuilder('p')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.category_id = :categoryId', { categoryId })
+      .andWhere('p.is_active = true');
+
+    if (branchId && branchId !== 'all') {
+      productQuery.andWhere('p.branch_id = :branchId', { branchId });
+    }
+
+    const products = await productQuery.getMany();
+
+    if (products.length === 0) {
+      return { added: 0, skipped: 0, products: [] };
+    }
+
+    // Get existing assignments
+    const productIds = products.map(p => p.id);
+    const existingAssignments = await this.productKitchenRepository.find({
+      where: { tenantId, kitchenId, productId: In(productIds) },
+    });
+    const existingProductIds = new Set(existingAssignments.map(a => a.productId));
+
+    // Filter out already assigned products
+    const newProductIds = productIds.filter(id => !existingProductIds.has(id));
+
+    // Create new assignments
+    if (newProductIds.length > 0) {
+      const assignments = newProductIds.map(productId =>
+        this.productKitchenRepository.create({
+          tenantId,
+          kitchenId,
+          productId,
+        })
+      );
+      await this.productKitchenRepository.save(assignments);
+    }
+
+    return {
+      added: newProductIds.length,
+      skipped: existingProductIds.size,
+      products: await this.getKitchenProducts(tenantId, kitchenId),
+    };
+  }
+
+  // Remove all products in a category from a kitchen
+  async removeCategoryProductsFromKitchen(
+    tenantId: string,
+    kitchenId: string,
+    categoryId: string,
+    branchId?: string,
+  ) {
+    await this.findOne(tenantId, kitchenId);
+
+    // Get all products in the category
+    const productQuery = this.productRepository
+      .createQueryBuilder('p')
+      .select('p.id')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.category_id = :categoryId', { categoryId });
+
+    if (branchId && branchId !== 'all') {
+      productQuery.andWhere('p.branch_id = :branchId', { branchId });
+    }
+
+    const products = await productQuery.getMany();
+    const productIds = products.map(p => p.id);
+
+    if (productIds.length === 0) {
+      return { removed: 0, products: [] };
+    }
+
+    // Delete assignments
+    const result = await this.productKitchenRepository
+      .createQueryBuilder()
+      .delete()
+      .where('tenant_id = :tenantId', { tenantId })
+      .andWhere('kitchen_id = :kitchenId', { kitchenId })
+      .andWhere('product_id IN (:...productIds)', { productIds })
+      .execute();
+
+    return {
+      removed: result.affected || 0,
+      products: await this.getKitchenProducts(tenantId, kitchenId),
+    };
+  }
 }
