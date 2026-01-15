@@ -1886,6 +1886,9 @@ private fun OrderDetailDialog(
 
                 HorizontalDivider()
 
+                // Global expand/collapse state
+                var allToppingsExpanded by remember { mutableStateOf(true) }
+
                 // Order Items - filter out combo children (they're shown under their parent)
                 val parentItems = orderItems.filter { !it.isComboChild }
                 val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
@@ -1897,16 +1900,40 @@ private fun OrderDetailDialog(
                         .padding(horizontal = 16.dp)
                 ) {
                     item {
-                        Text(
-                            text = "Danh sách món (${parentItems.size})",
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(vertical = 12.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Danh sách món (${parentItems.size})",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            // Expand/Collapse all button
+                            TextButton(
+                                onClick = { allToppingsExpanded = !allToppingsExpanded },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (allToppingsExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (allToppingsExpanded) "Thu gọn" else "Mở rộng",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
                     }
 
                     items(parentItems) { item ->
                         val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
-                        OrderItemRow(item, comboChildren)
+                        OrderItemRow(item, comboChildren, allToppingsExpanded)
                         HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                     }
 
@@ -2013,8 +2040,19 @@ private fun OrderDetailDialog(
  *               • Child 2           x1
  */
 @Composable
-private fun OrderItemRow(item: OrderItemEntity, comboChildren: List<OrderItemEntity> = emptyList()) {
+private fun OrderItemRow(
+    item: OrderItemEntity,
+    comboChildren: List<OrderItemEntity> = emptyList(),
+    forceExpanded: Boolean? = null // null = use local state, true/false = sync with global
+) {
     var toppingsExpanded by remember { mutableStateOf(true) }
+
+    // Sync with global forceExpanded when it changes
+    LaunchedEffect(forceExpanded) {
+        if (forceExpanded != null) {
+            toppingsExpanded = forceExpanded
+        }
+    }
 
     Column(
         modifier = Modifier
