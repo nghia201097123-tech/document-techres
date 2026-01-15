@@ -717,11 +717,11 @@ export class SyncService {
     return {
       id: kitchen.id,
       name: kitchen.name,
-      kitchenType: (kitchen as any).kitchenType || null, // Kitchen type (bar, cooking, grill, etc.)
+      kitchenType: kitchen.kitchenType || null,
       printerName: kitchen.printerName || null,
       printerIp: kitchen.printerIp || null,
       printerPort: kitchen.printerPort || null,
-      paperWidth: (kitchen as any).paperWidth || null,
+      paperWidth: kitchen.paperWidth || null,
       printMode: kitchen.printMode || null,
       description: kitchen.description || null,
       sortOrder: kitchen.sortOrder || 0,

@@ -10,9 +10,10 @@ import {
 } from 'typeorm';
 import { Branch } from './branch.entity';
 
-export enum PrintMode {
-  INDIVIDUAL = 'individual', // In từng món riêng lẻ
-  LIST = 'list', // In danh sách món
+export enum KitchenPrintMode {
+  TICKET = 'TICKET',  // In phiếu bếp (danh sách món)
+  LABEL = 'LABEL',    // In tem (từng món riêng lẻ)
+  BOTH = 'BOTH',      // In cả phiếu bếp và tem
 }
 
 @Entity('kitchens')
@@ -35,6 +36,9 @@ export class Kitchen {
   @Column()
   name: string;
 
+  @Column({ name: 'kitchen_type', type: 'varchar', length: 50, nullable: true })
+  kitchenType: string;
+
   @Column({ type: 'text', nullable: true })
   description: string;
 
@@ -47,14 +51,14 @@ export class Kitchen {
   @Column({ name: 'printer_port', type: 'int', nullable: true, default: 9100 })
   printerPort: number;
 
-  @Column({ name: 'paper_size', type: 'varchar', length: 50, nullable: true, default: '80mm' })
-  paperSize: string;
+  @Column({ name: 'paper_width', type: 'int', nullable: true, default: 80 })
+  paperWidth: number;
 
   @Column({
     name: 'print_mode',
     type: 'varchar',
     length: 50,
-    default: 'list',
+    default: KitchenPrintMode.TICKET,
   })
   printMode: string;
 
