@@ -930,27 +930,31 @@ class SaleViewModel @Inject constructor(
      * Select a table by ID (used when navigating from TableScreen)
      */
     fun selectTableById(tableId: String) {
+        Log.d(TAG, "selectTableById - Requested tableId: $tableId")
         viewModelScope.launch {
             // Find the table in the loaded tables list
             val table = _uiState.value.tables.find { it.id == tableId }
             if (table != null) {
+                Log.d(TAG, "selectTableById - Found table: name=${table.name}, id=${table.id}, areaId=${table.areaId}, areaName=${table.areaName}")
                 selectTable(table)
                 // Also set order type to DINE_IN
                 _uiState.update { it.copy(orderType = OrderType.DINE_IN) }
-                Log.d(TAG, "selectTableById - Selected table: ${table.name}")
             } else {
                 // Tables might not be loaded yet, try to load them first
-                Log.w(TAG, "selectTableById - Table not found in current list, trying to reload")
+                Log.w(TAG, "selectTableById - Table not found in current list (${_uiState.value.tables.size} tables), trying to reload")
                 refreshTables()
                 // Delay to allow tables to load
                 kotlinx.coroutines.delay(500)
                 val tableAfterLoad = _uiState.value.tables.find { it.id == tableId }
                 if (tableAfterLoad != null) {
+                    Log.d(TAG, "selectTableById - Found after reload: name=${tableAfterLoad.name}, id=${tableAfterLoad.id}, areaId=${tableAfterLoad.areaId}, areaName=${tableAfterLoad.areaName}")
                     selectTable(tableAfterLoad)
                     _uiState.update { it.copy(orderType = OrderType.DINE_IN) }
-                    Log.d(TAG, "selectTableById - Selected table after reload: ${tableAfterLoad.name}")
                 } else {
-                    Log.e(TAG, "selectTableById - Table not found: $tableId")
+                    Log.e(TAG, "selectTableById - Table not found after reload: $tableId")
+                    // Log all available table IDs for debugging
+                    val availableIds = _uiState.value.tables.map { "${it.id}:${it.name}:${it.areaName}" }
+                    Log.e(TAG, "selectTableById - Available tables: $availableIds")
                     _uiState.update { it.copy(errorMessage = "Không tìm thấy bàn") }
                 }
             }
@@ -1964,6 +1968,7 @@ class SaleViewModel @Inject constructor(
                 val now = getCurrentTimestamp()
 
                 Log.d(TAG, "placeOrder - staffId=$staffId, shiftId=$shiftId, branchId=$branchId")
+                Log.d(TAG, "placeOrder - SELECTED TABLE: id=${state.selectedTable?.id}, name=${state.selectedTable?.name}, areaId=${state.selectedTable?.areaId}, areaName=${state.selectedTable?.areaName}")
 
                 val orderId = UUID.randomUUID().toString()
                 val orderNumber = generateOrderNumber()
