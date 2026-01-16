@@ -146,6 +146,35 @@ data class KitchenEntity(
     @ColumnInfo(name = "print_density")
     val printDensity: Int = 8, // 0-15 for TSPL, affects darkness
 
+    // ========== TICKET PRINTING CONFIG ==========
+    @ColumnInfo(name = "ticket_cut_after_print")
+    val ticketCutAfterPrint: Boolean = true, // Cắt giấy sau khi in phiếu
+
+    @ColumnInfo(name = "ticket_print_items_separately")
+    val ticketPrintItemsSeparately: Boolean = false, // In từng món riêng biệt (thay vì gộp)
+
+    @ColumnInfo(name = "ticket_copies")
+    val ticketCopies: Int = 1, // Số bản in phiếu
+
+    // ========== LABEL PRINTING CONFIG ==========
+    @ColumnInfo(name = "label_print_price")
+    val labelPrintPrice: Boolean = false, // In giá trên tem
+
+    @ColumnInfo(name = "label_print_store_name")
+    val labelPrintStoreName: Boolean = false, // In tên cửa hàng trên tem
+
+    @ColumnInfo(name = "label_print_order_number")
+    val labelPrintOrderNumber: Boolean = true, // In mã đơn hàng trên tem
+
+    @ColumnInfo(name = "label_print_table_name")
+    val labelPrintTableName: Boolean = true, // In tên bàn trên tem
+
+    @ColumnInfo(name = "label_print_time")
+    val labelPrintTime: Boolean = true, // In thời gian trên tem
+
+    @ColumnInfo(name = "label_store_name")
+    val labelStoreName: String? = null, // Tên cửa hàng hiển thị trên tem
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 

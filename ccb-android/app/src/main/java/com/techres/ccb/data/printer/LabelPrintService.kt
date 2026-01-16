@@ -318,6 +318,14 @@ object LabelPrintService {
         val labelSize = kitchen.getLabelSize()
         val density = kitchen.printDensity
 
+        // Label printing configs
+        val showStoreName = kitchen.labelPrintStoreName
+        val showOrderNumber = kitchen.labelPrintOrderNumber
+        val showTableName = kitchen.labelPrintTableName
+        val showTime = kitchen.labelPrintTime
+        val showPrice = kitchen.labelPrintPrice
+        val storeName = kitchen.labelStoreName ?: label.storeName
+
         Log.d(TAG, "=== Generating TSPL label ===")
         Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
         Log.d(TAG, "  - Density: $density")
@@ -326,6 +334,8 @@ object LabelPrintService {
         Log.d(TAG, "  - partIndex: ${label.partIndex}/${label.totalParts}")
         Log.d(TAG, "  - isContinuation: ${label.isContinuation}")
         Log.d(TAG, "  - toppings: ${label.toppings}")
+        Log.d(TAG, "  - showStoreName: $showStoreName, showOrderNumber: $showOrderNumber")
+        Log.d(TAG, "  - showTableName: $showTableName, showTime: $showTime, showPrice: $showPrice")
 
         val output = ByteArrayOutputStream()
 
@@ -364,37 +374,36 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, continuationBitmap))
             yPos += continuationBitmap.height
             continuationBitmap.recycle()
-        } else {
-            label.storeName?.let { store ->
-                val storeBitmap = renderTextBitmap(
-                    text = store,
-                    width = contentWidth,
-                    fontSize = fontSmall,
-                    bold = false,
-                    centerAlign = false
-                )
-                output.write(bitmapToTspl(margin, yPos, storeBitmap))
-                yPos += storeBitmap.height
-                storeBitmap.recycle()
-            }
+        } else if (showStoreName && !storeName.isNullOrBlank()) {
+            val storeBitmap = renderTextBitmap(
+                text = storeName,
+                width = contentWidth,
+                fontSize = fontSmall,
+                bold = false,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, storeBitmap))
+            yPos += storeBitmap.height
+            storeBitmap.recycle()
         }
 
-        // ========== LINE 2: ORDER NUMBER + INDEX ==========
-        // Show both quantity index (x/y) and part index (a/b) if split
-        val labelCountText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
-        val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
-        val indexText = "$labelCountText $partText".trim()
+        // ========== LINE 2: ORDER NUMBER + INDEX (if enabled) ==========
+        if (showOrderNumber) {
+            val labelCountText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+            val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
+            val indexText = "$labelCountText $partText".trim()
 
-        val orderHeaderBitmap = renderTwoColumnText(
-            label.orderNumber,
-            indexText,
-            contentWidth,
-            fontSmall,
-            bold = false
-        )
-        output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
-        yPos += orderHeaderBitmap.height
-        orderHeaderBitmap.recycle()
+            val orderHeaderBitmap = renderTwoColumnText(
+                label.orderNumber,
+                indexText,
+                contentWidth,
+                fontSmall,
+                bold = false
+            )
+            output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
+            yPos += orderHeaderBitmap.height
+            orderHeaderBitmap.recycle()
+        }
 
         // ========== SEPARATOR 1 ==========
         output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
@@ -497,8 +506,8 @@ object LabelPrintService {
             noteBitmap.recycle()
         }
 
-        // ========== PRICE SECTION (nếu có giá) ==========
-        if (!label.isContinuation && label.finalPrice > 0) {
+        // ========== PRICE SECTION (if enabled and has price) ==========
+        if (showPrice && !label.isContinuation && label.finalPrice > 0) {
             yPos += 2
             output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
             yPos += 3
@@ -515,22 +524,23 @@ object LabelPrintService {
             priceBitmap.recycle()
         }
 
-        // ========== SEPARATOR BEFORE DATE ==========
-        yPos += 2
-        output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
-        yPos += 3
+        // ========== DATE TIME (if enabled) ==========
+        if (showTime) {
+            yPos += 2
+            output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
+            yPos += 3
 
-        // ========== DATE TIME ==========
-        val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-        val dateBitmap = renderTextBitmap(
-            text = dateFormat.format(label.orderTime),
-            width = contentWidth,
-            fontSize = fontSmall,
-            bold = false,
-            centerAlign = false
-        )
-        output.write(bitmapToTspl(margin, yPos, dateBitmap))
-        dateBitmap.recycle()
+            val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+            val dateBitmap = renderTextBitmap(
+                text = dateFormat.format(label.orderTime),
+                width = contentWidth,
+                fontSize = fontSmall,
+                bold = false,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, dateBitmap))
+            dateBitmap.recycle()
+        }
 
         // ========== PRINT ==========
         output.write("PRINT 1,1\r\n".toByteArray())
@@ -697,6 +707,14 @@ object LabelPrintService {
     ): ByteArray {
         val paperWidth = kitchen.paperWidth
 
+        // Label printing configs
+        val showStoreName = kitchen.labelPrintStoreName
+        val showOrderNumber = kitchen.labelPrintOrderNumber
+        val showTableName = kitchen.labelPrintTableName
+        val showTime = kitchen.labelPrintTime
+        val showPrice = kitchen.labelPrintPrice
+        val storeName = kitchen.labelStoreName ?: label.storeName
+
         Log.d(TAG, "=== Generating ESC/POS label ===")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
         Log.d(TAG, "  - Item: ${label.itemName}")
@@ -704,11 +722,19 @@ object LabelPrintService {
         Log.d(TAG, "  - partIndex: ${label.partIndex}/${label.totalParts}")
         Log.d(TAG, "  - isContinuation: ${label.isContinuation}")
         Log.d(TAG, "  - toppings (${label.toppings.size}): ${label.toppings}")
+        Log.d(TAG, "  - showStoreName: $showStoreName, showOrderNumber: $showOrderNumber")
+        Log.d(TAG, "  - showTableName: $showTableName, showTime: $showTime, showPrice: $showPrice")
 
         val builder = HybridBillBuilder(paperWidth, true, false)
 
         builder.apply {
             init()
+
+            // Store name (if enabled)
+            if (showStoreName && !storeName.isNullOrBlank() && !label.isContinuation) {
+                lineCenter(storeName)
+                separator('-')
+            }
 
             // Nếu là tem tiếp theo (continuation), thêm indicator nổi bật
             if (label.isContinuation && label.totalParts > 1) {
@@ -727,9 +753,12 @@ object LabelPrintService {
                 lineBold("Size: $it", BitmapTextStyle(centerAlign = true))
             }
 
-            label.tableName?.let {
-                separator('-')
-                lineBold("Bàn: $it")
+            // Table name (if enabled)
+            if (showTableName) {
+                label.tableName?.let {
+                    separator('-')
+                    lineBold("Bàn: $it")
+                }
             }
 
             if (label.sugar != null || label.ice != null) {
@@ -762,8 +791,8 @@ object LabelPrintService {
                 line("Ghi chú: $it")
             }
 
-            // ========== GIÁ TIỀN (chỉ hiển thị ở tem đầu tiên) ==========
-            if (!label.isContinuation && label.unitPrice > 0) {
+            // ========== GIÁ TIỀN (if enabled and not continuation) ==========
+            if (showPrice && !label.isContinuation && label.unitPrice > 0) {
                 separator('-')
                 lineKeyValue("Đơn giá:", formatVND(label.unitPrice))
 
@@ -779,16 +808,22 @@ object LabelPrintService {
                 lineBold("Thành tiền: ${formatVND(label.finalPrice)}")
             }
 
-            separator('-')
-            val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-            val orderInfo = "#${label.orderNumber} - ${timeFormat.format(label.orderTime)}"
+            // ========== ORDER INFO + TIME (based on config) ==========
+            if (showOrderNumber || showTime) {
+                separator('-')
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val orderPart = if (showOrderNumber) "#${label.orderNumber}" else ""
+                val timePart = if (showTime) timeFormat.format(label.orderTime) else ""
+                val orderInfo = listOf(orderPart, timePart).filter { it.isNotEmpty() }.joinToString(" - ")
 
-            // Show both label count and part info
-            val labelCount = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
-            if (labelCount.isNotEmpty()) {
-                lineKeyValue(orderInfo, labelCount)
-            } else {
-                lineCenter(orderInfo)
+                if (orderInfo.isNotEmpty()) {
+                    val labelCount = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+                    if (labelCount.isNotEmpty()) {
+                        lineKeyValue(orderInfo, labelCount)
+                    } else {
+                        lineCenter(orderInfo)
+                    }
+                }
             }
 
             feed(3)
