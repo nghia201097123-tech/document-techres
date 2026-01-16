@@ -191,11 +191,22 @@ class SunmiPrinterAdapter @Inject constructor(
     private suspend fun bindService(): Boolean = suspendCancellableCoroutine { cont ->
         serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                Timber.d("$TAG: Service connected")
-                printerService = service
-                isBound = true
-                if (cont.isActive) {
-                    cont.resume(true)
+                Timber.d("$TAG: Service connected, converting IBinder to interface...")
+
+                // Convert IBinder to IWoyouService interface using reflection
+                val serviceInterface = convertBinderToInterface(service)
+                if (serviceInterface != null) {
+                    printerService = serviceInterface
+                    isBound = true
+                    Timber.d("$TAG: Service interface obtained successfully")
+                    if (cont.isActive) {
+                        cont.resume(true)
+                    }
+                } else {
+                    Timber.e("$TAG: Failed to convert IBinder to service interface")
+                    if (cont.isActive) {
+                        cont.resume(false)
+                    }
                 }
             }
 
@@ -224,6 +235,127 @@ class SunmiPrinterAdapter @Inject constructor(
         }
     }
 
+    /**
+     * Convert IBinder to IWoyouService interface using reflection
+     * Sunmi AIDL: IWoyouService.Stub.asInterface(IBinder)
+     */
+    private fun convertBinderToInterface(binder: IBinder?): Any? {
+        if (binder == null) return null
+
+        Timber.d("$TAG: Converting IBinder to interface")
+        Timber.d("$TAG: IBinder class: ${binder.javaClass.name}")
+        Timber.d("$TAG: IBinder interfaces: ${binder.javaClass.interfaces.map { it.name }}")
+
+        // Danh sách các class name có thể của Sunmi service
+        val possibleClasses = listOf(
+            "woyou.aidlservice.jiuiv5.IWoyouService",
+            "com.sunmi.peripheral.printer.InnerPrinterService",
+            "com.sunmi.peripheral.printer.SunmiPrinterService",
+            "com.sunmi.peripheral.printer.IInnerPrinter"
+        )
+
+        // Danh sách descriptor có thể của Sunmi AIDL
+        val possibleDescriptors = listOf(
+            "woyou.aidlservice.jiuiv5.IWoyouService",
+            "com.sunmi.peripheral.printer.IInnerPrinter",
+            "com.sunmi.peripheral.printer.InnerPrinterService"
+        )
+
+        // Approach 1: Thử queryLocalInterface với các descriptors khác nhau
+        for (descriptor in possibleDescriptors) {
+            try {
+                val localInterface = binder.queryLocalInterface(descriptor)
+                if (localInterface != null) {
+                    Timber.d("$TAG: Got local interface from queryLocalInterface with descriptor: $descriptor")
+                    Timber.d("$TAG: Local interface class: ${localInterface.javaClass.name}")
+                    return localInterface
+                }
+            } catch (e: Exception) {
+                Timber.d("$TAG: queryLocalInterface($descriptor) failed: ${e.message}")
+            }
+        }
+
+        // Approach 2: Thử Stub.asInterface với các class khác nhau
+        for (className in possibleClasses) {
+            try {
+                // Thử load class
+                val serviceClass = Class.forName(className)
+                Timber.d("$TAG: Found class: $className")
+
+                // Tìm inner class Stub
+                val stubClass = try {
+                    serviceClass.classes.find { it.simpleName == "Stub" }
+                        ?: Class.forName("$className\$Stub")
+                } catch (e: ClassNotFoundException) {
+                    Timber.d("$TAG: Stub class not found for $className")
+                    continue
+                }
+
+                // Gọi asInterface method
+                val asInterfaceMethod = stubClass.getMethod("asInterface", IBinder::class.java)
+                val result = asInterfaceMethod.invoke(null, binder)
+
+                if (result != null) {
+                    Timber.d("$TAG: Successfully converted IBinder using $className.Stub.asInterface")
+                    Timber.d("$TAG: Result class: ${result.javaClass.name}")
+                    return result
+                }
+            } catch (e: ClassNotFoundException) {
+                Timber.d("$TAG: Class not found: $className")
+            } catch (e: Exception) {
+                Timber.d("$TAG: Failed to convert using $className: ${e.message}")
+            }
+        }
+
+        // Approach 3: Kiểm tra IBinder trực tiếp có method sendRAWData không
+        try {
+            val methods = binder.javaClass.methods
+            val printMethods = methods.filter {
+                it.name.contains("print", ignoreCase = true) ||
+                it.name.contains("RAW", ignoreCase = true) ||
+                it.name.contains("send", ignoreCase = true)
+            }
+            Timber.d("$TAG: IBinder print-related methods: ${printMethods.map { it.name }}")
+
+            val hasSendRawData = methods.any { it.name == "sendRAWData" }
+            if (hasSendRawData) {
+                Timber.d("$TAG: IBinder already has sendRAWData method, using directly")
+                return binder
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: Error checking IBinder methods")
+        }
+
+        // Approach 4: Check parent classes và interfaces của IBinder
+        try {
+            var currentClass: Class<*>? = binder.javaClass
+            while (currentClass != null) {
+                Timber.d("$TAG: Checking class hierarchy: ${currentClass.name}")
+
+                // Check tất cả interfaces của class này
+                for (iface in currentClass.interfaces) {
+                    Timber.d("$TAG: Interface: ${iface.name}")
+
+                    // Nếu là interface của Sunmi, binder có thể đã implement đúng
+                    if (iface.name.contains("IWoyouService") ||
+                        iface.name.contains("InnerPrinter") ||
+                        iface.name.contains("SunmiPrinter")) {
+                        Timber.d("$TAG: Found Sunmi interface, using binder directly")
+                        return binder
+                    }
+                }
+
+                currentClass = currentClass.superclass
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: Error checking class hierarchy")
+        }
+
+        // Approach 5: Nếu tất cả fail, vẫn return binder để thử
+        Timber.w("$TAG: Could not find specific interface, returning raw binder")
+        return binder
+    }
+
     override suspend fun disconnect(): PrinterResult = withContext(Dispatchers.Main) {
         try {
             serviceConnection?.let { context.unbindService(it) }
@@ -249,43 +381,98 @@ class SunmiPrinterAdapter @Inject constructor(
         }
 
         try {
-            // Tìm method sendRAWData bằng cách duyệt qua tất cả methods
-            // vì callback interface có thể khác nhau giữa các version Sunmi SDK
             val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
 
+            // Log service type để debug
+            Timber.d("$TAG: Service class: ${service.javaClass.name}")
+            Timber.d("$TAG: Service interfaces: ${service.javaClass.interfaces.map { it.name }}")
+
             val methods = service.javaClass.methods
+            Timber.d("$TAG: Available methods: ${methods.filter { it.name.contains("RAW", ignoreCase = true) || it.name.contains("print", ignoreCase = true) || it.name.contains("send", ignoreCase = true) }.map { "${it.name}(${it.parameterTypes.map { p -> p.simpleName }.joinToString(", ")})" }}")
+
+            // Approach 1: Tìm sendRAWData với byte[] và callback
             val sendRawMethod = methods.find { method ->
-                method.name == "sendRAWData" && method.parameterTypes.size == 2
+                method.name == "sendRAWData" &&
+                method.parameterTypes.isNotEmpty() &&
+                method.parameterTypes[0] == ByteArray::class.java
             }
 
             if (sendRawMethod != null) {
-                sendRawMethod.invoke(service, data, null)
+                Timber.d("$TAG: Found sendRAWData: ${sendRawMethod.parameterTypes.map { it.simpleName }}")
+                when (sendRawMethod.parameterTypes.size) {
+                    1 -> sendRawMethod.invoke(service, data)
+                    2 -> sendRawMethod.invoke(service, data, null)
+                    else -> sendRawMethod.invoke(service, data, null)
+                }
                 return@withContext PrinterResult.Success
             }
 
-            // Fallback: thử method printRawData
+            // Approach 2: thử printRawData
             val printRawMethod = methods.find { method ->
-                method.name == "printRawData" && method.parameterTypes.size == 2
+                method.name == "printRawData" &&
+                method.parameterTypes.isNotEmpty() &&
+                method.parameterTypes[0] == ByteArray::class.java
             }
 
             if (printRawMethod != null) {
-                printRawMethod.invoke(service, data, null)
+                Timber.d("$TAG: Found printRawData")
+                when (printRawMethod.parameterTypes.size) {
+                    1 -> printRawMethod.invoke(service, data)
+                    2 -> printRawMethod.invoke(service, data, null)
+                    else -> printRawMethod.invoke(service, data, null)
+                }
                 return@withContext PrinterResult.Success
             }
 
-            // Fallback 2: thử printerInit + sendRAWData không callback
+            // Approach 3: Thử printerInit trước rồi printText
             val initMethod = methods.find { it.name == "printerInit" }
-            initMethod?.invoke(service, null)
-
-            val rawMethodNoCallback = methods.find { method ->
-                method.name == "sendRAWData" && method.parameterTypes.size == 1
+            if (initMethod != null) {
+                Timber.d("$TAG: Calling printerInit first")
+                try {
+                    when (initMethod.parameterTypes.size) {
+                        0 -> initMethod.invoke(service)
+                        1 -> initMethod.invoke(service, null)
+                        else -> initMethod.invoke(service, null)
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "$TAG: printerInit failed, continuing anyway")
+                }
             }
-            if (rawMethodNoCallback != null) {
-                rawMethodNoCallback.invoke(service, data)
+
+            // Approach 4: Convert to text và dùng printOriginalText (for ESC/POS)
+            val printOriginalMethod = methods.find { method ->
+                method.name == "printOriginalText" &&
+                method.parameterTypes.isNotEmpty()
+            }
+            if (printOriginalMethod != null) {
+                Timber.d("$TAG: Found printOriginalText, converting data")
+                val text = String(data, Charsets.ISO_8859_1)
+                when (printOriginalMethod.parameterTypes.size) {
+                    1 -> printOriginalMethod.invoke(service, text)
+                    2 -> printOriginalMethod.invoke(service, text, null)
+                    else -> printOriginalMethod.invoke(service, text, null)
+                }
                 return@withContext PrinterResult.Success
             }
 
-            return@withContext PrinterResult.Error("Cannot find sendRAWData method")
+            // Approach 5: Thử sendRAWData qua declared methods (bao gồm protected/private)
+            val declaredMethods = service.javaClass.declaredMethods
+            val declaredRawMethod = declaredMethods.find { it.name == "sendRAWData" }
+            if (declaredRawMethod != null) {
+                Timber.d("$TAG: Found sendRAWData in declared methods")
+                declaredRawMethod.isAccessible = true
+                when (declaredRawMethod.parameterTypes.size) {
+                    1 -> declaredRawMethod.invoke(service, data)
+                    2 -> declaredRawMethod.invoke(service, data, null)
+                    else -> declaredRawMethod.invoke(service, data, null)
+                }
+                return@withContext PrinterResult.Success
+            }
+
+            // Log tất cả methods để debug
+            Timber.e("$TAG: Cannot find sendRAWData. All methods: ${methods.map { it.name }.distinct().sorted()}")
+
+            return@withContext PrinterResult.Error("Cannot find sendRAWData method. Service class: ${service.javaClass.name}")
         } catch (e: Exception) {
             Timber.e(e, "$TAG: Write failed")
             return@withContext PrinterResult.Error(e.message ?: "Write failed")
