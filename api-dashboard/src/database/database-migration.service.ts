@@ -547,6 +547,29 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Label size and font config columns added to kitchens table');
       }
 
+      // 19.7. Add extended ticket printing config columns to kitchens table
+      const hasTicketPrintOrderNumber = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'ticket_print_order_number'
+        );
+      `);
+
+      if (!hasTicketPrintOrderNumber[0].exists) {
+        this.logger.log('Adding extended ticket printing config columns to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN IF NOT EXISTS ticket_print_order_number BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS ticket_print_table_name BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS ticket_print_time BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS ticket_print_store_name BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS ticket_store_name VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS ticket_print_notes BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS ticket_font_size VARCHAR(20) DEFAULT 'medium'
+        `);
+        this.logger.log('Extended ticket printing config columns added to kitchens table');
+      }
+
       // 20. Add parent_id column to departments table for hierarchy support
       const hasParentId = await queryRunner.query(`
         SELECT EXISTS (
