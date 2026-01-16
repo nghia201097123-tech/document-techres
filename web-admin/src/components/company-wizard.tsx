@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { companyService, type CreateCompanyWizardData, type WizardResponse } from "@/services/company-service";
 import { useToast } from "@/hooks/use-toast";
+import { ProvinceSelect, WardSelect } from "@/components/ui/searchable-select";
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -54,7 +55,7 @@ const initialWizardData: CreateCompanyWizardData = {
     phone: "",
     representative: ""
   },
-  brand: { name: "", description: "", businessModel: "full_system" },
+  brand: { name: "", description: "", businessModel: "full_system", provinceCode: "", wardCode: "", addressDetail: "" },
   branch: {
     name: "",
     addressDetail: "",
@@ -131,6 +132,7 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
 
   // Derived state from Redux
   const companyWards = wizardData.company.provinceCode ? wardsByProvince[wizardData.company.provinceCode] || [] : [];
+  const brandWards = wizardData.brand.provinceCode ? wardsByProvince[wizardData.brand.provinceCode] || [] : [];
   const branchWards = wizardData.branch.provinceCode ? wardsByProvince[wizardData.branch.provinceCode] || [] : [];
   const loadingLocations = loadingProvinces || loadingWards;
 
@@ -147,6 +149,13 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
       dispatch(fetchWardsByProvince(wizardData.company.provinceCode));
     }
   }, [wizardData.company.provinceCode, dispatch]);
+
+  // Load brand wards when province changes
+  React.useEffect(() => {
+    if (wizardData.brand.provinceCode) {
+      dispatch(fetchWardsByProvince(wizardData.brand.provinceCode));
+    }
+  }, [wizardData.brand.provinceCode, dispatch]);
 
   // Load branch wards when province changes
   React.useEffect(() => {
@@ -176,6 +185,11 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
   const handleCompanyProvinceChange = (provinceCode: string) => {
     handleChange("company", "provinceCode", provinceCode);
     handleChange("company", "wardCode", "");
+  };
+
+  const handleBrandProvinceChange = (provinceCode: string) => {
+    handleChange("brand", "provinceCode", provinceCode);
+    handleChange("brand", "wardCode", "");
   };
 
   const handleBranchProvinceChange = (provinceCode: string) => {
@@ -232,6 +246,30 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
       return;
     }
     if (currentStep < 4) {
+      // Copy location defaults when moving to next step
+      if (currentStep === 1) {
+        // Copy company location to brand as defaults
+        setWizardData((prev) => ({
+          ...prev,
+          brand: {
+            ...prev.brand,
+            provinceCode: prev.brand.provinceCode || prev.company.provinceCode,
+            wardCode: prev.brand.wardCode || prev.company.wardCode,
+            addressDetail: prev.brand.addressDetail || prev.company.addressDetail,
+          },
+        }));
+      } else if (currentStep === 2) {
+        // Copy brand location to branch as defaults
+        setWizardData((prev) => ({
+          ...prev,
+          branch: {
+            ...prev.branch,
+            provinceCode: prev.branch.provinceCode || prev.brand.provinceCode,
+            wardCode: prev.branch.wardCode || prev.brand.wardCode,
+            addressDetail: prev.branch.addressDetail || prev.brand.addressDetail,
+          },
+        }));
+      }
       setCurrentStep(currentStep + 1);
     }
   };
@@ -486,41 +524,22 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Tỉnh/Thành phố</Label>
-                  <Select
+                  <ProvinceSelect
+                    options={provinces}
                     value={wizardData.company.provinceCode || ""}
                     onValueChange={handleCompanyProvinceChange}
-                    disabled={loadingLocations}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn tỉnh/thành" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {provinces.map((p) => (
-                        <SelectItem key={p.code} value={p.code}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    loading={loadingProvinces}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Phường/Xã</Label>
-                  <Select
+                  <WardSelect
+                    options={companyWards}
                     value={wizardData.company.wardCode || ""}
                     onValueChange={(v) => handleChange("company", "wardCode", v)}
-                    disabled={loadingLocations || !wizardData.company.provinceCode}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn phường/xã" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companyWards.map((w) => (
-                        <SelectItem key={w.code} value={w.code}>
-                          {w.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    disabled={!wizardData.company.provinceCode}
+                    loading={loadingWards}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
@@ -584,6 +603,35 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tỉnh/Thành phố</Label>
+                  <ProvinceSelect
+                    options={provinces}
+                    value={wizardData.brand.provinceCode || ""}
+                    onValueChange={handleBrandProvinceChange}
+                    loading={loadingProvinces}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phường/Xã</Label>
+                  <WardSelect
+                    options={brandWards}
+                    value={wizardData.brand.wardCode || ""}
+                    onValueChange={(v) => handleChange("brand", "wardCode", v)}
+                    disabled={!wizardData.brand.provinceCode}
+                    loading={loadingWards}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Địa chỉ chi tiết</Label>
+                <Input
+                  value={wizardData.brand.addressDetail || ""}
+                  onChange={(e) => handleChange("brand", "addressDetail", e.target.value)}
+                  placeholder="Số nhà, đường..."
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Mô tả</Label>
                 <Input
@@ -608,41 +656,22 @@ export function CompanyWizard({ open, onOpenChange, onSuccess }: CompanyWizardPr
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Tỉnh/Thành phố</Label>
-                  <Select
+                  <ProvinceSelect
+                    options={provinces}
                     value={wizardData.branch.provinceCode || ""}
                     onValueChange={handleBranchProvinceChange}
-                    disabled={loadingLocations}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn tỉnh/thành" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {provinces.map((p) => (
-                        <SelectItem key={p.code} value={p.code}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    loading={loadingProvinces}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Phường/Xã</Label>
-                  <Select
+                  <WardSelect
+                    options={branchWards}
                     value={wizardData.branch.wardCode || ""}
                     onValueChange={(v) => handleChange("branch", "wardCode", v)}
-                    disabled={loadingLocations || !wizardData.branch.provinceCode}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn phường/xã" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branchWards.map((w) => (
-                        <SelectItem key={w.code} value={w.code}>
-                          {w.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    disabled={!wizardData.branch.provinceCode}
+                    loading={loadingWards}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
