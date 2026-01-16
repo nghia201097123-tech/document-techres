@@ -17,7 +17,7 @@ import { Staff, Company } from '../../database/entities';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET', 'dashboard-secret-key'),
         signOptions: {
-          expiresIn: configService.get('JWT_EXPIRES_IN', '7d'),
+          expiresIn: configService.get('JWT_EXPIRES_IN', '30d'),
         },
       }),
       inject: [ConfigService],
