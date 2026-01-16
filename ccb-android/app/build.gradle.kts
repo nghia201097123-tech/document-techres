@@ -41,6 +41,8 @@ android {
     }
 
     compileOptions {
+        // Enable desugaring for Java 8+ APIs (java.time, etc.) on Android 6.0+
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -67,6 +69,9 @@ ksp {
 }
 
 dependencies {
+    // Desugaring for Java 8+ APIs on Android 6.0+ (java.time, streams, etc.)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
