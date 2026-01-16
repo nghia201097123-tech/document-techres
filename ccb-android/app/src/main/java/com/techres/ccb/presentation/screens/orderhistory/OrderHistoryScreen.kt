@@ -76,6 +76,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -887,6 +888,8 @@ private fun OrderDetailDialog(
 
                 // Global expand/collapse state for toppings (must be outside LazyColumn)
                 var allToppingsExpanded by remember { mutableStateOf(true) }
+                // Per-item expanded state (must be outside LazyColumn to avoid scroll issues)
+                val itemToppingsExpanded = remember { mutableStateMapOf<String, Boolean>() }
 
                 // Precompute items lists (must be outside LazyColumn)
                 val activeParentItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }
@@ -942,7 +945,10 @@ private fun OrderDetailDialog(
                             }
                             // Expand/Collapse all button
                             TextButton(
-                                onClick = { allToppingsExpanded = !allToppingsExpanded },
+                                onClick = {
+                                    allToppingsExpanded = !allToppingsExpanded
+                                    itemToppingsExpanded.clear() // Reset per-item states
+                                },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 modifier = Modifier.height(28.dp)
                             ) {
@@ -972,8 +978,8 @@ private fun OrderDetailDialog(
                         val userNote = parts.getOrNull(1)
                         val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
 
-                        // Toppings expanded state - use allToppingsExpanded from parent
-                        val toppingsExpanded = if (isCancelled) false else allToppingsExpanded
+                        // Toppings expanded state - per-item state overrides global state
+                        val toppingsExpanded = if (isCancelled) false else (itemToppingsExpanded[item.id] ?: allToppingsExpanded)
 
                         Column(
                             modifier = Modifier
@@ -1064,11 +1070,15 @@ private fun OrderDetailDialog(
                             if (variants.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                // Header showing topping count - always visible
+                                // Header showing topping count - clickable to toggle
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(start = 36.dp, top = 2.dp, bottom = 2.dp),
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .clickable(enabled = !isCancelled) {
+                                            itemToppingsExpanded[item.id] = !toppingsExpanded
+                                        }
+                                        .padding(start = 36.dp, top = 4.dp, bottom = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(

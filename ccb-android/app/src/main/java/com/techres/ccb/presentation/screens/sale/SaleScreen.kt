@@ -1208,6 +1208,8 @@ fun CartPanel(
         } else {
             // Global state for expand/collapse all toppings
             var allToppingsExpanded by remember { mutableStateOf(true) }
+            // Per-item expanded state (must be outside LazyColumn to avoid scroll issues)
+            val itemToppingsExpanded = remember { mutableStateMapOf<String, Boolean>() }
             var showCancelledItems by remember { mutableStateOf(false) }
 
             // Prepare data
@@ -1241,7 +1243,10 @@ fun CartPanel(
                             )
                             // Expand/Collapse all button
                             TextButton(
-                                onClick = { allToppingsExpanded = !allToppingsExpanded },
+                                onClick = {
+                                    allToppingsExpanded = !allToppingsExpanded
+                                    itemToppingsExpanded.clear() // Reset per-item states
+                                },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 modifier = Modifier.height(28.dp)
                             ) {
@@ -1262,12 +1267,14 @@ fun CartPanel(
                     items(activeItems.size, key = { activeItems[it].id }) { index ->
                         val item = activeItems[index]
                         val comboChildren = comboChildrenMap[item.id] ?: emptyList()
+                        val isExpanded = itemToppingsExpanded[item.id] ?: allToppingsExpanded
                         OrderItemRow(
                             item = item,
                             comboChildren = comboChildren,
                             onRemoveItem = onRemoveOrderItem,
                             onReprint = onReprintItem,
-                            forceExpanded = allToppingsExpanded
+                            forceExpanded = isExpanded,
+                            onToppingsToggle = { itemToppingsExpanded[item.id] = !isExpanded }
                         )
                     }
                 }
@@ -1980,7 +1987,8 @@ fun OrderItemRow(
     onRemoveItem: ((String) -> Unit)? = null,
     onRemoveTopping: ((String, String) -> Unit)? = null,
     onReprint: ((String) -> Unit)? = null, // Callback for reprint
-    forceExpanded: Boolean? = null // null = use local state, true/false = force state
+    forceExpanded: Boolean? = null, // null = use local state, true/false = force state
+    onToppingsToggle: (() -> Unit)? = null // Callback to toggle per-item expanded state
 ) {
     val isCancelled = item.status == "cancelled"
 
@@ -2174,11 +2182,13 @@ fun OrderItemRow(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Header showing topping count
+                    // Header showing topping count - clickable to toggle
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 2.dp, horizontal = 4.dp),
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable(enabled = onToppingsToggle != null && !isCancelled) { onToppingsToggle?.invoke() }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(

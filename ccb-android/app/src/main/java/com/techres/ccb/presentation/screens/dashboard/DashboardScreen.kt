@@ -2074,6 +2074,8 @@ private fun OrderDetailDialog(
 
                 // Global expand/collapse state
                 var allToppingsExpanded by remember { mutableStateOf(true) }
+                // Per-item expanded state (must be outside LazyColumn to avoid scroll issues)
+                val itemToppingsExpanded = remember { mutableStateMapOf<String, Boolean>() }
 
                 // Order Items - filter out combo children (they're shown under their parent)
                 val parentItems = orderItems.filter { !it.isComboChild }
@@ -2099,7 +2101,10 @@ private fun OrderDetailDialog(
                             )
                             // Expand/Collapse all button
                             TextButton(
-                                onClick = { allToppingsExpanded = !allToppingsExpanded },
+                                onClick = {
+                                    allToppingsExpanded = !allToppingsExpanded
+                                    itemToppingsExpanded.clear() // Reset per-item states
+                                },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 modifier = Modifier.height(28.dp)
                             ) {
@@ -2119,7 +2124,13 @@ private fun OrderDetailDialog(
 
                     items(parentItems) { item ->
                         val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
-                        OrderItemRow(item, comboChildren, allToppingsExpanded)
+                        val isExpanded = itemToppingsExpanded[item.id] ?: allToppingsExpanded
+                        OrderItemRow(
+                            item = item,
+                            comboChildren = comboChildren,
+                            forceExpanded = isExpanded,
+                            onToppingsToggle = { itemToppingsExpanded[item.id] = !isExpanded }
+                        )
                         HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                     }
 
@@ -2229,7 +2240,8 @@ private fun OrderDetailDialog(
 private fun OrderItemRow(
     item: OrderItemEntity,
     comboChildren: List<OrderItemEntity> = emptyList(),
-    forceExpanded: Boolean? = null // null = default expanded, true/false = sync with global
+    forceExpanded: Boolean? = null, // null = default expanded, true/false = sync with global
+    onToppingsToggle: (() -> Unit)? = null // Callback to toggle per-item expanded state
 ) {
     // Use forceExpanded directly - no local state to avoid LazyColumn recycling issues
     val toppingsExpanded = forceExpanded ?: true
@@ -2298,11 +2310,13 @@ private fun OrderItemRow(
             if (variants.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Header showing topping count
+                // Header showing topping count - clickable to toggle
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 36.dp, top = 2.dp, bottom = 2.dp),
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(enabled = onToppingsToggle != null) { onToppingsToggle?.invoke() }
+                        .padding(start = 36.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
