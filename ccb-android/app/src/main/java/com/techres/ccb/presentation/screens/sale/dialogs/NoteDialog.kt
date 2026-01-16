@@ -83,7 +83,7 @@ fun NoteDialog(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Ghi chu mon an",
+                            text = "Ghi chú món ăn",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -91,7 +91,7 @@ fun NoteDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Dong",
+                            contentDescription = "Đóng",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -102,7 +102,7 @@ fun NoteDialog(
                 // Quick notes section
                 if (availableNotes.isNotEmpty()) {
                     Text(
-                        text = "Chon nhanh:",
+                        text = "Chọn nhanh:",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -163,7 +163,7 @@ fun NoteDialog(
 
                 // Custom note input
                 Text(
-                    text = "Hoac nhap tu do:",
+                    text = "Hoặc nhập tự do:",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -176,7 +176,7 @@ fun NoteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp),
-                    placeholder = { Text("VD: It duong, khong da, them tran chau...") },
+                    placeholder = { Text("VD: Ít đường, không đá, thêm trân châu...") },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -207,7 +207,7 @@ fun NoteDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Xoa ghi chu")
+                        Text("Xóa ghi chú")
                     }
 
                     // Confirm button
@@ -228,7 +228,7 @@ fun NoteDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Xac nhan", fontWeight = FontWeight.Bold)
+                        Text("Xác nhận", fontWeight = FontWeight.Bold)
                     }
                 }
             }

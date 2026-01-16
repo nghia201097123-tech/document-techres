@@ -244,49 +244,49 @@ fun ProductVariantDialog(
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
-
-                        // Note Section - hide when adding topping
-                        Text(
-                            text = "Ghi chú",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Available notes as chips
-                        if (availableNotes.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                availableNotes.forEach { noteEntity ->
-                                    val isSelected = noteEntity.name in selectedNotes
-                                    NoteChip(
-                                        note = noteEntity.name,
-                                        isSelected = isSelected,
-                                        onClick = {
-                                            if (isSelected) {
-                                                selectedNotes.remove(noteEntity.name)
-                                            } else {
-                                                selectedNotes.add(noteEntity.name)
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-
-                        // Free-text note input
-                        OutlinedTextField(
-                            value = note,
-                            onValueChange = { note = it },
-                            placeholder = { Text("Ghi chú thêm...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 2,
-                            shape = RoundedCornerShape(8.dp)
-                        )
                     }
+
+                    // Note Section - show for both normal and topping modes
+                    Text(
+                        text = "Ghi chú",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Available notes as chips
+                    if (availableNotes.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            availableNotes.forEach { noteEntity ->
+                                val isSelected = noteEntity.name in selectedNotes
+                                NoteChip(
+                                    note = noteEntity.name,
+                                    isSelected = isSelected,
+                                    onClick = {
+                                        if (isSelected) {
+                                            selectedNotes.remove(noteEntity.name)
+                                        } else {
+                                            selectedNotes.add(noteEntity.name)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // Free-text note input
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        placeholder = { Text("Ghi chú thêm...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2,
+                        shape = RoundedCornerShape(8.dp)
+                    )
                 }
 
                 // Footer with Total and Actions
