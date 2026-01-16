@@ -52,6 +52,7 @@ import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { ProvinceSelect, WardSelect, ProvinceFilter } from "@/components/ui/searchable-select";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
 import { useStaffBatch, type StaffBatchOperationType } from "@/hooks/use-staff-batch";
@@ -1795,17 +1796,11 @@ export default function StaffPage() {
                           {/* Province Filter */}
                           <div className="space-y-1.5">
                             <Label className="text-sm">Tỉnh/Thành phố</Label>
-                            <Select value={provinceFilter} onValueChange={setProvinceFilter}>
-                              <SelectTrigger className="h-9">
-                                <SelectValue placeholder="Tất cả" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">Tất cả</SelectItem>
-                                {provinces.map((p) => (
-                                  <SelectItem key={p.code} value={p.code}>{p.fullName || p.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <ProvinceFilter
+                              options={provinces}
+                              value={provinceFilter}
+                              onValueChange={setProvinceFilter}
+                            />
                           </div>
                           {/* Department Filter */}
                           <div className="space-y-1.5">
@@ -2926,41 +2921,22 @@ export default function StaffPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="provinceCode">Tỉnh/Thành phố</Label>
-                    <Select
+                    <ProvinceSelect
+                      options={provinces}
                       value={formData.provinceCode || ""}
                       onValueChange={handleProvinceChange}
-                      disabled={loadingProvinces}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn tỉnh/thành phố" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {provinces.map((province) => (
-                          <SelectItem key={province.code} value={province.code}>
-                            {province.fullName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      loading={loadingProvinces}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="wardCode">Phường/Xã</Label>
-                    <Select
+                    <WardSelect
+                      options={wards}
                       value={formData.wardCode || ""}
                       onValueChange={(value) => setFormData({ ...formData, wardCode: value })}
-                      disabled={!formData.provinceCode || loadingWards || wards.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn phường/xã" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {wards.map((ward) => (
-                          <SelectItem key={ward.code} value={ward.code}>
-                            {ward.fullName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      disabled={!formData.provinceCode || loadingWards}
+                      loading={loadingWards}
+                    />
                   </div>
                 </div>
 

@@ -58,6 +58,8 @@ import {
 import type { Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 import { companyService } from "@/services/company-service";
+import { locationService, type Province, type Ward } from "@/services/location-service";
+import { ProvinceSelect, WardSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/hooks/use-toast";
 import { CompanyWizard } from "@/components/company-wizard";
 import { QuickCreateDialog } from "@/components/quick-create-dialog";
@@ -81,6 +83,8 @@ interface CompanyFormData {
   code: string;
   logo: string;
   taxCode: string;
+  provinceCode: string;
+  wardCode: string;
   address: string;
   phone: string;
   email: string;
@@ -92,6 +96,8 @@ const initialFormData: CompanyFormData = {
   code: "",
   logo: "",
   taxCode: "",
+  provinceCode: "",
+  wardCode: "",
   address: "",
   phone: "",
   email: "",
@@ -116,6 +122,12 @@ export default function CompaniesPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
+
+  // Location state
+  const [provinces, setProvinces] = React.useState<Province[]>([]);
+  const [wards, setWards] = React.useState<Ward[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = React.useState(false);
+  const [loadingWards, setLoadingWards] = React.useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -159,6 +171,47 @@ export default function CompaniesPage() {
   React.useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  // Load provinces on mount
+  React.useEffect(() => {
+    const loadProvinces = async () => {
+      setLoadingProvinces(true);
+      try {
+        const data = await locationService.getProvinces();
+        setProvinces(data);
+      } catch (error) {
+        console.error("Error loading provinces:", error);
+      } finally {
+        setLoadingProvinces(false);
+      }
+    };
+    loadProvinces();
+  }, []);
+
+  // Load wards when province changes
+  React.useEffect(() => {
+    const loadWards = async () => {
+      if (!formData.provinceCode) {
+        setWards([]);
+        return;
+      }
+      setLoadingWards(true);
+      try {
+        const data = await locationService.getWards(formData.provinceCode);
+        setWards(data);
+      } catch (error) {
+        console.error("Error loading wards:", error);
+      } finally {
+        setLoadingWards(false);
+      }
+    };
+    loadWards();
+  }, [formData.provinceCode]);
+
+  // Handle province change
+  const handleProvinceChange = (provinceCode: string) => {
+    setFormData({ ...formData, provinceCode, wardCode: "" });
+  };
 
   // Sorting logic
   const sortedCompanies = React.useMemo(() => {
@@ -714,11 +767,34 @@ export default function CompaniesPage() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="provinceCode">Tỉnh/Thành phố</Label>
+                  <ProvinceSelect
+                    options={provinces}
+                    value={formData.provinceCode}
+                    onValueChange={handleProvinceChange}
+                    loading={loadingProvinces}
+                    disabled={isViewMode}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="wardCode">Phường/Xã</Label>
+                  <WardSelect
+                    options={wards}
+                    value={formData.wardCode}
+                    onValueChange={(value) => setFormData({ ...formData, wardCode: value })}
+                    disabled={isViewMode || !formData.provinceCode}
+                    loading={loadingWards}
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ</Label>
+                <Label htmlFor="address">Địa chỉ chi tiết</Label>
                 <Input
                   id="address"
                   name="address"
+                  placeholder="Số nhà, đường..."
                   value={formData.address}
                   onChange={handleChange}
                   disabled={isViewMode}

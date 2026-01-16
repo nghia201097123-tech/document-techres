@@ -7,6 +7,10 @@ export interface Company {
   code: string;
   logo?: string;
   taxCode?: string;
+  provinceCode?: string;
+  provinceName?: string;
+  wardCode?: string;
+  wardName?: string;
   address?: string;
   phone?: string;
   email?: string;
@@ -21,6 +25,8 @@ export interface CreateCompanyDto {
   code: string;
   logo?: string;
   taxCode?: string;
+  provinceCode?: string;
+  wardCode?: string;
   address?: string;
   phone?: string;
   email?: string;
@@ -40,6 +46,11 @@ export interface Brand {
   code: string;
   businessModel: BusinessModel;
   logo?: string; // Backend returns 'logo' in GET response
+  provinceCode?: string;
+  provinceName?: string;
+  wardCode?: string;
+  wardName?: string;
+  address?: string;
   description?: string;
   isActive: boolean;
   branchCount?: number;
@@ -53,6 +64,9 @@ export interface CreateBrandDto {
   code: string;
   businessModel: BusinessModel;
   logoUrl?: string;
+  provinceCode?: string;
+  wardCode?: string;
+  address?: string;
   description?: string;
 }
 
@@ -67,6 +81,10 @@ export interface Branch {
   name: string;
   code: string;
   logo?: string; // Backend returns 'logo' in GET response
+  provinceCode?: string;
+  provinceName?: string;
+  wardCode?: string;
+  wardName?: string;
   address?: string;
   phone?: string;
   email?: string;
@@ -85,6 +103,8 @@ export interface CreateBranchDto {
   name: string;
   code: string;
   logoUrl?: string;
+  provinceCode?: string;
+  wardCode?: string;
   address?: string;
   phone?: string;
   email?: string;
