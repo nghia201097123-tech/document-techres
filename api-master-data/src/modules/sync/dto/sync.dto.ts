@@ -543,6 +543,27 @@ export class KitchenDto {
   @ApiProperty({ description: 'Số bản in phiếu' })
   ticketCopies: number;
 
+  @ApiProperty({ description: 'In số đơn hàng trên phiếu bếp' })
+  ticketPrintOrderNumber: boolean;
+
+  @ApiProperty({ description: 'In tên bàn trên phiếu bếp' })
+  ticketPrintTableName: boolean;
+
+  @ApiProperty({ description: 'In thời gian trên phiếu bếp' })
+  ticketPrintTime: boolean;
+
+  @ApiProperty({ description: 'In tên cửa hàng trên phiếu bếp' })
+  ticketPrintStoreName: boolean;
+
+  @ApiProperty({ description: 'Tên cửa hàng trên phiếu bếp', nullable: true })
+  ticketStoreName: string | null;
+
+  @ApiProperty({ description: 'In ghi chú trên phiếu bếp' })
+  ticketPrintNotes: boolean;
+
+  @ApiProperty({ description: 'Cỡ chữ phiếu bếp: small, medium, large' })
+  ticketFontSize: string;
+
   // ========== LABEL SIZE CONFIG ==========
   @ApiProperty({ description: 'Chiều rộng tem (mm)' })
   labelWidthMm: number;

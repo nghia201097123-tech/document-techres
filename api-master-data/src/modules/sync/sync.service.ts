@@ -735,6 +735,13 @@ export class SyncService {
       ticketCutAfterPrint: kitchen.ticketCutAfterPrint ?? true,
       ticketPrintItemsSeparately: kitchen.ticketPrintItemsSeparately ?? false,
       ticketCopies: kitchen.ticketCopies ?? 1,
+      ticketPrintOrderNumber: kitchen.ticketPrintOrderNumber ?? true,
+      ticketPrintTableName: kitchen.ticketPrintTableName ?? true,
+      ticketPrintTime: kitchen.ticketPrintTime ?? true,
+      ticketPrintStoreName: kitchen.ticketPrintStoreName ?? false,
+      ticketStoreName: kitchen.ticketStoreName || null,
+      ticketPrintNotes: kitchen.ticketPrintNotes ?? true,
+      ticketFontSize: kitchen.ticketFontSize || 'medium',
       // Label size config
       labelWidthMm: kitchen.labelWidthMm ?? 72,
       labelHeightMm: kitchen.labelHeightMm ?? 30,
