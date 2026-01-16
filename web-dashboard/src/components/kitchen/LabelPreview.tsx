@@ -273,31 +273,49 @@ export function LabelPreview({
   }, [maxToppings, heightMm]);
 
   // Split toppings into multiple labels if needed
+  // First label shows size/ice/sugar (3 extra lines), so calculate accordingly
   const labelData = React.useMemo(() => {
     const allToppings = SAMPLE_DATA.allToppings;
     const labels: { toppings: string[]; notes?: string }[] = [];
 
-    if (allToppings.length <= effectiveMaxToppings) {
-      // All toppings fit on one label
+    // Number of extra lines on first label (size, ice, sugar)
+    const FIRST_LABEL_EXTRA_LINES = 3;
+
+    if (allToppings.length === 0) {
+      // No toppings - just one label with attributes
+      labels.push({ toppings: [], notes: SAMPLE_DATA.notes });
+      return labels;
+    }
+
+    // Calculate how many toppings can fit on first label
+    // First label has size/ice/sugar, so fewer toppings fit
+    const firstLabelMaxToppings = Math.max(0, effectiveMaxToppings - FIRST_LABEL_EXTRA_LINES);
+
+    let remainingToppings = [...allToppings];
+
+    // First label
+    if (firstLabelMaxToppings > 0) {
+      const firstLabelToppings = remainingToppings.slice(0, firstLabelMaxToppings);
+      remainingToppings = remainingToppings.slice(firstLabelMaxToppings);
       labels.push({
-        toppings: allToppings,
+        toppings: firstLabelToppings,
         notes: SAMPLE_DATA.notes,
       });
     } else {
-      // Split toppings across multiple labels
-      let remainingToppings = [...allToppings];
-      let labelIndex = 0;
+      // First label has no room for toppings (only size/ice/sugar)
+      labels.push({
+        toppings: [],
+        notes: SAMPLE_DATA.notes,
+      });
+    }
 
-      while (remainingToppings.length > 0) {
-        const toppingsForThisLabel = remainingToppings.slice(0, effectiveMaxToppings);
-        remainingToppings = remainingToppings.slice(effectiveMaxToppings);
-
-        labels.push({
-          toppings: toppingsForThisLabel,
-          notes: labelIndex === 0 ? SAMPLE_DATA.notes : undefined,
-        });
-        labelIndex++;
-      }
+    // Subsequent labels - each gets effectiveMaxToppings toppings
+    while (remainingToppings.length > 0) {
+      const toppingsForThisLabel = remainingToppings.slice(0, effectiveMaxToppings);
+      remainingToppings = remainingToppings.slice(effectiveMaxToppings);
+      labels.push({
+        toppings: toppingsForThisLabel,
+      });
     }
 
     return labels;
@@ -344,7 +362,12 @@ export function LabelPreview({
         </div>
         {hasOverflow && (
           <div className="text-orange-600">
-            Topping tràn ({SAMPLE_DATA.allToppings.length} topping) → In {totalLabels} tem
+            {SAMPLE_DATA.allToppings.length} topping + 3 thuộc tính (size/đá/đường) → In {totalLabels} tem
+            <br />
+            <span className="text-muted-foreground">
+              (Tem 1: 3 thuộc tính + {Math.max(0, effectiveMaxToppings - 3)} topping,
+              tem tiếp theo: {effectiveMaxToppings} topping/tem)
+            </span>
           </div>
         )}
       </div>
