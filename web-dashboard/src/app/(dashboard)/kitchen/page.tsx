@@ -74,6 +74,17 @@ export default function KitchenPage() {
     paperWidth: 80,
     printMode: "TICKET" as KitchenPrintMode,
     description: "",
+    // Ticket printing config
+    ticketCutAfterPrint: true,
+    ticketPrintItemsSeparately: false,
+    ticketCopies: 1,
+    // Label printing config
+    labelPrintPrice: false,
+    labelPrintStoreName: false,
+    labelPrintOrderNumber: true,
+    labelPrintTableName: true,
+    labelPrintTime: true,
+    labelStoreName: "",
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
@@ -123,6 +134,17 @@ export default function KitchenPage() {
       paperWidth: 80,
       printMode: "TICKET" as KitchenPrintMode,
       description: "",
+      // Ticket printing config
+      ticketCutAfterPrint: true,
+      ticketPrintItemsSeparately: false,
+      ticketCopies: 1,
+      // Label printing config
+      labelPrintPrice: false,
+      labelPrintStoreName: false,
+      labelPrintOrderNumber: true,
+      labelPrintTableName: true,
+      labelPrintTime: true,
+      labelStoreName: "",
     });
     setDialogMode("create");
   };
@@ -139,6 +161,17 @@ export default function KitchenPage() {
       paperWidth: kitchen.paperWidth || 80,
       printMode: (kitchen.printMode || "TICKET") as KitchenPrintMode,
       description: kitchen.description || "",
+      // Ticket printing config
+      ticketCutAfterPrint: kitchen.ticketCutAfterPrint ?? true,
+      ticketPrintItemsSeparately: kitchen.ticketPrintItemsSeparately ?? false,
+      ticketCopies: kitchen.ticketCopies ?? 1,
+      // Label printing config
+      labelPrintPrice: kitchen.labelPrintPrice ?? false,
+      labelPrintStoreName: kitchen.labelPrintStoreName ?? false,
+      labelPrintOrderNumber: kitchen.labelPrintOrderNumber ?? true,
+      labelPrintTableName: kitchen.labelPrintTableName ?? true,
+      labelPrintTime: kitchen.labelPrintTime ?? true,
+      labelStoreName: kitchen.labelStoreName || "",
     });
     setDialogMode("edit");
     // Remove badges when editing
@@ -182,6 +215,17 @@ export default function KitchenPage() {
       paperWidth: 80,
       printMode: "TICKET" as KitchenPrintMode,
       description: "",
+      // Ticket printing config
+      ticketCutAfterPrint: true,
+      ticketPrintItemsSeparately: false,
+      ticketCopies: 1,
+      // Label printing config
+      labelPrintPrice: false,
+      labelPrintStoreName: false,
+      labelPrintOrderNumber: true,
+      labelPrintTableName: true,
+      labelPrintTime: true,
+      labelStoreName: "",
     });
     setAllProducts([]);
     setKitchenProducts([]);
@@ -212,6 +256,16 @@ export default function KitchenPage() {
             paperWidth: formData.paperWidth,
             printMode: formData.printMode,
             description: "",
+            // Keep printing config for consecutive creates
+            ticketCutAfterPrint: formData.ticketCutAfterPrint,
+            ticketPrintItemsSeparately: formData.ticketPrintItemsSeparately,
+            ticketCopies: formData.ticketCopies,
+            labelPrintPrice: formData.labelPrintPrice,
+            labelPrintStoreName: formData.labelPrintStoreName,
+            labelPrintOrderNumber: formData.labelPrintOrderNumber,
+            labelPrintTableName: formData.labelPrintTableName,
+            labelPrintTime: formData.labelPrintTime,
+            labelStoreName: formData.labelStoreName,
           });
           return;
         }
@@ -225,6 +279,17 @@ export default function KitchenPage() {
           paperWidth: formData.paperWidth,
           printMode: formData.printMode,
           description: formData.description,
+          // Ticket printing config
+          ticketCutAfterPrint: formData.ticketCutAfterPrint,
+          ticketPrintItemsSeparately: formData.ticketPrintItemsSeparately,
+          ticketCopies: formData.ticketCopies,
+          // Label printing config
+          labelPrintPrice: formData.labelPrintPrice,
+          labelPrintStoreName: formData.labelPrintStoreName,
+          labelPrintOrderNumber: formData.labelPrintOrderNumber,
+          labelPrintTableName: formData.labelPrintTableName,
+          labelPrintTime: formData.labelPrintTime,
+          labelStoreName: formData.labelStoreName,
         };
         const result = await kitchenService.update(selectedKitchen.id, updateData);
         setKitchens((prev) => prev.map((k) => (k.id === selectedKitchen.id ? { ...result, productCount: k.productCount } : k)));
@@ -712,6 +777,116 @@ export default function KitchenPage() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
+
+              {/* Ticket Printing Config - Only show for TICKET and BOTH modes */}
+              {(formData.printMode === "TICKET" || formData.printMode === "BOTH") && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm">Cấu hình in phiếu bếp</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketCutAfterPrint"
+                        checked={formData.ticketCutAfterPrint}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketCutAfterPrint: !!checked })}
+                      />
+                      <Label htmlFor="ticketCutAfterPrint" className="text-sm cursor-pointer">
+                        Cắt giấy sau khi in
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketPrintItemsSeparately"
+                        checked={formData.ticketPrintItemsSeparately}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintItemsSeparately: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintItemsSeparately" className="text-sm cursor-pointer">
+                        In từng món riêng biệt
+                      </Label>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 max-w-[200px]">
+                    <Label htmlFor="ticketCopies">Số bản in</Label>
+                    <Input
+                      id="ticketCopies"
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={formData.ticketCopies || 1}
+                      onChange={(e) => setFormData({ ...formData, ticketCopies: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Label Printing Config - Only show for LABEL and BOTH modes */}
+              {(formData.printMode === "LABEL" || formData.printMode === "BOTH") && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm">Cấu hình in tem</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="labelPrintPrice"
+                        checked={formData.labelPrintPrice}
+                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintPrice: !!checked })}
+                      />
+                      <Label htmlFor="labelPrintPrice" className="text-sm cursor-pointer">
+                        In giá
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="labelPrintStoreName"
+                        checked={formData.labelPrintStoreName}
+                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintStoreName: !!checked })}
+                      />
+                      <Label htmlFor="labelPrintStoreName" className="text-sm cursor-pointer">
+                        In tên cửa hàng
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="labelPrintOrderNumber"
+                        checked={formData.labelPrintOrderNumber}
+                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintOrderNumber: !!checked })}
+                      />
+                      <Label htmlFor="labelPrintOrderNumber" className="text-sm cursor-pointer">
+                        In mã đơn hàng
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="labelPrintTableName"
+                        checked={formData.labelPrintTableName}
+                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintTableName: !!checked })}
+                      />
+                      <Label htmlFor="labelPrintTableName" className="text-sm cursor-pointer">
+                        In tên bàn
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="labelPrintTime"
+                        checked={formData.labelPrintTime}
+                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintTime: !!checked })}
+                      />
+                      <Label htmlFor="labelPrintTime" className="text-sm cursor-pointer">
+                        In thời gian
+                      </Label>
+                    </div>
+                  </div>
+                  {formData.labelPrintStoreName && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="labelStoreName">Tên cửa hàng hiển thị</Label>
+                      <Input
+                        id="labelStoreName"
+                        placeholder="Tên cửa hàng trên tem..."
+                        value={formData.labelStoreName || ""}
+                        onChange={(e) => setFormData({ ...formData, labelStoreName: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-4">
               {dialogMode === "create" && (

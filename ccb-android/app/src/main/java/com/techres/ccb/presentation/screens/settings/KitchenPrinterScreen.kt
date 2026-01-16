@@ -247,7 +247,10 @@ fun KitchenPrinterScreen(
         PrinterConfigDialog(
             kitchen = selectedKitchen!!,
             onDismiss = { showPrinterDialog = false },
-            onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode ->
+            onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
+                       ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies,
+                       labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
+                       labelPrintTableName, labelPrintTime, labelStoreName ->
                 viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
                     ip = ip.ifBlank { null },
@@ -260,7 +263,16 @@ fun KitchenPrinterScreen(
                     labelGapMm = labelSize.gapMm,
                     printDensity = printDensity,
                     paperWidth = paperWidth,
-                    printMode = printMode.name
+                    printMode = printMode.name,
+                    ticketCutAfterPrint = ticketCutAfterPrint,
+                    ticketPrintItemsSeparately = ticketPrintItemsSeparately,
+                    ticketCopies = ticketCopies,
+                    labelPrintPrice = labelPrintPrice,
+                    labelPrintStoreName = labelPrintStoreName,
+                    labelPrintOrderNumber = labelPrintOrderNumber,
+                    labelPrintTableName = labelPrintTableName,
+                    labelPrintTime = labelPrintTime,
+                    labelStoreName = labelStoreName.ifBlank { null }
                 )
                 showPrinterDialog = false
             }
@@ -499,7 +511,10 @@ private fun PrinterInfoRow(label: String, value: String) {
 private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
     onDismiss: () -> Unit,
-    onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode) -> Unit
+    onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
+             ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int,
+             labelPrintPrice: Boolean, labelPrintStoreName: Boolean, labelPrintOrderNumber: Boolean,
+             labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String) -> Unit
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
@@ -511,6 +526,19 @@ private fun PrinterConfigDialog(
     var printDensity by remember { mutableStateOf(kitchen.printDensity) }
     var selectedPaperWidth by remember { mutableStateOf(kitchen.paperWidth) }
     var selectedPrintMode by remember { mutableStateOf(kitchen.getPrintModeEnum()) }
+
+    // Ticket printing config
+    var ticketCutAfterPrint by remember { mutableStateOf(kitchen.ticketCutAfterPrint) }
+    var ticketPrintItemsSeparately by remember { mutableStateOf(kitchen.ticketPrintItemsSeparately) }
+    var ticketCopies by remember { mutableStateOf(kitchen.ticketCopies) }
+
+    // Label printing config
+    var labelPrintPrice by remember { mutableStateOf(kitchen.labelPrintPrice) }
+    var labelPrintStoreName by remember { mutableStateOf(kitchen.labelPrintStoreName) }
+    var labelPrintOrderNumber by remember { mutableStateOf(kitchen.labelPrintOrderNumber) }
+    var labelPrintTableName by remember { mutableStateOf(kitchen.labelPrintTableName) }
+    var labelPrintTime by remember { mutableStateOf(kitchen.labelPrintTime) }
+    var labelStoreName by remember { mutableStateOf(kitchen.labelStoreName ?: "") }
 
     var protocolExpanded by remember { mutableStateOf(false) }
     var labelSizeExpanded by remember { mutableStateOf(false) }
@@ -898,6 +926,180 @@ private fun PrinterConfigDialog(
                     )
                 }
 
+                // Ticket printing config - Show for TICKET and BOTH modes
+                if (selectedPrintMode == KitchenPrintMode.TICKET || selectedPrintMode == KitchenPrintMode.BOTH) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Cấu hình in phiếu bếp",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = color
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Ticket cut after print
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketCutAfterPrint,
+                            onCheckedChange = { ticketCutAfterPrint = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(
+                            text = "Cắt giấy sau khi in",
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Print items separately
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintItemsSeparately,
+                            onCheckedChange = { ticketPrintItemsSeparately = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(
+                            text = "In từng món riêng biệt",
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Ticket copies
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Số bản in:",
+                            fontSize = 14.sp
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton(
+                                onClick = { if (ticketCopies > 1) ticketCopies-- },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Remove, contentDescription = "Giảm", tint = color)
+                            }
+                            Text(
+                                text = ticketCopies.toString(),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            IconButton(
+                                onClick = { if (ticketCopies < 5) ticketCopies++ },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Tăng", tint = color)
+                            }
+                        }
+                    }
+                }
+
+                // Label printing config - Show for LABEL and BOTH modes
+                if (selectedPrintMode == KitchenPrintMode.LABEL || selectedPrintMode == KitchenPrintMode.BOTH) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Cấu hình in tem",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = color
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Label print options
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = labelPrintPrice,
+                            onCheckedChange = { labelPrintPrice = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In giá", fontSize = 14.sp)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = labelPrintStoreName,
+                            onCheckedChange = { labelPrintStoreName = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In tên cửa hàng", fontSize = 14.sp)
+                    }
+
+                    // Store name input (show only when labelPrintStoreName is checked)
+                    if (labelPrintStoreName) {
+                        OutlinedTextField(
+                            value = labelStoreName,
+                            onValueChange = { labelStoreName = it },
+                            label = { Text("Tên cửa hàng") },
+                            placeholder = { Text("VD: Quán Cà phê ABC") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 40.dp),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = labelPrintOrderNumber,
+                            onCheckedChange = { labelPrintOrderNumber = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In mã đơn hàng", fontSize = 14.sp)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = labelPrintTableName,
+                            onCheckedChange = { labelPrintTableName = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In tên bàn", fontSize = 14.sp)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = labelPrintTime,
+                            onCheckedChange = { labelPrintTime = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In thời gian", fontSize = 14.sp)
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // Buttons
@@ -923,7 +1125,16 @@ private fun PrinterConfigDialog(
                                 selectedLabelSize,
                                 printDensity,
                                 selectedPaperWidth,
-                                selectedPrintMode
+                                selectedPrintMode,
+                                ticketCutAfterPrint,
+                                ticketPrintItemsSeparately,
+                                ticketCopies,
+                                labelPrintPrice,
+                                labelPrintStoreName,
+                                labelPrintOrderNumber,
+                                labelPrintTableName,
+                                labelPrintTime,
+                                labelStoreName
                             )
                         },
                         modifier = Modifier.weight(1f),

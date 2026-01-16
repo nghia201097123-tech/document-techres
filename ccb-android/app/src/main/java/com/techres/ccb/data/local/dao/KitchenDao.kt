@@ -49,7 +49,16 @@ interface KitchenDao {
             label_gap_mm = :labelGapMm,
             print_density = :printDensity,
             paper_width = :paperWidth,
-            print_mode = :printMode
+            print_mode = :printMode,
+            ticket_cut_after_print = :ticketCutAfterPrint,
+            ticket_print_items_separately = :ticketPrintItemsSeparately,
+            ticket_copies = :ticketCopies,
+            label_print_price = :labelPrintPrice,
+            label_print_store_name = :labelPrintStoreName,
+            label_print_order_number = :labelPrintOrderNumber,
+            label_print_table_name = :labelPrintTableName,
+            label_print_time = :labelPrintTime,
+            label_store_name = :labelStoreName
         WHERE id = :kitchenId
     """)
     suspend fun updateFullPrinterConfig(
@@ -64,7 +73,18 @@ interface KitchenDao {
         labelGapMm: Int,
         printDensity: Int,
         paperWidth: Int,
-        printMode: String
+        printMode: String,
+        // Ticket printing config
+        ticketCutAfterPrint: Boolean,
+        ticketPrintItemsSeparately: Boolean,
+        ticketCopies: Int,
+        // Label printing config
+        labelPrintPrice: Boolean,
+        labelPrintStoreName: Boolean,
+        labelPrintOrderNumber: Boolean,
+        labelPrintTableName: Boolean,
+        labelPrintTime: Boolean,
+        labelStoreName: String?
     )
 
     @Transaction

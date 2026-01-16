@@ -61,6 +61,17 @@ export interface Kitchen {
   brandId?: string;
   branchId?: string;
   createdAt: string;
+  // Ticket printing config
+  ticketCutAfterPrint?: boolean;
+  ticketPrintItemsSeparately?: boolean;
+  ticketCopies?: number;
+  // Label printing config
+  labelPrintPrice?: boolean;
+  labelPrintStoreName?: boolean;
+  labelPrintOrderNumber?: boolean;
+  labelPrintTableName?: boolean;
+  labelPrintTime?: boolean;
+  labelStoreName?: string;
 }
 
 export interface CreateKitchenDto {
@@ -72,6 +83,17 @@ export interface CreateKitchenDto {
   paperWidth?: number;
   printMode?: KitchenPrintMode;
   description?: string;
+  // Ticket printing config
+  ticketCutAfterPrint?: boolean;
+  ticketPrintItemsSeparately?: boolean;
+  ticketCopies?: number;
+  // Label printing config
+  labelPrintPrice?: boolean;
+  labelPrintStoreName?: boolean;
+  labelPrintOrderNumber?: boolean;
+  labelPrintTableName?: boolean;
+  labelPrintTime?: boolean;
+  labelStoreName?: string;
 }
 
 export interface UpdateKitchenDto {
@@ -83,6 +105,17 @@ export interface UpdateKitchenDto {
   paperWidth?: number;
   printMode?: KitchenPrintMode;
   description?: string;
+  // Ticket printing config
+  ticketCutAfterPrint?: boolean;
+  ticketPrintItemsSeparately?: boolean;
+  ticketCopies?: number;
+  // Label printing config
+  labelPrintPrice?: boolean;
+  labelPrintStoreName?: boolean;
+  labelPrintOrderNumber?: boolean;
+  labelPrintTableName?: boolean;
+  labelPrintTime?: boolean;
+  labelStoreName?: string;
 }
 
 export const kitchenService = {

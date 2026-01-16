@@ -120,7 +120,7 @@ class KitchenPrinterViewModel @Inject constructor(
     }
 
     /**
-     * Update full printer config including protocol, label size, paper width and print mode
+     * Update full printer config including protocol, label size, paper width, print mode and printing configs
      */
     fun updateFullPrinterConfig(
         kitchenId: String,
@@ -134,7 +134,18 @@ class KitchenPrinterViewModel @Inject constructor(
         labelGapMm: Int,
         printDensity: Int,
         paperWidth: Int,
-        printMode: String
+        printMode: String,
+        // Ticket printing config
+        ticketCutAfterPrint: Boolean = true,
+        ticketPrintItemsSeparately: Boolean = false,
+        ticketCopies: Int = 1,
+        // Label printing config
+        labelPrintPrice: Boolean = false,
+        labelPrintStoreName: Boolean = false,
+        labelPrintOrderNumber: Boolean = true,
+        labelPrintTableName: Boolean = true,
+        labelPrintTime: Boolean = true,
+        labelStoreName: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -150,7 +161,16 @@ class KitchenPrinterViewModel @Inject constructor(
                     labelGapMm = labelGapMm,
                     printDensity = printDensity,
                     paperWidth = paperWidth,
-                    printMode = printMode
+                    printMode = printMode,
+                    ticketCutAfterPrint = ticketCutAfterPrint,
+                    ticketPrintItemsSeparately = ticketPrintItemsSeparately,
+                    ticketCopies = ticketCopies,
+                    labelPrintPrice = labelPrintPrice,
+                    labelPrintStoreName = labelPrintStoreName,
+                    labelPrintOrderNumber = labelPrintOrderNumber,
+                    labelPrintTableName = labelPrintTableName,
+                    labelPrintTime = labelPrintTime,
+                    labelStoreName = labelStoreName
                 )
             } catch (e: Exception) {
                 _uiState.update {

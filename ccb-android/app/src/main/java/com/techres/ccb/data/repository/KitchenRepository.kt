@@ -37,7 +37,7 @@ class KitchenRepository @Inject constructor(
     }
 
     /**
-     * Update full printer config including protocol, label size, paper width and print mode
+     * Update full printer config including protocol, label size, paper width, print mode and printing configs
      */
     suspend fun updateFullPrinterConfig(
         kitchenId: String,
@@ -51,12 +51,26 @@ class KitchenRepository @Inject constructor(
         labelGapMm: Int,
         printDensity: Int,
         paperWidth: Int,
-        printMode: String
+        printMode: String,
+        // Ticket printing config
+        ticketCutAfterPrint: Boolean = true,
+        ticketPrintItemsSeparately: Boolean = false,
+        ticketCopies: Int = 1,
+        // Label printing config
+        labelPrintPrice: Boolean = false,
+        labelPrintStoreName: Boolean = false,
+        labelPrintOrderNumber: Boolean = true,
+        labelPrintTableName: Boolean = true,
+        labelPrintTime: Boolean = true,
+        labelStoreName: String? = null
     ) {
         kitchenDao.updateFullPrinterConfig(
             kitchenId, ip, port, name, isConnected,
             protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity,
-            paperWidth, printMode
+            paperWidth, printMode,
+            ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies,
+            labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
+            labelPrintTableName, labelPrintTime, labelStoreName
         )
     }
 
