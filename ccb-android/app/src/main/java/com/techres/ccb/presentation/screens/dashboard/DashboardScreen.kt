@@ -89,6 +89,12 @@ fun DashboardScreen(
     // Drawer state for mobile
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
+    // Ensure data is loaded when screen is displayed/resumed
+    // This fixes white screen issue when navigating back from other screens
+    LaunchedEffect(Unit) {
+        viewModel.ensureDataLoaded()
+    }
+
     if (isCompactScreen) {
         // Mobile Layout with Navigation Drawer
         ModalNavigationDrawer(
@@ -177,7 +183,8 @@ fun DashboardScreen(
                 filteredOrders = mobileFilteredOrders,
                 onSearchQueryChange = { viewModel.setSearchQuery(it) },
                 onSortTypeChange = { viewModel.setSortType(it) },
-                currentTimeMillis = mobileCurrentTimeMillis
+                currentTimeMillis = mobileCurrentTimeMillis,
+                onRefresh = { viewModel.refresh() }
             )
         }
     } else {
@@ -262,6 +269,13 @@ fun DashboardScreen(
                             ) {
                                 CircularProgressIndicator()
                             }
+                        }
+                        uiState.error != null -> {
+                            // Error state with retry button
+                            ErrorStateWithRetry(
+                                error = uiState.error!!,
+                                onRetry = { viewModel.refresh() }
+                            )
                         }
                         selectedTab == 0 -> {
                             if (filteredOrders.isEmpty()) {
@@ -683,7 +697,8 @@ private fun MobileDashboardContent(
     filteredOrders: List<PosOrder> = emptyList(),
     onSearchQueryChange: (String) -> Unit = {},
     onSortTypeChange: (OrderSortType) -> Unit = {},
-    currentTimeMillis: Long = System.currentTimeMillis()
+    currentTimeMillis: Long = System.currentTimeMillis(),
+    onRefresh: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -832,6 +847,13 @@ private fun MobileDashboardContent(
                         ) {
                             CircularProgressIndicator()
                         }
+                    }
+                    uiState.error != null -> {
+                        // Error state with retry button
+                        ErrorStateWithRetry(
+                            error = uiState.error!!,
+                            onRetry = onRefresh
+                        )
                     }
                     selectedTab == 0 -> {
                         if (filteredOrders.isEmpty()) {
@@ -1802,6 +1824,70 @@ private fun EmptyOrdersState(
                 fontSize = 14.sp,
                 color = Color.Gray
             )
+        }
+    }
+}
+
+/**
+ * Error state with retry button
+ * Used when data loading fails - provides user feedback and recovery option
+ */
+@Composable
+private fun ErrorStateWithRetry(
+    error: String,
+    onRetry: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFEBEE)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = Color(0xFFF44336)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Đã xảy ra lỗi",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF424242)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = error,
+                fontSize = 14.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1976D2)
+                )
+            ) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Thử lại")
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 data class PosOrder(
@@ -156,6 +158,7 @@ class DashboardViewModel @Inject constructor(
 
     /**
      * Observe orders continuously from database
+     * Added timeout and defensive handling to prevent white screen issue
      */
     private fun startOrdersObserver() {
         // Cancel any existing observer
@@ -163,8 +166,10 @@ class DashboardViewModel @Inject constructor(
 
         ordersObserverJob = viewModelScope.launch {
             try {
-                // Get current shift
-                val currentShift = shiftRepository.getCurrentOpenShift(branchId)
+                // Get current shift with timeout to prevent hang
+                val currentShift = withTimeoutOrNull(5000L) {
+                    shiftRepository.getCurrentOpenShift(branchId)
+                }
 
                 // Observe orders flow - will emit whenever orders change
                 val ordersFlow = if (currentShift != null) {
@@ -173,14 +178,29 @@ class DashboardViewModel @Inject constructor(
                     orderRepository.getActiveOrders(branchId)
                 }
 
+                // Safety: Ensure loading is turned off even if flow is slow to emit
+                // This prevents white screen on slow devices (Android 6.0.1)
+                launch {
+                    delay(3000L) // Wait max 3 seconds
+                    if (_uiState.value.isLoading) {
+                        Log.w(TAG, "startOrdersObserver - Flow slow to emit, setting isLoading=false as fallback")
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+                }
+
                 ordersFlow.collectLatest { orderEntities ->
                     Log.d(TAG, "Orders updated: ${orderEntities.size} orders")
 
                     val posOrders = orderEntities
                         .filter { it.status != "completed" && it.status != "cancelled" }
                         .map { entity ->
-                            // Get items for this order
-                            val orderItems = orderRepository.getOrderItemsSync(entity.id)
+                            // Get items for this order with error handling
+                            val orderItems = try {
+                                orderRepository.getOrderItemsSync(entity.id)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error getting items for order ${entity.id}: ${e.message}")
+                                emptyList()
+                            }
                             PosOrder(
                                 id = entity.id,
                                 tableName = entity.tableName,
@@ -236,6 +256,33 @@ class DashboardViewModel @Inject constructor(
 
     fun refresh() {
         loadData()
+    }
+
+    /**
+     * Ensures data is loaded when screen is resumed
+     * Call this from DashboardScreen's LaunchedEffect to handle:
+     * - Process death recovery
+     * - Navigation back from other screens
+     * - State corruption recovery
+     */
+    fun ensureDataLoaded() {
+        val currentState = _uiState.value
+        // If branchName is empty or we don't have an active observer, reload data
+        if (currentState.branchName.isEmpty() || ordersObserverJob?.isActive != true) {
+            Log.d(TAG, "ensureDataLoaded - Reloading data (branchName empty: ${currentState.branchName.isEmpty()}, observer active: ${ordersObserverJob?.isActive})")
+            loadData()
+        } else if (currentState.isLoading) {
+            // If stuck in loading state for too long, reset it
+            Log.d(TAG, "ensureDataLoaded - Still loading, ensuring observer is running")
+            // Observer should handle this, but ensure isLoading is reset
+            viewModelScope.launch {
+                delay(1000L)
+                if (_uiState.value.isLoading) {
+                    Log.w(TAG, "ensureDataLoaded - Forcing isLoading=false after timeout")
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            }
+        }
     }
 
     fun setGridColumns(columns: Int) {
