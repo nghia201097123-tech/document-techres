@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { Staff, Province, Ward, Department } from '../../database/entities';
 import { CreateStaffDto, UpdateStaffDto, BulkImportStaffDto, BulkImportResultDto, BulkStaffItemDto } from './dto';
 import * as bcrypt from 'bcrypt';
@@ -10,6 +13,9 @@ const INITIAL_OWNER_USERNAME_PATTERN = /^[a-z]{2}000001$/;
 
 @Injectable()
 export class StaffService {
+  private readonly logger = new Logger(StaffService.name);
+  private readonly oauthApiUrl: string;
+
   constructor(
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
@@ -19,7 +25,12 @@ export class StaffService {
     private readonly wardRepository: Repository<Ward>,
     @InjectRepository(Department)
     private readonly departmentRepository: Repository<Department>,
-  ) {}
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+  ) {
+    // Default to localhost:4002 for development
+    this.oauthApiUrl = this.configService.get('OAUTH_API_URL', 'http://localhost:4002');
+  }
 
   async findAll(tenantId: string, branchId?: string) {
     const query = this.staffRepository
@@ -165,7 +176,38 @@ export class StaffService {
     const tempPassword = this.generateTempPassword();
     staff.passwordHash = await bcrypt.hash(tempPassword, 10);
     await this.staffRepository.save(staff);
+
+    // Sync password with api-oauth
+    await this.syncPasswordToOAuth(tenantId, staff.username, tempPassword);
+
     return { temporaryPassword: tempPassword };
+  }
+
+  /**
+   * Sync password to api-oauth service
+   * This ensures the User table in api-oauth has the same password
+   */
+  private async syncPasswordToOAuth(tenantId: string, username: string, newPassword: string): Promise<void> {
+    try {
+      const url = `${this.oauthApiUrl}/api/v1/auth/tenant-users/password`;
+      this.logger.log(`Syncing password for user ${username} to api-oauth`);
+
+      await firstValueFrom(
+        this.httpService.put(url, {
+          tenantId,
+          username,
+          newPassword,
+        }),
+      );
+
+      this.logger.log(`Password synced successfully for user ${username}`);
+    } catch (error) {
+      // Log the error but don't fail the operation
+      // The password is already updated in api-dashboard, just log the sync failure
+      this.logger.error(`Failed to sync password to api-oauth for user ${username}: ${error.message}`);
+      // Optionally, you could throw here if you want the operation to fail
+      // throw new Error(`Failed to sync password with authentication service: ${error.message}`);
+    }
   }
 
   async delete(tenantId: string, id: string) {
@@ -476,6 +518,9 @@ export class StaffService {
 
         staff.passwordHash = passwordHash;
         await this.staffRepository.save(staff);
+
+        // Sync password with api-oauth
+        await this.syncPasswordToOAuth(tenantId, staff.username, password);
 
         result.passwords.push({ staffId, username: staff.username, password });
         result.success++;

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Body,
   UseGuards,
   Request,
@@ -35,6 +36,7 @@ import {
   UserProfileResponseDto,
   CreateTenantUserDto,
   TenantUserResponseDto,
+  UpdateTenantUserPasswordDto,
 } from '../../dto/auth.dto';
 
 @ApiTags('Authentication')
@@ -82,6 +84,18 @@ export class AuthController {
     @Body() createTenantUserDto: CreateTenantUserDto,
   ): Promise<TenantUserResponseDto> {
     return this.authService.createTenantUser(createTenantUserDto);
+  }
+
+  // ==================== UPDATE TENANT USER PASSWORD (Internal API) ====================
+  @Put('tenant-users/password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update tenant user password (Internal API for api-dashboard)' })
+  @ApiResponse({ status: 200, description: 'Password updated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async updateTenantUserPassword(
+    @Body() updateDto: UpdateTenantUserPasswordDto,
+  ): Promise<{ success: boolean }> {
+    return this.authService.updateTenantUserPassword(updateDto);
   }
 
   // ==================== REFRESH TOKEN ====================

@@ -212,6 +212,25 @@ export class CreateTenantUserDto {
   branchId?: string;
 }
 
+// DTO for updating tenant user password (internal API - used by api-dashboard)
+export class UpdateTenantUserPasswordDto {
+  @ApiProperty({ description: 'Tenant ID (Company ID from api-admin)' })
+  @IsString()
+  @IsNotEmpty()
+  tenantId: string;
+
+  @ApiProperty({ example: 'admin', description: 'Username of the tenant user' })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @ApiProperty({ example: 'newPassword123', description: 'New password (plain text, will be hashed)' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  newPassword: string;
+}
+
 // Response for created tenant user
 export class TenantUserResponseDto {
   @ApiProperty()

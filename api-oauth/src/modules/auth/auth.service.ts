@@ -35,6 +35,7 @@ import {
   TwoFactorSetupResponseDto,
   CreateTenantUserDto,
   TenantUserResponseDto,
+  UpdateTenantUserPasswordDto,
 } from '../../dto/auth.dto';
 
 export interface JwtPayload {
@@ -281,6 +282,47 @@ export class AuthService {
       role: user.role,
       createdAt: user.createdAt,
     };
+  }
+
+  // ==================== UPDATE TENANT USER PASSWORD (Internal API) ====================
+  async updateTenantUserPassword(
+    updateDto: UpdateTenantUserPasswordDto,
+  ): Promise<{ success: boolean }> {
+    const { tenantId, username, newPassword } = updateDto;
+
+    // Find user by username and tenantId
+    const user = await this.userRepository.findOne({
+      where: { username, tenantId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with username '${username}' not found for tenant '${tenantId}'`);
+    }
+
+    // Hash new password
+    const saltRounds = this.configService.get('security.bcryptSaltRounds');
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await this.userRepository.update(user.id, { passwordHash });
+
+    // Revoke all refresh tokens (force re-login with new password)
+    await this.refreshTokenRepository.update(
+      { userId: user.id, isRevoked: false },
+      { isRevoked: true, revokedAt: new Date() },
+    );
+
+    // Log the action
+    await this.logAudit(
+      user.id,
+      user.email,
+      tenantId,
+      AuditAction.PASSWORD_RESET_COMPLETE,
+      { ipAddress: 'internal-api' },
+      true,
+    );
+
+    return { success: true };
   }
 
   // ==================== REFRESH TOKEN ====================
