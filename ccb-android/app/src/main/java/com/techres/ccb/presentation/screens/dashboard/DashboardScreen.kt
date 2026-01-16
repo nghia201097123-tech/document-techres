@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -2243,12 +2244,14 @@ private fun OrderItemRow(
     forceExpanded: Boolean? = null, // null = default expanded, true/false = sync with global
     onToppingsToggle: (() -> Unit)? = null // Callback to toggle per-item expanded state
 ) {
+    val isCancelled = item.status == "cancelled"
     // Use forceExpanded directly - no local state to avoid LazyColumn recycling issues
-    val toppingsExpanded = forceExpanded ?: true
+    val toppingsExpanded = if (isCancelled) false else (forceExpanded ?: true)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (isCancelled) Color(0xFFFFEBEE) else Color.Transparent)
             .padding(vertical = 12.dp)
     ) {
         // Row 1: Quantity badge + Product name + Total Price
@@ -2265,28 +2268,48 @@ private fun OrderItemRow(
                 Box(
                     modifier = Modifier
                         .size(24.dp)
-                        .background(Color(0xFFE3F2FD), CircleShape),
+                        .background(
+                            if (isCancelled) Color(0xFFFFCDD2) else Color(0xFFE3F2FD),
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = item.quantity.toString(),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1976D2)
+                        color = if (isCancelled) Color(0xFFf44336) else Color(0xFF1976D2)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                // Product name only
-                Text(
-                    text = item.productName,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
-                )
+                // Product name with cancelled badge
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.productName,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        color = if (isCancelled) Color(0xFFf44336) else Color.Unspecified,
+                        textDecoration = if (isCancelled) TextDecoration.LineThrough else null
+                    )
+                    if (isCancelled) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "ĐÃ HUỶ",
+                            fontSize = 10.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(Color(0xFFf44336), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
             Text(
                 text = formatCurrency(item.totalPrice.toLong()),
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1976D2)
+                color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color(0xFF1976D2),
+                textDecoration = if (isCancelled) TextDecoration.LineThrough else null
             )
         }
 
@@ -2294,9 +2317,21 @@ private fun OrderItemRow(
         Text(
             text = formatCurrency(item.unitPrice.toLong()),
             fontSize = 13.sp,
-            color = Color.Gray,
+            color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.6f) else Color.Gray,
+            textDecoration = if (isCancelled) TextDecoration.LineThrough else null,
             modifier = Modifier.padding(start = 36.dp, top = 2.dp)
         )
+
+        // Cancel reason (if cancelled)
+        if (isCancelled && !item.cancelReason.isNullOrBlank()) {
+            Text(
+                text = "Lý do: ${item.cancelReason}",
+                fontSize = 12.sp,
+                color = Color(0xFFf44336),
+                fontStyle = FontStyle.Italic,
+                modifier = Modifier.padding(start = 36.dp, top = 2.dp)
+            )
+        }
 
         // Row 3: Variants/Toppings - Collapsible with correct parsing
         if (!item.notes.isNullOrBlank()) {
@@ -2310,12 +2345,12 @@ private fun OrderItemRow(
             if (variants.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Header showing topping count - clickable to toggle
+                // Header showing topping count - clickable to toggle (not when cancelled)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(4.dp))
-                        .clickable(enabled = onToppingsToggle != null) { onToppingsToggle?.invoke() }
+                        .clickable(enabled = onToppingsToggle != null && !isCancelled) { onToppingsToggle?.invoke() }
                         .padding(start = 36.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2323,12 +2358,12 @@ private fun OrderItemRow(
                         imageVector = if (toppingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = Color.Gray
+                        tint = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.5f) else Color.Gray
                     )
                     Text(
-                        text = if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
+                        text = if (isCancelled) "Tuỳ chọn (${variants.size})" else if (toppingsExpanded) "Tuỳ chọn (${variants.size})" else "Tuỳ chọn (${variants.size}) - Nhấn để xem",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = if (isCancelled) Color(0xFFf44336).copy(alpha = 0.5f) else Color.Gray,
                         modifier = Modifier.padding(start = 4.dp)
                     )
                 }
