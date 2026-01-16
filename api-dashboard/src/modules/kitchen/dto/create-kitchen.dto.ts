@@ -123,4 +123,47 @@ export class CreateKitchenDto {
   @IsOptional()
   @IsBoolean()
   labelReverse?: boolean;
+
+  // ========== LABEL SIZE & FONT CONFIG ==========
+  @ApiPropertyOptional({ description: 'Chiều rộng tem (mm)', default: 72 })
+  @IsOptional()
+  @IsInt()
+  @Min(20)
+  @Max(200)
+  labelWidthMm?: number;
+
+  @ApiPropertyOptional({ description: 'Chiều cao tem (mm)', default: 30 })
+  @IsOptional()
+  @IsInt()
+  @Min(15)
+  @Max(150)
+  labelHeightMm?: number;
+
+  @ApiPropertyOptional({ description: 'Khoảng cách giữa các tem (mm)', default: 3 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  labelGapMm?: number;
+
+  @ApiPropertyOptional({
+    description: 'Tỷ lệ phóng to/thu nhỏ chữ trên tem (0.5 - 2.0)',
+    default: 1.0,
+    minimum: 0.5,
+    maximum: 2.0,
+  })
+  @IsOptional()
+  labelFontScale?: number;
+
+  @ApiPropertyOptional({
+    description: 'Số topping tối đa hiển thị trên 1 tem (0 = tự động theo kích thước tem)',
+    default: 0,
+    minimum: 0,
+    maximum: 20,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  labelMaxToppings?: number;
 }

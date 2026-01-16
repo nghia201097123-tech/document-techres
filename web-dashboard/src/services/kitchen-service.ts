@@ -60,6 +60,30 @@ export const PrinterProtocolLabels: Record<PrinterProtocol, string> = {
   TSPL: "TSPL (Máy in tem)",
 };
 
+/**
+ * Các kích thước tem phổ biến
+ */
+export const LABEL_SIZE_OPTIONS = [
+  { width: 40, height: 30, label: "40x30mm (Nhỏ)", maxToppings: 2 },
+  { width: 50, height: 30, label: "50x30mm (Nhỏ)", maxToppings: 2 },
+  { width: 60, height: 40, label: "60x40mm (Trung bình)", maxToppings: 3 },
+  { width: 72, height: 30, label: "72x30mm (Mặc định)", maxToppings: 2 },
+  { width: 80, height: 50, label: "80x50mm (Lớn)", maxToppings: 5 },
+  { width: 100, height: 50, label: "100x50mm (Lớn)", maxToppings: 6 },
+  { width: 100, height: 80, label: "100x80mm (Rất lớn)", maxToppings: 10 },
+];
+
+/**
+ * Lấy max toppings đề xuất dựa trên kích thước tem
+ */
+export function getRecommendedMaxToppings(width: number, height: number): number {
+  if (height <= 30) return 2;
+  if (height <= 40) return 3;
+  if (height <= 50 && width <= 80) return 5;
+  if (height <= 50) return 6;
+  return 10;
+}
+
 export interface Kitchen {
   id: string;
   name: string;
@@ -89,6 +113,12 @@ export interface Kitchen {
   labelPrintTime?: boolean;
   labelStoreName?: string;
   labelReverse?: boolean;
+  // Label size & font config
+  labelWidthMm?: number;
+  labelHeightMm?: number;
+  labelGapMm?: number;
+  labelFontScale?: number;
+  labelMaxToppings?: number;
 }
 
 export interface CreateKitchenDto {
@@ -113,6 +143,12 @@ export interface CreateKitchenDto {
   labelPrintTime?: boolean;
   labelStoreName?: string;
   labelReverse?: boolean;
+  // Label size & font config
+  labelWidthMm?: number;
+  labelHeightMm?: number;
+  labelGapMm?: number;
+  labelFontScale?: number;
+  labelMaxToppings?: number;
 }
 
 export interface UpdateKitchenDto {
@@ -137,6 +173,12 @@ export interface UpdateKitchenDto {
   labelPrintTime?: boolean;
   labelStoreName?: string;
   labelReverse?: boolean;
+  // Label size & font config
+  labelWidthMm?: number;
+  labelHeightMm?: number;
+  labelGapMm?: number;
+  labelFontScale?: number;
+  labelMaxToppings?: number;
 }
 
 export const kitchenService = {

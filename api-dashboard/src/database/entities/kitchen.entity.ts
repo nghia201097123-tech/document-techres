@@ -139,6 +139,22 @@ export class Kitchen {
   @Column({ name: 'label_reverse', default: false })
   labelReverse: boolean;
 
+  // ========== LABEL SIZE & FONT CONFIG ==========
+  @Column({ name: 'label_width_mm', type: 'int', default: 72 })
+  labelWidthMm: number;
+
+  @Column({ name: 'label_height_mm', type: 'int', default: 30 })
+  labelHeightMm: number;
+
+  @Column({ name: 'label_gap_mm', type: 'int', default: 3 })
+  labelGapMm: number;
+
+  @Column({ name: 'label_font_scale', type: 'float', default: 1.0 })
+  labelFontScale: number;
+
+  @Column({ name: 'label_max_toppings', type: 'int', default: 0 })
+  labelMaxToppings: number; // 0 = auto based on size
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

@@ -36,7 +36,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
-import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels } from "@/services/kitchen-service";
+import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels, LABEL_SIZE_OPTIONS, getRecommendedMaxToppings } from "@/services/kitchen-service";
+import { LabelPreview } from "@/components/kitchen/LabelPreview";
+import { Slider } from "@/components/ui/slider";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
@@ -87,6 +89,12 @@ export default function KitchenPage() {
     labelPrintTime: true,
     labelStoreName: "",
     labelReverse: false,
+    // Label size & font config
+    labelWidthMm: 72,
+    labelHeightMm: 30,
+    labelGapMm: 3,
+    labelFontScale: 1.0,
+    labelMaxToppings: 0, // 0 = auto
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
@@ -149,6 +157,12 @@ export default function KitchenPage() {
       labelPrintTime: true,
       labelStoreName: "",
       labelReverse: false,
+      // Label size & font config
+      labelWidthMm: 72,
+      labelHeightMm: 30,
+      labelGapMm: 3,
+      labelFontScale: 1.0,
+      labelMaxToppings: 0,
     });
     setDialogMode("create");
   };
@@ -178,6 +192,12 @@ export default function KitchenPage() {
       labelPrintTime: kitchen.labelPrintTime ?? true,
       labelStoreName: kitchen.labelStoreName || "",
       labelReverse: kitchen.labelReverse ?? false,
+      // Label size & font config
+      labelWidthMm: kitchen.labelWidthMm ?? 72,
+      labelHeightMm: kitchen.labelHeightMm ?? 30,
+      labelGapMm: kitchen.labelGapMm ?? 3,
+      labelFontScale: kitchen.labelFontScale ?? 1.0,
+      labelMaxToppings: kitchen.labelMaxToppings ?? 0,
     });
     setDialogMode("edit");
     // Remove badges when editing
@@ -234,6 +254,12 @@ export default function KitchenPage() {
       labelPrintTime: true,
       labelStoreName: "",
       labelReverse: false,
+      // Label size & font config
+      labelWidthMm: 72,
+      labelHeightMm: 30,
+      labelGapMm: 3,
+      labelFontScale: 1.0,
+      labelMaxToppings: 0,
     });
     setAllProducts([]);
     setKitchenProducts([]);
@@ -276,6 +302,12 @@ export default function KitchenPage() {
             labelPrintTime: formData.labelPrintTime,
             labelStoreName: formData.labelStoreName,
             labelReverse: formData.labelReverse,
+            // Keep label size & font config for consecutive creates
+            labelWidthMm: formData.labelWidthMm,
+            labelHeightMm: formData.labelHeightMm,
+            labelGapMm: formData.labelGapMm,
+            labelFontScale: formData.labelFontScale,
+            labelMaxToppings: formData.labelMaxToppings,
           });
           return;
         }
@@ -302,6 +334,12 @@ export default function KitchenPage() {
           labelPrintTime: formData.labelPrintTime,
           labelStoreName: formData.labelStoreName,
           labelReverse: formData.labelReverse,
+          // Label size & font config
+          labelWidthMm: formData.labelWidthMm,
+          labelHeightMm: formData.labelHeightMm,
+          labelGapMm: formData.labelGapMm,
+          labelFontScale: formData.labelFontScale,
+          labelMaxToppings: formData.labelMaxToppings,
         };
         const result = await kitchenService.update(selectedKitchen.id, updateData);
         setKitchens((prev) => prev.map((k) => (k.id === selectedKitchen.id ? { ...result, productCount: k.productCount } : k)));
@@ -945,6 +983,115 @@ export default function KitchenPage() {
                       />
                     </div>
                   )}
+
+                  {/* Label Size & Font Config */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="font-medium text-sm">Kích thước tem & Font</h4>
+
+                    {/* Label Size Selection */}
+                    <div className="grid gap-2">
+                      <Label>Kích thước tem</Label>
+                      <Select
+                        value={`${formData.labelWidthMm}x${formData.labelHeightMm}`}
+                        onValueChange={(value) => {
+                          const [width, height] = value.split("x").map(Number);
+                          const recommendedMax = getRecommendedMaxToppings(width, height);
+                          setFormData({
+                            ...formData,
+                            labelWidthMm: width,
+                            labelHeightMm: height,
+                            // Reset max toppings to auto when changing size
+                            labelMaxToppings: 0,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn kích thước tem" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LABEL_SIZE_OPTIONS.map((size) => (
+                            <SelectItem key={`${size.width}x${size.height}`} value={`${size.width}x${size.height}`}>
+                              {size.label} - Max {size.maxToppings} topping
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Font Scale Slider */}
+                    <div className="grid gap-2">
+                      <div className="flex justify-between">
+                        <Label>Cỡ chữ (Scale: {(formData.labelFontScale || 1.0).toFixed(1)}x)</Label>
+                        <span className="text-xs text-muted-foreground">
+                          {(formData.labelFontScale || 1.0) < 1 ? "Thu nhỏ" : (formData.labelFontScale || 1.0) > 1 ? "Phóng to" : "Mặc định"}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[(formData.labelFontScale || 1.0) * 100]}
+                        min={50}
+                        max={200}
+                        step={10}
+                        onValueChange={([value]) => setFormData({ ...formData, labelFontScale: value / 100 })}
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>0.5x</span>
+                        <span>1.0x</span>
+                        <span>2.0x</span>
+                      </div>
+                    </div>
+
+                    {/* Max Toppings */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="labelMaxToppings">Số topping tối đa / tem</Label>
+                        <Input
+                          id="labelMaxToppings"
+                          type="number"
+                          min={0}
+                          max={20}
+                          placeholder="0 = Tự động"
+                          value={formData.labelMaxToppings || ""}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            labelMaxToppings: e.target.value ? parseInt(e.target.value) : 0
+                          })}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          0 = Tự động ({getRecommendedMaxToppings(formData.labelWidthMm || 72, formData.labelHeightMm || 30)} topping)
+                        </p>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="labelGapMm">Khoảng cách tem (mm)</Label>
+                        <Input
+                          id="labelGapMm"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={formData.labelGapMm || 3}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            labelGapMm: e.target.value ? parseInt(e.target.value) : 3
+                          })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Label Preview */}
+                    <div className="pt-4 border-t">
+                      <LabelPreview
+                        widthMm={formData.labelWidthMm || 72}
+                        heightMm={formData.labelHeightMm || 30}
+                        fontScale={formData.labelFontScale || 1.0}
+                        maxToppings={(formData.labelMaxToppings || 0) > 0 ? formData.labelMaxToppings! : getRecommendedMaxToppings(formData.labelWidthMm || 72, formData.labelHeightMm || 30)}
+                        showStoreName={formData.labelPrintStoreName}
+                        showOrderNumber={formData.labelPrintOrderNumber}
+                        showTableName={formData.labelPrintTableName}
+                        showTime={formData.labelPrintTime}
+                        showPrice={formData.labelPrintPrice}
+                        storeName={formData.labelStoreName || "Coffee House"}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

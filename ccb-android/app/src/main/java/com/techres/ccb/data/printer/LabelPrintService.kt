@@ -74,8 +74,8 @@ object LabelPrintService {
         val totalParts: Int = 1                 // Tổng số phần
     )
 
-    // Max toppings per label (for splitting)
-    private const val MAX_TOPPINGS_PER_LABEL = 4
+    // Default max toppings per label (fallback, will use config from kitchen)
+    private const val DEFAULT_MAX_TOPPINGS_PER_LABEL = 4
 
     // Price formatter for VND
     private val priceFormatter = DecimalFormat("#,###")
@@ -106,7 +106,8 @@ object LabelPrintService {
             var lastError: String? = null
 
             // Split label nếu có quá nhiều topping
-            val labelParts = splitLabelIfNeeded(labelData, kitchen.getLabelSize())
+            val maxToppings = kitchen.getEffectiveMaxToppings()
+            val labelParts = splitLabelIfNeeded(labelData, kitchen.getLabelSize(), maxToppings)
             Log.d(TAG, "Label split into ${labelParts.size} parts")
 
             // In nhiều tem nếu quantity > 1
@@ -169,34 +170,44 @@ object LabelPrintService {
 
     /**
      * Split label into multiple parts if too many toppings
-     * Mỗi phần sẽ có tối đa MAX_TOPPINGS_PER_LABEL topping
+     * Mỗi phần sẽ có tối đa maxToppingsPerLabel topping
      *
-     * Ví dụ: 10 toppings -> 3 phần (4 + 4 + 2)
+     * Ví dụ: 10 toppings với max=4 -> 3 phần (4 + 4 + 2)
      * - Phần 1: toppings 1-4, có đầy đủ thông tin (size, đá, đường, giá)
      * - Phần 2: toppings 5-8, chỉ có tên món + toppings
      * - Phần 3: toppings 9-10, chỉ có tên món + toppings
+     *
+     * @param labelData Dữ liệu tem
+     * @param labelSize Kích thước tem
+     * @param maxToppingsPerLabel Số topping tối đa mỗi tem (từ config hoặc auto)
      */
-    private fun splitLabelIfNeeded(labelData: LabelData, labelSize: LabelSize): List<LabelData> {
+    private fun splitLabelIfNeeded(
+        labelData: LabelData,
+        labelSize: LabelSize,
+        maxToppingsPerLabel: Int = DEFAULT_MAX_TOPPINGS_PER_LABEL
+    ): List<LabelData> {
         val toppings = labelData.toppings
         val toppingPrices = labelData.toppingPrices
+        val effectiveMax = maxToppingsPerLabel.coerceAtLeast(1) // Ít nhất 1 topping/tem
 
         Log.d(TAG, "=== splitLabelIfNeeded ===")
         Log.d(TAG, "  Item: ${labelData.itemName}")
         Log.d(TAG, "  Total toppings: ${toppings.size}")
         Log.d(TAG, "  Toppings: $toppings")
         Log.d(TAG, "  ToppingPrices: ${toppingPrices.map { "${it.first}(${it.second})" }}")
-        Log.d(TAG, "  MAX_TOPPINGS_PER_LABEL: $MAX_TOPPINGS_PER_LABEL")
+        Log.d(TAG, "  Label size: ${labelSize.displayName}")
+        Log.d(TAG, "  Max toppings per label: $effectiveMax")
 
         // Nếu ít topping, không cần split
-        if (toppings.size <= MAX_TOPPINGS_PER_LABEL) {
-            Log.d(TAG, "  -> No split needed (${toppings.size} <= $MAX_TOPPINGS_PER_LABEL)")
+        if (toppings.size <= effectiveMax) {
+            Log.d(TAG, "  -> No split needed (${toppings.size} <= $effectiveMax)")
             return listOf(labelData)
         }
 
         val parts = mutableListOf<LabelData>()
-        val toppingChunks = toppings.chunked(MAX_TOPPINGS_PER_LABEL)
+        val toppingChunks = toppings.chunked(effectiveMax)
         val toppingPriceChunks = if (toppingPrices.isNotEmpty()) {
-            toppingPrices.chunked(MAX_TOPPINGS_PER_LABEL)
+            toppingPrices.chunked(effectiveMax)
         } else {
             toppingChunks.map { emptyList() }
         }
@@ -317,6 +328,7 @@ object LabelPrintService {
     ): ByteArray {
         val labelSize = kitchen.getLabelSize()
         val density = kitchen.printDensity
+        val fontScale = kitchen.getEffectiveFontScale()
 
         // Label printing configs
         val showStoreName = kitchen.labelPrintStoreName
@@ -330,6 +342,7 @@ object LabelPrintService {
         Log.d(TAG, "=== Generating TSPL label ===")
         Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
         Log.d(TAG, "  - Density: $density")
+        Log.d(TAG, "  - Font scale: $fontScale")
         Log.d(TAG, "  - Item: ${label.itemName}")
         Log.d(TAG, "  - labelIndex: ${label.labelIndex}/${label.totalLabels}")
         Log.d(TAG, "  - partIndex: ${label.partIndex}/${label.totalParts}")
@@ -347,10 +360,10 @@ object LabelPrintService {
         val margin = 6
         val contentWidth = widthDots - (margin * 2)
 
-        // Font sizes
-        val fontSmall = calculateFontSize(labelSize, 0.65f)
-        val fontNormal = calculateFontSize(labelSize, 0.75f)
-        val fontBold = calculateFontSize(labelSize, 0.9f)
+        // Font sizes using new recommended values with user scale
+        val fontSmall = calculateFontSize(labelSize, "small", fontScale)
+        val fontNormal = calculateFontSize(labelSize, "normal", fontScale)
+        val fontBold = calculateFontSize(labelSize, "bold", fontScale)
 
         // ========== SETUP COMMANDS ==========
         // DIRECTION: 0 = normal, 1 = reverse (rotated 180°)
@@ -555,16 +568,37 @@ object LabelPrintService {
     }
 
     /**
-     * Calculate font size based on label size
+     * Calculate font size based on label size and scale factor
+     *
+     * @param labelSize Kích thước tem
+     * @param fontType Loại font: "bold", "normal", "small"
+     * @param fontScale Scale factor từ config (0.5 - 2.0)
+     */
+    private fun calculateFontSize(
+        labelSize: LabelSize,
+        fontType: String = "normal",
+        fontScale: Float = 1.0f
+    ): Float {
+        val (fontBold, fontNormal, fontSmall) = labelSize.getRecommendedFontSizes()
+        val baseFont = when (fontType) {
+            "bold" -> fontBold
+            "small" -> fontSmall
+            else -> fontNormal
+        }
+        return baseFont * fontScale.coerceIn(0.5f, 2.0f)
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated Use calculateFontSize(labelSize, fontType, fontScale) instead
      */
     private fun calculateFontSize(labelSize: LabelSize, scale: Float = 1.0f): Float {
-        // Base font size for 72x30mm label
-        val baseFontSize = when {
-            labelSize.heightMm <= 30 -> 18f
-            labelSize.heightMm <= 50 -> 22f
-            else -> 26f
+        // Map old scale to font type
+        return when {
+            scale <= 0.7f -> calculateFontSize(labelSize, "small", 1.0f)
+            scale >= 0.85f -> calculateFontSize(labelSize, "bold", 1.0f)
+            else -> calculateFontSize(labelSize, "normal", 1.0f)
         }
-        return baseFontSize * scale
     }
 
     /**

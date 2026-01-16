@@ -30,6 +30,17 @@ enum class PrinterProtocol(val displayName: String) {
 
 /**
  * Kích thước tem (cho máy in TSPL)
+ *
+ * Font size recommendations (base font, before scaling):
+ * | Khổ tem    | Font Bold | Font Normal | Font Small | Max Toppings |
+ * |------------|-----------|-------------|------------|--------------|
+ * | 40x30mm    | 22f       | 18f         | 14f        | 2            |
+ * | 50x30mm    | 24f       | 20f         | 16f        | 2            |
+ * | 60x40mm    | 26f       | 22f         | 18f        | 3            |
+ * | 72x30mm    | 24f       | 20f         | 16f        | 2            |
+ * | 80x50mm    | 30f       | 26f         | 20f        | 5            |
+ * | 100x50mm   | 32f       | 28f         | 22f        | 6            |
+ * | 100x80mm   | 36f       | 30f         | 24f        | 10           |
  */
 data class LabelSize(
     val widthMm: Int,
@@ -37,6 +48,60 @@ data class LabelSize(
     val gapMm: Int = 3
 ) {
     val displayName: String get() = "${widthMm}x${heightMm}mm"
+
+    /**
+     * Diện tích tem (mm²) để xác định nhóm kích thước
+     */
+    val area: Int get() = widthMm * heightMm
+
+    /**
+     * Lấy font size đề xuất cho tem (base font, chưa scale)
+     * Returns: Triple(fontBold, fontNormal, fontSmall)
+     */
+    fun getRecommendedFontSizes(): Triple<Float, Float, Float> {
+        return when {
+            // Small labels (area <= 1500 mm²)
+            heightMm <= 30 && widthMm <= 50 -> Triple(22f, 18f, 14f)  // 40x30
+            heightMm <= 30 && widthMm <= 60 -> Triple(24f, 20f, 16f)  // 50x30
+            heightMm <= 30 -> Triple(24f, 20f, 16f)                    // 72x30
+
+            // Medium labels (area <= 2500 mm²)
+            heightMm <= 40 -> Triple(26f, 22f, 18f)                    // 60x40
+
+            // Large labels (area <= 5000 mm²)
+            heightMm <= 50 && widthMm <= 80 -> Triple(30f, 26f, 20f)  // 80x50
+            heightMm <= 50 -> Triple(32f, 28f, 22f)                    // 100x50
+
+            // XL labels (area > 5000 mm²)
+            else -> Triple(36f, 30f, 24f)                              // 100x80
+        }
+    }
+
+    /**
+     * Lấy số topping tối đa đề xuất dựa trên kích thước tem
+     *
+     * Tính toán dựa trên:
+     * - Chiều cao tem và số dòng có thể hiển thị
+     * - Các dòng bắt buộc: Item name (1-2), Order number (1), Separator (2-3)
+     * - Các dòng tùy chọn: Size, Ice, Sugar, Price, Time
+     * - Mỗi topping cần 1 dòng
+     */
+    fun getRecommendedMaxToppings(): Int {
+        return when {
+            // Tem rất nhỏ: 40x30, 50x30, 72x30 - chỉ đủ 2 toppings
+            heightMm <= 30 -> 2
+
+            // Tem trung bình: 60x40 - đủ 3 toppings
+            heightMm <= 40 -> 3
+
+            // Tem lớn: 80x50, 100x50 - đủ 5-6 toppings
+            heightMm <= 50 && widthMm <= 80 -> 5
+            heightMm <= 50 -> 6
+
+            // Tem XL: 100x80 - đủ 10 toppings
+            else -> 10
+        }
+    }
 
     companion object {
         // Common label sizes
@@ -178,6 +243,22 @@ data class KitchenEntity(
     @ColumnInfo(name = "label_reverse")
     val labelReverse: Boolean = false, // Đảo chiều in tem (180°)
 
+    // ========== LABEL SIZE & FONT CONFIG ==========
+    @ColumnInfo(name = "label_width_mm")
+    val labelWidthMm: Int = 72, // Default 72mm (XPRINTER)
+
+    @ColumnInfo(name = "label_height_mm")
+    val labelHeightMm: Int = 30, // Default 30mm
+
+    @ColumnInfo(name = "label_gap_mm")
+    val labelGapMm: Int = 3, // Gap between labels
+
+    @ColumnInfo(name = "label_font_scale")
+    val labelFontScale: Float = 1.0f, // Font scale factor (0.5 - 2.0)
+
+    @ColumnInfo(name = "label_max_toppings")
+    val labelMaxToppings: Int = 0, // Max toppings per label (0 = auto based on size)
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 
@@ -254,5 +335,20 @@ data class KitchenEntity(
      */
     fun getLabelSize(): LabelSize {
         return LabelSize(labelWidthMm, labelHeightMm, labelGapMm)
+    }
+
+    /**
+     * Lấy max toppings (auto nếu = 0)
+     */
+    fun getEffectiveMaxToppings(): Int {
+        if (labelMaxToppings > 0) return labelMaxToppings
+        return getLabelSize().getRecommendedMaxToppings()
+    }
+
+    /**
+     * Lấy font scale factor
+     */
+    fun getEffectiveFontScale(): Float {
+        return labelFontScale.coerceIn(0.5f, 2.0f)
     }
 }
