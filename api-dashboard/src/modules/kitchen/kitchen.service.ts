@@ -196,23 +196,35 @@ export class KitchenService {
     }));
   }
 
-  // Get all products with their assigned kitchens
-  // Used for "Gán món ăn - Bếp" dialog to show which kitchens each product is assigned to
+  // Get all products with their assigned kitchens for a specific branch
+  // Used for branch-products page to show kitchen assignments
   async getProductsWithKitchenAssignments(
     tenantId: string,
     branchId?: string,
     categoryId?: string,
     search?: string,
   ) {
-    // Build product query
+    // If branchId provided, first get all kitchens for this branch
+    // Then get assignments only for those kitchens
+    let branchKitchenIds: string[] = [];
+    if (branchId && branchId !== 'all') {
+      const branchKitchens = await this.kitchenRepository.find({
+        where: { tenantId, branchId },
+        select: ['id'],
+      });
+      branchKitchenIds = branchKitchens.map(k => k.id);
+
+      // If branch has no kitchens, return empty
+      if (branchKitchenIds.length === 0) {
+        return [];
+      }
+    }
+
+    // Build product query (products don't have branch_id, they have brand_id)
     const productQuery = this.productRepository
       .createQueryBuilder('p')
       .where('p.tenant_id = :tenantId', { tenantId })
       .andWhere('p.is_active = true');
-
-    if (branchId && branchId !== 'all') {
-      productQuery.andWhere('p.branch_id = :branchId', { branchId });
-    }
 
     if (categoryId && categoryId !== 'all') {
       productQuery.andWhere('p.category_id = :categoryId', { categoryId });
@@ -236,22 +248,30 @@ export class KitchenService {
     }
 
     // Get all product-kitchen assignments for these products
+    // If branchId was provided, filter to only branch's kitchens
     const productIds = products.map(p => p.id);
+    let assignmentsWhere: any = { tenantId, productId: In(productIds) };
+    if (branchKitchenIds.length > 0) {
+      assignmentsWhere.kitchenId = In(branchKitchenIds);
+    }
+
     const assignments = await this.productKitchenRepository.find({
-      where: { tenantId, productId: In(productIds) },
+      where: assignmentsWhere,
       relations: ['kitchen'],
     });
 
     // Build map of productId -> kitchens
     const productKitchensMap = new Map<string, any[]>();
     assignments.forEach(a => {
-      const kitchens = productKitchensMap.get(a.productId) || [];
-      kitchens.push({
-        id: a.kitchen.id,
-        name: a.kitchen.name,
-        kitchenType: a.kitchen.kitchenType,
-      });
-      productKitchensMap.set(a.productId, kitchens);
+      if (a.kitchen) {
+        const kitchens = productKitchensMap.get(a.productId) || [];
+        kitchens.push({
+          id: a.kitchen.id,
+          name: a.kitchen.name,
+          kitchenType: a.kitchen.kitchenType,
+        });
+        productKitchensMap.set(a.productId, kitchens);
+      }
     });
 
     // Return products with their assigned kitchens
