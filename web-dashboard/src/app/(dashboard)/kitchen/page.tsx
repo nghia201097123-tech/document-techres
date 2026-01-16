@@ -36,7 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
-import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, KitchenTypeLabels, PrintModeLabels } from "@/services/kitchen-service";
+import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels } from "@/services/kitchen-service";
 import { productService, type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
@@ -71,6 +71,7 @@ export default function KitchenPage() {
     printerName: "",
     printerIp: "",
     printerPort: 9100,
+    printerProtocol: "ESC_POS" as PrinterProtocol,
     paperWidth: 80,
     printMode: "TICKET" as KitchenPrintMode,
     description: "",
@@ -132,6 +133,7 @@ export default function KitchenPage() {
       printerName: "",
       printerIp: "",
       printerPort: 9100,
+      printerProtocol: "ESC_POS" as PrinterProtocol,
       paperWidth: 80,
       printMode: "TICKET" as KitchenPrintMode,
       description: "",
@@ -160,6 +162,7 @@ export default function KitchenPage() {
       printerName: kitchen.printerName || "",
       printerIp: kitchen.printerIp || "",
       printerPort: kitchen.printerPort || 9100,
+      printerProtocol: (kitchen.printerProtocol || "ESC_POS") as PrinterProtocol,
       paperWidth: kitchen.paperWidth || 80,
       printMode: (kitchen.printMode || "TICKET") as KitchenPrintMode,
       description: kitchen.description || "",
@@ -215,6 +218,7 @@ export default function KitchenPage() {
       printerName: "",
       printerIp: "",
       printerPort: 9100,
+      printerProtocol: "ESC_POS" as PrinterProtocol,
       paperWidth: 80,
       printMode: "TICKET" as KitchenPrintMode,
       description: "",
@@ -257,6 +261,7 @@ export default function KitchenPage() {
             printerName: formData.printerName,
             printerIp: formData.printerIp,
             printerPort: formData.printerPort,
+            printerProtocol: formData.printerProtocol,
             paperWidth: formData.paperWidth,
             printMode: formData.printMode,
             description: "",
@@ -281,6 +286,7 @@ export default function KitchenPage() {
           printerName: formData.printerName,
           printerIp: formData.printerIp,
           printerPort: formData.printerPort,
+          printerProtocol: formData.printerProtocol,
           paperWidth: formData.paperWidth,
           printMode: formData.printMode,
           description: formData.description,
@@ -718,6 +724,44 @@ export default function KitchenPage() {
                       {(Object.keys(PrintModeLabels) as KitchenPrintMode[]).map((mode) => (
                         <SelectItem key={mode} value={mode}>
                           {PrintModeLabels[mode]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="printerProtocol">Loại máy in</Label>
+                  <Select
+                    value={formData.printerProtocol}
+                    onValueChange={(value: PrinterProtocol) => setFormData({ ...formData, printerProtocol: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn loại máy in" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(PrinterProtocolLabels) as PrinterProtocol[]).map((protocol) => (
+                        <SelectItem key={protocol} value={protocol}>
+                          {PrinterProtocolLabels[protocol]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="paperWidth">Khổ giấy</Label>
+                  <Select
+                    value={formData.paperWidth?.toString()}
+                    onValueChange={(value) => setFormData({ ...formData, paperWidth: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn khổ giấy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAPER_WIDTH_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value.toString()}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

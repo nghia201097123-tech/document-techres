@@ -45,6 +45,21 @@ export const PrintModeLabels: Record<KitchenPrintMode, string> = {
   BOTH: "In cả phiếu và tem",
 };
 
+/**
+ * Loại giao thức máy in
+ * - ESC_POS: Máy in hóa đơn/receipt (thermal printer)
+ * - TSPL: Máy in tem/sticker (label printer)
+ */
+export type PrinterProtocol = "ESC_POS" | "TSPL";
+
+/**
+ * Label cho các giao thức máy in
+ */
+export const PrinterProtocolLabels: Record<PrinterProtocol, string> = {
+  ESC_POS: "ESC/POS (Máy in bill)",
+  TSPL: "TSPL (Máy in tem)",
+};
+
 export interface Kitchen {
   id: string;
   name: string;
@@ -52,6 +67,7 @@ export interface Kitchen {
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
+  printerProtocol?: PrinterProtocol;
   paperWidth?: number; // 58, 80, 110, etc.
   printMode?: KitchenPrintMode;
   description?: string;
@@ -81,6 +97,7 @@ export interface CreateKitchenDto {
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
+  printerProtocol?: PrinterProtocol;
   paperWidth?: number;
   printMode?: KitchenPrintMode;
   description?: string;
@@ -104,6 +121,7 @@ export interface UpdateKitchenDto {
   printerName?: string;
   printerIp?: string;
   printerPort?: number;
+  printerProtocol?: PrinterProtocol;
   paperWidth?: number;
   printMode?: KitchenPrintMode;
   description?: string;

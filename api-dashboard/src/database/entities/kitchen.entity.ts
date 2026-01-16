@@ -36,6 +36,16 @@ export enum KitchenType {
   OTHER = 'other',         // Khác
 }
 
+/**
+ * Loại giao thức máy in
+ * - ESC_POS: Máy in hóa đơn/receipt (thermal printer)
+ * - TSPL: Máy in tem/sticker (label printer)
+ */
+export enum PrinterProtocol {
+  ESC_POS = 'ESC_POS',
+  TSPL = 'TSPL',
+}
+
 @Entity('kitchens')
 @Index(['tenantId', 'branchId'])
 export class Kitchen {
@@ -73,6 +83,15 @@ export class Kitchen {
 
   @Column({ name: 'printer_port', type: 'int', nullable: true, default: 9100 })
   printerPort: number;
+
+  @Column({
+    name: 'printer_protocol',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    default: PrinterProtocol.ESC_POS,
+  })
+  printerProtocol: string;
 
   @Column({ name: 'paper_width', type: 'int', nullable: true, default: 80 })
   paperWidth: number;

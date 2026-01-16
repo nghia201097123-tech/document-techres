@@ -509,6 +509,23 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Printing config columns added to kitchens table');
       }
 
+      // 19.5. Add printer_protocol column to kitchens table
+      const hasPrinterProtocol = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'printer_protocol'
+        );
+      `);
+
+      if (!hasPrinterProtocol[0].exists) {
+        this.logger.log('Adding printer_protocol column to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN IF NOT EXISTS printer_protocol VARCHAR(20) DEFAULT 'ESC_POS'
+        `);
+        this.logger.log('printer_protocol column added to kitchens table');
+      }
+
       // 20. Add parent_id column to departments table for hierarchy support
       const hasParentId = await queryRunner.query(`
         SELECT EXISTS (

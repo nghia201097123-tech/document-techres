@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsIn, Min, Max, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { KitchenPrintMode, KitchenType } from '../../../database/entities/kitchen.entity';
+import { KitchenPrintMode, KitchenType, PrinterProtocol } from '../../../database/entities/kitchen.entity';
 
 export class CreateKitchenDto {
   @ApiProperty({ example: 'Bếp chính' })
@@ -36,6 +36,16 @@ export class CreateKitchenDto {
   @Min(1)
   @Max(65535)
   printerPort?: number;
+
+  @ApiPropertyOptional({
+    example: 'ESC_POS',
+    enum: Object.values(PrinterProtocol),
+    description: 'Loại máy in: ESC_POS (máy in bill), TSPL (máy in tem)',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(Object.values(PrinterProtocol))
+  printerProtocol?: string;
 
   @ApiPropertyOptional({ example: 80, description: 'Khổ giấy in (mm): 58, 80, 110, 112' })
   @IsOptional()
