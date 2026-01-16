@@ -18,6 +18,47 @@ export class KitchenController {
     return this.kitchenService.findAllWithProductCount(req.user.tenantId, branchId);
   }
 
+  // IMPORTANT: Static routes MUST be placed BEFORE parameterized routes (:id)
+  // Otherwise NestJS will match 'products' or 'product' as :id value
+
+  @Get('products/with-assignments')
+  @ApiOperation({ summary: 'Lấy danh sách món ăn với các bếp đã gán (cho dialog gán món)' })
+  @ApiQuery({ name: 'branchId', required: false })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getProductsWithKitchenAssignments(
+    @Request() req,
+    @Query('branchId') branchId?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.kitchenService.getProductsWithKitchenAssignments(
+      req.user.tenantId,
+      branchId,
+      categoryId,
+      search,
+    );
+  }
+
+  @Get('product/:productId/kitchens')
+  @ApiOperation({ summary: 'Lấy danh sách bếp của món ăn' })
+  getProductKitchens(@Request() req, @Param('productId') productId: string) {
+    return this.kitchenService.getProductKitchens(req.user.tenantId, productId);
+  }
+
+  @Put('product/:productId/kitchens')
+  @ApiOperation({ summary: 'Gán danh sách bếp cho món ăn (thay thế toàn bộ)' })
+  @ApiBody({ schema: { type: 'object', properties: { kitchenIds: { type: 'array', items: { type: 'string' } } } } })
+  setProductKitchens(
+    @Request() req,
+    @Param('productId') productId: string,
+    @Body('kitchenIds') kitchenIds: string[],
+  ) {
+    return this.kitchenService.setProductKitchens(req.user.tenantId, productId, kitchenIds || []);
+  }
+
+  // Parameterized routes with :id below
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin bếp' })
   findOne(@Request() req, @Param('id') id: string) {
@@ -84,42 +125,6 @@ export class KitchenController {
     @Param('productId') productId: string,
   ) {
     return this.kitchenService.removeProductFromKitchen(req.user.tenantId, id, productId);
-  }
-
-  @Get('product/:productId/kitchens')
-  @ApiOperation({ summary: 'Lấy danh sách bếp của món ăn' })
-  getProductKitchens(@Request() req, @Param('productId') productId: string) {
-    return this.kitchenService.getProductKitchens(req.user.tenantId, productId);
-  }
-
-  @Put('product/:productId/kitchens')
-  @ApiOperation({ summary: 'Gán danh sách bếp cho món ăn (thay thế toàn bộ)' })
-  @ApiBody({ schema: { type: 'object', properties: { kitchenIds: { type: 'array', items: { type: 'string' } } } } })
-  setProductKitchens(
-    @Request() req,
-    @Param('productId') productId: string,
-    @Body('kitchenIds') kitchenIds: string[],
-  ) {
-    return this.kitchenService.setProductKitchens(req.user.tenantId, productId, kitchenIds || []);
-  }
-
-  @Get('products/with-assignments')
-  @ApiOperation({ summary: 'Lấy danh sách món ăn với các bếp đã gán (cho dialog gán món)' })
-  @ApiQuery({ name: 'branchId', required: false })
-  @ApiQuery({ name: 'categoryId', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  getProductsWithKitchenAssignments(
-    @Request() req,
-    @Query('branchId') branchId?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.kitchenService.getProductsWithKitchenAssignments(
-      req.user.tenantId,
-      branchId,
-      categoryId,
-      search,
-    );
   }
 
   @Post(':id/products/category/:categoryId')
