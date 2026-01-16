@@ -521,6 +521,9 @@ export class KitchenDto {
   @ApiProperty({ description: 'Port máy in', nullable: true })
   printerPort: number | null;
 
+  @ApiProperty({ description: 'Loại máy in: ESC_POS (máy in bill), TSPL (máy in tem)', nullable: true })
+  printerProtocol: string | null;
+
   @ApiProperty({ description: 'Khổ giấy', nullable: true })
   paperWidth: number | null;
 

@@ -420,6 +420,18 @@ class SyncRepository @Inject constructor(
                 labelWidthMm = dto.labelWidthMm ?: 50,
                 labelHeightMm = dto.labelHeightMm ?: 30,
                 labelGapMm = dto.labelGapMm ?: 3,
+                // Ticket printing config
+                ticketCutAfterPrint = dto.ticketCutAfterPrint,
+                ticketPrintItemsSeparately = dto.ticketPrintItemsSeparately,
+                ticketCopies = dto.ticketCopies,
+                // Label printing config
+                labelPrintPrice = dto.labelPrintPrice,
+                labelPrintStoreName = dto.labelPrintStoreName,
+                labelPrintOrderNumber = dto.labelPrintOrderNumber,
+                labelPrintTableName = dto.labelPrintTableName,
+                labelPrintTime = dto.labelPrintTime,
+                labelStoreName = dto.labelStoreName,
+                labelReverse = dto.labelReverse,
                 sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
                 createdAt = dto.createdAt,

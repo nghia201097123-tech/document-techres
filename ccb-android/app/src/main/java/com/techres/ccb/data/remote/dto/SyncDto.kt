@@ -198,13 +198,25 @@ data class KitchenDto(
     @SerializedName("printerName") val printerName: String? = null,
     @SerializedName("printerIp") val printerIp: String? = null,
     @SerializedName("printerPort") val printerPort: Int? = null,
-    @SerializedName("printerProtocol") val printerProtocol: String? = null, // ESCPOS or TSPL
+    @SerializedName("printerProtocol") val printerProtocol: String? = null, // ESC_POS or TSPL
     @SerializedName("paperWidth") val paperWidth: Int? = null, // 58 or 80
     @SerializedName("printMode") val printMode: String? = null, // TICKET, LABEL, BOTH
     @SerializedName("printDensity") val printDensity: Int? = null, // 0-15 for TSPL
     @SerializedName("labelWidthMm") val labelWidthMm: Int? = null,
     @SerializedName("labelHeightMm") val labelHeightMm: Int? = null,
     @SerializedName("labelGapMm") val labelGapMm: Int? = null,
+    // ========== TICKET PRINTING CONFIG ==========
+    @SerializedName("ticketCutAfterPrint") val ticketCutAfterPrint: Boolean = true,
+    @SerializedName("ticketPrintItemsSeparately") val ticketPrintItemsSeparately: Boolean = false,
+    @SerializedName("ticketCopies") val ticketCopies: Int = 1,
+    // ========== LABEL PRINTING CONFIG ==========
+    @SerializedName("labelPrintPrice") val labelPrintPrice: Boolean = false,
+    @SerializedName("labelPrintStoreName") val labelPrintStoreName: Boolean = false,
+    @SerializedName("labelPrintOrderNumber") val labelPrintOrderNumber: Boolean = true,
+    @SerializedName("labelPrintTableName") val labelPrintTableName: Boolean = true,
+    @SerializedName("labelPrintTime") val labelPrintTime: Boolean = true,
+    @SerializedName("labelStoreName") val labelStoreName: String? = null,
+    @SerializedName("labelReverse") val labelReverse: Boolean = false,
     @SerializedName("sortOrder") val sortOrder: Int = 0,
     @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("createdAt") val createdAt: String,

@@ -51,6 +51,9 @@ export class Kitchen {
   @Column({ name: 'printer_port', type: 'int', nullable: true, default: 9100 })
   printerPort: number;
 
+  @Column({ name: 'printer_protocol', type: 'varchar', length: 20, nullable: true, default: 'ESC_POS' })
+  printerProtocol: string;
+
   @Column({ name: 'paper_width', type: 'int', nullable: true, default: 80 })
   paperWidth: number;
 
