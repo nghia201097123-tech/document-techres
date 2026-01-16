@@ -519,7 +519,7 @@ class SunmiPrinterAdapter @Inject constructor(
             }
 
             // Fallback: gửi ESC/POS cash drawer command
-            val drawerCommand = byteArrayOf(0x1B, 0x70, 0x00, 0x19, 0xFA) // ESC p 0 25 250
+            val drawerCommand = byteArrayOf(0x1B, 0x70, 0x00, 0x19, 0xFA.toByte()) // ESC p 0 25 250
             return@withContext write(drawerCommand)
         } catch (e: Exception) {
             return@withContext PrinterResult.Error(e.message ?: "Open cash drawer failed")
