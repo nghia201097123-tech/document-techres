@@ -88,6 +88,38 @@ export class Kitchen {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  // ========== TICKET PRINTING CONFIG ==========
+  @Column({ name: 'ticket_cut_after_print', default: true })
+  ticketCutAfterPrint: boolean;
+
+  @Column({ name: 'ticket_print_items_separately', default: false })
+  ticketPrintItemsSeparately: boolean;
+
+  @Column({ name: 'ticket_copies', type: 'int', default: 1 })
+  ticketCopies: number;
+
+  // ========== LABEL PRINTING CONFIG ==========
+  @Column({ name: 'label_print_price', default: false })
+  labelPrintPrice: boolean;
+
+  @Column({ name: 'label_print_store_name', default: false })
+  labelPrintStoreName: boolean;
+
+  @Column({ name: 'label_print_order_number', default: true })
+  labelPrintOrderNumber: boolean;
+
+  @Column({ name: 'label_print_table_name', default: true })
+  labelPrintTableName: boolean;
+
+  @Column({ name: 'label_print_time', default: true })
+  labelPrintTime: boolean;
+
+  @Column({ name: 'label_store_name', nullable: true })
+  labelStoreName: string;
+
+  @Column({ name: 'label_reverse', default: false })
+  labelReverse: boolean;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

@@ -72,6 +72,7 @@ export interface Kitchen {
   labelPrintTableName?: boolean;
   labelPrintTime?: boolean;
   labelStoreName?: string;
+  labelReverse?: boolean;
 }
 
 export interface CreateKitchenDto {
@@ -94,6 +95,7 @@ export interface CreateKitchenDto {
   labelPrintTableName?: boolean;
   labelPrintTime?: boolean;
   labelStoreName?: string;
+  labelReverse?: boolean;
 }
 
 export interface UpdateKitchenDto {
@@ -116,6 +118,7 @@ export interface UpdateKitchenDto {
   labelPrintTableName?: boolean;
   labelPrintTime?: boolean;
   labelStoreName?: string;
+  labelReverse?: boolean;
 }
 
 export const kitchenService = {

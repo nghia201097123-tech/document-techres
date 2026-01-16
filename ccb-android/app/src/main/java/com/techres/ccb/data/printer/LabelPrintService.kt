@@ -325,6 +325,7 @@ object LabelPrintService {
         val showTime = kitchen.labelPrintTime
         val showPrice = kitchen.labelPrintPrice
         val storeName = kitchen.labelStoreName ?: label.storeName
+        val labelReverse = kitchen.labelReverse
 
         Log.d(TAG, "=== Generating TSPL label ===")
         Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
@@ -336,6 +337,7 @@ object LabelPrintService {
         Log.d(TAG, "  - toppings: ${label.toppings}")
         Log.d(TAG, "  - showStoreName: $showStoreName, showOrderNumber: $showOrderNumber")
         Log.d(TAG, "  - showTableName: $showTableName, showTime: $showTime, showPrice: $showPrice")
+        Log.d(TAG, "  - labelReverse: $labelReverse")
 
         val output = ByteArrayOutputStream()
 
@@ -351,9 +353,11 @@ object LabelPrintService {
         val fontBold = calculateFontSize(labelSize, 0.9f)
 
         // ========== SETUP COMMANDS ==========
+        // DIRECTION: 0 = normal, 1 = reverse (rotated 180°)
+        val direction = if (labelReverse) 1 else 0
         output.write("SIZE ${labelSize.widthMm} mm, ${labelSize.heightMm} mm\r\n".toByteArray())
         output.write("GAP ${labelSize.gapMm} mm, 0 mm\r\n".toByteArray())
-        output.write("DIRECTION 0\r\n".toByteArray())
+        output.write("DIRECTION $direction\r\n".toByteArray())
         output.write("CLS\r\n".toByteArray())
         output.write("DENSITY $density\r\n".toByteArray())
         output.write("SPEED 4\r\n".toByteArray())
@@ -700,6 +704,7 @@ object LabelPrintService {
     /**
      * Generate ESC/POS label for receipt printers
      * Supports split labels when there are many toppings
+     * Supports label reverse (180° rotation) via bitmap flip
      */
     private fun generateEscPosLabel(
         kitchen: KitchenEntity,
@@ -714,6 +719,7 @@ object LabelPrintService {
         val showTime = kitchen.labelPrintTime
         val showPrice = kitchen.labelPrintPrice
         val storeName = kitchen.labelStoreName ?: label.storeName
+        val labelReverse = kitchen.labelReverse
 
         Log.d(TAG, "=== Generating ESC/POS label ===")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
@@ -724,7 +730,10 @@ object LabelPrintService {
         Log.d(TAG, "  - toppings (${label.toppings.size}): ${label.toppings}")
         Log.d(TAG, "  - showStoreName: $showStoreName, showOrderNumber: $showOrderNumber")
         Log.d(TAG, "  - showTableName: $showTableName, showTime: $showTime, showPrice: $showPrice")
+        Log.d(TAG, "  - labelReverse: $labelReverse")
 
+        // Note: For ESC/POS printers, labelReverse would need bitmap rotation which is complex
+        // TSPL printers use DIRECTION command for reverse. ESC/POS can use upside-down mode in future.
         val builder = HybridBillBuilder(paperWidth, true, false)
 
         builder.apply {

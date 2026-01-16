@@ -250,7 +250,7 @@ fun KitchenPrinterScreen(
             onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
                        ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies,
                        labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
-                       labelPrintTableName, labelPrintTime, labelStoreName ->
+                       labelPrintTableName, labelPrintTime, labelStoreName, labelReverse ->
                 viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
                     ip = ip.ifBlank { null },
@@ -272,7 +272,8 @@ fun KitchenPrinterScreen(
                     labelPrintOrderNumber = labelPrintOrderNumber,
                     labelPrintTableName = labelPrintTableName,
                     labelPrintTime = labelPrintTime,
-                    labelStoreName = labelStoreName.ifBlank { null }
+                    labelStoreName = labelStoreName.ifBlank { null },
+                    labelReverse = labelReverse
                 )
                 showPrinterDialog = false
             }
@@ -514,7 +515,7 @@ private fun PrinterConfigDialog(
     onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
              ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int,
              labelPrintPrice: Boolean, labelPrintStoreName: Boolean, labelPrintOrderNumber: Boolean,
-             labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String) -> Unit
+             labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String, labelReverse: Boolean) -> Unit
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
@@ -539,6 +540,7 @@ private fun PrinterConfigDialog(
     var labelPrintTableName by remember { mutableStateOf(kitchen.labelPrintTableName) }
     var labelPrintTime by remember { mutableStateOf(kitchen.labelPrintTime) }
     var labelStoreName by remember { mutableStateOf(kitchen.labelStoreName ?: "") }
+    var labelReverse by remember { mutableStateOf(kitchen.labelReverse) }
 
     var protocolExpanded by remember { mutableStateOf(false) }
     var labelSizeExpanded by remember { mutableStateOf(false) }
@@ -1098,6 +1100,25 @@ private fun PrinterConfigDialog(
                         )
                         Text(text = "In thời gian", fontSize = 14.sp)
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = labelReverse,
+                            onCheckedChange = { labelReverse = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Column {
+                            Text(text = "Đảo chiều tem (180°)", fontSize = 14.sp)
+                            Text(
+                                text = "In tem ngược 180° cho máy in đặt ngược",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -1134,7 +1155,8 @@ private fun PrinterConfigDialog(
                                 labelPrintOrderNumber,
                                 labelPrintTableName,
                                 labelPrintTime,
-                                labelStoreName
+                                labelStoreName,
+                                labelReverse
                             )
                         },
                         modifier = Modifier.weight(1f),

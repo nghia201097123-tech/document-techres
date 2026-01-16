@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsIn, Min, Max } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsIn, Min, Max, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { KitchenPrintMode, KitchenType } from '../../../database/entities/kitchen.entity';
 
@@ -58,4 +58,59 @@ export class CreateKitchenDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  // ========== TICKET PRINTING CONFIG ==========
+  @ApiPropertyOptional({ description: 'Cắt giấy sau khi in phiếu', default: true })
+  @IsOptional()
+  @IsBoolean()
+  ticketCutAfterPrint?: boolean;
+
+  @ApiPropertyOptional({ description: 'In từng món riêng biệt', default: false })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintItemsSeparately?: boolean;
+
+  @ApiPropertyOptional({ description: 'Số bản in phiếu (1-5)', default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  ticketCopies?: number;
+
+  // ========== LABEL PRINTING CONFIG ==========
+  @ApiPropertyOptional({ description: 'In giá trên tem', default: false })
+  @IsOptional()
+  @IsBoolean()
+  labelPrintPrice?: boolean;
+
+  @ApiPropertyOptional({ description: 'In tên cửa hàng trên tem', default: false })
+  @IsOptional()
+  @IsBoolean()
+  labelPrintStoreName?: boolean;
+
+  @ApiPropertyOptional({ description: 'In mã đơn hàng trên tem', default: true })
+  @IsOptional()
+  @IsBoolean()
+  labelPrintOrderNumber?: boolean;
+
+  @ApiPropertyOptional({ description: 'In tên bàn trên tem', default: true })
+  @IsOptional()
+  @IsBoolean()
+  labelPrintTableName?: boolean;
+
+  @ApiPropertyOptional({ description: 'In thời gian trên tem', default: true })
+  @IsOptional()
+  @IsBoolean()
+  labelPrintTime?: boolean;
+
+  @ApiPropertyOptional({ description: 'Tên cửa hàng hiển thị trên tem' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  labelStoreName?: string;
+
+  @ApiPropertyOptional({ description: 'Đảo chiều in tem (180°)', default: false })
+  @IsOptional()
+  @IsBoolean()
+  labelReverse?: boolean;
 }

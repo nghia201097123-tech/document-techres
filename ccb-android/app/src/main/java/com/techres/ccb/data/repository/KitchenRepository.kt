@@ -62,7 +62,8 @@ class KitchenRepository @Inject constructor(
         labelPrintOrderNumber: Boolean = true,
         labelPrintTableName: Boolean = true,
         labelPrintTime: Boolean = true,
-        labelStoreName: String? = null
+        labelStoreName: String? = null,
+        labelReverse: Boolean = false
     ) {
         kitchenDao.updateFullPrinterConfig(
             kitchenId, ip, port, name, isConnected,
@@ -70,7 +71,7 @@ class KitchenRepository @Inject constructor(
             paperWidth, printMode,
             ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies,
             labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
-            labelPrintTableName, labelPrintTime, labelStoreName
+            labelPrintTableName, labelPrintTime, labelStoreName, labelReverse
         )
     }
 

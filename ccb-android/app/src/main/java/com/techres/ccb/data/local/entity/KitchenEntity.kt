@@ -175,6 +175,9 @@ data class KitchenEntity(
     @ColumnInfo(name = "label_store_name")
     val labelStoreName: String? = null, // Tên cửa hàng hiển thị trên tem
 
+    @ColumnInfo(name = "label_reverse")
+    val labelReverse: Boolean = false, // Đảo chiều in tem (180°)
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 

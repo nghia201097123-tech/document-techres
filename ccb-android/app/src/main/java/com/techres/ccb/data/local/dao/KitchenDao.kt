@@ -58,7 +58,8 @@ interface KitchenDao {
             label_print_order_number = :labelPrintOrderNumber,
             label_print_table_name = :labelPrintTableName,
             label_print_time = :labelPrintTime,
-            label_store_name = :labelStoreName
+            label_store_name = :labelStoreName,
+            label_reverse = :labelReverse
         WHERE id = :kitchenId
     """)
     suspend fun updateFullPrinterConfig(
@@ -84,7 +85,8 @@ interface KitchenDao {
         labelPrintOrderNumber: Boolean,
         labelPrintTableName: Boolean,
         labelPrintTime: Boolean,
-        labelStoreName: String?
+        labelStoreName: String?,
+        labelReverse: Boolean
     )
 
     @Transaction

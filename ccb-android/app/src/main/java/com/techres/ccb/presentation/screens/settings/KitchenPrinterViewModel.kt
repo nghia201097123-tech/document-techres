@@ -145,7 +145,8 @@ class KitchenPrinterViewModel @Inject constructor(
         labelPrintOrderNumber: Boolean = true,
         labelPrintTableName: Boolean = true,
         labelPrintTime: Boolean = true,
-        labelStoreName: String? = null
+        labelStoreName: String? = null,
+        labelReverse: Boolean = false
     ) {
         viewModelScope.launch {
             try {
@@ -170,7 +171,8 @@ class KitchenPrinterViewModel @Inject constructor(
                     labelPrintOrderNumber = labelPrintOrderNumber,
                     labelPrintTableName = labelPrintTableName,
                     labelPrintTime = labelPrintTime,
-                    labelStoreName = labelStoreName
+                    labelStoreName = labelStoreName,
+                    labelReverse = labelReverse
                 )
             } catch (e: Exception) {
                 _uiState.update {

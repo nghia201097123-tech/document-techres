@@ -85,6 +85,7 @@ export default function KitchenPage() {
     labelPrintTableName: true,
     labelPrintTime: true,
     labelStoreName: "",
+    labelReverse: false,
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
@@ -145,6 +146,7 @@ export default function KitchenPage() {
       labelPrintTableName: true,
       labelPrintTime: true,
       labelStoreName: "",
+      labelReverse: false,
     });
     setDialogMode("create");
   };
@@ -172,6 +174,7 @@ export default function KitchenPage() {
       labelPrintTableName: kitchen.labelPrintTableName ?? true,
       labelPrintTime: kitchen.labelPrintTime ?? true,
       labelStoreName: kitchen.labelStoreName || "",
+      labelReverse: kitchen.labelReverse ?? false,
     });
     setDialogMode("edit");
     // Remove badges when editing
@@ -226,6 +229,7 @@ export default function KitchenPage() {
       labelPrintTableName: true,
       labelPrintTime: true,
       labelStoreName: "",
+      labelReverse: false,
     });
     setAllProducts([]);
     setKitchenProducts([]);
@@ -266,6 +270,7 @@ export default function KitchenPage() {
             labelPrintTableName: formData.labelPrintTableName,
             labelPrintTime: formData.labelPrintTime,
             labelStoreName: formData.labelStoreName,
+            labelReverse: formData.labelReverse,
           });
           return;
         }
@@ -290,6 +295,7 @@ export default function KitchenPage() {
           labelPrintTableName: formData.labelPrintTableName,
           labelPrintTime: formData.labelPrintTime,
           labelStoreName: formData.labelStoreName,
+          labelReverse: formData.labelReverse,
         };
         const result = await kitchenService.update(selectedKitchen.id, updateData);
         setKitchens((prev) => prev.map((k) => (k.id === selectedKitchen.id ? { ...result, productCount: k.productCount } : k)));
@@ -871,6 +877,16 @@ export default function KitchenPage() {
                       />
                       <Label htmlFor="labelPrintTime" className="text-sm cursor-pointer">
                         In thời gian
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="labelReverse"
+                        checked={formData.labelReverse}
+                        onCheckedChange={(checked) => setFormData({ ...formData, labelReverse: !!checked })}
+                      />
+                      <Label htmlFor="labelReverse" className="text-sm cursor-pointer">
+                        Đảo chiều tem (180°)
                       </Label>
                     </div>
                   </div>

@@ -530,6 +530,38 @@ export class KitchenDto {
   @ApiProperty({ description: 'Mô tả', nullable: true })
   description: string | null;
 
+  // ========== TICKET PRINTING CONFIG ==========
+  @ApiProperty({ description: 'Cắt giấy sau khi in phiếu' })
+  ticketCutAfterPrint: boolean;
+
+  @ApiProperty({ description: 'In từng món riêng biệt' })
+  ticketPrintItemsSeparately: boolean;
+
+  @ApiProperty({ description: 'Số bản in phiếu' })
+  ticketCopies: number;
+
+  // ========== LABEL PRINTING CONFIG ==========
+  @ApiProperty({ description: 'In giá trên tem' })
+  labelPrintPrice: boolean;
+
+  @ApiProperty({ description: 'In tên cửa hàng trên tem' })
+  labelPrintStoreName: boolean;
+
+  @ApiProperty({ description: 'In mã đơn hàng trên tem' })
+  labelPrintOrderNumber: boolean;
+
+  @ApiProperty({ description: 'In tên bàn trên tem' })
+  labelPrintTableName: boolean;
+
+  @ApiProperty({ description: 'In thời gian trên tem' })
+  labelPrintTime: boolean;
+
+  @ApiProperty({ description: 'Tên cửa hàng hiển thị trên tem', nullable: true })
+  labelStoreName: string | null;
+
+  @ApiProperty({ description: 'Đảo chiều in tem (180°)' })
+  labelReverse: boolean;
+
   @ApiProperty({ description: 'Thứ tự sắp xếp' })
   sortOrder: number;
 

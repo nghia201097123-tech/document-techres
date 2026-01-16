@@ -91,6 +91,9 @@ export class Kitchen {
   @Column({ name: 'label_store_name', nullable: true })
   labelStoreName: string;
 
+  @Column({ name: 'label_reverse', default: false })
+  labelReverse: boolean;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
