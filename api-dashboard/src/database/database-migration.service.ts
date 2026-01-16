@@ -481,6 +481,34 @@ export class DatabaseMigrationService implements OnModuleInit {
       // Drop old print_mode enum if exists
       await queryRunner.query(`DROP TYPE IF EXISTS print_mode CASCADE`);
 
+      // 19.4. Add printing config columns to kitchens table (ticket and label config)
+      const hasTicketCutAfterPrint = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'ticket_cut_after_print'
+        );
+      `);
+
+      if (!hasTicketCutAfterPrint[0].exists) {
+        this.logger.log('Adding printing config columns to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          -- Ticket printing config
+          ADD COLUMN IF NOT EXISTS ticket_cut_after_print BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS ticket_print_items_separately BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS ticket_copies INTEGER DEFAULT 1,
+          -- Label printing config
+          ADD COLUMN IF NOT EXISTS label_print_price BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS label_print_store_name BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS label_print_order_number BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS label_print_table_name BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS label_print_time BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS label_store_name VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS label_reverse BOOLEAN DEFAULT FALSE
+        `);
+        this.logger.log('Printing config columns added to kitchens table');
+      }
+
       // 20. Add parent_id column to departments table for hierarchy support
       const hasParentId = await queryRunner.query(`
         SELECT EXISTS (
