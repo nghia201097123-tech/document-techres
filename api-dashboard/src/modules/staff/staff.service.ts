@@ -28,8 +28,8 @@ export class StaffService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    // Default to localhost:4002 for development
-    this.oauthApiUrl = this.configService.get('OAUTH_API_URL', 'http://localhost:4002');
+    // Default to localhost:3005 for development (api-oauth service port)
+    this.oauthApiUrl = this.configService.get('OAUTH_API_URL', 'http://localhost:3005');
   }
 
   async findAll(tenantId: string, branchId?: string) {
