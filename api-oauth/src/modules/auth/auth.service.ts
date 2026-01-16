@@ -258,6 +258,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Create tenant user
+    // Default role is STAFF (not OWNER) for security - only explicitly granted owners should have owner access
     const user = this.userRepository.create({
       tenantId,
       username,
@@ -265,7 +266,7 @@ export class AuthService {
       passwordHash,
       name,
       phone,
-      role: role || UserRole.OWNER,
+      role: role || UserRole.STAFF,
       branchId,
       userType: UserType.TENANT,
       isActive: true,

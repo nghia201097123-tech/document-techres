@@ -101,9 +101,10 @@ export class StaffService {
     const tempPassword = this.generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-    // Exclude role and usernamePrefix from DTO spread
+    // Exclude usernamePrefix from DTO spread (role is handled separately)
     // brandId, branchId, departmentId now come from DTO
     const { role, usernamePrefix, birthDate, ...restDto } = createDto;
+    const staffRole = role || 'staff'; // Default to 'staff' role
     const staff = this.staffRepository.create({
       ...restDto,
       tenantId,
@@ -111,13 +112,14 @@ export class StaffService {
       birthDate: birthDate ? new Date(birthDate) : undefined,
       username,
       passwordHash,
+      role: staffRole as any, // Set role from DTO or default
       isActive: true,
     });
 
     const saved = await this.staffRepository.save(staff);
 
-    // Sync user to api-oauth so they can login
-    await this.syncUserToOAuth(tenantId, username, tempPassword, saved.name, saved.email, saved.phone, saved.branchId);
+    // Sync user to api-oauth so they can login (pass the role for proper permission)
+    await this.syncUserToOAuth(tenantId, username, tempPassword, saved.name, saved.email, saved.phone, saved.branchId, staffRole);
 
     const enriched = await this.enrichStaffData(saved);
     return {
@@ -215,7 +217,7 @@ export class StaffService {
       // Check if user doesn't exist (404 error)
       if (error.response?.status === 404 && staff) {
         this.logger.warn(`User ${username} not found in api-oauth, creating...`);
-        // Create the user instead
+        // Create the user instead (pass role from staff entity)
         await this.syncUserToOAuth(
           tenantId,
           username,
@@ -224,6 +226,7 @@ export class StaffService {
           staff.email,
           staff.phone,
           staff.branchId,
+          staff.role, // Pass the staff's role to api-oauth
         );
       } else {
         // Log the error but don't fail the operation
@@ -245,10 +248,11 @@ export class StaffService {
     email?: string,
     phone?: string,
     branchId?: string,
+    role?: string,
   ): Promise<void> {
     try {
       const url = `${this.oauthApiUrl}/api/v1/auth/tenant-users`;
-      this.logger.log(`Creating user ${username} in api-oauth`);
+      this.logger.log(`Creating user ${username} in api-oauth with role ${role || 'staff'}`);
 
       await firstValueFrom(
         this.httpService.post(url, {
@@ -259,6 +263,7 @@ export class StaffService {
           email,
           phone,
           branchId,
+          role: role || 'staff', // Default to staff role, NOT owner
         }),
       );
 
