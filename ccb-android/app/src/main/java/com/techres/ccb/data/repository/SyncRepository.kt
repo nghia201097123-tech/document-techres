@@ -417,9 +417,11 @@ class SyncRepository @Inject constructor(
                 paperWidth = dto.paperWidth ?: 80,
                 printMode = dto.printMode ?: "TICKET",
                 printDensity = dto.printDensity ?: 8,
-                labelWidthMm = dto.labelWidthMm ?: 50,
+                labelWidthMm = dto.labelWidthMm ?: 72,
                 labelHeightMm = dto.labelHeightMm ?: 30,
                 labelGapMm = dto.labelGapMm ?: 3,
+                labelFontScale = dto.labelFontScale ?: 1.0f,
+                labelMaxToppings = dto.labelMaxToppings ?: 0,
                 // Ticket printing config
                 ticketCutAfterPrint = dto.ticketCutAfterPrint,
                 ticketPrintItemsSeparately = dto.ticketPrintItemsSeparately,

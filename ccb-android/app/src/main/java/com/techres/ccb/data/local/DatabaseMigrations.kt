@@ -719,6 +719,42 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 18 to 19
+     * Adds label_reverse, label_font_scale and label_max_toppings columns to kitchens table
+     */
+    val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 18 to 19...")
+
+            // Add label_reverse column
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN label_reverse INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added label_reverse column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "label_reverse column may already exist: ${e.message}")
+            }
+
+            // Add label_font_scale column (float, default 1.0)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN label_font_scale REAL NOT NULL DEFAULT 1.0")
+                Log.d(TAG, "Added label_font_scale column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "label_font_scale column may already exist: ${e.message}")
+            }
+
+            // Add label_max_toppings column (int, default 0 = auto based on label size)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN label_max_toppings INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added label_max_toppings column to kitchens")
+            } catch (e: Exception) {
+                Log.d(TAG, "label_max_toppings column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 18 to 19 complete - Added label_reverse, label_font_scale, label_max_toppings to kitchens")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -730,6 +766,7 @@ object DatabaseMigrations {
         MIGRATION_14_15,
         MIGRATION_15_16,
         MIGRATION_16_17,
-        MIGRATION_17_18
+        MIGRATION_17_18,
+        MIGRATION_18_19
     )
 }

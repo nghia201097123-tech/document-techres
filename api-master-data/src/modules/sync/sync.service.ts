@@ -735,6 +735,12 @@ export class SyncService {
       ticketCutAfterPrint: kitchen.ticketCutAfterPrint ?? true,
       ticketPrintItemsSeparately: kitchen.ticketPrintItemsSeparately ?? false,
       ticketCopies: kitchen.ticketCopies ?? 1,
+      // Label size config
+      labelWidthMm: kitchen.labelWidthMm ?? 72,
+      labelHeightMm: kitchen.labelHeightMm ?? 30,
+      labelGapMm: kitchen.labelGapMm ?? 3,
+      labelFontScale: kitchen.labelFontScale ?? 1.0,
+      labelMaxToppings: kitchen.labelMaxToppings ?? 0,
       // Label printing config
       labelPrintPrice: kitchen.labelPrintPrice ?? false,
       labelPrintStoreName: kitchen.labelPrintStoreName ?? false,

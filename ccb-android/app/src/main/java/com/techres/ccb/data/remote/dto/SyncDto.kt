@@ -205,6 +205,8 @@ data class KitchenDto(
     @SerializedName("labelWidthMm") val labelWidthMm: Int? = null,
     @SerializedName("labelHeightMm") val labelHeightMm: Int? = null,
     @SerializedName("labelGapMm") val labelGapMm: Int? = null,
+    @SerializedName("labelFontScale") val labelFontScale: Float? = null,
+    @SerializedName("labelMaxToppings") val labelMaxToppings: Int? = null, // 0 = auto based on size
     // ========== TICKET PRINTING CONFIG ==========
     @SerializedName("ticketCutAfterPrint") val ticketCutAfterPrint: Boolean = true,
     @SerializedName("ticketPrintItemsSeparately") val ticketPrintItemsSeparately: Boolean = false,

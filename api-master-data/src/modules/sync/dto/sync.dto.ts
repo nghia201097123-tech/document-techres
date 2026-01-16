@@ -543,6 +543,22 @@ export class KitchenDto {
   @ApiProperty({ description: 'Số bản in phiếu' })
   ticketCopies: number;
 
+  // ========== LABEL SIZE CONFIG ==========
+  @ApiProperty({ description: 'Chiều rộng tem (mm)' })
+  labelWidthMm: number;
+
+  @ApiProperty({ description: 'Chiều cao tem (mm)' })
+  labelHeightMm: number;
+
+  @ApiProperty({ description: 'Khoảng cách giữa các tem (mm)' })
+  labelGapMm: number;
+
+  @ApiProperty({ description: 'Hệ số scale font (0.5 - 2.0)' })
+  labelFontScale: number;
+
+  @ApiProperty({ description: 'Số topping tối đa trên tem (0 = auto)' })
+  labelMaxToppings: number;
+
   // ========== LABEL PRINTING CONFIG ==========
   @ApiProperty({ description: 'In giá trên tem' })
   labelPrintPrice: boolean;

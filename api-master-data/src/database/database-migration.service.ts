@@ -291,6 +291,9 @@ export class DatabaseMigrationService implements OnModuleInit {
       // Create bill_printer_configs table
       await this.createBillPrinterConfigsTable(queryRunner);
 
+      // Add label size config columns to kitchens table
+      await this.addKitchenLabelSizeColumns(queryRunner);
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
@@ -541,6 +544,32 @@ export class DatabaseMigrationService implements OnModuleInit {
     await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'total_discount_label', "VARCHAR(50) DEFAULT 'Tổng giảm giá'");
 
     this.logger.log('Time tracking and discount config columns added to bill_templates');
+  }
+
+  /**
+   * Add label size config columns to kitchens table
+   * These columns support configurable label size and font scale:
+   * - label_width_mm: Label width in mm (default: 72)
+   * - label_height_mm: Label height in mm (default: 30)
+   * - label_gap_mm: Gap between labels in mm (default: 3)
+   * - label_font_scale: Font scale factor 0.5-2.0 (default: 1.0)
+   * - label_max_toppings: Max toppings per label, 0=auto (default: 0)
+   */
+  private async addKitchenLabelSizeColumns(queryRunner: any): Promise<void> {
+    const exists = await this.tableExists(queryRunner, 'kitchens');
+    if (!exists) {
+      return; // Table doesn't exist yet
+    }
+
+    this.logger.log('Adding label size config columns to kitchens table...');
+
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_width_mm', 'INTEGER DEFAULT 72');
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_height_mm', 'INTEGER DEFAULT 30');
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_gap_mm', 'INTEGER DEFAULT 3');
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_font_scale', 'FLOAT DEFAULT 1.0');
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_max_toppings', 'INTEGER DEFAULT 0');
+
+    this.logger.log('Label size config columns added to kitchens table');
   }
 
   private async createBillPrinterConfigsTable(queryRunner: any): Promise<void> {

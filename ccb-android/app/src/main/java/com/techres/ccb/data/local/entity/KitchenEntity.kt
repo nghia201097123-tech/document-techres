@@ -197,16 +197,6 @@ data class KitchenEntity(
     @ColumnInfo(name = "printer_protocol")
     val printerProtocol: String = PrinterProtocol.ESCPOS.name, // ESCPOS or TSPL
 
-    // ========== LABEL SIZE (for TSPL printers) ==========
-    @ColumnInfo(name = "label_width_mm")
-    val labelWidthMm: Int = 72, // Default 72mm (XPRINTER)
-
-    @ColumnInfo(name = "label_height_mm")
-    val labelHeightMm: Int = 30, // Default 30mm
-
-    @ColumnInfo(name = "label_gap_mm")
-    val labelGapMm: Int = 3, // Gap between labels
-
     // ========== PRINT DENSITY ==========
     @ColumnInfo(name = "print_density")
     val printDensity: Int = 8, // 0-15 for TSPL, affects darkness

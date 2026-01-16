@@ -828,9 +828,11 @@ fun CouponsTable(coupons: List<CouponEntity>) {
 @Composable
 fun KitchensTable(kitchens: List<KitchenEntity>) {
     DataTable(
-        headers = listOf("ID", "Tên bếp", "Loại", "PrintMode", "PrinterIP", "Protocol", "Active"),
+        headers = listOf("ID", "Tên bếp", "Loại", "PrintMode", "PrinterIP", "Protocol", "Khổ tem", "FontScale", "MaxTop", "Đảo chiều", "Active"),
         data = kitchens,
         rowContent = { kitchen ->
+            val labelSize = "${kitchen.labelWidthMm}x${kitchen.labelHeightMm}mm"
+            val maxToppings = if (kitchen.labelMaxToppings == 0) "auto(${kitchen.getEffectiveMaxToppings()})" else kitchen.labelMaxToppings.toString()
             listOf(
                 kitchen.id.take(8) + "...",
                 kitchen.name,
@@ -838,6 +840,10 @@ fun KitchensTable(kitchens: List<KitchenEntity>) {
                 kitchen.printMode,
                 "${kitchen.printerIp ?: "-"}:${kitchen.printerPort}",
                 kitchen.printerProtocol,
+                labelSize,
+                "x${kitchen.labelFontScale}",
+                maxToppings,
+                if (kitchen.labelReverse) "✓" else "✗",
                 if (kitchen.isActive) "✓" else "✗"
             )
         }
