@@ -1,9 +1,11 @@
 package com.techres.ccb.data.printer
 
+import android.content.Context
 import android.util.Log
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.local.entity.BillTemplateType
+import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -28,6 +30,16 @@ object HybridBillPrintService {
     private const val TAG = "HybridBillPrintService"
     private val currencyFormat = DecimalFormat("#,###")
 
+    // Sunmi printer adapter instance (lazy init)
+    private var sunmiAdapter: SunmiPrinterAdapter? = null
+
+    /**
+     * Initialize Sunmi adapter (call from Application or PrinterModule)
+     */
+    fun initSunmiAdapter(adapter: SunmiPrinterAdapter) {
+        sunmiAdapter = adapter
+    }
+
     /**
      * In bill với template và config
      */
@@ -39,7 +51,12 @@ object HybridBillPrintService {
         return withContext(Dispatchers.IO) {
             var lastError: String? = null
 
-            // Detect printer capability
+            // Xử lý riêng cho máy in Sunmi tích hợp
+            if (printerConfig.connectionType == "sunmi") {
+                return@withContext printViaSunmi(printerConfig, template, billData)
+            }
+
+            // Detect printer capability for network printers
             val ip = printerConfig.printerIp ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in")
             val capability = PrinterCapabilityDetector.detect(ip, printerConfig.printerPort)
 
@@ -67,6 +84,65 @@ object HybridBillPrintService {
             }
 
             PrinterResult.Error(lastError ?: "In bill thất bại sau ${printerConfig.retryCount} lần thử")
+        }
+    }
+
+    /**
+     * In bill qua Sunmi Built-in Printer
+     * Máy in Sunmi tích hợp luôn hỗ trợ UTF-8 và tiếng Việt tốt
+     */
+    private suspend fun printViaSunmi(
+        config: BillPrinterConfigEntity,
+        template: BillTemplateEntity,
+        billData: BillData
+    ): PrinterResult {
+        val adapter = sunmiAdapter ?: return PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
+
+        return try {
+            // Kết nối đến máy in Sunmi
+            val connectResult = adapter.connect()
+            if (connectResult is com.techres.ccb.printer.core.PrinterResult.Error) {
+                return PrinterResult.Error("Không thể kết nối máy in Sunmi: ${connectResult.message}")
+            }
+
+            // Generate bill content - Sunmi hỗ trợ UTF-8 tốt, nhưng dùng bitmap để đảm bảo 100%
+            val capability = PrinterCapability(
+                supportVietnameseUtf8 = false, // Force bitmap mode cho Sunmi để đảm bảo tiếng Việt đẹp
+                printerModel = adapter.getSunmiModel(),
+                paperWidth = config.paperWidth
+            )
+            val billContent = generateHybridBill(config, template, billData, capability)
+
+            // Gửi dữ liệu in
+            val writeResult = adapter.write(billContent)
+            if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
+                return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
+            }
+
+            // Cắt giấy nếu được bật
+            if (config.cutPaper) {
+                adapter.cutPaper()
+            }
+
+            // Mở ngăn kéo tiền nếu được bật
+            if (config.openCashDrawer) {
+                adapter.openCashDrawer()
+            }
+
+            // In nhiều bản nếu cấu hình
+            repeat(config.numberOfCopies - 1) {
+                delay(500)
+                adapter.write(billContent)
+                if (config.cutPaper) {
+                    adapter.cutPaper()
+                }
+            }
+
+            Log.d(TAG, "Sunmi print successful")
+            PrinterResult.Success("In bill thành công!")
+        } catch (e: Exception) {
+            Log.e(TAG, "Sunmi print error: ${e.message}", e)
+            PrinterResult.Error("Lỗi in Sunmi: ${e.message}")
         }
     }
 

@@ -11,6 +11,7 @@ enum class ConnectionType {
     LAN,            // Ethernet / LAN (TCP IP)
     USB,            // USB Host
     SUNMI_INNER,    // Máy in tích hợp Sunmi
+    SUMI_INNER,     // Máy in tích hợp Sumi POS
     SERIAL,         // Serial RS232 / RS485
     UNKNOWN
 }
@@ -90,6 +91,16 @@ data class PrinterDevice(
                 connectionType = ConnectionType.SUNMI_INNER,
                 address = "inner",
                 manufacturer = "Sunmi"
+            )
+        }
+
+        fun sumiInner(): PrinterDevice {
+            return PrinterDevice(
+                id = "sumi_inner",
+                name = "Sumi Built-in Printer",
+                connectionType = ConnectionType.SUMI_INNER,
+                address = "inner",
+                manufacturer = "Sumi"
             )
         }
     }

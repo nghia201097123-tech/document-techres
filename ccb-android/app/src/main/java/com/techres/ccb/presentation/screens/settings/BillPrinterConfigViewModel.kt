@@ -10,11 +10,13 @@ import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,11 +41,13 @@ data class BillPrinterConfigUiState(
 class BillPrinterConfigViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val billPrinterConfigDao: BillPrinterConfigDao,
-    private val billTemplateDao: BillTemplateDao
+    private val billTemplateDao: BillTemplateDao,
+    private val sunmiPrinterAdapter: SunmiPrinterAdapter
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "BillPrinterConfigVM"
+        private const val SUNMI_PRINTER_ID = "sunmi_builtin_printer"
     }
 
     private val _uiState = MutableStateFlow(BillPrinterConfigUiState())
@@ -53,6 +57,95 @@ class BillPrinterConfigViewModel @Inject constructor(
 
     init {
         loadData()
+        // Tự động phát hiện máy in Sunmi tích hợp
+        autoDetectSunmiPrinter()
+    }
+
+    /**
+     * Tự động phát hiện và thêm máy in Sunmi tích hợp nếu:
+     * 1. Thiết bị là Sunmi POS
+     * 2. Chưa có cấu hình máy in Sunmi trong database
+     */
+    private fun autoDetectSunmiPrinter() {
+        if (!sunmiPrinterAdapter.isSunmiDevice()) {
+            Log.d(TAG, "Not a Sunmi device, skipping auto-detect")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val branchIdLocal = authRepository.getBranchId() ?: return@launch
+
+                // Kiểm tra xem đã có máy in Sunmi chưa
+                val existingConfigs = billPrinterConfigDao.getAllByBranch(branchIdLocal).first()
+                val hasSunmiPrinter = existingConfigs.any {
+                    it.connectionType == "sunmi" || it.id == SUNMI_PRINTER_ID
+                }
+
+                if (!hasSunmiPrinter) {
+                    Log.d(TAG, "Sunmi device detected, auto-creating built-in printer config")
+                    createSunmiPrinterConfig(branchIdLocal)
+                } else {
+                    Log.d(TAG, "Sunmi printer config already exists")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error auto-detecting Sunmi printer: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Tạo cấu hình máy in Sunmi tích hợp
+     */
+    private suspend fun createSunmiPrinterConfig(branchIdLocal: String) {
+        withContext(Dispatchers.IO) {
+            val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+            val sunmiModel = sunmiPrinterAdapter.getSunmiModel()
+
+            // Lấy độ rộng giấy từ máy Sunmi (nếu có thể)
+            val paperWidth = try {
+                sunmiPrinterAdapter.connect()
+                val width = sunmiPrinterAdapter.getPaperWidth()
+                sunmiPrinterAdapter.disconnect()
+                width
+            } catch (e: Exception) {
+                58 // Default 58mm
+            }
+
+            val sunmiConfig = BillPrinterConfigEntity(
+                id = "${SUNMI_PRINTER_ID}_$branchIdLocal",
+                branchId = branchIdLocal,
+                name = sunmiModel,
+                description = "Máy in tích hợp (tự động phát hiện)",
+                connectionType = "sunmi",
+                printerIp = null,
+                printerPort = 0,
+                printerMac = null,
+                printerUsbPath = null,
+                paperWidth = paperWidth,
+                autoPrintOnPayment = true,
+                printPreview = false,
+                numberOfCopies = 1,
+                cutPaper = true,
+                openCashDrawer = true,
+                beepAfterPrint = true,
+                retryCount = 3,
+                retryDelayMs = 1000,
+                connectionTimeoutMs = 5000,
+                isDefault = true, // Đặt làm mặc định
+                isActive = true,
+                sortOrder = 0,
+                createdAt = now,
+                updatedAt = now,
+                syncStatus = "local", // Đánh dấu là tạo local, chưa sync
+                isConnected = true
+            )
+
+            billPrinterConfigDao.insert(sunmiConfig)
+            Log.d(TAG, "Sunmi built-in printer config created: $sunmiModel, paper width: ${paperWidth}mm")
+        }
+
+        _uiState.update { it.copy(successMessage = "Đã phát hiện máy in ${sunmiPrinterAdapter.getSunmiModel()}") }
     }
 
     private fun loadData() {

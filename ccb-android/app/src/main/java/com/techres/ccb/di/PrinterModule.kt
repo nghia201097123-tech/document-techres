@@ -1,6 +1,7 @@
 package com.techres.ccb.di
 
 import android.content.Context
+import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.printer.PrinterManager
 import com.techres.ccb.printer.adapter.*
 import com.techres.ccb.printer.discovery.PrinterDiscoveryService
@@ -47,7 +48,10 @@ object PrinterModule {
     fun provideSunmiPrinterAdapter(
         @ApplicationContext context: Context
     ): SunmiPrinterAdapter {
-        return SunmiPrinterAdapter(context)
+        val adapter = SunmiPrinterAdapter(context)
+        // Initialize Sunmi adapter for HybridBillPrintService
+        HybridBillPrintService.initSunmiAdapter(adapter)
+        return adapter
     }
 
     @Provides
