@@ -208,16 +208,18 @@ data class KitchenDto(
     @SerializedName("labelFontScale") val labelFontScale: Float? = null,
     @SerializedName("labelMaxToppings") val labelMaxToppings: Int? = null, // 0 = auto based on size
     // ========== TICKET PRINTING CONFIG ==========
-    @SerializedName("ticketCutAfterPrint") val ticketCutAfterPrint: Boolean = true,
-    @SerializedName("ticketPrintItemsSeparately") val ticketPrintItemsSeparately: Boolean = false,
-    @SerializedName("ticketCopies") val ticketCopies: Int = 1,
-    @SerializedName("ticketPrintOrderNumber") val ticketPrintOrderNumber: Boolean = true,
-    @SerializedName("ticketPrintTableName") val ticketPrintTableName: Boolean = true,
-    @SerializedName("ticketPrintTime") val ticketPrintTime: Boolean = true,
-    @SerializedName("ticketPrintStoreName") val ticketPrintStoreName: Boolean = false,
+    // Note: All ticket config fields are nullable for backward compatibility with API
+    // Default values are applied in SyncRepository mapping
+    @SerializedName("ticketCutAfterPrint") val ticketCutAfterPrint: Boolean? = null,
+    @SerializedName("ticketPrintItemsSeparately") val ticketPrintItemsSeparately: Boolean? = null,
+    @SerializedName("ticketCopies") val ticketCopies: Int? = null,
+    @SerializedName("ticketPrintOrderNumber") val ticketPrintOrderNumber: Boolean? = null,
+    @SerializedName("ticketPrintTableName") val ticketPrintTableName: Boolean? = null,
+    @SerializedName("ticketPrintTime") val ticketPrintTime: Boolean? = null,
+    @SerializedName("ticketPrintStoreName") val ticketPrintStoreName: Boolean? = null,
     @SerializedName("ticketStoreName") val ticketStoreName: String? = null,
-    @SerializedName("ticketPrintNotes") val ticketPrintNotes: Boolean = true,
-    @SerializedName("ticketFontSize") val ticketFontSize: String = "medium",
+    @SerializedName("ticketPrintNotes") val ticketPrintNotes: Boolean? = null,
+    @SerializedName("ticketFontSize") val ticketFontSize: String? = null,
     // ========== LABEL PRINTING CONFIG ==========
     @SerializedName("labelPrintPrice") val labelPrintPrice: Boolean = false,
     @SerializedName("labelPrintStoreName") val labelPrintStoreName: Boolean = false,
