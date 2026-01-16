@@ -709,8 +709,8 @@ export default function KitchenPage() {
 
       {/* Create/Edit Kitchen Dialog */}
       <Dialog open={dialogMode === "create" || dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{dialogMode === "create" ? "Thêm bếp mới" : "Chỉnh sửa bếp"}</DialogTitle>
             <DialogDescription>
               {dialogMode === "create"
@@ -718,8 +718,8 @@ export default function KitchenPage() {
                 : "Cập nhật thông tin bếp."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
               <div className="grid gap-2">
                 <Label htmlFor="name">Tên bếp *</Label>
                 <Input
@@ -1095,7 +1095,7 @@ export default function KitchenPage() {
                 </div>
               )}
             </div>
-            <DialogFooter className="flex-col sm:flex-row gap-4">
+            <DialogFooter className="flex-col sm:flex-row gap-4 flex-shrink-0 pt-4 border-t">
               {dialogMode === "create" && (
                 <div className="flex items-center gap-2 mr-auto">
                   <Checkbox
