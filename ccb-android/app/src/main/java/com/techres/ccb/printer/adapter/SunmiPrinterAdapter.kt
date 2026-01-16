@@ -249,10 +249,43 @@ class SunmiPrinterAdapter @Inject constructor(
         }
 
         try {
-            // Sử dụng reflection để gọi sendRAWData
-            val method = printerService?.javaClass?.getMethod("sendRAWData", ByteArray::class.java, Any::class.java)
-            method?.invoke(printerService, data, null)
-            return@withContext PrinterResult.Success
+            // Tìm method sendRAWData bằng cách duyệt qua tất cả methods
+            // vì callback interface có thể khác nhau giữa các version Sunmi SDK
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+
+            val methods = service.javaClass.methods
+            val sendRawMethod = methods.find { method ->
+                method.name == "sendRAWData" && method.parameterTypes.size == 2
+            }
+
+            if (sendRawMethod != null) {
+                sendRawMethod.invoke(service, data, null)
+                return@withContext PrinterResult.Success
+            }
+
+            // Fallback: thử method printRawData
+            val printRawMethod = methods.find { method ->
+                method.name == "printRawData" && method.parameterTypes.size == 2
+            }
+
+            if (printRawMethod != null) {
+                printRawMethod.invoke(service, data, null)
+                return@withContext PrinterResult.Success
+            }
+
+            // Fallback 2: thử printerInit + sendRAWData không callback
+            val initMethod = methods.find { it.name == "printerInit" }
+            initMethod?.invoke(service, null)
+
+            val rawMethodNoCallback = methods.find { method ->
+                method.name == "sendRAWData" && method.parameterTypes.size == 1
+            }
+            if (rawMethodNoCallback != null) {
+                rawMethodNoCallback.invoke(service, data)
+                return@withContext PrinterResult.Success
+            }
+
+            return@withContext PrinterResult.Error("Cannot find sendRAWData method")
         } catch (e: Exception) {
             Timber.e(e, "$TAG: Write failed")
             return@withContext PrinterResult.Error(e.message ?: "Write failed")
@@ -413,9 +446,23 @@ class SunmiPrinterAdapter @Inject constructor(
         if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
 
         try {
-            val method = printerService?.javaClass?.getMethod("lineWrap", Int::class.java, Any::class.java)
-            method?.invoke(printerService, lines, null)
-            return@withContext PrinterResult.Success
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+            val methods = service.javaClass.methods
+
+            // Tìm method lineWrap
+            val lineWrapMethod = methods.find { it.name == "lineWrap" && it.parameterTypes.isNotEmpty() }
+            if (lineWrapMethod != null) {
+                when (lineWrapMethod.parameterTypes.size) {
+                    1 -> lineWrapMethod.invoke(service, lines)
+                    2 -> lineWrapMethod.invoke(service, lines, null)
+                    else -> lineWrapMethod.invoke(service, lines, null)
+                }
+                return@withContext PrinterResult.Success
+            }
+
+            // Fallback: gửi multiple line feeds
+            val lfCommand = ByteArray(lines) { 0x0A } // LF characters
+            return@withContext write(lfCommand)
         } catch (e: Exception) {
             return@withContext PrinterResult.Error(e.message ?: "Feed paper failed")
         }
@@ -428,9 +475,23 @@ class SunmiPrinterAdapter @Inject constructor(
         if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
 
         try {
-            val method = printerService?.javaClass?.getMethod("cutPaper", Any::class.java)
-            method?.invoke(printerService, null)
-            return@withContext PrinterResult.Success
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+            val methods = service.javaClass.methods
+
+            // Tìm method cutPaper với callback
+            val cutMethod = methods.find { it.name == "cutPaper" }
+            if (cutMethod != null) {
+                when (cutMethod.parameterTypes.size) {
+                    0 -> cutMethod.invoke(service)
+                    1 -> cutMethod.invoke(service, null)
+                    else -> cutMethod.invoke(service, null)
+                }
+                return@withContext PrinterResult.Success
+            }
+
+            // Fallback: gửi ESC/POS cut command
+            val cutCommand = byteArrayOf(0x1D, 0x56, 0x00) // GS V 0 - Full cut
+            return@withContext write(cutCommand)
         } catch (e: Exception) {
             return@withContext PrinterResult.Error(e.message ?: "Cut paper failed")
         }
@@ -443,9 +504,23 @@ class SunmiPrinterAdapter @Inject constructor(
         if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
 
         try {
-            val method = printerService?.javaClass?.getMethod("openDrawer", Any::class.java)
-            method?.invoke(printerService, null)
-            return@withContext PrinterResult.Success
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+            val methods = service.javaClass.methods
+
+            // Tìm method openDrawer
+            val drawerMethod = methods.find { it.name == "openDrawer" }
+            if (drawerMethod != null) {
+                when (drawerMethod.parameterTypes.size) {
+                    0 -> drawerMethod.invoke(service)
+                    1 -> drawerMethod.invoke(service, null)
+                    else -> drawerMethod.invoke(service, null)
+                }
+                return@withContext PrinterResult.Success
+            }
+
+            // Fallback: gửi ESC/POS cash drawer command
+            val drawerCommand = byteArrayOf(0x1B, 0x70, 0x00, 0x19, 0xFA) // ESC p 0 25 250
+            return@withContext write(drawerCommand)
         } catch (e: Exception) {
             return@withContext PrinterResult.Error(e.message ?: "Open cash drawer failed")
         }
