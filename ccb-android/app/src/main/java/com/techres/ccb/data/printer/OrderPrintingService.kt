@@ -302,6 +302,7 @@ object OrderPrintingService {
                     // Toppings start with "+" (including "+" with space or without)
                     part.startsWith("+") || part.startsWith("+ ") -> {
                         // Format: "+ Trân châu (+10000)" or "+ Trân châu" or "+Trân châu"
+                        // Also handle: "+ Topping: Trân châu" or "+ Addon: Pudding"
                         var toppingText = part.removePrefix("+").trim()
                         var toppingPrice = 0.0
 
@@ -310,6 +311,20 @@ object OrderPrintingService {
                         if (priceMatch != null) {
                             toppingPrice = priceMatch.groupValues[1].toDoubleOrNull() ?: 0.0
                             toppingText = toppingText.replace(priceMatch.value, "").trim()
+                        }
+
+                        // Strip group name prefix if present (e.g., "Topping: Trân châu" -> "Trân châu")
+                        val toppingGroupPrefixes = listOf(
+                            "topping:", "Topping:", "TOPPING:",
+                            "addon:", "Addon:", "ADDON:",
+                            "thêm:", "Thêm:", "THÊM:",
+                            "phần ăn kèm:", "Phần ăn kèm:"
+                        )
+                        for (prefix in toppingGroupPrefixes) {
+                            if (toppingText.startsWith(prefix, ignoreCase = true)) {
+                                toppingText = toppingText.removePrefix(prefix).trim()
+                                break
+                            }
                         }
 
                         if (toppingText.isNotBlank()) {
