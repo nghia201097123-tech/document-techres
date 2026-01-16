@@ -161,6 +161,11 @@ export default function BranchProductsPage() {
   const [savingKitchens, setSavingKitchens] = React.useState(false);
   const [loadingKitchens, setLoadingKitchens] = React.useState(false);
 
+  // Bulk kitchen assignment state
+  const [bulkKitchenDialogOpen, setBulkKitchenDialogOpen] = React.useState(false);
+  const [bulkKitchenMode, setBulkKitchenMode] = React.useState<"add" | "replace">("add");
+  const [bulkSelectedKitchenIds, setBulkSelectedKitchenIds] = React.useState<Set<string>>(new Set());
+
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
@@ -319,6 +324,151 @@ export default function BranchProductsPage() {
   // Get kitchens for a product (from map or fetch)
   const getProductKitchens = (productId: string): Kitchen[] => {
     return productKitchensMap.get(productId) || [];
+  };
+
+  // Open bulk kitchen assignment dialog
+  const handleOpenBulkKitchenDialog = () => {
+    setBulkKitchenMode("add");
+    setBulkSelectedKitchenIds(new Set());
+    setBulkKitchenDialogOpen(true);
+  };
+
+  // Close bulk kitchen assignment dialog
+  const handleCloseBulkKitchenDialog = () => {
+    setBulkKitchenDialogOpen(false);
+    setBulkSelectedKitchenIds(new Set());
+  };
+
+  // Toggle bulk kitchen selection
+  const handleToggleBulkKitchen = (kitchenId: string) => {
+    setBulkSelectedKitchenIds(prev => {
+      const next = new Set(prev);
+      if (next.has(kitchenId)) {
+        next.delete(kitchenId);
+      } else {
+        next.add(kitchenId);
+      }
+      return next;
+    });
+  };
+
+  // Bulk assign kitchens to selected products
+  const handleBulkKitchenAssignment = async () => {
+    if (selectedProductIds.size === 0 || bulkSelectedKitchenIds.size === 0) return;
+
+    const productIds = Array.from(selectedProductIds);
+    // Filter out toppings
+    const validProductIds = productIds.filter(id => {
+      const product = products.find(p => p.id === id);
+      return product && product.type !== ProductType.TOPPING;
+    });
+
+    if (validProductIds.length === 0) {
+      toast({
+        title: "Thông báo",
+        description: "Không có món ăn hợp lệ để gán bếp (topping không thể gán bếp)",
+      });
+      return;
+    }
+
+    const total = validProductIds.length;
+    const batchSize = 20;
+    const totalBatches = Math.ceil(total / batchSize);
+    const progressId = `bulk-kitchen-${Date.now()}`;
+    const kitchenIds = Array.from(bulkSelectedKitchenIds);
+    const kitchenNames = branchKitchens
+      .filter(k => bulkSelectedKitchenIds.has(k.id))
+      .map(k => k.name)
+      .join(", ");
+
+    // Close dialog and clear selection
+    handleCloseBulkKitchenDialog();
+    setSelectedProductIds(new Set());
+
+    // Add to background progress
+    addProgress({
+      id: progressId,
+      title: `Gán bếp: ${kitchenNames}`,
+      current: 0,
+      total,
+      batchNumber: 1,
+      totalBatches,
+    });
+
+    let successCount = 0;
+    let failCount = 0;
+    const updatedProductKitchens: Map<string, Kitchen[]> = new Map();
+
+    try {
+      // Process in batches
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const start = batchNum * batchSize;
+        const end = Math.min(start + batchSize, total);
+        const batch = validProductIds.slice(start, end);
+
+        updateProgress(progressId, {
+          current: start,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
+
+        // Process batch in parallel
+        const batchResults = await Promise.all(
+          batch.map(async (productId) => {
+            try {
+              let finalKitchenIds = kitchenIds;
+
+              // If "add" mode, merge with existing kitchens
+              if (bulkKitchenMode === "add") {
+                const existingKitchens = productKitchensMap.get(productId) || [];
+                const existingIds = new Set(existingKitchens.map(k => k.id));
+                finalKitchenIds = [...existingIds, ...kitchenIds.filter(id => !existingIds.has(id))];
+              }
+
+              const kitchens = await kitchenService.setProductKitchens(productId, finalKitchenIds);
+              return { success: true, productId, kitchens };
+            } catch (error) {
+              console.error(`Error assigning kitchens to product ${productId}:`, error);
+              return { success: false, productId, kitchens: [] };
+            }
+          })
+        );
+
+        // Count results and track updates
+        batchResults.forEach((result) => {
+          if (result.success) {
+            successCount++;
+            updatedProductKitchens.set(result.productId, result.kitchens);
+          } else {
+            failCount++;
+          }
+        });
+
+        updateProgress(progressId, {
+          current: end,
+          batchNumber: batchNum + 1,
+          totalBatches,
+        });
+      }
+
+      // Update productKitchensMap with all results
+      setProductKitchensMap(prev => {
+        const newMap = new Map(prev);
+        updatedProductKitchens.forEach((kitchens, productId) => {
+          newMap.set(productId, kitchens);
+        });
+        return newMap;
+      });
+
+      if (failCount === 0) {
+        completeProgress(progressId, `Đã gán ${successCount} món vào ${kitchenIds.length} bếp`);
+      } else {
+        completeProgress(progressId, `Thành công: ${successCount}, Thất bại: ${failCount}`);
+      }
+    } catch (error) {
+      console.error("Error bulk assigning kitchens:", error);
+      errorProgress(progressId, "Có lỗi xảy ra khi gán bếp");
+    }
   };
 
   // Toggle single product availability
@@ -965,6 +1115,11 @@ export default function BranchProductsPage() {
                   <DropdownMenuItem onClick={handleBulkResetPrice}>
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Khôi phục giá gốc
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleOpenBulkKitchenDialog}>
+                    <ChefHat className="mr-2 h-4 w-4 text-blue-600" />
+                    Gán bếp hàng loạt
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setSelectedProductIds(new Set())}>
@@ -1677,6 +1832,115 @@ export default function BranchProductsPage() {
               {savingKitchens && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <ChefHat className="mr-2 h-4 w-4" />
               Lưu ({selectedKitchenIds.size} bếp)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Kitchen Assignment Dialog */}
+      <Dialog open={bulkKitchenDialogOpen} onOpenChange={handleCloseBulkKitchenDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Gán bếp hàng loạt</DialogTitle>
+            <DialogDescription>
+              Gán {selectedProductIds.size} món đã chọn vào các bếp
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            {/* Mode selection */}
+            <div className="grid gap-2">
+              <Label>Phương thức gán</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={bulkKitchenMode === "add" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBulkKitchenMode("add")}
+                  className="flex-1"
+                >
+                  Thêm vào bếp đã có
+                </Button>
+                <Button
+                  type="button"
+                  variant={bulkKitchenMode === "replace" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBulkKitchenMode("replace")}
+                  className="flex-1"
+                >
+                  Thay thế toàn bộ
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {bulkKitchenMode === "add"
+                  ? "Giữ nguyên bếp cũ và thêm bếp mới"
+                  : "Xóa tất cả bếp cũ và chỉ gán vào bếp đã chọn"}
+              </p>
+            </div>
+
+            {/* Kitchens list */}
+            {branchKitchens.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <ChefHat className="h-10 w-10 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Chưa có bếp nào trong chi nhánh</p>
+                <p className="text-xs text-muted-foreground mt-1">Vui lòng tạo bếp trước</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-2">
+                  <Label>Chọn bếp để gán</Label>
+                  <div className="grid gap-2 max-h-[250px] overflow-y-auto border rounded-lg p-2">
+                    {branchKitchens.map((kitchen) => (
+                      <div
+                        key={kitchen.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50",
+                          bulkSelectedKitchenIds.has(kitchen.id) && "border-primary bg-primary/5"
+                        )}
+                        onClick={() => handleToggleBulkKitchen(kitchen.id)}
+                      >
+                        <Checkbox
+                          checked={bulkSelectedKitchenIds.has(kitchen.id)}
+                          onCheckedChange={() => handleToggleBulkKitchen(kitchen.id)}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{kitchen.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {kitchen.kitchenType && `${kitchen.kitchenType} • `}
+                            {kitchen.productCount ?? 0} món
+                          </p>
+                        </div>
+                        {bulkSelectedKitchenIds.has(kitchen.id) && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Đã chọn <span className="font-medium text-foreground">{bulkSelectedKitchenIds.size}</span> bếp
+                    {" • "}
+                    Sẽ gán <span className="font-medium text-foreground">{selectedProductIds.size}</span> món
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleCloseBulkKitchenDialog}>
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleBulkKitchenAssignment}
+              disabled={bulkSelectedKitchenIds.size === 0 || branchKitchens.length === 0}
+            >
+              <ChefHat className="mr-2 h-4 w-4" />
+              Gán {bulkSelectedKitchenIds.size} bếp
             </Button>
           </DialogFooter>
         </DialogContent>
