@@ -1,15 +1,43 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Province, Ward } from '../../database/entities';
+import axios from 'axios';
+
+/**
+ * Dữ liệu từ GitHub: sunshine-tech/VietnamProvinces
+ * Cập nhật theo Quyết định 19/2025/QĐ-TTg (34 tỉnh sau sáp nhập 07/2025)
+ * Cấu trúc 2 cấp: Tỉnh/Thành phố → Xã/Phường
+ */
+const DATA_URL = 'https://raw.githubusercontent.com/sunshine-tech/VietnamProvinces/main/vietnam_provinces/data/nested-divisions.json';
+
+interface ProvinceAPI {
+  code: number;
+  name: string;
+  codename: string;
+  division_type: string;
+  phone_code: number;
+  wards?: WardAPI[];
+}
+
+interface WardAPI {
+  code: number;
+  name: string;
+  codename: string;
+  division_type: string;
+  short_codename: string;
+}
 
 @Injectable()
 export class LocationsService {
+  private readonly logger = new Logger(LocationsService.name);
+
   constructor(
     @InjectRepository(Province)
     private readonly provinceRepository: Repository<Province>,
     @InjectRepository(Ward)
     private readonly wardRepository: Repository<Ward>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAllProvinces() {
@@ -29,5 +57,85 @@ export class LocationsService {
     return this.wardRepository.find({
       order: { provinceCode: 'ASC', name: 'ASC' },
     });
+  }
+
+  /**
+   * Import dữ liệu địa chỉ hành chính Việt Nam sau sáp nhập 07/2025
+   * Nguồn: GitHub sunshine-tech/VietnamProvinces
+   * Cấu trúc: 34 tỉnh/thành phố → xã/phường (không còn cấp quận/huyện)
+   */
+  async seedFromAPI(): Promise<{ provinces: number; wards: number }> {
+    this.logger.log('Starting location seed from API (post 07/2025 merger)...');
+
+    // Fetch all provinces with wards
+    const response = await axios.get<ProvinceAPI[]>(DATA_URL);
+    const provinces = response.data;
+    this.logger.log(`Found ${provinces.length} provinces (post-merger)`);
+
+    // Use transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Clear existing data
+      await queryRunner.query('DELETE FROM wards');
+      await queryRunner.query('DELETE FROM provinces');
+      // Drop districts table if exists (legacy)
+      await queryRunner.query('DROP TABLE IF EXISTS districts CASCADE');
+      this.logger.log('Cleared existing location data');
+
+      let wardCount = 0;
+
+      // Insert provinces
+      for (const province of provinces) {
+        await queryRunner.query(
+          `INSERT INTO provinces (code, name, full_name, code_name, division_type, phone_code)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            String(province.code),
+            province.name,
+            province.name,
+            province.codename,
+            province.division_type,
+            province.phone_code,
+          ]
+        );
+
+        // Insert wards (directly under province, no district level)
+        if (province.wards) {
+          for (const ward of province.wards) {
+            await queryRunner.query(
+              `INSERT INTO wards (code, name, full_name, code_name, division_type, short_codename, province_code)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                String(ward.code),
+                ward.name,
+                ward.name,
+                ward.codename,
+                ward.division_type,
+                ward.short_codename,
+                String(province.code),
+              ]
+            );
+            wardCount++;
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      this.logger.log(`Seed completed: ${provinces.length} provinces, ${wardCount} wards`);
+
+      return {
+        provinces: provinces.length,
+        wards: wardCount,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error('Error seeding locations:', error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

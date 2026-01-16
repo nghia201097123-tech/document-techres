@@ -40,6 +40,11 @@ import {
   Star,
   Copy,
   ExternalLink,
+  MapPin,
+  Database,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import {
   settingsService,
@@ -55,6 +60,7 @@ import {
   CreateBankAccountDto,
   CreateEInvoiceConfigDto,
 } from "@/services/settings-service";
+import { locationService } from "@/services/location-service";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -88,6 +94,10 @@ export default function SettingsPage() {
   const [invoiceDialog, setInvoiceDialog] = React.useState<DialogMode>(null);
   const [editingInvoice, setEditingInvoice] = React.useState<EInvoiceConfig | null>(null);
   const [savingInvoice, setSavingInvoice] = React.useState(false);
+
+  // Location seed state
+  const [seedingLocations, setSeedingLocations] = React.useState(false);
+  const [locationSeedResult, setLocationSeedResult] = React.useState<{ provinces: number; wards: number } | null>(null);
 
   // Form states
   const [paymentForm, setPaymentForm] = React.useState<CreatePaymentMethodDto>({
@@ -364,6 +374,31 @@ export default function SettingsPage() {
     toast({ title: "Đã sao chép", description: text });
   };
 
+  // Location seed handler
+  const handleSeedLocations = async () => {
+    if (!confirm("Thao tác này sẽ xóa toàn bộ dữ liệu địa chỉ hành chính cũ và nhập dữ liệu mới (34 tỉnh/thành phố theo QĐ 19/2025/QĐ-TTg sau sáp nhập 07/2025). Bạn có chắc chắn?")) {
+      return;
+    }
+    setSeedingLocations(true);
+    setLocationSeedResult(null);
+    try {
+      const result = await locationService.seedLocations();
+      setLocationSeedResult(result);
+      toast({
+        title: "Thành công",
+        description: `Đã nhập ${result.provinces} tỉnh/thành phố và ${result.wards} xã/phường`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể nhập dữ liệu địa chỉ",
+        variant: "destructive",
+      });
+    } finally {
+      setSeedingLocations(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -424,6 +459,10 @@ export default function SettingsPage() {
           <TabsTrigger value="invoice" className="gap-2">
             <FileText className="h-4 w-4" />
             Hóa đơn điện tử
+          </TabsTrigger>
+          <TabsTrigger value="system" className="gap-2">
+            <Database className="h-4 w-4" />
+            Dữ liệu hệ thống
           </TabsTrigger>
         </TabsList>
 
@@ -670,6 +709,74 @@ export default function SettingsPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* System Data Tab */}
+        <TabsContent value="system">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-primary" />
+                <CardTitle>Dữ liệu hệ thống</CardTitle>
+              </div>
+              <CardDescription>
+                Quản lý và cập nhật dữ liệu hệ thống
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Location Data Section */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <MapPin className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Địa chỉ hành chính Việt Nam</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Cập nhật dữ liệu địa chỉ hành chính theo QĐ 19/2025/QĐ-TTg (sau sáp nhập 07/2025).
+                      Cấu trúc mới: 34 tỉnh/thành phố → xã/phường (không còn cấp quận/huyện).
+                    </p>
+
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-amber-800">
+                          <strong>Lưu ý:</strong> Thao tác này sẽ xóa toàn bộ dữ liệu địa chỉ cũ và thay thế bằng dữ liệu mới.
+                          Các thông tin địa chỉ đã lưu trước đó có thể bị ảnh hưởng.
+                        </p>
+                      </div>
+                    </div>
+
+                    {locationSeedResult && (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-green-800">
+                            Đã nhập thành công: <strong>{locationSeedResult.provinces}</strong> tỉnh/thành phố
+                            và <strong>{locationSeedResult.wards}</strong> xã/phường
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleSeedLocations}
+                      disabled={seedingLocations}
+                      className="mt-4"
+                      variant="outline"
+                    >
+                      {seedingLocations ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      {seedingLocations ? "Đang cập nhật..." : "Cập nhật dữ liệu địa chỉ"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

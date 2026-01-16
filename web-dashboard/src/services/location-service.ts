@@ -44,4 +44,15 @@ export const locationService = {
     }
     return grouped;
   },
+
+  /**
+   * Seed dữ liệu địa chỉ hành chính mới (QĐ 19/2025/QĐ-TTg sau sáp nhập 07/2025)
+   * Cấu trúc 2 cấp: 34 tỉnh/thành → xã/phường (bỏ cấp quận/huyện)
+   */
+  async seedLocations(): Promise<{ provinces: number; wards: number }> {
+    const response = await api.post<{ provinces: number; wards: number }>(
+      "/locations/seed"
+    );
+    return response.data;
+  },
 };
