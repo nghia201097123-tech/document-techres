@@ -23,6 +23,8 @@ interface CreateCompanyData {
   code: string;
   logo?: string;
   taxCode?: string;
+  provinceCode?: string;
+  wardCode?: string;
   address?: string;
   phone?: string;
   email?: string;

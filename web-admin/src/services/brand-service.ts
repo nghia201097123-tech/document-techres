@@ -25,6 +25,9 @@ interface CreateBrandData {
   code: string;
   businessModel: BusinessModel;
   logoUrl?: string;
+  provinceCode?: string;
+  wardCode?: string;
+  address?: string;
   description?: string;
 }
 

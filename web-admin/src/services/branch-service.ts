@@ -25,6 +25,8 @@ interface CreateBranchData {
   name: string;
   code: string;
   logoUrl?: string;
+  provinceCode?: string;
+  wardCode?: string;
   address?: string;
   phone?: string;
   email?: string;

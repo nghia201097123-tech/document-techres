@@ -30,6 +30,23 @@ export class CreateBrandDto {
   @IsString()
   logoUrl?: string;
 
+  @ApiPropertyOptional({ example: '01', description: 'Mã tỉnh/thành phố (sau sáp nhập 2025)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '00001', description: 'Mã phường/xã (liên kết trực tiếp với tỉnh)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  wardCode?: string;
+
+  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh, Q7, TP.HCM' })
+  @IsOptional()
+  @IsString()
+  address?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
