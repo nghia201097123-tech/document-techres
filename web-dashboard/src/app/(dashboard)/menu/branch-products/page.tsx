@@ -254,9 +254,39 @@ export default function BranchProductsPage() {
     }
   }, []);
 
+  // Load kitchen assignments for all products
+  const loadProductKitchenAssignments = React.useCallback(async (branchId: string) => {
+    if (!branchId || branchId === "all") {
+      setProductKitchensMap(new Map());
+      return;
+    }
+    try {
+      const productsWithKitchens = await kitchenService.getProductsWithKitchenAssignments(branchId);
+      const newMap = new Map<string, Kitchen[]>();
+      for (const product of productsWithKitchens) {
+        if (product.assignedKitchens && product.assignedKitchens.length > 0) {
+          // Convert to Kitchen[] format
+          const kitchens: Kitchen[] = product.assignedKitchens.map(k => ({
+            id: k.id,
+            name: k.name,
+            kitchenType: k.kitchenType as Kitchen["kitchenType"],
+            isActive: true,
+            sortOrder: 0,
+            createdAt: "",
+          }));
+          newMap.set(product.id, kitchens);
+        }
+      }
+      setProductKitchensMap(newMap);
+    } catch (error) {
+      console.error("Error loading product kitchen assignments:", error);
+    }
+  }, []);
+
   React.useEffect(() => {
     loadKitchens(filterBranchId);
-  }, [filterBranchId, loadKitchens]);
+    loadProductKitchenAssignments(filterBranchId);
+  }, [filterBranchId, loadKitchens, loadProductKitchenAssignments]);
 
   // Open kitchen assignment dialog
   const handleOpenKitchenDialog = async (product: BranchProduct) => {
