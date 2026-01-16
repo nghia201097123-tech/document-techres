@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.IBinder
+import android.os.Parcel
 import android.os.RemoteException
 import com.techres.ccb.printer.core.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -81,6 +82,24 @@ class SunmiPrinterAdapter @Inject constructor(
     private var printerService: Any? = null
     private var serviceConnection: ServiceConnection? = null
     private var isBound = false
+
+    // Raw IBinder reference for AIDL transact calls when using BinderProxy
+    private var rawBinder: IBinder? = null
+    private var serviceDescriptor: String? = null
+
+    // AIDL transaction codes for IWoyouService (based on Sunmi AIDL definition order)
+    // These are calculated as IBinder.FIRST_CALL_TRANSACTION + method_index
+    private object TransactionCodes {
+        // Common transaction codes based on Sunmi IWoyouService.aidl
+        // Note: These may vary between Sunmi firmware versions
+        const val TRANSACTION_sendRAWData = IBinder.FIRST_CALL_TRANSACTION + 27
+        const val TRANSACTION_printerInit = IBinder.FIRST_CALL_TRANSACTION + 0
+        const val TRANSACTION_printOriginalText = IBinder.FIRST_CALL_TRANSACTION + 17
+        const val TRANSACTION_lineWrap = IBinder.FIRST_CALL_TRANSACTION + 25
+        const val TRANSACTION_cutPaper = IBinder.FIRST_CALL_TRANSACTION + 26
+        const val TRANSACTION_openDrawer = IBinder.FIRST_CALL_TRANSACTION + 28
+        const val TRANSACTION_updatePrinterState = IBinder.FIRST_CALL_TRANSACTION + 5
+    }
 
     override fun isConnected(): Boolean = printerService != null && _connectionState.value == ConnectionState.Connected
 
@@ -193,12 +212,23 @@ class SunmiPrinterAdapter @Inject constructor(
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 Timber.d("$TAG: Service connected, converting IBinder to interface...")
 
+                // Store raw binder for AIDL transact() calls
+                rawBinder = service
+
+                // Try to get interface descriptor for proper AIDL communication
+                try {
+                    serviceDescriptor = service?.interfaceDescriptor
+                    Timber.d("$TAG: Service descriptor: $serviceDescriptor")
+                } catch (e: Exception) {
+                    Timber.w(e, "$TAG: Failed to get interface descriptor")
+                }
+
                 // Convert IBinder to IWoyouService interface using reflection
                 val serviceInterface = convertBinderToInterface(service)
                 if (serviceInterface != null) {
                     printerService = serviceInterface
                     isBound = true
-                    Timber.d("$TAG: Service interface obtained successfully")
+                    Timber.d("$TAG: Service interface obtained successfully, class: ${serviceInterface.javaClass.name}")
                     if (cont.isActive) {
                         cont.resume(true)
                     }
@@ -213,6 +243,8 @@ class SunmiPrinterAdapter @Inject constructor(
             override fun onServiceDisconnected(name: ComponentName?) {
                 Timber.d("$TAG: Service disconnected")
                 printerService = null
+                rawBinder = null
+                serviceDescriptor = null
                 isBound = false
                 _connectionState.value = ConnectionState.Disconnected
             }
@@ -351,10 +383,22 @@ class SunmiPrinterAdapter @Inject constructor(
             Timber.e(e, "$TAG: Error checking class hierarchy")
         }
 
-        // Approach 5: Nếu tất cả fail, vẫn return binder để thử
+        // Approach 5: Nếu là BinderProxy, tạo wrapper để sử dụng transact()
+        if (binder.javaClass.name == "android.os.BinderProxy") {
+            Timber.d("$TAG: Detected BinderProxy, will use AIDL transact() for communication")
+            // Return a marker object that indicates we should use transact()
+            return BinderProxyWrapper(binder)
+        }
+
+        // Approach 6: Nếu tất cả fail, vẫn return binder để thử
         Timber.w("$TAG: Could not find specific interface, returning raw binder")
         return binder
     }
+
+    /**
+     * Wrapper class for BinderProxy to indicate we need to use transact() method
+     */
+    private class BinderProxyWrapper(val binder: IBinder)
 
     override suspend fun disconnect(): PrinterResult = withContext(Dispatchers.Main) {
         try {
@@ -364,6 +408,8 @@ class SunmiPrinterAdapter @Inject constructor(
         }
         printerService = null
         serviceConnection = null
+        rawBinder = null
+        serviceDescriptor = null
         isBound = false
         _connectedDevice = null
         _connectionState.value = ConnectionState.Disconnected
@@ -382,6 +428,12 @@ class SunmiPrinterAdapter @Inject constructor(
 
         try {
             val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+
+            // Check if we're using BinderProxyWrapper (remote service via AIDL)
+            if (service is BinderProxyWrapper) {
+                Timber.d("$TAG: Using AIDL transact() for BinderProxy")
+                return@withContext sendRawDataViaTransact(service.binder, data)
+            }
 
             // Log service type để debug
             Timber.d("$TAG: Service class: ${service.javaClass.name}")
@@ -469,6 +521,13 @@ class SunmiPrinterAdapter @Inject constructor(
                 return@withContext PrinterResult.Success
             }
 
+            // Approach 6: Fallback to AIDL transact if we have raw binder
+            val binder = rawBinder
+            if (binder != null) {
+                Timber.d("$TAG: Falling back to AIDL transact()")
+                return@withContext sendRawDataViaTransact(binder, data)
+            }
+
             // Log tất cả methods để debug
             Timber.e("$TAG: Cannot find sendRAWData. All methods: ${methods.map { it.name }.distinct().sorted()}")
 
@@ -477,6 +536,128 @@ class SunmiPrinterAdapter @Inject constructor(
             Timber.e(e, "$TAG: Write failed")
             return@withContext PrinterResult.Error(e.message ?: "Write failed")
         }
+    }
+
+    /**
+     * Send raw data via AIDL transact() mechanism for BinderProxy
+     * This is used when we can't get a proper service interface
+     */
+    private fun sendRawDataViaTransact(binder: IBinder, data: ByteArray): PrinterResult {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        // Try multiple transaction codes for sendRAWData
+        // Different Sunmi firmware versions may use different codes
+        val possibleTransactionCodes = listOf(
+            TransactionCodes.TRANSACTION_sendRAWData,  // Standard position
+            IBinder.FIRST_CALL_TRANSACTION + 26,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 28,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 30,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 32,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 24,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 25        // Alternative position
+        )
+
+        var lastError: Exception? = null
+
+        for (transactionCode in possibleTransactionCodes) {
+            try {
+                Timber.d("$TAG: Trying transact with code $transactionCode")
+
+                val dataParcel = Parcel.obtain()
+                val replyParcel = Parcel.obtain()
+
+                try {
+                    dataParcel.writeInterfaceToken(descriptor)
+                    dataParcel.writeByteArray(data)
+                    // Write null for callback (ICallback)
+                    dataParcel.writeStrongBinder(null)
+
+                    val success = binder.transact(transactionCode, dataParcel, replyParcel, 0)
+
+                    if (success) {
+                        replyParcel.readException()
+                        Timber.d("$TAG: transact($transactionCode) succeeded")
+                        return PrinterResult.Success
+                    } else {
+                        Timber.d("$TAG: transact($transactionCode) returned false")
+                    }
+                } finally {
+                    dataParcel.recycle()
+                    replyParcel.recycle()
+                }
+            } catch (e: SecurityException) {
+                Timber.d("$TAG: transact($transactionCode) security exception: ${e.message}")
+                lastError = e
+            } catch (e: RemoteException) {
+                Timber.d("$TAG: transact($transactionCode) remote exception: ${e.message}")
+                lastError = e
+            } catch (e: Exception) {
+                Timber.d("$TAG: transact($transactionCode) failed: ${e.message}")
+                lastError = e
+            }
+        }
+
+        // If sendRAWData fails, try printOriginalText as fallback
+        Timber.d("$TAG: sendRAWData transact failed, trying printOriginalText")
+        try {
+            val printOriginalResult = printOriginalTextViaTransact(binder, data)
+            if (printOriginalResult is PrinterResult.Success) {
+                return printOriginalResult
+            }
+        } catch (e: Exception) {
+            Timber.d("$TAG: printOriginalText fallback also failed: ${e.message}")
+        }
+
+        return PrinterResult.Error("AIDL transact failed: ${lastError?.message ?: "unknown error"}")
+    }
+
+    /**
+     * Fallback method: Print using printOriginalText via transact
+     */
+    private fun printOriginalTextViaTransact(binder: IBinder, data: ByteArray): PrinterResult {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        // Convert bytes to string for printOriginalText
+        val text = String(data, Charsets.ISO_8859_1)
+
+        val possibleTransactionCodes = listOf(
+            TransactionCodes.TRANSACTION_printOriginalText,
+            IBinder.FIRST_CALL_TRANSACTION + 16,
+            IBinder.FIRST_CALL_TRANSACTION + 18,
+            IBinder.FIRST_CALL_TRANSACTION + 19,
+            IBinder.FIRST_CALL_TRANSACTION + 20
+        )
+
+        for (transactionCode in possibleTransactionCodes) {
+            try {
+                Timber.d("$TAG: Trying printOriginalText transact with code $transactionCode")
+
+                val dataParcel = Parcel.obtain()
+                val replyParcel = Parcel.obtain()
+
+                try {
+                    dataParcel.writeInterfaceToken(descriptor)
+                    dataParcel.writeString(text)
+                    // Write null for callback
+                    dataParcel.writeStrongBinder(null)
+
+                    val success = binder.transact(transactionCode, dataParcel, replyParcel, 0)
+
+                    if (success) {
+                        replyParcel.readException()
+                        Timber.d("$TAG: printOriginalText transact($transactionCode) succeeded")
+                        return PrinterResult.Success
+                    }
+                } finally {
+                    dataParcel.recycle()
+                    replyParcel.recycle()
+                }
+            } catch (e: Exception) {
+                Timber.d("$TAG: printOriginalText transact($transactionCode) failed: ${e.message}")
+            }
+        }
+
+        return PrinterResult.Error("printOriginalText transact failed")
     }
 
     override suspend fun read(timeout: Long): ByteArray? {
@@ -836,6 +1017,8 @@ class SunmiPrinterAdapter @Inject constructor(
         }
         printerService = null
         serviceConnection = null
+        rawBinder = null
+        serviceDescriptor = null
         isBound = false
         _connectedDevice = null
         _connectionState.value = ConnectionState.Disconnected
