@@ -1063,43 +1063,32 @@ export default function BranchProductsPage() {
                       {isColumnVisible("kitchens") && (
                         <TableCell>
                           {product.type !== ProductType.TOPPING && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-auto p-1 text-xs hover:bg-blue-50"
-                                    onClick={() => handleOpenKitchenDialog(product)}
+                            <div
+                              className="flex flex-wrap gap-1 cursor-pointer hover:opacity-80"
+                              onClick={() => handleOpenKitchenDialog(product)}
+                            >
+                              {productKitchensMap.has(product.id) && productKitchensMap.get(product.id)!.length > 0 ? (
+                                productKitchensMap.get(product.id)!.map(k => (
+                                  <Badge
+                                    key={k.id}
+                                    variant="outline"
+                                    className="text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
                                   >
-                                    <ChefHat className="h-3.5 w-3.5 mr-1" />
-                                    {productKitchensMap.has(product.id) ? (
-                                      <span className={cn(
-                                        productKitchensMap.get(product.id)!.length > 0
-                                          ? "text-blue-600"
-                                          : "text-muted-foreground"
-                                      )}>
-                                        {productKitchensMap.get(product.id)!.length} bếp
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground">Gán bếp</span>
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {productKitchensMap.has(product.id) && productKitchensMap.get(product.id)!.length > 0 ? (
-                                    <div className="text-xs">
-                                      <div className="font-medium mb-1">Đã gán vào:</div>
-                                      {productKitchensMap.get(product.id)!.map(k => (
-                                        <div key={k.id}>• {k.name}</div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span>Nhấn để gán bếp</span>
-                                  )}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                                    <ChefHat className="h-3 w-3 mr-1" />
+                                    {k.name}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto p-1 text-xs text-muted-foreground hover:bg-blue-50"
+                                >
+                                  <ChefHat className="h-3.5 w-3.5 mr-1" />
+                                  Gán bếp
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                       )}
