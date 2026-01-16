@@ -75,6 +75,27 @@ export class Kitchen {
   @Column({ name: 'ticket_copies', type: 'int', default: 1 })
   ticketCopies: number;
 
+  @Column({ name: 'ticket_print_order_number', default: true })
+  ticketPrintOrderNumber: boolean;
+
+  @Column({ name: 'ticket_print_table_name', default: true })
+  ticketPrintTableName: boolean;
+
+  @Column({ name: 'ticket_print_time', default: true })
+  ticketPrintTime: boolean;
+
+  @Column({ name: 'ticket_print_store_name', default: false })
+  ticketPrintStoreName: boolean;
+
+  @Column({ name: 'ticket_store_name', nullable: true })
+  ticketStoreName: string;
+
+  @Column({ name: 'ticket_print_notes', default: true })
+  ticketPrintNotes: boolean;
+
+  @Column({ name: 'ticket_font_size', type: 'varchar', length: 20, default: 'medium' })
+  ticketFontSize: string;
+
   // ========== LABEL PRINTING CONFIG ==========
   @Column({ name: 'label_print_price', default: false })
   labelPrintPrice: boolean;
