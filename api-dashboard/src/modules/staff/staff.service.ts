@@ -115,6 +115,10 @@ export class StaffService {
     });
 
     const saved = await this.staffRepository.save(staff);
+
+    // Sync user to api-oauth so they can login
+    await this.syncUserToOAuth(tenantId, username, tempPassword, saved.name, saved.email, saved.phone, saved.branchId);
+
     const enriched = await this.enrichStaffData(saved);
     return {
       ...enriched,
@@ -177,8 +181,8 @@ export class StaffService {
     staff.passwordHash = await bcrypt.hash(tempPassword, 10);
     await this.staffRepository.save(staff);
 
-    // Sync password with api-oauth
-    await this.syncPasswordToOAuth(tenantId, staff.username, tempPassword);
+    // Sync password with api-oauth (will create user if not exists)
+    await this.syncPasswordToOAuth(tenantId, staff.username, tempPassword, staff);
 
     return { temporaryPassword: tempPassword };
   }
@@ -186,8 +190,14 @@ export class StaffService {
   /**
    * Sync password to api-oauth service
    * This ensures the User table in api-oauth has the same password
+   * If user doesn't exist in api-oauth, it will be created
    */
-  private async syncPasswordToOAuth(tenantId: string, username: string, newPassword: string): Promise<void> {
+  private async syncPasswordToOAuth(
+    tenantId: string,
+    username: string,
+    newPassword: string,
+    staff?: Staff,
+  ): Promise<void> {
     try {
       const url = `${this.oauthApiUrl}/api/v1/auth/tenant-users/password`;
       this.logger.log(`Syncing password for user ${username} to api-oauth`);
@@ -202,11 +212,63 @@ export class StaffService {
 
       this.logger.log(`Password synced successfully for user ${username}`);
     } catch (error) {
+      // Check if user doesn't exist (404 error)
+      if (error.response?.status === 404 && staff) {
+        this.logger.warn(`User ${username} not found in api-oauth, creating...`);
+        // Create the user instead
+        await this.syncUserToOAuth(
+          tenantId,
+          username,
+          newPassword,
+          staff.name,
+          staff.email,
+          staff.phone,
+          staff.branchId,
+        );
+      } else {
+        // Log the error but don't fail the operation
+        const errorMessage = error.response?.data?.message || error.message;
+        this.logger.error(`Failed to sync password to api-oauth for user ${username}: ${errorMessage}`);
+      }
+    }
+  }
+
+  /**
+   * Sync user creation to api-oauth service
+   * This creates a User record in api-oauth so the staff can login
+   */
+  private async syncUserToOAuth(
+    tenantId: string,
+    username: string,
+    password: string,
+    name: string,
+    email?: string,
+    phone?: string,
+    branchId?: string,
+  ): Promise<void> {
+    try {
+      const url = `${this.oauthApiUrl}/api/v1/auth/tenant-users`;
+      this.logger.log(`Creating user ${username} in api-oauth`);
+
+      await firstValueFrom(
+        this.httpService.post(url, {
+          tenantId,
+          username,
+          password,
+          name,
+          email,
+          phone,
+          branchId,
+        }),
+      );
+
+      this.logger.log(`User ${username} created successfully in api-oauth`);
+    } catch (error) {
       // Log the error but don't fail the operation
-      // The password is already updated in api-dashboard, just log the sync failure
-      this.logger.error(`Failed to sync password to api-oauth for user ${username}: ${error.message}`);
-      // Optionally, you could throw here if you want the operation to fail
-      // throw new Error(`Failed to sync password with authentication service: ${error.message}`);
+      // The staff is already created in api-dashboard
+      const errorMessage = error.response?.data?.message || error.message;
+      this.logger.error(`Failed to create user in api-oauth for ${username}: ${errorMessage}`);
+      // Don't throw - we don't want to fail staff creation just because oauth sync failed
     }
   }
 
@@ -359,6 +421,10 @@ export class StaffService {
           });
 
           await this.staffRepository.save(staff);
+
+          // Sync user to api-oauth so they can login
+          await this.syncUserToOAuth(tenantId, username, tempPassword, item.name, item.email, item.phone, item.branchId);
+
           result.created++;
         }
       } catch (error) {
@@ -519,8 +585,8 @@ export class StaffService {
         staff.passwordHash = passwordHash;
         await this.staffRepository.save(staff);
 
-        // Sync password with api-oauth
-        await this.syncPasswordToOAuth(tenantId, staff.username, password);
+        // Sync password with api-oauth (will create user if not exists)
+        await this.syncPasswordToOAuth(tenantId, staff.username, password, staff);
 
         result.passwords.push({ staffId, username: staff.username, password });
         result.success++;
