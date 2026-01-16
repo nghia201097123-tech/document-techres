@@ -28,6 +28,27 @@ interface WardAPI {
   short_codename: string;
 }
 
+/**
+ * Build full name with division type prefix
+ * Ví dụ: "thành phố trung ương" + "Hồ Chí Minh" => "Thành phố Hồ Chí Minh"
+ */
+function buildFullName(divisionType: string, name: string): string {
+  // Map division_type to proper prefix
+  const prefixMap: Record<string, string> = {
+    'thành phố trung ương': 'Thành phố',
+    'tỉnh': 'Tỉnh',
+    'phường': 'Phường',
+    'xã': 'Xã',
+    'thị trấn': 'Thị trấn',
+  };
+
+  const prefix = prefixMap[divisionType?.toLowerCase()] || '';
+  if (prefix) {
+    return `${prefix} ${name}`;
+  }
+  return name;
+}
+
 @Injectable()
 export class LocationsService {
   private readonly logger = new Logger(LocationsService.name);
@@ -89,13 +110,17 @@ export class LocationsService {
 
       // Insert provinces
       for (const province of provinces) {
+        // Build full_name with division_type prefix
+        // Ví dụ: "thành phố trung ương" + "Hồ Chí Minh" => "Thành phố Hồ Chí Minh"
+        const provinceFullName = buildFullName(province.division_type, province.name);
+
         await queryRunner.query(
           `INSERT INTO provinces (code, name, full_name, code_name, division_type, phone_code)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             String(province.code),
             province.name,
-            province.name,
+            provinceFullName,
             province.codename,
             province.division_type,
             province.phone_code,
@@ -105,13 +130,17 @@ export class LocationsService {
         // Insert wards (directly under province, no district level)
         if (province.wards) {
           for (const ward of province.wards) {
+            // Build full_name with division_type prefix
+            // Ví dụ: "phường" + "Bến Nghé" => "Phường Bến Nghé"
+            const wardFullName = buildFullName(ward.division_type, ward.name);
+
             await queryRunner.query(
               `INSERT INTO wards (code, name, full_name, code_name, division_type, short_codename, province_code)
                VALUES ($1, $2, $3, $4, $5, $6, $7)`,
               [
                 String(ward.code),
                 ward.name,
-                ward.name,
+                wardFullName,
                 ward.codename,
                 ward.division_type,
                 ward.short_codename,
