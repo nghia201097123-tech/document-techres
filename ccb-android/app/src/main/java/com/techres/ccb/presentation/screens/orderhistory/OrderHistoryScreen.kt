@@ -979,7 +979,8 @@ private fun OrderDetailDialog(
                         val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }
 
                         // Toppings expanded state - per-item state overrides global state
-                        val toppingsExpanded = if (isCancelled) false else (itemToppingsExpanded[item.id] ?: allToppingsExpanded)
+                        // Cancelled items default to collapsed but can still be expanded by user
+                        val toppingsExpanded = itemToppingsExpanded[item.id] ?: (if (isCancelled) false else allToppingsExpanded)
 
                         Column(
                             modifier = Modifier
@@ -1070,14 +1071,12 @@ private fun OrderDetailDialog(
                             if (variants.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                // Header showing topping count - clickable to toggle
+                                // Header showing topping count - clickable to toggle (even for cancelled items)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(4.dp))
-                                        .clickable(enabled = !isCancelled) {
-                                            itemToppingsExpanded[item.id] = !toppingsExpanded
-                                        }
+                                        .clickable { itemToppingsExpanded[item.id] = !toppingsExpanded }
                                         .padding(start = 36.dp, top = 4.dp, bottom = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
