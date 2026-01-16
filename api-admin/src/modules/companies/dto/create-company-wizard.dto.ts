@@ -124,6 +124,23 @@ export class WizardBrandDto {
   @IsString()
   logoUrl?: string;
 
+  @ApiPropertyOptional({ example: '79', description: 'Mã tỉnh/thành phố (34 tỉnh sau sáp nhập)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '26734', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  wardCode?: string;
+
+  @ApiPropertyOptional({ example: '123 Nguyễn Văn Linh', description: 'Địa chỉ chi tiết (số nhà, đường)' })
+  @IsOptional()
+  @IsString()
+  addressDetail?: string;
+
   @ApiPropertyOptional({ example: 'Chuỗi phở Việt Nam' })
   @IsOptional()
   @IsString()
