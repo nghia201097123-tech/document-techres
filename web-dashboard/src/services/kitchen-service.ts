@@ -5,9 +5,8 @@ import { Product } from "./product-service";
  * Chế độ in của bếp
  * - TICKET: In phiếu bếp (nhiều món trên 1 tờ)
  * - LABEL: In tem (1 tem cho mỗi món/ly)
- * - BOTH: In cả phiếu và tem
  */
-export type KitchenPrintMode = "TICKET" | "LABEL" | "BOTH";
+export type KitchenPrintMode = "TICKET" | "LABEL";
 
 /**
  * Loại bếp
@@ -42,7 +41,6 @@ export const KitchenTypeLabels: Record<KitchenType, string> = {
 export const PrintModeLabels: Record<KitchenPrintMode, string> = {
   TICKET: "In phiếu bếp",
   LABEL: "In tem/sticker",
-  BOTH: "In cả phiếu và tem",
 };
 
 /**

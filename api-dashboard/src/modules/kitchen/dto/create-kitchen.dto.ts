@@ -57,7 +57,7 @@ export class CreateKitchenDto {
   @ApiPropertyOptional({
     example: 'TICKET',
     enum: Object.values(KitchenPrintMode),
-    description: 'Chế độ in: TICKET (phiếu bếp), LABEL (tem), BOTH (cả hai)',
+    description: 'Chế độ in: TICKET (phiếu bếp), LABEL (tem)',
   })
   @IsOptional()
   @IsString()

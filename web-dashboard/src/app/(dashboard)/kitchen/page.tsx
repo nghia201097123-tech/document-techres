@@ -866,8 +866,8 @@ export default function KitchenPage() {
                 />
               </div>
 
-              {/* Ticket Printing Config - Only show for TICKET and BOTH modes */}
-              {(formData.printMode === "TICKET" || formData.printMode === "BOTH") && (
+              {/* Ticket Printing Config - Only show for TICKET mode */}
+              {formData.printMode === "TICKET" && (
                 <div className="space-y-3 pt-4 border-t">
                   <h4 className="font-medium text-sm">Cấu hình in phiếu bếp</h4>
                   <div className="grid grid-cols-2 gap-4">
@@ -906,14 +906,10 @@ export default function KitchenPage() {
                 </div>
               )}
 
-              {/* Label Printing Config - Always show for configuration */}
-              <div className="space-y-3 pt-4 border-t">
-                <h4 className="font-medium text-sm">Cấu hình in tem</h4>
-                {formData.printMode === "TICKET" && (
-                  <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                    Chế độ in hiện tại là "In phiếu bếp". Chuyển sang "In tem" hoặc "In cả hai" để sử dụng cấu hình tem này.
-                  </p>
-                )}
+              {/* Label Printing Config - Only show for LABEL mode */}
+              {formData.printMode === "LABEL" && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm">Cấu hình in tem</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -1098,6 +1094,7 @@ export default function KitchenPage() {
                   </div>
                 </div>
               </div>
+              )}
             <DialogFooter className="flex-col sm:flex-row gap-4 flex-shrink-0 pt-4 border-t">
               {dialogMode === "create" && (
                 <div className="flex items-center gap-2 mr-auto">

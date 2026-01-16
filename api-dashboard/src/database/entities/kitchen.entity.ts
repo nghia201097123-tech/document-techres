@@ -14,12 +14,10 @@ import { Branch } from './branch.entity';
  * Chế độ in của bếp
  * - TICKET: In phiếu bếp (nhiều món trên 1 tờ)
  * - LABEL: In tem (1 tem cho mỗi món/ly)
- * - BOTH: In cả phiếu và tem
  */
 export enum KitchenPrintMode {
   TICKET = 'TICKET',
   LABEL = 'LABEL',
-  BOTH = 'BOTH',
 }
 
 /**
