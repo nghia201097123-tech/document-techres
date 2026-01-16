@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw, DollarSign, ChevronDown } from "lucide-react";
+import { Store, Loader2, Search, Check, X, Package, Filter, ChevronLeft, ChevronRight, Pencil, RotateCcw, DollarSign, ChevronDown, ChefHat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { branchProductService, type BranchProduct, type BranchProductStats } from "@/services/branch-product-service";
 import { ProductType } from "@/services/product-service";
+import { kitchenService, type Kitchen } from "@/services/kitchen-service";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { cn } from "@/lib/utils";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
@@ -69,6 +70,7 @@ const defaultColumns: ColumnConfig[] = [
   { key: "code", label: "Mã", visible: true },
   { key: "name", label: "Tên món", visible: true, locked: true },
   { key: "type", label: "Loại", visible: true },
+  { key: "kitchens", label: "Bếp", visible: true },
   { key: "originalPrice", label: "Giá gốc", visible: true },
   { key: "branchPrice", label: "Giá bán CN", visible: true },
   { key: "seasonalPrice", label: "Giá thời vụ", visible: true },
@@ -151,6 +153,14 @@ export default function BranchProductsPage() {
   const [bulkPriceAdjustType, setBulkPriceAdjustType] = React.useState<"increase" | "decrease">("increase");
   const [bulkPriceAdjustMode, setBulkPriceAdjustMode] = React.useState<"amount" | "percent">("amount");
 
+  // Kitchen assignment state
+  const [branchKitchens, setBranchKitchens] = React.useState<Kitchen[]>([]);
+  const [productKitchensMap, setProductKitchensMap] = React.useState<Map<string, Kitchen[]>>(new Map());
+  const [kitchenDialogProduct, setKitchenDialogProduct] = React.useState<BranchProduct | null>(null);
+  const [selectedKitchenIds, setSelectedKitchenIds] = React.useState<Set<string>>(new Set());
+  const [savingKitchens, setSavingKitchens] = React.useState(false);
+  const [loadingKitchens, setLoadingKitchens] = React.useState(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
@@ -224,6 +234,92 @@ export default function BranchProductsPage() {
   React.useEffect(() => {
     loadProducts(filterBranchId);
   }, [filterBranchId, loadProducts]);
+
+  // Load kitchens for the branch
+  const loadKitchens = React.useCallback(async (branchId: string) => {
+    if (!branchId || branchId === "all") {
+      setBranchKitchens([]);
+      return;
+    }
+    try {
+      const kitchens = await kitchenService.getAll(branchId);
+      setBranchKitchens(kitchens.filter(k => k.isActive));
+    } catch (error) {
+      console.error("Error loading kitchens:", error);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadKitchens(filterBranchId);
+  }, [filterBranchId, loadKitchens]);
+
+  // Open kitchen assignment dialog
+  const handleOpenKitchenDialog = async (product: BranchProduct) => {
+    setKitchenDialogProduct(product);
+    setLoadingKitchens(true);
+    try {
+      const kitchens = await kitchenService.getProductKitchens(product.id);
+      setSelectedKitchenIds(new Set(kitchens.map(k => k.id)));
+      // Update the map for this product
+      setProductKitchensMap(prev => new Map(prev).set(product.id, kitchens));
+    } catch (error) {
+      console.error("Error loading product kitchens:", error);
+      setSelectedKitchenIds(new Set());
+    } finally {
+      setLoadingKitchens(false);
+    }
+  };
+
+  // Close kitchen assignment dialog
+  const handleCloseKitchenDialog = () => {
+    setKitchenDialogProduct(null);
+    setSelectedKitchenIds(new Set());
+  };
+
+  // Toggle kitchen selection
+  const handleToggleKitchen = (kitchenId: string) => {
+    setSelectedKitchenIds(prev => {
+      const next = new Set(prev);
+      if (next.has(kitchenId)) {
+        next.delete(kitchenId);
+      } else {
+        next.add(kitchenId);
+      }
+      return next;
+    });
+  };
+
+  // Save kitchen assignments
+  const handleSaveKitchenAssignments = async () => {
+    if (!kitchenDialogProduct) return;
+
+    setSavingKitchens(true);
+    try {
+      const kitchenIds = Array.from(selectedKitchenIds);
+      const kitchens = await kitchenService.setProductKitchens(kitchenDialogProduct.id, kitchenIds);
+      // Update the map for this product
+      setProductKitchensMap(prev => new Map(prev).set(kitchenDialogProduct.id, kitchens));
+      toast({
+        title: "Thành công",
+        description: `Đã gán "${kitchenDialogProduct.name}" vào ${kitchens.length} bếp`,
+      });
+      handleCloseKitchenDialog();
+    } catch (error: any) {
+      console.error("Error saving kitchen assignments:", error);
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể lưu bếp",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingKitchens(false);
+    }
+  };
+
+  // Get kitchens for a product (from map or fetch)
+  const getProductKitchens = (productId: string): Kitchen[] => {
+    return productKitchensMap.get(productId) || [];
+  };
 
   // Toggle single product availability
   const handleToggleAvailability = async (product: BranchProduct) => {
@@ -915,6 +1011,7 @@ export default function BranchProductsPage() {
                     {isColumnVisible("code") && <TableHead>Mã</TableHead>}
                     {isColumnVisible("name") && <TableHead>Tên món</TableHead>}
                     {isColumnVisible("type") && <TableHead>Loại</TableHead>}
+                    {isColumnVisible("kitchens") && <TableHead>Bếp</TableHead>}
                     {isColumnVisible("originalPrice") && <TableHead className="text-right">Giá gốc</TableHead>}
                     {isColumnVisible("branchPrice") && <TableHead className="text-right">Giá bán CN</TableHead>}
                     {isColumnVisible("seasonalPrice") && <TableHead className="text-right">Giá thời vụ</TableHead>}
@@ -961,6 +1058,49 @@ export default function BranchProductsPage() {
                           <Badge variant="outline" className={typeLabels[product.type]?.color}>
                             {typeLabels[product.type]?.label || product.type}
                           </Badge>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("kitchens") && (
+                        <TableCell>
+                          {product.type !== ProductType.TOPPING && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-auto p-1 text-xs hover:bg-blue-50"
+                                    onClick={() => handleOpenKitchenDialog(product)}
+                                  >
+                                    <ChefHat className="h-3.5 w-3.5 mr-1" />
+                                    {productKitchensMap.has(product.id) ? (
+                                      <span className={cn(
+                                        productKitchensMap.get(product.id)!.length > 0
+                                          ? "text-blue-600"
+                                          : "text-muted-foreground"
+                                      )}>
+                                        {productKitchensMap.get(product.id)!.length} bếp
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">Gán bếp</span>
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {productKitchensMap.has(product.id) && productKitchensMap.get(product.id)!.length > 0 ? (
+                                    <div className="text-xs">
+                                      <div className="font-medium mb-1">Đã gán vào:</div>
+                                      {productKitchensMap.get(product.id)!.map(k => (
+                                        <div key={k.id}>• {k.name}</div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span>Nhấn để gán bếp</span>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                         </TableCell>
                       )}
                       {isColumnVisible("originalPrice") && (
@@ -1452,6 +1592,102 @@ export default function BranchProductsPage() {
             >
               <DollarSign className="mr-2 h-4 w-4" />
               Áp dụng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Kitchen Assignment Dialog */}
+      <Dialog open={kitchenDialogProduct !== null} onOpenChange={() => handleCloseKitchenDialog()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Gán bếp cho món ăn</DialogTitle>
+            <DialogDescription>
+              Chọn các bếp sẽ chế biến món ăn này
+            </DialogDescription>
+          </DialogHeader>
+          {kitchenDialogProduct && (
+            <div className="grid gap-4 py-4">
+              {/* Product info */}
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                {kitchenDialogProduct.imageUrl ? (
+                  <img
+                    src={kitchenDialogProduct.imageUrl}
+                    alt={kitchenDialogProduct.name}
+                    className="w-12 h-12 rounded object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded bg-background flex items-center justify-center">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium">{kitchenDialogProduct.name}</p>
+                  <p className="text-sm text-muted-foreground">{kitchenDialogProduct.code}</p>
+                </div>
+              </div>
+
+              {/* Kitchens list */}
+              {loadingKitchens ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : branchKitchens.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <ChefHat className="h-10 w-10 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Chưa có bếp nào trong chi nhánh</p>
+                  <p className="text-xs text-muted-foreground mt-1">Vui lòng tạo bếp trước</p>
+                </div>
+              ) : (
+                <div className="grid gap-2 max-h-[300px] overflow-y-auto">
+                  {branchKitchens.map((kitchen) => (
+                    <div
+                      key={kitchen.id}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50",
+                        selectedKitchenIds.has(kitchen.id) && "border-primary bg-primary/5"
+                      )}
+                      onClick={() => handleToggleKitchen(kitchen.id)}
+                    >
+                      <Checkbox
+                        checked={selectedKitchenIds.has(kitchen.id)}
+                        onCheckedChange={() => handleToggleKitchen(kitchen.id)}
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium">{kitchen.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {kitchen.kitchenType && `${kitchen.kitchenType} • `}
+                          {kitchen.productCount ?? 0} món
+                        </p>
+                      </div>
+                      {selectedKitchenIds.has(kitchen.id) && (
+                        <Check className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="pt-2 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Đã chọn <span className="font-medium text-foreground">{selectedKitchenIds.size}</span> bếp
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleCloseKitchenDialog}>
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveKitchenAssignments}
+              disabled={savingKitchens || loadingKitchens}
+            >
+              {savingKitchens && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <ChefHat className="mr-2 h-4 w-4" />
+              Lưu ({selectedKitchenIds.size} bếp)
             </Button>
           </DialogFooter>
         </DialogContent>

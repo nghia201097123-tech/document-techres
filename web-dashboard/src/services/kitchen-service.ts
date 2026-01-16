@@ -242,4 +242,33 @@ export const kitchenService = {
     const response = await api.put<Kitchen[]>(`/kitchen/product/${productId}/kitchens`, { kitchenIds });
     return response.data;
   },
+
+  // Get products with assigned kitchens (for product assignment dialog)
+  getProductsWithKitchenAssignments: async (
+    branchId?: string,
+    categoryId?: string,
+    search?: string,
+  ): Promise<ProductWithKitchens[]> => {
+    const params: Record<string, string> = {};
+    if (branchId) params.branchId = branchId;
+    if (categoryId) params.categoryId = categoryId;
+    if (search) params.search = search;
+    const response = await api.get<ProductWithKitchens[]>('/kitchen/products/with-assignments', { params });
+    return response.data;
+  },
 };
+
+// Product with assigned kitchens info
+export interface ProductWithKitchens {
+  id: string;
+  code: string;
+  name: string;
+  categoryId: string | null;
+  type: string;
+  imageUrl: string | null;
+  assignedKitchens: {
+    id: string;
+    name: string;
+    kitchenType: string | null;
+  }[];
+}

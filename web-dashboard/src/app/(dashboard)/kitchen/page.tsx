@@ -36,10 +36,10 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
-import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels, LABEL_SIZE_OPTIONS, getRecommendedMaxToppings } from "@/services/kitchen-service";
+import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels, LABEL_SIZE_OPTIONS, getRecommendedMaxToppings, type ProductWithKitchens } from "@/services/kitchen-service";
 import { LabelPreview } from "@/components/kitchen/LabelPreview";
 import { Slider } from "@/components/ui/slider";
-import { productService, type Product, ProductType } from "@/services/product-service";
+import { type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 
@@ -103,7 +103,7 @@ export default function KitchenPage() {
   const [updatedKitchenIds, setUpdatedKitchenIds] = React.useState<Set<string>>(new Set());
 
   // Product assignment state
-  const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+  const [allProducts, setAllProducts] = React.useState<ProductWithKitchens[]>([]);
   const [kitchenProducts, setKitchenProducts] = React.useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
@@ -213,7 +213,7 @@ export default function KitchenPage() {
     setProductSearch("");
     try {
       const [products, assigned] = await Promise.all([
-        productService.getAll(),
+        kitchenService.getProductsWithKitchenAssignments(),
         kitchenService.getKitchenProducts(kitchen.id),
       ]);
       // Filter out toppings from the product list
@@ -1199,27 +1199,43 @@ export default function KitchenPage() {
                           </span>
                         </div>
                         <div className="grid gap-2">
-                          {products.map((product) => (
-                            <div
-                              key={product.id}
-                              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                                selectedProductIds.has(product.id) ? 'border-primary bg-primary/5' : ''
-                              }`}
-                              onClick={() => toggleProductSelection(product.id)}
-                            >
-                              <Checkbox
-                                checked={selectedProductIds.has(product.id)}
-                                onCheckedChange={() => toggleProductSelection(product.id)}
-                              />
-                              <div className="flex-1">
-                                <p className="font-medium">{product.name}</p>
-                                <p className="text-xs text-muted-foreground">{product.code}</p>
+                          {products.map((product) => {
+                            // Count other kitchens (exclude current kitchen)
+                            const otherKitchens = product.assignedKitchens?.filter(
+                              k => k.id !== selectedKitchen?.id
+                            ) || [];
+                            return (
+                              <div
+                                key={product.id}
+                                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                                  selectedProductIds.has(product.id) ? 'border-primary bg-primary/5' : ''
+                                }`}
+                                onClick={() => toggleProductSelection(product.id)}
+                              >
+                                <Checkbox
+                                  checked={selectedProductIds.has(product.id)}
+                                  onCheckedChange={() => toggleProductSelection(product.id)}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate">{product.name}</p>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-muted-foreground">{product.code}</span>
+                                    {otherKitchens.length > 0 && (
+                                      <span
+                                        className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+                                        title={otherKitchens.map(k => k.name).join(', ')}
+                                      >
+                                        {otherKitchens.length} bếp khác
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {selectedProductIds.has(product.id) && (
+                                  <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                                )}
                               </div>
-                              {selectedProductIds.has(product.id) && (
-                                <Check className="h-4 w-4 text-primary" />
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
