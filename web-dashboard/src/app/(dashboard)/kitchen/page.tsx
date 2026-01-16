@@ -36,8 +36,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
-import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels, LABEL_SIZE_OPTIONS, getRecommendedMaxToppings, type ProductWithKitchens } from "@/services/kitchen-service";
+import { kitchenService, type Kitchen, type CreateKitchenDto, type UpdateKitchenDto, type KitchenPrintMode, type KitchenType, type PrinterProtocol, type TicketFontSize, KitchenTypeLabels, PrintModeLabels, PrinterProtocolLabels, TicketFontSizeLabels, LABEL_SIZE_OPTIONS, getRecommendedMaxToppings, type ProductWithKitchens } from "@/services/kitchen-service";
 import { LabelPreview } from "@/components/kitchen/LabelPreview";
+import { TicketPreview } from "@/components/kitchen/TicketPreview";
 import { Slider } from "@/components/ui/slider";
 import { type Product, ProductType } from "@/services/product-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,6 +82,13 @@ export default function KitchenPage() {
     ticketCutAfterPrint: true,
     ticketPrintItemsSeparately: false,
     ticketCopies: 1,
+    ticketPrintOrderNumber: true,
+    ticketPrintTableName: true,
+    ticketPrintTime: true,
+    ticketPrintStoreName: false,
+    ticketStoreName: "",
+    ticketPrintNotes: true,
+    ticketFontSize: "medium" as TicketFontSize,
     // Label printing config
     labelPrintPrice: false,
     labelPrintStoreName: false,
@@ -149,6 +157,13 @@ export default function KitchenPage() {
       ticketCutAfterPrint: true,
       ticketPrintItemsSeparately: false,
       ticketCopies: 1,
+      ticketPrintOrderNumber: true,
+      ticketPrintTableName: true,
+      ticketPrintTime: true,
+      ticketPrintStoreName: false,
+      ticketStoreName: "",
+      ticketPrintNotes: true,
+      ticketFontSize: "medium" as TicketFontSize,
       // Label printing config
       labelPrintPrice: false,
       labelPrintStoreName: false,
@@ -184,6 +199,13 @@ export default function KitchenPage() {
       ticketCutAfterPrint: kitchen.ticketCutAfterPrint ?? true,
       ticketPrintItemsSeparately: kitchen.ticketPrintItemsSeparately ?? false,
       ticketCopies: kitchen.ticketCopies ?? 1,
+      ticketPrintOrderNumber: kitchen.ticketPrintOrderNumber ?? true,
+      ticketPrintTableName: kitchen.ticketPrintTableName ?? true,
+      ticketPrintTime: kitchen.ticketPrintTime ?? true,
+      ticketPrintStoreName: kitchen.ticketPrintStoreName ?? false,
+      ticketStoreName: kitchen.ticketStoreName || "",
+      ticketPrintNotes: kitchen.ticketPrintNotes ?? true,
+      ticketFontSize: (kitchen.ticketFontSize || "medium") as TicketFontSize,
       // Label printing config
       labelPrintPrice: kitchen.labelPrintPrice ?? false,
       labelPrintStoreName: kitchen.labelPrintStoreName ?? false,
@@ -246,6 +268,13 @@ export default function KitchenPage() {
       ticketCutAfterPrint: true,
       ticketPrintItemsSeparately: false,
       ticketCopies: 1,
+      ticketPrintOrderNumber: true,
+      ticketPrintTableName: true,
+      ticketPrintTime: true,
+      ticketPrintStoreName: false,
+      ticketStoreName: "",
+      ticketPrintNotes: true,
+      ticketFontSize: "medium" as TicketFontSize,
       // Label printing config
       labelPrintPrice: false,
       labelPrintStoreName: false,
@@ -291,10 +320,18 @@ export default function KitchenPage() {
             paperWidth: formData.paperWidth,
             printMode: formData.printMode,
             description: "",
-            // Keep printing config for consecutive creates
+            // Keep ticket printing config for consecutive creates
             ticketCutAfterPrint: formData.ticketCutAfterPrint,
             ticketPrintItemsSeparately: formData.ticketPrintItemsSeparately,
             ticketCopies: formData.ticketCopies,
+            ticketPrintOrderNumber: formData.ticketPrintOrderNumber,
+            ticketPrintTableName: formData.ticketPrintTableName,
+            ticketPrintTime: formData.ticketPrintTime,
+            ticketPrintStoreName: formData.ticketPrintStoreName,
+            ticketStoreName: formData.ticketStoreName,
+            ticketPrintNotes: formData.ticketPrintNotes,
+            ticketFontSize: formData.ticketFontSize,
+            // Keep label printing config for consecutive creates
             labelPrintPrice: formData.labelPrintPrice,
             labelPrintStoreName: formData.labelPrintStoreName,
             labelPrintOrderNumber: formData.labelPrintOrderNumber,
@@ -326,6 +363,13 @@ export default function KitchenPage() {
           ticketCutAfterPrint: formData.ticketCutAfterPrint,
           ticketPrintItemsSeparately: formData.ticketPrintItemsSeparately,
           ticketCopies: formData.ticketCopies,
+          ticketPrintOrderNumber: formData.ticketPrintOrderNumber,
+          ticketPrintTableName: formData.ticketPrintTableName,
+          ticketPrintTime: formData.ticketPrintTime,
+          ticketPrintStoreName: formData.ticketPrintStoreName,
+          ticketStoreName: formData.ticketStoreName,
+          ticketPrintNotes: formData.ticketPrintNotes,
+          ticketFontSize: formData.ticketFontSize,
           // Label printing config
           labelPrintPrice: formData.labelPrintPrice,
           labelPrintStoreName: formData.labelPrintStoreName,
@@ -870,7 +914,59 @@ export default function KitchenPage() {
               {formData.printMode === "TICKET" && (
                 <div className="space-y-3 pt-4 border-t">
                   <h4 className="font-medium text-sm">Cấu hình in phiếu bếp</h4>
-                  <div className="grid grid-cols-2 gap-4">
+
+                  {/* Display options */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketPrintOrderNumber"
+                        checked={formData.ticketPrintOrderNumber}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintOrderNumber: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintOrderNumber" className="text-sm cursor-pointer">
+                        In mã đơn hàng
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketPrintTableName"
+                        checked={formData.ticketPrintTableName}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintTableName: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintTableName" className="text-sm cursor-pointer">
+                        In tên bàn
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketPrintTime"
+                        checked={formData.ticketPrintTime}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintTime: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintTime" className="text-sm cursor-pointer">
+                        In thời gian
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketPrintNotes"
+                        checked={formData.ticketPrintNotes}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintNotes: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintNotes" className="text-sm cursor-pointer">
+                        In ghi chú
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ticketPrintStoreName"
+                        checked={formData.ticketPrintStoreName}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintStoreName: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintStoreName" className="text-sm cursor-pointer">
+                        In tên cửa hàng
+                      </Label>
+                    </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="ticketCutAfterPrint"
@@ -892,15 +988,65 @@ export default function KitchenPage() {
                       </Label>
                     </div>
                   </div>
-                  <div className="grid gap-2 max-w-[200px]">
-                    <Label htmlFor="ticketCopies">Số bản in</Label>
-                    <Input
-                      id="ticketCopies"
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={formData.ticketCopies || 1}
-                      onChange={(e) => setFormData({ ...formData, ticketCopies: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) })}
+
+                  {/* Store name input */}
+                  {formData.ticketPrintStoreName && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="ticketStoreName">Tên cửa hàng hiển thị</Label>
+                      <Input
+                        id="ticketStoreName"
+                        placeholder="Tên cửa hàng trên phiếu..."
+                        value={formData.ticketStoreName || ""}
+                        onChange={(e) => setFormData({ ...formData, ticketStoreName: e.target.value })}
+                      />
+                    </div>
+                  )}
+
+                  {/* Font size and copies */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="ticketFontSize">Cỡ chữ</Label>
+                      <Select
+                        value={formData.ticketFontSize || "medium"}
+                        onValueChange={(value: TicketFontSize) => setFormData({ ...formData, ticketFontSize: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn cỡ chữ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(TicketFontSizeLabels) as TicketFontSize[]).map((size) => (
+                            <SelectItem key={size} value={size}>
+                              {TicketFontSizeLabels[size]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="ticketCopies">Số bản in</Label>
+                      <Input
+                        id="ticketCopies"
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={formData.ticketCopies || 1}
+                        onChange={(e) => setFormData({ ...formData, ticketCopies: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ticket Preview */}
+                  <div className="pt-4 border-t">
+                    <TicketPreview
+                      paperWidth={formData.paperWidth || 80}
+                      fontSize={formData.ticketFontSize || "medium"}
+                      showStoreName={formData.ticketPrintStoreName}
+                      showOrderNumber={formData.ticketPrintOrderNumber}
+                      showTableName={formData.ticketPrintTableName}
+                      showTime={formData.ticketPrintTime}
+                      showNotes={formData.ticketPrintNotes}
+                      storeName={formData.ticketStoreName || "Coffee House"}
+                      printItemsSeparately={formData.ticketPrintItemsSeparately}
                     />
                   </div>
                 </div>

@@ -44,6 +44,17 @@ export const PrintModeLabels: Record<KitchenPrintMode, string> = {
 };
 
 /**
+ * Cỡ chữ phiếu bếp
+ */
+export type TicketFontSize = "small" | "medium" | "large";
+
+export const TicketFontSizeLabels: Record<TicketFontSize, string> = {
+  small: "Nhỏ",
+  medium: "Vừa",
+  large: "Lớn",
+};
+
+/**
  * Loại giao thức máy in
  * - ESC_POS: Máy in hóa đơn/receipt (thermal printer)
  * - TSPL: Máy in tem/sticker (label printer)
@@ -103,6 +114,13 @@ export interface Kitchen {
   ticketCutAfterPrint?: boolean;
   ticketPrintItemsSeparately?: boolean;
   ticketCopies?: number;
+  ticketPrintOrderNumber?: boolean;
+  ticketPrintTableName?: boolean;
+  ticketPrintTime?: boolean;
+  ticketPrintStoreName?: boolean;
+  ticketStoreName?: string;
+  ticketPrintNotes?: boolean;
+  ticketFontSize?: TicketFontSize;
   // Label printing config
   labelPrintPrice?: boolean;
   labelPrintStoreName?: boolean;
@@ -133,6 +151,13 @@ export interface CreateKitchenDto {
   ticketCutAfterPrint?: boolean;
   ticketPrintItemsSeparately?: boolean;
   ticketCopies?: number;
+  ticketPrintOrderNumber?: boolean;
+  ticketPrintTableName?: boolean;
+  ticketPrintTime?: boolean;
+  ticketPrintStoreName?: boolean;
+  ticketStoreName?: string;
+  ticketPrintNotes?: boolean;
+  ticketFontSize?: TicketFontSize;
   // Label printing config
   labelPrintPrice?: boolean;
   labelPrintStoreName?: boolean;
@@ -163,6 +188,13 @@ export interface UpdateKitchenDto {
   ticketCutAfterPrint?: boolean;
   ticketPrintItemsSeparately?: boolean;
   ticketCopies?: number;
+  ticketPrintOrderNumber?: boolean;
+  ticketPrintTableName?: boolean;
+  ticketPrintTime?: boolean;
+  ticketPrintStoreName?: boolean;
+  ticketStoreName?: string;
+  ticketPrintNotes?: boolean;
+  ticketFontSize?: TicketFontSize;
   // Label printing config
   labelPrintPrice?: boolean;
   labelPrintStoreName?: boolean;

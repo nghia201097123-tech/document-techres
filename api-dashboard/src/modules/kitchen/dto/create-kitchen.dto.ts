@@ -87,6 +87,47 @@ export class CreateKitchenDto {
   @Max(5)
   ticketCopies?: number;
 
+  @ApiPropertyOptional({ description: 'In mã đơn hàng trên phiếu', default: true })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintOrderNumber?: boolean;
+
+  @ApiPropertyOptional({ description: 'In tên bàn trên phiếu', default: true })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintTableName?: boolean;
+
+  @ApiPropertyOptional({ description: 'In thời gian trên phiếu', default: true })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintTime?: boolean;
+
+  @ApiPropertyOptional({ description: 'In tên cửa hàng trên phiếu', default: false })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintStoreName?: boolean;
+
+  @ApiPropertyOptional({ description: 'Tên cửa hàng hiển thị trên phiếu' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  ticketStoreName?: string;
+
+  @ApiPropertyOptional({ description: 'In ghi chú trên phiếu', default: true })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintNotes?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Cỡ chữ phiếu: small, medium, large',
+    default: 'medium',
+    enum: ['small', 'medium', 'large'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['small', 'medium', 'large'])
+  ticketFontSize?: string;
+
   // ========== LABEL PRINTING CONFIG ==========
   @ApiPropertyOptional({ description: 'In giá trên tem', default: false })
   @IsOptional()
