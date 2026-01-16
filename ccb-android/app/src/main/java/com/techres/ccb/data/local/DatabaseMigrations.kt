@@ -755,6 +755,74 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 19 to 20
+     * Adds extended ticket printing config columns to kitchens table
+     */
+    val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 19 to 20...")
+
+            // ticket_print_order_number (default true)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_print_order_number INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added ticket_print_order_number column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_print_order_number column may already exist: ${e.message}")
+            }
+
+            // ticket_print_table_name (default true)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_print_table_name INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added ticket_print_table_name column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_print_table_name column may already exist: ${e.message}")
+            }
+
+            // ticket_print_time (default true)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_print_time INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added ticket_print_time column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_print_time column may already exist: ${e.message}")
+            }
+
+            // ticket_print_store_name (default false)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_print_store_name INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added ticket_print_store_name column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_print_store_name column may already exist: ${e.message}")
+            }
+
+            // ticket_store_name (nullable)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_store_name TEXT DEFAULT NULL")
+                Log.d(TAG, "Added ticket_store_name column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_store_name column may already exist: ${e.message}")
+            }
+
+            // ticket_print_notes (default true)
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_print_notes INTEGER NOT NULL DEFAULT 1")
+                Log.d(TAG, "Added ticket_print_notes column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_print_notes column may already exist: ${e.message}")
+            }
+
+            // ticket_font_size (default "medium")
+            try {
+                db.execSQL("ALTER TABLE kitchens ADD COLUMN ticket_font_size TEXT NOT NULL DEFAULT 'medium'")
+                Log.d(TAG, "Added ticket_font_size column")
+            } catch (e: Exception) {
+                Log.d(TAG, "ticket_font_size column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 19 to 20 complete - Added extended ticket printing config columns to kitchens")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -767,6 +835,7 @@ object DatabaseMigrations {
         MIGRATION_15_16,
         MIGRATION_16_17,
         MIGRATION_17_18,
-        MIGRATION_18_19
+        MIGRATION_18_19,
+        MIGRATION_19_20
     )
 }

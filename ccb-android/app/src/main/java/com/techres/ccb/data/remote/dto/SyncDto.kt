@@ -211,6 +211,13 @@ data class KitchenDto(
     @SerializedName("ticketCutAfterPrint") val ticketCutAfterPrint: Boolean = true,
     @SerializedName("ticketPrintItemsSeparately") val ticketPrintItemsSeparately: Boolean = false,
     @SerializedName("ticketCopies") val ticketCopies: Int = 1,
+    @SerializedName("ticketPrintOrderNumber") val ticketPrintOrderNumber: Boolean = true,
+    @SerializedName("ticketPrintTableName") val ticketPrintTableName: Boolean = true,
+    @SerializedName("ticketPrintTime") val ticketPrintTime: Boolean = true,
+    @SerializedName("ticketPrintStoreName") val ticketPrintStoreName: Boolean = false,
+    @SerializedName("ticketStoreName") val ticketStoreName: String? = null,
+    @SerializedName("ticketPrintNotes") val ticketPrintNotes: Boolean = true,
+    @SerializedName("ticketFontSize") val ticketFontSize: String = "medium",
     // ========== LABEL PRINTING CONFIG ==========
     @SerializedName("labelPrintPrice") val labelPrintPrice: Boolean = false,
     @SerializedName("labelPrintStoreName") val labelPrintStoreName: Boolean = false,

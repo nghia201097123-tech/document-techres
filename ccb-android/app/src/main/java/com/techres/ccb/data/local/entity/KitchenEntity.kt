@@ -211,6 +211,27 @@ data class KitchenEntity(
     @ColumnInfo(name = "ticket_copies")
     val ticketCopies: Int = 1, // Số bản in phiếu
 
+    @ColumnInfo(name = "ticket_print_order_number")
+    val ticketPrintOrderNumber: Boolean = true, // In mã đơn hàng trên phiếu
+
+    @ColumnInfo(name = "ticket_print_table_name")
+    val ticketPrintTableName: Boolean = true, // In tên bàn trên phiếu
+
+    @ColumnInfo(name = "ticket_print_time")
+    val ticketPrintTime: Boolean = true, // In thời gian trên phiếu
+
+    @ColumnInfo(name = "ticket_print_store_name")
+    val ticketPrintStoreName: Boolean = false, // In tên cửa hàng trên phiếu
+
+    @ColumnInfo(name = "ticket_store_name")
+    val ticketStoreName: String? = null, // Tên cửa hàng hiển thị trên phiếu
+
+    @ColumnInfo(name = "ticket_print_notes")
+    val ticketPrintNotes: Boolean = true, // In ghi chú trên phiếu
+
+    @ColumnInfo(name = "ticket_font_size")
+    val ticketFontSize: String = "medium", // Cỡ chữ phiếu: small, medium, large
+
     // ========== LABEL PRINTING CONFIG ==========
     @ColumnInfo(name = "label_print_price")
     val labelPrintPrice: Boolean = false, // In giá trên tem
