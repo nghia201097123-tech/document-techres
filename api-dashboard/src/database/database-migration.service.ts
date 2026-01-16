@@ -526,6 +526,27 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('printer_protocol column added to kitchens table');
       }
 
+      // 19.6. Add label size and font config columns to kitchens table
+      const hasLabelWidthMm = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'label_width_mm'
+        );
+      `);
+
+      if (!hasLabelWidthMm[0].exists) {
+        this.logger.log('Adding label size and font config columns to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN IF NOT EXISTS label_width_mm INTEGER DEFAULT 72,
+          ADD COLUMN IF NOT EXISTS label_height_mm INTEGER DEFAULT 30,
+          ADD COLUMN IF NOT EXISTS label_gap_mm INTEGER DEFAULT 3,
+          ADD COLUMN IF NOT EXISTS label_font_scale FLOAT DEFAULT 1.0,
+          ADD COLUMN IF NOT EXISTS label_max_toppings INTEGER DEFAULT 0
+        `);
+        this.logger.log('Label size and font config columns added to kitchens table');
+      }
+
       // 20. Add parent_id column to departments table for hierarchy support
       const hasParentId = await queryRunner.query(`
         SELECT EXISTS (
