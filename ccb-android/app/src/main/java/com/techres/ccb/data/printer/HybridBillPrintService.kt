@@ -1,6 +1,5 @@
 package com.techres.ccb.data.printer
 
-import android.content.Context
 import android.util.Log
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
@@ -107,9 +106,10 @@ object HybridBillPrintService {
 
             // Generate bill content - Sunmi hỗ trợ UTF-8 tốt, nhưng dùng bitmap để đảm bảo 100%
             val capability = PrinterCapability(
+                printerIp = "sunmi_inner", // Dummy IP for internal printer
+                printerPort = 0,
                 supportVietnameseUtf8 = false, // Force bitmap mode cho Sunmi để đảm bảo tiếng Việt đẹp
-                printerModel = adapter.getSunmiModel(),
-                paperWidth = config.paperWidth
+                printerModel = adapter.getSunmiModel()
             )
             val billContent = generateHybridBill(config, template, billData, capability)
 
