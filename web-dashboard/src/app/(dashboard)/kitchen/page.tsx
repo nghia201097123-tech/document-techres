@@ -1094,6 +1094,7 @@ export default function KitchenPage() {
                   </div>
                 </div>
               )}
+            </div>
             <DialogFooter className="flex-col sm:flex-row gap-4 flex-shrink-0 pt-4 border-t">
               {dialogMode === "create" && (
                 <div className="flex items-center gap-2 mr-auto">
