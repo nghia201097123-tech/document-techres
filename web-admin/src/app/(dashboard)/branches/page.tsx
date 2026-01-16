@@ -59,14 +59,18 @@ import type { Branch, Brand } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 import { branchService } from "@/services/branch-service";
 import { brandService } from "@/services/brand-service";
+import { locationService, type Province, type Ward } from "@/services/location-service";
 import { useToast } from "@/hooks/use-toast";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { ProvinceSelect, WardSelect } from "@/components/ui/searchable-select";
 
 interface BranchFormData {
   brandId: string;
   name: string;
   code: string;
   logoUrl: string;
+  provinceCode: string;
+  wardCode: string;
   address: string;
   phone: string;
   email: string;
@@ -81,6 +85,8 @@ const initialFormData: BranchFormData = {
   name: "",
   code: "",
   logoUrl: "",
+  provinceCode: "",
+  wardCode: "",
   address: "",
   phone: "",
   email: "",
@@ -108,6 +114,12 @@ export default function BranchesPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isDuplicating, setIsDuplicating] = React.useState(false);
   const { toast } = useToast();
+
+  // Location state
+  const [provinces, setProvinces] = React.useState<Province[]>([]);
+  const [wards, setWards] = React.useState<Ward[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = React.useState(false);
+  const [loadingWards, setLoadingWards] = React.useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -163,6 +175,42 @@ export default function BranchesPage() {
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterBrand]);
+
+  // Load provinces on mount
+  React.useEffect(() => {
+    const loadProvinces = async () => {
+      setLoadingProvinces(true);
+      try {
+        const data = await locationService.getProvinces();
+        setProvinces(data);
+      } catch (error) {
+        console.error("Error loading provinces:", error);
+      } finally {
+        setLoadingProvinces(false);
+      }
+    };
+    loadProvinces();
+  }, []);
+
+  // Load wards when province changes
+  React.useEffect(() => {
+    if (formData.provinceCode) {
+      const loadWards = async () => {
+        setLoadingWards(true);
+        try {
+          const data = await locationService.getWards(formData.provinceCode);
+          setWards(data);
+        } catch (error) {
+          console.error("Error loading wards:", error);
+        } finally {
+          setLoadingWards(false);
+        }
+      };
+      loadWards();
+    } else {
+      setWards([]);
+    }
+  }, [formData.provinceCode]);
 
   // Sorting logic
   const sortedBranches = React.useMemo(() => {
@@ -240,6 +288,8 @@ export default function BranchesPage() {
       name: branch.name,
       code: branch.code,
       logoUrl: branch.logo || "", // Read from 'logo', send as 'logoUrl'
+      provinceCode: branch.provinceCode || "",
+      wardCode: branch.wardCode || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -259,6 +309,8 @@ export default function BranchesPage() {
       name: branch.name,
       code: branch.code,
       logoUrl: branch.logo || "", // Read from 'logo', send as 'logoUrl'
+      provinceCode: branch.provinceCode || "",
+      wardCode: branch.wardCode || "",
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
@@ -327,6 +379,28 @@ export default function BranchesPage() {
     }));
   };
 
+  // Handle province change - clear ward when province changes
+  const handleProvinceChange = (provinceCode: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      provinceCode,
+      wardCode: "", // Clear ward when province changes
+    }));
+  };
+
+  // Handle brand change - load brand's province/ward as defaults
+  const handleBrandChange = (brandId: string) => {
+    const selectedBrand = brands.find((b) => b.id === brandId);
+    setFormData((prev) => ({
+      ...prev,
+      brandId,
+      // Set brand's province/ward as defaults
+      provinceCode: selectedBrand?.provinceCode || prev.provinceCode,
+      wardCode: selectedBrand?.wardCode || prev.wardCode,
+      address: selectedBrand?.address || prev.address,
+    }));
+  };
+
   // Quick create handler
   const handleQuickCreate = () => {
     setFormData(initialFormData);
@@ -365,6 +439,8 @@ export default function BranchesPage() {
         brandId: branch.brandId,
         name: `${branch.name} (Bản sao)`,
         code: `${branch.code}_COPY`,
+        provinceCode: branch.provinceCode || "",
+        wardCode: branch.wardCode || "",
         address: branch.address || "",
         phone: branch.phone || "",
         email: branch.email || "",
@@ -698,9 +774,7 @@ export default function BranchesPage() {
                 <Label htmlFor="brandId">Thương hiệu *</Label>
                 <Select
                   value={formData.brandId}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, brandId: value }))
-                  }
+                  onValueChange={handleBrandChange}
                   disabled={isViewMode}
                 >
                   <SelectTrigger>
@@ -749,13 +823,38 @@ export default function BranchesPage() {
                 maxWidth={400}
                 maxHeight={400}
               />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tỉnh/Thành phố</Label>
+                  <ProvinceSelect
+                    options={provinces}
+                    value={formData.provinceCode}
+                    onValueChange={handleProvinceChange}
+                    disabled={isViewMode}
+                    loading={loadingProvinces}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phường/Xã</Label>
+                  <WardSelect
+                    options={wards}
+                    value={formData.wardCode}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, wardCode: value }))
+                    }
+                    disabled={isViewMode || !formData.provinceCode}
+                    loading={loadingWards}
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ</Label>
+                <Label htmlFor="address">Địa chỉ chi tiết</Label>
                 <Input
                   id="address"
                   name="address"
                   value={formData.address}
                   onChange={handleChange}
+                  placeholder="Số nhà, đường..."
                   disabled={isViewMode}
                 />
               </div>
@@ -857,9 +956,7 @@ export default function BranchesPage() {
                 <Label htmlFor="quick-brandId">Thương hiệu *</Label>
                 <Select
                   value={formData.brandId}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, brandId: value }))
-                  }
+                  onValueChange={handleBrandChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn thương hiệu" />

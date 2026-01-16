@@ -57,6 +57,8 @@ import type { Brand, BusinessModel, Company } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 import { brandService } from "@/services/brand-service";
 import { companyService } from "@/services/company-service";
+import { locationService, type Province, type Ward } from "@/services/location-service";
+import { ProvinceSelect, WardSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/hooks/use-toast";
 import { BrandWizard } from "@/components/brand-wizard";
 import { ImageUpload } from "@/components/ui/image-upload";
@@ -79,6 +81,9 @@ interface BrandFormData {
   code: string;
   logoUrl: string;
   businessModel: BusinessModel;
+  provinceCode: string;
+  wardCode: string;
+  address: string;
   description: string;
 }
 
@@ -88,6 +93,9 @@ const initialFormData: BrandFormData = {
   code: "",
   logoUrl: "",
   businessModel: "full_system",
+  provinceCode: "",
+  wardCode: "",
+  address: "",
   description: "",
 };
 
@@ -110,6 +118,12 @@ export default function BrandsPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isDuplicating, setIsDuplicating] = React.useState(false);
   const { toast } = useToast();
+
+  // Location state
+  const [provinces, setProvinces] = React.useState<Province[]>([]);
+  const [wards, setWards] = React.useState<Ward[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = React.useState(false);
+  const [loadingWards, setLoadingWards] = React.useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -165,6 +179,42 @@ export default function BrandsPage() {
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterCompany]);
+
+  // Load provinces on mount
+  React.useEffect(() => {
+    const loadProvinces = async () => {
+      setLoadingProvinces(true);
+      try {
+        const data = await locationService.getProvinces();
+        setProvinces(data);
+      } catch (error) {
+        console.error("Error loading provinces:", error);
+      } finally {
+        setLoadingProvinces(false);
+      }
+    };
+    loadProvinces();
+  }, []);
+
+  // Load wards when province changes
+  React.useEffect(() => {
+    if (formData.provinceCode) {
+      const loadWards = async () => {
+        setLoadingWards(true);
+        try {
+          const data = await locationService.getWards(formData.provinceCode);
+          setWards(data);
+        } catch (error) {
+          console.error("Error loading wards:", error);
+        } finally {
+          setLoadingWards(false);
+        }
+      };
+      loadWards();
+    } else {
+      setWards([]);
+    }
+  }, [formData.provinceCode]);
 
   // Sorting logic
   const sortedBrands = React.useMemo(() => {
@@ -244,6 +294,9 @@ export default function BrandsPage() {
       code: brand.code,
       logoUrl: brand.logo || "", // Read from 'logo', send as 'logoUrl'
       businessModel: brand.businessModel,
+      provinceCode: brand.provinceCode || "",
+      wardCode: brand.wardCode || "",
+      address: brand.address || "",
       description: brand.description || "",
     });
     setIsViewMode(false);
@@ -258,6 +311,9 @@ export default function BrandsPage() {
       code: brand.code,
       logoUrl: brand.logo || "", // Read from 'logo', send as 'logoUrl'
       businessModel: brand.businessModel,
+      provinceCode: brand.provinceCode || "",
+      wardCode: brand.wardCode || "",
+      address: brand.address || "",
       description: brand.description || "",
     });
     setIsViewMode(true);
@@ -317,6 +373,28 @@ export default function BrandsPage() {
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
+    }));
+  };
+
+  // Handle province change - clear ward when province changes
+  const handleProvinceChange = (provinceCode: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      provinceCode,
+      wardCode: "", // Clear ward when province changes
+    }));
+  };
+
+  // Handle company change - load company's province/ward as defaults
+  const handleCompanyChange = (companyId: string) => {
+    const selectedCompany = companies.find((c) => c.id === companyId);
+    setFormData((prev) => ({
+      ...prev,
+      companyId,
+      // Set company's province/ward as defaults
+      provinceCode: selectedCompany?.provinceCode || prev.provinceCode,
+      wardCode: selectedCompany?.wardCode || prev.wardCode,
+      address: selectedCompany?.address || prev.address,
     }));
   };
 
@@ -690,9 +768,7 @@ export default function BrandsPage() {
                 <Label htmlFor="companyId">Công ty *</Label>
                 <Select
                   value={formData.companyId}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, companyId: value }))
-                  }
+                  onValueChange={handleCompanyChange}
                   disabled={isViewMode}
                 >
                   <SelectTrigger>
@@ -760,6 +836,41 @@ export default function BrandsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tỉnh/Thành phố</Label>
+                  <ProvinceSelect
+                    options={provinces}
+                    value={formData.provinceCode}
+                    onValueChange={handleProvinceChange}
+                    disabled={isViewMode}
+                    loading={loadingProvinces}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phường/Xã</Label>
+                  <WardSelect
+                    options={wards}
+                    value={formData.wardCode}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, wardCode: value }))
+                    }
+                    disabled={isViewMode || !formData.provinceCode}
+                    loading={loadingWards}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Địa chỉ chi tiết</Label>
+                <Input
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Số nhà, đường..."
+                  disabled={isViewMode}
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Mô tả</Label>
                 <Input
@@ -818,9 +929,7 @@ export default function BrandsPage() {
                 <Label htmlFor="quick-companyId">Công ty *</Label>
                 <Select
                   value={formData.companyId}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, companyId: value }))
-                  }
+                  onValueChange={handleCompanyChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn công ty" />
