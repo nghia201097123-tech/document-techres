@@ -24,8 +24,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -287,7 +291,8 @@ fun PaymentDialog(
                                 suffix = { Text("đ", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                shape = RoundedCornerShape(10.dp)
+                                shape = RoundedCornerShape(10.dp),
+                                visualTransformation = ThousandSeparatorTransformation()
                             )
 
                             Spacer(modifier = Modifier.height(6.dp))
@@ -1736,6 +1741,53 @@ private fun CouponCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * VisualTransformation để hiển thị số tiền với dấu chấm ngàn
+ * VD: 775000 -> 775.000
+ */
+private class ThousandSeparatorTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val originalText = text.text
+
+        // Format số với dấu chấm ngàn
+        val formattedText = if (originalText.isNotEmpty()) {
+            try {
+                val number = originalText.toLongOrNull() ?: 0L
+                java.text.NumberFormat.getInstance(java.util.Locale("vi", "VN")).format(number)
+            } catch (e: Exception) {
+                originalText
+            }
+        } else {
+            originalText
+        }
+
+        // Tạo OffsetMapping để cursor di chuyển đúng vị trí
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (originalText.isEmpty()) return 0
+
+                // Đếm số dấu chấm được thêm vào trước vị trí offset
+                val digitsBeforeOffset = offset
+                val dotsAdded = (digitsBeforeOffset - 1) / 3
+                return (offset + dotsAdded).coerceAtMost(formattedText.length)
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (formattedText.isEmpty()) return 0
+
+                // Đếm số dấu chấm trước vị trí offset trong formatted text
+                var dotsCount = 0
+                for (i in 0 until offset.coerceAtMost(formattedText.length)) {
+                    if (formattedText[i] == '.') dotsCount++
+                }
+                return (offset - dotsCount).coerceAtMost(originalText.length)
+            }
+        }
+
+        return TransformedText(AnnotatedString(formattedText), offsetMapping)
     }
 }
 
