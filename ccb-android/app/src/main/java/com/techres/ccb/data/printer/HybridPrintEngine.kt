@@ -336,8 +336,8 @@ object BitmapTextRenderer {
     }
 
     /**
-     * Render key-value line (ví dụ: "Tổng tiền:     100,000đ")
-     * Tự động cắt ngắn key với "..." nếu quá dài
+     * Render key-value line (ví dụ: "Tên món dài...     x1  230.000đ")
+     * Nếu key quá dài: xuống dòng, value luôn canh phải trên dòng đầu
      */
     fun renderKeyValue(
         key: String,
@@ -348,7 +348,6 @@ object BitmapTextRenderer {
         val textPaint = TextPaint().apply {
             color = Color.BLACK
             textSize = style.fontSize
-            // Disable anti-aliasing for sharper text on thermal printers
             isAntiAlias = false
             isSubpixelText = false
             hinting = android.graphics.Paint.HINTING_ON
@@ -357,34 +356,51 @@ object BitmapTextRenderer {
 
         val valueWidth = textPaint.measureText(value)
         val spaceCharWidth = textPaint.measureText(" ")
-        val ellipsis = "..."
-        val ellipsisWidth = textPaint.measureText(ellipsis)
+        val keyWidth = textPaint.measureText(key)
 
         // Cần ít nhất 2 khoảng trắng giữa key và value
         val minSpaceWidth = spaceCharWidth * 2
-        val maxKeyWidth = paperWidth - valueWidth - minSpaceWidth
+        val maxFirstLineKeyWidth = paperWidth - valueWidth - minSpaceWidth
 
-        // Cắt ngắn key nếu quá dài
-        var truncatedKey = key
-        var keyWidth = textPaint.measureText(key)
-
-        if (keyWidth > maxKeyWidth && maxKeyWidth > ellipsisWidth) {
-            // Tìm vị trí cắt phù hợp
-            val targetWidth = maxKeyWidth - ellipsisWidth
-            var endIndex = key.length
-            while (endIndex > 0 && textPaint.measureText(key.substring(0, endIndex)) > targetWidth) {
-                endIndex--
-            }
-            if (endIndex > 0) {
-                truncatedKey = key.substring(0, endIndex).trimEnd() + ellipsis
-                keyWidth = textPaint.measureText(truncatedKey)
-            }
+        // Nếu key vừa trên 1 dòng
+        if (keyWidth <= maxFirstLineKeyWidth) {
+            val spaceWidth = paperWidth - keyWidth - valueWidth
+            val spaces = " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1))
+            return renderText("$key$spaces$value", style, paperWidth)
         }
 
-        val spaceWidth = paperWidth - keyWidth - valueWidth
-        val spaces = if (spaceWidth > 0) " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1)) else " "
+        // Key quá dài - cần xuống dòng
+        // Tìm vị trí cắt phù hợp cho dòng đầu (cắt theo từ nếu có thể)
+        var firstLineEndIndex = key.length
+        while (firstLineEndIndex > 0 && textPaint.measureText(key.substring(0, firstLineEndIndex)) > maxFirstLineKeyWidth) {
+            firstLineEndIndex--
+        }
 
-        return renderText("$truncatedKey$spaces$value", style, paperWidth)
+        // Tìm điểm cắt theo từ (space) nếu có thể
+        val lastSpaceIndex = key.substring(0, firstLineEndIndex).lastIndexOf(' ')
+        if (lastSpaceIndex > firstLineEndIndex / 2) {
+            firstLineEndIndex = lastSpaceIndex
+        }
+
+        val firstLinePart = key.substring(0, firstLineEndIndex).trimEnd()
+        val remainingPart = key.substring(firstLineEndIndex).trimStart()
+
+        // Tính khoảng trống cho dòng đầu
+        val firstLineKeyWidth = textPaint.measureText(firstLinePart)
+        val spaceWidth = paperWidth - firstLineKeyWidth - valueWidth
+        val spaces = " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1))
+
+        // Dòng đầu: key (phần đầu) + spaces + value (canh phải)
+        val firstLine = "$firstLinePart$spaces$value"
+
+        // Dòng còn lại: phần key chưa in (wrap tự động bởi StaticLayout)
+        val fullText = if (remainingPart.isNotEmpty()) {
+            "$firstLine\n$remainingPart"
+        } else {
+            firstLine
+        }
+
+        return renderText(fullText, style, paperWidth)
     }
 }
 

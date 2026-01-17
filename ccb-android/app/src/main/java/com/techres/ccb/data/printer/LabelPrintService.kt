@@ -780,7 +780,11 @@ object LabelPrintService {
     /**
      * Render two column text (left + right aligned) for price display
      * Example: "Đơn giá:"    "35,000đ"
-     * Tự động cắt ngắn left text với "..." nếu quá dài
+     *
+     * Xử lý tự động xuống dòng:
+     * - Nếu left text vừa trên 1 dòng với right text -> hiển thị 1 dòng
+     * - Nếu left text quá dài -> dòng 1 chứa phần text vừa được + right text canh phải,
+     *   phần còn lại xuống dòng tiếp theo
      */
     private fun renderTwoColumnText(
         leftText: String,
@@ -797,41 +801,88 @@ object LabelPrintService {
         }
 
         val rightWidth = paint.measureText(rightText).toInt()
-        val ellipsis = "..."
-        val ellipsisWidth = paint.measureText(ellipsis).toInt()
-        val minPadding = 10 // Khoảng cách tối thiểu giữa left và right
+        val spaceWidth = paint.measureText(" ").toInt()
+        val minPadding = spaceWidth * 2 // Tối thiểu 2 space giữa left và right
+        val lineHeight = (paint.textSize * 1.3f).toInt().coerceAtLeast(1)
 
-        // Tính chiều rộng tối đa cho left text
-        val maxLeftWidth = width - rightWidth - minPadding
+        // Tính chiều rộng tối đa cho left text trên dòng đầu tiên
+        val maxFirstLineLeftWidth = width - rightWidth - minPadding
+        val leftWidth = paint.measureText(leftText).toInt()
 
-        // Cắt ngắn left text nếu quá dài
-        var truncatedLeft = leftText
-        var leftWidth = paint.measureText(leftText).toInt()
+        // Nếu left text vừa trên 1 dòng
+        if (leftWidth <= maxFirstLineLeftWidth) {
+            val bitmap = Bitmap.createBitmap(width, lineHeight, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
 
-        if (leftWidth > maxLeftWidth && maxLeftWidth > ellipsisWidth) {
-            val targetWidth = maxLeftWidth - ellipsisWidth
-            var endIndex = leftText.length
-            while (endIndex > 0 && paint.measureText(leftText.substring(0, endIndex)) > targetWidth) {
-                endIndex--
-            }
-            if (endIndex > 0) {
-                truncatedLeft = leftText.substring(0, endIndex).trimEnd() + ellipsis
-                leftWidth = paint.measureText(truncatedLeft).toInt()
-            }
+            // Draw left text
+            canvas.drawText(leftText, 0f, paint.textSize, paint)
+
+            // Draw right text (right-aligned)
+            val rightX = (width - rightWidth).toFloat()
+            canvas.drawText(rightText, rightX, paint.textSize, paint)
+
+            return bitmap
         }
 
-        val height = (paint.textSize * 1.3f).toInt().coerceAtLeast(1)
+        // Left text quá dài - cần xuống dòng
+        // Tìm điểm ngắt hợp lý cho dòng đầu tiên
+        var firstLineEndIndex = leftText.length
+        while (firstLineEndIndex > 0 && paint.measureText(leftText.substring(0, firstLineEndIndex)) > maxFirstLineLeftWidth) {
+            firstLineEndIndex--
+        }
 
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        // Thử tìm điểm ngắt tại khoảng trắng (word boundary)
+        val lastSpaceIndex = leftText.substring(0, firstLineEndIndex).lastIndexOf(' ')
+        if (lastSpaceIndex > firstLineEndIndex / 2) {
+            firstLineEndIndex = lastSpaceIndex
+        }
+
+        // Bảo đảm có ít nhất 1 ký tự trên dòng đầu
+        if (firstLineEndIndex <= 0) {
+            firstLineEndIndex = 1
+        }
+
+        val firstLinePart = leftText.substring(0, firstLineEndIndex).trimEnd()
+        val remainingPart = leftText.substring(firstLineEndIndex).trimStart()
+
+        // Tính số dòng cần cho phần còn lại
+        val remainingLines = if (remainingPart.isNotEmpty()) {
+            val remainingLayout = StaticLayout.Builder
+                .obtain(remainingPart, 0, remainingPart.length, paint, width)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1.0f)
+                .setIncludePad(false)
+                .build()
+            remainingLayout.lineCount
+        } else {
+            0
+        }
+
+        val totalHeight = lineHeight * (1 + remainingLines)
+        val bitmap = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
 
-        // Draw left text
-        canvas.drawText(truncatedLeft, 0f, paint.textSize, paint)
-
-        // Draw right text (right-aligned)
-        val rightX = (width - rightWidth).toFloat().coerceAtLeast(leftWidth + minPadding.toFloat())
+        // Draw first line: left text part + right text (right-aligned)
+        canvas.drawText(firstLinePart, 0f, paint.textSize, paint)
+        val rightX = (width - rightWidth).toFloat()
         canvas.drawText(rightText, rightX, paint.textSize, paint)
+
+        // Draw remaining lines (if any)
+        if (remainingPart.isNotEmpty()) {
+            val remainingLayout = StaticLayout.Builder
+                .obtain(remainingPart, 0, remainingPart.length, paint, width)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1.0f)
+                .setIncludePad(false)
+                .build()
+
+            canvas.save()
+            canvas.translate(0f, lineHeight.toFloat())
+            remainingLayout.draw(canvas)
+            canvas.restore()
+        }
 
         return bitmap
     }
