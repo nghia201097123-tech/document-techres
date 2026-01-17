@@ -373,6 +373,15 @@ object BillPrintService {
             b.row("Tiền thừa:", fmt(billData.changeAmount))
         }
 
+        // ==================== GHI CHÚ TỔNG BILL ====================
+        if (template.showOrderNote && billData.orderNote != null && billData.orderNote.isNotBlank()) {
+            b.line()
+            b.bold()
+            b.text("Ghi chú:")
+            b.normal()
+            b.text(billData.orderNote)
+        }
+
         b.line()
 
         // ==================== 7. FOOTER ====================
@@ -565,6 +574,8 @@ data class BillData(
     // Time tracking
     val checkInTime: Date? = null,
     val checkOutTime: Date? = null,
+    // Order note - Ghi chú tổng bill
+    val orderNote: String? = null,
     // Temporary bill
     val isTemporaryBill: Boolean = false,
     val printCount: Int = 0,

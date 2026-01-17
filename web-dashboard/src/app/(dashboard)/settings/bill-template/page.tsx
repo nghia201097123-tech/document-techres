@@ -188,6 +188,7 @@ export default function BillTemplatePage() {
         // Items
         showItemCode: template.showItemCode,
         showItemNote: template.showItemNote,
+        showOrderNote: template.showOrderNote ?? true, // Ghi chú tổng bill
         showUnitPrice: template.showUnitPrice,
         showQuantity: template.showQuantity,
         showSubtotal: template.showSubtotal,
@@ -972,6 +973,13 @@ export default function BillTemplatePage() {
                           onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showItemNote: checked })}
                         />
                         <Label>Hiển thị ghi chú món</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.showOrderNote || false}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, showOrderNote: checked })}
+                        />
+                        <Label>Hiển thị ghi chú tổng bill</Label>
                       </div>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -1958,6 +1966,14 @@ export default function BillTemplatePage() {
                   <div className="flex justify-between text-sm">
                     <span>Tiền thừa:</span>
                     <span>45,500</span>
+                  </div>
+                )}
+
+                {/* ============ GHI CHÚ TỔNG BILL ============ */}
+                {previewTemplate.showOrderNote && (
+                  <div className="border-t border-dashed pt-2 mt-2">
+                    <p className="text-sm font-medium">Ghi chú:</p>
+                    <p className="text-sm text-muted-foreground italic">Giao hàng trước 12h trưa, gọi điện trước khi giao.</p>
                   </div>
                 )}
 

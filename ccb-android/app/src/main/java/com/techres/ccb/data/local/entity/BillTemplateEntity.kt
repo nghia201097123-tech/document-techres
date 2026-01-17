@@ -104,6 +104,9 @@ data class BillTemplateEntity(
     @ColumnInfo(name = "show_item_note")
     val showItemNote: Boolean = true,
 
+    @ColumnInfo(name = "show_order_note")
+    val showOrderNote: Boolean = true, // Hiển thị ghi chú tổng bill
+
     @ColumnInfo(name = "show_unit_price")
     val showUnitPrice: Boolean = true,
 

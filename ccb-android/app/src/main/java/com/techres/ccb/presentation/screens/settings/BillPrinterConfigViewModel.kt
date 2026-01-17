@@ -370,6 +370,30 @@ class BillPrinterConfigViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Toggle isActive status for a bill printer (enable/disable printing)
+     */
+    fun toggleActiveStatus(config: BillPrinterConfigEntity) {
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                val updated = config.copy(
+                    isActive = !config.isActive,
+                    updatedAt = now
+                )
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.update(updated)
+                }
+                _uiState.update {
+                    it.copy(successMessage = if (updated.isActive) "Đã bật máy in" else "Đã tắt máy in")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error toggling active status: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
     fun clearSuccessMessage() {
         _uiState.update { it.copy(successMessage = null) }
     }

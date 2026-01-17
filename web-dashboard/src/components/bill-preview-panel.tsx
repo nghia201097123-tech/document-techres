@@ -265,6 +265,14 @@ export function BillPreviewPanel({ template, className }: BillPreviewPanelProps)
           </div>
         )}
 
+        {/* Order Note - Ghi chú tổng bill */}
+        {template.showOrderNote && (
+          <div className="border-t border-dashed pt-2 mt-2">
+            <p className="text-xs font-medium">Ghi chu:</p>
+            <p className="text-xs text-muted-foreground italic">Giao hang truoc 12h trua</p>
+          </div>
+        )}
+
         {/* QR Code */}
         {template.showQrCode && (
           <div className="text-center my-3">

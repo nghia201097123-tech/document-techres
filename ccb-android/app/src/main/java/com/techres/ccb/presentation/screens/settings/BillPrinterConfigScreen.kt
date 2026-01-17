@@ -164,7 +164,8 @@ fun BillPrinterConfigScreen(
                         onSetDefaultClick = { viewModel.setDefault(config.id) },
                         onTemplateClick = { viewModel.showTemplateSelector(config) },
                         onPaperWidthClick = { viewModel.showPaperWidthSelector(config) },
-                        onToggleAutoPrint = { viewModel.toggleAutoPrint(config) }
+                        onToggleAutoPrint = { viewModel.toggleAutoPrint(config) },
+                        onToggleActive = { viewModel.toggleActiveStatus(config) }
                     )
                 }
 
@@ -223,17 +224,21 @@ private fun PrinterConfigCard(
     onSetDefaultClick: () -> Unit,
     onTemplateClick: () -> Unit,
     onPaperWidthClick: () -> Unit,
-    onToggleAutoPrint: () -> Unit
+    onToggleAutoPrint: () -> Unit,
+    onToggleActive: () -> Unit
 ) {
     val template = templates.find { it.id == config.templateId }
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (config.isDefault)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            else MaterialTheme.colorScheme.surface
+            containerColor = when {
+                !config.isActive -> Color(0xFFF5F5F5)
+                config.isDefault -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                else -> MaterialTheme.colorScheme.surface
+            }
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = if (config.isDefault) 4.dp else 2.dp
@@ -251,16 +256,22 @@ private fun PrinterConfigCard(
                         .size(48.dp)
                         .clip(CircleShape)
                         .background(
-                            if (config.isDefault) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant
+                            when {
+                                !config.isActive -> Color.Gray.copy(alpha = 0.3f)
+                                config.isDefault -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Receipt,
                         contentDescription = null,
-                        tint = if (config.isDefault) Color.White
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = when {
+                            !config.isActive -> Color.Gray
+                            config.isDefault -> Color.White
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
 
@@ -273,13 +284,20 @@ private fun PrinterConfigCard(
                         Text(
                             text = config.name,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
+                            color = if (config.isActive)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                         if (config.isDefault) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (config.isActive)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    Color.Gray
                             ) {
                                 Text(
                                     "Mặc định",
@@ -299,16 +317,48 @@ private fun PrinterConfigCard(
                     }
                 }
 
-                // Connection indicator
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (config.isConnected) Color(0xFF4CAF50)
-                            else Color(0xFFBDBDBD)
-                        )
+                // Enable/Disable Switch
+                Switch(
+                    checked = config.isActive,
+                    onCheckedChange = { onToggleActive() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = primaryColor,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                    )
                 )
+            }
+
+            // Show inactive message if disabled
+            if (!config.isActive) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFF3E0)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color(0xFFFF9800)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Máy in đang tắt - không in khi thanh toán",
+                            fontSize = 12.sp,
+                            color = Color(0xFFE65100)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
