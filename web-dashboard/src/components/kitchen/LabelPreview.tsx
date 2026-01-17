@@ -116,19 +116,38 @@ function SingleLabel({
         {/* Separator */}
         <div className="border-t border-gray-400 my-0.5" />
 
-        {/* Item Name */}
-        <div
-          className="font-bold truncate"
-          style={{ fontSize: `${fonts.bold}px` }}
-        >
-          {SAMPLE_DATA.itemName}
-        </div>
+        {/* Item Name + Total Price (giống phiếu bếp) */}
+        {showPrice && labelIndex === 1 ? (
+          <>
+            <div
+              className="font-bold flex justify-between"
+              style={{ fontSize: `${fonts.bold}px` }}
+            >
+              <span className="truncate">{SAMPLE_DATA.itemName}</span>
+              <span>{SAMPLE_DATA.totalPrice.toLocaleString("vi-VN")}đ</span>
+            </div>
+            {/* Base price on left (khi có topping/size có giá) */}
+            <div
+              className="text-gray-600"
+              style={{ fontSize: `${fonts.small}px` }}
+            >
+              {SAMPLE_DATA.basePrice.toLocaleString("vi-VN")}đ
+            </div>
+          </>
+        ) : (
+          <div
+            className="font-bold truncate"
+            style={{ fontSize: `${fonts.bold}px` }}
+          >
+            {SAMPLE_DATA.itemName}
+          </div>
+        )}
 
         {/* Size, Ice, Sugar - only on first label */}
         {labelIndex === 1 && (
           <div style={{ fontSize: `${fonts.normal}px` }} className="text-gray-700">
             <div className="flex justify-between">
-              <span className="truncate">+{SAMPLE_DATA.size}</span>
+              <span className="truncate">+ {SAMPLE_DATA.size}</span>
               {showPrice && SAMPLE_DATA.sizePrice > 0 && (
                 <span>+{SAMPLE_DATA.sizePrice.toLocaleString("vi-VN")}đ</span>
               )}
@@ -145,12 +164,12 @@ function SingleLabel({
           </div>
         )}
 
-        {/* Toppings */}
+        {/* Toppings với giá */}
         {toppings.length > 0 && (
           <div style={{ fontSize: `${fonts.normal}px` }} className="text-gray-700">
             {toppings.map((topping, i) => (
               <div key={i} className="flex justify-between">
-                <span className="truncate">+{topping.name}</span>
+                <span className="truncate">+ {topping.name}</span>
                 {showPrice && topping.price > 0 && (
                   <span>+{topping.price.toLocaleString("vi-VN")}đ</span>
                 )}
@@ -167,21 +186,7 @@ function SingleLabel({
               style={{ fontSize: `${fonts.normal}px` }}
               className="text-red-600 font-medium"
             >
-              Ghi chú: {notes}
-            </div>
-          </>
-        )}
-
-        {/* Price - only on last label */}
-        {showPrice && labelIndex === totalLabels && (
-          <>
-            <div className="border-t border-gray-400 my-0.5" />
-            <div
-              className="flex justify-between font-bold"
-              style={{ fontSize: `${fonts.normal}px` }}
-            >
-              <span>Thành tiền:</span>
-              <span>{SAMPLE_DATA.totalPrice.toLocaleString("vi-VN")}đ</span>
+              * {notes}
             </div>
           </>
         )}

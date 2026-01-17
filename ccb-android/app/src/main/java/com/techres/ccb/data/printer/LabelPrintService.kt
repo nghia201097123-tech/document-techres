@@ -426,36 +426,83 @@ object LabelPrintService {
         output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
         yPos += 3
 
-        // ========== PRODUCT NAME (BOLD) ==========
-        val itemNameBitmap = renderTextBitmap(
-            text = label.itemName,
-            width = contentWidth,
-            fontSize = fontBold,
-            bold = true,
-            centerAlign = false
-        )
-        output.write(bitmapToTspl(margin, yPos, itemNameBitmap))
-        yPos += itemNameBitmap.height + 1
-        itemNameBitmap.recycle()
+        // ========== PRODUCT NAME + TOTAL PRICE ==========
+        if (showPrice && !label.isContinuation && label.finalPrice > 0) {
+            // Tên món + Giá tổng (giống phiếu bếp)
+            val itemNamePriceBitmap = renderTwoColumnText(
+                label.itemName,
+                formatVND(label.finalPrice),
+                contentWidth,
+                fontBold,
+                bold = true
+            )
+            output.write(bitmapToTspl(margin, yPos, itemNamePriceBitmap))
+            yPos += itemNamePriceBitmap.height + 1
+            itemNamePriceBitmap.recycle()
 
-        // ========== SIZE ==========
-        label.size?.let { size ->
-            val sizeBitmap = renderTextBitmap(
-                text = "+Size $size",
+            // Giá gốc bên trái (nếu có topping/size có giá)
+            if (label.unitPrice > 0 && label.totalToppingPrice > 0) {
+                val basePriceBitmap = renderTextBitmap(
+                    text = "   ${formatVND(label.unitPrice)}",
+                    width = contentWidth,
+                    fontSize = fontSmall,
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(margin, yPos, basePriceBitmap))
+                yPos += basePriceBitmap.height
+                basePriceBitmap.recycle()
+            }
+        } else {
+            // Chỉ tên món (không có giá)
+            val itemNameBitmap = renderTextBitmap(
+                text = label.itemName,
                 width = contentWidth,
-                fontSize = fontNormal,
-                bold = false,
+                fontSize = fontBold,
+                bold = true,
                 centerAlign = false
             )
-            output.write(bitmapToTspl(margin, yPos, sizeBitmap))
-            yPos += sizeBitmap.height
-            sizeBitmap.recycle()
+            output.write(bitmapToTspl(margin, yPos, itemNameBitmap))
+            yPos += itemNameBitmap.height + 1
+            itemNameBitmap.recycle()
         }
 
-        // ========== ICE ==========
+        // ========== SIZE với giá ==========
+        label.size?.let { size ->
+            // Tìm giá của size trong toppingPrices
+            val sizePrice = label.toppingPrices.find {
+                it.first.lowercase().contains("size") || it.first.lowercase().contains(size.lowercase())
+            }?.second ?: 0.0
+
+            if (showPrice && sizePrice > 0) {
+                val sizeBitmap = renderTwoColumnText(
+                    "+ Size $size",
+                    "+${formatVND(sizePrice)}",
+                    contentWidth,
+                    fontNormal,
+                    bold = false
+                )
+                output.write(bitmapToTspl(margin, yPos, sizeBitmap))
+                yPos += sizeBitmap.height
+                sizeBitmap.recycle()
+            } else {
+                val sizeBitmap = renderTextBitmap(
+                    text = "+ Size $size",
+                    width = contentWidth,
+                    fontSize = fontNormal,
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(margin, yPos, sizeBitmap))
+                yPos += sizeBitmap.height
+                sizeBitmap.recycle()
+            }
+        }
+
+        // ========== ICE (không có giá) ==========
         label.ice?.let { ice ->
             val iceBitmap = renderTextBitmap(
-                text = "+$ice",
+                text = "• $ice",
                 width = contentWidth,
                 fontSize = fontNormal,
                 bold = false,
@@ -466,10 +513,10 @@ object LabelPrintService {
             iceBitmap.recycle()
         }
 
-        // ========== SUGAR ==========
+        // ========== SUGAR (không có giá) ==========
         label.sugar?.let { sugar ->
             val sugarBitmap = renderTextBitmap(
-                text = "+$sugar",
+                text = "• $sugar",
                 width = contentWidth,
                 fontSize = fontNormal,
                 bold = false,
@@ -480,24 +527,42 @@ object LabelPrintService {
             sugarBitmap.recycle()
         }
 
-        // ========== TOPPINGS ==========
+        // ========== TOPPINGS với giá ==========
         if (label.toppingPrices.isNotEmpty()) {
-            label.toppingPrices.forEach { (toppingName, _) ->
-                val toppingBitmap = renderTextBitmap(
-                    text = "+$toppingName",
-                    width = contentWidth,
-                    fontSize = fontNormal,
-                    bold = false,
-                    centerAlign = false
-                )
-                output.write(bitmapToTspl(margin, yPos, toppingBitmap))
-                yPos += toppingBitmap.height
-                toppingBitmap.recycle()
+            // Lọc bỏ size đã hiển thị ở trên
+            val filteredToppings = label.toppingPrices.filter { (name, _) ->
+                !name.lowercase().contains("size")
+            }
+
+            filteredToppings.forEach { (toppingName, toppingPrice) ->
+                if (showPrice && toppingPrice > 0) {
+                    val toppingBitmap = renderTwoColumnText(
+                        "+ $toppingName",
+                        "+${formatVND(toppingPrice)}",
+                        contentWidth,
+                        fontNormal,
+                        bold = false
+                    )
+                    output.write(bitmapToTspl(margin, yPos, toppingBitmap))
+                    yPos += toppingBitmap.height
+                    toppingBitmap.recycle()
+                } else {
+                    val toppingBitmap = renderTextBitmap(
+                        text = "+ $toppingName",
+                        width = contentWidth,
+                        fontSize = fontNormal,
+                        bold = false,
+                        centerAlign = false
+                    )
+                    output.write(bitmapToTspl(margin, yPos, toppingBitmap))
+                    yPos += toppingBitmap.height
+                    toppingBitmap.recycle()
+                }
             }
         } else if (label.toppings.isNotEmpty()) {
             label.toppings.forEach { topping ->
                 val toppingBitmap = renderTextBitmap(
-                    text = "+$topping",
+                    text = "+ $topping",
                     width = contentWidth,
                     fontSize = fontNormal,
                     bold = false,
@@ -521,24 +586,6 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, noteBitmap))
             yPos += noteBitmap.height
             noteBitmap.recycle()
-        }
-
-        // ========== PRICE SECTION (if enabled and has price) ==========
-        if (showPrice && !label.isContinuation && label.finalPrice > 0) {
-            yPos += 2
-            output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
-            yPos += 3
-
-            val priceBitmap = renderTwoColumnText(
-                "Thành tiền:",
-                formatVND(label.finalPrice),
-                contentWidth,
-                fontNormal,
-                bold = true
-            )
-            output.write(bitmapToTspl(margin, yPos, priceBitmap))
-            yPos += priceBitmap.height
-            priceBitmap.recycle()
         }
 
         // ========== DATE TIME (if enabled) ==========
@@ -785,15 +832,20 @@ object LabelPrintService {
                 separator('=')
             }
 
-            lineDouble(label.itemName, BitmapTextStyle(centerAlign = true))
+            // ========== TÊN MÓN + GIÁ TỔNG ==========
+            if (showPrice && !label.isContinuation && label.finalPrice > 0) {
+                lineKeyValueBold(label.itemName, formatVND(label.finalPrice))
+                // Giá gốc bên trái (nếu có topping/size có giá)
+                if (label.unitPrice > 0 && label.totalToppingPrice > 0) {
+                    line("   ${formatVND(label.unitPrice)}")
+                }
+            } else {
+                lineDouble(label.itemName, BitmapTextStyle(centerAlign = true))
+            }
 
             // Hiển thị phần x/y ở tem đầu tiên nếu có nhiều phần
             if (!label.isContinuation && label.totalParts > 1) {
                 lineCenter("(Phần ${label.partIndex}/${label.totalParts})")
-            }
-
-            label.size?.let {
-                lineBold("Size: $it", BitmapTextStyle(centerAlign = true))
             }
 
             // Table name (if enabled)
@@ -804,51 +856,48 @@ object LabelPrintService {
                 }
             }
 
-            if (label.sugar != null || label.ice != null) {
-                separator('-')
-                label.sugar?.let { line("Đường: $it") }
-                label.ice?.let { line("Đá: $it") }
+            // ========== SIZE với giá ==========
+            label.size?.let { size ->
+                val sizePrice = label.toppingPrices.find {
+                    it.first.lowercase().contains("size") || it.first.lowercase().contains(size.lowercase())
+                }?.second ?: 0.0
+
+                if (showPrice && sizePrice > 0) {
+                    lineKeyValue("+ Size $size", "+${formatVND(sizePrice)}")
+                } else {
+                    line("+ Size $size")
+                }
             }
 
-            if (label.toppings.isNotEmpty()) {
-                separator('-')
-                line("Topping (${label.toppings.size}):")
-                // Hiển thị topping với giá nếu có
+            // ========== ICE & SUGAR (không có giá) ==========
+            label.ice?.let { line("• $it") }
+            label.sugar?.let { line("• $it") }
+
+            // ========== TOPPINGS với giá ==========
+            if (label.toppings.isNotEmpty() || label.toppingPrices.isNotEmpty()) {
                 if (label.toppingPrices.isNotEmpty()) {
-                    label.toppingPrices.forEach { (toppingName, toppingPrice) ->
-                        if (toppingPrice > 0) {
-                            lineKeyValue("  + $toppingName", formatVND(toppingPrice))
+                    // Lọc bỏ size đã hiển thị
+                    val filteredToppings = label.toppingPrices.filter { (name, _) ->
+                        !name.lowercase().contains("size")
+                    }
+                    filteredToppings.forEach { (toppingName, toppingPrice) ->
+                        if (showPrice && toppingPrice > 0) {
+                            lineKeyValue("+ $toppingName", "+${formatVND(toppingPrice)}")
                         } else {
-                            line("  + $toppingName")
+                            line("+ $toppingName")
                         }
                     }
                 } else {
                     label.toppings.forEach { topping ->
-                        line("  + $topping")
+                        line("+ $topping")
                     }
                 }
             }
 
+            // ========== NOTE ==========
             label.note?.let {
                 separator('-')
-                line("Ghi chú: $it")
-            }
-
-            // ========== GIÁ TIỀN (if enabled and not continuation) ==========
-            if (showPrice && !label.isContinuation && label.unitPrice > 0) {
-                separator('-')
-                lineKeyValue("Đơn giá:", formatVND(label.unitPrice))
-
-                if (label.totalToppingPrice > 0) {
-                    lineKeyValue("Topping:", "+${formatVND(label.totalToppingPrice)}")
-                }
-
-                if (label.discountAmount > 0) {
-                    lineKeyValue("Giảm giá:", "-${formatVND(label.discountAmount)}")
-                }
-
-                separator('-')
-                lineBold("Thành tiền: ${formatVND(label.finalPrice)}")
+                line("* $it")
             }
 
             // ========== ORDER INFO + TIME (based on config) ==========
