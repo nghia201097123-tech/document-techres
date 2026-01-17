@@ -302,13 +302,9 @@ object BitmapTextRenderer {
         // Vẽ text
         staticLayout.draw(canvas)
 
-        // Nếu lineSpacing < 1.0, crop bitmap để giảm chiều cao
-        // lineSpacing 0.3 = crop 70% whitespace, lineSpacing 1.0 = không crop
-        if (style.lineSpacingMultiplier < 1.0f) {
-            return cropBitmapVertical(fullBitmap, style.lineSpacingMultiplier)
-        }
-
-        return fullBitmap
+        // LUÔN crop bitmap để loại bỏ khoảng trắng thừa
+        // lineSpacing chỉ ảnh hưởng đến lượng padding được giữ lại
+        return cropBitmapVertical(fullBitmap, style.lineSpacingMultiplier)
     }
 
     /**
@@ -369,15 +365,17 @@ object BitmapTextRenderer {
 
         // Tính padding dựa trên lineSpacing - sử dụng FIXED padding tối thiểu
         // để đảm bảo không có khoảng trắng thừa với font lớn
-        val paddingScale = lineSpacing.coerceIn(0.3f, 1.0f)
+        // lineSpacing có thể > 1.0 từ user config, nhưng ta vẫn giới hạn padding
+        val paddingScale = lineSpacing.coerceIn(0.3f, 1.5f)
 
-        // Padding cố định tối đa 2-4 pixels, không phụ thuộc vào font size
-        // Điều này đảm bảo font lớn không tạo ra khoảng trắng thừa
+        // Padding cố định tối đa 1-2 pixels để tránh khoảng trắng thừa
+        // Giảm từ 4 xuống 2 max để đảm bảo tight cropping với mọi font size
         val maxPadding = when {
-            paddingScale <= 0.3f -> 1
-            paddingScale <= 0.5f -> 2
-            paddingScale <= 0.7f -> 3
-            else -> 4
+            paddingScale <= 0.4f -> 1
+            paddingScale <= 0.6f -> 1
+            paddingScale <= 0.8f -> 2
+            paddingScale <= 1.0f -> 2
+            else -> 2  // Ngay cả với lineSpacing > 1.0, vẫn giới hạn padding tối đa 2px
         }
 
         val newTopPadding = maxPadding.coerceAtMost(topRow)
