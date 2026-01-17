@@ -321,13 +321,10 @@ object KitchenTicketPrintService {
             separator('=')
 
             // ═══════════════════════════════════════════
-            // SECTION 4: DANH SÁCH MÓN
+            // SECTION 4: DANH SÁCH MÓN (tối ưu: bỏ dòng trống giữa các món để tiết kiệm giấy)
             // ═══════════════════════════════════════════
             ticket.items.forEachIndexed { index, item ->
-                // Dòng trống trước mỗi món (trừ món đầu)
-                if (index > 0) {
-                    line("")
-                }
+                // Bỏ dòng trống để tiết kiệm giấy - các món vẫn rõ ràng nhờ số thứ tự
 
                 // Số thứ tự + Tên món + Số lượng
                 val qtyText = "x${item.quantity}"
@@ -395,9 +392,9 @@ object KitchenTicketPrintService {
             lineBold("TỔNG: $totalItems MÓN", BitmapTextStyle(centerAlign = true))
 
             // ═══════════════════════════════════════════
-            // FEED, BEEP & CUT
+            // FEED, BEEP & CUT (tối ưu: giảm feed từ 4 xuống 2 để tiết kiệm giấy)
             // ═══════════════════════════════════════════
-            feed(4)
+            feed(2)
             beep()
             // Cắt giấy dựa trên config
             if (kitchen.ticketCutAfterPrint) {

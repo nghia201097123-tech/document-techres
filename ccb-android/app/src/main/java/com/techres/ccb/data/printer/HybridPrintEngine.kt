@@ -153,7 +153,8 @@ data class BitmapTextStyle(
     val rightAlign: Boolean = false,
     val doubleHeight: Boolean = false,
     val doubleWidth: Boolean = false,
-    val fontFamily: Typeface = Typeface.DEFAULT
+    val fontFamily: Typeface = Typeface.DEFAULT,
+    val lineSpacingMultiplier: Float = 0.9f // Giảm từ 1.0 xuống 0.9 để tiết kiệm giấy
 )
 
 /**
@@ -211,29 +212,29 @@ object BitmapTextRenderer {
 
     /**
      * Tính font size phù hợp với khổ giấy
-     * Base: 80mm (576px) = 24f
+     * Base: 80mm (576px) = 20f (giảm từ 24f để tiết kiệm giấy)
      * Font size scale theo tỉ lệ pixel width
      */
     fun getBaseFontSize(paperWidthMm: Int): Float {
         val pixelWidth = getPixelWidth(paperWidthMm)
-        // Base: 576px = 24f, scale proportionally
-        val scaledSize = 24f * pixelWidth / PAPER_WIDTH_80MM
-        // Giới hạn min 16f, max 36f
-        return scaledSize.coerceIn(16f, 36f)
+        // Base: 576px = 20f (giảm từ 24f), scale proportionally
+        val scaledSize = 20f * pixelWidth / PAPER_WIDTH_80MM
+        // Giới hạn min 14f, max 28f
+        return scaledSize.coerceIn(14f, 28f)
     }
 
     /**
-     * Tính font size cho title (lớn hơn base 1.5x)
+     * Tính font size cho title (lớn hơn base 1.4x - giảm từ 1.5x)
      */
     fun getTitleFontSize(paperWidthMm: Int): Float {
-        return getBaseFontSize(paperWidthMm) * 1.5f
+        return getBaseFontSize(paperWidthMm) * 1.4f
     }
 
     /**
-     * Tính font size cho total (lớn hơn base 1.2x)
+     * Tính font size cho total (lớn hơn base 1.15x - giảm từ 1.2x)
      */
     fun getTotalFontSize(paperWidthMm: Int): Float {
-        return getBaseFontSize(paperWidthMm) * 1.2f
+        return getBaseFontSize(paperWidthMm) * 1.15f
     }
 
     /**
@@ -283,14 +284,15 @@ object BitmapTextRenderer {
         }
 
         // Tạo StaticLayout để handle Vietnamese text đúng cách
+        // Tối ưu: setIncludePad(false) để bỏ padding thừa, giảm line spacing để tiết kiệm giấy
         val staticLayout = StaticLayout.Builder
             .obtain(text, 0, text.length, textPaint, paperWidth)
             .setAlignment(alignment)
-            .setLineSpacing(0f, 1.0f)
-            .setIncludePad(true)
+            .setLineSpacing(0f, style.lineSpacingMultiplier) // Giảm line spacing để tiết kiệm giấy
+            .setIncludePad(false) // Bỏ padding thừa để tiết kiệm giấy
             .build()
 
-        // Tạo bitmap
+        // Tạo bitmap với chiều cao tối ưu
         val height = staticLayout.height.coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(paperWidth, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -303,12 +305,12 @@ object BitmapTextRenderer {
     }
 
     /**
-     * Render separator line
+     * Render separator line - tối ưu chiều cao
      */
     fun renderSeparator(
         char: Char = '-',
         paperWidth: Int = PAPER_WIDTH_80MM,
-        fontSize: Float = 24f
+        fontSize: Float = 16f // Giảm từ 24f xuống 16f để separator mỏng hơn
     ): Bitmap {
         // Create a paint to measure actual character width
         val measurePaint = TextPaint().apply {
@@ -325,7 +327,12 @@ object BitmapTextRenderer {
         val availableWidth = paperWidth * 0.9f
         val charCount = (availableWidth / charWidth).toInt().coerceAtLeast(10)
 
-        return renderText(char.toString().repeat(charCount), BitmapTextStyle(fontSize = fontSize, centerAlign = true), paperWidth)
+        // Sử dụng line spacing multiplier nhỏ hơn cho separator để tiết kiệm giấy
+        return renderText(
+            char.toString().repeat(charCount),
+            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 0.8f),
+            paperWidth
+        )
     }
 
     /**
@@ -565,11 +572,13 @@ class HybridBillBuilder(
     }
 
     /**
-     * In separator (đường kẻ ngang)
+     * In separator (đường kẻ ngang) - tối ưu chiều cao để tiết kiệm giấy
      */
     fun separator(char: Char = '-'): HybridBillBuilder {
         if (useBitmapMode) {
-            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, baseFontSize)
+            // Sử dụng font nhỏ hơn (0.7x base) để separator mỏng hơn, tiết kiệm giấy
+            val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
+            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize)
             val imageData = if (useRasterBitmap) {
                 EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             } else {

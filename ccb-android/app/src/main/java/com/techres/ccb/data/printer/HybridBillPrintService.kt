@@ -450,9 +450,7 @@ object HybridBillPrintService {
                 } else {
                     lineKeyValue("Thành tiền:", formatCurrency(item.totalPrice))
                 }
-
-                // Dòng trống giữa các món
-                line("")
+                // Bỏ dòng trống giữa các món để tiết kiệm giấy - các món vẫn rõ ràng nhờ bold
             }
 
             separator()
@@ -556,7 +554,7 @@ object HybridBillPrintService {
 
             // ============ QR CODE (theo config) ============
             if (template.showQrCode) {
-                feed(1)
+                // Bỏ feed(1) để tiết kiệm giấy
                 val qrContent = when (template.qrCodeType) {
                     "order_id" -> billData.orderNumber
                     "custom" -> template.qrCodeContent ?: billData.orderNumber
@@ -567,7 +565,7 @@ object HybridBillPrintService {
 
             // ============ BARCODE (theo config) ============
             if (template.showBarcode) {
-                feed(1)
+                // Bỏ feed(1) để tiết kiệm giấy
                 barcode(billData.orderNumber)
             }
 
@@ -592,8 +590,8 @@ object HybridBillPrintService {
             }
 
             // ============ PRINTER ACTIONS ============
-            // Feed đủ nhiều để đẩy footer ra khỏi vị trí cắt (5-6 dòng)
-            feed(6)
+            // Feed vừa đủ để đẩy footer ra khỏi vị trí cắt (3 dòng - tiết kiệm giấy)
+            feed(3)
             if (template.cutPaper) {
                 cut()
             }
