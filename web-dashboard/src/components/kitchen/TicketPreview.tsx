@@ -173,10 +173,10 @@ export function TicketPreview({
                 </span>
               </div>
 
-              {/* BASE price on separate line (when has toppings/size with price) */}
+              {/* BASE price on LEFT side (when has toppings/size with price) */}
               {showPrice && hasPricedToppings && item.basePrice > 0 && (
                 <div
-                  className="text-right text-gray-600"
+                  className="text-gray-600 ml-2"
                   style={{ fontSize: `${fonts.small}px` }}
                 >
                   {item.basePrice.toLocaleString("vi-VN")}đ

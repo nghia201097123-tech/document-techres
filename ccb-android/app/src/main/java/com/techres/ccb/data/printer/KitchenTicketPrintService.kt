@@ -343,9 +343,9 @@ object KitchenTicketPrintService {
                     lineKeyValue(itemLine, rightPart, BitmapTextStyle(bold = true))
                 }
 
-                // Hiển thị giá gốc trên dòng riêng (nếu có topping và showPrice)
+                // Hiển thị giá gốc bên trái (nếu có topping và showPrice)
                 if (showPrice && basePrice > 0 && toppingTotal > 0) {
-                    lineKeyValue("   ", formatPrice(basePrice))
+                    line("   ${formatPrice(basePrice)}")
                 }
 
                 // Tùy chọn (Size, Đá, Đường...) - hiển thị dạng "• Size L" thay vì "Size: L"
