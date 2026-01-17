@@ -369,12 +369,14 @@ object KitchenTicketPrintService {
                     val toppingCount = if (item.toppingPrices.isNotEmpty()) item.toppingPrices.size else item.toppings.size
                     Log.d(TAG, "  Printing $toppingCount toppings for ${item.name}")
 
-                    // Hiển thị topping với giá nếu có (giống tem)
+                    // Hiển thị topping - chỉ hiển thị giá nếu showPrice = true
                     if (item.toppingPrices.isNotEmpty()) {
                         item.toppingPrices.forEach { (toppingName, toppingPrice) ->
-                            if (toppingPrice > 0) {
+                            if (showPrice && toppingPrice > 0) {
+                                // Hiển thị topping với giá khi config bật
                                 lineKeyValue("   + $toppingName", "+${formatPrice(toppingPrice)}")
                             } else {
+                                // Chỉ hiển thị tên topping khi config tắt hoặc giá = 0
                                 line("   + $toppingName")
                             }
                         }
