@@ -730,6 +730,7 @@ export class SyncService {
       printerProtocol: kitchen.printerProtocol || null,
       paperWidth: kitchen.paperWidth || null,
       printMode: kitchen.printMode || null,
+      printDensity: kitchen.printDensity ?? 8,
       description: kitchen.description || null,
       // Ticket printing config
       ticketCutAfterPrint: kitchen.ticketCutAfterPrint ?? true,

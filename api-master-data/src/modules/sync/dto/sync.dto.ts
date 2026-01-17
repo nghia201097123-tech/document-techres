@@ -530,6 +530,9 @@ export class KitchenDto {
   @ApiProperty({ description: 'Chế độ in: TICKET, LABEL, BOTH', nullable: true })
   printMode: string | null;
 
+  @ApiProperty({ description: 'Độ đậm in (0-15, cho máy in TSPL)' })
+  printDensity: number;
+
   @ApiProperty({ description: 'Mô tả', nullable: true })
   description: string | null;
 

@@ -65,6 +65,9 @@ export class Kitchen {
   })
   printMode: string;
 
+  @Column({ name: 'print_density', type: 'int', default: 8 })
+  printDensity: number;
+
   // ========== TICKET PRINTING CONFIG ==========
   @Column({ name: 'ticket_cut_after_print', default: true })
   ticketCutAfterPrint: boolean;
