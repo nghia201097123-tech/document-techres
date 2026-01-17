@@ -239,6 +239,7 @@ object BitmapTextRenderer {
 
     /**
      * Render text thành bitmap với Vietnamese support
+     * Hỗ trợ cắt bỏ khoảng trắng thừa dựa trên lineSpacingMultiplier
      */
     fun renderText(
         text: String,
@@ -284,24 +285,94 @@ object BitmapTextRenderer {
         }
 
         // Tạo StaticLayout để handle Vietnamese text đúng cách
-        // Tối ưu: setIncludePad(false) để bỏ padding thừa, giảm line spacing để tiết kiệm giấy
         val staticLayout = StaticLayout.Builder
             .obtain(text, 0, text.length, textPaint, paperWidth)
             .setAlignment(alignment)
-            .setLineSpacing(0f, style.lineSpacingMultiplier) // Giảm line spacing để tiết kiệm giấy
-            .setIncludePad(false) // Bỏ padding thừa để tiết kiệm giấy
+            .setLineSpacing(0f, 1.0f) // Không dùng line spacing ở đây, sẽ crop sau
+            .setIncludePad(false) // Bỏ padding thừa
             .build()
 
-        // Tạo bitmap với chiều cao tối ưu
-        val height = staticLayout.height.coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(paperWidth, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
+        // Tạo bitmap với chiều cao đầy đủ
+        val fullHeight = staticLayout.height.coerceAtLeast(1)
+        val fullBitmap = Bitmap.createBitmap(paperWidth, fullHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(fullBitmap)
         canvas.drawColor(Color.WHITE)
 
         // Vẽ text
         staticLayout.draw(canvas)
 
-        return bitmap
+        // Nếu lineSpacing < 1.0, crop bitmap để giảm chiều cao
+        // lineSpacing 0.3 = crop 70% whitespace, lineSpacing 1.0 = không crop
+        if (style.lineSpacingMultiplier < 1.0f) {
+            return cropBitmapVertical(fullBitmap, style.lineSpacingMultiplier)
+        }
+
+        return fullBitmap
+    }
+
+    /**
+     * Crop bitmap theo chiều dọc để loại bỏ khoảng trắng thừa
+     * @param bitmap Bitmap gốc
+     * @param lineSpacing Hệ số (0.3-1.0): nhỏ hơn = crop nhiều hơn
+     */
+    private fun cropBitmapVertical(bitmap: Bitmap, lineSpacing: Float): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+
+        // Tìm hàng đầu tiên và cuối cùng có pixel đen (content)
+        var topRow = 0
+        var bottomRow = height - 1
+
+        // Scan từ trên xuống tìm hàng đầu tiên có content
+        val pixels = IntArray(width)
+        outer@ for (y in 0 until height) {
+            bitmap.getPixels(pixels, 0, width, 0, y, width, 1)
+            for (pixel in pixels) {
+                // Kiểm tra nếu pixel không phải màu trắng (có content)
+                if (pixel != Color.WHITE && pixel != -1) {
+                    topRow = y
+                    break@outer
+                }
+            }
+        }
+
+        // Scan từ dưới lên tìm hàng cuối cùng có content
+        outer@ for (y in height - 1 downTo 0) {
+            bitmap.getPixels(pixels, 0, width, 0, y, width, 1)
+            for (pixel in pixels) {
+                if (pixel != Color.WHITE && pixel != -1) {
+                    bottomRow = y
+                    break@outer
+                }
+            }
+        }
+
+        // Tính chiều cao content thực sự
+        val contentHeight = bottomRow - topRow + 1
+        if (contentHeight <= 0 || contentHeight >= height) {
+            return bitmap // Không cần crop
+        }
+
+        // Tính padding dựa trên lineSpacing
+        // lineSpacing 0.3 = padding 1px, lineSpacing 1.0 = padding = original whitespace
+        val originalTopPadding = topRow
+        val originalBottomPadding = height - 1 - bottomRow
+        val paddingScale = lineSpacing.coerceIn(0.3f, 1.0f)
+
+        val newTopPadding = (originalTopPadding * paddingScale).toInt().coerceAtLeast(0)
+        val newBottomPadding = (originalBottomPadding * paddingScale).toInt().coerceAtLeast(0)
+
+        // Tính vị trí crop
+        val cropTop = (topRow - newTopPadding).coerceAtLeast(0)
+        val cropBottom = (bottomRow + newBottomPadding).coerceAtMost(height - 1)
+        val newHeight = cropBottom - cropTop + 1
+
+        if (newHeight >= height || newHeight <= 0) {
+            return bitmap // Không cần crop
+        }
+
+        // Tạo bitmap mới với chiều cao đã crop
+        return Bitmap.createBitmap(bitmap, 0, cropTop, width, newHeight)
     }
 
     /**
