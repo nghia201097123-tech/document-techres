@@ -780,6 +780,7 @@ object LabelPrintService {
     /**
      * Render two column text (left + right aligned) for price display
      * Example: "Đơn giá:"    "35,000đ"
+     * Tự động cắt ngắn left text với "..." nếu quá dài
      */
     private fun renderTwoColumnText(
         leftText: String,
@@ -795,8 +796,30 @@ object LabelPrintService {
             typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
 
-        val leftWidth = paint.measureText(leftText).toInt()
         val rightWidth = paint.measureText(rightText).toInt()
+        val ellipsis = "..."
+        val ellipsisWidth = paint.measureText(ellipsis).toInt()
+        val minPadding = 10 // Khoảng cách tối thiểu giữa left và right
+
+        // Tính chiều rộng tối đa cho left text
+        val maxLeftWidth = width - rightWidth - minPadding
+
+        // Cắt ngắn left text nếu quá dài
+        var truncatedLeft = leftText
+        var leftWidth = paint.measureText(leftText).toInt()
+
+        if (leftWidth > maxLeftWidth && maxLeftWidth > ellipsisWidth) {
+            val targetWidth = maxLeftWidth - ellipsisWidth
+            var endIndex = leftText.length
+            while (endIndex > 0 && paint.measureText(leftText.substring(0, endIndex)) > targetWidth) {
+                endIndex--
+            }
+            if (endIndex > 0) {
+                truncatedLeft = leftText.substring(0, endIndex).trimEnd() + ellipsis
+                leftWidth = paint.measureText(truncatedLeft).toInt()
+            }
+        }
+
         val height = (paint.textSize * 1.3f).toInt().coerceAtLeast(1)
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -804,10 +827,10 @@ object LabelPrintService {
         canvas.drawColor(Color.WHITE)
 
         // Draw left text
-        canvas.drawText(leftText, 0f, paint.textSize, paint)
+        canvas.drawText(truncatedLeft, 0f, paint.textSize, paint)
 
         // Draw right text (right-aligned)
-        val rightX = (width - rightWidth).toFloat().coerceAtLeast(leftWidth + 10f)
+        val rightX = (width - rightWidth).toFloat().coerceAtLeast(leftWidth + minPadding.toFloat())
         canvas.drawText(rightText, rightX, paint.textSize, paint)
 
         return bitmap

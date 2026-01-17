@@ -337,6 +337,7 @@ object BitmapTextRenderer {
 
     /**
      * Render key-value line (ví dụ: "Tổng tiền:     100,000đ")
+     * Tự động cắt ngắn key với "..." nếu quá dài
      */
     fun renderKeyValue(
         key: String,
@@ -354,15 +355,36 @@ object BitmapTextRenderer {
             typeface = if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
 
-        val keyWidth = textPaint.measureText(key)
         val valueWidth = textPaint.measureText(value)
-        val spaceWidth = paperWidth - keyWidth - valueWidth
-
-        // Tính số khoảng trắng cần thêm
         val spaceCharWidth = textPaint.measureText(" ")
-        val spaces = if (spaceWidth > 0) " ".repeat((spaceWidth / spaceCharWidth).toInt()) else " "
+        val ellipsis = "..."
+        val ellipsisWidth = textPaint.measureText(ellipsis)
 
-        return renderText("$key$spaces$value", style, paperWidth)
+        // Cần ít nhất 2 khoảng trắng giữa key và value
+        val minSpaceWidth = spaceCharWidth * 2
+        val maxKeyWidth = paperWidth - valueWidth - minSpaceWidth
+
+        // Cắt ngắn key nếu quá dài
+        var truncatedKey = key
+        var keyWidth = textPaint.measureText(key)
+
+        if (keyWidth > maxKeyWidth && maxKeyWidth > ellipsisWidth) {
+            // Tìm vị trí cắt phù hợp
+            val targetWidth = maxKeyWidth - ellipsisWidth
+            var endIndex = key.length
+            while (endIndex > 0 && textPaint.measureText(key.substring(0, endIndex)) > targetWidth) {
+                endIndex--
+            }
+            if (endIndex > 0) {
+                truncatedKey = key.substring(0, endIndex).trimEnd() + ellipsis
+                keyWidth = textPaint.measureText(truncatedKey)
+            }
+        }
+
+        val spaceWidth = paperWidth - keyWidth - valueWidth
+        val spaces = if (spaceWidth > 0) " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1)) else " "
+
+        return renderText("$truncatedKey$spaces$value", style, paperWidth)
     }
 }
 
