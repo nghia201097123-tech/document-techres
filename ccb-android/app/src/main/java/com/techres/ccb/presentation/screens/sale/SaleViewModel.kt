@@ -113,6 +113,10 @@ data class SaleUiState(
     // Cancel order confirmation dialog
     val showCancelOrderDialog: Boolean = false,
 
+    // Order note dialog (ghi chú tổng bill)
+    val showOrderNoteDialog: Boolean = false,
+    val orderNoteInput: String = "",
+
     // Remove order item confirmation dialog
     val showRemoveItemDialog: Boolean = false,
     val itemToRemove: OrderItemEntity? = null, // Item pending removal
@@ -1327,6 +1331,51 @@ class SaleViewModel @Inject constructor(
     fun hideCustomerDialog() {
         _uiState.update { state ->
             state.copy(showCustomerDialog = false)
+        }
+    }
+
+    // ===== ORDER NOTE (GHI CHÚ TỔNG BILL) =====
+
+    fun showOrderNoteDialog() {
+        val currentNote = _uiState.value.currentOrder?.notes ?: ""
+        _uiState.update { state ->
+            state.copy(
+                showOrderNoteDialog = true,
+                orderNoteInput = currentNote
+            )
+        }
+    }
+
+    fun hideOrderNoteDialog() {
+        _uiState.update { state ->
+            state.copy(showOrderNoteDialog = false)
+        }
+    }
+
+    fun updateOrderNoteInput(note: String) {
+        _uiState.update { state ->
+            state.copy(orderNoteInput = note)
+        }
+    }
+
+    fun saveOrderNote() {
+        val state = _uiState.value
+        val currentOrder = state.currentOrder ?: return
+        val note = state.orderNoteInput.trim().ifEmpty { null }
+
+        viewModelScope.launch {
+            try {
+                val updatedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                orderDao.updateNotes(currentOrder.id, note, updatedAt)
+
+                // Update local state
+                _uiState.update { it.copy(
+                    currentOrder = it.currentOrder?.copy(notes = note),
+                    showOrderNoteDialog = false
+                )}
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save order note", e)
+            }
         }
     }
 
@@ -2946,6 +2995,8 @@ class SaleViewModel @Inject constructor(
             receivedAmount = receivedAmount,
             // Tự tính tiền thừa nếu chưa có (receivedAmount - totalAmount)
             changeAmount = if (changeAmount > 0) changeAmount else (receivedAmount - calculatedTotalAmount).coerceAtLeast(0.0),
+            // Ghi chú tổng bill
+            orderNote = order.notes,
             // Time tracking - sử dụng createdAt làm giờ vào, completedAt làm giờ ra
             checkInTime = try {
                 SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(order.createdAt)

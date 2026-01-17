@@ -79,6 +79,9 @@ interface OrderDao {
     @Query("UPDATE orders SET table_id = :tableId, table_name = :tableName, updated_at = :updatedAt WHERE id = :orderId")
     suspend fun updateTableId(orderId: String, tableId: String?, tableName: String?, updatedAt: String)
 
+    @Query("UPDATE orders SET notes = :notes, updated_at = :updatedAt, sync_status = 'pending' WHERE id = :orderId")
+    suspend fun updateNotes(orderId: String, notes: String?, updatedAt: String)
+
     @Delete
     suspend fun delete(order: OrderEntity)
 

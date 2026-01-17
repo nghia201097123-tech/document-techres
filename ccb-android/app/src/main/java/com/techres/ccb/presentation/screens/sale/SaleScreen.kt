@@ -441,6 +441,16 @@ fun SaleScreen(
             )
         }
 
+        // Order Note Dialog (ghi chú tổng bill)
+        if (uiState.showOrderNoteDialog) {
+            OrderNoteDialog(
+                note = uiState.orderNoteInput,
+                onNoteChanged = { viewModel.updateOrderNoteInput(it) },
+                onDismiss = { viewModel.hideOrderNoteDialog() },
+                onConfirm = { viewModel.saveOrderNote() }
+            )
+        }
+
         // Remove Order Item Confirmation Dialog (huỷ món với lý do)
         val itemToRemove = uiState.itemToRemove
         if (uiState.showRemoveItemDialog && itemToRemove != null) {
@@ -629,7 +639,8 @@ fun TabletLayout(
             onAddToppingToCartItem = viewModel::showAddToppingDialog,
             onCancelAddingItems = viewModel::cancelAddingItems,
             onReprintItem = viewModel::showReprintMenuForItem,
-            onReprintAllItems = viewModel::showReprintMenuForAllItems
+            onReprintAllItems = viewModel::showReprintMenuForAllItems,
+            onOrderNoteClicked = { viewModel.showOrderNoteDialog() }
         )
     }
 }
@@ -735,6 +746,7 @@ fun CartDialog(
                     onCancelAddingItems = viewModel::cancelAddingItems,
                     onReprintItem = viewModel::showReprintMenuForItem,
                     onReprintAllItems = viewModel::showReprintMenuForAllItems,
+                    onOrderNoteClicked = { viewModel.showOrderNoteDialog() },
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -1031,6 +1043,7 @@ fun CartPanel(
     onCancelAddingItems: () -> Unit = {}, // Cancel adding more items
     onReprintItem: (String) -> Unit = {}, // Reprint single item
     onReprintAllItems: () -> Unit = {}, // Reprint all items menu
+    onOrderNoteClicked: () -> Unit = {}, // Open order note dialog
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1177,6 +1190,23 @@ fun CartPanel(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            // Order Note button (only show when has active order)
+            if (hasActiveOrder) {
+                OutlinedButton(
+                    onClick = onOrderNoteClicked,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.NoteAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (currentOrder?.notes.isNullOrBlank()) "Ghi chú" else "Có ghi chú",
+                        fontSize = 12.sp,
+                        maxLines = 1
+                    )
+                }
             }
         }
 
@@ -2523,6 +2553,65 @@ fun CancelOrderConfirmationDialog(
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
                 Text("ĐÓNG")
+            }
+        }
+    )
+}
+
+/**
+ * Dialog nhập ghi chú tổng bill
+ */
+@Composable
+fun OrderNoteDialog(
+    note: String,
+    onNoteChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.NoteAlt,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Ghi chú đơn hàng",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Ghi chú sẽ được in trên bill (nếu bật hiển thị)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = onNoteChanged,
+                    label = { Text("Ghi chú") },
+                    placeholder = { Text("VD: Giao trước 12h, gọi trước khi giao...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 4,
+                    minLines = 2
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("LƯU")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("HUỶ")
             }
         }
     )

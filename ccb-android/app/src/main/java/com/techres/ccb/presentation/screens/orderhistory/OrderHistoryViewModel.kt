@@ -460,6 +460,8 @@ class OrderHistoryViewModel @Inject constructor(
             paymentMethod = order.paymentMethod ?: "Tiền mặt",
             receivedAmount = order.paidAmount,
             changeAmount = order.changeAmount,
+            // Ghi chú tổng bill
+            orderNote = order.notes,
             checkInTime = checkInTime,
             checkOutTime = checkOutTime,
             // Đánh dấu đây là bill in lại (tránh gian lận nhân viên)
