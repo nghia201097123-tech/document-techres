@@ -1504,6 +1504,12 @@ private fun VatDetailDialog(
                     color = MaterialTheme.colorScheme.outline,
                     fontStyle = FontStyle.Italic
                 )
+                Text(
+                    "* Công thức: VAT = Giá - (Giá ÷ (1 + VAT%))",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontStyle = FontStyle.Italic
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider()
@@ -1529,51 +1535,72 @@ private fun VatDetailDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 300.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(itemsWithVat.size) { index ->
                         val (item, itemVat, vatRate) = itemsWithVat[index]
                         val priceAfterDiscount = item.totalPrice - item.discountAmount
+                        val priceBeforeVat = if (vatRate > 0) {
+                            (priceAfterDiscount / (1 + vatRate / 100)).toLong()
+                        } else priceAfterDiscount
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        item.name,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        "x${item.quantity}",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
                                 Text(
-                                    item.name,
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    formatCurrency(priceAfterDiscount),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.width(80.dp),
+                                    textAlign = TextAlign.End
                                 )
                                 Text(
-                                    "x${item.quantity}",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.outline
+                                    if (vatRate > 0) "${vatRate.toInt()}%" else "-",
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.width(50.dp),
+                                    textAlign = TextAlign.End,
+                                    color = if (vatRate > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    if (itemVat > 0) formatCurrency(itemVat) else "-",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (itemVat > 0) FontWeight.Medium else FontWeight.Normal,
+                                    modifier = Modifier.width(80.dp),
+                                    textAlign = TextAlign.End,
+                                    color = if (itemVat > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
-                            Text(
-                                formatCurrency(priceAfterDiscount),
-                                fontSize = 11.sp,
-                                modifier = Modifier.width(80.dp),
-                                textAlign = TextAlign.End
-                            )
-                            Text(
-                                if (vatRate > 0) "${vatRate.toInt()}%" else "-",
-                                fontSize = 11.sp,
-                                modifier = Modifier.width(50.dp),
-                                textAlign = TextAlign.End,
-                                color = if (vatRate > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            )
-                            Text(
-                                if (itemVat > 0) formatCurrency(itemVat) else "-",
-                                fontSize = 11.sp,
-                                fontWeight = if (itemVat > 0) FontWeight.Medium else FontWeight.Normal,
-                                modifier = Modifier.width(80.dp),
-                                textAlign = TextAlign.End,
-                                color = if (itemVat > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            )
+                            // Hiển thị công thức tính cho từng món
+                            if (vatRate > 0) {
+                                val vatMultiplier = String.format("%.2f", 1 + vatRate / 100)
+                                Text(
+                                    "= ${formatCurrencyShort(priceAfterDiscount)} - (${formatCurrencyShort(priceAfterDiscount)} ÷ $vatMultiplier) = ${formatCurrencyShort(itemVat)}",
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    fontStyle = FontStyle.Italic,
+                                    modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                                )
+                            }
+
+                            if (index < itemsWithVat.size - 1) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                            }
                         }
                     }
                 }
@@ -1994,4 +2021,12 @@ private class ThousandSeparatorTransformation : VisualTransformation {
 
 private fun formatCurrency(amount: Long): String {
     return java.text.NumberFormat.getInstance(java.util.Locale("vi", "VN")).format(amount) + "đ"
+}
+
+private fun formatCurrencyShort(amount: Long): String {
+    return if (amount == 0L) {
+        "0"
+    } else {
+        java.text.NumberFormat.getInstance(java.util.Locale("vi", "VN")).format(amount)
+    }
 }
