@@ -18,6 +18,7 @@ data class HomeUiState(
     val branchName: String = "",
     val staffName: String = "",
     val activeOrders: List<OrderEntity> = emptyList(),
+    val ordersWithItemNotes: Set<String> = emptySet(), // Order IDs that have items with notes
     val isLoading: Boolean = false
 )
 
@@ -44,7 +45,14 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             orderRepository.getActiveOrders(branchId).collect { orders ->
-                _uiState.value = _uiState.value.copy(activeOrders = orders)
+                // Fetch order IDs that have items with notes
+                val orderIds = orders.map { it.id }
+                val ordersWithItemNotes = orderRepository.getOrderIdsWithItemNotes(orderIds)
+
+                _uiState.value = _uiState.value.copy(
+                    activeOrders = orders,
+                    ordersWithItemNotes = ordersWithItemNotes
+                )
             }
         }
     }

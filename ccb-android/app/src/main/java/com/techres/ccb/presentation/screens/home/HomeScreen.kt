@@ -186,6 +186,7 @@ fun HomeScreen(
                     items(uiState.activeOrders) { order ->
                         OrderCard(
                             order = order,
+                            hasItemNotes = uiState.ordersWithItemNotes.contains(order.id),
                             onClick = { onNavigateToOrder(order.id) }
                         )
                     }
@@ -236,6 +237,7 @@ private fun QuickActionCard(
 @Composable
 private fun OrderCard(
     order: OrderEntity,
+    hasItemNotes: Boolean,
     onClick: () -> Unit
 ) {
     // Calculate active time in minutes - try multiple date formats
@@ -266,7 +268,8 @@ private fun OrderCard(
         }
     }
 
-    val hasNote = !order.notes.isNullOrBlank()
+    // Check both order-level notes and item-level notes
+    val hasNote = !order.notes.isNullOrBlank() || hasItemNotes
     val timeColor = if (activeMinutes > 30) Color(0xFFF44336) else Color.Gray
 
     Card(

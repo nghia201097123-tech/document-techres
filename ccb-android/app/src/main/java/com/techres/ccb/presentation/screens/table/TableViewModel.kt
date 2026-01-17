@@ -208,7 +208,7 @@ class TableViewModel @Inject constructor(
                     .filter { !it.currentOrderId.isNullOrEmpty() }
                     .mapNotNull { it.currentOrderId }
 
-                // Load orders and item counts in parallel (optimized - single batch query)
+                // Load orders, item counts, and item notes in parallel (optimized - single batch query)
                 val ordersDeferred = async {
                     if (tableOrderIds.isNotEmpty()) {
                         orderRepository.getOrdersByIds(tableOrderIds).associateBy { it.id }
@@ -219,9 +219,13 @@ class TableViewModel @Inject constructor(
                 val itemCountsDeferred = async {
                     orderRepository.getItemCountsByOrderIds(tableOrderIds)
                 }
+                val itemNotesDeferred = async {
+                    orderRepository.getOrderIdsWithItemNotes(tableOrderIds)
+                }
 
                 val ordersMap = ordersDeferred.await()
                 val itemCountsMap = itemCountsDeferred.await()
+                val ordersWithItemNotes = itemNotesDeferred.await()
 
                 // Pre-calculate date formatters for multiple formats
                 val dateFormats = listOf(
@@ -261,6 +265,10 @@ class TableViewModel @Inject constructor(
                         0
                     }
 
+                    // Check both order-level notes and item-level notes
+                    val hasOrderNote = !order?.notes.isNullOrBlank()
+                    val hasItemNote = table.currentOrderId?.let { ordersWithItemNotes.contains(it) } ?: false
+
                     TableWithOrderInfo(
                         id = table.id,
                         name = table.name,
@@ -272,7 +280,7 @@ class TableViewModel @Inject constructor(
                         orderItemCount = itemCount,
                         orderTotal = order?.totalAmount?.toLong() ?: 0,
                         occupiedMinutes = occupiedMinutes,
-                        hasNote = !order?.notes.isNullOrBlank()
+                        hasNote = hasOrderNote || hasItemNote
                     )
                 }
 

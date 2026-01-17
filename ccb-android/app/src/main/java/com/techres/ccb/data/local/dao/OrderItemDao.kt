@@ -72,6 +72,13 @@ interface OrderItemDao {
      */
     @Query("SELECT order_id AS orderId, COUNT(*) AS itemCount FROM order_items WHERE order_id IN (:orderIds) GROUP BY order_id")
     suspend fun getItemCountsByOrderIds(orderIds: List<String>): List<OrderItemCount>
+
+    /**
+     * Get orders that have items with notes
+     * Returns a list of order IDs that have at least one item with notes
+     */
+    @Query("SELECT DISTINCT order_id AS orderId FROM order_items WHERE order_id IN (:orderIds) AND notes IS NOT NULL AND notes != ''")
+    suspend fun getOrderIdsWithItemNotes(orderIds: List<String>): List<String>
 }
 
 /**

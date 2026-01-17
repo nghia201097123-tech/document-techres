@@ -63,6 +63,14 @@ class OrderRepository @Inject constructor(
             .associate { it.orderId to it.itemCount }
     }
 
+    /**
+     * Get set of order IDs that have items with notes
+     */
+    suspend fun getOrderIdsWithItemNotes(orderIds: List<String>): Set<String> {
+        if (orderIds.isEmpty()) return emptySet()
+        return orderItemDao.getOrderIdsWithItemNotes(orderIds).toSet()
+    }
+
     suspend fun getPendingSyncOrders(): List<OrderEntity> {
         return orderDao.getPendingSyncOrders()
     }
