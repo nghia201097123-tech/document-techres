@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +61,7 @@ import {
   PRINTER_CONNECTION_TYPE_LABELS,
   PAPER_WIDTH_OPTIONS,
   FONT_SIZE_OPTIONS,
+  LINE_SPACING_OPTIONS,
   DATE_FORMAT_OPTIONS,
   QR_CODE_TYPE_LABELS,
   DEFAULT_BILL_TEMPLATE,
@@ -230,6 +232,7 @@ export default function BillTemplatePage() {
         wifiPassword: template.wifiPassword,
         paperWidth: template.paperWidth,
         fontSize: template.fontSize,
+        lineSpacing: template.lineSpacing,
         separatorChar: template.separatorChar,
         doubleSeparatorChar: template.doubleSeparatorChar,
         cutPaper: template.cutPaper,
@@ -526,7 +529,7 @@ export default function BillTemplatePage() {
                             {template.showWifiInfo && <Badge variant="outline">WiFi</Badge>}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Giấy: {template.paperWidth}mm • Font: {template.fontSize}
+                            Giấy: {template.paperWidth}mm • Font: {template.fontSize} • Dòng: {((template.lineSpacing || 0.7) * 100).toFixed(0)}%
                           </p>
                         </div>
                         <div className="flex items-center gap-1 mt-4 pt-4 border-t">
@@ -1400,6 +1403,25 @@ export default function BillTemplatePage() {
                       />
                     </div>
                   </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label>Khoảng cách dòng ({((templateForm.lineSpacing || 0.7) * 100).toFixed(0)}%)</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {(templateForm.lineSpacing || 0.7) <= 0.4 ? "Rất sát" : (templateForm.lineSpacing || 0.7) <= 0.6 ? "Sát" : (templateForm.lineSpacing || 0.7) <= 0.8 ? "Bình thường" : "Rộng"}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[(templateForm.lineSpacing || 0.7) * 100]}
+                      min={30}
+                      max={100}
+                      step={5}
+                      onValueChange={([value]) => setTemplateForm({ ...templateForm, lineSpacing: value / 100 })}
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>30% (rất sát)</span>
+                      <span>100% (bình thường)</span>
+                    </div>
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Ký tự phân cách</Label>
@@ -2028,6 +2050,7 @@ export default function BillTemplatePage() {
                     {previewTemplate.openCashDrawer && <span className="bg-gray-100 px-1 rounded">💰 Mở két</span>}
                     {previewTemplate.beepAfterPrint && <span className="bg-gray-100 px-1 rounded">🔔 Beep</span>}
                     {previewTemplate.numberOfCopies > 1 && <span className="bg-gray-100 px-1 rounded">📄 x{previewTemplate.numberOfCopies}</span>}
+                    {previewTemplate.lineSpacing && previewTemplate.lineSpacing !== 0.7 && <span className="bg-gray-100 px-1 rounded">↕️ {(previewTemplate.lineSpacing * 100).toFixed(0)}%</span>}
                   </div>
                 </div>
               </div>
