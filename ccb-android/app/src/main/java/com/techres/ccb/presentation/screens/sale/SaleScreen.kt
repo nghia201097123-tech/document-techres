@@ -52,6 +52,7 @@ import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.NoteDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentOrderItem
+import com.techres.ccb.presentation.screens.sale.dialogs.PaymentToppingItem
 import com.techres.ccb.presentation.screens.sale.dialogs.ProductVariantDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.TableSelectionDialog
 import java.text.NumberFormat
