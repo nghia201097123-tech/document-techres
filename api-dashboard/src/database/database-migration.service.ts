@@ -1350,6 +1350,33 @@ export class DatabaseMigrationService implements OnModuleInit {
         }
       }
 
+      // 44. Add fontSize and lineSpacing columns to bill_printer_configs table
+      const hasBillPrinterConfigsTable = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'bill_printer_configs'
+        );
+      `);
+
+      if (hasBillPrinterConfigsTable[0].exists) {
+        const hasFontSizeInPrinterConfigs = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_printer_configs' AND column_name = 'font_size'
+          );
+        `);
+
+        if (!hasFontSizeInPrinterConfigs[0].exists) {
+          this.logger.log('Adding fontSize and lineSpacing columns to bill_printer_configs table...');
+          await queryRunner.query(`
+            ALTER TABLE bill_printer_configs
+            ADD COLUMN IF NOT EXISTS font_size VARCHAR(20) DEFAULT 'normal',
+            ADD COLUMN IF NOT EXISTS line_spacing FLOAT DEFAULT 0.7
+          `);
+          this.logger.log('fontSize and lineSpacing columns added to bill_printer_configs table');
+        }
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
