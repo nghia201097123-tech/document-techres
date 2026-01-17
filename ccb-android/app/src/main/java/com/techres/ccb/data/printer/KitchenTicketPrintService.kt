@@ -166,15 +166,24 @@ object KitchenTicketPrintService {
 
     /**
      * Generate nội dung phiếu bếp - Thiết kế chuyên nghiệp
+     * Sử dụng cấu hình từ web-dashboard:
+     * - ticketPrintOrderNumber: Hiển thị mã đơn hàng
+     * - ticketPrintTableName: Hiển thị tên bàn
+     * - ticketPrintTime: Hiển thị thời gian
+     * - ticketPrintStoreName: Hiển thị tên cửa hàng
+     * - ticketStoreName: Tên cửa hàng custom
+     * - ticketPrintNotes: Hiển thị ghi chú
+     * - ticketFontSize: Cỡ chữ (small/medium/large)
      *
      * Layout:
      * ┌─────────────────────────────────┐
+     * │       [TÊN CỬA HÀNG]            │  ← Nếu ticketPrintStoreName = true
      * │         *** BẾP BAR ***         │  ← Tên bếp (TO, ĐẬM)
      * │═════════════════════════════════│
      * │ !!! GẤP !!!                     │  ← Đơn gấp (nếu có)
      * │─────────────────────────────────│
-     * │ BÀN: BÀN 5                      │  ← Tên bàn (TO, ĐẬM)
-     * │ #GF-472          14:30 15/01    │  ← Mã đơn + Thời gian
+     * │ BÀN: BÀN 5                      │  ← Nếu ticketPrintTableName = true
+     * │ #GF-472          14:30 15/01    │  ← Nếu ticketPrintOrderNumber/Time = true
      * │ NV: Nguyễn Văn A                │  ← Nhân viên
      * │═════════════════════════════════│
      * │                                 │
@@ -183,12 +192,12 @@ object KitchenTicketPrintService {
      * │    Đá: 50%                      │
      * │    + Trân châu đen              │  ← Topping
      * │    + Thạch dừa                  │  ← Topping (tất cả)
-     * │    >> Ít đường                  │  ← Ghi chú món
+     * │    >> Ít đường                  │  ← Ghi chú món (nếu ticketPrintNotes = true)
      * │                                 │
      * │ 2. Cà phê sữa đá          x1    │
      * │    >> Không đá                  │
      * │─────────────────────────────────│
-     * │ GHI CHÚ: Mang đi                │  ← Ghi chú chung
+     * │ GHI CHÚ: Mang đi                │  ← Ghi chú chung (nếu ticketPrintNotes = true)
      * │═════════════════════════════════│
      * │ TỔNG: 3 MÓN                     │
      * └─────────────────────────────────┘
@@ -201,10 +210,27 @@ object KitchenTicketPrintService {
         val useBitmapMode = true
         val useRasterBitmap = false
 
+        // ========== TICKET CONFIG FROM WEB-DASHBOARD ==========
+        val showOrderNumber = kitchen.ticketPrintOrderNumber
+        val showTableName = kitchen.ticketPrintTableName
+        val showTime = kitchen.ticketPrintTime
+        val showStoreName = kitchen.ticketPrintStoreName
+        val storeName = kitchen.ticketStoreName
+        val showNotes = kitchen.ticketPrintNotes
+        val fontSize = kitchen.ticketFontSize // "small", "medium", "large"
+
         Log.d(TAG, "=== Generating ticket content ===")
         Log.d(TAG, "  - Paper width: ${paperWidth}mm")
         Log.d(TAG, "  - Kitchen: ${ticket.kitchenName}")
         Log.d(TAG, "  - Items count: ${ticket.items.size}")
+        Log.d(TAG, "  === Ticket Config ===")
+        Log.d(TAG, "  - showOrderNumber: $showOrderNumber")
+        Log.d(TAG, "  - showTableName: $showTableName")
+        Log.d(TAG, "  - showTime: $showTime")
+        Log.d(TAG, "  - showStoreName: $showStoreName")
+        Log.d(TAG, "  - storeName: $storeName")
+        Log.d(TAG, "  - showNotes: $showNotes")
+        Log.d(TAG, "  - fontSize: $fontSize")
         ticket.items.forEachIndexed { index, item ->
             Log.d(TAG, "  Item $index: ${item.name}")
             Log.d(TAG, "    - quantity: ${item.quantity}")
@@ -213,13 +239,28 @@ object KitchenTicketPrintService {
             Log.d(TAG, "    - note: ${item.note}")
         }
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap)
+        // Font scale based on fontSize config
+        val fontScale = when (fontSize) {
+            "small" -> 0.85f
+            "large" -> 1.2f
+            else -> 1.0f // medium
+        }
+
+        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap, fontScale)
 
         builder.apply {
             init()
 
             // ═══════════════════════════════════════════
-            // SECTION 1: HEADER - TÊN BẾP
+            // SECTION 1: HEADER - TÊN CỬA HÀNG (nếu có)
+            // ═══════════════════════════════════════════
+            if (showStoreName && !storeName.isNullOrBlank()) {
+                lineBold(storeName, BitmapTextStyle(centerAlign = true))
+                separator('-')
+            }
+
+            // ═══════════════════════════════════════════
+            // SECTION 2: HEADER - TÊN BẾP
             // ═══════════════════════════════════════════
             val kitchenHeader = "*** ${ticket.kitchenName.uppercase()} ***"
             lineDouble(kitchenHeader, BitmapTextStyle(centerAlign = true))
@@ -248,16 +289,29 @@ object KitchenTicketPrintService {
             }
 
             // ═══════════════════════════════════════════
-            // SECTION 2: THÔNG TIN ĐƠN HÀNG
+            // SECTION 3: THÔNG TIN ĐƠN HÀNG (theo config)
             // ═══════════════════════════════════════════
-            // Tên bàn (TO, ĐẬM, nổi bật)
-            ticket.tableName?.let {
-                lineDouble("BÀN: $it", BitmapTextStyle(centerAlign = false))
+            // Tên bàn (TO, ĐẬM, nổi bật) - nếu config cho phép
+            if (showTableName) {
+                ticket.tableName?.let {
+                    lineDouble("BÀN: $it", BitmapTextStyle(centerAlign = false))
+                }
             }
 
-            // Mã đơn + Thời gian (trên cùng 1 dòng)
+            // Mã đơn + Thời gian (trên cùng 1 dòng) - theo config
             val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
-            lineKeyValue("#${ticket.orderNumber}", timeFormat.format(ticket.orderTime))
+            val orderPart = if (showOrderNumber) "#${ticket.orderNumber}" else ""
+            val timePart = if (showTime) timeFormat.format(ticket.orderTime) else ""
+
+            if (orderPart.isNotEmpty() || timePart.isNotEmpty()) {
+                if (orderPart.isNotEmpty() && timePart.isNotEmpty()) {
+                    lineKeyValue(orderPart, timePart)
+                } else if (orderPart.isNotEmpty()) {
+                    lineBold(orderPart)
+                } else {
+                    line(timePart)
+                }
+            }
 
             // Nhân viên
             ticket.staffName?.let {
@@ -267,7 +321,7 @@ object KitchenTicketPrintService {
             separator('=')
 
             // ═══════════════════════════════════════════
-            // SECTION 3: DANH SÁCH MÓN
+            // SECTION 4: DANH SÁCH MÓN
             // ═══════════════════════════════════════════
             ticket.items.forEachIndexed { index, item ->
                 // Dòng trống trước mỗi món (trừ món đầu)
@@ -313,22 +367,26 @@ object KitchenTicketPrintService {
                     }
                 }
 
-                // Ghi chú riêng cho món (nổi bật)
-                item.note?.let {
-                    lineBold("   >> $it")
+                // Ghi chú riêng cho món (nổi bật) - nếu config cho phép
+                if (showNotes) {
+                    item.note?.let {
+                        lineBold("   >> $it")
+                    }
                 }
             }
 
             // ═══════════════════════════════════════════
-            // SECTION 4: GHI CHÚ CHUNG
+            // SECTION 5: GHI CHÚ CHUNG (nếu config cho phép)
             // ═══════════════════════════════════════════
-            ticket.note?.let {
-                separator('-')
-                lineBold("GHI CHÚ: $it")
+            if (showNotes) {
+                ticket.note?.let {
+                    separator('-')
+                    lineBold("GHI CHÚ: $it")
+                }
             }
 
             // ═══════════════════════════════════════════
-            // SECTION 5: FOOTER
+            // SECTION 6: FOOTER
             // ═══════════════════════════════════════════
             separator('=')
 

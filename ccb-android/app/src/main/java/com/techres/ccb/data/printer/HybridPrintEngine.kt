@@ -373,20 +373,27 @@ object BitmapTextRenderer {
  * Bitmap modes:
  * - useRasterBitmap = true: Dùng GS v 0 (raster) - tốt cho EPSON, BIXOLON
  * - useRasterBitmap = false: Dùng ESC * (bit image) - tốt cho XPRINTER, máy in giá rẻ Trung Quốc
+ *
+ * Font scale:
+ * - fontScale = 0.85f: small (cỡ chữ nhỏ)
+ * - fontScale = 1.0f: medium (mặc định)
+ * - fontScale = 1.2f: large (cỡ chữ lớn)
  */
 class HybridBillBuilder(
     private val paperWidth: Int = 80, // Khổ giấy (mm): 32, 44, 48, 57, 58, 76, 80, 110, 112
     private val useBitmapMode: Boolean = true, // Mặc định dùng bitmap để đảm bảo
-    private val useRasterBitmap: Boolean = false // false = ESC * (XPRINTER compatible), true = GS v 0 (EPSON)
+    private val useRasterBitmap: Boolean = false, // false = ESC * (XPRINTER compatible), true = GS v 0 (EPSON)
+    private val fontScale: Float = 1.0f // Tỷ lệ font: 0.85 = small, 1.0 = medium, 1.2 = large
 ) {
     private val buffer = ByteArrayOutputStream()
     private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
     val lineWidth = BitmapTextRenderer.getLineWidth(paperWidth)
 
-    // Font sizes scaled by paper width
-    val baseFontSize = BitmapTextRenderer.getBaseFontSize(paperWidth)
-    val titleFontSize = BitmapTextRenderer.getTitleFontSize(paperWidth)
-    val totalFontSize = BitmapTextRenderer.getTotalFontSize(paperWidth)
+    // Font sizes scaled by paper width AND fontScale config
+    private val effectiveFontScale = fontScale.coerceIn(0.5f, 2.0f)
+    val baseFontSize = BitmapTextRenderer.getBaseFontSize(paperWidth) * effectiveFontScale
+    val titleFontSize = BitmapTextRenderer.getTitleFontSize(paperWidth) * effectiveFontScale
+    val totalFontSize = BitmapTextRenderer.getTotalFontSize(paperWidth) * effectiveFontScale
 
     // ESC/POS Commands
     private val ESC = 0x1B.toByte()
