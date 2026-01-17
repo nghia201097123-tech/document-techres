@@ -366,8 +366,9 @@ object EscPosCommands {
             y += rowsPerStrip
         }
 
-        // Restore default line spacing
-        output.write(byteArrayOf(0x1B, 0x32))
+        // KHÔNG khôi phục line spacing về default để tránh khoảng trắng thừa giữa các bitmap
+        // Line spacing sẽ được kiểm soát bởi HybridBillBuilder
+        // output.write(byteArrayOf(0x1B, 0x32)) // ESC 2 - Đã bỏ
 
         if (scaledBitmap != bitmap) {
             scaledBitmap.recycle()
