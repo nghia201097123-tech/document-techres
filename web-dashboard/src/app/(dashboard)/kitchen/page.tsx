@@ -753,8 +753,8 @@ export default function KitchenPage() {
 
       {/* Create/Edit Kitchen Dialog */}
       <Dialog open={dialogMode === "create" || dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
+        <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
             <DialogTitle>{dialogMode === "create" ? "Thêm bếp mới" : "Chỉnh sửa bếp"}</DialogTitle>
             <DialogDescription>
               {dialogMode === "create"
@@ -762,8 +762,11 @@ export default function KitchenPage() {
                 : "Cập nhật thông tin bếp."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[60vh]">
+              {/* Form Section - 2/3 width */}
+              <div className="lg:col-span-2 overflow-y-auto pr-2 h-full">
+                <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Tên bếp *</Label>
                 <Input
@@ -1034,21 +1037,6 @@ export default function KitchenPage() {
                       />
                     </div>
                   </div>
-
-                  {/* Ticket Preview */}
-                  <div className="pt-4 border-t">
-                    <TicketPreview
-                      paperWidth={formData.paperWidth || 80}
-                      fontSize={formData.ticketFontSize || "medium"}
-                      showStoreName={formData.ticketPrintStoreName}
-                      showOrderNumber={formData.ticketPrintOrderNumber}
-                      showTableName={formData.ticketPrintTableName}
-                      showTime={formData.ticketPrintTime}
-                      showNotes={formData.ticketPrintNotes}
-                      storeName={formData.ticketStoreName || "Coffee House"}
-                      printItemsSeparately={formData.ticketPrintItemsSeparately}
-                    />
-                  </div>
                 </div>
               )}
 
@@ -1221,27 +1209,53 @@ export default function KitchenPage() {
                         />
                       </div>
                     </div>
-
-                    {/* Label Preview */}
-                    <div className="pt-4 border-t">
-                      <LabelPreview
-                        widthMm={formData.labelWidthMm || 72}
-                        heightMm={formData.labelHeightMm || 30}
-                        fontScale={formData.labelFontScale || 1.0}
-                        maxToppings={(formData.labelMaxToppings || 0) > 0 ? formData.labelMaxToppings! : getRecommendedMaxToppings(formData.labelWidthMm || 72, formData.labelHeightMm || 30)}
-                        showStoreName={formData.labelPrintStoreName}
-                        showOrderNumber={formData.labelPrintOrderNumber}
-                        showTableName={formData.labelPrintTableName}
-                        showTime={formData.labelPrintTime}
-                        showPrice={formData.labelPrintPrice}
-                        storeName={formData.labelStoreName || "Coffee House"}
-                      />
-                    </div>
                   </div>
                 </div>
               )}
+                </div>
+              </div>
+
+              {/* Live Preview Section - 1/3 width */}
+              <div className="hidden lg:block border-l pl-6 overflow-y-auto h-full">
+                <h3 className="font-medium text-sm text-muted-foreground mb-3 sticky top-0 bg-background py-1">Xem trước trực tiếp</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Xem truoc - {formData.paperWidth || 80}mm
+                </p>
+                {formData.printMode === "TICKET" && (
+                  <TicketPreview
+                    paperWidth={formData.paperWidth || 80}
+                    fontSize={formData.ticketFontSize || "medium"}
+                    showStoreName={formData.ticketPrintStoreName}
+                    showOrderNumber={formData.ticketPrintOrderNumber}
+                    showTableName={formData.ticketPrintTableName}
+                    showTime={formData.ticketPrintTime}
+                    showNotes={formData.ticketPrintNotes}
+                    storeName={formData.ticketStoreName || "Coffee House"}
+                    printItemsSeparately={formData.ticketPrintItemsSeparately}
+                  />
+                )}
+                {formData.printMode === "LABEL" && (
+                  <LabelPreview
+                    widthMm={formData.labelWidthMm || 72}
+                    heightMm={formData.labelHeightMm || 30}
+                    fontScale={formData.labelFontScale || 1.0}
+                    maxToppings={(formData.labelMaxToppings || 0) > 0 ? formData.labelMaxToppings! : getRecommendedMaxToppings(formData.labelWidthMm || 72, formData.labelHeightMm || 30)}
+                    showStoreName={formData.labelPrintStoreName}
+                    showOrderNumber={formData.labelPrintOrderNumber}
+                    showTableName={formData.labelPrintTableName}
+                    showTime={formData.labelPrintTime}
+                    showPrice={formData.labelPrintPrice}
+                    storeName={formData.labelStoreName || "Coffee House"}
+                  />
+                )}
+                {formData.printMode !== "TICKET" && formData.printMode !== "LABEL" && (
+                  <p className="text-sm text-muted-foreground">
+                    Chọn chế độ in "In phiếu bếp" hoặc "In tem" để xem trước.
+                  </p>
+                )}
+              </div>
             </div>
-            <DialogFooter className="flex-col sm:flex-row gap-4 flex-shrink-0 pt-4 border-t">
+            <DialogFooter className="pt-4 border-t">
               {dialogMode === "create" && (
                 <div className="flex items-center gap-2 mr-auto">
                   <Checkbox
