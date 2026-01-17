@@ -309,8 +309,10 @@ object BitmapTextRenderer {
 
     /**
      * Crop bitmap theo chiều dọc để loại bỏ khoảng trắng thừa
+     * LUÔN crop sát content (0 padding) để tránh khoảng trắng vô nghĩa
+     * Khoảng cách giữa các dòng sẽ được kiểm soát riêng qua lineSpacing
      * @param bitmap Bitmap gốc
-     * @param lineSpacing Hệ số (0.3-1.0): nhỏ hơn = crop nhiều hơn
+     * @param lineSpacing Không sử dụng cho padding nữa, giữ để tương thích API
      */
     private fun cropBitmapVertical(bitmap: Bitmap, lineSpacing: Float): Bitmap {
         val width = bitmap.width
@@ -363,27 +365,10 @@ object BitmapTextRenderer {
             return bitmap // Không cần crop
         }
 
-        // Tính padding dựa trên lineSpacing - sử dụng FIXED padding tối thiểu
-        // để đảm bảo không có khoảng trắng thừa với font lớn
-        // lineSpacing có thể > 1.0 từ user config, nhưng ta vẫn giới hạn padding
-        val paddingScale = lineSpacing.coerceIn(0.3f, 1.5f)
-
-        // Padding cố định tối đa 1-2 pixels để tránh khoảng trắng thừa
-        // Giảm từ 4 xuống 2 max để đảm bảo tight cropping với mọi font size
-        val maxPadding = when {
-            paddingScale <= 0.4f -> 1
-            paddingScale <= 0.6f -> 1
-            paddingScale <= 0.8f -> 2
-            paddingScale <= 1.0f -> 2
-            else -> 2  // Ngay cả với lineSpacing > 1.0, vẫn giới hạn padding tối đa 2px
-        }
-
-        val newTopPadding = maxPadding.coerceAtMost(topRow)
-        val newBottomPadding = maxPadding.coerceAtMost(height - 1 - bottomRow)
-
-        // Tính vị trí crop
-        val cropTop = (topRow - newTopPadding).coerceAtLeast(0)
-        val cropBottom = (bottomRow + newBottomPadding).coerceAtMost(height - 1)
+        // LUÔN crop sát content - KHÔNG thêm padding
+        // Điều này đảm bảo không có khoảng trắng vô nghĩa giữa các dòng
+        val cropTop = topRow
+        val cropBottom = bottomRow
         val newHeight = cropBottom - cropTop + 1
 
         if (newHeight >= height || newHeight <= 0) {
