@@ -32,6 +32,10 @@ data class BillPrinterConfigUiState(
     val showEditDialog: Boolean = false,
     val showTemplateSelector: Boolean = false,
     val showPaperWidthSelector: Boolean = false,
+    val showFontSizeSelector: Boolean = false,
+    val showLineSpacingSelector: Boolean = false,
+    val showNumberOfCopiesSelector: Boolean = false,
+    val showPrintSettingsDialog: Boolean = false,
     val testingPrinterId: String? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null
@@ -205,6 +209,38 @@ class BillPrinterConfigViewModel @Inject constructor(
         _uiState.update { it.copy(selectedConfig = null, showPaperWidthSelector = false) }
     }
 
+    fun showFontSizeSelector(config: BillPrinterConfigEntity) {
+        _uiState.update { it.copy(selectedConfig = config, showFontSizeSelector = true) }
+    }
+
+    fun hideFontSizeSelector() {
+        _uiState.update { it.copy(selectedConfig = null, showFontSizeSelector = false) }
+    }
+
+    fun showLineSpacingSelector(config: BillPrinterConfigEntity) {
+        _uiState.update { it.copy(selectedConfig = config, showLineSpacingSelector = true) }
+    }
+
+    fun hideLineSpacingSelector() {
+        _uiState.update { it.copy(selectedConfig = null, showLineSpacingSelector = false) }
+    }
+
+    fun showNumberOfCopiesSelector(config: BillPrinterConfigEntity) {
+        _uiState.update { it.copy(selectedConfig = config, showNumberOfCopiesSelector = true) }
+    }
+
+    fun hideNumberOfCopiesSelector() {
+        _uiState.update { it.copy(selectedConfig = null, showNumberOfCopiesSelector = false) }
+    }
+
+    fun showPrintSettingsDialog(config: BillPrinterConfigEntity) {
+        _uiState.update { it.copy(selectedConfig = config, showPrintSettingsDialog = true) }
+    }
+
+    fun hidePrintSettingsDialog() {
+        _uiState.update { it.copy(selectedConfig = null, showPrintSettingsDialog = false) }
+    }
+
     fun updatePrinterAddress(configId: String, ip: String, port: Int) {
         viewModelScope.launch {
             try {
@@ -242,6 +278,103 @@ class BillPrinterConfigViewModel @Inject constructor(
                 _uiState.update { it.copy(successMessage = "Đã cập nhật khổ giấy: ${paperWidth}mm") }
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating paper width: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun updateFontSize(configId: String, fontSize: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.updateFontSize(configId, fontSize)
+                }
+                val label = when (fontSize) {
+                    "extra_small" -> "Rất nhỏ (0.7x)"
+                    "small" -> "Nhỏ (0.85x)"
+                    "large" -> "Lớn (1.2x)"
+                    "extra_large" -> "Rất lớn (1.4x)"
+                    else -> "Vừa (1.0x)"
+                }
+                _uiState.update { it.copy(successMessage = "Đã cập nhật cỡ chữ: $label", showFontSizeSelector = false) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating font size: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun updateLineSpacing(configId: String, lineSpacing: Float) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.updateLineSpacing(configId, lineSpacing)
+                }
+                _uiState.update { it.copy(successMessage = "Đã cập nhật khoảng cách dòng: ${(lineSpacing * 100).toInt()}%", showLineSpacingSelector = false) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating line spacing: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun updateNumberOfCopies(configId: String, numberOfCopies: Int) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.updateNumberOfCopies(configId, numberOfCopies)
+                }
+                _uiState.update { it.copy(successMessage = "Đã cập nhật số bản in: $numberOfCopies", showNumberOfCopiesSelector = false) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating number of copies: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun toggleCutPaper(config: BillPrinterConfigEntity) {
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                val updated = config.copy(cutPaper = !config.cutPaper, updatedAt = now)
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.update(updated)
+                }
+                _uiState.update { it.copy(successMessage = if (updated.cutPaper) "Đã bật cắt giấy tự động" else "Đã tắt cắt giấy tự động") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error toggling cut paper: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun toggleOpenCashDrawer(config: BillPrinterConfigEntity) {
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                val updated = config.copy(openCashDrawer = !config.openCashDrawer, updatedAt = now)
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.update(updated)
+                }
+                _uiState.update { it.copy(successMessage = if (updated.openCashDrawer) "Đã bật mở két tiền" else "Đã tắt mở két tiền") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error toggling open cash drawer: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
+    }
+
+    fun toggleBeepAfterPrint(config: BillPrinterConfigEntity) {
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                val updated = config.copy(beepAfterPrint = !config.beepAfterPrint, updatedAt = now)
+                withContext(Dispatchers.IO) {
+                    billPrinterConfigDao.update(updated)
+                }
+                _uiState.update { it.copy(successMessage = if (updated.beepAfterPrint) "Đã bật beep sau khi in" else "Đã tắt beep sau khi in") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error toggling beep after print: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
             }
         }

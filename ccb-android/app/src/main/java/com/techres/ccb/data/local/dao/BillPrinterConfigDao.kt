@@ -79,6 +79,18 @@ interface BillPrinterConfigDao {
     @Query("UPDATE bill_printer_configs SET paper_width = :paperWidth WHERE id = :id")
     suspend fun updatePaperWidth(id: String, paperWidth: Int)
 
+    // Update font size
+    @Query("UPDATE bill_printer_configs SET font_size = :fontSize WHERE id = :id")
+    suspend fun updateFontSize(id: String, fontSize: String)
+
+    // Update line spacing
+    @Query("UPDATE bill_printer_configs SET line_spacing = :lineSpacing WHERE id = :id")
+    suspend fun updateLineSpacing(id: String, lineSpacing: Float)
+
+    // Update number of copies
+    @Query("UPDATE bill_printer_configs SET number_of_copies = :numberOfCopies WHERE id = :id")
+    suspend fun updateNumberOfCopies(id: String, numberOfCopies: Int)
+
     @Query("SELECT COUNT(*) FROM bill_printer_configs WHERE branch_id = :branchId")
     suspend fun getCount(branchId: String): Int
 

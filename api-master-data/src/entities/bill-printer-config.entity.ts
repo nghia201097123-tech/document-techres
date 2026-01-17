@@ -79,6 +79,12 @@ export class BillPrinterConfig {
   @Column({ name: 'paper_width', type: 'int', default: 80 })
   paperWidth: number; // 58 hoặc 80mm
 
+  @Column({ name: 'font_size', length: 20, default: 'normal' })
+  fontSize: string; // extra_small, small, normal, large, extra_large
+
+  @Column({ name: 'line_spacing', type: 'float', default: 0.7 })
+  lineSpacing: number; // 0.3-1.0
+
   @Column({ name: 'auto_print_on_payment', default: true })
   autoPrintOnPayment: boolean; // Tự động in khi thanh toán
 

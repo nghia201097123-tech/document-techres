@@ -839,6 +839,8 @@ data class BillPrinterConfigDto(
     @SerializedName("templateId") val templateId: String?,
     // Print config
     @SerializedName("paperWidth") val paperWidth: Int = 80,
+    @SerializedName("fontSize") val fontSize: String = "normal",
+    @SerializedName("lineSpacing") val lineSpacing: Float = 0.7f,
     @SerializedName("autoPrintOnPayment") val autoPrintOnPayment: Boolean = true,
     @SerializedName("printPreview") val printPreview: Boolean = false,
     @SerializedName("numberOfCopies") val numberOfCopies: Int = 1,

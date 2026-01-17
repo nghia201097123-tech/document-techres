@@ -51,6 +51,16 @@ export class CreateBillPrinterConfigDto {
   @IsNumber()
   paperWidth?: number;
 
+  @ApiPropertyOptional({ description: 'Cỡ chữ: extra_small, small, normal, large, extra_large' })
+  @IsOptional()
+  @IsString()
+  fontSize?: string;
+
+  @ApiPropertyOptional({ description: 'Khoảng cách dòng (0.3-1.0)' })
+  @IsOptional()
+  @IsNumber()
+  lineSpacing?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

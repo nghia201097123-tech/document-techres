@@ -691,6 +691,8 @@ class SyncRepository @Inject constructor(
                 templateId = dto.templateId,
                 // Print config
                 paperWidth = dto.paperWidth,
+                fontSize = dto.fontSize,
+                lineSpacing = dto.lineSpacing,
                 autoPrintOnPayment = dto.autoPrintOnPayment,
                 printPreview = dto.printPreview,
                 numberOfCopies = dto.numberOfCopies,

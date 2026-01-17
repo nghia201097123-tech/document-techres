@@ -85,6 +85,50 @@ fun BillPrinterConfigScreen(
         )
     }
 
+    // Font size selector dialog
+    if (uiState.showFontSizeSelector && uiState.selectedConfig != null) {
+        FontSizeSelectionDialog(
+            currentFontSize = uiState.selectedConfig!!.fontSize,
+            onDismiss = { viewModel.hideFontSizeSelector() },
+            onSelect = { fontSize ->
+                viewModel.updateFontSize(uiState.selectedConfig!!.id, fontSize)
+            }
+        )
+    }
+
+    // Line spacing selector dialog
+    if (uiState.showLineSpacingSelector && uiState.selectedConfig != null) {
+        LineSpacingSelectionDialog(
+            currentLineSpacing = uiState.selectedConfig!!.lineSpacing,
+            onDismiss = { viewModel.hideLineSpacingSelector() },
+            onSelect = { lineSpacing ->
+                viewModel.updateLineSpacing(uiState.selectedConfig!!.id, lineSpacing)
+            }
+        )
+    }
+
+    // Number of copies selector dialog
+    if (uiState.showNumberOfCopiesSelector && uiState.selectedConfig != null) {
+        NumberOfCopiesSelectionDialog(
+            currentCopies = uiState.selectedConfig!!.numberOfCopies,
+            onDismiss = { viewModel.hideNumberOfCopiesSelector() },
+            onSelect = { copies ->
+                viewModel.updateNumberOfCopies(uiState.selectedConfig!!.id, copies)
+            }
+        )
+    }
+
+    // Print settings dialog
+    if (uiState.showPrintSettingsDialog && uiState.selectedConfig != null) {
+        PrintSettingsDialog(
+            config = uiState.selectedConfig!!,
+            onDismiss = { viewModel.hidePrintSettingsDialog() },
+            onToggleCutPaper = { viewModel.toggleCutPaper(uiState.selectedConfig!!) },
+            onToggleOpenCashDrawer = { viewModel.toggleOpenCashDrawer(uiState.selectedConfig!!) },
+            onToggleBeepAfterPrint = { viewModel.toggleBeepAfterPrint(uiState.selectedConfig!!) }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -164,6 +208,10 @@ fun BillPrinterConfigScreen(
                         onSetDefaultClick = { viewModel.setDefault(config.id) },
                         onTemplateClick = { viewModel.showTemplateSelector(config) },
                         onPaperWidthClick = { viewModel.showPaperWidthSelector(config) },
+                        onFontSizeClick = { viewModel.showFontSizeSelector(config) },
+                        onLineSpacingClick = { viewModel.showLineSpacingSelector(config) },
+                        onNumberOfCopiesClick = { viewModel.showNumberOfCopiesSelector(config) },
+                        onPrintSettingsClick = { viewModel.showPrintSettingsDialog(config) },
                         onToggleAutoPrint = { viewModel.toggleAutoPrint(config) },
                         onToggleActive = { viewModel.toggleActiveStatus(config) }
                     )
@@ -224,6 +272,10 @@ private fun PrinterConfigCard(
     onSetDefaultClick: () -> Unit,
     onTemplateClick: () -> Unit,
     onPaperWidthClick: () -> Unit,
+    onFontSizeClick: () -> Unit,
+    onLineSpacingClick: () -> Unit,
+    onNumberOfCopiesClick: () -> Unit,
+    onPrintSettingsClick: () -> Unit,
     onToggleAutoPrint: () -> Unit,
     onToggleActive: () -> Unit
 ) {
@@ -461,6 +513,120 @@ private fun PrinterConfigCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Khổ giấy: ${config.paperWidth}mm",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+
+                    // Font size
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onFontSizeClick)
+                    ) {
+                        Icon(
+                            Icons.Default.FormatSize,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Cỡ chữ: ${getFontSizeLabel(config.fontSize)}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+
+                    // Line spacing
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onLineSpacingClick)
+                    ) {
+                        Icon(
+                            Icons.Default.FormatLineSpacing,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Khoảng cách dòng: ${(config.lineSpacing * 100).toInt()}%",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+
+                    // Number of copies
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onNumberOfCopiesClick)
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Số bản in: ${config.numberOfCopies}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+
+                    // Print settings (cut paper, cash drawer, beep)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onPrintSettingsClick)
+                    ) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = buildString {
+                                val settings = mutableListOf<String>()
+                                if (config.cutPaper) settings.add("Cắt giấy")
+                                if (config.openCashDrawer) settings.add("Mở két")
+                                if (config.beepAfterPrint) settings.add("Beep")
+                                append(if (settings.isEmpty()) "Không có" else settings.joinToString(", "))
+                            },
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                         )
@@ -823,6 +989,175 @@ private fun PaperWidthSelectionDialog(
                 ) {
                     Text("Đóng")
                 }
+            }
+        }
+    }
+}
+
+// Font size options
+private val FONT_SIZE_OPTIONS = listOf(
+    FontSizeOption("extra_small", "Rất nhỏ (0.7x)", "Tiết kiệm giấy"),
+    FontSizeOption("small", "Nhỏ (0.85x)", "Chữ nhỏ hơn mặc định"),
+    FontSizeOption("normal", "Vừa (1.0x)", "Kích thước mặc định"),
+    FontSizeOption("large", "Lớn (1.2x)", "Chữ to dễ đọc"),
+    FontSizeOption("extra_large", "Rất lớn (1.4x)", "Chữ rất to")
+)
+
+private data class FontSizeOption(val value: String, val label: String, val description: String)
+
+private fun getFontSizeLabel(fontSize: String): String {
+    return when (fontSize) {
+        "extra_small" -> "Rất nhỏ (0.7x)"
+        "small" -> "Nhỏ (0.85x)"
+        "large" -> "Lớn (1.2x)"
+        "extra_large" -> "Rất lớn (1.4x)"
+        else -> "Vừa (1.0x)"
+    }
+}
+
+@Composable
+private fun FontSizeSelectionDialog(
+    currentFontSize: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.widthIn(max = 400.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Chọn cỡ chữ", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    items(FONT_SIZE_OPTIONS) { option ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(option.value) }.padding(vertical = 12.dp)) {
+                            RadioButton(selected = currentFontSize == option.value, onClick = { onSelect(option.value) })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(option.label, fontWeight = FontWeight.Medium)
+                                Text(option.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Đóng") }
+            }
+        }
+    }
+}
+
+// Line spacing options
+private val LINE_SPACING_OPTIONS = listOf(
+    LineSpacingOption(0.3f, "30%", "Rất sát"),
+    LineSpacingOption(0.4f, "40%", "Sát"),
+    LineSpacingOption(0.5f, "50%", "Chặt"),
+    LineSpacingOption(0.7f, "70%", "Bình thường"),
+    LineSpacingOption(1.0f, "100%", "Rộng")
+)
+
+private data class LineSpacingOption(val value: Float, val label: String, val description: String)
+
+@Composable
+private fun LineSpacingSelectionDialog(
+    currentLineSpacing: Float,
+    onDismiss: () -> Unit,
+    onSelect: (Float) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.widthIn(max = 400.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Chọn khoảng cách dòng", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    items(LINE_SPACING_OPTIONS) { option ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(option.value) }.padding(vertical = 12.dp)) {
+                            RadioButton(selected = currentLineSpacing == option.value, onClick = { onSelect(option.value) })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(option.label, fontWeight = FontWeight.Medium)
+                                Text(option.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Đóng") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumberOfCopiesSelectionDialog(
+    currentCopies: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.widthIn(max = 400.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Chọn số bản in", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(5) { index ->
+                        val copies = index + 1
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(copies) }.padding(vertical = 12.dp)) {
+                            RadioButton(selected = currentCopies == copies, onClick = { onSelect(copies) })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("$copies bản", fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Đóng") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrintSettingsDialog(
+    config: BillPrinterConfigEntity,
+    onDismiss: () -> Unit,
+    onToggleCutPaper: () -> Unit,
+    onToggleOpenCashDrawer: () -> Unit,
+    onToggleBeepAfterPrint: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.widthIn(max = 400.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Cài đặt in", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleCutPaper).padding(vertical = 12.dp)) {
+                    Icon(Icons.Default.ContentCut, null, Modifier.size(24.dp), tint = if (config.cutPaper) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Cắt giấy tự động", fontWeight = FontWeight.Medium)
+                        Text("Tự động cắt giấy sau khi in", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(checked = config.cutPaper, onCheckedChange = { onToggleCutPaper() })
+                }
+                HorizontalDivider()
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleOpenCashDrawer).padding(vertical = 12.dp)) {
+                    Icon(Icons.Default.Inventory, null, Modifier.size(24.dp), tint = if (config.openCashDrawer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Mở két đựng tiền", fontWeight = FontWeight.Medium)
+                        Text("Tự động mở két tiền khi in bill", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(checked = config.openCashDrawer, onCheckedChange = { onToggleOpenCashDrawer() })
+                }
+                HorizontalDivider()
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleBeepAfterPrint).padding(vertical = 12.dp)) {
+                    Icon(Icons.Default.NotificationsActive, null, Modifier.size(24.dp), tint = if (config.beepAfterPrint) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Beep sau khi in", fontWeight = FontWeight.Medium)
+                        Text("Phát tiếng beep khi in xong", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(checked = config.beepAfterPrint, onCheckedChange = { onToggleBeepAfterPrint() })
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Đóng") }
             }
         }
     }

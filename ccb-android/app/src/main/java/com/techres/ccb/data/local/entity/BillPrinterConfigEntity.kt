@@ -56,6 +56,12 @@ data class BillPrinterConfigEntity(
     @ColumnInfo(name = "paper_width")
     val paperWidth: Int = 80, // 58 hoặc 80mm
 
+    @ColumnInfo(name = "font_size")
+    val fontSize: String = "normal", // extra_small, small, normal, large, extra_large
+
+    @ColumnInfo(name = "line_spacing")
+    val lineSpacing: Float = 0.7f, // 0.3-1.0
+
     @ColumnInfo(name = "auto_print_on_payment")
     val autoPrintOnPayment: Boolean = true, // Tự động in khi thanh toán
 
