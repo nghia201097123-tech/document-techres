@@ -223,10 +223,29 @@ class TableViewModel @Inject constructor(
                 val ordersMap = ordersDeferred.await()
                 val itemCountsMap = itemCountsDeferred.await()
 
-                // Pre-calculate date formatter once
-                val dateFormatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                // Pre-calculate date formatters for multiple formats
+                val dateFormats = listOf(
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    "yyyy-MM-dd HH:mm:ss"
+                ).map { pattern ->
+                    java.text.SimpleDateFormat(pattern, java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }
+                }
                 val currentTime = System.currentTimeMillis()
+
+                // Helper function to parse date with multiple formats
+                fun parseDate(dateStr: String): Long? {
+                    for (formatter in dateFormats) {
+                        try {
+                            return formatter.parse(dateStr)?.time
+                        } catch (e: Exception) { }
+                    }
+                    return null
+                }
 
                 // Build table with order info (optimized - no N+1 queries)
                 val tablesWithInfo = tables.map { table ->
@@ -234,12 +253,10 @@ class TableViewModel @Inject constructor(
                     val itemCount = table.currentOrderId?.let { itemCountsMap[it] } ?: 0
 
                     val occupiedMinutes = if (order != null) {
-                        try {
-                            val createdAt = dateFormatter.parse(order.createdAt)?.time ?: 0L
-                            ((currentTime - createdAt) / 60000).toInt()
-                        } catch (e: Exception) {
-                            0
-                        }
+                        val createdAt = parseDate(order.createdAt)
+                        if (createdAt != null) {
+                            ((currentTime - createdAt) / 60000).toInt().coerceAtLeast(0)
+                        } else 0
                     } else {
                         0
                     }

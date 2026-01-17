@@ -238,20 +238,36 @@ private fun OrderCard(
     order: OrderEntity,
     onClick: () -> Unit
 ) {
-    // Calculate active time in minutes
+    // Calculate active time in minutes - try multiple date formats
     val activeMinutes = remember(order.createdAt) {
         try {
-            val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-            val createdTime = format.parse(order.createdAt.take(19))?.time ?: 0L
-            val now = System.currentTimeMillis()
-            ((now - createdTime) / 60000).toInt().coerceAtLeast(0)
+            val dateFormats = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS",
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd HH:mm:ss"
+            )
+            var createdTime: Long? = null
+            for (pattern in dateFormats) {
+                try {
+                    val format = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
+                    format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    createdTime = format.parse(order.createdAt)?.time
+                    if (createdTime != null) break
+                } catch (e: Exception) { }
+            }
+            if (createdTime != null) {
+                val now = System.currentTimeMillis()
+                ((now - createdTime) / 60000).toInt().coerceAtLeast(0)
+            } else 0
         } catch (e: Exception) {
             0
         }
     }
 
     val hasNote = !order.notes.isNullOrBlank()
-    val timeColor = if (activeMinutes > 30) Color(0xFFF44336) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+    val timeColor = if (activeMinutes > 30) Color(0xFFF44336) else Color.Gray
 
     Card(
         modifier = Modifier
@@ -279,31 +295,8 @@ private fun OrderCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
-                    // Note indicator
-                    if (hasNote) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.Note,
-                            contentDescription = "Có ghi chú",
-                            modifier = Modifier.size(16.dp),
-                            tint = Color(0xFFFF9800) // Orange
-                        )
-                    }
                 }
-                StatusChip(status = order.status)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = formatPrice(order.totalAmount),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-            // Active time
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // Time display
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.Schedule,
@@ -311,12 +304,59 @@ private fun OrderCard(
                         modifier = Modifier.size(14.dp),
                         tint = timeColor
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
                     Text(
                         text = "${activeMinutes}p",
                         fontSize = 12.sp,
-                        color = timeColor
+                        color = timeColor,
+                        fontWeight = FontWeight.Medium
                     )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Total amount
+            Text(
+                text = formatPrice(order.totalAmount),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+
+            // Status and Note indicator row
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StatusChip(status = order.status)
+
+                // Note indicator badge
+                if (hasNote) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFFFF9800).copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.StickyNote2,
+                                contentDescription = "Có ghi chú",
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFFF9800)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "Ghi chú",
+                                fontSize = 10.sp,
+                                color = Color(0xFFFF9800),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }
