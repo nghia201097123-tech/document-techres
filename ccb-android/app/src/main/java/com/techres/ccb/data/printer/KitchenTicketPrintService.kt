@@ -24,6 +24,34 @@ object KitchenTicketPrintService {
     private val priceFormatter = DecimalFormat("#,###")
 
     /**
+     * Regex để match tất cả các ký tự whitespace Unicode và zero-width characters
+     * Bao gồm:
+     * - \s: Standard whitespace (space, tab, newline, carriage return, etc.)
+     * - \u00A0: Non-breaking space
+     * - \u2000-\u200A: Various Unicode spaces (en quad, em quad, en space, em space, etc.)
+     * - \u200B-\u200D: Zero-width characters (zero-width space, non-joiner, joiner)
+     * - \u2028: Line separator
+     * - \u2029: Paragraph separator
+     * - \u202F: Narrow no-break space
+     * - \u205F: Medium mathematical space
+     * - \u3000: Ideographic space (CJK)
+     * - \uFEFF: Byte order mark / Zero-width no-break space
+     */
+    private val UNICODE_WHITESPACE_REGEX = Regex("[\\s\\u00A0\\u2000-\\u200A\\u200B-\\u200D\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+")
+
+    /**
+     * Normalize text: loại bỏ tất cả Unicode whitespace thừa, newlines, và zero-width characters
+     * Thay thế bằng single space và trim
+     */
+    private fun normalizeText(text: String): String {
+        return text
+            .replace("\n", " ")
+            .replace("\r", " ")
+            .replace(UNICODE_WHITESPACE_REGEX, " ")
+            .trim()
+    }
+
+    /**
      * Format price in VND format (e.g., 35,000đ)
      */
     private fun formatPrice(price: Double): String {
@@ -357,9 +385,9 @@ object KitchenTicketPrintService {
                 // Chỉ hiển thị options không có trong toppingPrices (tránh trùng lặp)
                 val toppingNames = item.toppingPrices.map { it.first.lowercase() }
                 item.options.forEach { (key, value) ->
-                    // Normalize key và value: loại bỏ newline và whitespace thừa
-                    val normalizedKey = key.replace("\n", " ").replace("\r", " ").replace(Regex("\\s+"), " ").trim()
-                    val normalizedValue = value.replace("\n", " ").replace("\r", " ").replace(Regex("\\s+"), " ").trim()
+                    // Normalize key và value: loại bỏ tất cả Unicode whitespace thừa
+                    val normalizedKey = normalizeText(key)
+                    val normalizedValue = normalizeText(value)
 
                     // Bỏ qua nếu key hoặc value rỗng
                     if (normalizedKey.isNotBlank() && normalizedValue.isNotBlank()) {
@@ -379,12 +407,8 @@ object KitchenTicketPrintService {
                     // Hiển thị topping - chỉ hiển thị giá nếu showPrice = true
                     if (item.toppingPrices.isNotEmpty()) {
                         item.toppingPrices.forEach { (toppingName, toppingPrice) ->
-                            // Normalize topping name: loại bỏ newline và whitespace thừa
-                            val normalizedName = toppingName
-                                .replace("\n", " ")
-                                .replace("\r", " ")
-                                .replace(Regex("\\s+"), " ")
-                                .trim()
+                            // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
+                            val normalizedName = normalizeText(toppingName)
 
                             // Bỏ qua topping name rỗng
                             if (normalizedName.isNotBlank()) {
@@ -399,12 +423,8 @@ object KitchenTicketPrintService {
                         }
                     } else {
                         item.toppings.forEach { topping ->
-                            // Normalize topping name: loại bỏ newline và whitespace thừa
-                            val normalizedTopping = topping
-                                .replace("\n", " ")
-                                .replace("\r", " ")
-                                .replace(Regex("\\s+"), " ")
-                                .trim()
+                            // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
+                            val normalizedTopping = normalizeText(topping)
 
                             // Bỏ qua topping name rỗng
                             if (normalizedTopping.isNotBlank()) {

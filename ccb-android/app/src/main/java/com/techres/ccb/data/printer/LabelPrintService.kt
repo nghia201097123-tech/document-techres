@@ -41,6 +41,22 @@ object LabelPrintService {
     private const val DOTS_PER_MM = 8 // 203 DPI ≈ 8 dots/mm
 
     /**
+     * Regex để match tất cả các ký tự whitespace Unicode và zero-width characters
+     */
+    private val UNICODE_WHITESPACE_REGEX = Regex("[\\s\\u00A0\\u2000-\\u200A\\u200B-\\u200D\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+")
+
+    /**
+     * Normalize text: loại bỏ tất cả Unicode whitespace thừa, newlines, và zero-width characters
+     */
+    private fun normalizeText(text: String): String {
+        return text
+            .replace("\n", " ")
+            .replace("\r", " ")
+            .replace(UNICODE_WHITESPACE_REGEX, " ")
+            .trim()
+    }
+
+    /**
      * Data class cho thông tin in tem
      */
     data class LabelData(
@@ -568,12 +584,8 @@ object LabelPrintService {
             }
 
             filteredToppings.forEach { (toppingName, toppingPrice) ->
-                // Normalize topping name: loại bỏ newline và whitespace thừa
-                val normalizedName = toppingName
-                    .replace("\n", " ")
-                    .replace("\r", " ")
-                    .replace(Regex("\\s+"), " ")
-                    .trim()
+                // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
+                val normalizedName = normalizeText(toppingName)
 
                 // Bỏ qua topping name rỗng
                 if (normalizedName.isNotBlank()) {
@@ -604,12 +616,8 @@ object LabelPrintService {
             }
         } else if (label.toppings.isNotEmpty()) {
             label.toppings.forEach { topping ->
-                // Normalize topping name: loại bỏ newline và whitespace thừa
-                val normalizedTopping = topping
-                    .replace("\n", " ")
-                    .replace("\r", " ")
-                    .replace(Regex("\\s+"), " ")
-                    .trim()
+                // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
+                val normalizedTopping = normalizeText(topping)
 
                 // Bỏ qua topping name rỗng
                 if (normalizedTopping.isNotBlank()) {
@@ -1023,12 +1031,8 @@ object LabelPrintService {
                         name != displayedSizeTopping
                     }
                     filteredToppings.forEach { (toppingName, toppingPrice) ->
-                        // Normalize topping name: loại bỏ newline và whitespace thừa
-                        val normalizedName = toppingName
-                            .replace("\n", " ")
-                            .replace("\r", " ")
-                            .replace(Regex("\\s+"), " ")
-                            .trim()
+                        // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
+                        val normalizedName = normalizeText(toppingName)
 
                         // Bỏ qua topping name rỗng
                         if (normalizedName.isNotBlank()) {
@@ -1041,12 +1045,8 @@ object LabelPrintService {
                     }
                 } else {
                     label.toppings.forEach { topping ->
-                        // Normalize topping name: loại bỏ newline và whitespace thừa
-                        val normalizedTopping = topping
-                            .replace("\n", " ")
-                            .replace("\r", " ")
-                            .replace(Regex("\\s+"), " ")
-                            .trim()
+                        // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
+                        val normalizedTopping = normalizeText(topping)
 
                         // Bỏ qua topping name rỗng
                         if (normalizedTopping.isNotBlank()) {
