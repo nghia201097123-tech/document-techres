@@ -569,6 +569,12 @@ export class DatabaseMigrationService implements OnModuleInit {
     await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_font_scale', 'FLOAT DEFAULT 1.0');
     await this.addColumnIfNotExists(queryRunner, 'kitchens', 'label_max_toppings', 'INTEGER DEFAULT 0');
 
+    // Add print_density column (for label printer density)
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'print_density', 'INTEGER DEFAULT 8');
+
+    // Add ticket_print_price column (for displaying item prices on kitchen tickets)
+    await this.addColumnIfNotExists(queryRunner, 'kitchens', 'ticket_print_price', 'BOOLEAN DEFAULT FALSE');
+
     this.logger.log('Label size config columns added to kitchens table');
   }
 
