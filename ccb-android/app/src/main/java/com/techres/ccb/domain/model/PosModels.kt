@@ -45,7 +45,8 @@ data class ProductVariantOption(
     val id: String,
     val name: String,           // "S", "M", "L", "Trân châu"
     val price: Long = 0,        // Giá cộng thêm
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val vatRate: Double = 0.0   // VAT rate của topping (%)
 )
 
 enum class VariantType {
@@ -83,7 +84,8 @@ data class SelectedVariant(
     val groupName: String,
     val optionId: String,
     val name: String,
-    val price: Long
+    val price: Long,
+    val vatRate: Double = 0.0   // VAT rate của topping (%)
 )
 
 // ===== COMBO CHILD ITEM =====

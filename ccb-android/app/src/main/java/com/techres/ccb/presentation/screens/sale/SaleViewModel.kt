@@ -586,7 +586,8 @@ class SaleViewModel @Inject constructor(
                             id = topping.toppingId,
                             name = toppingProduct.name,
                             price = finalPrice,
-                            isDefault = topping.isDefault
+                            isDefault = topping.isDefault,
+                            vatRate = toppingProduct.vatRate
                         )
                     } else null
                 }.sortedBy { it.name }

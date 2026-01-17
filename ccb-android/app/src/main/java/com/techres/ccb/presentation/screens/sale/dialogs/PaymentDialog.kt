@@ -91,18 +91,28 @@ data class AppliedDiscount(
 )
 
 /**
+ * Thông tin topping trong PaymentDialog
+ */
+data class PaymentToppingItem(
+    val name: String,
+    val price: Long,           // Giá đơn vị của topping
+    val vatRate: Double = 0.0  // VAT rate của topping (%)
+)
+
+/**
  * Thông tin món để hiển thị trong PaymentDialog
  */
 data class PaymentOrderItem(
     val id: String,
     val name: String,
     val quantity: Int,
-    val unitPrice: Long,
-    val totalPrice: Long,
+    val unitPrice: Long,       // Giá món chính (không bao gồm topping)
+    val totalPrice: Long,      // Tổng giá (món + topping) * quantity
     val discountAmount: Long = 0,
     val categoryId: String? = null,
     val categoryName: String? = null,
-    val vatRate: Double = 0.0 // % VAT (8, 10, etc.)
+    val vatRate: Double = 0.0, // % VAT của món chính
+    val toppings: List<PaymentToppingItem> = emptyList() // Danh sách toppings
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -1443,30 +1453,66 @@ fun PaymentDialog(
     }
 }
 
+// Data class cho hiển thị VAT từng dòng
+private data class VatDisplayRow(
+    val name: String,
+    val quantity: Int,
+    val totalPrice: Long,
+    val vatRate: Double,
+    val vatAmount: Long,
+    val isTopping: Boolean = false
+)
+
 @Composable
 private fun VatDetailDialog(
     orderItems: List<PaymentOrderItem>,
     totalVatAmount: Long,
     onDismiss: () -> Unit
 ) {
-    // Calculate VAT for each item (VAT đã bao gồm trong giá)
-    // Công thức: Giá sau VAT = Giá trước VAT × (1 + VAT%)
-    // → Giá trước VAT = Giá sau VAT / (1 + VAT%)
-    // → Tiền VAT = Giá sau VAT - Giá trước VAT
-    val itemsWithVat = remember(orderItems) {
-        orderItems.map { item ->
-            val priceAfterDiscount = item.totalPrice - item.discountAmount
-            val vatAmount = if (item.vatRate > 0) {
-                val priceBeforeVat = priceAfterDiscount / (1 + item.vatRate / 100)
-                (priceAfterDiscount - priceBeforeVat).toLong()
-            } else 0L
-            Triple(item, vatAmount, item.vatRate)
+    // Build flat list: main items + their toppings with VAT
+    val vatRows = remember(orderItems) {
+        buildList {
+            orderItems.forEach { item ->
+                // VAT của món chính (giá gốc, không bao gồm topping)
+                val mainPrice = item.unitPrice * item.quantity
+                val mainVat = if (item.vatRate > 0) {
+                    val priceBeforeVat = mainPrice / (1 + item.vatRate / 100.0)
+                    (mainPrice - priceBeforeVat).toLong()
+                } else 0L
+
+                add(VatDisplayRow(
+                    name = item.name,
+                    quantity = item.quantity,
+                    totalPrice = mainPrice,
+                    vatRate = item.vatRate,
+                    vatAmount = mainVat,
+                    isTopping = false
+                ))
+
+                // VAT của từng topping
+                item.toppings.forEach { topping ->
+                    val toppingTotal = topping.price * item.quantity
+                    val toppingVat = if (topping.vatRate > 0) {
+                        val priceBeforeVat = toppingTotal / (1 + topping.vatRate / 100.0)
+                        (toppingTotal - priceBeforeVat).toLong()
+                    } else 0L
+
+                    add(VatDisplayRow(
+                        name = topping.name,
+                        quantity = item.quantity,
+                        totalPrice = toppingTotal,
+                        vatRate = topping.vatRate,
+                        vatAmount = toppingVat,
+                        isTopping = true
+                    ))
+                }
+            }
         }
     }
 
-    // Tính tổng VAT từ các items
-    val calculatedTotalVat = remember(itemsWithVat) {
-        itemsWithVat.sumOf { it.second }
+    // Tính tổng VAT từ các rows
+    val calculatedTotalVat = remember(vatRows) {
+        vatRows.sumOf { it.vatAmount }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1537,67 +1583,70 @@ private fun VatDetailDialog(
                         .heightIn(max = 300.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(itemsWithVat.size) { index ->
-                        val (item, itemVat, vatRate) = itemsWithVat[index]
-                        val priceAfterDiscount = item.totalPrice - item.discountAmount
-                        val priceBeforeVat = if (vatRate > 0) {
-                            (priceAfterDiscount / (1 + vatRate / 100)).toLong()
-                        } else priceAfterDiscount
+                    items(vatRows.size) { index ->
+                        val row = vatRows[index]
 
                         Column {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = if (row.isTopping) 16.dp else 0.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        item.name,
-                                        fontSize = 12.sp,
+                                        if (row.isTopping) "+ ${row.name}" else row.name,
+                                        fontSize = if (row.isTopping) 11.sp else 12.sp,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (row.isTopping) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                                     )
-                                    Text(
-                                        "x${item.quantity}",
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
+                                    if (!row.isTopping) {
+                                        Text(
+                                            "x${row.quantity}",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
                                 }
                                 Text(
-                                    formatCurrency(priceAfterDiscount),
-                                    fontSize = 11.sp,
+                                    formatCurrency(row.totalPrice),
+                                    fontSize = if (row.isTopping) 10.sp else 11.sp,
                                     modifier = Modifier.width(80.dp),
                                     textAlign = TextAlign.End
                                 )
                                 Text(
-                                    if (vatRate > 0) "${vatRate.toInt()}%" else "-",
-                                    fontSize = 11.sp,
+                                    if (row.vatRate > 0) "${row.vatRate.toInt()}%" else "-",
+                                    fontSize = if (row.isTopping) 10.sp else 11.sp,
                                     modifier = Modifier.width(50.dp),
                                     textAlign = TextAlign.End,
-                                    color = if (vatRate > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    color = if (row.vatRate > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                                 Text(
-                                    if (itemVat > 0) formatCurrency(itemVat) else "-",
-                                    fontSize = 11.sp,
-                                    fontWeight = if (itemVat > 0) FontWeight.Medium else FontWeight.Normal,
+                                    if (row.vatAmount > 0) formatCurrency(row.vatAmount) else "-",
+                                    fontSize = if (row.isTopping) 10.sp else 11.sp,
+                                    fontWeight = if (row.vatAmount > 0) FontWeight.Medium else FontWeight.Normal,
                                     modifier = Modifier.width(80.dp),
                                     textAlign = TextAlign.End,
-                                    color = if (itemVat > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    color = if (row.vatAmount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
-                            // Hiển thị công thức tính cho từng món
-                            if (vatRate > 0) {
-                                val vatMultiplier = String.format("%.2f", 1 + vatRate / 100)
+                            // Hiển thị công thức tính
+                            if (row.vatRate > 0) {
+                                val vatMultiplier = String.format("%.2f", 1 + row.vatRate / 100)
                                 Text(
-                                    "= ${formatCurrencyShort(priceAfterDiscount)} - (${formatCurrencyShort(priceAfterDiscount)} ÷ $vatMultiplier) = ${formatCurrencyShort(itemVat)}",
+                                    "= ${formatCurrencyShort(row.totalPrice)} - (${formatCurrencyShort(row.totalPrice)} ÷ $vatMultiplier) = ${formatCurrencyShort(row.vatAmount)}",
                                     fontSize = 9.sp,
                                     color = MaterialTheme.colorScheme.outline,
                                     fontStyle = FontStyle.Italic,
-                                    modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                                    modifier = Modifier.padding(start = if (row.isTopping) 24.dp else 8.dp, top = 2.dp)
                                 )
                             }
 
-                            if (index < itemsWithVat.size - 1) {
+                            // Divider giữa các món chính (không phải sau topping)
+                            val nextRow = vatRows.getOrNull(index + 1)
+                            if (nextRow != null && !nextRow.isTopping) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                             }

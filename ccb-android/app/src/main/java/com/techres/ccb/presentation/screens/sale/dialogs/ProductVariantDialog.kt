@@ -349,7 +349,8 @@ fun ProductVariantDialog(
                                                 groupName = group.name,
                                                 optionId = option.id,
                                                 name = option.name,
-                                                price = option.price
+                                                price = option.price,
+                                                vatRate = option.vatRate
                                             )
                                         )
                                     }

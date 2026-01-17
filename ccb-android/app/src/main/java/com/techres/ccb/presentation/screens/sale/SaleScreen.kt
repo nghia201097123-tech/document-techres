@@ -320,22 +320,39 @@ fun SaleScreen(
                             totalPrice = item.totalPrice,
                             discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
                             categoryId = item.product.categoryId,
-                            vatRate = item.product.vatRate
+                            vatRate = item.product.vatRate,
+                            toppings = item.selectedVariants.map { variant ->
+                                PaymentToppingItem(
+                                    name = variant.name,
+                                    price = variant.price,
+                                    vatRate = variant.vatRate
+                                )
+                            }
                         ))
                     }
                 }
             }
 
-            // Tính VAT từ từng món (dựa trên vatRate của mỗi món)
+            // Tính VAT từ từng món và topping (dựa trên vatRate riêng của mỗi item)
             // Công thức: VAT = Giá - (Giá / (1 + VAT%))
             val vatAmount = orderItems.sumOf { item ->
-                val priceAfterDiscount = item.totalPrice - item.discountAmount
-                if (item.vatRate > 0) {
-                    val priceBeforeVat = priceAfterDiscount / (1 + item.vatRate / 100.0)
-                    (priceAfterDiscount - priceBeforeVat).toLong()
-                } else {
-                    0L
+                // VAT của món chính (giá gốc, không bao gồm topping)
+                val mainItemPrice = item.unitPrice * item.quantity
+                val mainItemVat = if (item.vatRate > 0) {
+                    val priceBeforeVat = mainItemPrice / (1 + item.vatRate / 100.0)
+                    (mainItemPrice - priceBeforeVat).toLong()
+                } else 0L
+
+                // VAT của từng topping
+                val toppingsVat = item.toppings.sumOf { topping ->
+                    val toppingTotalPrice = topping.price * item.quantity
+                    if (topping.vatRate > 0) {
+                        val priceBeforeVat = toppingTotalPrice / (1 + topping.vatRate / 100.0)
+                        (toppingTotalPrice - priceBeforeVat).toLong()
+                    } else 0L
                 }
+
+                mainItemVat + toppingsVat
             }
 
             // Convert CouponEntity to CouponDisplayItem with availability status
