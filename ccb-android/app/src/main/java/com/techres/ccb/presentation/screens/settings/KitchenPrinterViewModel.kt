@@ -141,7 +141,9 @@ class KitchenPrinterViewModel @Inject constructor(
         labelPrintTableName: Boolean = true,
         labelPrintTime: Boolean = true,
         labelStoreName: String? = null,
-        labelReverse: Boolean = false
+        labelReverse: Boolean = false,
+        labelFontScale: Float = 1.0f,
+        labelMaxToppings: Int = 0
     ) {
         viewModelScope.launch {
             try {
@@ -168,7 +170,9 @@ class KitchenPrinterViewModel @Inject constructor(
                     labelPrintTableName = labelPrintTableName,
                     labelPrintTime = labelPrintTime,
                     labelStoreName = labelStoreName,
-                    labelReverse = labelReverse
+                    labelReverse = labelReverse,
+                    labelFontScale = labelFontScale,
+                    labelMaxToppings = labelMaxToppings
                 )
             } catch (e: Exception) {
                 _uiState.update {

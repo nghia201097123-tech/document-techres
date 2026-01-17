@@ -250,7 +250,8 @@ fun KitchenPrinterScreen(
             onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
                        ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize,
                        labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
-                       labelPrintTableName, labelPrintTime, labelStoreName, labelReverse ->
+                       labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
+                       labelFontScale, labelMaxToppings ->
                 viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
                     ip = ip.ifBlank { null },
@@ -274,7 +275,9 @@ fun KitchenPrinterScreen(
                     labelPrintTableName = labelPrintTableName,
                     labelPrintTime = labelPrintTime,
                     labelStoreName = labelStoreName.ifBlank { null },
-                    labelReverse = labelReverse
+                    labelReverse = labelReverse,
+                    labelFontScale = labelFontScale,
+                    labelMaxToppings = labelMaxToppings
                 )
                 showPrinterDialog = false
             }
@@ -516,7 +519,8 @@ private fun PrinterConfigDialog(
     onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
              ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String,
              labelPrintPrice: Boolean, labelPrintStoreName: Boolean, labelPrintOrderNumber: Boolean,
-             labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String, labelReverse: Boolean) -> Unit
+             labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String, labelReverse: Boolean,
+             labelFontScale: Float, labelMaxToppings: Int) -> Unit
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
@@ -544,6 +548,9 @@ private fun PrinterConfigDialog(
     var labelPrintTime by remember { mutableStateOf(kitchen.labelPrintTime) }
     var labelStoreName by remember { mutableStateOf(kitchen.labelStoreName ?: "") }
     var labelReverse by remember { mutableStateOf(kitchen.labelReverse) }
+    var labelFontScale by remember { mutableStateOf(kitchen.labelFontScale) }
+    var labelMaxToppings by remember { mutableStateOf(kitchen.labelMaxToppings) }
+    var labelFontScaleExpanded by remember { mutableStateOf(false) }
 
     var protocolExpanded by remember { mutableStateOf(false) }
     var labelSizeExpanded by remember { mutableStateOf(false) }
@@ -1167,6 +1174,70 @@ private fun PrinterConfigDialog(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Font Scale Dropdown
+                    val fontScaleOptions = listOf(
+                        0.7f to "Rất nhỏ (0.7x)",
+                        0.8f to "Nhỏ (0.8x)",
+                        0.9f to "Hơi nhỏ (0.9x)",
+                        1.0f to "Bình thường (1.0x)",
+                        1.1f to "Hơi lớn (1.1x)",
+                        1.2f to "Lớn (1.2x)",
+                        1.3f to "Rất lớn (1.3x)"
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = labelFontScaleExpanded,
+                        onExpandedChange = { labelFontScaleExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = fontScaleOptions.find { it.first == labelFontScale }?.second
+                                ?: "Bình thường (1.0x)",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Cỡ chữ tem") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = labelFontScaleExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = labelFontScaleExpanded,
+                            onDismissRequest = { labelFontScaleExpanded = false }
+                        ) {
+                            fontScaleOptions.forEach { (scale, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        labelFontScale = scale
+                                        labelFontScaleExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Max Toppings Input
+                    OutlinedTextField(
+                        value = if (labelMaxToppings == 0) "" else labelMaxToppings.toString(),
+                        onValueChange = { value ->
+                            labelMaxToppings = value.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 20) ?: 0
+                        },
+                        label = { Text("Số topping tối đa") },
+                        placeholder = { Text("0 = Tự động") },
+                        supportingText = {
+                            val recommended = selectedLabelSize.getRecommendedMaxToppings()
+                            Text("Đề xuất: $recommended topping (0 = tự động theo khổ tem)")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -1205,7 +1276,9 @@ private fun PrinterConfigDialog(
                                 labelPrintTableName,
                                 labelPrintTime,
                                 labelStoreName,
-                                labelReverse
+                                labelReverse,
+                                labelFontScale,
+                                labelMaxToppings
                             )
                         },
                         modifier = Modifier.weight(1f),

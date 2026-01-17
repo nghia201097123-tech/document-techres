@@ -60,7 +60,9 @@ interface KitchenDao {
             label_print_table_name = :labelPrintTableName,
             label_print_time = :labelPrintTime,
             label_store_name = :labelStoreName,
-            label_reverse = :labelReverse
+            label_reverse = :labelReverse,
+            label_font_scale = :labelFontScale,
+            label_max_toppings = :labelMaxToppings
         WHERE id = :kitchenId
     """)
     suspend fun updateFullPrinterConfig(
@@ -88,7 +90,9 @@ interface KitchenDao {
         labelPrintTableName: Boolean,
         labelPrintTime: Boolean,
         labelStoreName: String?,
-        labelReverse: Boolean
+        labelReverse: Boolean,
+        labelFontScale: Float,
+        labelMaxToppings: Int
     )
 
     @Transaction
