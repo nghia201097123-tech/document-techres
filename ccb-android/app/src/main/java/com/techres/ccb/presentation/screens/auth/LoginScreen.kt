@@ -34,9 +34,9 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    var tenantId by remember { mutableStateOf("NHC") }
+    var tenantId by remember { mutableStateOf("CTSG") }
     var username by remember { mutableStateOf("tr000001") }
-    var password by remember { mutableStateOf("abc1234") }
+    var password by remember { mutableStateOf("abc123") }
     var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSuccess) {

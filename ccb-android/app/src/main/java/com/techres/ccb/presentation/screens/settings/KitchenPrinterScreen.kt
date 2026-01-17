@@ -462,11 +462,11 @@ private fun KitchenPrinterCard(
                     Text("Cấu hình")
                 }
 
-                // Test print button
+                // Test print button - enabled when IP is configured (not requiring isPrinterConnected flag)
                 Button(
                     onClick = onTestPrint,
                     modifier = Modifier.weight(1f),
-                    enabled = kitchen.isPrinterConnected,
+                    enabled = !kitchen.printerIp.isNullOrBlank(),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = color

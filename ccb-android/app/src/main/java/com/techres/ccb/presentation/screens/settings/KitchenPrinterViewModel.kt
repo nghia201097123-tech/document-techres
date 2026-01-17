@@ -2,7 +2,6 @@ package com.techres.ccb.presentation.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.KitchenRepository
@@ -51,14 +50,9 @@ class KitchenPrinterViewModel @Inject constructor(
                     return@launch
                 }
 
-                // In DEBUG mode, always check and insert debug data if empty
-                if (BuildConfig.DEBUG) {
-                    val count = kitchenRepository.getKitchensCount(branchId)
-                    if (count == 0) {
-                        kitchenRepository.insertDebugKitchens(branchId)
-                        _uiState.update { it.copy(isDebugDataInserted = true) }
-                    }
-                }
+                // NOTE: Không tự động thêm debug data khi không có bếp
+                // Chỉ hiển thị dữ liệu đã đồng bộ từ web
+                // Nếu muốn test có thể nhấn nút "Thêm dữ liệu debug" thủ công
 
                 kitchenRepository.getAllKitchens(branchId).collect { kitchens ->
                     _uiState.update {

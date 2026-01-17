@@ -243,10 +243,8 @@ object OrderPrintingService {
             }
         }
 
-        // Final fallback: gửi đến kitchen đầu tiên
-        if (result.isEmpty() && kitchens.isNotEmpty()) {
-            result.add(kitchens.first().id)
-        }
+        // NOTE: Không có fallback - chỉ in món đã được gán bếp
+        // Món không gán bếp sẽ không được in ra phiếu bếp
 
         return result.distinct()
     }
