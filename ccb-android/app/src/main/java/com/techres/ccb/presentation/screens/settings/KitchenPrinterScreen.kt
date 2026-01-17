@@ -1055,9 +1055,11 @@ private fun PrinterConfigDialog(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     val fontSizeOptions = listOf(
-                        "small" to "Nhỏ",
-                        "medium" to "Vừa",
-                        "large" to "Lớn"
+                        "extra_small" to "Rất nhỏ (0.7x)",
+                        "small" to "Nhỏ (0.85x)",
+                        "medium" to "Vừa (1.0x)",
+                        "large" to "Lớn (1.2x)",
+                        "extra_large" to "Rất lớn (1.4x)"
                     )
 
                     ExposedDropdownMenuBox(

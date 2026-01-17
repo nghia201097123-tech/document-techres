@@ -242,11 +242,13 @@ object KitchenTicketPrintService {
             Log.d(TAG, "    - note: ${item.note}")
         }
 
-        // Font scale based on fontSize config
+        // Font scale based on fontSize config - nhiều lựa chọn hơn
         val fontScale = when (fontSize) {
+            "extra_small" -> 0.7f
             "small" -> 0.85f
             "large" -> 1.2f
-            else -> 1.0f // medium
+            "extra_large" -> 1.4f
+            else -> 1.0f // medium (default)
         }
 
         // Line spacing từ config (0.3 - 1.0, default 0.4)

@@ -44,14 +44,27 @@ export const PrintModeLabels: Record<KitchenPrintMode, string> = {
 };
 
 /**
- * Cỡ chữ phiếu bếp
+ * Cỡ chữ phiếu bếp - Nhiều lựa chọn hơn để phù hợp các khổ giấy khác nhau
  */
-export type TicketFontSize = "small" | "medium" | "large";
+export type TicketFontSize = "extra_small" | "small" | "medium" | "large" | "extra_large";
 
 export const TicketFontSizeLabels: Record<TicketFontSize, string> = {
-  small: "Nhỏ",
-  medium: "Vừa",
-  large: "Lớn",
+  extra_small: "Rất nhỏ (0.7x)",
+  small: "Nhỏ (0.85x)",
+  medium: "Vừa (1.0x)",
+  large: "Lớn (1.2x)",
+  extra_large: "Rất lớn (1.4x)",
+};
+
+/**
+ * Font scale values tương ứng với từng cỡ chữ
+ */
+export const TicketFontScaleValues: Record<TicketFontSize, number> = {
+  extra_small: 0.7,
+  small: 0.85,
+  medium: 1.0,
+  large: 1.2,
+  extra_large: 1.4,
 };
 
 /**
