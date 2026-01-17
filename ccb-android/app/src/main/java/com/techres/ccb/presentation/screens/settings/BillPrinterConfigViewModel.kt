@@ -340,7 +340,11 @@ class BillPrinterConfigViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     billPrinterConfigDao.update(updated)
                 }
-                _uiState.update { it.copy(successMessage = if (updated.cutPaper) "Đã bật cắt giấy tự động" else "Đã tắt cắt giấy tự động") }
+                // Update selectedConfig in UI state to reflect the change
+                _uiState.update { it.copy(
+                    selectedConfig = updated,
+                    successMessage = if (updated.cutPaper) "Đã bật cắt giấy tự động" else "Đã tắt cắt giấy tự động"
+                ) }
             } catch (e: Exception) {
                 Log.e(TAG, "Error toggling cut paper: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
@@ -356,7 +360,11 @@ class BillPrinterConfigViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     billPrinterConfigDao.update(updated)
                 }
-                _uiState.update { it.copy(successMessage = if (updated.openCashDrawer) "Đã bật mở két tiền" else "Đã tắt mở két tiền") }
+                // Update selectedConfig in UI state to reflect the change
+                _uiState.update { it.copy(
+                    selectedConfig = updated,
+                    successMessage = if (updated.openCashDrawer) "Đã bật mở két tiền" else "Đã tắt mở két tiền"
+                ) }
             } catch (e: Exception) {
                 Log.e(TAG, "Error toggling open cash drawer: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
@@ -372,7 +380,11 @@ class BillPrinterConfigViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     billPrinterConfigDao.update(updated)
                 }
-                _uiState.update { it.copy(successMessage = if (updated.beepAfterPrint) "Đã bật beep sau khi in" else "Đã tắt beep sau khi in") }
+                // Update selectedConfig in UI state to reflect the change
+                _uiState.update { it.copy(
+                    selectedConfig = updated,
+                    successMessage = if (updated.beepAfterPrint) "Đã bật beep sau khi in" else "Đã tắt beep sau khi in"
+                ) }
             } catch (e: Exception) {
                 Log.e(TAG, "Error toggling beep after print: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
