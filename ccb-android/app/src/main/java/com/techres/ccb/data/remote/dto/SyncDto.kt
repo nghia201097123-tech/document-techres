@@ -102,6 +102,7 @@ data class CategoryDto(
     @SerializedName("name") val name: String,
     @SerializedName("description") val description: String?,
     @SerializedName("imageUrl") val imageUrl: String?,
+    @SerializedName("productType") val productType: String = "food", // food, drink, other, combo
     @SerializedName("sortOrder") val sortOrder: Int,
     @SerializedName("isActive") val isActive: Boolean,
     @SerializedName("createdAt") val createdAt: String,

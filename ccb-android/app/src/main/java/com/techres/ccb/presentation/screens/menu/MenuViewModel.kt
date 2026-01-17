@@ -16,14 +16,47 @@ import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
+// Product types for grouping categories
+enum class ProductType(val value: String, val label: String) {
+    ALL("all", "Tất cả"),
+    FOOD("food", "Đồ ăn"),
+    DRINK("drink", "Đồ uống"),
+    COMBO("combo", "Combo"),
+    OTHER("other", "Khác");
+
+    companion object {
+        fun fromValue(value: String): ProductType {
+            return entries.find { it.value == value } ?: OTHER
+        }
+    }
+}
+
 data class MenuUiState(
     val categories: List<CategoryEntity> = emptyList(),
     val products: List<ProductEntity> = emptyList(),
+    val selectedProductType: ProductType = ProductType.ALL,
     val selectedCategoryId: String? = null,
     val searchQuery: String = "",
     val orderItemCount: Int = 0,
     val isLoading: Boolean = false
-)
+) {
+    // Get categories filtered by selected product type
+    val filteredCategories: List<CategoryEntity>
+        get() = if (selectedProductType == ProductType.ALL) {
+            categories
+        } else {
+            categories.filter { it.productType == selectedProductType.value }
+        }
+
+    // Check if product type has categories
+    fun hasCategories(productType: ProductType): Boolean {
+        return if (productType == ProductType.ALL) {
+            categories.isNotEmpty()
+        } else {
+            categories.any { it.productType == productType.value }
+        }
+    }
+}
 
 @HiltViewModel
 class MenuViewModel @Inject constructor(
@@ -71,6 +104,14 @@ class MenuViewModel @Inject constructor(
         }
     }
 
+    fun selectProductType(productType: ProductType) {
+        _uiState.value = _uiState.value.copy(
+            selectedProductType = productType,
+            selectedCategoryId = null // Reset category when changing product type
+        )
+        filterProducts()
+    }
+
     fun selectCategory(categoryId: String?) {
         _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId)
         filterProducts()
@@ -82,15 +123,31 @@ class MenuViewModel @Inject constructor(
     }
 
     private fun filterProducts() {
-        val categoryId = _uiState.value.selectedCategoryId
-        val query = _uiState.value.searchQuery.lowercase()
+        val state = _uiState.value
+        val categoryId = state.selectedCategoryId
+        val productType = state.selectedProductType
+        val query = state.searchQuery.lowercase()
+
+        // Get category IDs for selected product type
+        val categoryIdsForType = if (productType == ProductType.ALL) {
+            state.categories.map { it.id }.toSet()
+        } else {
+            state.categories.filter { it.productType == productType.value }.map { it.id }.toSet()
+        }
 
         val filtered = allProducts.filter { product ->
+            // Filter by product type (through category)
+            val matchesProductType = product.categoryId == null ||
+                    categoryIdsForType.contains(product.categoryId)
+            // Filter by specific category
             val matchesCategory = categoryId == null || product.categoryId == categoryId
+            // Filter by search query
             val matchesQuery = query.isEmpty() ||
                     product.name.lowercase().contains(query) ||
-                    product.code.lowercase().contains(query)
-            matchesCategory && matchesQuery
+                    product.code.lowercase().contains(query) ||
+                    (product.searchName?.lowercase()?.contains(query) == true) ||
+                    (product.abbreviation?.lowercase()?.contains(query) == true)
+            matchesProductType && matchesCategory && matchesQuery
         }
 
         _uiState.value = _uiState.value.copy(products = filtered)

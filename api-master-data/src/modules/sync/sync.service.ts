@@ -612,6 +612,7 @@ export class SyncService {
       name: category.name,
       description: category.description || null,
       imageUrl: category.imageUrl || null,
+      productType: category.productType || 'food',
       sortOrder: category.sortOrder || 0,
       isActive: category.isActive,
       createdAt: category.createdAt?.toISOString() || new Date().toISOString(),

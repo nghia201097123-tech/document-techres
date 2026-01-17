@@ -9,7 +9,8 @@ import androidx.room.PrimaryKey
     tableName = "categories",
     indices = [
         Index(value = ["branch_id"]),
-        Index(value = ["is_active"])
+        Index(value = ["is_active"]),
+        Index(value = ["product_type"])
     ]
 )
 data class CategoryEntity(
@@ -28,6 +29,9 @@ data class CategoryEntity(
 
     @ColumnInfo(name = "image_url")
     val imageUrl: String? = null,
+
+    @ColumnInfo(name = "product_type")
+    val productType: String = "food", // food, drink, other, combo
 
     @ColumnInfo(name = "sort_order")
     val sortOrder: Int = 0,

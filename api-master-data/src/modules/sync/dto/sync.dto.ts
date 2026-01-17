@@ -21,6 +21,9 @@ export class CategoryDto {
   @ApiProperty({ nullable: true })
   imageUrl: string | null;
 
+  @ApiProperty({ description: 'Loại sản phẩm: food, drink, other, combo' })
+  productType: string;
+
   @ApiProperty()
   sortOrder: number;
 

@@ -82,29 +82,54 @@ fun MenuScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
-            // Categories
-            LazyRow(
+            // Product Type Tabs
+            ScrollableTabRow(
+                selectedTabIndex = ProductType.entries.indexOf(uiState.selectedProductType),
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                edgePadding = 16.dp,
+                divider = {}
             ) {
-                item {
-                    CategoryChip(
-                        name = "Tất cả",
-                        isSelected = uiState.selectedCategoryId == null,
-                        onClick = { viewModel.selectCategory(null) }
-                    )
-                }
-                items(uiState.categories) { category ->
-                    CategoryChip(
-                        name = category.name,
-                        isSelected = uiState.selectedCategoryId == category.id,
-                        onClick = { viewModel.selectCategory(category.id) }
+                ProductType.entries.forEach { productType ->
+                    val hasItems = uiState.hasCategories(productType)
+                    Tab(
+                        selected = uiState.selectedProductType == productType,
+                        onClick = { viewModel.selectProductType(productType) },
+                        enabled = hasItems || productType == ProductType.ALL,
+                        text = {
+                            Text(
+                                text = productType.label,
+                                fontWeight = if (uiState.selectedProductType == productType) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Categories for selected product type
+            if (uiState.filteredCategories.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        CategoryChip(
+                            name = "Tất cả",
+                            isSelected = uiState.selectedCategoryId == null,
+                            onClick = { viewModel.selectCategory(null) }
+                        )
+                    }
+                    items(uiState.filteredCategories) { category ->
+                        CategoryChip(
+                            name = category.name,
+                            isSelected = uiState.selectedCategoryId == category.id,
+                            onClick = { viewModel.selectCategory(category.id) }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Products grid
             if (uiState.products.isEmpty()) {

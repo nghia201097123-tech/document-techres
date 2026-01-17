@@ -124,6 +124,7 @@ class SyncRepository @Inject constructor(
                 name = dto.name ?: "",
                 description = dto.description,
                 imageUrl = dto.imageUrl,
+                productType = dto.productType,
                 sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
                 createdAt = dto.createdAt,
