@@ -587,6 +587,24 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('ticket_print_price column added to kitchens table');
       }
 
+      // 19.2 Add line spacing columns to kitchens table (for ticket and label printing)
+      const hasTicketLineSpacing = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'kitchens' AND column_name = 'ticket_line_spacing'
+        );
+      `);
+
+      if (!hasTicketLineSpacing[0].exists) {
+        this.logger.log('Adding line spacing columns to kitchens table...');
+        await queryRunner.query(`
+          ALTER TABLE kitchens
+          ADD COLUMN IF NOT EXISTS ticket_line_spacing FLOAT DEFAULT 0.4,
+          ADD COLUMN IF NOT EXISTS label_line_spacing FLOAT DEFAULT 1.0
+        `);
+        this.logger.log('Line spacing columns added to kitchens table');
+      }
+
       // 20. Add parent_id column to departments table for hierarchy support
       const hasParentId = await queryRunner.query(`
         SELECT EXISTS (
