@@ -764,8 +764,8 @@ object LabelPrintService {
         val layout = StaticLayout.Builder
             .obtain(text, 0, text.length, paint, width)
             .setAlignment(alignment)
-            .setLineSpacing(0f, 1.0f)
-            .setIncludePad(true)
+            .setLineSpacing(0f, 0.9f) // Giảm line spacing để khoảng cách nhỏ hơn
+            .setIncludePad(false) // Bỏ padding thừa
             .build()
 
         val height = layout.height.coerceAtLeast(1)
@@ -803,7 +803,7 @@ object LabelPrintService {
         val rightWidth = paint.measureText(rightText).toInt()
         val spaceWidth = paint.measureText(" ").toInt()
         val minPadding = spaceWidth * 2 // Tối thiểu 2 space giữa left và right
-        val lineHeight = (paint.textSize * 1.3f).toInt().coerceAtLeast(1)
+        val lineHeight = (paint.textSize * 1.05f).toInt().coerceAtLeast(1) // Giảm từ 1.3 xuống 1.05 để khoảng cách nhỏ nhất
 
         // Tính chiều rộng tối đa cho left text trên dòng đầu tiên
         val maxFirstLineLeftWidth = width - rightWidth - minPadding
@@ -851,7 +851,7 @@ object LabelPrintService {
             val remainingLayout = StaticLayout.Builder
                 .obtain(remainingPart, 0, remainingPart.length, paint, width)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(0f, 1.0f)
+                .setLineSpacing(0f, 0.9f)
                 .setIncludePad(false)
                 .build()
             remainingLayout.lineCount
@@ -874,7 +874,7 @@ object LabelPrintService {
             val remainingLayout = StaticLayout.Builder
                 .obtain(remainingPart, 0, remainingPart.length, paint, width)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(0f, 1.0f)
+                .setLineSpacing(0f, 0.9f)
                 .setIncludePad(false)
                 .build()
 

@@ -154,7 +154,7 @@ data class BitmapTextStyle(
     val doubleHeight: Boolean = false,
     val doubleWidth: Boolean = false,
     val fontFamily: Typeface = Typeface.DEFAULT,
-    val lineSpacingMultiplier: Float = 0.55f // Giảm từ 0.75 xuống 0.55 để tiết kiệm giấy hơn nữa
+    val lineSpacingMultiplier: Float = 0.4f // Giảm xuống 0.4 để khoảng cách giữa các dòng nhỏ nhất
 )
 
 /**

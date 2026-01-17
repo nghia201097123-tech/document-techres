@@ -273,6 +273,13 @@ data class KitchenEntity(
     @ColumnInfo(name = "label_max_toppings")
     val labelMaxToppings: Int = 0, // Max toppings per label (0 = auto based on size)
 
+    // ========== LINE SPACING CONFIG ==========
+    @ColumnInfo(name = "ticket_line_spacing")
+    val ticketLineSpacing: Float = 0.4f, // Line spacing multiplier for tickets (0.3 - 1.0, default 0.4 = tight)
+
+    @ColumnInfo(name = "label_line_spacing")
+    val labelLineSpacing: Float = 1.0f, // Line spacing multiplier for labels (0.8 - 1.5, default 1.0 = no extra)
+
     @ColumnInfo(name = "created_at")
     val createdAt: String,
 
