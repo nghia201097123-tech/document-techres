@@ -290,11 +290,6 @@ fun SaleScreen(
             // Tổng = Tạm tính - Giảm giá (giá đã bao gồm VAT nên không cộng thêm)
             val paymentTotal = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
 
-            // VAT tách ra từ tổng để hiển thị (không cộng thêm)
-            // Công thức: VAT = Tổng - (Tổng / 1.08)
-            val priceBeforeVat = paymentTotal / (1 + uiState.taxRate / 100.0)
-            val vatAmount = (paymentTotal - priceBeforeVat).toLong()
-
             // Tạo danh sách món cho item-level discount
             // CHỈ bao gồm món đã order, KHÔNG bao gồm cart items chưa thêm
             val orderItems = buildList {
@@ -328,6 +323,18 @@ fun SaleScreen(
                             vatRate = item.product.vatRate
                         ))
                     }
+                }
+            }
+
+            // Tính VAT từ từng món (dựa trên vatRate của mỗi món)
+            // Công thức: VAT = Giá - (Giá / (1 + VAT%))
+            val vatAmount = orderItems.sumOf { item ->
+                val priceAfterDiscount = item.totalPrice - item.discountAmount
+                if (item.vatRate > 0) {
+                    val priceBeforeVat = priceAfterDiscount / (1 + item.vatRate / 100.0)
+                    (priceAfterDiscount - priceBeforeVat).toLong()
+                } else {
+                    0L
                 }
             }
 
