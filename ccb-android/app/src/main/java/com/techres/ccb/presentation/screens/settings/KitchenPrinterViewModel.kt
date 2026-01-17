@@ -134,6 +134,7 @@ class KitchenPrinterViewModel @Inject constructor(
         ticketPrintItemsSeparately: Boolean = false,
         ticketCopies: Int = 1,
         ticketFontSize: String = "medium",
+        ticketLineSpacing: Float = 0.4f,
         // Label printing config
         labelPrintPrice: Boolean = false,
         labelPrintStoreName: Boolean = false,
@@ -143,7 +144,8 @@ class KitchenPrinterViewModel @Inject constructor(
         labelStoreName: String? = null,
         labelReverse: Boolean = false,
         labelFontScale: Float = 1.0f,
-        labelMaxToppings: Int = 0
+        labelMaxToppings: Int = 0,
+        labelLineSpacing: Float = 1.0f
     ) {
         viewModelScope.launch {
             try {
@@ -164,6 +166,7 @@ class KitchenPrinterViewModel @Inject constructor(
                     ticketPrintItemsSeparately = ticketPrintItemsSeparately,
                     ticketCopies = ticketCopies,
                     ticketFontSize = ticketFontSize,
+                    ticketLineSpacing = ticketLineSpacing,
                     labelPrintPrice = labelPrintPrice,
                     labelPrintStoreName = labelPrintStoreName,
                     labelPrintOrderNumber = labelPrintOrderNumber,
@@ -172,7 +175,8 @@ class KitchenPrinterViewModel @Inject constructor(
                     labelStoreName = labelStoreName,
                     labelReverse = labelReverse,
                     labelFontScale = labelFontScale,
-                    labelMaxToppings = labelMaxToppings
+                    labelMaxToppings = labelMaxToppings,
+                    labelLineSpacing = labelLineSpacing
                 )
             } catch (e: Exception) {
                 _uiState.update {

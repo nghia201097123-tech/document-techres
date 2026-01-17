@@ -57,6 +57,7 @@ class KitchenRepository @Inject constructor(
         ticketPrintItemsSeparately: Boolean = false,
         ticketCopies: Int = 1,
         ticketFontSize: String = "medium",
+        ticketLineSpacing: Float = 0.4f,
         // Label printing config
         labelPrintPrice: Boolean = false,
         labelPrintStoreName: Boolean = false,
@@ -66,16 +67,17 @@ class KitchenRepository @Inject constructor(
         labelStoreName: String? = null,
         labelReverse: Boolean = false,
         labelFontScale: Float = 1.0f,
-        labelMaxToppings: Int = 0
+        labelMaxToppings: Int = 0,
+        labelLineSpacing: Float = 1.0f
     ) {
         kitchenDao.updateFullPrinterConfig(
             kitchenId, ip, port, name, isConnected,
             protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity,
             paperWidth, printMode,
-            ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize,
+            ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
             labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
             labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
-            labelFontScale, labelMaxToppings
+            labelFontScale, labelMaxToppings, labelLineSpacing
         )
     }
 

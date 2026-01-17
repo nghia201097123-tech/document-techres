@@ -60,6 +60,7 @@ interface KitchenDao {
             ticket_print_items_separately = :ticketPrintItemsSeparately,
             ticket_copies = :ticketCopies,
             ticket_font_size = :ticketFontSize,
+            ticket_line_spacing = :ticketLineSpacing,
             label_print_price = :labelPrintPrice,
             label_print_store_name = :labelPrintStoreName,
             label_print_order_number = :labelPrintOrderNumber,
@@ -68,7 +69,8 @@ interface KitchenDao {
             label_store_name = :labelStoreName,
             label_reverse = :labelReverse,
             label_font_scale = :labelFontScale,
-            label_max_toppings = :labelMaxToppings
+            label_max_toppings = :labelMaxToppings,
+            label_line_spacing = :labelLineSpacing
         WHERE id = :kitchenId
     """)
     suspend fun updateFullPrinterConfig(
@@ -89,6 +91,7 @@ interface KitchenDao {
         ticketPrintItemsSeparately: Boolean,
         ticketCopies: Int,
         ticketFontSize: String,
+        ticketLineSpacing: Float,
         // Label printing config
         labelPrintPrice: Boolean,
         labelPrintStoreName: Boolean,
@@ -98,7 +101,8 @@ interface KitchenDao {
         labelStoreName: String?,
         labelReverse: Boolean,
         labelFontScale: Float,
-        labelMaxToppings: Int
+        labelMaxToppings: Int,
+        labelLineSpacing: Float
     )
 
     @Transaction

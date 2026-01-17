@@ -251,10 +251,10 @@ fun KitchenPrinterScreen(
             kitchen = selectedKitchen!!,
             onDismiss = { showPrinterDialog = false },
             onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
-                       ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize,
+                       ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
                        labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
                        labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
-                       labelFontScale, labelMaxToppings ->
+                       labelFontScale, labelMaxToppings, labelLineSpacing ->
                 viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
                     ip = ip.ifBlank { null },
@@ -272,6 +272,7 @@ fun KitchenPrinterScreen(
                     ticketPrintItemsSeparately = ticketPrintItemsSeparately,
                     ticketCopies = ticketCopies,
                     ticketFontSize = ticketFontSize,
+                    ticketLineSpacing = ticketLineSpacing,
                     labelPrintPrice = labelPrintPrice,
                     labelPrintStoreName = labelPrintStoreName,
                     labelPrintOrderNumber = labelPrintOrderNumber,
@@ -280,7 +281,8 @@ fun KitchenPrinterScreen(
                     labelStoreName = labelStoreName.ifBlank { null },
                     labelReverse = labelReverse,
                     labelFontScale = labelFontScale,
-                    labelMaxToppings = labelMaxToppings
+                    labelMaxToppings = labelMaxToppings,
+                    labelLineSpacing = labelLineSpacing
                 )
                 showPrinterDialog = false
             }
@@ -542,10 +544,10 @@ private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
     onDismiss: () -> Unit,
     onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
-             ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String,
+             ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String, ticketLineSpacing: Float,
              labelPrintPrice: Boolean, labelPrintStoreName: Boolean, labelPrintOrderNumber: Boolean,
              labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String, labelReverse: Boolean,
-             labelFontScale: Float, labelMaxToppings: Int) -> Unit
+             labelFontScale: Float, labelMaxToppings: Int, labelLineSpacing: Float) -> Unit
 ) {
     val color = getKitchenColor(kitchen.kitchenType)
 
@@ -564,6 +566,7 @@ private fun PrinterConfigDialog(
     var ticketCopies by remember { mutableStateOf(kitchen.ticketCopies) }
     var ticketFontSize by remember { mutableStateOf(kitchen.ticketFontSize ?: "medium") }
     var ticketFontSizeExpanded by remember { mutableStateOf(false) }
+    var ticketLineSpacing by remember { mutableStateOf(kitchen.ticketLineSpacing) }
 
     // Label printing config
     var labelPrintPrice by remember { mutableStateOf(kitchen.labelPrintPrice) }
@@ -576,6 +579,7 @@ private fun PrinterConfigDialog(
     var labelFontScale by remember { mutableStateOf(kitchen.labelFontScale) }
     var labelMaxToppings by remember { mutableStateOf(kitchen.labelMaxToppings) }
     var labelFontScaleExpanded by remember { mutableStateOf(false) }
+    var labelLineSpacing by remember { mutableStateOf(kitchen.labelLineSpacing) }
 
     var protocolExpanded by remember { mutableStateOf(false) }
     var labelSizeExpanded by remember { mutableStateOf(false) }
@@ -1091,6 +1095,29 @@ private fun PrinterConfigDialog(
                             }
                         }
                     }
+
+                    // Ticket line spacing slider
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Khoảng cách dòng: ${(ticketLineSpacing * 100).toInt()}%",
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = if (ticketLineSpacing <= 0.4f) "Rất sát" else if (ticketLineSpacing <= 0.6f) "Sát" else "Bình thường",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Slider(
+                        value = ticketLineSpacing,
+                        onValueChange = { ticketLineSpacing = it },
+                        valueRange = 0.3f..1.0f,
+                        steps = 6,
+                        colors = SliderDefaults.colors(
+                            thumbColor = color,
+                            activeTrackColor = color
+                        )
+                    )
                 }
 
                 // Label printing config - Show for LABEL and BOTH modes
@@ -1297,6 +1324,7 @@ private fun PrinterConfigDialog(
                                 ticketPrintItemsSeparately,
                                 ticketCopies,
                                 ticketFontSize,
+                                ticketLineSpacing,
                                 labelPrintPrice,
                                 labelPrintStoreName,
                                 labelPrintOrderNumber,
@@ -1305,7 +1333,8 @@ private fun PrinterConfigDialog(
                                 labelStoreName,
                                 labelReverse,
                                 labelFontScale,
-                                labelMaxToppings
+                                labelMaxToppings,
+                                labelLineSpacing
                             )
                         },
                         modifier = Modifier.weight(1f),
