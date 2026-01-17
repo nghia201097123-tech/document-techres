@@ -442,6 +442,9 @@ class SyncRepository @Inject constructor(
                 labelPrintTime = dto.labelPrintTime,
                 labelStoreName = dto.labelStoreName,
                 labelReverse = dto.labelReverse,
+                // Line spacing config
+                ticketLineSpacing = dto.ticketLineSpacing ?: 0.4f,
+                labelLineSpacing = dto.labelLineSpacing ?: 1.0f,
                 sortOrder = dto.sortOrder,
                 isActive = dto.isActive,
                 createdAt = dto.createdAt,

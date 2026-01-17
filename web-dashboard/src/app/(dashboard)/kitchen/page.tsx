@@ -104,6 +104,9 @@ export default function KitchenPage() {
     labelGapMm: 3,
     labelFontScale: 1.0,
     labelMaxToppings: 0, // 0 = auto
+    // Line spacing config
+    ticketLineSpacing: 0.4, // 0.3 - 1.0
+    labelLineSpacing: 1.0, // 0.8 - 1.5
   });
   const [continueCreating, setContinueCreating] = React.useState(false);
 
@@ -180,6 +183,9 @@ export default function KitchenPage() {
       labelGapMm: 3,
       labelFontScale: 1.0,
       labelMaxToppings: 0,
+      // Line spacing config
+      ticketLineSpacing: 0.4,
+      labelLineSpacing: 1.0,
     });
     setDialogMode("create");
   };
@@ -223,6 +229,9 @@ export default function KitchenPage() {
       labelGapMm: kitchen.labelGapMm ?? 3,
       labelFontScale: kitchen.labelFontScale ?? 1.0,
       labelMaxToppings: kitchen.labelMaxToppings ?? 0,
+      // Line spacing config
+      ticketLineSpacing: kitchen.ticketLineSpacing ?? 0.4,
+      labelLineSpacing: kitchen.labelLineSpacing ?? 1.0,
     });
     setDialogMode("edit");
     // Remove badges when editing
@@ -293,6 +302,9 @@ export default function KitchenPage() {
       labelGapMm: 3,
       labelFontScale: 1.0,
       labelMaxToppings: 0,
+      // Line spacing config
+      ticketLineSpacing: 0.4,
+      labelLineSpacing: 1.0,
     });
     setAllProducts([]);
     setKitchenProducts([]);
@@ -350,6 +362,9 @@ export default function KitchenPage() {
             labelGapMm: formData.labelGapMm,
             labelFontScale: formData.labelFontScale,
             labelMaxToppings: formData.labelMaxToppings,
+            // Keep line spacing config for consecutive creates
+            ticketLineSpacing: formData.ticketLineSpacing,
+            labelLineSpacing: formData.labelLineSpacing,
           });
           return;
         }
@@ -390,6 +405,9 @@ export default function KitchenPage() {
           labelGapMm: formData.labelGapMm,
           labelFontScale: formData.labelFontScale,
           labelMaxToppings: formData.labelMaxToppings,
+          // Line spacing config
+          ticketLineSpacing: formData.ticketLineSpacing,
+          labelLineSpacing: formData.labelLineSpacing,
         };
         const result = await kitchenService.update(selectedKitchen.id, updateData);
         setKitchens((prev) => prev.map((k) => (k.id === selectedKitchen.id ? { ...result, productCount: k.productCount } : k)));
@@ -1053,6 +1071,27 @@ export default function KitchenPage() {
                       />
                     </div>
                   </div>
+
+                  {/* Line spacing for tickets */}
+                  <div className="grid gap-2">
+                    <div className="flex justify-between">
+                      <Label>Khoảng cách dòng ({((formData.ticketLineSpacing || 0.4) * 100).toFixed(0)}%)</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {(formData.ticketLineSpacing || 0.4) <= 0.4 ? "Rất sát" : (formData.ticketLineSpacing || 0.4) <= 0.6 ? "Sát" : "Bình thường"}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[(formData.ticketLineSpacing || 0.4) * 100]}
+                      min={30}
+                      max={100}
+                      step={5}
+                      onValueChange={([value]) => setFormData({ ...formData, ticketLineSpacing: value / 100 })}
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>30% (rất sát)</span>
+                      <span>100% (bình thường)</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1223,6 +1262,27 @@ export default function KitchenPage() {
                             labelGapMm: e.target.value ? parseInt(e.target.value) : 3
                           })}
                         />
+                      </div>
+                    </div>
+
+                    {/* Line spacing for labels */}
+                    <div className="grid gap-2">
+                      <div className="flex justify-between">
+                        <Label>Khoảng cách dòng ({((formData.labelLineSpacing || 1.0) * 100).toFixed(0)}%)</Label>
+                        <span className="text-xs text-muted-foreground">
+                          {(formData.labelLineSpacing || 1.0) <= 0.9 ? "Sát" : (formData.labelLineSpacing || 1.0) <= 1.0 ? "Bình thường" : "Rộng"}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[(formData.labelLineSpacing || 1.0) * 100]}
+                        min={80}
+                        max={150}
+                        step={5}
+                        onValueChange={([value]) => setFormData({ ...formData, labelLineSpacing: value / 100 })}
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>80% (sát)</span>
+                        <span>150% (rộng)</span>
                       </div>
                     </div>
                   </div>

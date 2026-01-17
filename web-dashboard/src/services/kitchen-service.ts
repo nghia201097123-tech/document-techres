@@ -136,6 +136,9 @@ export interface Kitchen {
   labelGapMm?: number;
   labelFontScale?: number;
   labelMaxToppings?: number;
+  // Line spacing config
+  ticketLineSpacing?: number; // 0.3 - 1.0, default 0.4
+  labelLineSpacing?: number; // 0.8 - 1.5, default 1.0
 }
 
 export interface CreateKitchenDto {
@@ -174,6 +177,9 @@ export interface CreateKitchenDto {
   labelGapMm?: number;
   labelFontScale?: number;
   labelMaxToppings?: number;
+  // Line spacing config
+  ticketLineSpacing?: number; // 0.3 - 1.0, default 0.4
+  labelLineSpacing?: number; // 0.8 - 1.5, default 1.0
 }
 
 export interface UpdateKitchenDto {
@@ -212,6 +218,9 @@ export interface UpdateKitchenDto {
   labelGapMm?: number;
   labelFontScale?: number;
   labelMaxToppings?: number;
+  // Line spacing config
+  ticketLineSpacing?: number; // 0.3 - 1.0, default 0.4
+  labelLineSpacing?: number; // 0.8 - 1.5, default 1.0
 }
 
 export const kitchenService = {

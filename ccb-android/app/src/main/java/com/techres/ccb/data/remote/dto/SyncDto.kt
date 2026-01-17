@@ -229,6 +229,9 @@ data class KitchenDto(
     @SerializedName("labelPrintTime") val labelPrintTime: Boolean = true,
     @SerializedName("labelStoreName") val labelStoreName: String? = null,
     @SerializedName("labelReverse") val labelReverse: Boolean = false,
+    // ========== LINE SPACING CONFIG ==========
+    @SerializedName("ticketLineSpacing") val ticketLineSpacing: Float? = null, // 0.3 - 1.0, default 0.4
+    @SerializedName("labelLineSpacing") val labelLineSpacing: Float? = null, // 0.8 - 1.5, default 1.0
     @SerializedName("sortOrder") val sortOrder: Int = 0,
     @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("createdAt") val createdAt: String,
