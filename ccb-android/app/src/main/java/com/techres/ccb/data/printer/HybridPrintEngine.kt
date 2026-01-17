@@ -286,10 +286,11 @@ object BitmapTextRenderer {
         }
 
         // Tạo StaticLayout để handle Vietnamese text đúng cách
+        // Sử dụng line spacing cố định 0.9 để text sát nhau hơn khi wrap nhiều dòng
         val staticLayout = StaticLayout.Builder
             .obtain(text, 0, text.length, textPaint, paperWidth)
             .setAlignment(alignment)
-            .setLineSpacing(0f, 1.0f) // Không dùng line spacing ở đây, sẽ crop sau
+            .setLineSpacing(0f, 0.9f) // Line spacing 0.9 = 90% của default, giảm khoảng cách giữa các dòng
             .setIncludePad(false) // Bỏ padding thừa
             .build()
 
@@ -562,11 +563,12 @@ class HybridBillBuilder(
 
     /**
      * In text - tự động chọn bitmap hoặc text mode
+     * KHÔNG in gì nếu text rỗng hoặc chỉ chứa whitespace
      */
     fun line(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
-        if (text.isEmpty()) {
-            buffer.write(EscPosCommands.LF)
-            return this
+        // QUAN TRỌNG: Bỏ qua text rỗng hoặc chỉ whitespace để tránh khoảng trắng vô nghĩa
+        if (text.isEmpty() || text.isBlank()) {
+            return this // Không in gì cả, không có LF
         }
 
         // Sử dụng baseFontSize nếu style dùng font mặc định (24f)
@@ -580,6 +582,13 @@ class HybridBillBuilder(
         if (useBitmapMode) {
             // BITMAP MODE - Đảm bảo Vietnamese hiển thị đúng
             val bitmap = BitmapTextRenderer.renderText(text, actualStyle, pixelWidth)
+
+            // Bỏ qua bitmap quá nhỏ (chỉ chứa whitespace sau khi crop)
+            if (bitmap.height <= 2) {
+                bitmap.recycle()
+                return this
+            }
+
             // Chọn chế độ in bitmap phù hợp với máy in
             val imageData = if (useRasterBitmap) {
                 // GS v 0 - Raster bitmap (EPSON, BIXOLON, máy in cao cấp)
@@ -638,12 +647,24 @@ class HybridBillBuilder(
      * In key-value (ví dụ: "Tổng tiền:" và "100,000đ")
      */
     fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        // Bỏ qua nếu cả key và value đều blank
+        if (key.isBlank() && value.isBlank()) {
+            return this
+        }
+
         // Nếu bold thì dùng totalFontSize (cho dòng TỔNG)
         val fontSize = if (style.bold) totalFontSize else baseFontSize
         val actualStyle = BitmapTextStyle(fontSize = fontSize, bold = style.bold, lineSpacingMultiplier = lineSpacing)
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
+
+            // Bỏ qua bitmap quá nhỏ
+            if (bitmap.height <= 2) {
+                bitmap.recycle()
+                return this
+            }
+
             val imageData = if (useRasterBitmap) {
                 EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             } else {
@@ -668,10 +689,22 @@ class HybridBillBuilder(
      * In key-value đậm (cho danh sách món với số lượng > 1)
      */
     fun lineKeyValueBold(key: String, value: String): HybridBillBuilder {
+        // Bỏ qua nếu cả key và value đều blank
+        if (key.isBlank() && value.isBlank()) {
+            return this
+        }
+
         val actualStyle = BitmapTextStyle(fontSize = totalFontSize, bold = true, lineSpacingMultiplier = lineSpacing)
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
+
+            // Bỏ qua bitmap quá nhỏ
+            if (bitmap.height <= 2) {
+                bitmap.recycle()
+                return this
+            }
+
             val imageData = if (useRasterBitmap) {
                 EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             } else {
