@@ -338,9 +338,11 @@ object OrderPrintingService {
                         val key = part.substring(0, colonIndex).trim()
                         var value = part.substring(colonIndex + 1).trim()
 
-                        // Remove price suffix like "(+10000)" from value
+                        // Extract price suffix like "(+10000)" from value
+                        var optionPrice = 0.0
                         val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)$").find(value)
                         if (priceMatch != null) {
+                            optionPrice = priceMatch.groupValues[1].toDoubleOrNull() ?: 0.0
                             value = value.replace(priceMatch.value, "").trim()
                         }
 
@@ -375,6 +377,11 @@ object OrderPrintingService {
                             // This is a topping in "Key: Value" format
                             Log.d(TAG, "      -> TOPPING (from key): '$value'")
                             toppings.add(PrintRoutingService.ToppingInfo(name = value, price = 0.0))
+                        } else if (keyLower == "size" && optionPrice > 0) {
+                            // Size với giá => thêm vào toppings để hiển thị giá như topping
+                            val sizeDisplay = "$key $value"
+                            Log.d(TAG, "      -> TOPPING (Size with price): '$sizeDisplay' price=$optionPrice")
+                            toppings.add(PrintRoutingService.ToppingInfo(name = sizeDisplay, price = optionPrice))
                         } else {
                             when (key.lowercase()) {
                                 "ghi chú", "note", "ghi chu" -> {
