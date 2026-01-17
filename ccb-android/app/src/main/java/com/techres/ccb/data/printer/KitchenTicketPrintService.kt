@@ -320,9 +320,21 @@ object KitchenTicketPrintService {
             ticket.items.forEachIndexed { index, item ->
                 // Bỏ dòng trống để tiết kiệm giấy - các món vẫn rõ ràng nhờ số thứ tự
 
-                // Số thứ tự + Tên món + Số lượng + Giá (nếu có)
+                // Tính giá gốc = giá tổng - tổng giá topping
+                // Để khi hiển thị giá gốc + giá topping sẽ ra tổng hợp lý
+                val toppingTotal = item.toppingPrices.sumOf { it.second }
+                val basePrice = if (item.price > 0 && toppingTotal > 0) {
+                    (item.price - toppingTotal).coerceAtLeast(0.0)
+                } else {
+                    item.price
+                }
+
+                // Số thứ tự + Tên món + Số lượng + Giá gốc (nếu có)
                 val itemLine = "${index + 1}. ${item.name}"
-                val rightPart = if (showPrice && item.price > 0) {
+                val rightPart = if (showPrice && basePrice > 0) {
+                    "x${item.quantity}  ${formatPrice(basePrice)}"
+                } else if (showPrice && item.price > 0 && toppingTotal == 0.0) {
+                    // Nếu không có topping, hiển thị giá gốc
                     "x${item.quantity}  ${formatPrice(item.price)}"
                 } else {
                     "x${item.quantity}"
@@ -337,8 +349,14 @@ object KitchenTicketPrintService {
                 }
 
                 // Tùy chọn (Size, Đá, Đường...) - hiển thị dạng "• Size L" thay vì "Size: L"
+                // Chỉ hiển thị options không có trong toppingPrices (tránh trùng lặp)
+                val toppingNames = item.toppingPrices.map { it.first.lowercase() }
                 item.options.forEach { (key, value) ->
-                    line("   • $key $value")
+                    val optionText = "$key $value"
+                    // Bỏ qua nếu đã có trong toppingPrices (ví dụ: "Size L" đã có giá trong toppingPrices)
+                    if (!toppingNames.any { it.contains(key.lowercase()) || it.contains(value.lowercase()) }) {
+                        line("   • $optionText")
+                    }
                 }
 
                 // Topping - hiển thị tất cả toppings giống như in tem
