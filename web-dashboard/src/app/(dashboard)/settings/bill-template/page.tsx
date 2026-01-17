@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { BillPreviewPanel } from "@/components/bill-preview-panel";
 import {
   Dialog,
   DialogContent,
@@ -700,7 +701,7 @@ export default function BillTemplatePage() {
 
       {/* Bill Template Dialog */}
       <Dialog open={templateDialog !== null} onOpenChange={() => setTemplateDialog(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-7xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>
               {templateDialog === "create" ? "Thêm mẫu bill mới" : "Sửa mẫu bill"}
@@ -709,8 +710,11 @@ export default function BillTemplatePage() {
               Thiết lập các thông tin hiển thị trên hóa đơn bán hàng
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            <div className="space-y-4 pr-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Form Section - 2/3 width */}
+            <div className="lg:col-span-2">
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <div className="space-y-4">
               {/* Basic info */}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
@@ -1432,8 +1436,18 @@ export default function BillTemplatePage() {
                   </div>
                 </TabsContent>
               </Tabs>
+                </div>
+              </ScrollArea>
             </div>
-          </ScrollArea>
+
+            {/* Live Preview Section - 1/3 width */}
+            <div className="hidden lg:block border-l pl-6">
+              <div className="sticky top-0">
+                <h3 className="font-medium text-sm text-muted-foreground mb-3">Xem trước trực tiếp</h3>
+                <BillPreviewPanel template={templateForm} />
+              </div>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTemplateDialog(null)}>
               Hủy
