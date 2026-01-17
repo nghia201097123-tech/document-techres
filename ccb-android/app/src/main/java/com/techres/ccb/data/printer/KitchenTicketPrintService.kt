@@ -320,21 +320,20 @@ object KitchenTicketPrintService {
             ticket.items.forEachIndexed { index, item ->
                 // Bỏ dòng trống để tiết kiệm giấy - các món vẫn rõ ràng nhờ số thứ tự
 
-                // Số thứ tự + Tên món + Số lượng
-                val qtyText = "x${item.quantity}"
+                // Số thứ tự + Tên món + Số lượng + Giá (nếu có)
                 val itemLine = "${index + 1}. ${item.name}"
-
-                // In tên món và số lượng trên cùng dòng
-                if (item.quantity > 1) {
-                    // Số lượng > 1: in đậm cả dòng
-                    lineKeyValueBold(itemLine, qtyText)
+                val rightPart = if (showPrice && item.price > 0) {
+                    "x${item.quantity}  ${formatPrice(item.price)}"
                 } else {
-                    lineKeyValue(itemLine, qtyText, BitmapTextStyle(bold = true))
+                    "x${item.quantity}"
                 }
 
-                // In giá món nếu config cho phép và có giá
-                if (showPrice && item.price > 0) {
-                    line("   Giá: ${formatPrice(item.price)}")
+                // In tên món, số lượng và giá trên cùng dòng
+                if (item.quantity > 1) {
+                    // Số lượng > 1: in đậm cả dòng
+                    lineKeyValueBold(itemLine, rightPart)
+                } else {
+                    lineKeyValue(itemLine, rightPart, BitmapTextStyle(bold = true))
                 }
 
                 // Tùy chọn (Size, Đá, Đường...)

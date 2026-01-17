@@ -142,21 +142,19 @@ export function TicketPreview({
       <div className="space-y-3">
         {items.map((item, index) => (
           <div key={index} className="border-b border-dashed border-gray-300 pb-2">
-            {/* Item name with quantity */}
+            {/* Item name with quantity and price */}
             <div
               className="font-bold flex justify-between"
               style={{ fontSize: `${fonts.normal}px` }}
             >
               <span>{item.name}</span>
-              <span>x{item.quantity}</span>
+              <span>
+                x{item.quantity}
+                {showPrice && item.price && (
+                  <span className="ml-2">{item.price.toLocaleString("vi-VN")}đ</span>
+                )}
+              </span>
             </div>
-
-            {/* Price */}
-            {showPrice && item.price && (
-              <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">
-                Giá: {item.price.toLocaleString("vi-VN")}đ
-              </div>
-            )}
 
             {/* Attributes */}
             <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">
