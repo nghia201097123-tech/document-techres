@@ -212,29 +212,29 @@ object BitmapTextRenderer {
 
     /**
      * Tính font size phù hợp với khổ giấy
-     * Base: 80mm (576px) = 20f (giảm từ 24f để tiết kiệm giấy)
+     * Base: 80mm (576px) = 16f (giảm từ 20f để tiết kiệm giấy nhiều hơn)
      * Font size scale theo tỉ lệ pixel width
      */
     fun getBaseFontSize(paperWidthMm: Int): Float {
         val pixelWidth = getPixelWidth(paperWidthMm)
-        // Base: 576px = 20f (giảm từ 24f), scale proportionally
-        val scaledSize = 20f * pixelWidth / PAPER_WIDTH_80MM
-        // Giới hạn min 14f, max 28f
-        return scaledSize.coerceIn(14f, 28f)
+        // Base: 576px = 16f (giảm từ 20f), scale proportionally
+        val scaledSize = 16f * pixelWidth / PAPER_WIDTH_80MM
+        // Giới hạn min 12f, max 24f
+        return scaledSize.coerceIn(12f, 24f)
     }
 
     /**
-     * Tính font size cho title (lớn hơn base 1.4x - giảm từ 1.5x)
+     * Tính font size cho title (lớn hơn base 1.5x)
      */
     fun getTitleFontSize(paperWidthMm: Int): Float {
-        return getBaseFontSize(paperWidthMm) * 1.4f
+        return getBaseFontSize(paperWidthMm) * 1.5f
     }
 
     /**
-     * Tính font size cho total (lớn hơn base 1.15x - giảm từ 1.2x)
+     * Tính font size cho total (lớn hơn base 1.2x)
      */
     fun getTotalFontSize(paperWidthMm: Int): Float {
-        return getBaseFontSize(paperWidthMm) * 1.15f
+        return getBaseFontSize(paperWidthMm) * 1.2f
     }
 
     /**
