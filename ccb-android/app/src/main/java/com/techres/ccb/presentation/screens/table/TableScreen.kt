@@ -634,20 +634,36 @@ private fun TableCard(
                     )
                 }
 
-                // Wait time
-                if (table.occupiedMinutes > 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // Wait time and note indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Wait time
+                    if (table.occupiedMinutes > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(10.dp),
+                                tint = timeColor
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = "${table.occupiedMinutes}p",
+                                fontSize = 10.sp,
+                                color = timeColor
+                            )
+                        }
+                    }
+
+                    // Note indicator
+                    if (table.hasNote) {
                         Icon(
-                            Icons.Default.Schedule,
-                            contentDescription = null,
-                            modifier = Modifier.size(10.dp),
-                            tint = timeColor
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = "${table.occupiedMinutes}p",
-                            fontSize = 10.sp,
-                            color = timeColor
+                            Icons.Default.Note,
+                            contentDescription = "Có ghi chú",
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFFFF9800) // Orange
                         )
                     }
                 }

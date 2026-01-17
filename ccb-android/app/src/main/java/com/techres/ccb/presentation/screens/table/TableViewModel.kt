@@ -35,7 +35,8 @@ data class TableWithOrderInfo(
     val orderNumber: String? = null,
     val orderItemCount: Int = 0,
     val orderTotal: Long = 0,
-    val occupiedMinutes: Int = 0
+    val occupiedMinutes: Int = 0,
+    val hasNote: Boolean = false // Có ghi chú hay không
 )
 
 /**
@@ -253,7 +254,8 @@ class TableViewModel @Inject constructor(
                         orderNumber = order?.orderNumber,
                         orderItemCount = itemCount,
                         orderTotal = order?.totalAmount?.toLong() ?: 0,
-                        occupiedMinutes = occupiedMinutes
+                        occupiedMinutes = occupiedMinutes,
+                        hasNote = !order?.notes.isNullOrBlank()
                     )
                 }
 

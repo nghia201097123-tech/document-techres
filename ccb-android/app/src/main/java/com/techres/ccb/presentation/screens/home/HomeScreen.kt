@@ -238,6 +238,21 @@ private fun OrderCard(
     order: OrderEntity,
     onClick: () -> Unit
 ) {
+    // Calculate active time in minutes
+    val activeMinutes = remember(order.createdAt) {
+        try {
+            val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+            val createdTime = format.parse(order.createdAt.take(19))?.time ?: 0L
+            val now = System.currentTimeMillis()
+            ((now - createdTime) / 60000).toInt().coerceAtLeast(0)
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    val hasNote = !order.notes.isNullOrBlank()
+    val timeColor = if (activeMinutes > 30) Color(0xFFF44336) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -258,11 +273,23 @@ private fun OrderCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = order.tableName ?: "Mang đi",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = order.tableName ?: "Mang đi",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    // Note indicator
+                    if (hasNote) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.Note,
+                            contentDescription = "Có ghi chú",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFFFF9800) // Orange
+                        )
+                    }
+                }
                 StatusChip(status = order.status)
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -271,11 +298,27 @@ private fun OrderCard(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
-            Text(
-                text = "Tạo lúc: ${order.createdAt.take(16).replace("T", " ")}",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
+            // Active time
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = timeColor
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${activeMinutes}p",
+                        fontSize = 12.sp,
+                        color = timeColor
+                    )
+                }
+            }
         }
     }
 }
