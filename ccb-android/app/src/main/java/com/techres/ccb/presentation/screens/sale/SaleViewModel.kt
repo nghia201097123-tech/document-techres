@@ -641,6 +641,8 @@ class SaleViewModel @Inject constructor(
         val state = _uiState.value
         val productType = state.selectedProductType
 
+        Log.d(TAG, "selectCategory - categoryId: $categoryId, productType: $productType, cacheSize: ${productsByCategoryCache.size}, cacheKeys: ${productsByCategoryCache.keys}")
+
         // OPTIMIZATION: Use pre-computed cache - NO database query, INSTANT switching
         val products = if (categoryId == "all") {
             // "All" category: show all products filtered by product type
@@ -655,6 +657,8 @@ class SaleViewModel @Inject constructor(
             // Specific category: show products for that category
             productsByCategoryCache[categoryId] ?: emptyList()
         }
+
+        Log.d(TAG, "selectCategory - Found ${products.size} products for category $categoryId")
 
         _uiState.update {
             it.copy(
