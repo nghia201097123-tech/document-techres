@@ -950,7 +950,8 @@ object LabelPrintService {
 
         // Note: For ESC/POS printers, labelReverse would need bitmap rotation which is complex
         // TSPL printers use DIRECTION command for reverse. ESC/POS can use upside-down mode in future.
-        val builder = HybridBillBuilder(paperWidth, true, false)
+        // Sử dụng GS v 0 (raster bitmap) để tránh khoảng trắng thừa giữa các dòng
+        val builder = HybridBillBuilder(paperWidth, true, true)
 
         builder.apply {
             init()

@@ -385,6 +385,10 @@ object EscPosCommands {
     fun printRasterBitmap(bitmap: Bitmap, targetWidth: Int = 0): ByteArray {
         val output = ByteArrayOutputStream()
 
+        // Đặt line spacing = 0 trước khi in bitmap để đảm bảo không có khoảng trắng thừa
+        // sau khi bitmap in xong (một số máy in tự động thêm LF sau GS v 0)
+        output.write(byteArrayOf(0x1B, 0x33, 0x00)) // ESC 3 0 - Line spacing = 0
+
         val width = bitmap.width
         val height = bitmap.height
 
@@ -401,6 +405,7 @@ object EscPosCommands {
         val widthBytes = (w + 7) / 8
 
         // GS v 0 - Print raster bit image
+        // Mode 0 = normal, không tự động LF sau khi in
         val xL = (widthBytes % 256).toByte()
         val xH = (widthBytes / 256).toByte()
         val yL = (h % 256).toByte()
