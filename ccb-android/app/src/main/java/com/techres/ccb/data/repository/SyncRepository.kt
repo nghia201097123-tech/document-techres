@@ -137,16 +137,27 @@ class SyncRepository @Inject constructor(
 
         // Sync products
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCTS, SyncStepStatus.IN_PROGRESS))
+        // Build set of valid category IDs to validate product.categoryId (avoid FK constraint error)
+        val validCategoryIds = categories.map { it.id }.toSet()
         val products = syncData.products.map { dto ->
             // Auto-generate searchName and abbreviation if API doesn't provide them
             val productName = dto.name ?: ""
             val searchName = dto.searchName ?: StringUtils.removeVietnameseAccents(productName)
             val abbreviation = dto.abbreviation ?: StringUtils.generateAbbreviation(productName)
+            // Validate categoryId - set to null if category doesn't exist (avoid FK constraint error)
+            val validCategoryId = if (dto.categoryId != null && validCategoryIds.contains(dto.categoryId)) {
+                dto.categoryId
+            } else {
+                if (dto.categoryId != null) {
+                    Log.w("SyncRepository", "Product '${productName}' has invalid categoryId=${dto.categoryId}, setting to null")
+                }
+                null
+            }
 
             ProductEntity(
                 id = dto.id,
                 branchId = branchId,
-                categoryId = dto.categoryId,
+                categoryId = validCategoryId,
                 code = dto.code ?: "",
                 name = productName,
                 searchName = searchName,
