@@ -128,6 +128,11 @@ export class CreateKitchenDto {
   @IsIn(['small', 'medium', 'large'])
   ticketFontSize?: string;
 
+  @ApiPropertyOptional({ description: 'In giá món trên phiếu bếp', default: false })
+  @IsOptional()
+  @IsBoolean()
+  ticketPrintPrice?: boolean;
+
   // ========== LABEL PRINTING CONFIG ==========
   @ApiPropertyOptional({ description: 'In giá trên tem', default: false })
   @IsOptional()

@@ -24,19 +24,24 @@ const SAMPLE_DATA = {
   tableName: "Bàn 05",
   items: [
     {
-      name: "Trà sữa trân châu",
-      quantity: 2,
-      price: 35000,
+      name: "Lục trà macchiato",
+      quantity: 1,
+      price: 320000,
+      basePrice: 20000,
       size: "Size L",
       ice: "50% Đá",
       sugar: "30% Đường",
-      toppings: ["Trân châu đen", "Thạch dừa"],
+      toppings: [
+        { name: "Trân châu cam", price: 100000 },
+        { name: "Trân châu vàng", price: 100000 },
+      ],
       notes: "Ít đá",
     },
     {
       name: "Cà phê sữa đá",
       quantity: 1,
       price: 25000,
+      basePrice: 25000,
       size: "Size M",
       ice: "100% Đá",
       sugar: "50% Đường",
@@ -47,7 +52,11 @@ const SAMPLE_DATA = {
       name: "Bánh mì thịt nướng",
       quantity: 1,
       price: 30000,
-      toppings: ["Thêm rau", "Thêm ớt"],
+      basePrice: 30000,
+      toppings: [
+        { name: "Thêm rau", price: 0 },
+        { name: "Thêm ớt", price: 0 },
+      ],
       notes: "Không hành",
     },
   ],
@@ -158,11 +167,21 @@ export function TicketPreview({
 
             {/* Attributes */}
             <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">
-              {item.size && <div>• {item.size}</div>}
+              {item.size && (
+                <div className="flex justify-between">
+                  <span>• {item.size}</span>
+                  {showPrice && <span>+100.000đ</span>}
+                </div>
+              )}
               {item.ice && <div>• {item.ice}</div>}
               {item.sugar && <div>• {item.sugar}</div>}
               {item.toppings?.map((topping, i) => (
-                <div key={i}>+ {topping}</div>
+                <div key={i} className="flex justify-between">
+                  <span>+ {typeof topping === 'string' ? topping : topping.name}</span>
+                  {showPrice && typeof topping !== 'string' && topping.price > 0 && (
+                    <span>+{topping.price.toLocaleString("vi-VN")}đ</span>
+                  )}
+                </div>
               ))}
             </div>
 

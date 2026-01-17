@@ -114,6 +114,7 @@ class KitchenRepository @Inject constructor(
                 ticketStoreName = "NHÀ HÀNG DEMO",
                 ticketPrintNotes = true,
                 ticketFontSize = "medium",
+                ticketPrintPrice = true, // In giá món trên phiếu
                 // Label config
                 labelPrintPrice = false,
                 labelPrintStoreName = true,
@@ -146,6 +147,7 @@ class KitchenRepository @Inject constructor(
                 ticketStoreName = null,
                 ticketPrintNotes = true,
                 ticketFontSize = "large",
+                ticketPrintPrice = true, // In giá món trên phiếu
                 // Label config
                 labelPrintPrice = true,
                 labelPrintStoreName = true,
@@ -182,6 +184,7 @@ class KitchenRepository @Inject constructor(
                 ticketStoreName = null,
                 ticketPrintNotes = true,
                 ticketFontSize = "small",
+                ticketPrintPrice = false, // Quầy bar không in giá trên phiếu
                 // Label config
                 labelPrintPrice = true,
                 labelPrintStoreName = true,
@@ -219,6 +222,7 @@ class KitchenRepository @Inject constructor(
                 ticketStoreName = null,
                 ticketPrintNotes = false,
                 ticketFontSize = "medium",
+                ticketPrintPrice = false, // Quầy tráng miệng không in giá trên phiếu
                 // Label config
                 labelPrintPrice = false,
                 labelPrintStoreName = false,

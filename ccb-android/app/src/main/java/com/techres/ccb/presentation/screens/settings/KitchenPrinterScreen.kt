@@ -1306,24 +1306,34 @@ private fun TestPrintDialog(
                     staffName = "Nhân viên test",
                     items = listOf(
                         KitchenTicketPrintService.KitchenItem(
-                            name = "Cà phê sữa đá",
-                            quantity = 2,
-                            note = "Ít đường",
-                            toppings = listOf("Trân châu đen"),
-                            options = mapOf("Size" to "L", "Đá" to "Ít đá")
+                            name = "Lục trà macchiato",
+                            quantity = 1,
+                            price = 320000.0,
+                            note = "Ít đá",
+                            toppings = emptyList(),
+                            toppingPrices = listOf(
+                                "Size L" to 100000.0,
+                                "Trân châu cam" to 100000.0,
+                                "Trân châu vàng" to 100000.0
+                            ),
+                            options = mapOf("Size" to "L", "Đá" to "50%", "Đường" to "30%")
                         ),
                         KitchenTicketPrintService.KitchenItem(
-                            name = "Trà sữa ô long",
+                            name = "Cà phê sữa đá",
                             quantity = 1,
+                            price = 25000.0,
                             note = null,
-                            toppings = listOf("Thạch dừa", "Pudding"),
-                            options = mapOf("Size" to "M", "Đường" to "50%")
+                            toppings = emptyList(),
+                            toppingPrices = emptyList(),
+                            options = mapOf("Size" to "M", "Đá" to "100%", "Đường" to "50%")
                         ),
                         KitchenTicketPrintService.KitchenItem(
                             name = "Bánh mì thịt nướng",
-                            quantity = 3,
+                            quantity = 1,
+                            price = 30000.0,
                             note = "Không hành",
-                            toppings = emptyList(),
+                            toppings = listOf("Thêm rau", "Thêm ớt"),
+                            toppingPrices = emptyList(),
                             options = emptyMap()
                         )
                     ),
