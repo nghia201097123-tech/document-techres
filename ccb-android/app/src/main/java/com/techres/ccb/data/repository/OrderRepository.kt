@@ -89,6 +89,13 @@ class OrderRepository @Inject constructor(
     }
 
     /**
+     * Update order notes (ghi chú tổng bill)
+     */
+    suspend fun updateOrderNotes(orderId: String, notes: String?, updatedAt: String) {
+        orderDao.updateNotes(orderId, notes, updatedAt)
+    }
+
+    /**
      * Update all items status for an order (when order completes/cancels)
      */
     suspend fun updateAllItemsStatus(orderId: String, status: String, updatedAt: String, cancelReason: String? = null) {

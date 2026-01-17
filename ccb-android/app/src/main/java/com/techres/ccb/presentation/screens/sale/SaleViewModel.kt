@@ -1366,7 +1366,7 @@ class SaleViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val updatedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
-                orderDao.updateNotes(currentOrder.id, note, updatedAt)
+                orderRepository.updateOrderNotes(currentOrder.id, note, updatedAt)
 
                 // Update local state
                 _uiState.update { it.copy(
