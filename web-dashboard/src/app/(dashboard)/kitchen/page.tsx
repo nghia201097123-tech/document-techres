@@ -762,10 +762,10 @@ export default function KitchenPage() {
                 : "Cập nhật thông tin bếp."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[60vh]">
-              {/* Form Section - 2/3 width */}
-              <div className="lg:col-span-2 overflow-y-auto pr-2 h-full">
+          <form onSubmit={handleSubmit} className="flex flex-col h-[70vh]">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1 min-h-0">
+              {/* Form Section - 3/5 width */}
+              <div className="lg:col-span-3 overflow-y-auto pr-2">
                 <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Tên bếp *</Label>
@@ -1215,12 +1215,13 @@ export default function KitchenPage() {
                 </div>
               </div>
 
-              {/* Live Preview Section - 1/3 width */}
-              <div className="hidden lg:block border-l pl-6 overflow-y-auto h-full">
-                <h3 className="font-medium text-sm text-muted-foreground mb-3 sticky top-0 bg-background py-1">Xem trước trực tiếp</h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Xem truoc - {formData.paperWidth || 80}mm
+              {/* Live Preview Section - 2/5 width */}
+              <div className="hidden lg:col-span-2 lg:flex lg:flex-col border-l pl-6 overflow-hidden">
+                <h3 className="font-medium text-sm text-muted-foreground mb-2">Xem trước trực tiếp</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Kích thước tem {formData.labelWidthMm || 72}x{formData.labelHeightMm || 30}mm (scale: {formData.labelFontScale || 1.0}x, max {(formData.labelMaxToppings || 0) > 0 ? formData.labelMaxToppings : getRecommendedMaxToppings(formData.labelWidthMm || 72, formData.labelHeightMm || 30)} topping)
                 </p>
+                <div className="flex-1 overflow-y-auto">
                 {formData.printMode === "TICKET" && (
                   <TicketPreview
                     paperWidth={formData.paperWidth || 80}
@@ -1253,6 +1254,7 @@ export default function KitchenPage() {
                     Chọn chế độ in "In phiếu bếp" hoặc "In tem" để xem trước.
                   </p>
                 )}
+                </div>
               </div>
             </div>
             <DialogFooter className="pt-4 border-t">
