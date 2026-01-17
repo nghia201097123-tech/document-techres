@@ -568,20 +568,53 @@ object LabelPrintService {
             }
 
             filteredToppings.forEach { (toppingName, toppingPrice) ->
-                if (showPrice && toppingPrice > 0) {
-                    val toppingBitmap = renderTwoColumnText(
-                        "+ $toppingName",
-                        "+${formatVND(toppingPrice)}",
-                        contentWidth,
-                        fontNormal,
-                        bold = false
-                    )
-                    output.write(bitmapToTspl(margin, yPos, toppingBitmap))
-                    yPos += toppingBitmap.height
-                    toppingBitmap.recycle()
-                } else {
+                // Normalize topping name: loại bỏ newline và whitespace thừa
+                val normalizedName = toppingName
+                    .replace("\n", " ")
+                    .replace("\r", " ")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+
+                // Bỏ qua topping name rỗng
+                if (normalizedName.isNotBlank()) {
+                    if (showPrice && toppingPrice > 0) {
+                        val toppingBitmap = renderTwoColumnText(
+                            "+ $normalizedName",
+                            "+${formatVND(toppingPrice)}",
+                            contentWidth,
+                            fontNormal,
+                            bold = false
+                        )
+                        output.write(bitmapToTspl(margin, yPos, toppingBitmap))
+                        yPos += toppingBitmap.height
+                        toppingBitmap.recycle()
+                    } else {
+                        val toppingBitmap = renderTextBitmap(
+                            text = "+ $normalizedName",
+                            width = contentWidth,
+                            fontSize = fontNormal,
+                            bold = false,
+                            centerAlign = false
+                        )
+                        output.write(bitmapToTspl(margin, yPos, toppingBitmap))
+                        yPos += toppingBitmap.height
+                        toppingBitmap.recycle()
+                    }
+                }
+            }
+        } else if (label.toppings.isNotEmpty()) {
+            label.toppings.forEach { topping ->
+                // Normalize topping name: loại bỏ newline và whitespace thừa
+                val normalizedTopping = topping
+                    .replace("\n", " ")
+                    .replace("\r", " ")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+
+                // Bỏ qua topping name rỗng
+                if (normalizedTopping.isNotBlank()) {
                     val toppingBitmap = renderTextBitmap(
-                        text = "+ $toppingName",
+                        text = "+ $normalizedTopping",
                         width = contentWidth,
                         fontSize = fontNormal,
                         bold = false,
@@ -591,19 +624,6 @@ object LabelPrintService {
                     yPos += toppingBitmap.height
                     toppingBitmap.recycle()
                 }
-            }
-        } else if (label.toppings.isNotEmpty()) {
-            label.toppings.forEach { topping ->
-                val toppingBitmap = renderTextBitmap(
-                    text = "+ $topping",
-                    width = contentWidth,
-                    fontSize = fontNormal,
-                    bold = false,
-                    centerAlign = false
-                )
-                output.write(bitmapToTspl(margin, yPos, toppingBitmap))
-                yPos += toppingBitmap.height
-                toppingBitmap.recycle()
             }
         }
 
@@ -1003,15 +1023,35 @@ object LabelPrintService {
                         name != displayedSizeTopping
                     }
                     filteredToppings.forEach { (toppingName, toppingPrice) ->
-                        if (showPrice && toppingPrice > 0) {
-                            lineKeyValue("+ $toppingName", "+${formatVND(toppingPrice)}")
-                        } else {
-                            line("+ $toppingName")
+                        // Normalize topping name: loại bỏ newline và whitespace thừa
+                        val normalizedName = toppingName
+                            .replace("\n", " ")
+                            .replace("\r", " ")
+                            .replace(Regex("\\s+"), " ")
+                            .trim()
+
+                        // Bỏ qua topping name rỗng
+                        if (normalizedName.isNotBlank()) {
+                            if (showPrice && toppingPrice > 0) {
+                                lineKeyValue("+ $normalizedName", "+${formatVND(toppingPrice)}")
+                            } else {
+                                line("+ $normalizedName")
+                            }
                         }
                     }
                 } else {
                     label.toppings.forEach { topping ->
-                        line("+ $topping")
+                        // Normalize topping name: loại bỏ newline và whitespace thừa
+                        val normalizedTopping = topping
+                            .replace("\n", " ")
+                            .replace("\r", " ")
+                            .replace(Regex("\\s+"), " ")
+                            .trim()
+
+                        // Bỏ qua topping name rỗng
+                        if (normalizedTopping.isNotBlank()) {
+                            line("+ $normalizedTopping")
+                        }
                     }
                 }
             }

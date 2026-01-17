@@ -357,10 +357,17 @@ object KitchenTicketPrintService {
                 // Chỉ hiển thị options không có trong toppingPrices (tránh trùng lặp)
                 val toppingNames = item.toppingPrices.map { it.first.lowercase() }
                 item.options.forEach { (key, value) ->
-                    val optionText = "$key $value"
-                    // Bỏ qua nếu đã có trong toppingPrices (ví dụ: "Size L" đã có giá trong toppingPrices)
-                    if (!toppingNames.any { it.contains(key.lowercase()) || it.contains(value.lowercase()) }) {
-                        line("   • $optionText")
+                    // Normalize key và value: loại bỏ newline và whitespace thừa
+                    val normalizedKey = key.replace("\n", " ").replace("\r", " ").replace(Regex("\\s+"), " ").trim()
+                    val normalizedValue = value.replace("\n", " ").replace("\r", " ").replace(Regex("\\s+"), " ").trim()
+
+                    // Bỏ qua nếu key hoặc value rỗng
+                    if (normalizedKey.isNotBlank() && normalizedValue.isNotBlank()) {
+                        val optionText = "$normalizedKey $normalizedValue"
+                        // Bỏ qua nếu đã có trong toppingPrices (ví dụ: "Size L" đã có giá trong toppingPrices)
+                        if (!toppingNames.any { it.contains(normalizedKey.lowercase()) || it.contains(normalizedValue.lowercase()) }) {
+                            line("   • $optionText")
+                        }
                     }
                 }
 
@@ -372,17 +379,37 @@ object KitchenTicketPrintService {
                     // Hiển thị topping - chỉ hiển thị giá nếu showPrice = true
                     if (item.toppingPrices.isNotEmpty()) {
                         item.toppingPrices.forEach { (toppingName, toppingPrice) ->
-                            if (showPrice && toppingPrice > 0) {
-                                // Hiển thị topping với giá khi config bật
-                                lineKeyValue("   + $toppingName", "+${formatPrice(toppingPrice)}")
-                            } else {
-                                // Chỉ hiển thị tên topping khi config tắt hoặc giá = 0
-                                line("   + $toppingName")
+                            // Normalize topping name: loại bỏ newline và whitespace thừa
+                            val normalizedName = toppingName
+                                .replace("\n", " ")
+                                .replace("\r", " ")
+                                .replace(Regex("\\s+"), " ")
+                                .trim()
+
+                            // Bỏ qua topping name rỗng
+                            if (normalizedName.isNotBlank()) {
+                                if (showPrice && toppingPrice > 0) {
+                                    // Hiển thị topping với giá khi config bật
+                                    lineKeyValue("   + $normalizedName", "+${formatPrice(toppingPrice)}")
+                                } else {
+                                    // Chỉ hiển thị tên topping khi config tắt hoặc giá = 0
+                                    line("   + $normalizedName")
+                                }
                             }
                         }
                     } else {
                         item.toppings.forEach { topping ->
-                            line("   + $topping")
+                            // Normalize topping name: loại bỏ newline và whitespace thừa
+                            val normalizedTopping = topping
+                                .replace("\n", " ")
+                                .replace("\r", " ")
+                                .replace(Regex("\\s+"), " ")
+                                .trim()
+
+                            // Bỏ qua topping name rỗng
+                            if (normalizedTopping.isNotBlank()) {
+                                line("   + $normalizedTopping")
+                            }
                         }
                     }
                 }
