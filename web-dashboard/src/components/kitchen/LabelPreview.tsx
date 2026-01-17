@@ -18,24 +18,27 @@ interface LabelPreviewProps {
 }
 
 // Sample data for preview - including notes for testing
+// Giá: basePrice 35.000 + Size L 10.000 + toppings = 63.000đ
 const SAMPLE_DATA = {
   itemName: "Trà sữa trân châu",
   orderNumber: "GF-472",
   index: "1/3",
   size: "Size L",
+  sizePrice: 10000,
   ice: "50% Đá",
   sugar: "30% Đường",
   allToppings: [
-    "Trân châu đen",
-    "Thạch dừa",
-    "Pudding",
-    "Kem cheese",
-    "Đậu đỏ",
-    "Trân châu trắng",
-    "Thạch cà phê",
+    { name: "Trân châu đen", price: 10000 },
+    { name: "Thạch dừa", price: 8000 },
+    { name: "Pudding", price: 0 },
+    { name: "Kem cheese", price: 0 },
+    { name: "Đậu đỏ", price: 0 },
+    { name: "Trân châu trắng", price: 0 },
+    { name: "Thạch cà phê", price: 0 },
   ],
   notes: "Ít đá, không đường, mang đi",
-  price: "45,000đ",
+  basePrice: 35000,
+  totalPrice: 63000, // 35000 + 10000 (size) + 10000 + 8000 (toppings)
 };
 
 interface SingleLabelProps {
@@ -48,7 +51,7 @@ interface SingleLabelProps {
   showTime: boolean;
   showPrice: boolean;
   storeName: string;
-  toppings: string[];
+  toppings: { name: string; price: number }[];
   notes?: string;
   labelIndex: number;
   totalLabels: number;
@@ -124,9 +127,14 @@ function SingleLabel({
         {/* Size, Ice, Sugar - only on first label */}
         {labelIndex === 1 && (
           <div style={{ fontSize: `${fonts.normal}px` }} className="text-gray-700">
-            <div className="truncate">+{SAMPLE_DATA.size}</div>
-            <div className="truncate">+{SAMPLE_DATA.ice}</div>
-            <div className="truncate">+{SAMPLE_DATA.sugar}</div>
+            <div className="flex justify-between">
+              <span className="truncate">+{SAMPLE_DATA.size}</span>
+              {showPrice && SAMPLE_DATA.sizePrice > 0 && (
+                <span>+{SAMPLE_DATA.sizePrice.toLocaleString("vi-VN")}đ</span>
+              )}
+            </div>
+            <div className="truncate">• {SAMPLE_DATA.ice}</div>
+            <div className="truncate">• {SAMPLE_DATA.sugar}</div>
           </div>
         )}
 
@@ -141,8 +149,11 @@ function SingleLabel({
         {toppings.length > 0 && (
           <div style={{ fontSize: `${fonts.normal}px` }} className="text-gray-700">
             {toppings.map((topping, i) => (
-              <div key={i} className="truncate">
-                +{topping}
+              <div key={i} className="flex justify-between">
+                <span className="truncate">+{topping.name}</span>
+                {showPrice && topping.price > 0 && (
+                  <span>+{topping.price.toLocaleString("vi-VN")}đ</span>
+                )}
               </div>
             ))}
           </div>
@@ -170,7 +181,7 @@ function SingleLabel({
               style={{ fontSize: `${fonts.normal}px` }}
             >
               <span>Thành tiền:</span>
-              <span>{SAMPLE_DATA.price}</span>
+              <span>{SAMPLE_DATA.totalPrice.toLocaleString("vi-VN")}đ</span>
             </div>
           </>
         )}
@@ -276,7 +287,7 @@ export function LabelPreview({
   // First label shows size/ice/sugar (3 extra lines), so calculate accordingly
   const labelData = React.useMemo(() => {
     const allToppings = SAMPLE_DATA.allToppings;
-    const labels: { toppings: string[]; notes?: string }[] = [];
+    const labels: { toppings: { name: string; price: number }[]; notes?: string }[] = [];
 
     // Number of extra lines on first label (size, ice, sugar)
     const FIRST_LABEL_EXTRA_LINES = 3;
@@ -376,7 +387,8 @@ export function LabelPreview({
       <div className="text-xs text-muted-foreground border-t pt-2 mt-1">
         <div className="font-medium mb-1">Dữ liệu mẫu:</div>
         <div>Tên: {SAMPLE_DATA.itemName}</div>
-        <div>Topping: {SAMPLE_DATA.allToppings.join(", ")}</div>
+        <div>Giá gốc: {SAMPLE_DATA.basePrice.toLocaleString("vi-VN")}đ | Tổng: {SAMPLE_DATA.totalPrice.toLocaleString("vi-VN")}đ</div>
+        <div>Topping: {SAMPLE_DATA.allToppings.map(t => t.name).join(", ")}</div>
         <div className="text-red-600">Ghi chú: {SAMPLE_DATA.notes}</div>
       </div>
     </div>

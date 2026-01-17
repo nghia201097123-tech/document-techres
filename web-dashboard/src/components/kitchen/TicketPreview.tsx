@@ -19,6 +19,7 @@ interface TicketPreviewProps {
 }
 
 // Sample data for preview
+// Lục trà macchiato: basePrice 20.000 + Size L 100.000 + 2 topping (200.000) = 320.000đ
 const SAMPLE_DATA = {
   orderNumber: "GF-472",
   tableName: "Bàn 05",
@@ -26,9 +27,9 @@ const SAMPLE_DATA = {
     {
       name: "Lục trà macchiato",
       quantity: 1,
-      price: 320000,
-      basePrice: 20000,
-      size: "Size L",
+      price: 320000, // Tổng giá = 20.000 + 100.000 (size) + 200.000 (toppings)
+      basePrice: 20000, // Giá gốc món
+      size: "Size L", // Size có giá +100.000
       ice: "50% Đá",
       sugar: "30% Đường",
       toppings: [
@@ -40,9 +41,9 @@ const SAMPLE_DATA = {
     {
       name: "Cà phê sữa đá",
       quantity: 1,
-      price: 25000,
+      price: 25000, // Không có topping nên giá = basePrice
       basePrice: 25000,
-      size: "Size M",
+      size: "",
       ice: "100% Đá",
       sugar: "50% Đường",
       toppings: [],
@@ -51,8 +52,9 @@ const SAMPLE_DATA = {
     {
       name: "Bánh mì thịt nướng",
       quantity: 1,
-      price: 30000,
+      price: 30000, // Không có topping có giá nên giá = basePrice
       basePrice: 30000,
+      size: "",
       toppings: [
         { name: "Thêm rau", price: 0 },
         { name: "Thêm ớt", price: 0 },
@@ -149,53 +151,72 @@ export function TicketPreview({
 
       {/* Items */}
       <div className="space-y-3">
-        {items.map((item, index) => (
-          <div key={index} className="border-b border-dashed border-gray-300 pb-2">
-            {/* Item name with quantity and price */}
-            <div
-              className="font-bold flex justify-between"
-              style={{ fontSize: `${fonts.normal}px` }}
-            >
-              <span>{item.name}</span>
-              <span>
-                x{item.quantity}
-                {showPrice && item.price && (
-                  <span className="ml-2">{item.price.toLocaleString("vi-VN")}đ</span>
-                )}
-              </span>
-            </div>
+        {items.map((item, index) => {
+          // Tính tổng giá topping
+          const toppingTotal = item.toppings?.reduce((sum, t) => sum + (typeof t === 'string' ? 0 : t.price), 0) || 0;
+          // Có topping với giá không?
+          const hasPricedToppings = toppingTotal > 0 || (item.size && item.price !== item.basePrice);
 
-            {/* Attributes */}
-            <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">
-              {item.size && (
-                <div className="flex justify-between">
-                  <span>• {item.size}</span>
-                  {showPrice && <span>+100.000đ</span>}
+          return (
+            <div key={index} className="border-b border-dashed border-gray-300 pb-2">
+              {/* Item name with quantity and TOTAL price */}
+              <div
+                className="font-bold flex justify-between"
+                style={{ fontSize: `${fonts.normal}px` }}
+              >
+                <span>{item.name}</span>
+                <span>
+                  x{item.quantity}
+                  {showPrice && item.price > 0 && (
+                    <span className="ml-2">{item.price.toLocaleString("vi-VN")}đ</span>
+                  )}
+                </span>
+              </div>
+
+              {/* BASE price on separate line (when has toppings/size with price) */}
+              {showPrice && hasPricedToppings && item.basePrice > 0 && (
+                <div
+                  className="text-right text-gray-600"
+                  style={{ fontSize: `${fonts.small}px` }}
+                >
+                  {item.basePrice.toLocaleString("vi-VN")}đ
                 </div>
               )}
-              {item.ice && <div>• {item.ice}</div>}
-              {item.sugar && <div>• {item.sugar}</div>}
-              {item.toppings?.map((topping, i) => (
-                <div key={i} className="flex justify-between">
-                  <span>+ {typeof topping === 'string' ? topping : topping.name}</span>
-                  {showPrice && typeof topping !== 'string' && topping.price > 0 && (
-                    <span>+{topping.price.toLocaleString("vi-VN")}đ</span>
-                  )}
-                </div>
-              ))}
-            </div>
 
-            {/* Notes */}
-            {showNotes && item.notes && (
-              <div
-                style={{ fontSize: `${fonts.small}px` }}
-                className="text-red-600 font-medium ml-2 mt-1"
-              >
-                ⚠ {item.notes}
+              {/* Attributes */}
+              <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">
+                {item.size && (
+                  <div className="flex justify-between">
+                    <span>+ {item.size}</span>
+                    {showPrice && item.price !== item.basePrice && (
+                      <span>+{((item.price - item.basePrice - toppingTotal) > 0 ? (item.price - item.basePrice - toppingTotal) : 100000).toLocaleString("vi-VN")}đ</span>
+                    )}
+                  </div>
+                )}
+                {item.ice && <div>• {item.ice}</div>}
+                {item.sugar && <div>• {item.sugar}</div>}
+                {item.toppings?.map((topping, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span>+ {typeof topping === 'string' ? topping : topping.name}</span>
+                    {showPrice && typeof topping !== 'string' && topping.price > 0 && (
+                      <span>+{topping.price.toLocaleString("vi-VN")}đ</span>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Notes */}
+              {showNotes && item.notes && (
+                <div
+                  style={{ fontSize: `${fonts.small}px` }}
+                  className="text-red-600 font-medium ml-2 mt-1"
+                >
+                  ⚠ {item.notes}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Footer */}
