@@ -1449,18 +1449,24 @@ private fun VatDetailDialog(
     totalVatAmount: Long,
     onDismiss: () -> Unit
 ) {
-    // Calculate VAT for each item
+    // Calculate VAT for each item (VAT đã bao gồm trong giá)
+    // Công thức: Giá sau VAT = Giá trước VAT × (1 + VAT%)
+    // → Giá trước VAT = Giá sau VAT / (1 + VAT%)
+    // → Tiền VAT = Giá sau VAT - Giá trước VAT
     val itemsWithVat = remember(orderItems) {
         orderItems.map { item ->
             val priceAfterDiscount = item.totalPrice - item.discountAmount
             val vatAmount = if (item.vatRate > 0) {
-                // VAT đã bao gồm trong giá: price = priceBeforeVat * (1 + vatRate/100)
-                // vatAmount = price - priceBeforeVat = price - price/(1+vatRate/100)
                 val priceBeforeVat = priceAfterDiscount / (1 + item.vatRate / 100)
                 (priceAfterDiscount - priceBeforeVat).toLong()
             } else 0L
             Triple(item, vatAmount, item.vatRate)
         }
+    }
+
+    // Tính tổng VAT từ các items
+    val calculatedTotalVat = remember(itemsWithVat) {
+        itemsWithVat.sumOf { it.second }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1491,7 +1497,15 @@ private fun VatDetailDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Giải thích công thức
+                Text(
+                    "* VAT đã bao gồm trong giá bán",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontStyle = FontStyle.Italic
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -1568,18 +1582,18 @@ private fun VatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Total VAT
+                // Tổng VAT tính từ items
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "Tổng VAT:",
+                        "Tổng VAT (theo món):",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        formatCurrency(totalVatAmount),
+                        formatCurrency(calculatedTotalVat),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
