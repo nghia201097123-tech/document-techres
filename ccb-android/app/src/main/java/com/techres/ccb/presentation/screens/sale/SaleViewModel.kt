@@ -191,15 +191,17 @@ data class SaleUiState(
         get() = totalAmount - taxAmount
 
     /**
-     * Get categories filtered by selected product type
+     * Get categories filtered by selected product type, sorted by order
      */
     val filteredCategories: List<Category>
         get() = if (selectedProductType == SaleProductType.ALL) {
-            categories
+            categories.sortedBy { it.order }
         } else {
-            // Always include "Tất cả" category, then filter by product type
+            // Always include "Tất cả" category (order=-1), then filter by product type and sort
             val allCategory = categories.find { it.id == "all" }
-            val filtered = categories.filter { it.productType == selectedProductType.value }
+            val filtered = categories
+                .filter { it.productType == selectedProductType.value }
+                .sortedBy { it.order }
             if (allCategory != null) listOf(allCategory) + filtered else filtered
         }
 
@@ -381,7 +383,7 @@ class SaleViewModel @Inject constructor(
                         .toSet()
 
                     val categoryList = mutableListOf(
-                        Category(id = "all", name = "Tất cả", icon = "🍽️", productType = "all")
+                        Category(id = "all", name = "Tất cả", icon = "🍽️", productType = "all", order = -1)
                     )
                     categoryList.addAll(categoryEntities
                         .filter { !it.name.lowercase().contains("topping") }
@@ -390,7 +392,8 @@ class SaleViewModel @Inject constructor(
                                 id = entity.id,
                                 name = entity.name,
                                 icon = entity.imageUrl,
-                                productType = entity.productType
+                                productType = entity.productType,
+                                order = entity.sortOrder
                             )
                         })
 
