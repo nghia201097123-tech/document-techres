@@ -246,7 +246,8 @@ object BitmapTextRenderer {
         style: BitmapTextStyle = BitmapTextStyle(),
         paperWidth: Int = PAPER_WIDTH_80MM
     ): Bitmap {
-        if (text.isEmpty()) {
+        // Kiểm tra text rỗng hoặc chỉ toàn whitespace
+        if (text.isEmpty() || text.isBlank()) {
             return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         }
 
@@ -320,31 +321,44 @@ object BitmapTextRenderer {
         val height = bitmap.height
 
         // Tìm hàng đầu tiên và cuối cùng có pixel đen (content)
-        var topRow = 0
-        var bottomRow = height - 1
+        var topRow = -1
+        var bottomRow = -1
 
         // Scan từ trên xuống tìm hàng đầu tiên có content
         val pixels = IntArray(width)
-        outer@ for (y in 0 until height) {
+        for (y in 0 until height) {
             bitmap.getPixels(pixels, 0, width, 0, y, width, 1)
             for (pixel in pixels) {
                 // Kiểm tra nếu pixel không phải màu trắng (có content)
-                if (pixel != Color.WHITE && pixel != -1) {
+                // Color.WHITE = 0xFFFFFFFF = -1 as Int
+                if (pixel != Color.WHITE && pixel != -1 && (pixel and 0xFF000000.toInt()) != 0) {
                     topRow = y
-                    break@outer
+                    break
                 }
             }
+            if (topRow >= 0) break
+        }
+
+        // Nếu không tìm thấy content (bitmap trống), trả về bitmap 1x1
+        if (topRow < 0) {
+            bitmap.recycle()
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         }
 
         // Scan từ dưới lên tìm hàng cuối cùng có content
-        outer@ for (y in height - 1 downTo 0) {
+        for (y in height - 1 downTo topRow) {
             bitmap.getPixels(pixels, 0, width, 0, y, width, 1)
             for (pixel in pixels) {
-                if (pixel != Color.WHITE && pixel != -1) {
+                if (pixel != Color.WHITE && pixel != -1 && (pixel and 0xFF000000.toInt()) != 0) {
                     bottomRow = y
-                    break@outer
+                    break
                 }
             }
+            if (bottomRow >= 0) break
+        }
+
+        if (bottomRow < topRow) {
+            bottomRow = topRow
         }
 
         // Tính chiều cao content thực sự
@@ -353,14 +367,21 @@ object BitmapTextRenderer {
             return bitmap // Không cần crop
         }
 
-        // Tính padding dựa trên lineSpacing
-        // lineSpacing 0.3 = padding 1px, lineSpacing 1.0 = padding = original whitespace
-        val originalTopPadding = topRow
-        val originalBottomPadding = height - 1 - bottomRow
+        // Tính padding dựa trên lineSpacing - sử dụng FIXED padding tối thiểu
+        // để đảm bảo không có khoảng trắng thừa với font lớn
         val paddingScale = lineSpacing.coerceIn(0.3f, 1.0f)
 
-        val newTopPadding = (originalTopPadding * paddingScale).toInt().coerceAtLeast(0)
-        val newBottomPadding = (originalBottomPadding * paddingScale).toInt().coerceAtLeast(0)
+        // Padding cố định tối đa 2-4 pixels, không phụ thuộc vào font size
+        // Điều này đảm bảo font lớn không tạo ra khoảng trắng thừa
+        val maxPadding = when {
+            paddingScale <= 0.3f -> 1
+            paddingScale <= 0.5f -> 2
+            paddingScale <= 0.7f -> 3
+            else -> 4
+        }
+
+        val newTopPadding = maxPadding.coerceAtMost(topRow)
+        val newBottomPadding = maxPadding.coerceAtMost(height - 1 - bottomRow)
 
         // Tính vị trí crop
         val cropTop = (topRow - newTopPadding).coerceAtLeast(0)
@@ -372,7 +393,14 @@ object BitmapTextRenderer {
         }
 
         // Tạo bitmap mới với chiều cao đã crop
-        return Bitmap.createBitmap(bitmap, 0, cropTop, width, newHeight)
+        val croppedBitmap = Bitmap.createBitmap(bitmap, 0, cropTop, width, newHeight)
+
+        // Recycle bitmap gốc nếu đã tạo bitmap mới
+        if (croppedBitmap != bitmap) {
+            bitmap.recycle()
+        }
+
+        return croppedBitmap
     }
 
     /**
