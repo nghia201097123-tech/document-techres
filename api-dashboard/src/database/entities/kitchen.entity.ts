@@ -139,6 +139,9 @@ export class Kitchen {
   @Column({ name: 'ticket_print_price', default: false })
   ticketPrintPrice: boolean;
 
+  @Column({ name: 'ticket_line_spacing', type: 'float', default: 0.4 })
+  ticketLineSpacing: number; // 0.3 - 1.0, default 0.4 = tight
+
   // ========== LABEL PRINTING CONFIG ==========
   @Column({ name: 'label_print_price', default: false })
   labelPrintPrice: boolean;
@@ -176,6 +179,9 @@ export class Kitchen {
 
   @Column({ name: 'label_max_toppings', type: 'int', default: 0 })
   labelMaxToppings: number; // 0 = auto based on size
+
+  @Column({ name: 'label_line_spacing', type: 'float', default: 1.0 })
+  labelLineSpacing: number; // 0.8 - 1.5, default 1.0 = normal
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

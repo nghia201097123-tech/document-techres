@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsIn, Min, Max, IsBoolean } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsInt, IsIn, Min, Max, IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { KitchenPrintMode, KitchenType, PrinterProtocol } from '../../../database/entities/kitchen.entity';
 
@@ -119,19 +119,31 @@ export class CreateKitchenDto {
   ticketPrintNotes?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Cỡ chữ phiếu: small, medium, large',
+    description: 'Cỡ chữ phiếu: extra_small, small, medium, large, extra_large',
     default: 'medium',
-    enum: ['small', 'medium', 'large'],
+    enum: ['extra_small', 'small', 'medium', 'large', 'extra_large'],
   })
   @IsOptional()
   @IsString()
-  @IsIn(['small', 'medium', 'large'])
+  @IsIn(['extra_small', 'small', 'medium', 'large', 'extra_large'])
   ticketFontSize?: string;
 
   @ApiPropertyOptional({ description: 'In giá món trên phiếu bếp', default: false })
   @IsOptional()
   @IsBoolean()
   ticketPrintPrice?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Khoảng cách dòng phiếu bếp (0.3 - 1.0, mặc định 0.4 = rất sát)',
+    default: 0.4,
+    minimum: 0.3,
+    maximum: 1.0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.3)
+  @Max(1.0)
+  ticketLineSpacing?: number;
 
   // ========== LABEL PRINTING CONFIG ==========
   @ApiPropertyOptional({ description: 'In giá trên tem', default: false })
@@ -212,4 +224,16 @@ export class CreateKitchenDto {
   @Min(0)
   @Max(20)
   labelMaxToppings?: number;
+
+  @ApiPropertyOptional({
+    description: 'Khoảng cách dòng tem (0.8 - 1.5, mặc định 1.0 = bình thường)',
+    default: 1.0,
+    minimum: 0.8,
+    maximum: 1.5,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.8)
+  @Max(1.5)
+  labelLineSpacing?: number;
 }
