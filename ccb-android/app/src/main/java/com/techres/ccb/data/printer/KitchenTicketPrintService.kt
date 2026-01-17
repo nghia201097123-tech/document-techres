@@ -249,7 +249,10 @@ object KitchenTicketPrintService {
             else -> 1.0f // medium
         }
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap, fontScale)
+        // Line spacing từ config (0.3 - 1.0, default 0.4)
+        val ticketLineSpacing = kitchen.ticketLineSpacing.coerceIn(0.3f, 1.0f)
+
+        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap, fontScale, ticketLineSpacing)
 
         builder.apply {
             init()

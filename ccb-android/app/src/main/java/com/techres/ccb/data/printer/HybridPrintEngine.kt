@@ -428,7 +428,8 @@ class HybridBillBuilder(
     private val paperWidth: Int = 80, // Khổ giấy (mm): 32, 44, 48, 57, 58, 76, 80, 110, 112
     private val useBitmapMode: Boolean = true, // Mặc định dùng bitmap để đảm bảo
     private val useRasterBitmap: Boolean = false, // false = ESC * (XPRINTER compatible), true = GS v 0 (EPSON)
-    private val fontScale: Float = 1.0f // Tỷ lệ font: 0.85 = small, 1.0 = medium, 1.2 = large
+    private val fontScale: Float = 1.0f, // Tỷ lệ font: 0.85 = small, 1.0 = medium, 1.2 = large
+    private val lineSpacing: Float = 0.4f // Line spacing multiplier: 0.3-1.0, default 0.4 = tight
 ) {
     private val buffer = ByteArrayOutputStream()
     private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
@@ -487,10 +488,11 @@ class HybridBillBuilder(
         }
 
         // Sử dụng baseFontSize nếu style dùng font mặc định (24f)
+        // và luôn sử dụng lineSpacing từ builder
         val actualStyle = if (style.fontSize == 24f) {
-            style.copy(fontSize = baseFontSize)
+            style.copy(fontSize = baseFontSize, lineSpacingMultiplier = lineSpacing)
         } else {
-            style
+            style.copy(lineSpacingMultiplier = lineSpacing)
         }
 
         if (useBitmapMode) {
@@ -545,7 +547,8 @@ class HybridBillBuilder(
             fontSize = titleFontSize,
             bold = true,
             centerAlign = style.centerAlign,
-            rightAlign = style.rightAlign
+            rightAlign = style.rightAlign,
+            lineSpacingMultiplier = lineSpacing
         ))
     }
 
@@ -555,7 +558,7 @@ class HybridBillBuilder(
     fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
         // Nếu bold thì dùng totalFontSize (cho dòng TỔNG)
         val fontSize = if (style.bold) totalFontSize else baseFontSize
-        val actualStyle = BitmapTextStyle(fontSize = fontSize, bold = style.bold)
+        val actualStyle = BitmapTextStyle(fontSize = fontSize, bold = style.bold, lineSpacingMultiplier = lineSpacing)
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
@@ -583,7 +586,7 @@ class HybridBillBuilder(
      * In key-value đậm (cho danh sách món với số lượng > 1)
      */
     fun lineKeyValueBold(key: String, value: String): HybridBillBuilder {
-        val actualStyle = BitmapTextStyle(fontSize = totalFontSize, bold = true)
+        val actualStyle = BitmapTextStyle(fontSize = totalFontSize, bold = true, lineSpacingMultiplier = lineSpacing)
 
         if (useBitmapMode) {
             val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)

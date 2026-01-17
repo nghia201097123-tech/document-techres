@@ -582,8 +582,8 @@ private fun PrinterConfigDialog(
     var paperWidthExpanded by remember { mutableStateOf(false) }
     var printModeExpanded by remember { mutableStateOf(false) }
 
-    // Paper width options
-    val paperWidthOptions = listOf(58, 80)
+    // Paper width options - đồng bộ với web dashboard
+    val paperWidthOptions = listOf(58, 76, 80, 110, 112)
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
