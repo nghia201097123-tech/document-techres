@@ -1330,6 +1330,26 @@ export class DatabaseMigrationService implements OnModuleInit {
         }
       }
 
+      // 43. Add showOrderNote and lineSpacing columns to bill_templates table
+      if (hasBillTemplatesTable[0].exists) {
+        const hasShowOrderNote = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_templates' AND column_name = 'show_order_note'
+          );
+        `);
+
+        if (!hasShowOrderNote[0].exists) {
+          this.logger.log('Adding showOrderNote and lineSpacing columns to bill_templates table...');
+          await queryRunner.query(`
+            ALTER TABLE bill_templates
+            ADD COLUMN IF NOT EXISTS show_order_note BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS line_spacing FLOAT DEFAULT 0.7
+          `);
+          this.logger.log('showOrderNote and lineSpacing columns added to bill_templates table');
+        }
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

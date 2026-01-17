@@ -113,6 +113,9 @@ export class BillTemplate {
   @Column({ name: 'show_item_note', default: true })
   showItemNote: boolean;
 
+  @Column({ name: 'show_order_note', default: true })
+  showOrderNote: boolean;
+
   @Column({ name: 'show_unit_price', default: true })
   showUnitPrice: boolean;
 
@@ -240,6 +243,9 @@ export class BillTemplate {
 
   @Column({ name: 'font_size', type: 'varchar', length: 20, default: 'normal' })
   fontSize: string;
+
+  @Column({ name: 'line_spacing', type: 'float', default: 0.7 })
+  lineSpacing: number;
 
   @Column({ name: 'separator_char', type: 'char', length: 1, default: '-' })
   separatorChar: string;

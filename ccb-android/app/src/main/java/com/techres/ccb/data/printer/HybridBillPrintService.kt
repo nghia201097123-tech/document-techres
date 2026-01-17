@@ -301,9 +301,25 @@ object HybridBillPrintService {
         Log.d(TAG, "checkInLabel: ${template.checkInLabel}")
         Log.d(TAG, "showCheckOutTime: ${template.showCheckOutTime}")
         Log.d(TAG, "checkOutLabel: ${template.checkOutLabel}")
+        Log.d(TAG, "fontSize: ${template.fontSize}")
+        Log.d(TAG, "lineSpacing: ${template.lineSpacing}")
         Log.d(TAG, "========== END BILL DATA DEBUG ==========")
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode)
+        // Chuyển đổi fontSize từ string sang fontScale float
+        val fontScale = when (template.fontSize) {
+            "extra_small" -> 0.7f
+            "small" -> 0.85f
+            "large" -> 1.2f
+            "extra_large" -> 1.4f
+            else -> 1.0f // normal
+        }
+
+        val builder = HybridBillBuilder(
+            paperWidth = paperWidth,
+            useBitmapMode = useBitmapMode,
+            fontScale = fontScale,
+            lineSpacing = template.lineSpacing
+        )
 
         builder.apply {
             init()
@@ -384,6 +400,11 @@ object HybridBillPrintService {
             if (template.showCheckOutTime && billData.checkOutTime != null) {
                 val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
                 line("${template.checkOutLabel}: ${timeFormat.format(billData.checkOutTime)}")
+            }
+
+            // ============ ORDER NOTE - Ghi chú đơn hàng (theo config) ============
+            if (template.showOrderNote && billData.orderNote != null && billData.orderNote.isNotBlank()) {
+                line("Ghi chú: ${billData.orderNote}")
             }
 
             separator()

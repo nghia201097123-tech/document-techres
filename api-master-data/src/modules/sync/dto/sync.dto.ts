@@ -700,6 +700,9 @@ export class BillTemplateDto {
   @ApiProperty()
   showItemNote: boolean;
 
+  @ApiProperty({ description: 'Hiển thị ghi chú đơn hàng' })
+  showOrderNote: boolean;
+
   @ApiProperty()
   showUnitPrice: boolean;
 
@@ -820,8 +823,11 @@ export class BillTemplateDto {
   @ApiProperty({ description: 'Độ rộng giấy (58 hoặc 80)' })
   paperWidth: number;
 
-  @ApiProperty({ description: 'Cỡ chữ: small, normal, large' })
+  @ApiProperty({ description: 'Cỡ chữ: extra_small, small, normal, large, extra_large' })
   fontSize: string;
+
+  @ApiProperty({ description: 'Khoảng cách dòng (0.3-1.0)' })
+  lineSpacing: number;
 
   @ApiProperty()
   separatorChar: string;

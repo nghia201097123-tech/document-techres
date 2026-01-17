@@ -58,6 +58,7 @@ export interface BillTemplate {
   // Items config
   showItemCode: boolean;
   showItemNote: boolean;
+  showOrderNote: boolean;
   showUnitPrice: boolean;
   showQuantity: boolean;
 
@@ -112,6 +113,7 @@ export interface BillTemplate {
   // Style config
   paperWidth: number;
   fontSize: string;
+  lineSpacing: number;
   separatorChar: string;
   doubleSeparatorChar: string;
   cutPaper: boolean;
@@ -206,6 +208,7 @@ export interface CreateBillTemplateDto {
   // Items
   showItemCode?: boolean;
   showItemNote?: boolean;
+  showOrderNote?: boolean;
   showUnitPrice?: boolean;
   showQuantity?: boolean;
 
@@ -261,6 +264,7 @@ export interface CreateBillTemplateDto {
   // Style
   paperWidth?: number;
   fontSize?: string;
+  lineSpacing?: number;
   separatorChar?: string;
   doubleSeparatorChar?: string;
   cutPaper?: boolean;
@@ -443,9 +447,28 @@ export const PAPER_WIDTH_OPTIONS = [
 ];
 
 export const FONT_SIZE_OPTIONS = [
+  { value: 'extra_small', label: 'Rất nhỏ' },
   { value: 'small', label: 'Nhỏ' },
   { value: 'normal', label: 'Bình thường' },
   { value: 'large', label: 'Lớn' },
+  { value: 'extra_large', label: 'Rất lớn' },
+];
+
+// Bill font size type and scale values (similar to kitchen ticket)
+export type BillFontSize = "extra_small" | "small" | "normal" | "large" | "extra_large";
+export const BillFontScaleValues: Record<BillFontSize, number> = {
+  extra_small: 0.7,
+  small: 0.85,
+  normal: 1.0,
+  large: 1.2,
+  extra_large: 1.4,
+};
+
+export const LINE_SPACING_OPTIONS = [
+  { value: 0.3, label: '30% - Rất chặt' },
+  { value: 0.5, label: '50% - Chặt' },
+  { value: 0.7, label: '70% - Bình thường' },
+  { value: 1.0, label: '100% - Rộng' },
 ];
 
 export const DATE_FORMAT_OPTIONS = [
@@ -474,6 +497,7 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   // Items
   showItemCode: false,
   showItemNote: true,
+  showOrderNote: true,
   showUnitPrice: true,
   showQuantity: true,
   showSubtotal: true,
@@ -511,6 +535,7 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   showWifiInfo: false,
   paperWidth: 80,
   fontSize: 'normal',
+  lineSpacing: 0.7,
   separatorChar: '-',
   doubleSeparatorChar: '=',
   cutPaper: true,

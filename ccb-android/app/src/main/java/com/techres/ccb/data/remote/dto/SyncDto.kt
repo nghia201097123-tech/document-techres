@@ -762,6 +762,7 @@ data class BillTemplateDto(
     // Items config
     @SerializedName("showItemCode") val showItemCode: Boolean = false,
     @SerializedName("showItemNote") val showItemNote: Boolean = true,
+    @SerializedName("showOrderNote") val showOrderNote: Boolean = true, // Hiển thị ghi chú đơn hàng
     @SerializedName("showUnitPrice") val showUnitPrice: Boolean = true,
     @SerializedName("showQuantity") val showQuantity: Boolean = true,
     // Price config
@@ -805,7 +806,8 @@ data class BillTemplateDto(
     @SerializedName("wifiPassword") val wifiPassword: String?,
     // Style config
     @SerializedName("paperWidth") val paperWidth: Int = 80,
-    @SerializedName("fontSize") val fontSize: String = "normal",
+    @SerializedName("fontSize") val fontSize: String = "normal", // extra_small, small, normal, large, extra_large
+    @SerializedName("lineSpacing") val lineSpacing: Float = 0.7f, // Khoảng cách dòng (0.3-1.0)
     @SerializedName("separatorChar") val separatorChar: String = "-",
     @SerializedName("doubleSeparatorChar") val doubleSeparatorChar: String = "=",
     @SerializedName("cutPaper") val cutPaper: Boolean = true,

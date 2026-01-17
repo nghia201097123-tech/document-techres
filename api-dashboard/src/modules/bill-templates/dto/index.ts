@@ -125,6 +125,11 @@ export class CreateBillTemplateDto {
   @IsBoolean()
   showItemNote?: boolean;
 
+  @ApiPropertyOptional({ description: 'Hiển thị ghi chú đơn hàng' })
+  @IsOptional()
+  @IsBoolean()
+  showOrderNote?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
@@ -326,10 +331,15 @@ export class CreateBillTemplateDto {
   @IsNumber()
   paperWidth?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Cỡ chữ: extra_small, small, normal, large, extra_large' })
   @IsOptional()
   @IsString()
   fontSize?: string;
+
+  @ApiPropertyOptional({ description: 'Khoảng cách dòng (0.3-1.0)' })
+  @IsOptional()
+  @IsNumber()
+  lineSpacing?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

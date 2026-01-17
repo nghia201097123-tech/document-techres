@@ -604,6 +604,7 @@ class SyncRepository @Inject constructor(
                 // Items config
                 showItemCode = dto.showItemCode,
                 showItemNote = dto.showItemNote,
+                showOrderNote = dto.showOrderNote,
                 showUnitPrice = dto.showUnitPrice,
                 showQuantity = dto.showQuantity,
                 // Price config
@@ -648,6 +649,7 @@ class SyncRepository @Inject constructor(
                 // Style config
                 paperWidth = dto.paperWidth,
                 fontSize = dto.fontSize,
+                lineSpacing = dto.lineSpacing,
                 separatorChar = dto.separatorChar,
                 doubleSeparatorChar = dto.doubleSeparatorChar,
                 cutPaper = dto.cutPaper,

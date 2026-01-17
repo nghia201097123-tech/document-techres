@@ -233,7 +233,10 @@ data class BillTemplateEntity(
     val paperWidth: Int = 80, // 58 hoặc 80mm
 
     @ColumnInfo(name = "font_size")
-    val fontSize: String = "normal", // small, normal, large
+    val fontSize: String = "normal", // extra_small, small, normal, large, extra_large
+
+    @ColumnInfo(name = "line_spacing")
+    val lineSpacing: Float = 0.7f, // Khoảng cách dòng (0.3-1.0)
 
     @ColumnInfo(name = "separator_char")
     val separatorChar: String = "-",
