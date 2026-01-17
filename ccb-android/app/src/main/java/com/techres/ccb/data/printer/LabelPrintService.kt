@@ -468,15 +468,20 @@ object LabelPrintService {
         }
 
         // ========== SIZE với giá ==========
-        label.size?.let { size ->
-            // Tìm giá của size trong toppingPrices
-            val sizePrice = label.toppingPrices.find {
-                it.first.lowercase().contains("size") || it.first.lowercase().contains(size.lowercase())
-            }?.second ?: 0.0
+        // Tìm SIZE: từ options hoặc từ topping có tên chứa "size"
+        var displayedSizeTopping: String? = null // Track topping đã hiển thị như SIZE
+
+        val sizeValue = label.size
+        val sizeToppingEntry = label.toppingPrices.find { it.first.lowercase().contains("size") }
+
+        if (sizeValue != null) {
+            // SIZE từ options - tìm giá từ toppingPrices
+            val sizePrice = sizeToppingEntry?.second ?: 0.0
+            displayedSizeTopping = sizeToppingEntry?.first // Mark this topping as displayed
 
             if (showPrice && sizePrice > 0) {
                 val sizeBitmap = renderTwoColumnText(
-                    "+ Size $size",
+                    "+ Size $sizeValue",
                     "+${formatVND(sizePrice)}",
                     contentWidth,
                     fontNormal,
@@ -487,7 +492,35 @@ object LabelPrintService {
                 sizeBitmap.recycle()
             } else {
                 val sizeBitmap = renderTextBitmap(
-                    text = "+ Size $size",
+                    text = "+ Size $sizeValue",
+                    width = contentWidth,
+                    fontSize = fontNormal,
+                    bold = false,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(margin, yPos, sizeBitmap))
+                yPos += sizeBitmap.height
+                sizeBitmap.recycle()
+            }
+        } else if (sizeToppingEntry != null) {
+            // Không có SIZE trong options nhưng có topping chứa "size" - hiển thị nó
+            val (sizeName, sizePrice) = sizeToppingEntry
+            displayedSizeTopping = sizeName
+
+            if (showPrice && sizePrice > 0) {
+                val sizeBitmap = renderTwoColumnText(
+                    "+ $sizeName",
+                    "+${formatVND(sizePrice)}",
+                    contentWidth,
+                    fontNormal,
+                    bold = false
+                )
+                output.write(bitmapToTspl(margin, yPos, sizeBitmap))
+                yPos += sizeBitmap.height
+                sizeBitmap.recycle()
+            } else {
+                val sizeBitmap = renderTextBitmap(
+                    text = "+ $sizeName",
                     width = contentWidth,
                     fontSize = fontNormal,
                     bold = false,
@@ -529,9 +562,9 @@ object LabelPrintService {
 
         // ========== TOPPINGS với giá ==========
         if (label.toppingPrices.isNotEmpty()) {
-            // Lọc bỏ size đã hiển thị ở trên
+            // Chỉ lọc bỏ topping đã hiển thị như SIZE (nếu có)
             val filteredToppings = label.toppingPrices.filter { (name, _) ->
-                !name.lowercase().contains("size")
+                name != displayedSizeTopping
             }
 
             filteredToppings.forEach { (toppingName, toppingPrice) ->
@@ -857,15 +890,30 @@ object LabelPrintService {
             }
 
             // ========== SIZE với giá ==========
-            label.size?.let { size ->
-                val sizePrice = label.toppingPrices.find {
-                    it.first.lowercase().contains("size") || it.first.lowercase().contains(size.lowercase())
-                }?.second ?: 0.0
+            // Tìm SIZE: từ options hoặc từ topping có tên chứa "size"
+            var displayedSizeTopping: String? = null
+            val sizeValue = label.size
+            val sizeToppingEntry = label.toppingPrices.find { it.first.lowercase().contains("size") }
+
+            if (sizeValue != null) {
+                // SIZE từ options - tìm giá từ toppingPrices
+                val sizePrice = sizeToppingEntry?.second ?: 0.0
+                displayedSizeTopping = sizeToppingEntry?.first
 
                 if (showPrice && sizePrice > 0) {
-                    lineKeyValue("+ Size $size", "+${formatVND(sizePrice)}")
+                    lineKeyValue("+ Size $sizeValue", "+${formatVND(sizePrice)}")
                 } else {
-                    line("+ Size $size")
+                    line("+ Size $sizeValue")
+                }
+            } else if (sizeToppingEntry != null) {
+                // Không có SIZE trong options nhưng có topping chứa "size" - hiển thị nó
+                val (sizeName, sizePrice) = sizeToppingEntry
+                displayedSizeTopping = sizeName
+
+                if (showPrice && sizePrice > 0) {
+                    lineKeyValue("+ $sizeName", "+${formatVND(sizePrice)}")
+                } else {
+                    line("+ $sizeName")
                 }
             }
 
@@ -876,9 +924,9 @@ object LabelPrintService {
             // ========== TOPPINGS với giá ==========
             if (label.toppings.isNotEmpty() || label.toppingPrices.isNotEmpty()) {
                 if (label.toppingPrices.isNotEmpty()) {
-                    // Lọc bỏ size đã hiển thị
+                    // Chỉ lọc bỏ topping đã hiển thị như SIZE (nếu có)
                     val filteredToppings = label.toppingPrices.filter { (name, _) ->
-                        !name.lowercase().contains("size")
+                        name != displayedSizeTopping
                     }
                     filteredToppings.forEach { (toppingName, toppingPrice) ->
                         if (showPrice && toppingPrice > 0) {
