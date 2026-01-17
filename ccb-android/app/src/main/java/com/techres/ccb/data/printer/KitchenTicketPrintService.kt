@@ -336,9 +336,9 @@ object KitchenTicketPrintService {
                     lineKeyValue(itemLine, rightPart, BitmapTextStyle(bold = true))
                 }
 
-                // Tùy chọn (Size, Đá, Đường...)
+                // Tùy chọn (Size, Đá, Đường...) - hiển thị dạng "• Size L" thay vì "Size: L"
                 item.options.forEach { (key, value) ->
-                    line("   $key: $value")
+                    line("   • $key $value")
                 }
 
                 // Topping - hiển thị tất cả toppings giống như in tem

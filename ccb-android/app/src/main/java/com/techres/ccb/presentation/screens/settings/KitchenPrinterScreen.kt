@@ -1316,7 +1316,7 @@ private fun TestPrintDialog(
                                 "Trân châu cam" to 100000.0,
                                 "Trân châu vàng" to 100000.0
                             ),
-                            options = mapOf("Size" to "L", "Đá" to "50%", "Đường" to "30%")
+                            options = mapOf("Đá" to "50%", "Đường" to "30%") // Size đã có trong toppingPrices
                         ),
                         KitchenTicketPrintService.KitchenItem(
                             name = "Cà phê sữa đá",
