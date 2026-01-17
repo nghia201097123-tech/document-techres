@@ -310,7 +310,8 @@ fun SaleScreen(
                                 unitPrice = item.unitPrice.toLong(),
                                 totalPrice = item.totalPrice.toLong(),
                                 discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
-                                categoryId = null
+                                categoryId = null,
+                                vatRate = item.vatRate
                             ))
                         }
                 } else {
@@ -323,7 +324,8 @@ fun SaleScreen(
                             unitPrice = item.product.price.toLong(),
                             totalPrice = item.totalPrice,
                             discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
-                            categoryId = item.product.categoryId
+                            categoryId = item.product.categoryId,
+                            vatRate = item.product.vatRate
                         ))
                     }
                 }
