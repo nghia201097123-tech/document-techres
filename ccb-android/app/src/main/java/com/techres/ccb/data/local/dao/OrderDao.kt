@@ -112,13 +112,14 @@ interface OrderDao {
 
     /**
      * Get order history filtered by date range
+     * Uses SUBSTR to compare only the date part (YYYY-MM-DD) for timezone safety
      */
     @Query("""
         SELECT * FROM orders
         WHERE branch_id = :branchId
         AND status IN ('completed', 'cancelled')
-        AND created_at >= :startDate
-        AND created_at <= :endDate
+        AND SUBSTR(created_at, 1, 10) >= :startDate
+        AND SUBSTR(created_at, 1, 10) < :endDate
         ORDER BY created_at DESC
     """)
     fun getOrderHistoryByDateRange(
@@ -129,13 +130,14 @@ interface OrderDao {
 
     /**
      * Get order history filtered by both status and date range
+     * Uses SUBSTR to compare only the date part (YYYY-MM-DD) for timezone safety
      */
     @Query("""
         SELECT * FROM orders
         WHERE branch_id = :branchId
         AND status = :status
-        AND created_at >= :startDate
-        AND created_at <= :endDate
+        AND SUBSTR(created_at, 1, 10) >= :startDate
+        AND SUBSTR(created_at, 1, 10) < :endDate
         ORDER BY created_at DESC
     """)
     fun getOrderHistoryFiltered(

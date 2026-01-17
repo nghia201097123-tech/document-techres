@@ -98,6 +98,14 @@ import com.techres.ccb.util.AppliedCouponInfo
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import java.time.Instant
+import java.time.ZoneId
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -154,9 +162,54 @@ fun OrderHistoryScreen(
             CompactFiltersRow(
                 statusFilter = uiState.statusFilter,
                 dateFilter = uiState.dateFilter,
+                customStartDate = uiState.customStartDate,
+                customEndDate = uiState.customEndDate,
                 onStatusFilterChange = { viewModel.setStatusFilter(it) },
-                onDateFilterChange = { viewModel.setDateFilter(it) }
+                onDateFilterChange = { viewModel.setDateFilter(it) },
+                onShowStartDatePicker = { viewModel.showDatePicker("start") },
+                onShowEndDatePicker = { viewModel.showDatePicker("end") }
             )
+
+            // Date Picker Dialog
+            if (uiState.showDatePicker) {
+                val initialDate = if (uiState.datePickerType == "start") {
+                    uiState.customStartDate ?: LocalDate.now()
+                } else {
+                    uiState.customEndDate ?: LocalDate.now()
+                }
+                val datePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = initialDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                )
+
+                DatePickerDialog(
+                    onDismissRequest = { viewModel.hideDatePicker() },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                datePickerState.selectedDateMillis?.let { millis ->
+                                    val selectedDate = Instant.ofEpochMilli(millis)
+                                        .atZone(ZoneId.systemDefault())
+                                        .toLocalDate()
+                                    if (uiState.datePickerType == "start") {
+                                        viewModel.setCustomStartDate(selectedDate)
+                                    } else {
+                                        viewModel.setCustomEndDate(selectedDate)
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("Chọn")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.hideDatePicker() }) {
+                            Text("Hủy")
+                        }
+                    }
+                ) {
+                    DatePicker(state = datePickerState)
+                }
+            }
 
             // Orders List
             if (uiState.isLoading) {
@@ -290,67 +343,139 @@ private fun CompactStat(value: String, color: Color) {
 private fun CompactFiltersRow(
     statusFilter: OrderHistoryFilter,
     dateFilter: DateFilter,
+    customStartDate: LocalDate?,
+    customEndDate: LocalDate?,
     onStatusFilterChange: (OrderHistoryFilter) -> Unit,
-    onDateFilterChange: (DateFilter) -> Unit
+    onDateFilterChange: (DateFilter) -> Unit,
+    onShowStartDatePicker: () -> Unit,
+    onShowEndDatePicker: () -> Unit
 ) {
-    Row(
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Status filters
-        OrderHistoryFilter.entries.forEach { filter ->
-            FilterChip(
-                selected = statusFilter == filter,
-                onClick = { onStatusFilterChange(filter) },
-                label = { Text(filter.displayName, fontSize = 11.sp) },
-                modifier = Modifier.height(28.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Status filters
+            OrderHistoryFilter.entries.forEach { filter ->
+                FilterChip(
+                    selected = statusFilter == filter,
+                    onClick = { onStatusFilterChange(filter) },
+                    label = { Text(filter.displayName, fontSize = 11.sp) },
+                    modifier = Modifier.height(28.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
-            )
-        }
+            }
 
-        Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f))
 
-        // Date filter dropdown
-        var expanded by remember { mutableStateOf(false) }
-        Box {
-            FilterChip(
-                selected = true,
-                onClick = { expanded = true },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(dateFilter.displayName, fontSize = 11.sp)
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+            // Date filter dropdown
+            var expanded by remember { mutableStateOf(false) }
+            Box {
+                FilterChip(
+                    selected = true,
+                    onClick = { expanded = true },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(dateFilter.displayName, fontSize = 11.sp)
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    },
+                    modifier = Modifier.height(28.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                    )
+                )
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    DateFilter.entries.forEach { filter ->
+                        DropdownMenuItem(
+                            text = { Text(filter.displayName, fontSize = 13.sp) },
+                            onClick = {
+                                onDateFilterChange(filter)
+                                expanded = false
+                            }
                         )
                     }
-                },
-                modifier = Modifier.height(28.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary
-                )
-            )
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
+                }
+            }
+        }
+
+        // Custom date range row (only show when CUSTOM is selected)
+        if (dateFilter == DateFilter.CUSTOM) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                DateFilter.entries.forEach { filter ->
-                    DropdownMenuItem(
-                        text = { Text(filter.displayName, fontSize = 13.sp) },
-                        onClick = {
-                            onDateFilterChange(filter)
-                            expanded = false
-                        }
-                    )
+                Text("Từ:", fontSize = 12.sp, color = Color.Gray)
+                Surface(
+                    modifier = Modifier.clickable { onShowStartDatePicker() },
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.White,
+                    shadowElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DateRange,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = customStartDate?.format(dateFormatter) ?: "Chọn ngày",
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Text("Đến:", fontSize = 12.sp, color = Color.Gray)
+                Surface(
+                    modifier = Modifier.clickable { onShowEndDatePicker() },
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.White,
+                    shadowElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DateRange,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = customEndDate?.format(dateFormatter) ?: "Chọn ngày",
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }

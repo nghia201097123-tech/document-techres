@@ -44,6 +44,7 @@ enum class DateFilter(val displayName: String) {
     YESTERDAY("Hôm qua"),
     THIS_WEEK("Tuần này"),
     THIS_MONTH("Tháng này"),
+    CUSTOM("Tùy chọn"),
     ALL("Tất cả")
 }
 
@@ -79,6 +80,11 @@ data class OrderHistoryUiState(
     val allOrders: List<OrderHistoryItem> = emptyList(),  // All orders before pagination
     val statusFilter: OrderHistoryFilter = OrderHistoryFilter.ALL,
     val dateFilter: DateFilter = DateFilter.TODAY,
+    // Custom date range
+    val customStartDate: LocalDate? = null,
+    val customEndDate: LocalDate? = null,
+    val showDatePicker: Boolean = false,
+    val datePickerType: String = "start", // "start" or "end"
     val totalCount: Int = 0,
     val completedCount: Int = 0,
     val cancelledCount: Int = 0,
@@ -266,8 +272,42 @@ class OrderHistoryViewModel @Inject constructor(
     }
 
     fun setDateFilter(filter: DateFilter) {
-        _uiState.update { it.copy(dateFilter = filter) }
+        if (filter == DateFilter.CUSTOM) {
+            // Initialize custom dates if not set
+            val today = LocalDate.now()
+            _uiState.update {
+                it.copy(
+                    dateFilter = filter,
+                    customStartDate = it.customStartDate ?: today,
+                    customEndDate = it.customEndDate ?: today
+                )
+            }
+        } else {
+            _uiState.update { it.copy(dateFilter = filter) }
+        }
         startOrdersObserver()
+    }
+
+    fun showDatePicker(type: String) {
+        _uiState.update { it.copy(showDatePicker = true, datePickerType = type) }
+    }
+
+    fun hideDatePicker() {
+        _uiState.update { it.copy(showDatePicker = false) }
+    }
+
+    fun setCustomStartDate(date: LocalDate) {
+        _uiState.update { it.copy(customStartDate = date, showDatePicker = false) }
+        if (_uiState.value.dateFilter == DateFilter.CUSTOM) {
+            startOrdersObserver()
+        }
+    }
+
+    fun setCustomEndDate(date: LocalDate) {
+        _uiState.update { it.copy(customEndDate = date, showDatePicker = false) }
+        if (_uiState.value.dateFilter == DateFilter.CUSTOM) {
+            startOrdersObserver()
+        }
     }
 
     fun showOrderDetail(orderId: String) {
@@ -612,36 +652,39 @@ class OrderHistoryViewModel @Inject constructor(
 
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
-        val formatter = DateTimeFormatter.ISO_INSTANT
 
-        val (startDate, endDate) = when (dateFilter) {
+        val (startLocalDate, endLocalDate) = when (dateFilter) {
             DateFilter.TODAY -> {
-                val start = today.atStartOfDay(zone).toInstant()
-                val end = today.plusDays(1).atStartOfDay(zone).toInstant()
-                start to end
+                today to today
             }
             DateFilter.YESTERDAY -> {
                 val yesterday = today.minusDays(1)
-                val start = yesterday.atStartOfDay(zone).toInstant()
-                val end = today.atStartOfDay(zone).toInstant()
-                start to end
+                yesterday to yesterday
             }
             DateFilter.THIS_WEEK -> {
                 val startOfWeek = today.minusDays(today.dayOfWeek.value.toLong() - 1)
-                val start = startOfWeek.atStartOfDay(zone).toInstant()
-                val end = today.plusDays(1).atStartOfDay(zone).toInstant()
-                start to end
+                startOfWeek to today
             }
             DateFilter.THIS_MONTH -> {
                 val startOfMonth = today.withDayOfMonth(1)
-                val start = startOfMonth.atStartOfDay(zone).toInstant()
-                val end = today.plusDays(1).atStartOfDay(zone).toInstant()
-                start to end
+                startOfMonth to today
+            }
+            DateFilter.CUSTOM -> {
+                val customStart = _uiState.value.customStartDate ?: today
+                val customEnd = _uiState.value.customEndDate ?: today
+                customStart to customEnd
             }
             else -> return null to null
         }
 
-        return formatter.format(startDate) to formatter.format(endDate)
+        // Format as simple date string for LIKE comparison: "2025-01-17"
+        // This ensures timezone issues don't affect the query
+        val startDate = startLocalDate.toString() // "2025-01-17"
+        val endDate = endLocalDate.plusDays(1).toString() // "2025-01-18" (exclusive)
+
+        Log.d(TAG, "getDateRange - filter: $dateFilter, startDate: $startDate, endDate: $endDate")
+
+        return startDate to endDate
     }
 
     private fun parseTimestamp(isoTime: String): Long {
