@@ -1285,7 +1285,7 @@ private fun TestPrintDialog(
                 KitchenTicketPrintService.printTicket(kitchen, ticketData)
             }
             TestPrintType.LABEL -> {
-                // Print label
+                // Print label with price data for testing
                 val labelData = LabelPrintService.LabelData(
                     itemName = "Trà sữa trân châu đường đen",
                     itemCode = "TS001",
@@ -1294,11 +1294,21 @@ private fun TestPrintDialog(
                     sugar = "70%",
                     ice = "Ít đá",
                     toppings = listOf("Trân châu đen", "Thạch dừa"),
-                    note = "Không hành - Test tem",
+                    toppingPrices = listOf(
+                        "Trân châu đen" to 10000.0,
+                        "Thạch dừa" to 8000.0
+                    ),
+                    note = "Ít đá, không đường, mang đi",
                     tableName = "Bàn 5",
                     orderNumber = "TEST${System.currentTimeMillis() % 10000}",
                     orderTime = Date(),
-                    staffName = "Nhân viên test"
+                    staffName = "Nhân viên test",
+                    // Price data for testing "In giá" option
+                    unitPrice = 35000.0,
+                    totalToppingPrice = 18000.0,
+                    totalPrice = 53000.0,
+                    finalPrice = 45000.0,
+                    discountAmount = 8000.0
                 )
                 LabelPrintService.printLabels(kitchen, labelData)
             }

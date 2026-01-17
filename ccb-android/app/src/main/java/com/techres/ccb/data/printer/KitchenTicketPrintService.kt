@@ -252,49 +252,40 @@ object KitchenTicketPrintService {
             init()
 
             // ═══════════════════════════════════════════
-            // SECTION 1: HEADER - TÊN CỬA HÀNG (nếu có)
-            // ═══════════════════════════════════════════
-            if (showStoreName && !storeName.isNullOrBlank()) {
-                lineBold(storeName, BitmapTextStyle(centerAlign = true))
-                separator('-')
-            }
-
-            // ═══════════════════════════════════════════
-            // SECTION 2: HEADER - TÊN BẾP
+            // SECTION 1: HEADER - TÊN BẾP (luôn hiển thị đầu tiên, nổi bật)
             // ═══════════════════════════════════════════
             val kitchenHeader = "*** ${ticket.kitchenName.uppercase()} ***"
             lineDouble(kitchenHeader, BitmapTextStyle(centerAlign = true))
 
-            // Loại phiếu (SỬA ĐƠN, HỦY ĐƠN)
+            // Loại phiếu (SỬA ĐƠN, HỦY ĐƠN) - gộp chung với đơn gấp
             when (ticket.ticketType) {
                 "MODIFIED" -> {
-                    separator('=')
-                    lineDouble("SỬA ĐƠN", BitmapTextStyle(centerAlign = true))
-                    separator('=')
+                    lineBold("[ SỬA ĐƠN ]", BitmapTextStyle(centerAlign = true))
                 }
                 "CANCELLED" -> {
-                    separator('=')
-                    lineDouble("HỦY ĐƠN", BitmapTextStyle(centerAlign = true))
-                    separator('=')
-                }
-                else -> {
-                    separator('=')
+                    lineBold("[ HỦY ĐƠN ]", BitmapTextStyle(centerAlign = true))
                 }
             }
 
-            // Đơn gấp
+            // Đơn gấp - hiển thị nổi bật
             if (ticket.isUrgent) {
-                lineDouble("!!! GẤP !!!", BitmapTextStyle(centerAlign = true))
-                separator('-')
+                lineBold("!!! GẤP !!!", BitmapTextStyle(centerAlign = true))
             }
 
+            separator('=')
+
             // ═══════════════════════════════════════════
-            // SECTION 3: THÔNG TIN ĐƠN HÀNG (theo config)
+            // SECTION 2: THÔNG TIN ĐƠN HÀNG (gọn gàng trên ít dòng)
             // ═══════════════════════════════════════════
+            // Tên cửa hàng (nếu có) - cùng dòng với tên bàn
+            if (showStoreName && !storeName.isNullOrBlank()) {
+                line(storeName)
+            }
+
             // Tên bàn (TO, ĐẬM, nổi bật) - nếu config cho phép
             if (showTableName) {
                 ticket.tableName?.let {
-                    lineDouble("BÀN: $it", BitmapTextStyle(centerAlign = false))
+                    lineBold("BÀN: $it")
                 }
             }
 
@@ -307,7 +298,7 @@ object KitchenTicketPrintService {
                 if (orderPart.isNotEmpty() && timePart.isNotEmpty()) {
                     lineKeyValue(orderPart, timePart)
                 } else if (orderPart.isNotEmpty()) {
-                    lineBold(orderPart)
+                    line(orderPart)
                 } else {
                     line(timePart)
                 }
