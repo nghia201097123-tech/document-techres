@@ -80,6 +80,7 @@ object OrderPrintingService {
                     productName = item.productName,
                     productCode = item.productCode,
                     quantity = item.quantity,
+                    price = item.totalPrice, // Giá tổng của món (đã bao gồm topping, size...)
                     note = note,
                     toppings = toppings,
                     options = options,
@@ -151,6 +152,7 @@ object OrderPrintingService {
                     productName = item.productName,
                     productCode = item.productCode,
                     quantity = item.quantity,
+                    price = item.totalPrice, // Giá tổng của món (đã bao gồm topping, size...)
                     note = note,
                     toppings = toppings,
                     options = options,

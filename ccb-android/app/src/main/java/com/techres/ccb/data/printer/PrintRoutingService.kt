@@ -28,6 +28,7 @@ object PrintRoutingService {
         val productName: String,
         val productCode: String? = null,
         val quantity: Int,
+        val price: Double = 0.0, // Giá món (tổng giá sau khi tính topping, size...)
         val note: String? = null,
         val toppings: List<ToppingInfo> = emptyList(),
         val options: Map<String, String> = emptyMap(), // Size, Đường, Đá...
@@ -273,6 +274,7 @@ object PrintRoutingService {
 
         val ticketItems = items.map { item ->
             Log.d(TAG, "  Converting item: ${item.productName}")
+            Log.d(TAG, "    - price: ${item.price}")
             Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})" }}")
             Log.d(TAG, "    - options: ${item.options}")
             Log.d(TAG, "    - note: ${item.note}")
@@ -283,6 +285,7 @@ object PrintRoutingService {
             KitchenTicketPrintService.KitchenItem(
                 name = item.productName,
                 quantity = item.quantity,
+                price = item.price, // Giá món để hiển thị khi ticketPrintPrice = true
                 note = item.note,
                 toppings = item.toppings.map { it.name },
                 toppingPrices = toppingPrices, // Pass topping prices giống như tem
