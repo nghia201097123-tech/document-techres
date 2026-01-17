@@ -228,6 +228,9 @@ fun KitchenPrinterScreen(
                                 onTestPrint = {
                                     testPrintKitchen = kitchen
                                     showTestPrintDialog = true
+                                },
+                                onToggleActive = { isActive ->
+                                    viewModel.toggleActiveStatus(kitchen.id, isActive)
                                 }
                             )
                         }
@@ -297,7 +300,8 @@ fun KitchenPrinterScreen(
 private fun KitchenPrinterCard(
     kitchen: KitchenEntity,
     onConfigurePrinter: () -> Unit,
-    onTestPrint: () -> Unit
+    onTestPrint: () -> Unit,
+    onToggleActive: (Boolean) -> Unit
 ) {
     val icon = getKitchenIcon(kitchen.kitchenType)
     val color = getKitchenColor(kitchen.kitchenType)
@@ -306,7 +310,9 @@ private fun KitchenPrinterCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(
+            containerColor = if (kitchen.isActive) Color.White else Color(0xFFF5F5F5)
+        )
     ) {
         Column(
             modifier = Modifier
@@ -323,14 +329,17 @@ private fun KitchenPrinterCard(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(color.copy(alpha = 0.15f)),
+                        .background(
+                            if (kitchen.isActive) color.copy(alpha = 0.15f)
+                            else Color.Gray.copy(alpha = 0.15f)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
-                        tint = color
+                        tint = if (kitchen.isActive) color else Color.Gray
                     )
                 }
 
@@ -342,7 +351,10 @@ private fun KitchenPrinterCard(
                         text = kitchen.name,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = if (kitchen.isActive)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                     Text(
                         text = kitchen.description ?: kitchen.kitchenType ?: "",
@@ -351,32 +363,45 @@ private fun KitchenPrinterCard(
                     )
                 }
 
-                // Connection status
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            if (kitchen.isPrinterConnected) Color(0xFFE8F5E9)
-                            else Color(0xFFFFEBEE)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                // Enable/Disable Switch
+                Switch(
+                    checked = kitchen.isActive,
+                    onCheckedChange = onToggleActive,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = color,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                    )
+                )
+            }
+
+            // Show inactive message if disabled
+            if (!kitchen.isActive) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFF3E0)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (kitchen.isPrinterConnected) Color(0xFF4CAF50)
-                                    else Color(0xFFE53935)
-                                )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color(0xFFFF9800)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (kitchen.isPrinterConnected) "Đã kết nối" else "Chưa kết nối",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (kitchen.isPrinterConnected) Color(0xFF2E7D32) else Color(0xFFC62828)
+                            text = "Bếp đang tắt - không in khi có order",
+                            fontSize = 12.sp,
+                            color = Color(0xFFE65100)
                         )
                     }
                 }

@@ -83,6 +83,13 @@ class KitchenRepository @Inject constructor(
         return kitchenDao.getCount(branchId)
     }
 
+    /**
+     * Update isActive status for a kitchen (enable/disable printing)
+     */
+    suspend fun updateActiveStatus(kitchenId: String, isActive: Boolean) {
+        kitchenDao.updateActiveStatus(kitchenId, isActive)
+    }
+
     suspend fun clearByBranch(branchId: String) {
         kitchenDao.deleteAllByBranch(branchId)
     }

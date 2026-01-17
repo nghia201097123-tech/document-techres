@@ -182,6 +182,21 @@ class KitchenPrinterViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Toggle isActive status for a kitchen (enable/disable printing)
+     */
+    fun toggleActiveStatus(kitchenId: String, isActive: Boolean) {
+        viewModelScope.launch {
+            try {
+                kitchenRepository.updateActiveStatus(kitchenId, isActive)
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: "Lỗi cập nhật trạng thái")
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }

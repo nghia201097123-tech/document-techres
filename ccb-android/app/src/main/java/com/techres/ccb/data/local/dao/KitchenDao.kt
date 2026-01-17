@@ -7,10 +7,13 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface KitchenDao {
 
-    @Query("SELECT * FROM kitchens WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
+    @Query("SELECT * FROM kitchens WHERE branch_id = :branchId ORDER BY sort_order ASC")
     fun getAllByBranch(branchId: String): Flow<List<KitchenEntity>>
 
     @Query("SELECT * FROM kitchens WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
+    fun getActiveByBranch(branchId: String): Flow<List<KitchenEntity>>
+
+    @Query("SELECT * FROM kitchens WHERE branch_id = :branchId ORDER BY sort_order ASC")
     suspend fun getAllByBranchSync(branchId: String): List<KitchenEntity>
 
     @Query("SELECT * FROM kitchens WHERE id = :id")
@@ -33,6 +36,9 @@ interface KitchenDao {
 
     @Query("SELECT COUNT(*) FROM kitchens WHERE branch_id = :branchId AND is_active = 1")
     suspend fun getCount(branchId: String): Int
+
+    @Query("UPDATE kitchens SET is_active = :isActive WHERE id = :kitchenId")
+    suspend fun updateActiveStatus(kitchenId: String, isActive: Boolean)
 
     @Query("UPDATE kitchens SET printer_ip = :ip, printer_port = :port, printer_name = :name, is_printer_connected = :isConnected WHERE id = :kitchenId")
     suspend fun updatePrinterConfig(kitchenId: String, ip: String?, port: Int, name: String?, isConnected: Boolean)
