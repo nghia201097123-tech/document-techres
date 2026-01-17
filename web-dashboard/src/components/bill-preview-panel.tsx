@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { CreateBillTemplateDto } from "@/services/bill-template-service";
 
 interface BillPreviewPanelProps {
@@ -39,11 +38,10 @@ export function BillPreviewPanel({ template, className }: BillPreviewPanelProps)
       <div className="text-center text-xs text-muted-foreground mb-2">
         Xem trước • {template.paperWidth || 80}mm
       </div>
-      <ScrollArea className="h-[500px]">
-        <div
-          className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${getFontSizeClass()}`}
-          style={{ width: getPreviewWidth() }}
-        >
+      <div
+        className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${getFontSizeClass()}`}
+        style={{ width: getPreviewWidth() }}
+      >
           {/* Header */}
           <div className="text-center mb-2">
             {template.showLogo && (
@@ -321,7 +319,7 @@ export function BillPreviewPanel({ template, className }: BillPreviewPanelProps)
             {(template.numberOfCopies || 1) > 1 && <span className="bg-gray-100 px-1 rounded">📄 x{template.numberOfCopies}</span>}
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

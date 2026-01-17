@@ -710,11 +710,10 @@ export default function BillTemplatePage() {
               Thiết lập các thông tin hiển thị trên hóa đơn bán hàng
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[60vh]">
             {/* Form Section - 2/3 width */}
-            <div className="lg:col-span-2">
-              <ScrollArea className="max-h-[60vh] pr-4">
-                <div className="space-y-4">
+            <div className="lg:col-span-2 overflow-y-auto pr-2 h-full">
+              <div className="space-y-4">
               {/* Basic info */}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
@@ -1436,16 +1435,13 @@ export default function BillTemplatePage() {
                   </div>
                 </TabsContent>
               </Tabs>
-                </div>
-              </ScrollArea>
+              </div>
             </div>
 
             {/* Live Preview Section - 1/3 width */}
-            <div className="hidden lg:block border-l pl-6">
-              <div className="sticky top-0">
-                <h3 className="font-medium text-sm text-muted-foreground mb-3">Xem trước trực tiếp</h3>
-                <BillPreviewPanel template={templateForm} />
-              </div>
+            <div className="hidden lg:block border-l pl-6 overflow-y-auto h-full">
+              <h3 className="font-medium text-sm text-muted-foreground mb-3 sticky top-0 bg-background py-1">Xem trước trực tiếp</h3>
+              <BillPreviewPanel template={templateForm} />
             </div>
           </div>
           <DialogFooter>
