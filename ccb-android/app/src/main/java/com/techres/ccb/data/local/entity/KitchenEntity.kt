@@ -232,6 +232,9 @@ data class KitchenEntity(
     @ColumnInfo(name = "ticket_font_size")
     val ticketFontSize: String = "medium", // Cỡ chữ phiếu: small, medium, large
 
+    @ColumnInfo(name = "ticket_print_price")
+    val ticketPrintPrice: Boolean = false, // In giá món trên phiếu
+
     // ========== LABEL PRINTING CONFIG ==========
     @ColumnInfo(name = "label_print_price")
     val labelPrintPrice: Boolean = false, // In giá trên tem

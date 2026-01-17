@@ -220,6 +220,7 @@ data class KitchenDto(
     @SerializedName("ticketStoreName") val ticketStoreName: String? = null,
     @SerializedName("ticketPrintNotes") val ticketPrintNotes: Boolean? = null,
     @SerializedName("ticketFontSize") val ticketFontSize: String? = null,
+    @SerializedName("ticketPrintPrice") val ticketPrintPrice: Boolean? = null,
     // ========== LABEL PRINTING CONFIG ==========
     @SerializedName("labelPrintPrice") val labelPrintPrice: Boolean = false,
     @SerializedName("labelPrintStoreName") val labelPrintStoreName: Boolean = false,

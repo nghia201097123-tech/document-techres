@@ -99,6 +99,9 @@ export class Kitchen {
   @Column({ name: 'ticket_font_size', type: 'varchar', length: 20, default: 'medium' })
   ticketFontSize: string;
 
+  @Column({ name: 'ticket_print_price', default: false })
+  ticketPrintPrice: boolean;
+
   // ========== LABEL PRINTING CONFIG ==========
   @Column({ name: 'label_print_price', default: false })
   labelPrintPrice: boolean;

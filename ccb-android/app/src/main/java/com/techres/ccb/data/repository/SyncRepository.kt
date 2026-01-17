@@ -433,6 +433,7 @@ class SyncRepository @Inject constructor(
                 ticketStoreName = dto.ticketStoreName,
                 ticketPrintNotes = dto.ticketPrintNotes ?: true,
                 ticketFontSize = dto.ticketFontSize ?: "medium",
+                ticketPrintPrice = dto.ticketPrintPrice ?: false,
                 // Label printing config
                 labelPrintPrice = dto.labelPrintPrice,
                 labelPrintStoreName = dto.labelPrintStoreName,

@@ -567,6 +567,9 @@ export class KitchenDto {
   @ApiProperty({ description: 'Cỡ chữ phiếu bếp: small, medium, large' })
   ticketFontSize: string;
 
+  @ApiProperty({ description: 'In giá món trên phiếu bếp' })
+  ticketPrintPrice: boolean;
+
   // ========== LABEL SIZE CONFIG ==========
   @ApiProperty({ description: 'Chiều rộng tem (mm)' })
   labelWidthMm: number;

@@ -12,6 +12,7 @@ interface TicketPreviewProps {
   showTableName?: boolean;
   showTime?: boolean;
   showNotes?: boolean;
+  showPrice?: boolean;
   storeName?: string;
   printItemsSeparately?: boolean;
   className?: string;
@@ -25,6 +26,7 @@ const SAMPLE_DATA = {
     {
       name: "Trà sữa trân châu",
       quantity: 2,
+      price: 35000,
       size: "Size L",
       ice: "50% Đá",
       sugar: "30% Đường",
@@ -34,6 +36,7 @@ const SAMPLE_DATA = {
     {
       name: "Cà phê sữa đá",
       quantity: 1,
+      price: 25000,
       size: "Size M",
       ice: "100% Đá",
       sugar: "50% Đường",
@@ -43,6 +46,7 @@ const SAMPLE_DATA = {
     {
       name: "Bánh mì thịt nướng",
       quantity: 1,
+      price: 30000,
       toppings: ["Thêm rau", "Thêm ớt"],
       notes: "Không hành",
     },
@@ -60,6 +64,7 @@ export function TicketPreview({
   showTableName = true,
   showTime = true,
   showNotes = true,
+  showPrice = false,
   storeName = "Coffee House",
   printItemsSeparately = false,
   className,
@@ -145,6 +150,13 @@ export function TicketPreview({
               <span>{item.name}</span>
               <span>x{item.quantity}</span>
             </div>
+
+            {/* Price */}
+            {showPrice && item.price && (
+              <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">
+                Giá: {item.price.toLocaleString("vi-VN")}đ
+              </div>
+            )}
 
             {/* Attributes */}
             <div style={{ fontSize: `${fonts.small}px` }} className="text-gray-700 ml-2">

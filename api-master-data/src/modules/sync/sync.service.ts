@@ -743,6 +743,7 @@ export class SyncService {
       ticketStoreName: kitchen.ticketStoreName || null,
       ticketPrintNotes: kitchen.ticketPrintNotes ?? true,
       ticketFontSize: kitchen.ticketFontSize || 'medium',
+      ticketPrintPrice: kitchen.ticketPrintPrice ?? false,
       // Label size config
       labelWidthMm: kitchen.labelWidthMm ?? 72,
       labelHeightMm: kitchen.labelHeightMm ?? 30,

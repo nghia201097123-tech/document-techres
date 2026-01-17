@@ -36,6 +36,7 @@ object KitchenTicketPrintService {
     data class KitchenItem(
         val name: String,               // Tên món
         val quantity: Int,              // Số lượng
+        val price: Double = 0.0,        // Giá món (để in khi ticketPrintPrice = true)
         val note: String? = null,       // Ghi chú riêng cho món
         val toppings: List<String> = emptyList(), // Topping names
         val toppingPrices: List<Pair<String, Double>> = emptyList(), // Topping với giá (giống tem)
@@ -217,6 +218,7 @@ object KitchenTicketPrintService {
         val showStoreName = kitchen.ticketPrintStoreName
         val storeName = kitchen.ticketStoreName
         val showNotes = kitchen.ticketPrintNotes
+        val showPrice = kitchen.ticketPrintPrice // In giá món
         val fontSize = kitchen.ticketFontSize // "small", "medium", "large"
 
         Log.d(TAG, "=== Generating ticket content ===")
@@ -230,6 +232,7 @@ object KitchenTicketPrintService {
         Log.d(TAG, "  - showStoreName: $showStoreName")
         Log.d(TAG, "  - storeName: $storeName")
         Log.d(TAG, "  - showNotes: $showNotes")
+        Log.d(TAG, "  - showPrice: $showPrice")
         Log.d(TAG, "  - fontSize: $fontSize")
         ticket.items.forEachIndexed { index, item ->
             Log.d(TAG, "  Item $index: ${item.name}")
@@ -327,6 +330,11 @@ object KitchenTicketPrintService {
                     lineKeyValueBold(itemLine, qtyText)
                 } else {
                     lineKeyValue(itemLine, qtyText, BitmapTextStyle(bold = true))
+                }
+
+                // In giá món nếu config cho phép và có giá
+                if (showPrice && item.price > 0) {
+                    line("   Giá: ${formatPrice(item.price)}")
                 }
 
                 // Tùy chọn (Size, Đá, Đường...)

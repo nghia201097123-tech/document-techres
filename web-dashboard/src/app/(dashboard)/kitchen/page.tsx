@@ -89,6 +89,7 @@ export default function KitchenPage() {
     ticketStoreName: "",
     ticketPrintNotes: true,
     ticketFontSize: "medium" as TicketFontSize,
+    ticketPrintPrice: false,
     // Label printing config
     labelPrintPrice: false,
     labelPrintStoreName: false,
@@ -164,6 +165,7 @@ export default function KitchenPage() {
       ticketStoreName: "",
       ticketPrintNotes: true,
       ticketFontSize: "medium" as TicketFontSize,
+      ticketPrintPrice: false,
       // Label printing config
       labelPrintPrice: false,
       labelPrintStoreName: false,
@@ -206,6 +208,7 @@ export default function KitchenPage() {
       ticketStoreName: kitchen.ticketStoreName || "",
       ticketPrintNotes: kitchen.ticketPrintNotes ?? true,
       ticketFontSize: (kitchen.ticketFontSize || "medium") as TicketFontSize,
+      ticketPrintPrice: kitchen.ticketPrintPrice ?? false,
       // Label printing config
       labelPrintPrice: kitchen.labelPrintPrice ?? false,
       labelPrintStoreName: kitchen.labelPrintStoreName ?? false,
@@ -275,6 +278,7 @@ export default function KitchenPage() {
       ticketStoreName: "",
       ticketPrintNotes: true,
       ticketFontSize: "medium" as TicketFontSize,
+      ticketPrintPrice: false,
       // Label printing config
       labelPrintPrice: false,
       labelPrintStoreName: false,
@@ -331,6 +335,7 @@ export default function KitchenPage() {
             ticketStoreName: formData.ticketStoreName,
             ticketPrintNotes: formData.ticketPrintNotes,
             ticketFontSize: formData.ticketFontSize,
+            ticketPrintPrice: formData.ticketPrintPrice,
             // Keep label printing config for consecutive creates
             labelPrintPrice: formData.labelPrintPrice,
             labelPrintStoreName: formData.labelPrintStoreName,
@@ -370,6 +375,7 @@ export default function KitchenPage() {
           ticketStoreName: formData.ticketStoreName,
           ticketPrintNotes: formData.ticketPrintNotes,
           ticketFontSize: formData.ticketFontSize,
+          ticketPrintPrice: formData.ticketPrintPrice,
           // Label printing config
           labelPrintPrice: formData.labelPrintPrice,
           labelPrintStoreName: formData.labelPrintStoreName,
@@ -962,6 +968,16 @@ export default function KitchenPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
+                        id="ticketPrintPrice"
+                        checked={formData.ticketPrintPrice}
+                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintPrice: !!checked })}
+                      />
+                      <Label htmlFor="ticketPrintPrice" className="text-sm cursor-pointer">
+                        In giá món
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
                         id="ticketPrintStoreName"
                         checked={formData.ticketPrintStoreName}
                         onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintStoreName: !!checked })}
@@ -1231,6 +1247,7 @@ export default function KitchenPage() {
                     showTableName={formData.ticketPrintTableName}
                     showTime={formData.ticketPrintTime}
                     showNotes={formData.ticketPrintNotes}
+                    showPrice={formData.ticketPrintPrice}
                     storeName={formData.ticketStoreName || "Coffee House"}
                     printItemsSeparately={formData.ticketPrintItemsSeparately}
                   />

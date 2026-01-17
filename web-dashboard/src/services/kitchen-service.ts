@@ -121,6 +121,7 @@ export interface Kitchen {
   ticketStoreName?: string;
   ticketPrintNotes?: boolean;
   ticketFontSize?: TicketFontSize;
+  ticketPrintPrice?: boolean;
   // Label printing config
   labelPrintPrice?: boolean;
   labelPrintStoreName?: boolean;
@@ -158,6 +159,7 @@ export interface CreateKitchenDto {
   ticketStoreName?: string;
   ticketPrintNotes?: boolean;
   ticketFontSize?: TicketFontSize;
+  ticketPrintPrice?: boolean;
   // Label printing config
   labelPrintPrice?: boolean;
   labelPrintStoreName?: boolean;
@@ -195,6 +197,7 @@ export interface UpdateKitchenDto {
   ticketStoreName?: string;
   ticketPrintNotes?: boolean;
   ticketFontSize?: TicketFontSize;
+  ticketPrintPrice?: boolean;
   // Label printing config
   labelPrintPrice?: boolean;
   labelPrintStoreName?: boolean;
