@@ -7,6 +7,7 @@ data class Category(
     val id: String,
     val name: String,
     val icon: String? = null,
+    val productType: String = "food", // food, drink, other, combo
     val order: Int = 0,
     val isActive: Boolean = true
 )

@@ -57,10 +57,26 @@ import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 
+// Product types for grouping categories
+enum class SaleProductType(val value: String, val label: String) {
+    ALL("all", "Tất cả"),
+    FOOD("food", "Đồ ăn"),
+    DRINK("drink", "Đồ uống"),
+    COMBO("combo", "Combo"),
+    OTHER("other", "Khác");
+
+    companion object {
+        fun fromValue(value: String): SaleProductType {
+            return entries.find { it.value == value } ?: OTHER
+        }
+    }
+}
+
 data class SaleUiState(
     // Categories & Products
     val categories: List<Category> = emptyList(),
     val products: List<Product> = emptyList(),
+    val selectedProductType: SaleProductType = SaleProductType.ALL,
     val selectedCategoryId: String = "all",
     val searchQuery: String = "",
 
@@ -173,6 +189,30 @@ data class SaleUiState(
      */
     val priceBeforeVat: Long
         get() = totalAmount - taxAmount
+
+    /**
+     * Get categories filtered by selected product type
+     */
+    val filteredCategories: List<Category>
+        get() = if (selectedProductType == SaleProductType.ALL) {
+            categories
+        } else {
+            // Always include "Tất cả" category, then filter by product type
+            val allCategory = categories.find { it.id == "all" }
+            val filtered = categories.filter { it.productType == selectedProductType.value }
+            if (allCategory != null) listOf(allCategory) + filtered else filtered
+        }
+
+    /**
+     * Check if product type has categories
+     */
+    fun hasCategories(productType: SaleProductType): Boolean {
+        return if (productType == SaleProductType.ALL) {
+            categories.isNotEmpty()
+        } else {
+            categories.any { it.productType == productType.value }
+        }
+    }
 
     val cartItemCount: Int
         get() = cartItems.sumOf { it.quantity }
@@ -341,7 +381,7 @@ class SaleViewModel @Inject constructor(
                         .toSet()
 
                     val categoryList = mutableListOf(
-                        Category(id = "all", name = "Tất cả", icon = "🍽️")
+                        Category(id = "all", name = "Tất cả", icon = "🍽️", productType = "all")
                     )
                     categoryList.addAll(categoryEntities
                         .filter { !it.name.lowercase().contains("topping") }
@@ -349,7 +389,8 @@ class SaleViewModel @Inject constructor(
                             Category(
                                 id = entity.id,
                                 name = entity.name,
-                                icon = entity.imageUrl
+                                icon = entity.imageUrl,
+                                productType = entity.productType
                             )
                         })
 
@@ -565,17 +606,58 @@ class SaleViewModel @Inject constructor(
 
     // ===== CATEGORY & SEARCH =====
 
-    fun selectCategory(categoryId: String) {
-        // OPTIMIZATION: Use pre-computed cache - NO database query, INSTANT switching
-        // Only show all products for "all" category, otherwise return empty list if category has no products
-        val products = if (categoryId == "all") {
+    fun selectProductType(productType: SaleProductType) {
+        // When changing product type, reset category to "all" and filter products
+        val state = _uiState.value
+
+        // Get category IDs for selected product type
+        val categoryIdsForType = if (productType == SaleProductType.ALL) {
+            state.categories.map { it.id }.toSet()
+        } else {
+            state.categories.filter { it.productType == productType.value }.map { it.id }.toSet() + "all"
+        }
+
+        // Filter products by product type (through category)
+        val products = if (productType == SaleProductType.ALL) {
             allProductsCache
         } else {
+            allProductsCache.filter { product ->
+                product.categoryId in categoryIdsForType ||
+                state.categories.find { it.id == product.categoryId }?.productType == productType.value
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                selectedProductType = productType,
+                selectedCategoryId = "all",
+                products = products,
+                searchQuery = ""
+            )
+        }
+    }
+
+    fun selectCategory(categoryId: String) {
+        val state = _uiState.value
+        val productType = state.selectedProductType
+
+        // OPTIMIZATION: Use pre-computed cache - NO database query, INSTANT switching
+        val products = if (categoryId == "all") {
+            // "All" category: show all products filtered by product type
+            if (productType == SaleProductType.ALL) {
+                allProductsCache
+            } else {
+                allProductsCache.filter { product ->
+                    state.categories.find { it.id == product.categoryId }?.productType == productType.value
+                }
+            }
+        } else {
+            // Specific category: show products for that category
             productsByCategoryCache[categoryId] ?: emptyList()
         }
 
-        _uiState.update { state ->
-            state.copy(
+        _uiState.update {
+            it.copy(
                 selectedCategoryId = categoryId,
                 products = products,
                 searchQuery = ""

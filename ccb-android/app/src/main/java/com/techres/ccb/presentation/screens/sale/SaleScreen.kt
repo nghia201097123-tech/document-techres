@@ -495,14 +495,18 @@ fun PhoneLayout(
         ProductPanel(
             modifier = Modifier.fillMaxSize(),
             categories = uiState.categories,
+            filteredCategories = uiState.filteredCategories,
             products = uiState.products,
+            selectedProductType = uiState.selectedProductType,
             selectedCategoryId = uiState.selectedCategoryId,
             searchQuery = uiState.searchQuery,
+            onProductTypeSelected = viewModel::selectProductType,
             onCategorySelected = viewModel::selectCategory,
             onSearchQueryChanged = viewModel::searchProducts,
             onProductClicked = viewModel::addToCart,
             onProductLongClicked = viewModel::showVariantDialog,
-            onNavigateBack = onNavigateBack
+            onNavigateBack = onNavigateBack,
+            hasCategories = uiState::hasCategories
         )
 
         // Floating Cart Button
@@ -586,14 +590,18 @@ fun TabletLayout(
                 .weight(0.65f)
                 .fillMaxHeight(),
             categories = uiState.categories,
+            filteredCategories = uiState.filteredCategories,
             products = uiState.products,
+            selectedProductType = uiState.selectedProductType,
             selectedCategoryId = uiState.selectedCategoryId,
             searchQuery = uiState.searchQuery,
+            onProductTypeSelected = viewModel::selectProductType,
             onCategorySelected = viewModel::selectCategory,
             onSearchQueryChanged = viewModel::searchProducts,
             onProductClicked = viewModel::addToCart,
             onProductLongClicked = viewModel::showVariantDialog,
-            onNavigateBack = onNavigateBack
+            onNavigateBack = onNavigateBack,
+            hasCategories = uiState::hasCategories
         )
 
         // Divider
@@ -759,14 +767,18 @@ fun CartDialog(
 fun ProductPanel(
     modifier: Modifier = Modifier,
     categories: List<Category>,
+    filteredCategories: List<Category>,
     products: List<Product>,
+    selectedProductType: SaleProductType,
     selectedCategoryId: String,
     searchQuery: String,
+    onProductTypeSelected: (SaleProductType) -> Unit,
     onCategorySelected: (String) -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onProductClicked: (Product) -> Unit,
     onProductLongClicked: (Product) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    hasCategories: (SaleProductType) -> Boolean
 ) {
     Column(modifier = modifier.background(MaterialTheme.colorScheme.surface)) {
         // Top Bar with Search
@@ -813,19 +825,46 @@ fun ProductPanel(
             )
         )
 
-        // Category Tabs
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Product Type Tabs
+        ScrollableTabRow(
+            selectedTabIndex = SaleProductType.entries.indexOf(selectedProductType),
+            modifier = Modifier.fillMaxWidth(),
+            edgePadding = 8.dp,
+            divider = {},
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
-            items(categories) { category ->
-                CategoryChip(
-                    category = category,
-                    isSelected = category.id == selectedCategoryId,
-                    onClick = { onCategorySelected(category.id) }
+            SaleProductType.entries.forEach { productType ->
+                val hasItems = hasCategories(productType)
+                Tab(
+                    selected = selectedProductType == productType,
+                    onClick = { onProductTypeSelected(productType) },
+                    enabled = hasItems || productType == SaleProductType.ALL,
+                    text = {
+                        Text(
+                            text = productType.label,
+                            fontWeight = if (selectedProductType == productType) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 13.sp
+                        )
+                    }
                 )
+            }
+        }
+
+        // Category Chips (filtered by product type)
+        if (filteredCategories.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredCategories) { category ->
+                    CategoryChip(
+                        category = category,
+                        isSelected = category.id == selectedCategoryId,
+                        onClick = { onCategorySelected(category.id) }
+                    )
+                }
             }
         }
 
