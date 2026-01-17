@@ -154,7 +154,7 @@ data class BitmapTextStyle(
     val doubleHeight: Boolean = false,
     val doubleWidth: Boolean = false,
     val fontFamily: Typeface = Typeface.DEFAULT,
-    val lineSpacingMultiplier: Float = 0.75f // Giảm từ 0.9 xuống 0.75 để tiết kiệm giấy hơn
+    val lineSpacingMultiplier: Float = 0.55f // Giảm từ 0.75 xuống 0.55 để tiết kiệm giấy hơn nữa
 )
 
 /**
@@ -330,7 +330,7 @@ object BitmapTextRenderer {
         // Sử dụng line spacing multiplier nhỏ hơn cho separator để tiết kiệm giấy
         return renderText(
             char.toString().repeat(charCount),
-            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 0.6f),
+            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 0.4f),
             paperWidth
         )
     }
