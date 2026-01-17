@@ -333,6 +333,13 @@ object PrintRoutingService {
             val toppingPrices = item.toppings.map { Pair(it.name, it.price) }
             val totalToppingPrice = item.toppings.sumOf { it.price }
 
+            // Tính giá gốc (unitPrice) = giá tổng - tổng giá topping
+            val unitPrice = if (item.price > 0 && totalToppingPrice > 0) {
+                (item.price - totalToppingPrice).coerceAtLeast(0.0)
+            } else {
+                item.price
+            }
+
             LabelPrintService.LabelData(
                 itemName = item.productName,
                 itemCode = item.productCode,
@@ -347,7 +354,11 @@ object PrintRoutingService {
                 tableName = order.tableName,
                 orderNumber = order.orderNumber,
                 orderTime = order.orderTime,
-                staffName = order.staffName
+                staffName = order.staffName,
+                // Price fields for label printing
+                unitPrice = unitPrice,
+                totalPrice = item.price,
+                finalPrice = item.price // Giá cuối cùng (có thể bằng totalPrice nếu không giảm giá)
             )
         }
 

@@ -321,31 +321,31 @@ object KitchenTicketPrintService {
                 // Bỏ dòng trống để tiết kiệm giấy - các món vẫn rõ ràng nhờ số thứ tự
 
                 // Tính giá gốc = giá tổng - tổng giá topping
-                // Để khi hiển thị giá gốc + giá topping sẽ ra tổng hợp lý
                 val toppingTotal = item.toppingPrices.sumOf { it.second }
                 val basePrice = if (item.price > 0 && toppingTotal > 0) {
                     (item.price - toppingTotal).coerceAtLeast(0.0)
                 } else {
-                    item.price
+                    0.0
                 }
 
-                // Số thứ tự + Tên món + Số lượng + Giá gốc (nếu có)
+                // Số thứ tự + Tên món + Số lượng + Giá TỔNG (trên dòng header)
                 val itemLine = "${index + 1}. ${item.name}"
-                val rightPart = if (showPrice && basePrice > 0) {
-                    "x${item.quantity}  ${formatPrice(basePrice)}"
-                } else if (showPrice && item.price > 0 && toppingTotal == 0.0) {
-                    // Nếu không có topping, hiển thị giá gốc
+                val rightPart = if (showPrice && item.price > 0) {
                     "x${item.quantity}  ${formatPrice(item.price)}"
                 } else {
                     "x${item.quantity}"
                 }
 
-                // In tên món, số lượng và giá trên cùng dòng
+                // In tên món, số lượng và giá TỔNG trên cùng dòng
                 if (item.quantity > 1) {
-                    // Số lượng > 1: in đậm cả dòng
                     lineKeyValueBold(itemLine, rightPart)
                 } else {
                     lineKeyValue(itemLine, rightPart, BitmapTextStyle(bold = true))
+                }
+
+                // Hiển thị giá gốc trên dòng riêng (nếu có topping và showPrice)
+                if (showPrice && basePrice > 0 && toppingTotal > 0) {
+                    lineKeyValue("   ", formatPrice(basePrice))
                 }
 
                 // Tùy chọn (Size, Đá, Đường...) - hiển thị dạng "• Size L" thay vì "Size: L"
