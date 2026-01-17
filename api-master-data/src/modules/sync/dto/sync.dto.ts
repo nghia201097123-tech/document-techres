@@ -900,6 +900,12 @@ export class BillPrinterConfigDto {
   @ApiProperty({ description: 'Độ rộng giấy' })
   paperWidth: number;
 
+  @ApiProperty({ description: 'Cỡ chữ: extra_small, small, normal, large, extra_large' })
+  fontSize: string;
+
+  @ApiProperty({ description: 'Khoảng cách dòng (0.3-1.0)' })
+  lineSpacing: number;
+
   @ApiProperty({ description: 'Tự động in khi thanh toán' })
   autoPrintOnPayment: boolean;
 

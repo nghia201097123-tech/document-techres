@@ -932,6 +932,7 @@ export class SyncService {
       showItemNote: bt.showItemNote,
       showUnitPrice: bt.showUnitPrice,
       showQuantity: bt.showQuantity,
+      showOrderNote: bt.showOrderNote,
       // Price config
       showSubtotal: bt.showSubtotal,
       // Discount config (4 loại giảm giá)
@@ -975,6 +976,7 @@ export class SyncService {
       // Style config
       paperWidth: bt.paperWidth,
       fontSize: bt.fontSize,
+      lineSpacing: bt.lineSpacing,
       separatorChar: bt.separatorChar,
       doubleSeparatorChar: bt.doubleSeparatorChar,
       cutPaper: bt.cutPaper,
@@ -1005,6 +1007,8 @@ export class SyncService {
       templateId: bpc.templateId || null,
       // Print config
       paperWidth: bpc.paperWidth,
+      fontSize: bpc.fontSize,
+      lineSpacing: bpc.lineSpacing,
       autoPrintOnPayment: bpc.autoPrintOnPayment,
       printPreview: bpc.printPreview,
       numberOfCopies: bpc.numberOfCopies,

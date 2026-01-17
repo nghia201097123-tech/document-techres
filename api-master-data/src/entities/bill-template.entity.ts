@@ -129,6 +129,9 @@ export class BillTemplate {
   @Column({ name: 'show_quantity', default: true })
   showQuantity: boolean;
 
+  @Column({ name: 'show_order_note', default: true })
+  showOrderNote: boolean; // Hiển thị ghi chú đơn hàng
+
   // ============ PRICE CONFIG ============
   @Column({ name: 'show_subtotal', default: true })
   showSubtotal: boolean;
@@ -247,6 +250,9 @@ export class BillTemplate {
   // ============ STYLE CONFIG (Content styling) ============
   @Column({ name: 'font_size', type: 'varchar', length: 20, default: 'normal' })
   fontSize: string; // 'small', 'normal', 'large'
+
+  @Column({ name: 'line_spacing', type: 'float', default: 0.7 })
+  lineSpacing: number; // 0.3-1.0
 
   @Column({ name: 'separator_char', type: 'char', length: 1, default: '-' })
   separatorChar: string;
