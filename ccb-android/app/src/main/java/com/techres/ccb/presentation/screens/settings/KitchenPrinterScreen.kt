@@ -248,7 +248,7 @@ fun KitchenPrinterScreen(
             kitchen = selectedKitchen!!,
             onDismiss = { showPrinterDialog = false },
             onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
-                       ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies,
+                       ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize,
                        labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
                        labelPrintTableName, labelPrintTime, labelStoreName, labelReverse ->
                 viewModel.updateFullPrinterConfig(
@@ -267,6 +267,7 @@ fun KitchenPrinterScreen(
                     ticketCutAfterPrint = ticketCutAfterPrint,
                     ticketPrintItemsSeparately = ticketPrintItemsSeparately,
                     ticketCopies = ticketCopies,
+                    ticketFontSize = ticketFontSize,
                     labelPrintPrice = labelPrintPrice,
                     labelPrintStoreName = labelPrintStoreName,
                     labelPrintOrderNumber = labelPrintOrderNumber,
@@ -513,7 +514,7 @@ private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
     onDismiss: () -> Unit,
     onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
-             ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int,
+             ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String,
              labelPrintPrice: Boolean, labelPrintStoreName: Boolean, labelPrintOrderNumber: Boolean,
              labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String, labelReverse: Boolean) -> Unit
 ) {
@@ -532,6 +533,8 @@ private fun PrinterConfigDialog(
     var ticketCutAfterPrint by remember { mutableStateOf(kitchen.ticketCutAfterPrint) }
     var ticketPrintItemsSeparately by remember { mutableStateOf(kitchen.ticketPrintItemsSeparately) }
     var ticketCopies by remember { mutableStateOf(kitchen.ticketCopies) }
+    var ticketFontSize by remember { mutableStateOf(kitchen.ticketFontSize ?: "medium") }
+    var ticketFontSizeExpanded by remember { mutableStateOf(false) }
 
     // Label printing config
     var labelPrintPrice by remember { mutableStateOf(kitchen.labelPrintPrice) }
@@ -1009,6 +1012,51 @@ private fun PrinterConfigDialog(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Font size selection
+                    Text(
+                        text = "Cỡ chữ:",
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    val fontSizeOptions = listOf(
+                        "small" to "Nhỏ",
+                        "medium" to "Vừa",
+                        "large" to "Lớn"
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = ticketFontSizeExpanded,
+                        onExpandedChange = { ticketFontSizeExpanded = !ticketFontSizeExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = fontSizeOptions.find { it.first == ticketFontSize }?.second ?: "Vừa",
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = ticketFontSizeExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = ticketFontSizeExpanded,
+                            onDismissRequest = { ticketFontSizeExpanded = false }
+                        ) {
+                            fontSizeOptions.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        ticketFontSize = value
+                                        ticketFontSizeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Label printing config - Show for LABEL and BOTH modes
@@ -1150,6 +1198,7 @@ private fun PrinterConfigDialog(
                                 ticketCutAfterPrint,
                                 ticketPrintItemsSeparately,
                                 ticketCopies,
+                                ticketFontSize,
                                 labelPrintPrice,
                                 labelPrintStoreName,
                                 labelPrintOrderNumber,

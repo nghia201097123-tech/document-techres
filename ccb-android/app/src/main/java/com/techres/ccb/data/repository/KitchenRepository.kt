@@ -56,6 +56,7 @@ class KitchenRepository @Inject constructor(
         ticketCutAfterPrint: Boolean = true,
         ticketPrintItemsSeparately: Boolean = false,
         ticketCopies: Int = 1,
+        ticketFontSize: String = "medium",
         // Label printing config
         labelPrintPrice: Boolean = false,
         labelPrintStoreName: Boolean = false,
@@ -69,7 +70,7 @@ class KitchenRepository @Inject constructor(
             kitchenId, ip, port, name, isConnected,
             protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity,
             paperWidth, printMode,
-            ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies,
+            ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize,
             labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
             labelPrintTableName, labelPrintTime, labelStoreName, labelReverse
         )

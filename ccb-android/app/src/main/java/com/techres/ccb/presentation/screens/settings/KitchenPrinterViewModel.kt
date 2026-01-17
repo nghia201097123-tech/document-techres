@@ -133,6 +133,7 @@ class KitchenPrinterViewModel @Inject constructor(
         ticketCutAfterPrint: Boolean = true,
         ticketPrintItemsSeparately: Boolean = false,
         ticketCopies: Int = 1,
+        ticketFontSize: String = "medium",
         // Label printing config
         labelPrintPrice: Boolean = false,
         labelPrintStoreName: Boolean = false,
@@ -160,6 +161,7 @@ class KitchenPrinterViewModel @Inject constructor(
                     ticketCutAfterPrint = ticketCutAfterPrint,
                     ticketPrintItemsSeparately = ticketPrintItemsSeparately,
                     ticketCopies = ticketCopies,
+                    ticketFontSize = ticketFontSize,
                     labelPrintPrice = labelPrintPrice,
                     labelPrintStoreName = labelPrintStoreName,
                     labelPrintOrderNumber = labelPrintOrderNumber,

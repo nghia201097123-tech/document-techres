@@ -383,9 +383,10 @@ object KitchenTicketPrintService {
             lineBold("TỔNG: $totalItems MÓN", BitmapTextStyle(centerAlign = true))
 
             // ═══════════════════════════════════════════
-            // FEED, BEEP & CUT (tối ưu: giảm feed từ 4 xuống 2 để tiết kiệm giấy)
+            // FEED, BEEP & CUT
+            // Feed 4 dòng để đảm bảo dòng TỔNG MÓN không bị cắt mất
             // ═══════════════════════════════════════════
-            feed(2)
+            feed(4)
             beep()
             // Cắt giấy dựa trên config
             if (kitchen.ticketCutAfterPrint) {

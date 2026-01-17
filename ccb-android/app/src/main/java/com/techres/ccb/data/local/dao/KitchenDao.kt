@@ -53,6 +53,7 @@ interface KitchenDao {
             ticket_cut_after_print = :ticketCutAfterPrint,
             ticket_print_items_separately = :ticketPrintItemsSeparately,
             ticket_copies = :ticketCopies,
+            ticket_font_size = :ticketFontSize,
             label_print_price = :labelPrintPrice,
             label_print_store_name = :labelPrintStoreName,
             label_print_order_number = :labelPrintOrderNumber,
@@ -79,6 +80,7 @@ interface KitchenDao {
         ticketCutAfterPrint: Boolean,
         ticketPrintItemsSeparately: Boolean,
         ticketCopies: Int,
+        ticketFontSize: String,
         // Label printing config
         labelPrintPrice: Boolean,
         labelPrintStoreName: Boolean,
