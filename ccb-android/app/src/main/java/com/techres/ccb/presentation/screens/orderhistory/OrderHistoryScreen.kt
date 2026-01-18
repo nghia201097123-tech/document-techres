@@ -1500,6 +1500,63 @@ private fun OrderDetailDialog(
                         }
                     }
 
+                    // Phụ thu (Surcharge) item - hiển thị như một dòng riêng nếu có
+                    if (order.surchargeAmount > 0) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFFFF3E0)) // Light orange background
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // Icon
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .background(Color(0xFFFFE0B2), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "⊕",
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFF9800)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(
+                                                "Phụ thu",
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFFE65100)
+                                            )
+                                            Text(
+                                                "Phí phụ thu đơn hàng",
+                                                fontSize = 12.sp,
+                                                color = Color(0xFF757575)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        "+${formatCurrency(order.surchargeAmount.toLong())}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFF9800)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Spacer before summary
                     item { Spacer(modifier = Modifier.height(12.dp)) }
                 }
