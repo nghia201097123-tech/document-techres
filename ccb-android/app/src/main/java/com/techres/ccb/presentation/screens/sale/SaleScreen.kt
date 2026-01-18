@@ -1654,8 +1654,10 @@ fun CartPanel(
         }
 
         // Cart Summary
+        // orderSubtotal = items trong order cũ + items mới trong cart
         val orderSubtotal = (currentOrder?.subtotal?.toLong() ?: 0L) + subtotal
-        val orderTotal = (currentOrder?.totalAmount?.toLong() ?: 0L) + totalAmount
+        // orderTotal = orderSubtotal + phụ thu - giảm giá (KHÔNG dùng currentOrder.totalAmount vì nó đã có surcharge)
+        val orderTotal = (orderSubtotal + surchargeAmount - discountAmount).coerceAtLeast(0L)
 
         Card(
             modifier = Modifier
@@ -1667,14 +1669,14 @@ fun CartPanel(
             )
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                // Current order amount (if exists)
+                // Current order amount (if exists) - hiển thị subtotal (chỉ items), không bao gồm surcharge
                 if (hasActiveOrder && currentOrder != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Đã order:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-                        Text(formatCurrency(currentOrder.totalAmount.toLong()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                        Text(formatCurrency(currentOrder.subtotal.toLong()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                     }
                     if (subtotal > 0) {
                         Spacer(modifier = Modifier.height(4.dp))
