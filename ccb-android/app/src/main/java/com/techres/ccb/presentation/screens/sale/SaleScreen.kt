@@ -48,12 +48,15 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.screens.sale.dialogs.CouponDisplayItem
+import com.techres.ccb.presentation.screens.sale.dialogs.CustomItemDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.NoteDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentOrderItem
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentToppingItem
 import com.techres.ccb.presentation.screens.sale.dialogs.ProductVariantDialog
+import com.techres.ccb.presentation.screens.sale.dialogs.SelectedSurcharge
+import com.techres.ccb.presentation.screens.sale.dialogs.SurchargeDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.TableSelectionDialog
 import java.text.NumberFormat
 import java.util.Locale
@@ -531,6 +534,28 @@ fun SaleScreen(
             )
         }
 
+        // Custom Item Dialog
+        if (uiState.showCustomItemDialog) {
+            CustomItemDialog(
+                onDismiss = { viewModel.hideCustomItemDialog() },
+                onConfirm = { name, price, quantity, note ->
+                    viewModel.addCustomItem(name, price, quantity, note)
+                }
+            )
+        }
+
+        // Surcharge Dialog
+        if (uiState.showSurchargeDialog) {
+            SurchargeDialog(
+                surcharges = uiState.availableSurcharges,
+                currentlySelectedSurcharges = uiState.selectedSurcharges,
+                onDismiss = { viewModel.hideSurchargeDialog() },
+                onConfirm = { selectedSurcharges ->
+                    viewModel.applySurcharges(selectedSurcharges)
+                }
+            )
+        }
+
         // Note Dialog - use product-specific notes
         if (uiState.showNoteDialog && uiState.selectedCartItemForNote != null) {
             val selectedItem = uiState.cartItems.find { it.id == uiState.selectedCartItemForNote }
@@ -764,7 +789,11 @@ fun TabletLayout(
             onCancelAddingItems = viewModel::cancelAddingItems,
             onReprintItem = viewModel::showReprintMenuForItem,
             onReprintAllItems = viewModel::showReprintMenuForAllItems,
-            onOrderNoteClicked = { viewModel.showOrderNoteDialog() }
+            onOrderNoteClicked = { viewModel.showOrderNoteDialog() },
+            onCustomItemClicked = { viewModel.showCustomItemDialog() },
+            onSurchargeClicked = { viewModel.showSurchargeDialog() },
+            surchargeAmount = uiState.surchargeAmount,
+            selectedSurchargesCount = uiState.selectedSurcharges.size
         )
     }
 }
@@ -871,6 +900,10 @@ fun CartDialog(
                     onReprintItem = viewModel::showReprintMenuForItem,
                     onReprintAllItems = viewModel::showReprintMenuForAllItems,
                     onOrderNoteClicked = { viewModel.showOrderNoteDialog() },
+                    onCustomItemClicked = { viewModel.showCustomItemDialog() },
+                    onSurchargeClicked = { viewModel.showSurchargeDialog() },
+                    surchargeAmount = uiState.surchargeAmount,
+                    selectedSurchargesCount = uiState.selectedSurcharges.size,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -1199,6 +1232,10 @@ fun CartPanel(
     onReprintItem: (String) -> Unit = {}, // Reprint single item
     onReprintAllItems: () -> Unit = {}, // Reprint all items menu
     onOrderNoteClicked: () -> Unit = {}, // Open order note dialog
+    onCustomItemClicked: () -> Unit = {}, // Open custom item dialog
+    onSurchargeClicked: () -> Unit = {}, // Open surcharge dialog
+    surchargeAmount: Long = 0, // Total surcharge amount
+    selectedSurchargesCount: Int = 0, // Number of selected surcharges
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1362,6 +1399,50 @@ fun CartPanel(
                         maxLines = 1
                     )
                 }
+            }
+        }
+
+        // Custom Item & Surcharge Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Custom Item button (Món ngoài)
+            OutlinedButton(
+                onClick = onCustomItemClicked,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF9C27B0)
+                )
+            ) {
+                Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Món ngoài",
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+            }
+
+            // Surcharge button (Phụ thu)
+            OutlinedButton(
+                onClick = onSurchargeClicked,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (selectedSurchargesCount > 0) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (selectedSurchargesCount > 0) "Phụ thu ($selectedSurchargesCount)" else "Phụ thu",
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
             }
         }
 
@@ -1610,6 +1691,18 @@ fun CartPanel(
                     ) {
                         Text("Giảm giá:", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50))
                         Text("-${formatCurrency(discountAmount)}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50))
+                    }
+                }
+
+                // Surcharge
+                if (surchargeAmount > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Phụ thu:", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFFF9800))
+                        Text("+${formatCurrency(surchargeAmount)}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFFF9800))
                     }
                 }
 
