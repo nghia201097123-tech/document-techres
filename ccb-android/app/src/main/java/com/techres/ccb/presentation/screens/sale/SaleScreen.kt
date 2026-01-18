@@ -366,6 +366,14 @@ fun SaleScreen(
                             val variantsPrice = variants.sumOf { it.price }
                             val mainUnitPrice = (item.unitPrice.toLong() - variantsPrice).coerceAtLeast(0L)
 
+                            // Debug logging
+                            android.util.Log.d("VAT_DEBUG", "Item: ${item.productName}")
+                            android.util.Log.d("VAT_DEBUG", "  notes: ${item.notes}")
+                            android.util.Log.d("VAT_DEBUG", "  unitPrice: ${item.unitPrice}")
+                            android.util.Log.d("VAT_DEBUG", "  parsed variants: ${variants.map { "${it.name}=${it.price}" }}")
+                            android.util.Log.d("VAT_DEBUG", "  variantsPrice: $variantsPrice")
+                            android.util.Log.d("VAT_DEBUG", "  mainUnitPrice: $mainUnitPrice")
+
                             add(PaymentOrderItem(
                                 id = item.id,
                                 name = item.productName,
