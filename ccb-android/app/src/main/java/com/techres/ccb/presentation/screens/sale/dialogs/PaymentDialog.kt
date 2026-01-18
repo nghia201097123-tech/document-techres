@@ -159,7 +159,7 @@ fun PaymentDialog(
 
     // Discount section state
     var showDiscountSection by remember { mutableStateOf(false) }
-    var discountTab by remember { mutableStateOf(0) } // 0=Món (ưu tiên 1), 1=Bill (ưu tiên 2), 2=Coupon
+    var discountTab by remember { mutableStateOf(0) } // 0=Hóa đơn (ưu tiên), 1=Theo món, 2=Mã giảm giá
 
     // VAT detail popup state
     var showVatDetail by remember { mutableStateOf(false) }
@@ -631,12 +631,12 @@ fun PaymentDialog(
                                         HorizontalDivider()
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Tab selection - Thứ tự ưu tiên: Theo món (1) → Hóa đơn (2) → Mã giảm giá (3)
+                                        // Tab selection - Thứ tự ưu tiên: Hóa đơn (0) → Theo món (1) → Mã giảm giá (2)
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            listOf("Theo món", "Hóa đơn", "Mã giảm giá").forEachIndexed { index, label ->
+                                            listOf("Hóa đơn", "Theo món", "Mã giảm giá").forEachIndexed { index, label ->
                                                 FilterChip(
                                                     selected = discountTab == index,
                                                     onClick = { discountTab = index },
@@ -653,8 +653,8 @@ fun PaymentDialog(
                                         Spacer(modifier = Modifier.height(8.dp))
 
                                         when (discountTab) {
-                                            1 -> {
-                                                // Bill discount - Ưu tiên 2 (sau giảm giá món)
+                                            0 -> {
+                                                // Bill discount - Ưu tiên 1 (giảm giá hóa đơn trước)
                                                 // Preset values
                                                 val presetPercents = listOf(5, 10, 15, 20, 30)
                                                 val presetAmounts = listOf(5000L, 10000L, 20000L, 50000L, 100000L)
@@ -899,8 +899,8 @@ fun PaymentDialog(
                                                 }
                                             }
 
-                                            0 -> {
-                                                // Item discount - Ưu tiên 1 (giảm giá món trước)
+                                            1 -> {
+                                                // Item discount - Giảm giá theo món
                                                 // Direct buttons
                                                 if (orderItems.isEmpty()) {
                                                     Text("Không có món để giảm giá", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
