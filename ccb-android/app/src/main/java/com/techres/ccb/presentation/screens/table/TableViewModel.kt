@@ -61,7 +61,10 @@ data class TableUiState(
     val occupiedTables: Int = 0,
 
     // Grid columns preference
-    val gridColumns: Int = 4
+    val gridColumns: Int = 4,
+
+    // Area filter (null = all areas)
+    val selectedAreaId: String? = null
 )
 
 @HiltViewModel
@@ -356,5 +359,13 @@ class TableViewModel @Inject constructor(
 
     fun clearErrorMessage() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    /**
+     * Set selected area for filtering
+     * @param areaId null = show all areas
+     */
+    fun setSelectedArea(areaId: String?) {
+        _uiState.update { it.copy(selectedAreaId = areaId) }
     }
 }

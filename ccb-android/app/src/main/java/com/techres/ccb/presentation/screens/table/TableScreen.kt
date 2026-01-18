@@ -195,15 +195,32 @@ fun TableScreen(
                     }
                 }
             } else {
+                // Filter areas based on selected area
+                val filteredAreas = remember(uiState.areas, uiState.selectedAreaId) {
+                    if (uiState.selectedAreaId == null) {
+                        uiState.areas
+                    } else {
+                        uiState.areas.filter { it.area.id == uiState.selectedAreaId }
+                    }
+                }
+
+                // Filter tables without area
+                val showTablesWithoutArea = remember(uiState.selectedAreaId, uiState.tablesWithoutArea) {
+                    uiState.selectedAreaId == null && uiState.tablesWithoutArea.isNotEmpty()
+                }
+
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Statistics bar with grid column selector
+                    // Statistics bar with grid column selector and area filter
                     TableStatisticsBar(
                         totalTables = uiState.totalTables,
                         availableTables = uiState.availableTables,
                         occupiedTables = uiState.occupiedTables,
                         gridColumns = gridColumns,
                         columnOptions = columnOptions,
-                        onGridColumnsChange = { viewModel.setGridColumns(it) }
+                        onGridColumnsChange = { viewModel.setGridColumns(it) },
+                        areas = uiState.areas,
+                        selectedAreaId = uiState.selectedAreaId,
+                        onAreaSelected = { viewModel.setSelectedArea(it) }
                     )
 
                     // Table list grouped by area
@@ -211,8 +228,8 @@ fun TableScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        // Areas with tables
-                        uiState.areas.forEach { areaWithTables ->
+                        // Filtered areas with tables
+                        filteredAreas.forEach { areaWithTables ->
                             item(key = "area_${areaWithTables.area.id}") {
                                 AreaSection(
                                     areaWithTables = areaWithTables,
@@ -231,8 +248,8 @@ fun TableScreen(
                             }
                         }
 
-                        // Tables without area
-                        if (uiState.tablesWithoutArea.isNotEmpty()) {
+                        // Tables without area (only show when "Tất cả" is selected)
+                        if (showTablesWithoutArea) {
                             item(key = "area_no_area") {
                                 AreaSection(
                                     areaWithTables = AreaWithTables(
@@ -301,42 +318,103 @@ private fun TableStatisticsBar(
     occupiedTables: Int,
     gridColumns: Int,
     columnOptions: List<Int>,
-    onGridColumnsChange: (Int) -> Unit
+    onGridColumnsChange: (Int) -> Unit,
+    areas: List<AreaWithTables>,
+    selectedAreaId: String?,
+    onAreaSelected: (String?) -> Unit
 ) {
     Surface(
         color = Color.White,
         shadowElevation = 2.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Statistics chips
+            // Row 1: Statistics and grid selector
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                StatChip(
-                    count = availableTables,
-                    label = "Trống",
-                    color = StatusAvailable
-                )
-                StatChip(
-                    count = occupiedTables,
-                    label = "Có khách",
-                    color = StatusOccupied
+                // Statistics chips
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatChip(
+                        count = availableTables,
+                        label = "Trống",
+                        color = StatusAvailable
+                    )
+                    StatChip(
+                        count = occupiedTables,
+                        label = "Có khách",
+                        color = StatusOccupied
+                    )
+                }
+
+                // Grid column selector
+                GridColumnSelector(
+                    gridColumns = gridColumns,
+                    columnOptions = columnOptions,
+                    onGridColumnsChange = onGridColumnsChange
                 )
             }
 
-            // Grid column selector
-            GridColumnSelector(
-                gridColumns = gridColumns,
-                columnOptions = columnOptions,
-                onGridColumnsChange = onGridColumnsChange
-            )
+            // Row 2: Area filter chips (only show if more than 1 area)
+            if (areas.size > 1) {
+                Spacer(modifier = Modifier.height(10.dp))
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // "Tất cả" chip
+                    item {
+                        AreaFilterChip(
+                            name = "Tất cả",
+                            isSelected = selectedAreaId == null,
+                            onClick = { onAreaSelected(null) }
+                        )
+                    }
+                    // Area chips
+                    items(areas.size) { index ->
+                        val area = areas[index]
+                        AreaFilterChip(
+                            name = area.area.name,
+                            isSelected = selectedAreaId == area.area.id,
+                            onClick = { onAreaSelected(area.area.id) }
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun AreaFilterChip(
+    name: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) Color(0xFF1976D2) else Color.White
+    val textColor = if (isSelected) Color.White else Color(0xFF424242)
+    val borderColor = if (isSelected) Color(0xFF1976D2) else Color.Gray.copy(alpha = 0.4f)
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(backgroundColor)
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = name,
+            fontSize = 13.sp,
+            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+            color = textColor
+        )
     }
 }
 
