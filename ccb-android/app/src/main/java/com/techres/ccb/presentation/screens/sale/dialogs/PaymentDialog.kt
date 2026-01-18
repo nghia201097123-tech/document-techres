@@ -121,6 +121,7 @@ fun PaymentDialog(
     totalAmount: Long,
     subtotal: Long = totalAmount,
     surchargeAmount: Long = 0,
+    selectedSurcharges: List<SelectedSurcharge> = emptyList(), // Danh sách phụ thu để hiển thị VAT chi tiết
     discountAmount: Long = 0,
     vatAmount: Long = 0,
     appliedDiscounts: List<AppliedDiscount> = emptyList(),
@@ -1556,6 +1557,7 @@ fun PaymentDialog(
     if (showVatDetail) {
         VatDetailDialog(
             orderItems = orderItems,
+            selectedSurcharges = selectedSurcharges,
             totalVatAmount = vatAmount,
             subtotal = subtotal,
             discountAmount = discountAmount,
@@ -1577,18 +1579,19 @@ private data class VatDisplayRow(
 @Composable
 private fun VatDetailDialog(
     orderItems: List<PaymentOrderItem>,
+    selectedSurcharges: List<SelectedSurcharge> = emptyList(),
     totalVatAmount: Long,
     subtotal: Long = 0,
     discountAmount: Long = 0,
     onDismiss: () -> Unit
 ) {
-    // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm)
+    // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm - chỉ áp dụng cho items, không áp dụng cho surcharges)
     val afterDiscountRatio = if (subtotal > 0) {
         ((subtotal - discountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
     } else 1.0
 
     // Build flat list: main items + their toppings with VAT (sau giảm giá)
-    val vatRows = remember(orderItems, afterDiscountRatio) {
+    val vatRows = remember(orderItems, selectedSurcharges, afterDiscountRatio) {
         buildList {
             orderItems.forEach { item ->
                 // VAT của món chính (giá sau giảm giá)
@@ -1626,6 +1629,25 @@ private fun VatDetailDialog(
                         isTopping = true
                     ))
                 }
+            }
+
+            // Thêm VAT của phụ thu (surcharges không bị giảm giá)
+            selectedSurcharges.forEach { selected ->
+                val surcharge = selected.surcharge
+                val totalPrice = (surcharge.amount * selected.quantity).toLong()
+                val surchargeVat = if (surcharge.vatRate > 0) {
+                    val priceBeforeVat = totalPrice / (1 + surcharge.vatRate / 100.0)
+                    (totalPrice - priceBeforeVat).toLong()
+                } else 0L
+
+                add(VatDisplayRow(
+                    name = "⊕ ${surcharge.name}",
+                    quantity = selected.quantity,
+                    totalPrice = totalPrice,
+                    vatRate = surcharge.vatRate,
+                    vatAmount = surchargeVat,
+                    isTopping = false // Show as main item
+                ))
             }
         }
     }
@@ -1778,13 +1800,13 @@ private fun VatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tổng VAT tính từ items
+                // Tổng VAT tính từ items + surcharges
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "Tổng VAT (theo món):",
+                        if (selectedSurcharges.isNotEmpty()) "Tổng VAT:" else "Tổng VAT (theo món):",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium
                     )

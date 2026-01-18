@@ -504,6 +504,7 @@ fun SaleScreen(
                 totalAmount = paymentTotal,
                 subtotal = subtotal,
                 surchargeAmount = uiState.surchargeAmount,
+                selectedSurcharges = uiState.selectedSurcharges,
                 discountAmount = uiState.discountAmount,
                 vatAmount = vatAmount,
                 appliedDiscounts = uiState.appliedDiscounts,
