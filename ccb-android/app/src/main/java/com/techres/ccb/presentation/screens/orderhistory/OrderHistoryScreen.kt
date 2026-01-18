@@ -1519,7 +1519,16 @@ private fun OrderDetailDialog(
                     val vatRate = 8.0
                     val priceAfterDiscount = order.subtotal - totalDiscount
                     val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
-                    val vatAmount = priceAfterDiscount - priceBeforeVat
+                    val itemsVatAmount = priceAfterDiscount - priceBeforeVat
+
+                    // Tính VAT của phụ thu (surcharge không bị giảm giá)
+                    val surchargeVatAmount = if (order.surchargeAmount > 0) {
+                        val surchargeBeforeVat = order.surchargeAmount / (1 + vatRate / 100)
+                        order.surchargeAmount - surchargeBeforeVat
+                    } else 0.0
+
+                    // Tổng VAT = VAT món + VAT phụ thu
+                    val vatAmount = itemsVatAmount + surchargeVatAmount
 
                     // Parse applied coupons from JSON
                     val appliedCoupons: List<AppliedCouponInfo> = try {
@@ -1801,37 +1810,43 @@ private fun HistoryVatDetailDialog(
 
                 // VAT của món chính (giá sau giảm giá)
                 val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
-                val mainVat = if (item.vatRate > 0) {
+                val mainVat = if (item.vatRate > 0 && mainPriceAfterDiscount > 0) {
                     val priceBeforeVat = mainPriceAfterDiscount / (1 + item.vatRate / 100.0)
                     (mainPriceAfterDiscount - priceBeforeVat).toLong()
                 } else 0L
 
-                add(HistoryVatDisplayRow(
-                    name = item.productName,
-                    quantity = item.quantity,
-                    totalPrice = mainPriceAfterDiscount,
-                    vatRate = item.vatRate,
-                    vatAmount = mainVat,
-                    isTopping = false
-                ))
+                // Chỉ hiển thị món chính nếu có giá > 0
+                if (mainPriceAfterDiscount > 0) {
+                    add(HistoryVatDisplayRow(
+                        name = item.productName,
+                        quantity = item.quantity,
+                        totalPrice = mainPriceAfterDiscount,
+                        vatRate = item.vatRate,
+                        vatAmount = mainVat,
+                        isTopping = false
+                    ))
+                }
 
                 // VAT của từng topping (cũng tính sau giảm giá)
                 toppings.forEach { (toppingName, toppingPrice) ->
                     val toppingTotal = toppingPrice * item.quantity
                     val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
-                    val toppingVat = if (item.vatRate > 0) {
+                    val toppingVat = if (item.vatRate > 0 && toppingAfterDiscount > 0) {
                         val priceBeforeVat = toppingAfterDiscount / (1 + item.vatRate / 100.0)
                         (toppingAfterDiscount - priceBeforeVat).toLong()
                     } else 0L
 
-                    add(HistoryVatDisplayRow(
-                        name = toppingName,
-                        quantity = item.quantity,
-                        totalPrice = toppingAfterDiscount,
-                        vatRate = item.vatRate,
-                        vatAmount = toppingVat,
-                        isTopping = true
-                    ))
+                    // Chỉ hiển thị topping nếu có giá > 0
+                    if (toppingAfterDiscount > 0) {
+                        add(HistoryVatDisplayRow(
+                            name = toppingName,
+                            quantity = item.quantity,
+                            totalPrice = toppingAfterDiscount,
+                            vatRate = item.vatRate,
+                            vatAmount = toppingVat,
+                            isTopping = true
+                        ))
+                    }
                 }
             }
 
