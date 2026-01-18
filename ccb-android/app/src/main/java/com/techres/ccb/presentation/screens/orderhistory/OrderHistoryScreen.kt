@@ -646,14 +646,24 @@ private fun OrderTableRow(
     }
 
     // === FINANCIAL CALCULATIONS (Vietnamese Tax Law) ===
-    // VAT is calculated on price AFTER discount
+    // VAT is calculated on price AFTER discount + surcharge VAT
     // Formula: priceAfterDiscount = subtotal - discount
-    //          VAT = priceAfterDiscount - (priceAfterDiscount / 1.08)
-    // Total = priceAfterDiscount (already includes VAT in Vietnamese pricing)
+    //          itemsVAT = priceAfterDiscount - (priceAfterDiscount / 1.08)
+    //          surchargeVAT = surchargeAmount - (surchargeAmount / 1.08)
+    //          totalVAT = itemsVAT + surchargeVAT
     val vatRate = 8.0
     val priceAfterDiscount = (order.subtotal - order.discountAmount).coerceAtLeast(0L)
     val priceBeforeVat = (priceAfterDiscount / (1 + vatRate / 100)).toLong()
-    val calculatedVat = priceAfterDiscount - priceBeforeVat
+    val itemsVat = priceAfterDiscount - priceBeforeVat
+
+    // Tính VAT của phụ thu (surcharge không bị giảm giá)
+    val surchargeVat = if (order.surchargeAmount > 0) {
+        val surchargeBeforeVat = (order.surchargeAmount / (1 + vatRate / 100)).toLong()
+        order.surchargeAmount.toLong() - surchargeBeforeVat
+    } else 0L
+
+    // Tổng VAT = VAT món + VAT phụ thu
+    val calculatedVat = itemsVat + surchargeVat
 
     Row(
         modifier = Modifier
