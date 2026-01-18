@@ -15,11 +15,11 @@ const configService = new ConfigService();
 
 export default new DataSource({
   type: 'postgres',
-  host: configService.get('DB_HOST') || 'localhost',
-  port: configService.get('DB_PORT') || 5432,
-  username: configService.get('DB_USERNAME') || 'postgres',
-  password: configService.get('DB_PASSWORD') || 'postgres',
-  database: configService.get('DB_DATABASE') || 'fnbpos_oauth',
+  host: configService.get('CONFIG_POSTGRESQL_HOST') || 'localhost',
+  port: configService.get('CONFIG_POSTGRESQL_PORT') || 5432,
+  username: configService.get('CONFIG_POSTGRESQL_USERNAME') || 'postgres',
+  password: configService.get('CONFIG_POSTGRESQL_PASSWORD') || 'postgres',
+  database: configService.get('CONFIG_POSTGRESQL_DB_NAME') || 'fnbpos_oauth',
   entities: [User, RefreshToken, Session, PasswordReset, AuditLog],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,

@@ -1,13 +1,13 @@
 export default () => ({
-  port: parseInt(process.env.PORT, 10) || 3005,
+  port: parseInt(process.env.SERVICE_PORT, 10) || 3005,
   nodeEnv: process.env.NODE_ENV || 'development',
 
   database: {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_DATABASE || 'fnbpos_oauth',
+    host: process.env.CONFIG_POSTGRESQL_HOST || 'localhost',
+    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT, 10) || 5432,
+    username: process.env.CONFIG_POSTGRESQL_USERNAME || 'postgres',
+    password: process.env.CONFIG_POSTGRESQL_PASSWORD || 'postgres',
+    database: process.env.CONFIG_POSTGRESQL_DB_NAME || 'fnbpos_oauth',
   },
 
   jwt: {
