@@ -35,7 +35,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.SERVICE_PORT || 3004;
   await app.listen(port);
   console.log(`Master Data API is running on port ${port}`);
 }
