@@ -415,21 +415,30 @@ fun SaleScreen(
             }
 
             // Tính VAT từ từng món và topping (dựa trên vatRate riêng của mỗi item)
-            // Công thức: VAT = Giá - (Giá / (1 + VAT%))
+            // Theo luật thuế VN: VAT tính trên giá SAU giảm giá (chiết khấu)
+            // Công thức: VAT = Giá sau giảm - (Giá sau giảm / (1 + VAT%))
+            val totalDiscount = uiState.discountAmount
+            // Tính tỷ lệ còn lại sau giảm giá (để phân bổ giảm giá cho từng item)
+            val afterDiscountRatio = if (subtotal > 0) {
+                ((subtotal - totalDiscount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+            } else 1.0
+
             val vatAmount = orderItems.sumOf { item ->
-                // VAT của món chính (giá gốc, không bao gồm topping)
+                // Áp dụng tỷ lệ giảm giá cho giá món chính
                 val mainItemPrice = item.unitPrice * item.quantity
+                val mainItemPriceAfterDiscount = (mainItemPrice * afterDiscountRatio).toLong()
                 val mainItemVat = if (item.vatRate > 0) {
-                    val priceBeforeVat = mainItemPrice / (1 + item.vatRate / 100.0)
-                    (mainItemPrice - priceBeforeVat).toLong()
+                    val priceBeforeVat = mainItemPriceAfterDiscount / (1 + item.vatRate / 100.0)
+                    (mainItemPriceAfterDiscount - priceBeforeVat).toLong()
                 } else 0L
 
-                // VAT của từng topping
+                // VAT của từng topping (cũng áp dụng tỷ lệ giảm giá)
                 val toppingsVat = item.toppings.sumOf { topping ->
                     val toppingTotalPrice = topping.price * item.quantity
+                    val toppingPriceAfterDiscount = (toppingTotalPrice * afterDiscountRatio).toLong()
                     if (topping.vatRate > 0) {
-                        val priceBeforeVat = toppingTotalPrice / (1 + topping.vatRate / 100.0)
-                        (toppingTotalPrice - priceBeforeVat).toLong()
+                        val priceBeforeVat = toppingPriceAfterDiscount / (1 + topping.vatRate / 100.0)
+                        (toppingPriceAfterDiscount - priceBeforeVat).toLong()
                     } else 0L
                 }
 

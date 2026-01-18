@@ -1448,6 +1448,8 @@ fun PaymentDialog(
         VatDetailDialog(
             orderItems = orderItems,
             totalVatAmount = vatAmount,
+            subtotal = subtotal,
+            discountAmount = discountAmount,
             onDismiss = { showVatDetail = false }
         )
     }
@@ -1467,40 +1469,49 @@ private data class VatDisplayRow(
 private fun VatDetailDialog(
     orderItems: List<PaymentOrderItem>,
     totalVatAmount: Long,
+    subtotal: Long = 0,
+    discountAmount: Long = 0,
     onDismiss: () -> Unit
 ) {
-    // Build flat list: main items + their toppings with VAT
-    val vatRows = remember(orderItems) {
+    // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm)
+    val afterDiscountRatio = if (subtotal > 0) {
+        ((subtotal - discountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+    } else 1.0
+
+    // Build flat list: main items + their toppings with VAT (sau giảm giá)
+    val vatRows = remember(orderItems, afterDiscountRatio) {
         buildList {
             orderItems.forEach { item ->
-                // VAT của món chính (giá gốc, không bao gồm topping)
+                // VAT của món chính (giá sau giảm giá)
                 val mainPrice = item.unitPrice * item.quantity
+                val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
                 val mainVat = if (item.vatRate > 0) {
-                    val priceBeforeVat = mainPrice / (1 + item.vatRate / 100.0)
-                    (mainPrice - priceBeforeVat).toLong()
+                    val priceBeforeVat = mainPriceAfterDiscount / (1 + item.vatRate / 100.0)
+                    (mainPriceAfterDiscount - priceBeforeVat).toLong()
                 } else 0L
 
                 add(VatDisplayRow(
                     name = item.name,
                     quantity = item.quantity,
-                    totalPrice = mainPrice,
+                    totalPrice = mainPriceAfterDiscount,
                     vatRate = item.vatRate,
                     vatAmount = mainVat,
                     isTopping = false
                 ))
 
-                // VAT của từng topping
+                // VAT của từng topping (cũng tính sau giảm giá)
                 item.toppings.forEach { topping ->
                     val toppingTotal = topping.price * item.quantity
+                    val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
                     val toppingVat = if (topping.vatRate > 0) {
-                        val priceBeforeVat = toppingTotal / (1 + topping.vatRate / 100.0)
-                        (toppingTotal - priceBeforeVat).toLong()
+                        val priceBeforeVat = toppingAfterDiscount / (1 + topping.vatRate / 100.0)
+                        (toppingAfterDiscount - priceBeforeVat).toLong()
                     } else 0L
 
                     add(VatDisplayRow(
                         name = topping.name,
                         quantity = item.quantity,
-                        totalPrice = toppingTotal,
+                        totalPrice = toppingAfterDiscount,
                         vatRate = topping.vatRate,
                         vatAmount = toppingVat,
                         isTopping = true
