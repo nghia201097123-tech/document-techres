@@ -897,6 +897,9 @@ private fun OrderDetailDialog(
     // State for VAT detail dialog
     var showVatDetail by remember { mutableStateOf(false) }
 
+    // State for collapsible order info section (default collapsed to prioritize items list)
+    var isOrderInfoExpanded by remember { mutableStateOf(false) }
+
     // Cancel confirmation dialog
     if (showCancelDialog) {
         AlertDialog(
@@ -1092,19 +1095,75 @@ private fun OrderDetailDialog(
                         .weight(1f)
                         .padding(horizontal = 12.dp)
                 ) {
-                    // Order Info - Compact grid
+                    // Order Info - Collapsible header (compact inline view)
                     item {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                CompactInfo("Bàn", order.tableName ?: "---")
-                                CompactInfo("Thu ngân", order.staffName ?: "---")
-                                CompactInfo("Giờ vào", formatDateTime(parseTimestamp(order.createdAt)))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Compact inline info: Bàn + Số khách + Thanh toán (always visible)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFF0F4F8))
+                                .clickable { isOrderInfoExpanded = !isOrderInfoExpanded }
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Quick info chips
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                // Table chip
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.TableBar, null, modifier = Modifier.size(14.dp), tint = Color(0xFF1976D2))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(order.tableName ?: "---", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                                // Guest count
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.People, null, modifier = Modifier.size(14.dp), tint = Color(0xFF616161))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("${order.guestCount}", fontSize = 12.sp)
+                                }
+                                // Payment method
+                                Text(
+                                    getPaymentMethodName(order.paymentMethod),
+                                    fontSize = 11.sp,
+                                    color = Color.White,
+                                    modifier = Modifier
+                                        .background(Color(0xFF4CAF50), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                CompactInfo("Số khách", "${order.guestCount}")
-                                CompactInfo("Thanh toán", getPaymentMethodName(order.paymentMethod))
-                                order.completedAt?.let { CompactInfo("Giờ ra", formatDateTime(parseTimestamp(it))) }
+
+                            // Expand/collapse icon
+                            Icon(
+                                imageVector = if (isOrderInfoExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isOrderInfoExpanded) "Thu gọn" else "Xem thêm",
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.Gray
+                            )
+                        }
+
+                        // Expandable detail section
+                        androidx.compose.animation.AnimatedVisibility(visible = isOrderInfoExpanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        CompactInfo("Thu ngân", order.staffName ?: "---")
+                                        CompactInfo("Giờ vào", formatDateTime(parseTimestamp(order.createdAt)))
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        order.completedAt?.let { CompactInfo("Giờ ra", formatDateTime(parseTimestamp(it))) }
+                                    }
+                                }
                             }
                         }
 
@@ -1113,9 +1172,9 @@ private fun OrderDetailDialog(
                             Text("Lý do hủy: ${order.cancelReason}", fontSize = 12.sp, color = Color(0xFFf44336), fontStyle = FontStyle.Italic)
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(8.dp))
+                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
 
                     // Items header
@@ -1440,8 +1499,8 @@ private fun OrderDetailDialog(
                     // Bill discount (excluding items and coupons)
                     val billDiscount = (totalDiscount - itemDiscountTotal - couponDiscountTotal).coerceAtLeast(0.0)
 
-                    // Subtotal
-                    SummaryRow("Tạm tính", formatCurrency(order.subtotal.toLong()))
+                    // Subtotal (đã gồm VAT - giá bán đã bao gồm thuế)
+                    SummaryRow("Tạm tính (đã gồm VAT)", formatCurrency(order.subtotal.toLong()))
 
                     // Item discounts
                     if (itemDiscountTotal > 0) {
@@ -1465,7 +1524,7 @@ private fun OrderDetailDialog(
                         SummaryRow("Giảm giá HĐ", "-${formatCurrency(billDiscount.toLong())}", Color(0xFF4CAF50))
                     }
 
-                    // VAT - clickable to show detail
+                    // VAT - clickable to show detail (Trong đó VAT = VAT đã bao gồm trong tạm tính)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1476,9 +1535,9 @@ private fun OrderDetailDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "VAT",
+                                "Trong đó VAT",
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.primary
+                                color = Color.Gray
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
@@ -1491,7 +1550,7 @@ private fun OrderDetailDialog(
                         Text(
                             formatCurrency(vatAmount.toLong()),
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color.Gray
                         )
                     }
 
