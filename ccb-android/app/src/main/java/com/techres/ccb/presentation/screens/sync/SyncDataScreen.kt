@@ -384,14 +384,18 @@ private fun getIconForSyncItem(id: String): ImageVector {
         "categories" -> Icons.Default.Category
         "products" -> Icons.Default.Fastfood
         "product_toppings" -> Icons.Default.AddCircle
+        "combo_items" -> Icons.Default.Layers
         "areas" -> Icons.Default.Map
         "tables" -> Icons.Default.TableBar
         "staff" -> Icons.Default.People
         "seasonal_prices" -> Icons.Default.Event
         "coupons" -> Icons.Default.Discount
+        "surcharges" -> Icons.Default.AttachMoney
         "product_notes" -> Icons.Default.Note
         "bill_templates" -> Icons.Default.Receipt
         "settings" -> Icons.Default.Settings
+        "stations" -> Icons.Default.Restaurant
+        "kitchens" -> Icons.Default.Restaurant
         else -> Icons.Default.Sync
     }
 }

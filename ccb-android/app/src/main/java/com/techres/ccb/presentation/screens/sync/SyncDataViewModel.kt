@@ -99,6 +99,7 @@ class SyncDataViewModel @Inject constructor(
             SyncItem("areas", "Khu vực", "place"),
             SyncItem("tables", "Bàn", "table_bar"),
             SyncItem("staff", "Nhân viên", "people"),
+            SyncItem("kitchens", "Bếp", "restaurant"),
             SyncItem("seasonal_prices", "Giá thời vụ", "event"),
             SyncItem("coupons", "Coupon", "discount"),
             SyncItem("surcharges", "Phụ thu", "attach_money"),
