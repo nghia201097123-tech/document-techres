@@ -48,11 +48,11 @@ import { TransactionCategoriesModule } from './modules/transaction-categories/tr
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get('DB_HOST', '172.16.10.146'),
-        port: configService.get<number>('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'techres_master'),
-        password: configService.get('DB_PASSWORD', 'techres_master'),
-        database: configService.get('DB_DATABASE', 'techres_master'),
+        host: configService.get('CONFIG_POSTGRESQL_HOST', '172.16.10.146'),
+        port: configService.get<number>('CONFIG_POSTGRESQL_PORT', 5432),
+        username: configService.get('CONFIG_POSTGRESQL_USERNAME', 'techres_master'),
+        password: configService.get('CONFIG_POSTGRESQL_PASSWORD', 'techres_master'),
+        database: configService.get('CONFIG_POSTGRESQL_DB_NAME', 'techres_master'),
         entities: [
           Company,
           Brand,
