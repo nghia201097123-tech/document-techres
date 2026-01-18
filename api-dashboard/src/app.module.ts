@@ -83,11 +83,11 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: "postgres",
-        host: configService.get("DB_HOST", "172.16.10.146"),
-        port: configService.get("DB_PORT", 5432),
-        username: configService.get("DB_USERNAME", "techres"),
-        password: configService.get("DB_PASSWORD", "techres"),
-        database: configService.get("DB_DATABASE", "techres"),
+        host: configService.get("CONFIG_POSTGRESQL_HOST", "172.16.10.146"),
+        port: configService.get("CONFIG_POSTGRESQL_PORT", 5432),
+        username: configService.get("CONFIG_POSTGRESQL_USERNAME", "techres"),
+        password: configService.get("CONFIG_POSTGRESQL_PASSWORD", "techres"),
+        database: configService.get("CONFIG_POSTGRESQL_DB_NAME", "techres"),
         entities: [
           Company,
           Brand,
