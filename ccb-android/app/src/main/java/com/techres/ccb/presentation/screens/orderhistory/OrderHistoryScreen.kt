@@ -256,15 +256,15 @@ fun OrderHistoryScreen(
                             .padding(vertical = 10.dp, horizontal = 8.dp)
                     ) {
                         TableHeaderCell("STT", 40.dp)
-                        TableHeaderCell("MÃ ĐƠN", 80.dp)
-                        TableHeaderCell("GIỜ", 55.dp)
+                        TableHeaderCell("MÃ HÓA ĐƠN", 115.dp)  // Wider for full order number
+                        TableHeaderCell("GIỜ", 50.dp)
                         TableHeaderCell("BÀN", 50.dp)
                         TableHeaderCell("GIÁ BÁN", 85.dp)  // Subtotal before discount
-                        TableHeaderCell("GIẢM GIÁ", 80.dp) // Total discount
+                        TableHeaderCell("GIẢM GIÁ", 75.dp) // Total discount
                         TableHeaderCell("SAU GIẢM", 85.dp) // After discount
-                        TableHeaderCell("VAT 8%", 75.dp)   // VAT calculated on after-discount
+                        TableHeaderCell("VAT 8%", 70.dp)   // VAT calculated on after-discount
                         TableHeaderCell("TỔNG", 90.dp)     // Final total
-                        TableHeaderCell("", 45.dp)         // Sync status (icon only)
+                        TableHeaderCell("", 40.dp)         // Sync status (icon only)
                     }
 
                     Divider(color = Color.LightGray)
@@ -315,21 +315,21 @@ fun OrderHistoryScreen(
                         ) {
                             // Label showing completed vs cancelled count
                             Text("TỔNG", modifier = Modifier.width(40.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                            Column(modifier = Modifier.width(80.dp)) {
+                            Column(modifier = Modifier.width(115.dp)) {
                                 Text("${completedOrders.size} hoàn tất", fontSize = 9.sp, color = Color(0xFF4CAF50), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                 if (cancelledCount > 0) {
                                     Text("$cancelledCount đã hủy", fontSize = 9.sp, color = Color(0xFFf44336), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                 }
                             }
-                            Text("", modifier = Modifier.width(55.dp))
+                            Text("", modifier = Modifier.width(50.dp))
                             Text("", modifier = Modifier.width(50.dp))
                             // Totals (only from completed orders)
                             Text(formatCurrencyShort(totalSubtotal), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
-                            Text(formatCurrencyShort(totalDiscount), modifier = Modifier.width(80.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50), textAlign = TextAlign.End)
+                            Text(formatCurrencyShort(totalDiscount), modifier = Modifier.width(75.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50), textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalAfterDiscount), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
-                            Text(formatCurrencyShort(totalVat), modifier = Modifier.width(75.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF757575), textAlign = TextAlign.End)
+                            Text(formatCurrencyShort(totalVat), modifier = Modifier.width(70.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF757575), textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalRevenue), modifier = Modifier.width(90.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2), textAlign = TextAlign.End)
-                            Text("", modifier = Modifier.width(45.dp))
+                            Text("", modifier = Modifier.width(40.dp))
                         }
                     }
                 }
@@ -659,20 +659,22 @@ private fun OrderTableRow(
             color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // Mã đơn
+        // Mã hóa đơn (Full order number)
         Text(
-            text = order.orderNumber.takeLast(5),
-            modifier = Modifier.width(80.dp),
-            fontSize = 12.sp,
+            text = order.orderNumber,
+            modifier = Modifier.width(115.dp),
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            color = if (isCancelled) Color.Gray else Color.Unspecified
+            textAlign = TextAlign.Start,
+            color = if (isCancelled) Color.Gray else Color(0xFF1976D2),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
 
         // Giờ (Time)
         Text(
             text = formatTimeOnly(order.createdAt),
-            modifier = Modifier.width(55.dp),
+            modifier = Modifier.width(50.dp),
             fontSize = 11.sp,
             textAlign = TextAlign.Center,
             color = Color.Gray
@@ -700,7 +702,7 @@ private fun OrderTableRow(
         // Giảm giá (Total discount)
         Text(
             text = if (order.discountAmount > 0) formatCurrencyShort(order.discountAmount) else "-",
-            modifier = Modifier.width(80.dp),
+            modifier = Modifier.width(75.dp),
             fontSize = 12.sp,
             color = if (order.discountAmount > 0) Color(0xFF4CAF50) else Color.LightGray,
             fontWeight = if (order.discountAmount > 0) FontWeight.Medium else FontWeight.Normal,
@@ -719,7 +721,7 @@ private fun OrderTableRow(
         // VAT 8% (Calculated on after-discount price)
         Text(
             text = formatCurrencyShort(calculatedVat),
-            modifier = Modifier.width(75.dp),
+            modifier = Modifier.width(70.dp),
             fontSize = 11.sp,
             textAlign = TextAlign.End,
             color = Color(0xFF757575) // Gray for tax
@@ -741,7 +743,7 @@ private fun OrderTableRow(
 
         // Đồng bộ (Sync status) - Icon only
         Box(
-            modifier = Modifier.width(45.dp),
+            modifier = Modifier.width(40.dp),
             contentAlignment = Alignment.Center
         ) {
             val (syncIcon, syncColor, syncDesc) = when (order.syncStatus) {
