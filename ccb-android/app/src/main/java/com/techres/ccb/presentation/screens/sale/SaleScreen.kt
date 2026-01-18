@@ -291,8 +291,8 @@ fun SaleScreen(
                 uiState.subtotal
             }
 
-            // Tổng = Tạm tính - Giảm giá (giá đã bao gồm VAT nên không cộng thêm)
-            val paymentTotal = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
+            // Tổng = Tạm tính + Phụ thu - Giảm giá (giá đã bao gồm VAT nên không cộng thêm)
+            val paymentTotal = (subtotal + uiState.surchargeAmount - uiState.discountAmount).coerceAtLeast(0L)
 
             // Helper function to parse ALL variants (options and toppings) from notes field
             // Formats:
@@ -489,6 +489,7 @@ fun SaleScreen(
             PaymentDialog(
                 totalAmount = paymentTotal,
                 subtotal = subtotal,
+                surchargeAmount = uiState.surchargeAmount,
                 discountAmount = uiState.discountAmount,
                 vatAmount = vatAmount,
                 appliedDiscounts = uiState.appliedDiscounts,

@@ -2742,6 +2742,7 @@ class SaleViewModel @Inject constructor(
                                 itemDiscounts = state.itemDiscounts,
                                 itemDiscountTypes = state.itemDiscountTypes,
                                 billDiscountAmount = state.billDiscountAmount,
+                                surchargeAmount = state.surchargeAmount,
                                 appliedDiscounts = state.appliedDiscounts,
                                 tableName = state.selectedTable?.name,
                                 staffName = currentOrder.staffName,
@@ -2808,12 +2809,13 @@ class SaleViewModel @Inject constructor(
             try {
                 val now = getCurrentTimestamp()
 
-                // Calculate final amounts with applied discounts
+                // Calculate final amounts with applied discounts and surcharges
                 val orderSubtotal = currentOrder.subtotal
                 val finalDiscountAmount = state.discountAmount.toDouble()  // Includes bill + item + coupon discounts
-                val finalTotalAmount = (orderSubtotal - finalDiscountAmount).coerceAtLeast(0.0)
+                val finalSurchargeAmount = state.surchargeAmount.toDouble()  // Phụ thu
+                val finalTotalAmount = (orderSubtotal + finalSurchargeAmount - finalDiscountAmount).coerceAtLeast(0.0)
 
-                Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, discount: $finalDiscountAmount, total: $finalTotalAmount")
+                Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount")
 
                 // Lưu thông tin cần thiết cho việc in bill
                 val completedOrder: OrderEntity
@@ -2821,17 +2823,19 @@ class SaleViewModel @Inject constructor(
                 val itemDiscountsForPrint = state.itemDiscounts
                 val itemDiscountTypesForPrint = state.itemDiscountTypes  // Loại giảm giá: "percent" hoặc "fixed"
                 val billDiscountForPrint = state.billDiscountAmount
+                val surchargeForPrint = state.surchargeAmount  // Phụ thu
                 val appliedDiscountsForPrint = state.appliedDiscounts  // Coupon/Voucher đã áp dụng
                 val tableNameForPrint = state.selectedTable?.name
 
                 withContext(Dispatchers.IO) {
-                    // 1. Update order status to completed with correct discount and total
+                    // 1. Update order status to completed with correct discount, surcharge and total
                     completedOrder = currentOrder.copy(
                         status = "completed",
                         paymentStatus = "paid",
                         paymentMethod = paymentMethod,
                         discountAmount = finalDiscountAmount,
                         discountReason = state.billDiscountDescription,
+                        surchargeAmount = finalSurchargeAmount,
                         totalAmount = finalTotalAmount,
                         paidAmount = finalTotalAmount,
                         completedAt = now,
@@ -2885,6 +2889,8 @@ class SaleViewModel @Inject constructor(
                         couponCode = "",
                         appliedDiscounts = emptyList(),
                         couponError = null,
+                        // Clear surcharges
+                        selectedSurcharges = emptyList(),
                         // Reset temp bill print count
                         tempBillPrintCount = 0,
                         successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
@@ -2931,6 +2937,7 @@ class SaleViewModel @Inject constructor(
                                     itemDiscounts = itemDiscountsForPrint,
                                     itemDiscountTypes = itemDiscountTypesForPrint,
                                     billDiscountAmount = billDiscountForPrint,
+                                    surchargeAmount = surchargeForPrint,
                                     appliedDiscounts = appliedDiscountsForPrint,
                                     tableName = tableNameForPrint,
                                     staffName = completedOrder.staffName,
@@ -2978,6 +2985,7 @@ class SaleViewModel @Inject constructor(
      * @param itemDiscounts Map of itemId -> discount amount (from UI state)
      * @param itemDiscountTypes Map of itemId -> discount type ("percent" or "fixed")
      * @param billDiscountAmount Giảm giá tổng bill (từ giảm giá thủ công hoặc %)
+     * @param surchargeAmount Phụ thu
      */
     private fun buildBillData(
         order: OrderEntity,
@@ -2985,6 +2993,7 @@ class SaleViewModel @Inject constructor(
         itemDiscounts: Map<String, Long> = emptyMap(),
         itemDiscountTypes: Map<String, String> = emptyMap(),
         billDiscountAmount: Long = 0,
+        surchargeAmount: Long = 0,
         appliedDiscounts: List<AppliedDiscount> = emptyList(),
         tableName: String?,
         staffName: String?,
@@ -3091,8 +3100,8 @@ class SaleViewModel @Inject constructor(
             totalVatAmount += itemVat
         }
 
-        // Tính totalAmount thực tế (sau tất cả giảm giá)
-        val calculatedTotalAmount = (calculatedSubtotal - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
+        // Tính totalAmount thực tế (sau tất cả giảm giá + phụ thu)
+        val calculatedTotalAmount = (calculatedSubtotal + surchargeAmount - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
 
         // Nếu có giảm giá bill, VAT cũng giảm theo tỷ lệ
         val totalItemsPrice = billItems.sumOf { it.totalPrice }
@@ -3170,6 +3179,7 @@ class SaleViewModel @Inject constructor(
             discountAmount = manualBillDiscount + couponDiscountTotal, // Total order-level discount
             discountPercent = billDiscountPercentValue,
             // Phí và thuế
+            surchargeAmount = surchargeAmount.toDouble(),
             serviceFee = 0.0,
             serviceFeePercent = 0.0,
             vatRate = displayVatRate, // VAT rate trung bình (tính từ tổng VAT / tổng giá trước VAT)

@@ -120,6 +120,7 @@ data class PaymentOrderItem(
 fun PaymentDialog(
     totalAmount: Long,
     subtotal: Long = totalAmount,
+    surchargeAmount: Long = 0,
     discountAmount: Long = 0,
     vatAmount: Long = 0,
     appliedDiscounts: List<AppliedDiscount> = emptyList(),
@@ -415,6 +416,24 @@ fun PaymentDialog(
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text("Tạm tính:", style = MaterialTheme.typography.bodyMedium)
                                     Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium)
+                                }
+
+                                // === PHỤ THU (nếu có) ===
+                                if (surchargeAmount > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Phụ thu", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF9800))
+                                        Text(
+                                            "+${formatCurrency(surchargeAmount)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFFFF9800),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
 
                                 // === GIẢM GIÁ (nếu có) - hiển thị tổng ===

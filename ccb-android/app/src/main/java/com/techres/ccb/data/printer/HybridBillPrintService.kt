@@ -270,6 +270,7 @@ object HybridBillPrintService {
 
         // VAT & Total
         Log.d(TAG, "--- VAT & Total ---")
+        Log.d(TAG, "surchargeAmount: ${billData.surchargeAmount}")
         Log.d(TAG, "serviceFee: ${billData.serviceFee}")
         Log.d(TAG, "serviceFeePercent: ${billData.serviceFeePercent}")
         Log.d(TAG, "vatRate: ${billData.vatRate}")
@@ -522,6 +523,11 @@ object HybridBillPrintService {
             // 5. Tổng giảm giá (nếu có nhiều loại giảm giá)
             if (template.showTotalDiscount && billData.totalDiscountAmount > 0) {
                 lineKeyValue("${template.totalDiscountLabel}:", "-${formatCurrency(billData.totalDiscountAmount)}")
+            }
+
+            // ============ PHỤ THU ============
+            if (billData.surchargeAmount > 0) {
+                lineKeyValue("Phụ thu:", "+${formatCurrency(billData.surchargeAmount)}")
             }
 
             // ============ PHÍ DỊCH VỤ ============

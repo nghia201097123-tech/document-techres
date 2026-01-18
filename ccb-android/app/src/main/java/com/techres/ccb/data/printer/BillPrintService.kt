@@ -560,6 +560,7 @@ data class BillData(
     val discountPercent: Double = 0.0,
     val totalItemDiscount: Double = 0.0,
     // Phí và thuế
+    val surchargeAmount: Double = 0.0, // Phụ thu
     val serviceFee: Double = 0.0,
     val serviceFeePercent: Double = 0.0,
     val vatRate: Double = 10.0,
