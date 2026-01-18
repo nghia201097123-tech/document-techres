@@ -1476,7 +1476,7 @@ private fun OrderDetailDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "VAT (${vatRate.toInt()}%)",
+                                "VAT",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
