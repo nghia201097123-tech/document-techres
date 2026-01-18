@@ -1117,17 +1117,18 @@ private fun OrderDetailDialog(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 // Table chip
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = Icons.Default.Place, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF1976D2))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(order.tableName ?: "---", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                }
+                                Text(
+                                    "Bàn: ${order.tableName ?: "---"}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF1976D2)
+                                )
                                 // Guest count
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF616161))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("${order.guestCount}", fontSize = 12.sp)
-                                }
+                                Text(
+                                    "Khách: ${order.guestCount}",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF616161)
+                                )
                                 // Payment method
                                 Text(
                                     getPaymentMethodName(order.paymentMethod),
