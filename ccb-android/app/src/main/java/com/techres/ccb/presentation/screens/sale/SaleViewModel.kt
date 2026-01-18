@@ -2743,6 +2743,7 @@ class SaleViewModel @Inject constructor(
                                 itemDiscountTypes = state.itemDiscountTypes,
                                 billDiscountAmount = state.billDiscountAmount,
                                 surchargeAmount = state.surchargeAmount,
+                                surcharges = state.selectedSurcharges,
                                 appliedDiscounts = state.appliedDiscounts,
                                 tableName = state.selectedTable?.name,
                                 staffName = currentOrder.staffName,
@@ -2824,6 +2825,7 @@ class SaleViewModel @Inject constructor(
                 val itemDiscountTypesForPrint = state.itemDiscountTypes  // Loại giảm giá: "percent" hoặc "fixed"
                 val billDiscountForPrint = state.billDiscountAmount
                 val surchargeForPrint = state.surchargeAmount  // Phụ thu
+                val surchargesForPrint = state.selectedSurcharges  // Danh sách phụ thu (để tính VAT)
                 val appliedDiscountsForPrint = state.appliedDiscounts  // Coupon/Voucher đã áp dụng
                 val tableNameForPrint = state.selectedTable?.name
 
@@ -2938,6 +2940,7 @@ class SaleViewModel @Inject constructor(
                                     itemDiscountTypes = itemDiscountTypesForPrint,
                                     billDiscountAmount = billDiscountForPrint,
                                     surchargeAmount = surchargeForPrint,
+                                    surcharges = surchargesForPrint,
                                     appliedDiscounts = appliedDiscountsForPrint,
                                     tableName = tableNameForPrint,
                                     staffName = completedOrder.staffName,
@@ -2985,7 +2988,8 @@ class SaleViewModel @Inject constructor(
      * @param itemDiscounts Map of itemId -> discount amount (from UI state)
      * @param itemDiscountTypes Map of itemId -> discount type ("percent" or "fixed")
      * @param billDiscountAmount Giảm giá tổng bill (từ giảm giá thủ công hoặc %)
-     * @param surchargeAmount Phụ thu
+     * @param surchargeAmount Phụ thu (tổng tiền)
+     * @param surcharges Danh sách phụ thu đã chọn (để tính VAT)
      */
     private fun buildBillData(
         order: OrderEntity,
@@ -2994,6 +2998,7 @@ class SaleViewModel @Inject constructor(
         itemDiscountTypes: Map<String, String> = emptyMap(),
         billDiscountAmount: Long = 0,
         surchargeAmount: Long = 0,
+        surcharges: List<SelectedSurcharge> = emptyList(),
         appliedDiscounts: List<AppliedDiscount> = emptyList(),
         tableName: String?,
         staffName: String?,
@@ -3090,24 +3095,50 @@ class SaleViewModel @Inject constructor(
 
         // Tính VAT cho TỪNG MÓN rồi cộng lại (mỗi món có VAT rate riêng)
         // Giá đã bao gồm VAT (inclusive): VAT = price - price/(1 + vatRate/100)
-        var totalVatAmount = 0.0
-        var totalPriceBeforeVat = 0.0
+        var itemsVatAmount = 0.0
+        var itemsPriceBeforeVat = 0.0
         billItems.forEach { item ->
             // Tính VAT cho từng món dựa trên vatRate của món đó
             val itemPriceBeforeVat = item.totalPrice / (1 + item.vatRate / 100)
             val itemVat = item.totalPrice - itemPriceBeforeVat
-            totalPriceBeforeVat += itemPriceBeforeVat
-            totalVatAmount += itemVat
+            itemsPriceBeforeVat += itemPriceBeforeVat
+            itemsVatAmount += itemVat
         }
+
+        // Tính VAT cho phụ thu (surcharges)
+        var surchargesVatAmount = 0.0
+        var surchargesPriceBeforeVat = 0.0
+        surcharges.forEach { selected ->
+            val surcharge = selected.surcharge
+            val totalAmount = surcharge.amount * selected.quantity
+            if (surcharge.vatRate > 0) {
+                val priceBeforeVat = totalAmount / (1 + surcharge.vatRate / 100)
+                surchargesPriceBeforeVat += priceBeforeVat
+                surchargesVatAmount += (totalAmount - priceBeforeVat)
+            } else {
+                surchargesPriceBeforeVat += totalAmount
+            }
+        }
+
+        // Tổng VAT và giá trước VAT
+        val totalVatAmount = itemsVatAmount + surchargesVatAmount
+        val totalPriceBeforeVat = itemsPriceBeforeVat + surchargesPriceBeforeVat
 
         // Tính totalAmount thực tế (sau tất cả giảm giá + phụ thu)
         val calculatedTotalAmount = (calculatedSubtotal + surchargeAmount - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
 
-        // Nếu có giảm giá bill, VAT cũng giảm theo tỷ lệ
+        // Nếu có giảm giá bill, VAT của món cũng giảm theo tỷ lệ (phụ thu không bị giảm)
         val totalItemsPrice = billItems.sumOf { it.totalPrice }
-        val discountRatio = if (totalItemsPrice > 0) calculatedTotalAmount / totalItemsPrice else 1.0
-        val vatAmount = totalVatAmount * discountRatio
-        val priceBeforeVat = totalPriceBeforeVat * discountRatio
+        val itemsAfterDiscount = (totalItemsPrice - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
+        val discountRatio = if (totalItemsPrice > 0) itemsAfterDiscount / totalItemsPrice else 1.0
+
+        // VAT của món giảm theo tỷ lệ, VAT của phụ thu giữ nguyên
+        val itemsVatAfterDiscount = itemsVatAmount * discountRatio
+        val itemsPriceBeforeVatAfterDiscount = itemsPriceBeforeVat * discountRatio
+
+        // Tổng VAT = VAT món sau giảm + VAT phụ thu (không giảm)
+        val vatAmount = itemsVatAfterDiscount + surchargesVatAmount
+        val priceBeforeVat = itemsPriceBeforeVatAfterDiscount + surchargesPriceBeforeVat
 
         // Tính VAT rate trung bình để hiển thị trên bill (chỉ để hiển thị)
         val displayVatRate = if (priceBeforeVat > 0) {

@@ -426,7 +426,7 @@ fun SaleScreen(
                 ((subtotal - totalDiscount).toDouble() / subtotal).coerceIn(0.0, 1.0)
             } else 1.0
 
-            val vatAmount = orderItems.sumOf { item ->
+            val itemsVatAmount = orderItems.sumOf { item ->
                 // Áp dụng tỷ lệ giảm giá cho giá món chính
                 val mainItemPrice = item.unitPrice * item.quantity
                 val mainItemPriceAfterDiscount = (mainItemPrice * afterDiscountRatio).toLong()
@@ -447,6 +447,20 @@ fun SaleScreen(
 
                 mainItemVat + toppingsVat
             }
+
+            // Tính VAT từ phụ thu (surcharges)
+            // Phụ thu có giá đã gồm VAT, nên VAT = amount - amount/(1 + vatRate/100)
+            val surchargesVatAmount = uiState.selectedSurcharges.sumOf { selected ->
+                val surcharge = selected.surcharge
+                val totalAmount = surcharge.amount * selected.quantity
+                if (surcharge.vatRate > 0) {
+                    val priceBeforeVat = totalAmount / (1 + surcharge.vatRate / 100.0)
+                    (totalAmount - priceBeforeVat).toLong()
+                } else 0L
+            }
+
+            // Tổng VAT = VAT món + VAT phụ thu
+            val vatAmount = itemsVatAmount + surchargesVatAmount
 
             // Convert CouponEntity to CouponDisplayItem with availability status
             val couponDisplayItems = uiState.availableCoupons.map { coupon ->
