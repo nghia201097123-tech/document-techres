@@ -363,13 +363,17 @@ fun SaleScreen(
                             // Parse all variants (options and toppings) from notes field
                             val variants = parseVariantsFromNotes(item.notes, item.vatRate)
                             // Calculate unit price of main item (without variants)
+                            // Use totalPrice / quantity for more accurate calculation
                             val variantsPrice = variants.sumOf { it.price }
-                            val mainUnitPrice = (item.unitPrice.toLong() - variantsPrice).coerceAtLeast(0L)
+                            val actualUnitPrice = (item.totalPrice / item.quantity).toLong()
+                            val mainUnitPrice = (actualUnitPrice - variantsPrice).coerceAtLeast(0L)
 
                             // Debug logging
                             android.util.Log.d("VAT_DEBUG", "Item: ${item.productName}")
                             android.util.Log.d("VAT_DEBUG", "  notes: ${item.notes}")
-                            android.util.Log.d("VAT_DEBUG", "  unitPrice: ${item.unitPrice}")
+                            android.util.Log.d("VAT_DEBUG", "  unitPrice from DB: ${item.unitPrice}")
+                            android.util.Log.d("VAT_DEBUG", "  totalPrice: ${item.totalPrice}, quantity: ${item.quantity}")
+                            android.util.Log.d("VAT_DEBUG", "  actualUnitPrice (totalPrice/qty): $actualUnitPrice")
                             android.util.Log.d("VAT_DEBUG", "  parsed variants: ${variants.map { "${it.name}=${it.price}" }}")
                             android.util.Log.d("VAT_DEBUG", "  variantsPrice: $variantsPrice")
                             android.util.Log.d("VAT_DEBUG", "  mainUnitPrice: $mainUnitPrice")
