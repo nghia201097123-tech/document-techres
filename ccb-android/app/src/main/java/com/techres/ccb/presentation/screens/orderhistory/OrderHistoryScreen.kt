@@ -1632,6 +1632,7 @@ private fun OrderDetailDialog(
             orderItems = orderItems,
             subtotal = order.subtotal.toLong(),
             discountAmount = order.discountAmount.toLong(),
+            surchargeAmount = order.surchargeAmount.toLong(),
             onDismiss = { showVatDetail = false }
         )
     }
@@ -1725,12 +1726,16 @@ private fun HistoryVatDetailDialog(
     orderItems: List<OrderItemEntity>,
     subtotal: Long,
     discountAmount: Long,
+    surchargeAmount: Long = 0,
     onDismiss: () -> Unit
 ) {
-    // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm)
+    // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm - chỉ áp dụng cho items, không áp dụng cho surcharges)
     val afterDiscountRatio = if (subtotal > 0) {
         ((subtotal - discountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
     } else 1.0
+
+    // VAT rate mặc định cho phụ thu (8%)
+    val surchargeVatRate = 8.0
 
     // Helper function to parse variants/toppings from notes field
     fun parseVariantsFromNotes(notes: String?, itemVatRate: Double): List<Pair<String, Long>> {
@@ -1781,7 +1786,7 @@ private fun HistoryVatDetailDialog(
     }
 
     // Build flat list: main items + their toppings with VAT (sau giảm giá)
-    val vatRows = remember(orderItems, afterDiscountRatio) {
+    val vatRows = remember(orderItems, afterDiscountRatio, surchargeAmount) {
         buildList {
             // Only process active (non-cancelled, non-combo-child) items
             orderItems.filter { it.status != "cancelled" && !it.isComboChild }.forEach { item ->
@@ -1828,6 +1833,23 @@ private fun HistoryVatDetailDialog(
                         isTopping = true
                     ))
                 }
+            }
+
+            // Thêm VAT của phụ thu (surcharges không bị giảm giá)
+            if (surchargeAmount > 0) {
+                val surchargeVat = if (surchargeVatRate > 0) {
+                    val priceBeforeVat = surchargeAmount / (1 + surchargeVatRate / 100.0)
+                    (surchargeAmount - priceBeforeVat).toLong()
+                } else 0L
+
+                add(HistoryVatDisplayRow(
+                    name = "⊕ Phụ thu",
+                    quantity = 1,
+                    totalPrice = surchargeAmount,
+                    vatRate = surchargeVatRate,
+                    vatAmount = surchargeVat,
+                    isTopping = false
+                ))
             }
         }
     }
@@ -1988,13 +2010,13 @@ private fun HistoryVatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tổng VAT tính từ items
+                // Tổng VAT tính từ items + surcharges
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "Tổng VAT (theo món):",
+                        if (surchargeAmount > 0) "Tổng VAT:" else "Tổng VAT (theo món):",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium
                     )
