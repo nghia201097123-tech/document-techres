@@ -1466,6 +1466,8 @@ fun PaymentDialog(
                                                 }
                                             }
                                         }
+                                            } // end Column inside AnimatedVisibility (detailed discount)
+                                        } // end AnimatedVisibility (detailed discount)
                                     }
                                 }
                             }
