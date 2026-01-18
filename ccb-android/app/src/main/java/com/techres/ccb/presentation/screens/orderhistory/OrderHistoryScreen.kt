@@ -167,16 +167,10 @@ fun OrderHistoryScreen(
                 dateFilter = uiState.dateFilter,
                 customStartDate = uiState.customStartDate,
                 customEndDate = uiState.customEndDate,
-                orderTypeFilter = uiState.orderTypeFilter,
-                syncStatusFilter = uiState.syncStatusFilter,
-                sortOption = uiState.sortOption,
                 onStatusFilterChange = { viewModel.setStatusFilter(it) },
                 onDateFilterChange = { viewModel.setDateFilter(it) },
                 onShowStartDatePicker = { viewModel.showDatePicker("start") },
-                onShowEndDatePicker = { viewModel.showDatePicker("end") },
-                onOrderTypeFilterChange = { viewModel.setOrderTypeFilter(it) },
-                onSyncStatusFilterChange = { viewModel.setSyncStatusFilter(it) },
-                onSortOptionChange = { viewModel.setSortOption(it) }
+                onShowEndDatePicker = { viewModel.showDatePicker("end") }
             )
 
             // Date Picker Dialog
@@ -256,6 +250,42 @@ fun OrderHistoryScreen(
                         .weight(1f)
                         .fillMaxWidth()
                 ) {
+                    // Sorting toolbar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        var sortExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            Surface(
+                                onClick = { sortExpanded = true },
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF37474F),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Sắp xếp: ${uiState.sortOption.displayName}", fontSize = 12.sp, color = Color.White)
+                                    Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                }
+                            }
+                            DropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
+                                SortOption.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.displayName, fontSize = 14.sp) },
+                                        onClick = { viewModel.setSortOption(option); sortExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Table Header - Professional financial layout
                     Row(
                         modifier = Modifier
@@ -399,16 +429,10 @@ private fun CompactFiltersRow(
     dateFilter: DateFilter,
     customStartDate: LocalDate?,
     customEndDate: LocalDate?,
-    orderTypeFilter: OrderTypeFilter,
-    syncStatusFilter: SyncStatusFilter,
-    sortOption: SortOption,
     onStatusFilterChange: (OrderHistoryFilter) -> Unit,
     onDateFilterChange: (DateFilter) -> Unit,
     onShowStartDatePicker: () -> Unit,
-    onShowEndDatePicker: () -> Unit,
-    onOrderTypeFilterChange: (OrderTypeFilter) -> Unit,
-    onSyncStatusFilterChange: (SyncStatusFilter) -> Unit,
-    onSortOptionChange: (SortOption) -> Unit
+    onShowEndDatePicker: () -> Unit
 ) {
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
@@ -417,31 +441,34 @@ private fun CompactFiltersRow(
             .fillMaxWidth()
             .background(Color(0xFFF5F5F5))
     ) {
-        // Row 1: Status filters + Date filter
+        // Single row: Status filters on left, dropdowns on right
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Status filters
-            OrderHistoryFilter.entries.forEach { filter ->
-                FilterChip(
-                    selected = statusFilter == filter,
-                    onClick = { onStatusFilterChange(filter) },
-                    label = { Text(filter.displayName, fontSize = 11.sp) },
-                    modifier = Modifier.height(28.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+            // Left side: Status filters (Tất cả / Hoàn tất / Đã hủy)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OrderHistoryFilter.entries.forEach { filter ->
+                    FilterChip(
+                        selected = statusFilter == filter,
+                        onClick = { onStatusFilterChange(filter) },
+                        label = { Text(filter.displayName, fontSize = 12.sp) },
+                        modifier = Modifier.height(32.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     )
-                )
+                }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Date filter dropdown
+            // Right side: Date filter dropdown
             var dateExpanded by remember { mutableStateOf(false) }
             Box {
                 FilterChip(
@@ -449,151 +476,28 @@ private fun CompactFiltersRow(
                     onClick = { dateExpanded = true },
                     label = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(dateFilter.displayName, fontSize = 11.sp)
-                            Icon(
-                                Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Text(dateFilter.displayName, fontSize = 12.sp)
+                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(18.dp))
                         }
                     },
-                    modifier = Modifier.height(28.dp),
+                    modifier = Modifier.height(32.dp),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.secondary,
                         selectedLabelColor = MaterialTheme.colorScheme.onSecondary
                     )
                 )
-                DropdownMenu(
-                    expanded = dateExpanded,
-                    onDismissRequest = { dateExpanded = false }
-                ) {
+                DropdownMenu(expanded = dateExpanded, onDismissRequest = { dateExpanded = false }) {
                     DateFilter.entries.forEach { filter ->
                         DropdownMenuItem(
-                            text = { Text(filter.displayName, fontSize = 13.sp) },
-                            onClick = {
-                                onDateFilterChange(filter)
-                                dateExpanded = false
-                            }
+                            text = { Text(filter.displayName, fontSize = 14.sp) },
+                            onClick = { onDateFilterChange(filter); dateExpanded = false }
                         )
                     }
                 }
             }
         }
 
-        // Row 2: Order type + Sync status + Sort
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Order type filter dropdown
-            var orderTypeExpanded by remember { mutableStateOf(false) }
-            Box {
-                FilterChip(
-                    selected = orderTypeFilter != OrderTypeFilter.ALL,
-                    onClick = { orderTypeExpanded = true },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(orderTypeFilter.displayName, fontSize = 10.sp)
-                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
-                        }
-                    },
-                    modifier = Modifier.height(26.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF1976D2),
-                        selectedLabelColor = Color.White
-                    )
-                )
-                DropdownMenu(
-                    expanded = orderTypeExpanded,
-                    onDismissRequest = { orderTypeExpanded = false }
-                ) {
-                    OrderTypeFilter.entries.forEach { filter ->
-                        DropdownMenuItem(
-                            text = { Text(filter.displayName, fontSize = 13.sp) },
-                            onClick = {
-                                onOrderTypeFilterChange(filter)
-                                orderTypeExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Sync status filter dropdown
-            var syncExpanded by remember { mutableStateOf(false) }
-            Box {
-                FilterChip(
-                    selected = syncStatusFilter != SyncStatusFilter.ALL,
-                    onClick = { syncExpanded = true },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(syncStatusFilter.displayName, fontSize = 10.sp)
-                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
-                        }
-                    },
-                    modifier = Modifier.height(26.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF4CAF50),
-                        selectedLabelColor = Color.White
-                    )
-                )
-                DropdownMenu(
-                    expanded = syncExpanded,
-                    onDismissRequest = { syncExpanded = false }
-                ) {
-                    SyncStatusFilter.entries.forEach { filter ->
-                        DropdownMenuItem(
-                            text = { Text(filter.displayName, fontSize = 13.sp) },
-                            onClick = {
-                                onSyncStatusFilterChange(filter)
-                                syncExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Sort option dropdown
-            var sortExpanded by remember { mutableStateOf(false) }
-            Box {
-                FilterChip(
-                    selected = true,
-                    onClick = { sortExpanded = true },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Sắp xếp: ${sortOption.displayName}", fontSize = 10.sp)
-                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
-                        }
-                    },
-                    modifier = Modifier.height(26.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF757575),
-                        selectedLabelColor = Color.White
-                    )
-                )
-                DropdownMenu(
-                    expanded = sortExpanded,
-                    onDismissRequest = { sortExpanded = false }
-                ) {
-                    SortOption.entries.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option.displayName, fontSize = 13.sp) },
-                            onClick = {
-                                onSortOptionChange(option)
-                                sortExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // Custom date range row (only show when CUSTOM is selected)
+        // Custom date range (only when CUSTOM selected)
         if (dateFilter == DateFilter.CUSTOM) {
             Row(
                 modifier = Modifier
@@ -609,24 +513,12 @@ private fun CompactFiltersRow(
                     color = Color.White,
                     shadowElevation = 1.dp
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.DateRange,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DateRange, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = customStartDate?.format(dateFormatter) ?: "Chọn ngày",
-                            fontSize = 12.sp
-                        )
+                        Text(customStartDate?.format(dateFormatter) ?: "Chọn ngày", fontSize = 12.sp)
                     }
                 }
-
                 Text("Đến:", fontSize = 12.sp, color = Color.Gray)
                 Surface(
                     modifier = Modifier.clickable { onShowEndDatePicker() },
@@ -634,25 +526,16 @@ private fun CompactFiltersRow(
                     color = Color.White,
                     shadowElevation = 1.dp
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.DateRange,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DateRange, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = customEndDate?.format(dateFormatter) ?: "Chọn ngày",
-                            fontSize = 12.sp
-                        )
+                        Text(customEndDate?.format(dateFormatter) ?: "Chọn ngày", fontSize = 12.sp)
                     }
                 }
             }
         }
+
+        Divider(color = Color.LightGray.copy(alpha = 0.5f))
     }
 }
 
