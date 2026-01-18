@@ -167,10 +167,16 @@ fun OrderHistoryScreen(
                 dateFilter = uiState.dateFilter,
                 customStartDate = uiState.customStartDate,
                 customEndDate = uiState.customEndDate,
+                orderTypeFilter = uiState.orderTypeFilter,
+                syncStatusFilter = uiState.syncStatusFilter,
+                sortOption = uiState.sortOption,
                 onStatusFilterChange = { viewModel.setStatusFilter(it) },
                 onDateFilterChange = { viewModel.setDateFilter(it) },
                 onShowStartDatePicker = { viewModel.showDatePicker("start") },
-                onShowEndDatePicker = { viewModel.showDatePicker("end") }
+                onShowEndDatePicker = { viewModel.showDatePicker("end") },
+                onOrderTypeFilterChange = { viewModel.setOrderTypeFilter(it) },
+                onSyncStatusFilterChange = { viewModel.setSyncStatusFilter(it) },
+                onSortOptionChange = { viewModel.setSortOption(it) }
             )
 
             // Date Picker Dialog
@@ -260,14 +266,15 @@ fun OrderHistoryScreen(
                     ) {
                         TableHeaderCell("STT", 40.dp)
                         TableHeaderCell("MÃ HÓA ĐƠN", 115.dp)  // Wider for full order number
-                        TableHeaderCell("GIỜ", 50.dp)
+                        TableHeaderCell("NGÀY GIỜ", 90.dp)     // Date + Time
                         TableHeaderCell("BÀN", 50.dp)
-                        TableHeaderCell("GIÁ BÁN", 85.dp)  // Subtotal before discount
-                        TableHeaderCell("GIẢM GIÁ", 75.dp) // Total discount
-                        TableHeaderCell("SAU GIẢM", 85.dp) // After discount
-                        TableHeaderCell("VAT 8%", 70.dp)   // VAT calculated on after-discount
-                        TableHeaderCell("TỔNG", 90.dp)     // Final total
-                        TableHeaderCell("", 40.dp)         // Sync status (icon only)
+                        TableHeaderCell("LOẠI", 55.dp)         // Order type
+                        TableHeaderCell("GIÁ BÁN", 85.dp)      // Subtotal before discount
+                        TableHeaderCell("GIẢM GIÁ", 75.dp)     // Total discount
+                        TableHeaderCell("SAU GIẢM", 85.dp)     // After discount
+                        TableHeaderCell("VAT 8%", 70.dp)       // VAT calculated on after-discount
+                        TableHeaderCell("TỔNG", 90.dp)         // Final total
+                        TableHeaderCell("", 40.dp)             // Sync status (icon only)
                     }
 
                     Divider(color = Color.LightGray)
@@ -324,8 +331,9 @@ fun OrderHistoryScreen(
                                     Text("$cancelledCount đã hủy", fontSize = 9.sp, color = Color(0xFFf44336), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                 }
                             }
-                            Text("", modifier = Modifier.width(50.dp))
-                            Text("", modifier = Modifier.width(50.dp))
+                            Text("", modifier = Modifier.width(90.dp))  // NGÀY GIỜ column
+                            Text("", modifier = Modifier.width(50.dp))  // BÀN column
+                            Text("", modifier = Modifier.width(55.dp))  // LOẠI column
                             // Totals (only from completed orders)
                             Text(formatCurrencyShort(totalSubtotal), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalDiscount), modifier = Modifier.width(75.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50), textAlign = TextAlign.End)
@@ -391,10 +399,16 @@ private fun CompactFiltersRow(
     dateFilter: DateFilter,
     customStartDate: LocalDate?,
     customEndDate: LocalDate?,
+    orderTypeFilter: OrderTypeFilter,
+    syncStatusFilter: SyncStatusFilter,
+    sortOption: SortOption,
     onStatusFilterChange: (OrderHistoryFilter) -> Unit,
     onDateFilterChange: (DateFilter) -> Unit,
     onShowStartDatePicker: () -> Unit,
-    onShowEndDatePicker: () -> Unit
+    onShowEndDatePicker: () -> Unit,
+    onOrderTypeFilterChange: (OrderTypeFilter) -> Unit,
+    onSyncStatusFilterChange: (SyncStatusFilter) -> Unit,
+    onSortOptionChange: (SortOption) -> Unit
 ) {
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
@@ -403,6 +417,7 @@ private fun CompactFiltersRow(
             .fillMaxWidth()
             .background(Color(0xFFF5F5F5))
     ) {
+        // Row 1: Status filters + Date filter
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -427,11 +442,11 @@ private fun CompactFiltersRow(
             Spacer(modifier = Modifier.weight(1f))
 
             // Date filter dropdown
-            var expanded by remember { mutableStateOf(false) }
+            var dateExpanded by remember { mutableStateOf(false) }
             Box {
                 FilterChip(
                     selected = true,
-                    onClick = { expanded = true },
+                    onClick = { dateExpanded = true },
                     label = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(dateFilter.displayName, fontSize = 11.sp)
@@ -449,15 +464,128 @@ private fun CompactFiltersRow(
                     )
                 )
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded = dateExpanded,
+                    onDismissRequest = { dateExpanded = false }
                 ) {
                     DateFilter.entries.forEach { filter ->
                         DropdownMenuItem(
                             text = { Text(filter.displayName, fontSize = 13.sp) },
                             onClick = {
                                 onDateFilterChange(filter)
-                                expanded = false
+                                dateExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Row 2: Order type + Sync status + Sort
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Order type filter dropdown
+            var orderTypeExpanded by remember { mutableStateOf(false) }
+            Box {
+                FilterChip(
+                    selected = orderTypeFilter != OrderTypeFilter.ALL,
+                    onClick = { orderTypeExpanded = true },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(orderTypeFilter.displayName, fontSize = 10.sp)
+                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
+                        }
+                    },
+                    modifier = Modifier.height(26.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF1976D2),
+                        selectedLabelColor = Color.White
+                    )
+                )
+                DropdownMenu(
+                    expanded = orderTypeExpanded,
+                    onDismissRequest = { orderTypeExpanded = false }
+                ) {
+                    OrderTypeFilter.entries.forEach { filter ->
+                        DropdownMenuItem(
+                            text = { Text(filter.displayName, fontSize = 13.sp) },
+                            onClick = {
+                                onOrderTypeFilterChange(filter)
+                                orderTypeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Sync status filter dropdown
+            var syncExpanded by remember { mutableStateOf(false) }
+            Box {
+                FilterChip(
+                    selected = syncStatusFilter != SyncStatusFilter.ALL,
+                    onClick = { syncExpanded = true },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(syncStatusFilter.displayName, fontSize = 10.sp)
+                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
+                        }
+                    },
+                    modifier = Modifier.height(26.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF4CAF50),
+                        selectedLabelColor = Color.White
+                    )
+                )
+                DropdownMenu(
+                    expanded = syncExpanded,
+                    onDismissRequest = { syncExpanded = false }
+                ) {
+                    SyncStatusFilter.entries.forEach { filter ->
+                        DropdownMenuItem(
+                            text = { Text(filter.displayName, fontSize = 13.sp) },
+                            onClick = {
+                                onSyncStatusFilterChange(filter)
+                                syncExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Sort option dropdown
+            var sortExpanded by remember { mutableStateOf(false) }
+            Box {
+                FilterChip(
+                    selected = true,
+                    onClick = { sortExpanded = true },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Sắp xếp: ${sortOption.displayName}", fontSize = 10.sp)
+                            Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
+                        }
+                    },
+                    modifier = Modifier.height(26.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF757575),
+                        selectedLabelColor = Color.White
+                    )
+                )
+                DropdownMenu(
+                    expanded = sortExpanded,
+                    onDismissRequest = { sortExpanded = false }
+                ) {
+                    SortOption.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.displayName, fontSize = 13.sp) },
+                            onClick = {
+                                onSortOptionChange(option)
+                                sortExpanded = false
                             }
                         )
                     }
@@ -674,14 +802,22 @@ private fun OrderTableRow(
             overflow = TextOverflow.Ellipsis
         )
 
-        // Giờ (Time)
-        Text(
-            text = formatTimeOnly(order.createdAt),
-            modifier = Modifier.width(50.dp),
-            fontSize = 11.sp,
-            textAlign = TextAlign.Center,
-            color = Color.Gray
-        )
+        // Ngày giờ (Date + Time)
+        Column(
+            modifier = Modifier.width(90.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = formatDateShort(order.createdAt),
+                fontSize = 10.sp,
+                color = Color.Gray
+            )
+            Text(
+                text = formatTimeOnly(order.createdAt),
+                fontSize = 11.sp,
+                color = Color.Gray
+            )
+        }
 
         // Bàn
         Text(
@@ -691,6 +827,23 @@ private fun OrderTableRow(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+
+        // Loại đơn (Order type)
+        Text(
+            text = when (order.orderType) {
+                "dine_in" -> "Tại chỗ"
+                "takeaway" -> "Mang đi"
+                else -> "---"
+            },
+            modifier = Modifier.width(55.dp),
+            fontSize = 10.sp,
+            textAlign = TextAlign.Center,
+            color = when (order.orderType) {
+                "dine_in" -> Color(0xFF1976D2)
+                "takeaway" -> Color(0xFFE65100)
+                else -> Color.Gray
+            }
         )
 
         // Giá bán (Subtotal before discount)
@@ -2000,6 +2153,11 @@ private fun formatTime(timestamp: Long): String {
 
 private fun formatTimeOnly(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp))
+}
+
+private fun formatDateShort(timestamp: Long): String {
+    val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
     return sdf.format(Date(timestamp))
 }
 

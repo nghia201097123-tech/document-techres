@@ -48,6 +48,26 @@ enum class DateFilter(val displayName: String) {
     ALL("Tất cả")
 }
 
+enum class OrderTypeFilter(val displayName: String) {
+    ALL("Tất cả"),
+    DINE_IN("Tại chỗ"),
+    TAKEAWAY("Mang đi")
+}
+
+enum class SyncStatusFilter(val displayName: String) {
+    ALL("Tất cả"),
+    SYNCED("Đã đồng bộ"),
+    PENDING("Chờ đồng bộ"),
+    FAILED("Lỗi")
+}
+
+enum class SortOption(val displayName: String) {
+    TIME_DESC("Mới nhất"),
+    TIME_ASC("Cũ nhất"),
+    AMOUNT_DESC("Tiền cao nhất"),
+    AMOUNT_ASC("Tiền thấp nhất")
+}
+
 data class OrderHistoryItem(
     val id: String,
     val orderNumber: String,
@@ -69,6 +89,8 @@ data class OrderHistoryItem(
     val couponCode: String? = null,   // Mã coupon
     val paidAmount: Long = 0,         // Tiền thanh toán
     val guestCount: Int = 1,          // Số khách
+    // Order type
+    val orderType: String = "dine_in", // dine_in, takeaway, delivery
     // Sync status
     val syncStatus: String = "pending", // pending, syncing, synced, failed
     val syncError: String? = null
@@ -85,6 +107,11 @@ data class OrderHistoryUiState(
     val customEndDate: LocalDate? = null,
     val showDatePicker: Boolean = false,
     val datePickerType: String = "start", // "start" or "end"
+    // Additional filters
+    val orderTypeFilter: OrderTypeFilter = OrderTypeFilter.ALL,
+    val syncStatusFilter: SyncStatusFilter = SyncStatusFilter.ALL,
+    // Sorting
+    val sortOption: SortOption = SortOption.TIME_DESC,
     val totalCount: Int = 0,
     val completedCount: Int = 0,
     val cancelledCount: Int = 0,
@@ -219,32 +246,62 @@ class OrderHistoryViewModel @Inject constructor(
                             couponCode = entity.couponCode,
                             paidAmount = entity.paidAmount.toLong(),
                             guestCount = entity.guestCount,
+                            // Order type
+                            orderType = entity.orderType,
                             // Sync status
                             syncStatus = entity.syncStatus,
                             syncError = entity.syncError
                         )
                     }
 
-                    val completedCount = historyItems.count { it.status == "completed" }
-                    val cancelledCount = historyItems.count { it.status == "cancelled" }
-                    val totalRevenue = historyItems
+                    // Apply additional filters (order type, sync status)
+                    val orderTypeFilter = _uiState.value.orderTypeFilter
+                    val syncStatusFilter = _uiState.value.syncStatusFilter
+
+                    val filteredItems = historyItems.filter { item ->
+                        val matchesOrderType = when (orderTypeFilter) {
+                            OrderTypeFilter.ALL -> true
+                            OrderTypeFilter.DINE_IN -> item.orderType == "dine_in"
+                            OrderTypeFilter.TAKEAWAY -> item.orderType == "takeaway"
+                        }
+                        val matchesSyncStatus = when (syncStatusFilter) {
+                            SyncStatusFilter.ALL -> true
+                            SyncStatusFilter.SYNCED -> item.syncStatus == "synced"
+                            SyncStatusFilter.PENDING -> item.syncStatus == "pending"
+                            SyncStatusFilter.FAILED -> item.syncStatus == "failed"
+                        }
+                        matchesOrderType && matchesSyncStatus
+                    }
+
+                    // Apply sorting
+                    val sortOption = _uiState.value.sortOption
+                    val sortedItems = when (sortOption) {
+                        SortOption.TIME_DESC -> filteredItems.sortedByDescending { it.createdAt }
+                        SortOption.TIME_ASC -> filteredItems.sortedBy { it.createdAt }
+                        SortOption.AMOUNT_DESC -> filteredItems.sortedByDescending { it.totalAmount }
+                        SortOption.AMOUNT_ASC -> filteredItems.sortedBy { it.totalAmount }
+                    }
+
+                    val completedCount = sortedItems.count { it.status == "completed" }
+                    val cancelledCount = sortedItems.count { it.status == "cancelled" }
+                    val totalRevenue = sortedItems
                         .filter { it.status == "completed" }
                         .sumOf { it.totalAmount }
 
                     // Calculate pagination
                     val pageSize = _uiState.value.pageSize
-                    val totalPages = if (historyItems.isEmpty()) 1 else (historyItems.size + pageSize - 1) / pageSize
+                    val totalPages = if (sortedItems.isEmpty()) 1 else (sortedItems.size + pageSize - 1) / pageSize
                     val currentPage = minOf(_uiState.value.currentPage, totalPages)
                     val startIndex = (currentPage - 1) * pageSize
-                    val endIndex = minOf(startIndex + pageSize, historyItems.size)
-                    val pagedOrders = if (historyItems.isNotEmpty()) historyItems.subList(startIndex, endIndex) else emptyList()
+                    val endIndex = minOf(startIndex + pageSize, sortedItems.size)
+                    val pagedOrders = if (sortedItems.isNotEmpty()) sortedItems.subList(startIndex, endIndex) else emptyList()
 
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             orders = pagedOrders,
-                            allOrders = historyItems,
-                            totalCount = historyItems.size,
+                            allOrders = sortedItems,
+                            totalCount = sortedItems.size,
                             completedCount = completedCount,
                             cancelledCount = cancelledCount,
                             totalRevenue = totalRevenue,
@@ -285,6 +342,21 @@ class OrderHistoryViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(dateFilter = filter) }
         }
+        startOrdersObserver()
+    }
+
+    fun setOrderTypeFilter(filter: OrderTypeFilter) {
+        _uiState.update { it.copy(orderTypeFilter = filter, currentPage = 1) }
+        startOrdersObserver()
+    }
+
+    fun setSyncStatusFilter(filter: SyncStatusFilter) {
+        _uiState.update { it.copy(syncStatusFilter = filter, currentPage = 1) }
+        startOrdersObserver()
+    }
+
+    fun setSortOption(option: SortOption) {
+        _uiState.update { it.copy(sortOption = option, currentPage = 1) }
         startOrdersObserver()
     }
 
