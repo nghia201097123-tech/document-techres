@@ -86,6 +86,7 @@ data class OrderHistoryItem(
     val subtotal: Long = 0,           // Tạm tính
     val vatAmount: Long = 0,          // VAT
     val discountAmount: Long = 0,     // Giảm giá
+    val surchargeAmount: Long = 0,    // Phụ thu
     val couponCode: String? = null,   // Mã coupon
     val paidAmount: Long = 0,         // Tiền thanh toán
     val guestCount: Int = 1,          // Số khách
@@ -243,6 +244,7 @@ class OrderHistoryViewModel @Inject constructor(
                             subtotal = entity.subtotal.toLong(),
                             vatAmount = entity.vatAmount.toLong(),
                             discountAmount = entity.discountAmount.toLong(),
+                            surchargeAmount = entity.surchargeAmount.toLong(),
                             couponCode = entity.couponCode,
                             paidAmount = entity.paidAmount.toLong(),
                             guestCount = entity.guestCount,
