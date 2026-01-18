@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
@@ -59,6 +61,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -891,6 +894,9 @@ private fun OrderDetailDialog(
     var showCancelDialog by remember { mutableStateOf(false) }
     var cancelReason by remember { mutableStateOf("") }
 
+    // State for VAT detail dialog
+    var showVatDetail by remember { mutableStateOf(false) }
+
     // Cancel confirmation dialog
     if (showCancelDialog) {
         AlertDialog(
@@ -1459,8 +1465,35 @@ private fun OrderDetailDialog(
                         SummaryRow("Giảm giá HĐ", "-${formatCurrency(billDiscount.toLong())}", Color(0xFF4CAF50))
                     }
 
-                    // VAT
-                    SummaryRow("VAT (${vatRate.toInt()}%)", formatCurrency(vatAmount.toLong()), Color.Gray)
+                    // VAT - clickable to show detail
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showVatDetail = true }
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "VAT (${vatRate.toInt()}%)",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Xem chi tiết VAT",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Text(
+                            formatCurrency(vatAmount.toLong()),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Divider()
@@ -1490,6 +1523,16 @@ private fun OrderDetailDialog(
                 }
             }
         }
+    }
+
+    // VAT Detail Dialog
+    if (showVatDetail) {
+        HistoryVatDetailDialog(
+            orderItems = orderItems,
+            subtotal = order.subtotal.toLong(),
+            discountAmount = order.discountAmount.toLong(),
+            onDismiss = { showVatDetail = false }
+        )
     }
 }
 
@@ -1559,6 +1602,321 @@ private fun SummaryRow(label: String, value: String, color: Color = Color.Unspec
     ) {
         Text(label, fontSize = 13.sp, color = if (color != Color.Unspecified) color else Color.Gray)
         Text(value, fontSize = 13.sp, color = if (color != Color.Unspecified) color else Color.Unspecified)
+    }
+}
+
+// Data class for VAT detail display
+private data class HistoryVatDisplayRow(
+    val name: String,
+    val quantity: Int,
+    val totalPrice: Long,
+    val vatRate: Double,
+    val vatAmount: Long,
+    val isTopping: Boolean = false
+)
+
+/**
+ * Dialog hiển thị chi tiết VAT cho từng món trong lịch sử đơn hàng
+ * Bao gồm cả toppings được parse từ notes field
+ */
+@Composable
+private fun HistoryVatDetailDialog(
+    orderItems: List<OrderItemEntity>,
+    subtotal: Long,
+    discountAmount: Long,
+    onDismiss: () -> Unit
+) {
+    // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm)
+    val afterDiscountRatio = if (subtotal > 0) {
+        ((subtotal - discountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+    } else 1.0
+
+    // Helper function to parse variants/toppings from notes field
+    fun parseVariantsFromNotes(notes: String?, itemVatRate: Double): List<Pair<String, Long>> {
+        if (notes.isNullOrBlank()) return emptyList()
+
+        val variants = mutableListOf<Pair<String, Long>>()
+        // Remove user note part if present (after " | ")
+        val variantsPart = notes.split(" | ").firstOrNull()?.trim() ?: return emptyList()
+
+        // Split by comma
+        val parts = variantsPart.split(",").map { it.trim() }
+
+        for (part in parts) {
+            if (part.isEmpty()) continue
+
+            // Extract price if present: "...something (+10000)" pattern
+            val priceMatch = Regex("""\(\+(\d+)\)""").find(part)
+            val price = priceMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+
+            // Determine name based on format
+            val name: String
+            val isTopping: Boolean
+
+            if (part.startsWith("+")) {
+                // Topping format: "+ ToppingName (+price)"
+                isTopping = true
+                name = part.removePrefix("+").trim()
+                    .replace(Regex("""\s*\(\+\d+\)"""), "").trim()
+            } else if (part.contains(":")) {
+                // Option format: "GroupName: Value (+price)"
+                isTopping = false
+                val colonParts = part.split(":").map { it.trim() }
+                name = if (colonParts.size >= 2) {
+                    colonParts[1].replace(Regex("""\s*\(\+\d+\)"""), "").trim()
+                } else {
+                    part.replace(Regex("""\s*\(\+\d+\)"""), "").trim()
+                }
+            } else {
+                // Unknown format, skip if no price
+                continue
+            }
+
+            if (name.isNotEmpty() && price > 0) {
+                variants.add(Pair(name, price))
+            }
+        }
+        return variants
+    }
+
+    // Build flat list: main items + their toppings with VAT (sau giảm giá)
+    val vatRows = remember(orderItems, afterDiscountRatio) {
+        buildList {
+            // Only process active (non-cancelled, non-combo-child) items
+            orderItems.filter { it.status != "cancelled" && !it.isComboChild }.forEach { item ->
+                // Parse toppings from notes
+                val toppings = parseVariantsFromNotes(item.notes, item.vatRate)
+                val toppingsTotal = toppings.sumOf { it.second }
+
+                // Calculate main item price (total price minus toppings)
+                val actualUnitPrice = (item.totalPrice / item.quantity).toLong()
+                val mainUnitPrice = (actualUnitPrice - toppingsTotal).coerceAtLeast(0L)
+                val mainPrice = mainUnitPrice * item.quantity
+
+                // VAT của món chính (giá sau giảm giá)
+                val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+                val mainVat = if (item.vatRate > 0) {
+                    val priceBeforeVat = mainPriceAfterDiscount / (1 + item.vatRate / 100.0)
+                    (mainPriceAfterDiscount - priceBeforeVat).toLong()
+                } else 0L
+
+                add(HistoryVatDisplayRow(
+                    name = item.productName,
+                    quantity = item.quantity,
+                    totalPrice = mainPriceAfterDiscount,
+                    vatRate = item.vatRate,
+                    vatAmount = mainVat,
+                    isTopping = false
+                ))
+
+                // VAT của từng topping (cũng tính sau giảm giá)
+                toppings.forEach { (toppingName, toppingPrice) ->
+                    val toppingTotal = toppingPrice * item.quantity
+                    val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
+                    val toppingVat = if (item.vatRate > 0) {
+                        val priceBeforeVat = toppingAfterDiscount / (1 + item.vatRate / 100.0)
+                        (toppingAfterDiscount - priceBeforeVat).toLong()
+                    } else 0L
+
+                    add(HistoryVatDisplayRow(
+                        name = toppingName,
+                        quantity = item.quantity,
+                        totalPrice = toppingAfterDiscount,
+                        vatRate = item.vatRate,
+                        vatAmount = toppingVat,
+                        isTopping = true
+                    ))
+                }
+            }
+        }
+    }
+
+    // Tính tổng VAT từ các rows
+    val calculatedTotalVat = remember(vatRows) {
+        vatRows.sumOf { it.vatAmount }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Chi tiết VAT",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Đóng", modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                // Giải thích công thức
+                Text(
+                    "* VAT đã bao gồm trong giá bán",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontStyle = FontStyle.Italic
+                )
+                Text(
+                    "* Công thức: VAT = Giá - (Giá ÷ (1 + VAT%))",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontStyle = FontStyle.Italic
+                )
+                if (discountAmount > 0) {
+                    Text(
+                        "* Giá đã trừ giảm giá (tỷ lệ ${String.format("%.1f", afterDiscountRatio * 100)}%)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontStyle = FontStyle.Italic
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Header row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Món", fontWeight = FontWeight.Medium, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Text("Giá", fontWeight = FontWeight.Medium, fontSize = 12.sp, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                    Text("VAT %", fontWeight = FontWeight.Medium, fontSize = 12.sp, modifier = Modifier.width(50.dp), textAlign = TextAlign.End)
+                    Text("Tiền VAT", fontWeight = FontWeight.Medium, fontSize = 12.sp, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Items list
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(vatRows.size) { index ->
+                        val row = vatRows[index]
+
+                        Column {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = if (row.isTopping) 16.dp else 0.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        if (row.isTopping) "+ ${row.name}" else row.name,
+                                        fontSize = if (row.isTopping) 11.sp else 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (row.isTopping) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (!row.isTopping) {
+                                        Text(
+                                            "x${row.quantity}",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                                Text(
+                                    formatCurrency(row.totalPrice),
+                                    fontSize = if (row.isTopping) 10.sp else 11.sp,
+                                    modifier = Modifier.width(80.dp),
+                                    textAlign = TextAlign.End
+                                )
+                                Text(
+                                    if (row.vatRate > 0) "${row.vatRate.toInt()}%" else "-",
+                                    fontSize = if (row.isTopping) 10.sp else 11.sp,
+                                    modifier = Modifier.width(50.dp),
+                                    textAlign = TextAlign.End,
+                                    color = if (row.vatRate > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    if (row.vatAmount > 0) formatCurrency(row.vatAmount) else "-",
+                                    fontSize = if (row.isTopping) 10.sp else 11.sp,
+                                    fontWeight = if (row.vatAmount > 0) FontWeight.Medium else FontWeight.Normal,
+                                    modifier = Modifier.width(80.dp),
+                                    textAlign = TextAlign.End,
+                                    color = if (row.vatAmount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                            // Hiển thị công thức tính
+                            if (row.vatRate > 0) {
+                                val vatMultiplier = String.format("%.2f", 1 + row.vatRate / 100)
+                                Text(
+                                    "= ${formatCurrencyShort(row.totalPrice)} - (${formatCurrencyShort(row.totalPrice)} ÷ $vatMultiplier) = ${formatCurrencyShort(row.vatAmount)}",
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    fontStyle = FontStyle.Italic,
+                                    modifier = Modifier.padding(start = if (row.isTopping) 24.dp else 8.dp, top = 2.dp)
+                                )
+                            }
+
+                            // Divider giữa các món chính (không phải sau topping)
+                            val nextRow = vatRows.getOrNull(index + 1)
+                            if (nextRow != null && !nextRow.isTopping) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Tổng VAT tính từ items
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Tổng VAT (theo món):",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        formatCurrency(calculatedTotalVat),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Close button
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Đóng")
+                }
+            }
+        }
     }
 }
 
