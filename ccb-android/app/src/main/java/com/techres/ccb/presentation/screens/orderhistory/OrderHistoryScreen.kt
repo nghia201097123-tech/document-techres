@@ -247,7 +247,7 @@ fun OrderHistoryScreen(
                         .weight(1f)
                         .fillMaxWidth()
                 ) {
-                    // Table Header
+                    // Table Header - Professional financial layout
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -255,17 +255,16 @@ fun OrderHistoryScreen(
                             .background(Color(0xFFF5F5F5))
                             .padding(vertical = 10.dp, horizontal = 8.dp)
                     ) {
-                        TableHeaderCell("STT", 45.dp)
-                        TableHeaderCell("MÃ ĐƠN", 100.dp)
-                        TableHeaderCell("BÀN", 60.dp)
-                        TableHeaderCell("NHÂN VIÊN", 100.dp)
-                        TableHeaderCell("TẠM TÍNH", 85.dp)
-                        TableHeaderCell("VAT", 70.dp)
-                        TableHeaderCell("GIẢM GIÁ", 80.dp)
-                        TableHeaderCell("COUPON", 80.dp)
-                        TableHeaderCell("SỐ KHÁCH", 70.dp)
-                        TableHeaderCell("THANH TOÁN", 90.dp)
-                        TableHeaderCell("ĐỒNG BỘ", 60.dp)
+                        TableHeaderCell("STT", 40.dp)
+                        TableHeaderCell("MÃ ĐƠN", 80.dp)
+                        TableHeaderCell("GIỜ", 55.dp)
+                        TableHeaderCell("BÀN", 50.dp)
+                        TableHeaderCell("GIÁ BÁN", 85.dp)  // Subtotal before discount
+                        TableHeaderCell("GIẢM GIÁ", 80.dp) // Total discount
+                        TableHeaderCell("SAU GIẢM", 85.dp) // After discount
+                        TableHeaderCell("VAT 8%", 75.dp)   // VAT calculated on after-discount
+                        TableHeaderCell("TỔNG", 90.dp)     // Final total
+                        TableHeaderCell("", 45.dp)         // Sync status (icon only)
                     }
 
                     Divider(color = Color.LightGray)
@@ -287,6 +286,44 @@ fun OrderHistoryScreen(
                             if (index < uiState.orders.size - 1) {
                                 Divider(color = Color.LightGray.copy(alpha = 0.5f))
                             }
+                        }
+                    }
+
+                    // Financial Summary Row (for all filtered orders)
+                    if (uiState.allOrders.isNotEmpty()) {
+                        val completedOrders = uiState.allOrders.filter { it.status == "completed" }
+                        val totalSubtotal = completedOrders.sumOf { it.subtotal }
+                        val totalDiscount = completedOrders.sumOf { it.discountAmount }
+                        val totalAfterDiscount = (totalSubtotal - totalDiscount).coerceAtLeast(0L)
+                        val vatRate = 8.0
+                        val totalVat = completedOrders.sumOf { order ->
+                            val afterDiscount = (order.subtotal - order.discountAmount).coerceAtLeast(0L)
+                            val beforeVat = (afterDiscount / (1 + vatRate / 100)).toLong()
+                            afterDiscount - beforeVat
+                        }
+                        val totalRevenue = completedOrders.sumOf { it.totalAmount }
+
+                        Divider(color = MaterialTheme.colorScheme.primary, thickness = 1.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(scrollState)
+                                .background(Color(0xFFE3F2FD))
+                                .padding(vertical = 10.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Empty cells for STT, Mã đơn, Giờ, Bàn
+                            Text("TỔNG", modifier = Modifier.width(40.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            Text("${completedOrders.size} đơn", modifier = Modifier.width(80.dp), fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                            Text("", modifier = Modifier.width(55.dp))
+                            Text("", modifier = Modifier.width(50.dp))
+                            // Totals
+                            Text(formatCurrencyShort(totalSubtotal), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+                            Text(formatCurrencyShort(totalDiscount), modifier = Modifier.width(80.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50), textAlign = TextAlign.End)
+                            Text(formatCurrencyShort(totalAfterDiscount), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+                            Text(formatCurrencyShort(totalVat), modifier = Modifier.width(75.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF757575), textAlign = TextAlign.End)
+                            Text(formatCurrencyShort(totalRevenue), modifier = Modifier.width(90.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2), textAlign = TextAlign.End)
+                            Text("", modifier = Modifier.width(45.dp))
                         }
                     }
                 }
@@ -581,7 +618,22 @@ private fun OrderTableRow(
     onClick: () -> Unit
 ) {
     val isCompleted = order.status == "completed"
-    val rowBackground = if (index % 2 == 0) Color.White else Color(0xFFFAFAFA)
+    val isCancelled = order.status == "cancelled"
+    val rowBackground = when {
+        isCancelled -> Color(0xFFFFEBEE).copy(alpha = 0.5f)
+        index % 2 == 0 -> Color.White
+        else -> Color(0xFFFAFAFA)
+    }
+
+    // === FINANCIAL CALCULATIONS (Vietnamese Tax Law) ===
+    // VAT is calculated on price AFTER discount
+    // Formula: priceAfterDiscount = subtotal - discount
+    //          VAT = priceAfterDiscount - (priceAfterDiscount / 1.08)
+    // Total = priceAfterDiscount (already includes VAT in Vietnamese pricing)
+    val vatRate = 8.0
+    val priceAfterDiscount = (order.subtotal - order.discountAmount).coerceAtLeast(0L)
+    val priceBeforeVat = (priceAfterDiscount / (1 + vatRate / 100)).toLong()
+    val calculatedVat = priceAfterDiscount - priceBeforeVat
 
     Row(
         modifier = Modifier
@@ -589,115 +641,113 @@ private fun OrderTableRow(
             .horizontalScroll(scrollState)
             .background(rowBackground)
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = 10.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // STT
         Text(
             text = index.toString(),
-            modifier = Modifier.width(45.dp),
+            modifier = Modifier.width(40.dp),
             fontSize = 12.sp,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
         // Mã đơn
         Text(
             text = order.orderNumber.takeLast(5),
-            modifier = Modifier.width(100.dp),
+            modifier = Modifier.width(80.dp),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = if (isCancelled) Color.Gray else Color.Unspecified
+        )
+
+        // Giờ (Time)
+        Text(
+            text = formatTimeOnly(order.createdAt),
+            modifier = Modifier.width(55.dp),
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            color = Color.Gray
         )
 
         // Bàn
         Text(
             text = order.tableName ?: "---",
-            modifier = Modifier.width(60.dp),
-            fontSize = 12.sp,
+            modifier = Modifier.width(50.dp),
+            fontSize = 11.sp,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
 
-        // Nhân viên
-        Text(
-            text = order.staffName ?: "---",
-            modifier = Modifier.width(100.dp),
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        // Tạm tính
+        // Giá bán (Subtotal before discount)
         Text(
             text = formatCurrencyShort(order.subtotal),
             modifier = Modifier.width(85.dp),
             fontSize = 12.sp,
-            textAlign = TextAlign.End
+            textAlign = TextAlign.End,
+            color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // VAT
+        // Giảm giá (Total discount)
         Text(
-            text = formatCurrencyShort(order.vatAmount),
-            modifier = Modifier.width(70.dp),
-            fontSize = 12.sp,
-            textAlign = TextAlign.End
-        )
-
-        // Giảm giá
-        Text(
-            text = formatCurrencyShort(order.discountAmount),
+            text = if (order.discountAmount > 0) formatCurrencyShort(order.discountAmount) else "-",
             modifier = Modifier.width(80.dp),
             fontSize = 12.sp,
-            color = if (order.discountAmount > 0) Color(0xFF4CAF50) else Color.Unspecified,
+            color = if (order.discountAmount > 0) Color(0xFF4CAF50) else Color.LightGray,
+            fontWeight = if (order.discountAmount > 0) FontWeight.Medium else FontWeight.Normal,
             textAlign = TextAlign.End
         )
 
-        // Coupon
+        // Sau giảm (After discount)
         Text(
-            text = order.couponCode?.take(8) ?: "0",
-            modifier = Modifier.width(80.dp),
+            text = formatCurrencyShort(priceAfterDiscount),
+            modifier = Modifier.width(85.dp),
             fontSize = 12.sp,
-            color = if (!order.couponCode.isNullOrEmpty()) Color(0xFF2196F3) else Color.Unspecified,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            textAlign = TextAlign.End,
+            color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // Số khách
+        // VAT 8% (Calculated on after-discount price)
         Text(
-            text = order.guestCount.toString(),
-            modifier = Modifier.width(70.dp),
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center
+            text = formatCurrencyShort(calculatedVat),
+            modifier = Modifier.width(75.dp),
+            fontSize = 11.sp,
+            textAlign = TextAlign.End,
+            color = Color(0xFF757575) // Gray for tax
         )
 
-        // Thanh toán (tổng tiền)
+        // Tổng (Total amount)
         Text(
             text = formatCurrencyShort(order.totalAmount),
             modifier = Modifier.width(90.dp),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray,
+            color = when {
+                isCancelled -> Color(0xFFf44336)
+                isCompleted -> Color(0xFF4CAF50)
+                else -> Color.Gray
+            },
             textAlign = TextAlign.End
         )
 
-        // Đồng bộ (Sync status)
+        // Đồng bộ (Sync status) - Icon only
         Box(
-            modifier = Modifier.width(60.dp),
+            modifier = Modifier.width(45.dp),
             contentAlignment = Alignment.Center
         ) {
             val (syncIcon, syncColor, syncDesc) = when (order.syncStatus) {
                 "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
                 "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang đồng bộ")
                 "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi đồng bộ")
-                else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ đồng bộ") // pending
+                else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ đồng bộ")
             }
             Icon(
                 imageVector = syncIcon,
                 contentDescription = syncDesc,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
                 tint = syncColor
             )
         }
@@ -1519,6 +1569,11 @@ private fun formatCurrencyShort(amount: Long): String {
 
 private fun formatTime(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
+    return sdf.format(Date(timestamp))
+}
+
+private fun formatTimeOnly(timestamp: Long): String {
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
 }
 
