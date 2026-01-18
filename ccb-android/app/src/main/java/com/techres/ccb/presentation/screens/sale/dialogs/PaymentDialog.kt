@@ -159,7 +159,8 @@ fun PaymentDialog(
 
     // Discount section state
     var showDiscountSection by remember { mutableStateOf(false) }
-    var discountTab by remember { mutableStateOf(0) } // 0=Hóa đơn (ưu tiên), 1=Theo món, 2=Mã giảm giá
+    var showDetailedDiscount by remember { mutableStateOf(false) } // Show detailed options (Khác)
+    var discountTab by remember { mutableStateOf(0) } // 0=Hóa đơn, 1=Theo món, 2=Mã giảm giá
 
     // VAT detail popup state
     var showVatDetail by remember { mutableStateOf(false) }
@@ -631,16 +632,33 @@ fun PaymentDialog(
                                         HorizontalDivider()
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Tab selection - Thứ tự ưu tiên: Hóa đơn (0) → Theo món (1) → Mã giảm giá (2)
+                                        // ===== QUICK DISCOUNT CHIPS =====
+                                        // 1-tap discount for common values
+                                        Text(
+                                            "Giảm nhanh:",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        // Quick chips row - most common discounts
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            listOf("Hóa đơn", "Theo món", "Mã giảm giá").forEachIndexed { index, label ->
+                                            // Percent discounts
+                                            listOf(5, 10, 20).forEach { percent ->
+                                                val isSelected = billDiscountDescription?.contains("$percent%") == true
                                                 FilterChip(
-                                                    selected = discountTab == index,
-                                                    onClick = { discountTab = index },
-                                                    label = { Text(label, fontSize = 10.sp) },
+                                                    selected = isSelected,
+                                                    onClick = {
+                                                        if (isSelected) {
+                                                            onClearBillDiscount()
+                                                        } else {
+                                                            onApplyPercentDiscount(percent, "Giảm $percent%")
+                                                        }
+                                                    },
+                                                    label = { Text("$percent%", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                                                     modifier = Modifier.weight(1f),
                                                     colors = FilterChipDefaults.filterChipColors(
                                                         selectedContainerColor = Color(0xFFFF5722),
@@ -648,9 +666,79 @@ fun PaymentDialog(
                                                     )
                                                 )
                                             }
+                                            // Fixed amount discounts
+                                            listOf(50000L, 100000L).forEach { amount ->
+                                                val isSelected = billDiscountTotal == amount && billDiscountDescription?.contains("%") != true
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = {
+                                                        if (isSelected) {
+                                                            onClearBillDiscount()
+                                                        } else {
+                                                            onApplyManualDiscount(amount, "Giảm ${formatCurrency(amount)}")
+                                                        }
+                                                    },
+                                                    label = { Text("${amount/1000}k", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = Color(0xFFFF5722),
+                                                        selectedLabelColor = Color.White
+                                                    )
+                                                )
+                                            }
+                                            // "Khác" button to show detailed options
+                                            FilterChip(
+                                                selected = showDetailedDiscount,
+                                                onClick = { showDetailedDiscount = !showDetailedDiscount },
+                                                label = {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text("Khác", fontSize = 11.sp)
+                                                        Icon(
+                                                            if (showDetailedDiscount) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                            null,
+                                                            Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                                )
+                                            )
                                         }
 
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        // ===== DETAILED DISCOUNT OPTIONS =====
+                                        AnimatedVisibility(
+                                            visible = showDetailedDiscount,
+                                            enter = expandVertically(),
+                                            exit = shrinkVertically()
+                                        ) {
+                                            Column {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                // Tab selection
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    listOf("Hóa đơn", "Theo món", "Mã giảm giá").forEachIndexed { index, label ->
+                                                        FilterChip(
+                                                            selected = discountTab == index,
+                                                            onClick = { discountTab = index },
+                                                            label = { Text(label, fontSize = 10.sp) },
+                                                            modifier = Modifier.weight(1f),
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                selectedContainerColor = Color(0xFFFF5722),
+                                                                selectedLabelColor = Color.White
+                                                            )
+                                                        )
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
 
                                         when (discountTab) {
                                             0 -> {
