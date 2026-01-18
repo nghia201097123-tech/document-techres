@@ -1561,6 +1561,11 @@ private fun OrderDetailDialog(
                         SummaryRow("Giảm giá HĐ", "-${formatCurrency(billDiscount.toLong())}", Color(0xFF4CAF50))
                     }
 
+                    // Phụ thu (Surcharge)
+                    if (order.surchargeAmount > 0) {
+                        SummaryRow("Phụ thu", "+${formatCurrency(order.surchargeAmount.toLong())}", Color(0xFFFF9800))
+                    }
+
                     // VAT - clickable to show detail (Trong đó VAT = VAT đã bao gồm trong tạm tính)
                     Row(
                         modifier = Modifier
