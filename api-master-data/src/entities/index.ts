@@ -21,3 +21,4 @@ export * from './kitchen.entity';
 export * from './product-kitchen.entity';
 export * from './bill-template.entity';
 export * from './bill-printer-config.entity';
+export * from './surcharge.entity';

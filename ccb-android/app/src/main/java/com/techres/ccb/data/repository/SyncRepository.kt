@@ -5,6 +5,7 @@ import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.dao.SurchargeDao
 import com.techres.ccb.data.local.dao.OrderDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
@@ -39,6 +40,7 @@ enum class SyncStep {
     KITCHENS,         // Bếp
     SEASONAL_PRICES,  // Giá thời vụ
     COUPONS,          // Mã giảm giá
+    SURCHARGES,       // Phụ thu
     PRODUCT_NOTES,    // Ghi chú món ăn
     BILL_TEMPLATES    // Mẫu hóa đơn
 }
@@ -68,7 +70,8 @@ class SyncRepository @Inject constructor(
     private val orderDao: OrderDao,
     private val tableDao: TableDao,
     private val billTemplateDao: BillTemplateDao,
-    private val billPrinterConfigDao: BillPrinterConfigDao
+    private val billPrinterConfigDao: BillPrinterConfigDao,
+    private val surchargeDao: SurchargeDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -551,6 +554,27 @@ class SyncRepository @Inject constructor(
         couponDao.syncCoupons(branchId, couponsList)
         onProgress?.invoke(SyncStepProgress(SyncStep.COUPONS, SyncStepStatus.COMPLETED, couponsList.size))
 
+        // Sync surcharges (phụ thu)
+        onProgress?.invoke(SyncStepProgress(SyncStep.SURCHARGES, SyncStepStatus.IN_PROGRESS))
+        val surchargesList = syncData.surcharges?.map { dto ->
+            SurchargeEntity(
+                id = dto.id,
+                branchId = branchId,
+                name = dto.name,
+                description = dto.description,
+                amount = dto.amount,
+                vatRate = dto.vatRate,
+                sortOrder = dto.sortOrder,
+                isActive = dto.isActive,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+        surchargeDao.syncSurcharges(branchId, surchargesList)
+        onProgress?.invoke(SyncStepProgress(SyncStep.SURCHARGES, SyncStepStatus.COMPLETED, surchargesList.size))
+
         // Sync product notes
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_NOTES, SyncStepStatus.IN_PROGRESS))
         val productNotesList = syncData.productNotes?.map { dto ->
@@ -796,6 +820,7 @@ class SyncRepository @Inject constructor(
         seasonalPriceDao.deleteAllByBranch(branchId)
         seasonalPriceProductDao.deleteAllByBranch(branchId)
         couponDao.deleteAllByBranch(branchId)
+        surchargeDao.deleteAllByBranch(branchId)
         billTemplateDao.deleteByBranch(branchId)
         billPrinterConfigDao.deleteByBranch(branchId)
     }

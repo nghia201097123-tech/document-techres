@@ -867,6 +867,37 @@ export class BillTemplateDto {
   updatedAt: string;
 }
 
+// ============ Surcharge DTOs ============
+
+export class SurchargeDto {
+  @ApiProperty({ description: 'ID của phụ thu' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên phụ thu' })
+  name: string;
+
+  @ApiProperty({ description: 'Mô tả', nullable: true })
+  description: string | null;
+
+  @ApiProperty({ description: 'Số tiền phụ thu (đã gồm VAT)' })
+  amount: number;
+
+  @ApiProperty({ description: 'Thuế VAT (%)' })
+  vatRate: number;
+
+  @ApiProperty({ description: 'Thứ tự sắp xếp' })
+  sortOrder: number;
+
+  @ApiProperty({ description: 'Còn hoạt động không' })
+  isActive: boolean;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 // ============ Bill Printer Config DTOs ============
 
 export class BillPrinterConfigDto {
@@ -993,6 +1024,9 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [BillPrinterConfigDto], description: 'Cấu hình máy in bill' })
   billPrinterConfigs: BillPrinterConfigDto[];
+
+  @ApiProperty({ type: [SurchargeDto], description: 'Danh sách phụ thu' })
+  surcharges: SurchargeDto[];
 }
 
 export class FullSyncResponseDto {

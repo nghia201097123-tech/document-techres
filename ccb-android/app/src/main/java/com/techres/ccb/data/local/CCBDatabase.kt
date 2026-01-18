@@ -39,9 +39,11 @@ import com.techres.ccb.data.local.entity.*
         ProductNoteAssignmentEntity::class,
         // Bill printing
         BillTemplateEntity::class,
-        BillPrinterConfigEntity::class
+        BillPrinterConfigEntity::class,
+        // Surcharges (phụ thu)
+        SurchargeEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -81,6 +83,9 @@ abstract class CCBDatabase : RoomDatabase() {
     // Bill printing DAOs
     abstract fun billTemplateDao(): BillTemplateDao
     abstract fun billPrinterConfigDao(): BillPrinterConfigDao
+
+    // Surcharge DAOs
+    abstract fun surchargeDao(): SurchargeDao
 
     /**
      * Clear only master data tables, preserving transaction data (orders, shifts, payments)
@@ -144,6 +149,10 @@ abstract class CCBDatabase : RoomDatabase() {
             db.execSQL("DELETE FROM bill_templates")
             Log.d(TAG, "clearMasterData - Clearing bill_printer_configs...")
             db.execSQL("DELETE FROM bill_printer_configs")
+
+            // Clear surcharges
+            Log.d(TAG, "clearMasterData - Clearing surcharges...")
+            db.execSQL("DELETE FROM surcharges")
 
             db.setTransactionSuccessful()
             Log.d(TAG, "clearMasterData - Transaction successful, committing...")

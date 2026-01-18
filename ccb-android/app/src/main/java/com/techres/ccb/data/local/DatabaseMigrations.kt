@@ -823,6 +823,41 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 20 to 21
+     * Adds surcharges table for phụ thu (additional charges)
+     */
+    val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 20 to 21...")
+
+            // Create surcharges table
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS surcharges (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    branch_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    amount REAL NOT NULL DEFAULT 0.0,
+                    vat_rate REAL NOT NULL DEFAULT 0.0,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    sync_status TEXT NOT NULL DEFAULT 'synced',
+                    synced_at TEXT,
+                    version INTEGER NOT NULL DEFAULT 1
+                )
+            """.trimIndent())
+
+            // Create indices
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_surcharges_branch_id ON surcharges(branch_id)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_surcharges_is_active ON surcharges(is_active)")
+
+            Log.d(TAG, "Migration 20 to 21 complete - Created surcharges table")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -836,6 +871,7 @@ object DatabaseMigrations {
         MIGRATION_16_17,
         MIGRATION_17_18,
         MIGRATION_18_19,
-        MIGRATION_19_20
+        MIGRATION_19_20,
+        MIGRATION_20_21
     )
 }

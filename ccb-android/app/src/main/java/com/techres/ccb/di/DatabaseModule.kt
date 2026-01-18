@@ -178,4 +178,11 @@ object DatabaseModule {
     fun provideBillPrinterConfigDao(database: CCBDatabase): BillPrinterConfigDao {
         return database.billPrinterConfigDao()
     }
+
+    // Surcharge DAO
+    @Provides
+    @Singleton
+    fun provideSurchargeDao(database: CCBDatabase): SurchargeDao {
+        return database.surchargeDao()
+    }
 }

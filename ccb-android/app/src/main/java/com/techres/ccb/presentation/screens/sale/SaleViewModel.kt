@@ -18,7 +18,10 @@ import com.techres.ccb.data.local.entity.ProductToppingEntity
 import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceEntity
 import com.techres.ccb.data.local.entity.SeasonalPriceProductEntity
+import com.techres.ccb.data.local.entity.SurchargeEntity
+import com.techres.ccb.data.local.dao.SurchargeDao
 import com.techres.ccb.presentation.screens.sale.dialogs.AppliedDiscount
+import com.techres.ccb.presentation.screens.sale.dialogs.SelectedSurcharge
 import com.techres.ccb.presentation.screens.sale.dialogs.DiscountTarget
 import com.techres.ccb.util.DiscountCalculator
 import com.techres.ccb.util.OrderItemForDiscount
@@ -109,6 +112,12 @@ data class SaleUiState(
     val itemDiscountTypes: Map<String, String> = emptyMap(),    // Loại giảm giá theo món: itemId -> "percent" hoặc "fixed"
     val vatAmount: Long = 0,                         // Tiền VAT
 
+    // Surcharges (Phụ thu)
+    val availableSurcharges: List<SurchargeEntity> = emptyList(),  // Danh sách phụ thu có thể chọn
+    val selectedSurcharges: List<SelectedSurcharge> = emptyList(), // Phụ thu đã chọn cho đơn
+    val showSurchargeDialog: Boolean = false,                       // Hiển thị dialog chọn phụ thu
+    val showCustomItemDialog: Boolean = false,                      // Hiển thị dialog thêm món ngoài menu
+
     // Tax
     val taxRate: Double = 8.0,  // VAT 8% cho F&B (Nghị định 174/2025)
     val pricesIncludeVat: Boolean = true,  // Giá sản phẩm đã bao gồm VAT
@@ -161,12 +170,16 @@ data class SaleUiState(
     val totalCouponDiscount: Long
         get() = appliedDiscounts.sumOf { it.discountAmount }
 
+    // Tổng phụ thu
+    val surchargeAmount: Long
+        get() = selectedSurcharges.sumOf { it.totalAmount.toLong() }
+
     /**
-     * Tổng tiền sau giảm giá
+     * Tổng tiền sau giảm giá và phụ thu
      * Vì giá sản phẩm đã bao gồm VAT nên KHÔNG cộng thêm VAT
      */
     val totalAmount: Long
-        get() = (subtotal - discountAmount).coerceAtLeast(0L)
+        get() = (subtotal - discountAmount + surchargeAmount).coerceAtLeast(0L)
 
     /**
      * Tiền VAT (tách ra từ tổng để hiển thị trên hóa đơn)
@@ -289,7 +302,8 @@ class SaleViewModel @Inject constructor(
     private val billTemplateDao: BillTemplateDao,
     private val billPrinterConfigDao: BillPrinterConfigDao,
     private val seasonalPriceDao: SeasonalPriceDao,
-    private val seasonalPriceProductDao: SeasonalPriceProductDao
+    private val seasonalPriceProductDao: SeasonalPriceProductDao,
+    private val surchargeDao: SurchargeDao
 ) : ViewModel() {
 
     companion object {
@@ -348,6 +362,9 @@ class SaleViewModel @Inject constructor(
                     val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     val seasonalPricesDeferred = async { seasonalPriceDao.getValidSeasonalPrices(branchId, currentDate) }
 
+                    // Load surcharges (phụ thu)
+                    val surchargesDeferred = async { surchargeDao.getActiveSurchargesList(branchId) }
+
                     // Await all results
                     val categoryEntities = categoriesDeferred.await()
                     val allProducts = allProductsDeferred.await()
@@ -355,6 +372,7 @@ class SaleViewModel @Inject constructor(
                     val tableEntities = tablesDeferred.await()
                     val notes = notesDeferred.await()
                     val seasonalPrices = seasonalPricesDeferred.await()
+                    val surcharges = surchargesDeferred.await()
 
                     // Build seasonal price map: productId -> SeasonalPriceEntity
                     seasonalPriceMap = if (seasonalPrices.isNotEmpty()) {
@@ -461,6 +479,7 @@ class SaleViewModel @Inject constructor(
                             products = productList,
                             tables = tableList,
                             availableNotes = notes,
+                            availableSurcharges = surcharges,
                             isLoading = false
                         )
                     }
@@ -3487,6 +3506,128 @@ class SaleViewModel @Inject constructor(
                 (basePrice + seasonalPrice.adjustmentValue).toLong()
             }
             else -> basePrice
+        }
+    }
+
+    // ============ CUSTOM ITEM FUNCTIONS ============
+
+    /**
+     * Hiển thị dialog thêm món ngoài menu
+     */
+    fun showCustomItemDialog() {
+        _uiState.update { it.copy(showCustomItemDialog = true) }
+    }
+
+    /**
+     * Ẩn dialog thêm món ngoài menu
+     */
+    fun hideCustomItemDialog() {
+        _uiState.update { it.copy(showCustomItemDialog = false) }
+    }
+
+    /**
+     * Thêm món ngoài menu vào giỏ hàng
+     * @param name Tên món
+     * @param price Giá tiền
+     * @param quantity Số lượng
+     * @param note Ghi chú (tùy chọn)
+     */
+    fun addCustomItem(name: String, price: Double, quantity: Int, note: String?) {
+        viewModelScope.launch {
+            try {
+                // Tạo product giả cho món ngoài menu
+                // ID bắt đầu bằng "custom_" để phân biệt với món trong menu
+                val customProductId = "custom_${UUID.randomUUID()}"
+                val customProduct = Product(
+                    id = customProductId,
+                    name = name,
+                    price = price.toLong(),
+                    categoryId = "custom",
+                    description = "Món ngoài menu",
+                    imageUrl = null,
+                    isAvailable = true,
+                    vatRate = 8.0, // Default VAT rate
+                    hasVariants = false,
+                    variants = emptyList()
+                )
+
+                val customItem = CartItem(
+                    product = customProduct,
+                    quantity = quantity,
+                    selectedVariants = emptyList(),
+                    note = note,
+                    comboItems = emptyList()
+                )
+
+                _uiState.update { state ->
+                    state.copy(
+                        cartItems = state.cartItems + customItem,
+                        showCustomItemDialog = false,
+                        successMessage = "Đã thêm: $name"
+                    )
+                }
+
+                Log.d(TAG, "addCustomItem - Added custom item: $name, price: $price, qty: $quantity")
+            } catch (e: Exception) {
+                Log.e(TAG, "addCustomItem - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        showCustomItemDialog = false,
+                        errorMessage = "Lỗi thêm món: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    // ============ SURCHARGE FUNCTIONS ============
+
+    /**
+     * Hiển thị dialog chọn phụ thu
+     */
+    fun showSurchargeDialog() {
+        _uiState.update { it.copy(showSurchargeDialog = true) }
+    }
+
+    /**
+     * Ẩn dialog chọn phụ thu
+     */
+    fun hideSurchargeDialog() {
+        _uiState.update { it.copy(showSurchargeDialog = false) }
+    }
+
+    /**
+     * Áp dụng các phụ thu đã chọn
+     * @param surcharges Danh sách phụ thu với số lượng
+     */
+    fun applySurcharges(surcharges: List<SelectedSurcharge>) {
+        _uiState.update { state ->
+            val totalAmount = surcharges.sumOf { it.totalAmount }
+            val message = if (surcharges.isEmpty()) {
+                "Đã xoá phụ thu"
+            } else {
+                "Đã áp dụng ${surcharges.size} khoản phụ thu"
+            }
+
+            state.copy(
+                selectedSurcharges = surcharges,
+                showSurchargeDialog = false,
+                successMessage = message
+            )
+        }
+
+        Log.d(TAG, "applySurcharges - Applied ${surcharges.size} surcharges")
+    }
+
+    /**
+     * Xoá tất cả phụ thu
+     */
+    fun clearSurcharges() {
+        _uiState.update {
+            it.copy(
+                selectedSurcharges = emptyList(),
+                successMessage = "Đã xoá phụ thu"
+            )
         }
     }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, ProductKitchen, BillTemplate, BillPrinterConfig } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, ProductKitchen, BillTemplate, BillPrinterConfig, Surcharge } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -20,6 +20,7 @@ import {
   BrandWithBranchesDto,
   BillTemplateDto,
   BillPrinterConfigDto,
+  SurchargeDto,
 } from './dto/sync.dto';
 
 @Injectable()
@@ -71,6 +72,8 @@ export class SyncService {
     private billTemplateRepository: Repository<BillTemplate>,
     @InjectRepository(BillPrinterConfig)
     private billPrinterConfigRepository: Repository<BillPrinterConfig>,
+    @InjectRepository(Surcharge)
+    private surchargeRepository: Repository<Surcharge>,
   ) {}
 
   /**
@@ -295,7 +298,7 @@ export class SyncService {
       const tenantId = branch.tenantId;
       console.log(`[SyncService.getFullSync] tenantId=${tenantId}, branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, branchProducts, areas, tables, staff, kitchens, productKitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff, kitchens, productKitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs, surcharges] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -355,6 +358,11 @@ export class SyncService {
           where: { branchId, isActive: true },
           order: { sortOrder: 'ASC' },
         }),
+        // Surcharges for this brand
+        brandId ? this.surchargeRepository.find({
+          where: { brandId, isActive: true },
+          order: { sortOrder: 'ASC' },
+        }) : Promise.resolve([]),
       ]);
 
       // Build product-kitchen mapping (productId -> comma-separated kitchenIds)
@@ -463,7 +471,7 @@ export class SyncService {
             }),
       ]);
 
-      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, kitchens=${kitchens.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}, billTemplates=${billTemplates.length}, billPrinterConfigs=${billPrinterConfigs.length}`);
+      console.log(`[SyncService.getFullSync] Found: categories=${categories.length}, products=${products.length}, areas=${areas.length}, tables=${tables.length}, staff=${staff.length}, kitchens=${kitchens.length}, seasonalPrices=${seasonalPrices.length}, coupons=${coupons.length}, toppingGroups=${toppingGroups.length}, productNotes=${productNotes.length}, comboItems=${comboItems.length}, billTemplates=${billTemplates.length}, billPrinterConfigs=${billPrinterConfigs.length}, surcharges=${surcharges.length}`);
 
       // Debug log for topping groups with min/max selection limits
       if (toppingGroups.length > 0) {
@@ -507,6 +515,7 @@ export class SyncService {
           comboItems: comboItems.map(ci => this.mapComboItem(ci)),
           billTemplates: billTemplates.map(bt => this.mapBillTemplate(bt)),
           billPrinterConfigs: billPrinterConfigs.map(bpc => this.mapBillPrinterConfig(bpc)),
+          surcharges: surcharges.map(s => this.mapSurcharge(s)),
         },
         syncTime,
         message: null,
@@ -1026,6 +1035,20 @@ export class SyncService {
       sortOrder: bpc.sortOrder,
       createdAt: bpc.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: bpc.updatedAt.toISOString(),
+    };
+  }
+
+  private mapSurcharge(s: Surcharge): SurchargeDto {
+    return {
+      id: s.id,
+      name: s.name,
+      description: s.description || null,
+      amount: Number(s.amount),
+      vatRate: Number(s.vatRate),
+      sortOrder: s.sortOrder || 0,
+      isActive: s.isActive,
+      createdAt: s.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
     };
   }
 }

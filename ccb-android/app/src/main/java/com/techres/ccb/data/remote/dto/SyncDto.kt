@@ -92,7 +92,9 @@ data class FullSyncData(
     // Bill templates (mẫu hóa đơn)
     @SerializedName("billTemplates") val billTemplates: List<BillTemplateDto>?,
     // Bill printer configs (cấu hình máy in bill)
-    @SerializedName("billPrinterConfigs") val billPrinterConfigs: List<BillPrinterConfigDto>?
+    @SerializedName("billPrinterConfigs") val billPrinterConfigs: List<BillPrinterConfigDto>?,
+    // Surcharges (phụ thu)
+    @SerializedName("surcharges") val surcharges: List<SurchargeDto>?
 )
 
 // ============ Master Data DTOs ============
@@ -856,6 +858,22 @@ data class BillPrinterConfigDto(
     @SerializedName("isDefault") val isDefault: Boolean = false,
     @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+/**
+ * Phụ thu (Surcharge)
+ * Dùng để tính thêm phí cho đơn hàng (VD: phí mang đồ ăn vào, phí dịch vụ...)
+ */
+data class SurchargeDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("amount") val amount: Double, // Số tiền phụ thu (đã gồm VAT)
+    @SerializedName("vatRate") val vatRate: Double = 0.0, // % VAT
+    @SerializedName("sortOrder") val sortOrder: Int = 0,
+    @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String
 )
