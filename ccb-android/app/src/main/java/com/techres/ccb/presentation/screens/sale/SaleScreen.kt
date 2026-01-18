@@ -291,39 +291,65 @@ fun SaleScreen(
             // Tổng = Tạm tính - Giảm giá (giá đã bao gồm VAT nên không cộng thêm)
             val paymentTotal = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
 
-            // Helper function to parse toppings from notes field
-            // Format: "+ ToppingName (+price)" or just "+ ToppingName"
-            fun parseToppingsFromNotes(notes: String?, itemVatRate: Double): List<PaymentToppingItem> {
+            // Helper function to parse ALL variants (options and toppings) from notes field
+            // Formats:
+            // - Topping: "+ ToppingName (+price)" or "+ ToppingName"
+            // - Option: "GroupName: Value (+price)" or "GroupName: Value"
+            fun parseVariantsFromNotes(notes: String?, itemVatRate: Double): List<PaymentToppingItem> {
                 if (notes.isNullOrBlank()) return emptyList()
 
-                val toppings = mutableListOf<PaymentToppingItem>()
-                // Split by comma and look for topping entries (starting with "+")
-                val parts = notes.split(",").map { it.trim() }
+                val variants = mutableListOf<PaymentToppingItem>()
+                // Remove user note part if present (after " | ")
+                val variantsPart = notes.split(" | ").firstOrNull()?.trim() ?: return emptyList()
+
+                // Split by comma
+                val parts = variantsPart.split(",").map { it.trim() }
 
                 for (part in parts) {
-                    // Check if this is a topping (starts with "+ ")
-                    if (part.startsWith("+ ") || part.startsWith("+")) {
-                        val toppingPart = part.removePrefix("+ ").removePrefix("+").trim()
+                    if (part.isEmpty()) continue
 
-                        // Extract price if present: "ToppingName (+10000)" or "ToppingName"
-                        val priceMatch = Regex("""\(\+(\d+)\)$""").find(toppingPart)
-                        val price = priceMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-                        val name = if (priceMatch != null) {
+                    // Extract price if present: "...something (+10000)" pattern
+                    val priceMatch = Regex("""\(\+(\d+)\)""").find(part)
+                    val price = priceMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+
+                    // Determine name based on format
+                    val name: String
+                    val isTopping: Boolean
+
+                    if (part.startsWith("+ ") || part.startsWith("+")) {
+                        // Topping format: "+ ToppingName (+price)"
+                        isTopping = true
+                        val toppingPart = part.removePrefix("+ ").removePrefix("+").trim()
+                        name = if (priceMatch != null) {
                             toppingPart.replace(priceMatch.value, "").trim()
                         } else {
                             toppingPart
                         }
-
-                        if (name.isNotEmpty()) {
-                            toppings.add(PaymentToppingItem(
-                                name = name,
-                                price = price,
-                                vatRate = itemVatRate // Use item's VAT rate for toppings
-                            ))
+                    } else if (part.contains(":")) {
+                        // Option format: "GroupName: Value (+price)"
+                        isTopping = false
+                        val colonIndex = part.indexOf(":")
+                        val groupName = part.substring(0, colonIndex).trim()
+                        var valuePart = part.substring(colonIndex + 1).trim()
+                        // Remove price from value part
+                        if (priceMatch != null) {
+                            valuePart = valuePart.replace(priceMatch.value, "").trim()
                         }
+                        name = "$groupName: $valuePart"
+                    } else {
+                        // Unknown format, skip
+                        continue
+                    }
+
+                    if (name.isNotEmpty() && price > 0) {
+                        variants.add(PaymentToppingItem(
+                            name = name,
+                            price = price,
+                            vatRate = itemVatRate // Use item's VAT rate for variants
+                        ))
                     }
                 }
-                return toppings
+                return variants
             }
 
             // Tạo danh sách món cho item-level discount
@@ -334,11 +360,11 @@ fun SaleScreen(
                     uiState.currentOrderItems
                         .filter { !it.isComboChild }
                         .forEach { item ->
-                            // Parse toppings from notes field
-                            val toppings = parseToppingsFromNotes(item.notes, item.vatRate)
-                            // Calculate unit price of main item (without toppings)
-                            val toppingsPrice = toppings.sumOf { it.price }
-                            val mainUnitPrice = (item.unitPrice.toLong() - toppingsPrice).coerceAtLeast(0L)
+                            // Parse all variants (options and toppings) from notes field
+                            val variants = parseVariantsFromNotes(item.notes, item.vatRate)
+                            // Calculate unit price of main item (without variants)
+                            val variantsPrice = variants.sumOf { it.price }
+                            val mainUnitPrice = (item.unitPrice.toLong() - variantsPrice).coerceAtLeast(0L)
 
                             add(PaymentOrderItem(
                                 id = item.id,
@@ -349,7 +375,7 @@ fun SaleScreen(
                                 discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
                                 categoryId = item.categoryId,
                                 vatRate = item.vatRate,
-                                toppings = toppings
+                                toppings = variants
                             ))
                         }
                 } else {
