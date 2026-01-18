@@ -1226,7 +1226,7 @@ class SaleViewModel @Inject constructor(
                 val updatedOrder = existingOrder.copy(
                     tableId = null,
                     tableName = null,
-                    orderType = orderType.name.lowercase(),
+                    orderType = orderType.dbValue,
                     updatedAt = java.time.Instant.now().toString()
                 )
 
@@ -1532,7 +1532,7 @@ class SaleViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val updatedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                val updatedAt = java.time.Instant.now().toString()
                 orderRepository.updateOrderNotes(currentOrder.id, note, updatedAt)
 
                 // Update local state
@@ -2309,7 +2309,8 @@ class SaleViewModel @Inject constructor(
     // ===== ORDER MANAGEMENT =====
 
     private fun getCurrentTimestamp(): String {
-        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).format(Date())
+        // Use Instant.now() to get proper UTC timestamp in ISO-8601 format
+        return java.time.Instant.now().toString()
     }
 
     /**
@@ -2507,7 +2508,7 @@ class SaleViewModel @Inject constructor(
                     customerPhone = state.selectedCustomer?.phone,
                     orderNumber = orderNumber,
                     status = "pending",
-                    orderType = state.orderType.name.lowercase(),
+                    orderType = state.orderType.dbValue,
                     subtotal = state.subtotal.toDouble(),
                     discountAmount = state.discountAmount.toDouble(),
                     discountReason = state.billDiscountDescription,
@@ -3267,9 +3268,7 @@ class SaleViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                    .format(Date())
+                val now = java.time.Instant.now().toString()
 
                 withContext(Dispatchers.IO) {
                     // Update the item status to cancelled (instead of deleting)
@@ -3327,9 +3326,7 @@ class SaleViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                    .format(Date())
+                val now = java.time.Instant.now().toString()
 
                 withContext(Dispatchers.IO) {
                     // Parse notes to find and remove the topping

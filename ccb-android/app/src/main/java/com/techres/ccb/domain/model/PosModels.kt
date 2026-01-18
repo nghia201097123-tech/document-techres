@@ -122,10 +122,10 @@ data class Order(
     val completedAt: Long? = null
 )
 
-enum class OrderType(val displayName: String) {
-    DINE_IN("Tại bàn"),
-    TAKE_AWAY("Mang về"),
-    DELIVERY("Giao hàng")
+enum class OrderType(val displayName: String, val dbValue: String) {
+    DINE_IN("Tại bàn", "dine_in"),
+    TAKE_AWAY("Mang về", "takeaway"),
+    DELIVERY("Giao hàng", "delivery")
 }
 
 enum class OrderStatus(val displayName: String) {
