@@ -1118,13 +1118,13 @@ private fun OrderDetailDialog(
                             ) {
                                 // Table chip
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.TableBar, null, modifier = Modifier.size(14.dp), tint = Color(0xFF1976D2))
+                                    Icon(imageVector = Icons.Default.Place, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF1976D2))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(order.tableName ?: "---", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 }
                                 // Guest count
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.People, null, modifier = Modifier.size(14.dp), tint = Color(0xFF616161))
+                                    Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF616161))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("${order.guestCount}", fontSize = 12.sp)
                                 }
