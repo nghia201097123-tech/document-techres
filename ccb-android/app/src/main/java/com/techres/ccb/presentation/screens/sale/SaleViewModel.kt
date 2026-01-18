@@ -3540,12 +3540,13 @@ class SaleViewModel @Inject constructor(
                 val customProductId = "custom_${UUID.randomUUID()}"
                 val customProduct = Product(
                     id = customProductId,
+                    code = "CUSTOM",
                     name = name,
                     price = price.toLong(),
                     categoryId = "custom",
                     description = "Món ngoài menu",
                     imageUrl = null,
-                    isAvailable = true,
+                    isActive = true,
                     vatRate = 8.0, // Default VAT rate
                     hasVariants = false,
                     variants = emptyList()

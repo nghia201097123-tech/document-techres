@@ -101,6 +101,7 @@ class SyncDataViewModel @Inject constructor(
             SyncItem("staff", "Nhân viên", "people"),
             SyncItem("seasonal_prices", "Giá thời vụ", "event"),
             SyncItem("coupons", "Coupon", "discount"),
+            SyncItem("surcharges", "Phụ thu", "attach_money"),
             SyncItem("product_notes", "Ghi chú", "note"),
             SyncItem("bill_templates", "Mẫu in bill", "receipt"),
             SyncItem("settings", "Cấu hình", "settings")
@@ -165,6 +166,7 @@ class SyncDataViewModel @Inject constructor(
             SyncStep.KITCHENS -> "kitchens"
             SyncStep.SEASONAL_PRICES -> "seasonal_prices"
             SyncStep.COUPONS -> "coupons"
+            SyncStep.SURCHARGES -> "surcharges"
             SyncStep.PRODUCT_NOTES -> "product_notes"
             SyncStep.BILL_TEMPLATES -> "bill_templates"
         }
