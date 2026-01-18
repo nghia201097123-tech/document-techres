@@ -292,6 +292,7 @@ fun OrderHistoryScreen(
                     // Financial Summary Row (for all filtered orders)
                     if (uiState.allOrders.isNotEmpty()) {
                         val completedOrders = uiState.allOrders.filter { it.status == "completed" }
+                        val cancelledCount = uiState.allOrders.count { it.status == "cancelled" }
                         val totalSubtotal = completedOrders.sumOf { it.subtotal }
                         val totalDiscount = completedOrders.sumOf { it.discountAmount }
                         val totalAfterDiscount = (totalSubtotal - totalDiscount).coerceAtLeast(0L)
@@ -312,12 +313,17 @@ fun OrderHistoryScreen(
                                 .padding(vertical = 10.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Empty cells for STT, Mã đơn, Giờ, Bàn
+                            // Label showing completed vs cancelled count
                             Text("TỔNG", modifier = Modifier.width(40.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                            Text("${completedOrders.size} đơn", modifier = Modifier.width(80.dp), fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                            Column(modifier = Modifier.width(80.dp)) {
+                                Text("${completedOrders.size} hoàn tất", fontSize = 9.sp, color = Color(0xFF4CAF50), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                if (cancelledCount > 0) {
+                                    Text("$cancelledCount đã hủy", fontSize = 9.sp, color = Color(0xFFf44336), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                }
+                            }
                             Text("", modifier = Modifier.width(55.dp))
                             Text("", modifier = Modifier.width(50.dp))
-                            // Totals
+                            // Totals (only from completed orders)
                             Text(formatCurrencyShort(totalSubtotal), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalDiscount), modifier = Modifier.width(80.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50), textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalAfterDiscount), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
