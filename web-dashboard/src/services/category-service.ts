@@ -26,6 +26,11 @@ export interface UpdateCategoryDto {
   sortOrder?: number;
 }
 
+export interface SortOrderItem {
+  id: string;
+  sortOrder: number;
+}
+
 export interface CategoryCount {
   productType: ProductType;
   count: number;
@@ -68,5 +73,10 @@ export const categoryService = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/categories/${id}`);
+  },
+
+  updateSortOrder: async (sortOrders: SortOrderItem[]): Promise<Category[]> => {
+    const response = await api.patch<Category[]>("/categories/sort-order", { sortOrders });
+    return response.data;
   },
 };

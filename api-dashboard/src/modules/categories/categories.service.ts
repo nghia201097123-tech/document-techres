@@ -77,4 +77,25 @@ export class CategoriesService {
 
     return queryBuilder.groupBy('category.product_type').getRawMany();
   }
+
+  /**
+   * Bulk update sort order for categories
+   * @param tenantId - Tenant ID for security check
+   * @param sortOrders - Array of { id, sortOrder } to update
+   */
+  async updateSortOrders(tenantId: string, sortOrders: { id: string; sortOrder: number }[]) {
+    const updates = sortOrders.map(async ({ id, sortOrder }) => {
+      const category = await this.categoryRepository.findOne({
+        where: { tenantId, id },
+      });
+      if (category) {
+        category.sortOrder = sortOrder;
+        return this.categoryRepository.save(category);
+      }
+      return null;
+    });
+
+    const results = await Promise.all(updates);
+    return results.filter(Boolean);
+  }
 }

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuard
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateCategoryDto, UpdateCategoryDto } from './dto';
+import { CreateCategoryDto, UpdateCategoryDto, UpdateSortOrderDto } from './dto';
 import { ProductType } from '../../database/entities/product.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -63,6 +63,12 @@ export class CategoriesController {
     }
 
     return this.categoriesService.create(req.user.tenantId, brandId, createDto);
+  }
+
+  @Patch('sort-order')
+  @ApiOperation({ summary: 'Cập nhật thứ tự hiển thị danh mục (bulk)' })
+  updateSortOrder(@Request() req, @Body() updateDto: UpdateSortOrderDto) {
+    return this.categoriesService.updateSortOrders(req.user.tenantId, updateDto.sortOrders);
   }
 
   @Put(':id')
