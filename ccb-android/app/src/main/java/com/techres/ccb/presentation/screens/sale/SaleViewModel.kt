@@ -1214,11 +1214,44 @@ class SaleViewModel @Inject constructor(
     // ===== ORDER TYPE & TABLE =====
 
     fun setOrderType(orderType: OrderType) {
-        _uiState.update { state ->
-            state.copy(
-                orderType = orderType,
-                selectedTable = if (orderType != OrderType.DINE_IN) null else state.selectedTable
-            )
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val existingOrder = currentState.currentOrder
+
+            // If there's an existing order and we're changing type away from DINE_IN,
+            // update the order to remove table association
+            if (existingOrder != null && orderType != OrderType.DINE_IN && currentState.selectedTable != null) {
+                Log.d(TAG, "setOrderType - Updating order ${existingOrder.orderNumber} from DINE_IN to ${orderType.name}")
+
+                val updatedOrder = existingOrder.copy(
+                    tableId = null,
+                    tableName = null,
+                    orderType = orderType.name.lowercase(),
+                    updatedAt = java.time.Instant.now().toString()
+                )
+
+                // Save to database
+                withContext(Dispatchers.IO) {
+                    orderRepository.updateOrder(updatedOrder)
+                }
+
+                _uiState.update { state ->
+                    state.copy(
+                        orderType = orderType,
+                        selectedTable = null,
+                        currentOrder = updatedOrder
+                        // Keep currentOrderItems, cartItems, discounts unchanged!
+                    )
+                }
+            } else {
+                // No existing order or just switching type - simple update
+                _uiState.update { state ->
+                    state.copy(
+                        orderType = orderType,
+                        selectedTable = if (orderType != OrderType.DINE_IN) null else state.selectedTable
+                    )
+                }
+            }
         }
     }
 
@@ -1324,16 +1357,60 @@ class SaleViewModel @Inject constructor(
 
     fun selectTable(table: Table) {
         viewModelScope.launch {
-            // Load active order for this table by table_id only
-            // NOTE: Removed fallback by table_name because it causes bug when
-            // multiple areas have tables with same name (e.g., "Bàn 1" in both Khu A and Khu Vip)
-            val activeOrder = withContext(Dispatchers.IO) {
+            val currentState = _uiState.value
+            val existingOrder = currentState.currentOrder
+            val existingOrderItems = currentState.currentOrderItems
+
+            // Check if new table has an active order
+            val tableActiveOrder = withContext(Dispatchers.IO) {
                 orderRepository.getActiveOrderByTable(table.id)
             }
 
-            val orderItems = if (activeOrder != null) {
+            // CASE 1: Current order exists and is switching table/type
+            // (e.g., changing from "Mang về" to "Tại bàn" or switching between tables)
+            if (existingOrder != null && tableActiveOrder == null) {
+                // Update current order's table - DON'T clear items!
+                Log.d(TAG, "selectTable - Updating existing order ${existingOrder.orderNumber} to table ${table.name}")
+
+                val updatedOrder = existingOrder.copy(
+                    tableId = table.id,
+                    tableName = table.name,
+                    orderType = "dine_in",
+                    updatedAt = java.time.Instant.now().toString()
+                )
+
+                // Save to database
                 withContext(Dispatchers.IO) {
-                    orderRepository.getOrderItemsSync(activeOrder.id)
+                    orderRepository.updateOrder(updatedOrder)
+                }
+
+                _uiState.update { state ->
+                    state.copy(
+                        selectedTable = table,
+                        showTableDialog = false,
+                        currentOrder = updatedOrder,
+                        orderType = OrderType.DINE_IN
+                        // Keep currentOrderItems, cartItems, discounts unchanged!
+                    )
+                }
+                return@launch
+            }
+
+            // CASE 2: Current order exists AND new table also has an active order
+            // This is a conflict - show warning
+            if (existingOrder != null && tableActiveOrder != null && existingOrder.id != tableActiveOrder.id) {
+                Log.w(TAG, "selectTable - Conflict: current order ${existingOrder.orderNumber}, table has ${tableActiveOrder.orderNumber}")
+                _uiState.update { it.copy(
+                    errorMessage = "Bàn ${table.name} đã có đơn hàng ${tableActiveOrder.orderNumber}. Vui lòng chọn bàn khác hoặc hoàn tất đơn hiện tại.",
+                    showTableDialog = false
+                ) }
+                return@launch
+            }
+
+            // CASE 3: No current order - load table's active order (or empty state)
+            val orderItems = if (tableActiveOrder != null) {
+                withContext(Dispatchers.IO) {
+                    orderRepository.getOrderItemsSync(tableActiveOrder.id)
                 }
             } else {
                 emptyList()
@@ -1344,17 +1421,17 @@ class SaleViewModel @Inject constructor(
             val restoredBillDiscount: Long
             val restoredBillDescription: String?
 
-            if (activeOrder != null) {
+            if (tableActiveOrder != null) {
                 // Build item discounts map from order items
                 restoredItemDiscounts = orderItems
                     .filter { it.discountAmount > 0 }
                     .associate { it.id to it.discountAmount.toLong() }
 
                 val totalItemDiscount = restoredItemDiscounts.values.sum()
-                restoredBillDiscount = (activeOrder.discountAmount - totalItemDiscount).coerceAtLeast(0.0).toLong()
-                restoredBillDescription = activeOrder.discountReason
+                restoredBillDiscount = (tableActiveOrder.discountAmount - totalItemDiscount).coerceAtLeast(0.0).toLong()
+                restoredBillDescription = tableActiveOrder.discountReason
 
-                Log.d(TAG, "selectTable - Restoring discounts: total=${activeOrder.discountAmount}, " +
+                Log.d(TAG, "selectTable - Restoring discounts: total=${tableActiveOrder.discountAmount}, " +
                     "items=$totalItemDiscount, bill=$restoredBillDiscount")
             } else {
                 restoredItemDiscounts = emptyMap()
@@ -1362,16 +1439,16 @@ class SaleViewModel @Inject constructor(
                 restoredBillDescription = null
             }
 
-            Log.d(TAG, "selectTable - table: ${table.name}, activeOrder: ${activeOrder?.orderNumber}, items: ${orderItems.size}")
+            Log.d(TAG, "selectTable - table: ${table.name}, activeOrder: ${tableActiveOrder?.orderNumber}, items: ${orderItems.size}")
 
             _uiState.update { state ->
                 state.copy(
                     selectedTable = table,
                     showTableDialog = false,
-                    currentOrder = activeOrder,
+                    currentOrder = tableActiveOrder,
                     currentOrderItems = orderItems,
                     // Clear cart when switching tables with active order
-                    cartItems = if (activeOrder != null) emptyList() else state.cartItems,
+                    cartItems = if (tableActiveOrder != null) emptyList() else state.cartItems,
                     // Reset temp bill print count when switching tables
                     tempBillPrintCount = 0,
                     // Restore discount states
