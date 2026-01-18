@@ -291,6 +291,41 @@ fun SaleScreen(
             // Tổng = Tạm tính - Giảm giá (giá đã bao gồm VAT nên không cộng thêm)
             val paymentTotal = (subtotal - uiState.discountAmount).coerceAtLeast(0L)
 
+            // Helper function to parse toppings from notes field
+            // Format: "+ ToppingName (+price)" or just "+ ToppingName"
+            fun parseToppingsFromNotes(notes: String?, itemVatRate: Double): List<PaymentToppingItem> {
+                if (notes.isNullOrBlank()) return emptyList()
+
+                val toppings = mutableListOf<PaymentToppingItem>()
+                // Split by comma and look for topping entries (starting with "+")
+                val parts = notes.split(",").map { it.trim() }
+
+                for (part in parts) {
+                    // Check if this is a topping (starts with "+ ")
+                    if (part.startsWith("+ ") || part.startsWith("+")) {
+                        val toppingPart = part.removePrefix("+ ").removePrefix("+").trim()
+
+                        // Extract price if present: "ToppingName (+10000)" or "ToppingName"
+                        val priceMatch = Regex("""\(\+(\d+)\)$""").find(toppingPart)
+                        val price = priceMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                        val name = if (priceMatch != null) {
+                            toppingPart.replace(priceMatch.value, "").trim()
+                        } else {
+                            toppingPart
+                        }
+
+                        if (name.isNotEmpty()) {
+                            toppings.add(PaymentToppingItem(
+                                name = name,
+                                price = price,
+                                vatRate = itemVatRate // Use item's VAT rate for toppings
+                            ))
+                        }
+                    }
+                }
+                return toppings
+            }
+
             // Tạo danh sách món cho item-level discount
             // CHỈ bao gồm món đã order, KHÔNG bao gồm cart items chưa thêm
             val orderItems = buildList {
@@ -299,15 +334,22 @@ fun SaleScreen(
                     uiState.currentOrderItems
                         .filter { !it.isComboChild }
                         .forEach { item ->
+                            // Parse toppings from notes field
+                            val toppings = parseToppingsFromNotes(item.notes, item.vatRate)
+                            // Calculate unit price of main item (without toppings)
+                            val toppingsPrice = toppings.sumOf { it.price }
+                            val mainUnitPrice = (item.unitPrice.toLong() - toppingsPrice).coerceAtLeast(0L)
+
                             add(PaymentOrderItem(
                                 id = item.id,
                                 name = item.productName,
                                 quantity = item.quantity,
-                                unitPrice = item.unitPrice.toLong(),
+                                unitPrice = mainUnitPrice,
                                 totalPrice = item.totalPrice.toLong(),
                                 discountAmount = uiState.itemDiscounts[item.id] ?: 0L,
-                                categoryId = null,
-                                vatRate = item.vatRate
+                                categoryId = item.categoryId,
+                                vatRate = item.vatRate,
+                                toppings = toppings
                             ))
                         }
                 } else {
