@@ -1926,9 +1926,16 @@ private fun HistoryVatDetailDialog(
         }
     }
 
-    // Tính tổng VAT từ các rows
-    val calculatedTotalVat = remember(vatRows) {
-        vatRows.sumOf { it.vatAmount }
+    // Tính tổng VAT giống như summary (từ tổng tiền) để đảm bảo khớp
+    // Thay vì cộng từng món (có thể sai số làm tròn)
+    val calculatedTotalVat = remember(subtotal, discountAmount, surchargeAmount) {
+        val vatRate = 8.0
+        val priceAfterDiscount = subtotal - discountAmount
+        val itemsVat = priceAfterDiscount - (priceAfterDiscount / (1 + vatRate / 100.0))
+        val surchargeVat = if (surchargeAmount > 0) {
+            surchargeAmount - (surchargeAmount / (1 + vatRate / 100.0))
+        } else 0.0
+        (itemsVat + surchargeVat).toLong()
     }
 
     Dialog(onDismissRequest = onDismiss) {
