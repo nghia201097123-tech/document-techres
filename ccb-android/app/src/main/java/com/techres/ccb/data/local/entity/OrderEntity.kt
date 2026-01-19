@@ -115,6 +115,11 @@ data class OrderEntity(
     @ColumnInfo(name = "surcharge_amount")
     val surchargeAmount: Double = 0.0,
 
+    // JSON string chứa danh sách phụ thu đã áp dụng
+    // Format: [{"id": "...", "name": "...", "amount": 10000, "quantity": 1, "vatRate": 8}]
+    @ColumnInfo(name = "surcharges_json")
+    val surchargesJson: String? = null,
+
     @ColumnInfo(name = "vat_amount")
     val vatAmount: Double = 0.0,
 

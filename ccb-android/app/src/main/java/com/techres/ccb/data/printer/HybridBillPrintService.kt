@@ -559,8 +559,19 @@ object HybridBillPrintService {
                 lineKeyValue("${template.totalDiscountLabel}:", "-${formatCurrency(billData.totalDiscountAmount)}")
             }
 
-            // ============ PHỤ THU ============
-            if (billData.surchargeAmount > 0) {
+            // ============ PHỤ THU (CHI TIẾT) ============
+            if (billData.surchargeItems.isNotEmpty()) {
+                // Hiển thị từng món phụ thu
+                billData.surchargeItems.forEach { item ->
+                    val itemText = if (item.quantity > 1) {
+                        "Phụ thu: ${item.name} x${item.quantity}"
+                    } else {
+                        "Phụ thu: ${item.name}"
+                    }
+                    lineKeyValue(itemText, "+${formatCurrency(item.totalAmount)}")
+                }
+            } else if (billData.surchargeAmount > 0) {
+                // Fallback: nếu không có chi tiết, hiển thị tổng
                 lineKeyValue("Phụ thu:", "+${formatCurrency(billData.surchargeAmount)}")
             }
 

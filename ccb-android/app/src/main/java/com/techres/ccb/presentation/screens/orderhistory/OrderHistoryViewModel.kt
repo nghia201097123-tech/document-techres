@@ -9,9 +9,12 @@ import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.printer.BillData
 import com.techres.ccb.data.printer.BillItem
+import com.techres.ccb.data.printer.BillSurchargeItem
 import com.techres.ccb.data.printer.BillVariant
 import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.PrinterResult
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -555,6 +558,26 @@ class OrderHistoryViewModel @Inject constructor(
         val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
         val vatAmount = priceAfterDiscount - priceBeforeVat
 
+        // Parse surcharge items from JSON
+        val surchargeItems: List<BillSurchargeItem> = try {
+            if (!order.surchargesJson.isNullOrEmpty()) {
+                val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+                val surchargesList: List<Map<String, Any>> = Gson().fromJson(order.surchargesJson, type)
+                surchargesList.map { map ->
+                    BillSurchargeItem(
+                        id = map["id"] as? String ?: "",
+                        name = map["name"] as? String ?: "Phụ thu",
+                        amount = (map["amount"] as? Double) ?: 0.0,
+                        quantity = (map["quantity"] as? Double)?.toInt() ?: 1,
+                        vatRate = (map["vatRate"] as? Double) ?: 0.0
+                    )
+                }
+            } else emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing surcharges JSON: ${e.message}")
+            emptyList()
+        }
+
         return BillData(
             orderNumber = order.orderNumber,
             orderDate = orderDate,
@@ -574,6 +597,8 @@ class OrderHistoryViewModel @Inject constructor(
             totalItemDiscount = totalItemDiscount,
             discountAmount = billDiscount,
             discountPercent = 0.0,
+            surchargeAmount = order.surchargeAmount,
+            surchargeItems = surchargeItems,
             serviceFee = 0.0,
             serviceFeePercent = 0.0,
             vatRate = vatRate,

@@ -858,6 +858,26 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 21 to 22
+     * Adds surcharges_json column to orders table for storing surcharge details
+     */
+    val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 21 to 22...")
+
+            // Add surcharges_json column to orders table
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN surcharges_json TEXT DEFAULT NULL")
+                Log.d(TAG, "Added surcharges_json column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "surcharges_json column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 21 to 22 complete - Added surcharges_json to orders")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -872,6 +892,7 @@ object DatabaseMigrations {
         MIGRATION_17_18,
         MIGRATION_18_19,
         MIGRATION_19_20,
-        MIGRATION_20_21
+        MIGRATION_20_21,
+        MIGRATION_21_22
     )
 }

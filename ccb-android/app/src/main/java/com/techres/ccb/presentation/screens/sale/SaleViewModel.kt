@@ -29,6 +29,7 @@ import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.printer.BillData
 import com.techres.ccb.data.printer.BillItem
+import com.techres.ccb.data.printer.BillSurchargeItem
 import com.techres.ccb.data.printer.BillTopping
 import com.techres.ccb.data.printer.BillVariant
 import com.techres.ccb.data.printer.HybridBillPrintService
@@ -43,6 +44,7 @@ import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.data.printer.OrderPrintingService
 import com.techres.ccb.presentation.screens.table.TableViewModel
 import com.techres.ccb.domain.model.*
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -2907,6 +2909,20 @@ class SaleViewModel @Inject constructor(
 
                 Log.d(TAG, "completeOrder - subtotal: ${state.subtotal}, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount, vat: $finalVatAmount")
 
+                // Serialize surcharges to JSON for storage
+                val surchargesJsonValue = if (state.selectedSurcharges.isNotEmpty()) {
+                    val surchargesList = state.selectedSurcharges.map { selected ->
+                        mapOf(
+                            "id" to selected.surcharge.id,
+                            "name" to selected.surcharge.name,
+                            "amount" to selected.surcharge.amount,
+                            "quantity" to selected.quantity,
+                            "vatRate" to selected.surcharge.vatRate
+                        )
+                    }
+                    Gson().toJson(surchargesList)
+                } else null
+
                 // Lưu thông tin cần thiết cho việc in bill
                 val completedOrder: OrderEntity
                 val orderItemsForPrint = state.currentOrderItems
@@ -2927,6 +2943,7 @@ class SaleViewModel @Inject constructor(
                         discountAmount = finalDiscountAmount.toDouble(),
                         discountReason = state.billDiscountDescription,
                         surchargeAmount = finalSurchargeAmount.toDouble(),
+                        surchargesJson = surchargesJsonValue,  // Lưu chi tiết phụ thu để hiển thị trong lịch sử
                         vatAmount = finalVatAmount.toDouble(),  // Lưu VAT vào database (khớp với màn hình thanh toán)
                         totalAmount = finalTotalAmount.toDouble(),
                         paidAmount = finalTotalAmount.toDouble(),
@@ -3299,6 +3316,17 @@ class SaleViewModel @Inject constructor(
         // Tổng giảm giá tất cả loại
         val totalDiscountAmount = totalItemDiscount + manualBillDiscount + couponDiscountTotal + voucherDiscountTotal
 
+        // ============ BUILD SURCHARGE ITEMS LIST ============
+        val surchargeItems = surcharges.map { selected ->
+            BillSurchargeItem(
+                id = selected.surcharge.id,
+                name = selected.surcharge.name,
+                amount = selected.surcharge.amount,
+                quantity = selected.quantity,
+                vatRate = selected.surcharge.vatRate
+            )
+        }
+
         return BillData(
             orderNumber = order.orderNumber,
             orderDate = orderDate,
@@ -3322,6 +3350,7 @@ class SaleViewModel @Inject constructor(
             discountPercent = billDiscountPercentValue,
             // Phí và thuế
             surchargeAmount = surchargeAmount.toDouble(),
+            surchargeItems = surchargeItems,
             serviceFee = 0.0,
             serviceFeePercent = 0.0,
             vatRate = displayVatRate, // VAT rate trung bình (tính từ tổng VAT / tổng giá trước VAT)

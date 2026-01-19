@@ -560,7 +560,8 @@ data class BillData(
     val discountPercent: Double = 0.0,
     val totalItemDiscount: Double = 0.0,
     // Phí và thuế
-    val surchargeAmount: Double = 0.0, // Phụ thu
+    val surchargeAmount: Double = 0.0, // Phụ thu (tổng)
+    val surchargeItems: List<BillSurchargeItem> = emptyList(), // Danh sách chi tiết phụ thu
     val serviceFee: Double = 0.0,
     val serviceFeePercent: Double = 0.0,
     val vatRate: Double = 10.0,
@@ -617,3 +618,16 @@ data class BillTopping(
     val price: Double,
     val quantity: Int = 1
 )
+
+/**
+ * Bill Surcharge Item - Thông tin phụ thu
+ */
+data class BillSurchargeItem(
+    val id: String,
+    val name: String,
+    val amount: Double,      // Giá đơn vị (đã gồm VAT)
+    val quantity: Int = 1,
+    val vatRate: Double = 0.0
+) {
+    val totalAmount: Double get() = amount * quantity
+}

@@ -43,7 +43,7 @@ import com.techres.ccb.data.local.entity.*
         // Surcharges (phụ thu)
         SurchargeEntity::class
     ],
-    version = 21,
+    version = 22,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {

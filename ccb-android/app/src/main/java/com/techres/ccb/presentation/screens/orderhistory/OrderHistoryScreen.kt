@@ -1529,59 +1529,166 @@ private fun OrderDetailDialog(
                         }
                     }
 
-                    // Phụ thu (Surcharge) item - hiển thị như một dòng riêng nếu có
+                    // Phụ thu (Surcharge) items - hiển thị từng món phụ thu riêng nếu có
                     if (order.surchargeAmount > 0) {
+                        // Parse surcharges from JSON
+                        val surchargeItems: List<SurchargeDisplayItem> = try {
+                            if (!order.surchargesJson.isNullOrEmpty()) {
+                                val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+                                val surchargesList: List<Map<String, Any>> = Gson().fromJson(order.surchargesJson, type)
+                                surchargesList.map { map ->
+                                    SurchargeDisplayItem(
+                                        id = map["id"] as? String ?: "",
+                                        name = map["name"] as? String ?: "Phụ thu",
+                                        amount = (map["amount"] as? Double) ?: 0.0,
+                                        quantity = (map["quantity"] as? Double)?.toInt() ?: 1,
+                                        vatRate = (map["vatRate"] as? Double) ?: 0.0
+                                    )
+                                }
+                            } else emptyList()
+                        } catch (e: Exception) {
+                            emptyList()
+                        }
+
+                        if (surchargeItems.isNotEmpty()) {
+                            // Hiển thị từng món phụ thu
+                            items(surchargeItems) { surchargeItem ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFFFF3E0)) // Light orange background
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            // Quantity badge
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(Color(0xFFFFE0B2), CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    surchargeItem.quantity.toString(),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFFF9800)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    "Phụ thu: ${surchargeItem.name}",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color(0xFFE65100)
+                                                )
+                                                if (surchargeItem.vatRate > 0) {
+                                                    Text(
+                                                        "Đã gồm VAT ${surchargeItem.vatRate.toInt()}%",
+                                                        fontSize = 12.sp,
+                                                        color = Color(0xFF757575)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            "+${formatCurrency((surchargeItem.amount * surchargeItem.quantity).toLong())}",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFFF9800)
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            // Fallback: hiển thị tổng nếu không có chi tiết
+                            item {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFFFF3E0)) // Light orange background
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            // Icon
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(Color(0xFFFFE0B2), CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    "⊕",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFFF9800)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    "Phụ thu",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color(0xFFE65100)
+                                                )
+                                                Text(
+                                                    "Phí phụ thu đơn hàng",
+                                                    fontSize = 12.sp,
+                                                    color = Color(0xFF757575)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            "+${formatCurrency(order.surchargeAmount.toLong())}",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFFF9800)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Order Note (Ghi chú tổng bill) - hiển thị nếu có
+                    if (!order.notes.isNullOrBlank()) {
                         item {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFFFF3E0)) // Light orange background
+                                    .background(Color(0xFFE3F2FD)) // Light blue background
                                     .padding(12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        // Icon
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .background(Color(0xFFFFE0B2), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                "⊕",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFFF9800)
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column {
-                                            Text(
-                                                "Phụ thu",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color(0xFFE65100)
-                                            )
-                                            Text(
-                                                "Phí phụ thu đơn hàng",
-                                                fontSize = 12.sp,
-                                                color = Color(0xFF757575)
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        "+${formatCurrency(order.surchargeAmount.toLong())}",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFFF9800)
-                                    )
-                                }
+                                Text(
+                                    "Ghi chú đơn hàng:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF1976D2)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    order.notes,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF424242),
+                                    fontStyle = FontStyle.Italic
+                                )
                             }
                         }
                     }
@@ -1850,6 +1957,15 @@ private fun SummaryRow(label: String, value: String, color: Color = Color.Unspec
         Text(value, fontSize = 13.sp, color = if (color != Color.Unspecified) color else Color.Unspecified)
     }
 }
+
+// Data class for surcharge display
+private data class SurchargeDisplayItem(
+    val id: String,
+    val name: String,
+    val amount: Double,
+    val quantity: Int = 1,
+    val vatRate: Double = 0.0
+)
 
 // Data class for VAT detail display
 private data class HistoryVatDisplayRow(
