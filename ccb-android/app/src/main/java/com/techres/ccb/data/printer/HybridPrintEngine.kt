@@ -654,6 +654,20 @@ class HybridBillBuilder(
     }
 
     /**
+     * In text nghiêng (italic) - dùng cho ghi chú
+     */
+    fun lineItalic(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return line(text, style.copy(italic = true))
+    }
+
+    /**
+     * In text đậm + nghiêng - dùng cho ghi chú quan trọng
+     */
+    fun lineBoldItalic(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return line(text, style.copy(bold = true, italic = true))
+    }
+
+    /**
      * In text lớn (title) - sử dụng titleFontSize
      */
     fun lineDouble(text: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {

@@ -419,7 +419,7 @@ object HybridBillPrintService {
 
             // ============ ORDER NOTE - Ghi chú đơn hàng (theo config) ============
             if (template.showOrderNote && billData.orderNote != null && billData.orderNote.isNotBlank()) {
-                line("Ghi chú: ${billData.orderNote}")
+                lineItalic("Ghi chú: ${billData.orderNote}")
             }
 
             separator()
@@ -491,9 +491,9 @@ object HybridBillPrintService {
                     line("   Mã: ${item.code}")
                 }
 
-                // 6. Item note (optional)
+                // 6. Item note (optional) - in nghiêng để nổi bật
                 if (template.showItemNote && item.note != null) {
-                    line("   Ghi chú: ${item.note}")
+                    lineItalic("   Ghi chú: ${item.note}")
                 }
 
                 // 7. Giảm giá trên món (nếu có)

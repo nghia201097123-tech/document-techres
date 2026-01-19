@@ -450,10 +450,10 @@ object KitchenTicketPrintService {
                     }
                 }
 
-                // Ghi chú riêng cho món (nổi bật) - nếu config cho phép
+                // Ghi chú riêng cho món (nổi bật, in nghiêng đậm) - nếu config cho phép
                 if (showNotes) {
                     item.note?.let {
-                        lineBold("   >> $it")
+                        lineBoldItalic("   >> $it")
                     }
                 }
             }
@@ -464,7 +464,7 @@ object KitchenTicketPrintService {
             if (showNotes) {
                 ticket.note?.let {
                     separator('-')
-                    lineBold("GHI CHÚ: $it")
+                    lineBoldItalic("GHI CHÚ: $it")
                 }
             }
 

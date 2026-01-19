@@ -673,14 +673,15 @@ object LabelPrintService {
             }
         }
 
-        // ========== NOTE ==========
+        // ========== NOTE (in nghiêng để nổi bật) ==========
         label.note?.let { note ->
             val noteBitmap = renderTextBitmap(
                 text = "* $note",
                 width = contentWidth,
                 fontSize = fontSmall,
                 bold = false,
-                centerAlign = false
+                centerAlign = false,
+                italic = true
             )
             output.write(bitmapToTspl(margin, yPos, noteBitmap))
             yPos += noteBitmap.height + lineSpacingExtra
@@ -810,7 +811,8 @@ object LabelPrintService {
         width: Int,
         fontSize: Float = 20f,
         bold: Boolean = false,
-        centerAlign: Boolean = false
+        centerAlign: Boolean = false,
+        italic: Boolean = false
     ): Bitmap {
         if (text.isEmpty()) {
             return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).apply {
@@ -822,7 +824,12 @@ object LabelPrintService {
             color = Color.BLACK  // BLACK text
             textSize = fontSize
             isAntiAlias = false  // No anti-aliasing for crisp thermal print
-            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            typeface = when {
+                bold && italic -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
+                bold -> Typeface.DEFAULT_BOLD
+                italic -> Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+                else -> Typeface.DEFAULT
+            }
         }
 
         val alignment = if (centerAlign) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL
@@ -1095,10 +1102,10 @@ object LabelPrintService {
                 }
             }
 
-            // ========== NOTE ==========
+            // ========== NOTE (in nghiêng để nổi bật) ==========
             label.note?.let {
                 separator('-')
-                line("* $it")
+                lineItalic("* $it")
             }
 
             // ========== ORDER INFO + TIME (based on config) ==========
