@@ -424,6 +424,10 @@ object HybridBillPrintService {
 
             separator()
 
+            // Thêm một dòng trống nhỏ để đảm bảo món đầu tiên không bị cắt chữ
+            // Đặc biệt cần thiết cho bill in lại từ lịch sử
+            line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
+
             // ============ ITEMS (format giống phiếu bếp - hiển thị giá tổng trên dòng đầu) ============
             billData.items.forEach { item ->
                 // Tính topping total để biết giá gốc
