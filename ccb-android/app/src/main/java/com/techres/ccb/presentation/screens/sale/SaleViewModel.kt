@@ -2867,8 +2867,8 @@ class SaleViewModel @Inject constructor(
                     currentOrder.shiftId?.let { shiftId ->
                         shiftRepository.addOrderRevenue(
                             shiftId = shiftId,
-                            orderTotal = finalTotalAmount,
-                            discountAmount = finalDiscountAmount,
+                            orderTotal = finalTotalAmount.toDouble(),
+                            discountAmount = finalDiscountAmount.toDouble(),
                             paymentMethod = paymentMethod,
                             updatedAt = now
                         )
