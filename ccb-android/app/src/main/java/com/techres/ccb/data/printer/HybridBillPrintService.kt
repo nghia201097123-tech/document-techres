@@ -148,6 +148,7 @@ object HybridBillPrintService {
 
     /**
      * In bill qua Network (TCP/IP)
+     * Gửi dữ liệu theo từng chunk để máy in xử lý kịp, tránh giật
      */
     private suspend fun printViaNetwork(
         config: BillPrinterConfigEntity,
@@ -159,19 +160,23 @@ object HybridBillPrintService {
         var outputStream: OutputStream? = null
 
         return try {
-            socket = Socket()
+            socket = Socket().apply {
+                // Cấu hình socket giống kitchen ticket để đảm bảo tương thích
+                reuseAddress = true
+                keepAlive = true
+                tcpNoDelay = true // Gửi ngay, không buffer
+                setSoLinger(true, 2)
+            }
             socket.connect(InetSocketAddress(ip, config.printerPort), config.connectionTimeoutMs)
             outputStream = socket.getOutputStream()
 
-            // Send bill content
-            outputStream.write(billContent)
-            outputStream.flush()
+            // Gửi dữ liệu theo chunk để máy in kịp xử lý (giống cách in phiếu bếp)
+            writeChunked(outputStream, billContent)
 
             // Print multiple copies if configured
             repeat(config.numberOfCopies - 1) {
                 delay(500)
-                outputStream.write(billContent)
-                outputStream.flush()
+                writeChunked(outputStream, billContent)
             }
 
             PrinterResult.Success("In bill thành công!")
@@ -180,10 +185,33 @@ object HybridBillPrintService {
             PrinterResult.Error("Lỗi in: ${e.message}")
         } finally {
             try {
+                outputStream?.flush()
+                socket?.shutdownOutput()
                 outputStream?.close()
                 socket?.close()
             } catch (e: Exception) {
                 Log.e(TAG, "Close error: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Gửi dữ liệu theo chunk để máy in không bị quá tải buffer
+     * Chunk size 4KB là kích thước tối ưu cho hầu hết máy in nhiệt
+     */
+    private suspend fun writeChunked(outputStream: OutputStream, data: ByteArray) {
+        val chunkSize = 4096 // 4KB mỗi chunk
+        var offset = 0
+
+        while (offset < data.size) {
+            val end = minOf(offset + chunkSize, data.size)
+            outputStream.write(data, offset, end - offset)
+            outputStream.flush()
+            offset = end
+
+            // Delay nhỏ giữa các chunk để máy in kịp xử lý
+            if (offset < data.size) {
+                delay(5) // 5ms delay - đủ cho máy in xử lý mà không làm chậm quá nhiều
             }
         }
     }
@@ -323,10 +351,10 @@ object HybridBillPrintService {
             else -> 1.0f // normal/medium
         }
 
-        // Sử dụng GS v 0 (raster bitmap) thay vì ESC * để tránh khoảng trắng thừa
-        // GS v 0 gửi toàn bộ bitmap trong 1 lệnh, không có LF giữa các strip
-        // Điều này giúp loại bỏ hoàn toàn vấn đề line spacing giữa các bitmap
-        val useRasterBitmap = true
+        // Sử dụng ESC * (bit image) thay vì GS v 0 (raster bitmap)
+        // ESC * tương thích tốt hơn với các máy in giá rẻ và in mượt hơn
+        // Giống cách in phiếu bếp đang hoạt động tốt
+        val useRasterBitmap = false
 
         val builder = HybridBillBuilder(
             paperWidth = paperWidth,
