@@ -367,6 +367,7 @@ class SaleViewModel @Inject constructor(
     companion object {
         private const val TAG = "SaleViewModel"
         private const val KEY_PAGER_GRID_SIZE = "pager_grid_size"
+        private const val KEY_ORDER_TYPE = "order_type"
     }
 
     private val _uiState = MutableStateFlow(SaleUiState())
@@ -392,6 +393,7 @@ class SaleViewModel @Inject constructor(
     init {
         loadInitialData()
         loadPagerGridSize()
+        loadOrderType()
     }
 
     private fun loadInitialData() {
@@ -1293,6 +1295,9 @@ class SaleViewModel @Inject constructor(
     // ===== ORDER TYPE & TABLE =====
 
     fun setOrderType(orderType: OrderType) {
+        // Save order type preference
+        saveOrderType(orderType)
+
         viewModelScope.launch {
             val currentState = _uiState.value
             val existingOrder = currentState.currentOrder
@@ -1741,6 +1746,28 @@ class SaleViewModel @Inject constructor(
                 _uiState.update { it.copy(pagerGridSize = size) }
             }
         }
+    }
+
+    /**
+     * Load saved order type from SharedPreferences
+     */
+    private fun loadOrderType() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val savedType = sharedPreferences.getString(KEY_ORDER_TYPE, OrderType.DINE_IN.dbValue) ?: OrderType.DINE_IN.dbValue
+            val orderType = OrderType.entries.find { it.dbValue == savedType } ?: OrderType.DINE_IN
+            Log.d(TAG, "loadOrderType - savedType=$savedType, orderType=$orderType")
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(orderType = orderType) }
+            }
+        }
+    }
+
+    /**
+     * Save order type to SharedPreferences
+     */
+    private fun saveOrderType(orderType: OrderType) {
+        sharedPreferences.edit().putString(KEY_ORDER_TYPE, orderType.dbValue).apply()
+        Log.d(TAG, "saveOrderType - saved $orderType")
     }
 
     // ===== DISCOUNT / COUPON =====
