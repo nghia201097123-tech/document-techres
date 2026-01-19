@@ -315,9 +315,15 @@ object HybridBillPrintService {
             else -> 1.0f // normal
         }
 
+        // Sử dụng GS v 0 (raster bitmap) thay vì ESC * để tránh khoảng trắng thừa
+        // GS v 0 gửi toàn bộ bitmap trong 1 lệnh, không có LF giữa các strip
+        // Điều này giúp loại bỏ hoàn toàn vấn đề line spacing giữa các bitmap
+        val useRasterBitmap = true
+
         val builder = HybridBillBuilder(
             paperWidth = paperWidth,
             useBitmapMode = useBitmapMode,
+            useRasterBitmap = useRasterBitmap,
             fontScale = fontScale,
             lineSpacing = template.lineSpacing
         )
