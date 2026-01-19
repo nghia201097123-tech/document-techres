@@ -1735,14 +1735,16 @@ fun CartPanel(
                         Text("Đã order:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                         Text(formatCurrency(currentOrder.subtotal.toLong()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                     }
-                    if (subtotal > 0) {
+                    // Tính tổng món mới từ cartItems (không dùng subtotal vì subtotal trả về currentOrder.subtotal khi có order)
+                    val newItemsTotal = cartItems.sumOf { it.totalPrice }
+                    if (newItemsTotal > 0) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Thêm mới:", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF2196F3))
-                            Text(formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, color = Color(0xFF2196F3))
+                            Text(formatCurrency(newItemsTotal), style = MaterialTheme.typography.bodyMedium, color = Color(0xFF2196F3))
                         }
                     }
                 } else {

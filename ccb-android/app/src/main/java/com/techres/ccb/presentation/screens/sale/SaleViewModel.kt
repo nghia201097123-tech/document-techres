@@ -157,9 +157,10 @@ data class SaleUiState(
     val errorMessage: String? = null
 ) {
     // Computed properties
-    // Ưu tiên dùng subtotal từ currentOrder nếu có, nếu không thì tính từ cartItems
+    // Subtotal = tổng tiền items đã order + items mới trong giỏ hàng
+    // Cần tính cả hai khi có currentOrder VÀ cartItems mới
     val subtotal: Long
-        get() = currentOrder?.subtotal?.toLong() ?: cartItems.sumOf { it.totalPrice }
+        get() = (currentOrder?.subtotal?.toLong() ?: 0L) + cartItems.sumOf { it.totalPrice }
 
     // Tổng giảm giá món
     val itemDiscountTotal: Long
