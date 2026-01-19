@@ -47,6 +47,7 @@ enum class PagerGridSize(val count: Int, val columns: Int) {
 fun PagerDialog(
     currentPagerNumber: Int? = null,
     gridSize: PagerGridSize = PagerGridSize.SIZE_16,
+    usedPagerNumbers: Set<Int> = emptySet(),
     onDismiss: () -> Unit,
     onConfirm: (Int?) -> Unit,
     onClear: () -> Unit,
@@ -180,6 +181,26 @@ fun PagerDialog(
                 ) {
                     items(numbers) { number ->
                         val isCurrentSelection = currentPagerNumber == number
+                        val isUsed = number in usedPagerNumbers
+
+                        val backgroundColor = when {
+                            isCurrentSelection -> Color(0xFFFF5722).copy(alpha = 0.3f)
+                            isUsed -> Color(0xFF2196F3).copy(alpha = 0.2f) // Blue for used
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+
+                        val textColor = when {
+                            isCurrentSelection -> Color(0xFFFF5722)
+                            isUsed -> Color(0xFF2196F3) // Blue for used
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+
+                        val borderModifier = when {
+                            isCurrentSelection -> Modifier.border(3.dp, Color(0xFFFF5722), RoundedCornerShape(8.dp))
+                            isUsed -> Modifier.border(2.dp, Color(0xFF2196F3), RoundedCornerShape(8.dp))
+                            else -> Modifier
+                        }
+
                         Surface(
                             modifier = Modifier
                                 .aspectRatio(1f)
@@ -188,15 +209,8 @@ fun PagerDialog(
                                     // One-tap: select and close immediately
                                     onConfirm(number)
                                 }
-                                .then(
-                                    if (isCurrentSelection) Modifier.border(
-                                        3.dp,
-                                        Color(0xFFFF5722),
-                                        RoundedCornerShape(8.dp)
-                                    ) else Modifier
-                                ),
-                            color = if (isCurrentSelection) Color(0xFFFF5722).copy(alpha = 0.3f)
-                                   else MaterialTheme.colorScheme.surfaceVariant,
+                                .then(borderModifier),
+                            color = backgroundColor,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Box(
@@ -210,9 +224,8 @@ fun PagerDialog(
                                         selectedGridSize.columns <= 8 -> 18.sp
                                         else -> 14.sp
                                     },
-                                    fontWeight = if (isCurrentSelection) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isCurrentSelection) Color(0xFFFF5722)
-                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontWeight = if (isCurrentSelection || isUsed) FontWeight.Bold else FontWeight.Medium,
+                                    color = textColor
                                 )
                             }
                         }

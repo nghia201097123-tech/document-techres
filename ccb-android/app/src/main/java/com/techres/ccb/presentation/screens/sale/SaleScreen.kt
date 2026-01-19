@@ -574,6 +574,7 @@ fun SaleScreen(
             PagerDialog(
                 currentPagerNumber = uiState.pagerNumber,
                 gridSize = uiState.pagerGridSize,
+                usedPagerNumbers = uiState.usedPagerNumbers,
                 onDismiss = { viewModel.hidePagerDialog() },
                 onConfirm = { number -> viewModel.updatePagerNumber(number) },
                 onClear = { viewModel.clearPagerNumber() },

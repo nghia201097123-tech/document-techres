@@ -158,6 +158,7 @@ data class SaleUiState(
     val pagerNumber: Int? = null,            // Số thẻ rung hiện tại (1-99)
     val showPagerDialog: Boolean = false,    // Hiển thị dialog chỉnh sửa số thẻ rung
     val pagerGridSize: PagerGridSize = PagerGridSize.SIZE_16, // Số lượng thẻ hiển thị
+    val usedPagerNumbers: Set<Int> = emptySet(), // Thẻ đang được dùng bởi order khác
 
     // Messages
     val successMessage: String? = null,
@@ -1658,9 +1659,34 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Show dialog to manually edit pager number
+     * Loads used pager numbers to show which are already taken
      */
     fun showPagerDialog() {
-        _uiState.update { it.copy(showPagerDialog = true) }
+        viewModelScope.launch {
+            // Load used pager numbers first
+            val usedNumbers = loadUsedPagerNumbers()
+            _uiState.update { it.copy(
+                showPagerDialog = true,
+                usedPagerNumbers = usedNumbers
+            )}
+        }
+    }
+
+    /**
+     * Load pager numbers that are in use by active orders today
+     * Excludes current order's pager number
+     */
+    private suspend fun loadUsedPagerNumbers(): Set<Int> {
+        return withContext(Dispatchers.IO) {
+            val branchId = authRepository.getBranchId() ?: return@withContext emptySet()
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val currentOrderId = _uiState.value.currentOrder?.id
+
+            val allUsed = orderRepository.getUsedPagerNumbersToday(branchId, today)
+            // Exclude current order's pager if editing
+            val currentPager = _uiState.value.currentOrder?.pagerNumber
+            allUsed.filter { it != currentPager }.toSet()
+        }
     }
 
     /**

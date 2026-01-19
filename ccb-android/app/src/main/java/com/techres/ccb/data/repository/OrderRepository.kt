@@ -196,4 +196,11 @@ class OrderRepository @Inject constructor(
     suspend fun getMaxPagerNumberForToday(branchId: String, today: String): Int {
         return orderDao.getMaxPagerNumberForToday(branchId, today)
     }
+
+    /**
+     * Get list of pager numbers in use by active orders today
+     */
+    suspend fun getUsedPagerNumbersToday(branchId: String, today: String): List<Int> {
+        return orderDao.getUsedPagerNumbersToday(branchId, today)
+    }
 }

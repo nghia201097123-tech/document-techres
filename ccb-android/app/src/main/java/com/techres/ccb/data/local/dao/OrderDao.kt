@@ -157,4 +157,17 @@ interface OrderDao {
         AND SUBSTR(created_at, 1, 10) = :today
     """)
     suspend fun getMaxPagerNumberForToday(branchId: String, today: String): Int
+
+    /**
+     * Get list of pager numbers in use by active orders today
+     * Used to show which pagers are already taken
+     */
+    @Query("""
+        SELECT pager_number FROM orders
+        WHERE branch_id = :branchId
+        AND SUBSTR(created_at, 1, 10) = :today
+        AND status NOT IN ('completed', 'cancelled')
+        AND pager_number IS NOT NULL
+    """)
+    suspend fun getUsedPagerNumbersToday(branchId: String, today: String): List<Int>
 }
