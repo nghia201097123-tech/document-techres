@@ -426,10 +426,11 @@ object BitmapTextRenderer {
         val availableWidth = paperWidth * 0.9f
         val charCount = (availableWidth / charWidth).toInt().coerceAtLeast(10)
 
-        // Sử dụng line spacing multiplier nhỏ hơn cho separator để tiết kiệm giấy
+        // Sử dụng line spacing multiplier đủ lớn để có padding với dòng tiếp theo
+        // 0.7f thay vì 0.4f để tránh món đầu tiên bị đè
         return renderText(
             char.toString().repeat(charCount),
-            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 0.4f),
+            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 0.7f),
             paperWidth
         )
     }
