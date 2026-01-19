@@ -303,7 +303,7 @@ fun OrderHistoryScreen(
                         TableHeaderCell("GIÁ BÁN", 85.dp)      // Subtotal before discount
                         TableHeaderCell("GIẢM GIÁ", 75.dp)     // Total discount
                         TableHeaderCell("SAU GIẢM", 85.dp)     // After discount
-                        TableHeaderCell("VAT 8%", 70.dp)       // VAT calculated on after-discount
+                        TableHeaderCell("VAT", 90.dp)          // VAT amount
                         TableHeaderCell("TỔNG", 90.dp)         // Final total
                         TableHeaderCell("", 40.dp)             // Sync status (icon only)
                     }
@@ -369,7 +369,7 @@ fun OrderHistoryScreen(
                             Text(formatCurrencyShort(totalSubtotal), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalDiscount), modifier = Modifier.width(75.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50), textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalAfterDiscount), modifier = Modifier.width(85.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
-                            Text(formatCurrencyShort(totalVat), modifier = Modifier.width(70.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF757575), textAlign = TextAlign.End)
+                            Text(formatCurrency(totalVat), modifier = Modifier.width(90.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF757575), textAlign = TextAlign.End)
                             Text(formatCurrencyShort(totalRevenue), modifier = Modifier.width(90.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2), textAlign = TextAlign.End)
                             Text("", modifier = Modifier.width(40.dp))
                         }
@@ -768,13 +768,13 @@ private fun OrderTableRow(
             color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // VAT 8% (Dùng VAT đã lưu trong database thay vì tính lại)
+        // VAT (Dùng VAT đã lưu trong database thay vì tính lại)
         Text(
-            text = formatCurrencyShort(order.vatAmount),
-            modifier = Modifier.width(70.dp),
+            text = formatCurrency(order.vatAmount),
+            modifier = Modifier.width(90.dp),
             fontSize = 11.sp,
             textAlign = TextAlign.End,
-            color = Color(0xFF757575) // Gray for tax
+            color = if (isCancelled) Color.Gray else Color(0xFF757575)
         )
 
         // Tổng (Total amount)
