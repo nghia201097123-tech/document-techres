@@ -162,9 +162,10 @@ object DiscountCalculator {
 
             // Áp dụng công thức thuế Việt Nam (giá đã bao gồm VAT)
             // VAT = Giá - (Giá ÷ (1 + vatRate/100))
+            // Làm tròn xuống (toLong) để đồng nhất với OrderHistoryScreen
             val originalTotal = item.unitPrice * item.quantity
             val priceAfterDiscount = (originalTotal - itemDiscount).coerceAtLeast(0.0)
-            val priceBeforeVatItem = priceAfterDiscount / (1 + item.vatRate / 100.0)
+            val priceBeforeVatItem = (priceAfterDiscount / (1 + item.vatRate / 100.0)).toLong().toDouble()
             val vatAmount = priceAfterDiscount - priceBeforeVatItem
             val finalPrice = priceAfterDiscount // Giá cuối = giá sau giảm (đã bao gồm VAT)
 
@@ -223,11 +224,12 @@ object DiscountCalculator {
 
         // Tính VAT theo phương pháp tách (giá đã bao gồm VAT)
         // VAT = grandTotal - (grandTotal ÷ 1.08)
+        // Làm tròn xuống (toLong) để đồng nhất với OrderHistoryScreen
         val avgVatRate = if (items.isNotEmpty()) {
             items.map { it.vatRate }.average()
         } else 0.0
 
-        val priceBeforeVat = grandTotal / (1 + avgVatRate / 100.0)
+        val priceBeforeVat = (grandTotal / (1 + avgVatRate / 100.0)).toLong().toDouble()
         val totalVat = grandTotal - priceBeforeVat
 
         return BillDiscountResult(
