@@ -2789,7 +2789,7 @@ class SaleViewModel @Inject constructor(
                         cartItems = emptyList(),
                         currentOrder = orderEntity,
                         currentOrderItems = orderItems,
-                        pagerNumber = null, // Reset pager number after order created
+                        pagerNumber = orderEntity.pagerNumber, // Keep pager number from saved order
                         successMessage = "Đặt món thành công! $orderNumber"
                     )
                 }
