@@ -2456,6 +2456,11 @@ class SaleViewModel @Inject constructor(
             comboItemDao.getItemsByComboSync(cartItem.product.id)
         }
 
+        // Check if this is a custom item (món ngoài menu) - ID starts with "custom_"
+        // Custom items don't exist in products table, so productId must be null to avoid FK constraint
+        val isCustomItem = cartItem.product.id.startsWith("custom_")
+        val actualProductId = if (isCustomItem) null else cartItem.product.id
+
         if (comboItems.isEmpty()) {
             // Not a combo - create single order item
             // originalPrice = giá đơn vị đầy đủ (bao gồm topping) để tính giảm giá đúng
@@ -2464,7 +2469,7 @@ class SaleViewModel @Inject constructor(
                 OrderItemEntity(
                     id = UUID.randomUUID().toString(),
                     orderId = orderId,
-                    productId = cartItem.product.id,
+                    productId = actualProductId,
                     productCode = cartItem.product.code,
                     productName = cartItem.product.name,
                     productImageUrl = cartItem.product.imageUrl,
@@ -2487,7 +2492,7 @@ class SaleViewModel @Inject constructor(
                 OrderItemEntity(
                     id = parentItemId,
                     orderId = orderId,
-                    productId = cartItem.product.id,
+                    productId = actualProductId,
                     productCode = cartItem.product.code,
                     productName = cartItem.product.name,
                     productImageUrl = cartItem.product.imageUrl,
