@@ -372,7 +372,8 @@ object LabelPrintService {
         Log.d(TAG, "  - isContinuation: ${label.isContinuation}")
         Log.d(TAG, "  - toppings: ${label.toppings}")
         Log.d(TAG, "  - showStoreName: $showStoreName, showOrderNumber: $showOrderNumber")
-        Log.d(TAG, "  - showTableName: $showTableName, showTime: $showTime, showPrice: $showPrice")
+        Log.d(TAG, "  - showTableName: $showTableName, tableName: ${label.tableName}")
+        Log.d(TAG, "  - showTime: $showTime, showPrice: $showPrice")
         Log.d(TAG, "  - labelReverse: $labelReverse")
 
         val output = ByteArrayOutputStream()
@@ -443,6 +444,20 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
             yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
+        }
+
+        // ========== TABLE NAME (if enabled) ==========
+        if (showTableName && !label.tableName.isNullOrBlank()) {
+            val tableBitmap = renderTextBitmap(
+                text = "Bàn: ${label.tableName}",
+                width = contentWidth,
+                fontSize = fontNormal,
+                bold = true,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, tableBitmap))
+            yPos += tableBitmap.height + lineSpacingExtra
+            tableBitmap.recycle()
         }
 
         // ========== SEPARATOR 1 ==========
