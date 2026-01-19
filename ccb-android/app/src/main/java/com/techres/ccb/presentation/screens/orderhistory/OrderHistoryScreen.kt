@@ -859,7 +859,7 @@ private fun PaginationControls(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
-                                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                 contentDescription = null,
                                 modifier = Modifier.size(20.dp)
                             )
