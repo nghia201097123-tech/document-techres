@@ -3642,44 +3642,47 @@ class SaleViewModel @Inject constructor(
             try {
                 val now = java.time.Instant.now().toString()
 
-                withContext(Dispatchers.IO) {
-                    // Update the item status to cancelled (instead of deleting)
-                    val cancelledItem = itemToCancel.copy(
-                        status = "cancelled",
-                        cancelledAt = now,
-                        cancelReason = reason.ifBlank { null },
-                        updatedAt = now
-                    )
-                    orderRepository.updateOrderItem(cancelledItem)
+                // Update the item status to cancelled (instead of deleting)
+                val cancelledItem = itemToCancel.copy(
+                    status = "cancelled",
+                    cancelledAt = now,
+                    cancelReason = reason.ifBlank { null },
+                    updatedAt = now
+                )
 
-                    // Update items list with cancelled item
-                    val updatedItems = state.currentOrderItems.map {
-                        if (it.id == itemToCancel.id) cancelledItem else it
-                    }
-
-                    // Calculate new order totals (exclude cancelled items)
-                    val activeItems = updatedItems.filter { it.status != "cancelled" }
-                    val newSubtotal = activeItems.sumOf { it.totalPrice }
-                    val newTotal = newSubtotal // TODO: Apply discount/tax if needed
-
-                    // Update order totals
-                    val updatedOrder = currentOrder.copy(
-                        subtotal = newSubtotal,
-                        totalAmount = newTotal,
-                        updatedAt = now
-                    )
-                    orderRepository.updateOrder(updatedOrder)
-
-                    _uiState.update { s ->
-                        s.copy(
-                            currentOrder = updatedOrder,
-                            currentOrderItems = updatedItems,
-                            successMessage = "Đã huỷ ${itemToCancel.productName}"
-                        )
-                    }
+                // Update items list with cancelled item
+                val updatedItems = state.currentOrderItems.map {
+                    if (it.id == itemToCancel.id) cancelledItem else it
                 }
 
-                Log.d(TAG, "confirmCancelOrderItem - Cancelled item: ${itemToCancel.productName}, reason: $reason")
+                // Calculate new order totals (exclude cancelled items)
+                val activeItems = updatedItems.filter { it.status != "cancelled" }
+                val newSubtotal = activeItems.sumOf { it.totalPrice }
+                val newTotal = newSubtotal // TODO: Apply discount/tax if needed
+
+                // Update order totals
+                val updatedOrder = currentOrder.copy(
+                    subtotal = newSubtotal,
+                    totalAmount = newTotal,
+                    updatedAt = now
+                )
+
+                // Save to database
+                withContext(Dispatchers.IO) {
+                    orderRepository.updateOrderItem(cancelledItem)
+                    orderRepository.updateOrder(updatedOrder)
+                }
+
+                // Update UI state on Main thread
+                _uiState.update { s ->
+                    s.copy(
+                        currentOrder = updatedOrder,
+                        currentOrderItems = updatedItems,
+                        successMessage = "Đã huỷ ${itemToCancel.productName}"
+                    )
+                }
+
+                Log.d(TAG, "confirmCancelOrderItem - Cancelled item: ${itemToCancel.productName}, newSubtotal=$newSubtotal, newTotal=$newTotal")
             } catch (e: Exception) {
                 Log.e(TAG, "confirmCancelOrderItem - Error: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi huỷ món: ${e.message}") }
