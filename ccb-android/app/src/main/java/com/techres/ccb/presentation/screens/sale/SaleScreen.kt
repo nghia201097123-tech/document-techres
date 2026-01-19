@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.ProductNoteEntity
+import com.techres.ccb.data.local.entity.SurchargeEntity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -809,7 +810,7 @@ fun TabletLayout(
             onCustomItemClicked = { viewModel.showCustomItemDialog() },
             onSurchargeClicked = { viewModel.showSurchargeDialog() },
             surchargeAmount = uiState.surchargeAmount,
-            selectedSurchargesCount = uiState.selectedSurcharges.size
+            selectedSurcharges = uiState.selectedSurcharges
         )
     }
 }
@@ -919,7 +920,7 @@ fun CartDialog(
                     onCustomItemClicked = { viewModel.showCustomItemDialog() },
                     onSurchargeClicked = { viewModel.showSurchargeDialog() },
                     surchargeAmount = uiState.surchargeAmount,
-                    selectedSurchargesCount = uiState.selectedSurcharges.size,
+                    selectedSurcharges = uiState.selectedSurcharges,
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -1251,7 +1252,7 @@ fun CartPanel(
     onCustomItemClicked: () -> Unit = {}, // Open custom item dialog
     onSurchargeClicked: () -> Unit = {}, // Open surcharge dialog
     surchargeAmount: Long = 0, // Total surcharge amount
-    selectedSurchargesCount: Int = 0, // Number of selected surcharges
+    selectedSurcharges: List<SelectedSurcharge> = emptyList(), // List of selected surcharges with details
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1645,6 +1646,54 @@ fun CartPanel(
                             onRemoveVariant = onRemoveCartItemVariant,
                             onAddTopping = { onAddToppingToCartItem(item.id) },
                             missingRequiredGroups = missingGroups
+                        )
+                    }
+                }
+
+                // Selected surcharges section
+                if (selectedSurcharges.isNotEmpty()) {
+                    item {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Phụ thu (${selectedSurcharges.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFFFF9800),
+                                fontWeight = FontWeight.Bold
+                            )
+                            TextButton(
+                                onClick = onSurchargeClicked,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color(0xFFFF9800)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Sửa",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFFF9800)
+                                )
+                            }
+                        }
+                    }
+
+                    items(selectedSurcharges.size, key = { "surcharge_${selectedSurcharges[it].surcharge.id}" }) { index ->
+                        val selected = selectedSurcharges[index]
+                        SurchargeItemRow(
+                            surcharge = selected.surcharge,
+                            quantity = selected.quantity,
+                            totalAmount = selected.totalAmount
                         )
                     }
                 }
@@ -2263,6 +2312,68 @@ fun VariantLineItem(variant: SelectedVariant) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Hiển thị một phụ thu trong danh sách đã chọn
+ */
+@Composable
+fun SurchargeItemRow(
+    surcharge: SurchargeEntity,
+    quantity: Int,
+    totalAmount: Double
+) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFFF8E1) // Light orange background
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icon
+            Icon(
+                imageVector = Icons.Default.AddCircle,
+                contentDescription = null,
+                tint = Color(0xFFFF9800),
+                modifier = Modifier.size(20.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Name and quantity
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = surcharge.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFE65100)
+                )
+                if (quantity > 1) {
+                    Text(
+                        text = "x$quantity",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFFF9800)
+                    )
+                }
+            }
+
+            // Price
+            Text(
+                text = "+${formatCurrency(totalAmount.toLong())}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFF9800)
             )
         }
     }
