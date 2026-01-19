@@ -2792,7 +2792,7 @@ class SaleViewModel @Inject constructor(
                         currentOrder = orderEntity,
                         currentOrderItems = orderItems,
                         pagerNumber = orderEntity.pagerNumber, // Keep pager number from saved order
-                        successMessage = "Đặt món thành công! $orderNumber"
+                        successMessage = "Đặt món thành công! #${String.format("%04d", dailyOrderNumber)}"
                     )
                 }
 
