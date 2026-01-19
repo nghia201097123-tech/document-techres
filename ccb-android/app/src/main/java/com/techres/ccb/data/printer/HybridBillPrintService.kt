@@ -190,7 +190,8 @@ object HybridBillPrintService {
 
     /**
      * Generate bill content với Hybrid approach
-     * Sử dụng paperWidth từ printerConfig, các config khác từ template
+     * Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user config trong app)
+     * Các config hiển thị (labels, show flags) từ template (web dashboard)
      */
     private fun generateHybridBill(
         printerConfig: BillPrinterConfigEntity,
@@ -201,16 +202,18 @@ object HybridBillPrintService {
         // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
         val useBitmapMode = !capability.supportVietnameseUtf8
 
-        // Sử dụng paperWidth từ printerConfig (đã được user chọn trong app)
+        // Sử dụng settings từ printerConfig (đã được user chọn trong app)
         val paperWidth = printerConfig.paperWidth
+        val fontSize = printerConfig.fontSize
+        val lineSpacing = printerConfig.lineSpacing
 
-        return generateBillFromConfig(paperWidth, template, billData, useBitmapMode)
+        return generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode)
     }
 
     /**
-     * Generate bill theo đúng config từ web dashboard
-     * paperWidth: Lấy từ printerConfig (được user chọn trong app)
-     * template: Chứa các config hiển thị (từ web dashboard)
+     * Generate bill theo đúng config
+     * paperWidth, fontSize, lineSpacing: Lấy từ printerConfig (được user chọn trong app)
+     * template: Chứa các config hiển thị labels, show flags (từ web dashboard)
      *
      * Format y chang web-dashboard preview:
      * - 4 loại giảm giá với label từ template config
@@ -219,6 +222,8 @@ object HybridBillPrintService {
      */
     private fun generateBillFromConfig(
         paperWidth: Int,
+        fontSize: String,
+        lineSpacing: Float,
         template: BillTemplateEntity,
         billData: BillData,
         useBitmapMode: Boolean
@@ -302,17 +307,20 @@ object HybridBillPrintService {
         Log.d(TAG, "checkInLabel: ${template.checkInLabel}")
         Log.d(TAG, "showCheckOutTime: ${template.showCheckOutTime}")
         Log.d(TAG, "checkOutLabel: ${template.checkOutLabel}")
-        Log.d(TAG, "fontSize: ${template.fontSize}")
-        Log.d(TAG, "lineSpacing: ${template.lineSpacing}")
+        // Printer config settings (from app settings)
+        Log.d(TAG, "--- Printer Config (from app) ---")
+        Log.d(TAG, "fontSize: $fontSize")
+        Log.d(TAG, "lineSpacing: $lineSpacing")
         Log.d(TAG, "========== END BILL DATA DEBUG ==========")
 
         // Chuyển đổi fontSize từ string sang fontScale float
-        val fontScale = when (template.fontSize) {
+        // Sử dụng fontSize từ printerConfig (user đã chọn trong app)
+        val fontScale = when (fontSize) {
             "extra_small" -> 0.7f
             "small" -> 0.85f
             "large" -> 1.2f
             "extra_large" -> 1.4f
-            else -> 1.0f // normal
+            else -> 1.0f // normal/medium
         }
 
         // Sử dụng GS v 0 (raster bitmap) thay vì ESC * để tránh khoảng trắng thừa
@@ -325,7 +333,7 @@ object HybridBillPrintService {
             useBitmapMode = useBitmapMode,
             useRasterBitmap = useRasterBitmap,
             fontScale = fontScale,
-            lineSpacing = template.lineSpacing
+            lineSpacing = lineSpacing // Sử dụng lineSpacing từ printerConfig
         )
 
         builder.apply {
