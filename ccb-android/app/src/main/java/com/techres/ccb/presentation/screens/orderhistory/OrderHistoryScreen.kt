@@ -768,9 +768,9 @@ private fun OrderTableRow(
             color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // VAT 8% (Calculated on after-discount price)
+        // VAT 8% (Dùng VAT đã lưu trong database thay vì tính lại)
         Text(
-            text = formatCurrencyShort(calculatedVat),
+            text = formatCurrencyShort(order.vatAmount),
             modifier = Modifier.width(70.dp),
             fontSize = 11.sp,
             textAlign = TextAlign.End,
@@ -1602,19 +1602,9 @@ private fun OrderDetailDialog(
                     val activeOrderItems = orderItems.filter { it.status != "cancelled" }
                     val itemDiscountTotal = activeOrderItems.sumOf { it.discountAmount }
                     val totalDiscount = order.discountAmount
-                    val vatRate = 8.0
-                    val priceAfterDiscount = order.subtotal - totalDiscount
-                    val priceBeforeVat = priceAfterDiscount / (1 + vatRate / 100)
-                    val itemsVatAmount = priceAfterDiscount - priceBeforeVat
 
-                    // Tính VAT của phụ thu (surcharge không bị giảm giá)
-                    val surchargeVatAmount = if (order.surchargeAmount > 0) {
-                        val surchargeBeforeVat = order.surchargeAmount / (1 + vatRate / 100)
-                        order.surchargeAmount - surchargeBeforeVat
-                    } else 0.0
-
-                    // Tổng VAT = VAT món + VAT phụ thu
-                    val vatAmount = itemsVatAmount + surchargeVatAmount
+                    // Dùng VAT đã lưu trong database (đồng nhất với màn hình thanh toán)
+                    val vatAmount = order.vatAmount.toDouble()
 
                     // Parse applied coupons from JSON
                     val appliedCoupons: List<AppliedCouponInfo> = try {
