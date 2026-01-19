@@ -502,16 +502,26 @@ class OrderHistoryViewModel @Inject constructor(
 
         val billItems = orderItems.filter { !it.isComboChild }.map { item ->
             // Parse variants
+            // Format trong notes: "+ ToppingName (+100000)" hoặc "Size: L (+10000)"
             val variants = if (!item.notes.isNullOrBlank()) {
                 val parts = item.notes.split(" | ")
                 val variantsPart = parts.firstOrNull() ?: ""
                 variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("Ghi chú:") }.map { variant ->
-                    val colonIndex = variant.lastIndexOf(":")
-                    if (colonIndex > 0) {
-                        BillVariant(variant.substring(0, colonIndex), variant.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0)
+                    // Parse price from format "(+price)" at the end
+                    val priceStart = variant.lastIndexOf("(+")
+                    val priceEnd = variant.lastIndexOf(")")
+                    val price = if (priceStart > 0 && priceEnd > priceStart) {
+                        variant.substring(priceStart + 2, priceEnd).toDoubleOrNull() ?: 0.0
                     } else {
-                        BillVariant(variant, 0.0)
+                        0.0
                     }
+                    // Get name without price suffix
+                    val name = if (priceStart > 0) {
+                        variant.substring(0, priceStart).trim()
+                    } else {
+                        variant
+                    }
+                    BillVariant(name, price)
                 }
             } else emptyList()
 

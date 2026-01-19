@@ -3108,8 +3108,8 @@ class SaleViewModel @Inject constructor(
         val filteredItems = orderItems.filter { !it.isComboChild }
 
         val billItems = filteredItems.map { item ->
-            // Parse variants from notes field "Variant1:price1, Variant2:price2 | User note"
-            // Format: "NHIỀU:0, Size L:10000 | Ghi chú: Ít đường"
+            // Parse variants from notes field
+            // Format trong notes: "+ ToppingName (+100000)" hoặc "Size: L (+10000)"
             val parts = item.notes?.split(" | ") ?: emptyList()
             val variantsPart = parts.firstOrNull()?.takeIf { it.isNotEmpty() && !it.startsWith("Ghi chú:") } ?: ""
             val userNote = parts.getOrNull(1)?.removePrefix("Ghi chú: ")
@@ -3120,15 +3120,21 @@ class SaleViewModel @Inject constructor(
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .map { variantStr ->
-                    val colonIndex = variantStr.lastIndexOf(":")
-                    if (colonIndex > 0) {
-                        BillVariant(
-                            name = variantStr.substring(0, colonIndex),
-                            priceAdjustment = variantStr.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0
-                        )
+                    // Parse price from format "(+price)" at the end
+                    val priceStart = variantStr.lastIndexOf("(+")
+                    val priceEnd = variantStr.lastIndexOf(")")
+                    val price = if (priceStart > 0 && priceEnd > priceStart) {
+                        variantStr.substring(priceStart + 2, priceEnd).toDoubleOrNull() ?: 0.0
                     } else {
-                        BillVariant(name = variantStr, priceAdjustment = 0.0)
+                        0.0
                     }
+                    // Get name without price suffix
+                    val name = if (priceStart > 0) {
+                        variantStr.substring(0, priceStart).trim()
+                    } else {
+                        variantStr
+                    }
+                    BillVariant(name = name, priceAdjustment = price)
                 }
 
             // Toppings - currently not stored separately, will be empty
@@ -3201,20 +3207,27 @@ class SaleViewModel @Inject constructor(
             val variantsPart = parts.firstOrNull()?.takeIf { it.isNotEmpty() && !it.startsWith("Ghi chú:") } ?: ""
 
             var toppingsTotal = 0L
+            // Format trong notes: "+ ToppingName (+100000)" hoặc "Size: L (+10000)"
+            // Cần parse giá từ "(+price)" ở cuối mỗi variant
             variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { variantStr ->
-                val colonIndex = variantStr.lastIndexOf(":")
-                if (colonIndex > 0) {
-                    val price = variantStr.substring(colonIndex + 1).toDoubleOrNull()?.toLong() ?: 0L
-                    if (price > 0) {
-                        // Tính VAT cho topping này
-                        val toppingTotal = price * item.quantity
-                        val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
-                        if (item.vatRate > 0) {
-                            val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
-                            calculatedVatAmount += (toppingAfterDiscount - priceBeforeVat).toDouble()
-                        }
-                        toppingsTotal += price
+                // Parse price from format "(+price)" at the end
+                val priceStart = variantStr.lastIndexOf("(+")
+                val priceEnd = variantStr.lastIndexOf(")")
+                val price = if (priceStart > 0 && priceEnd > priceStart) {
+                    variantStr.substring(priceStart + 2, priceEnd).toLongOrNull() ?: 0L
+                } else {
+                    0L
+                }
+
+                if (price > 0) {
+                    // Tính VAT cho topping này
+                    val toppingTotal = price * item.quantity
+                    val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
+                    if (item.vatRate > 0) {
+                        val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                        calculatedVatAmount += (toppingAfterDiscount - priceBeforeVat).toDouble()
                     }
+                    toppingsTotal += price
                 }
             }
 
@@ -3494,15 +3507,28 @@ class SaleViewModel @Inject constructor(
                     val userNote = parts.getOrNull(1)
 
                     // Parse variants and find the one to remove
+                    // Format trong notes: "+ ToppingName (+100000)" hoặc "Size: L (+10000)"
                     val variants = variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                     var toppingPrice = 0.0
 
                     val updatedVariants = variants.filter { variant ->
-                        val colonIndex = variant.lastIndexOf(":")
-                        val name = if (colonIndex > 0) variant.substring(0, colonIndex) else variant
-                        if (name == toppingName) {
+                        // Parse price from format "(+price)" at the end
+                        val priceStart = variant.lastIndexOf("(+")
+                        val priceEnd = variant.lastIndexOf(")")
+                        val price = if (priceStart > 0 && priceEnd > priceStart) {
+                            variant.substring(priceStart + 2, priceEnd).toDoubleOrNull() ?: 0.0
+                        } else {
+                            0.0
+                        }
+                        // Get name without price suffix
+                        val name = if (priceStart > 0) {
+                            variant.substring(0, priceStart).trim()
+                        } else {
+                            variant
+                        }
+                        if (name == toppingName || name.endsWith(toppingName)) {
                             // Found the topping to remove, get its price
-                            toppingPrice = if (colonIndex > 0) variant.substring(colonIndex + 1).toDoubleOrNull() ?: 0.0 else 0.0
+                            toppingPrice = price
                             false // Remove this topping
                         } else {
                             true // Keep this topping
