@@ -286,12 +286,19 @@ object BitmapTextRenderer {
         }
 
         // Tạo StaticLayout để handle Vietnamese text đúng cách
-        // Sử dụng lineSpacingMultiplier từ config để điều chỉnh khoảng cách dòng trong text wrap
-        val internalLineSpacing = style.lineSpacingMultiplier.coerceIn(0.3f, 1.0f)
+        // QUAN TRỌNG: Khoảng cách TRONG text wrap (khi text dài xuống dòng) phải >= 1.0
+        // để các dòng không bị đè nhau. Config lineSpacing chỉ ảnh hưởng padding GIỮA các dòng.
+        // Tính internal line spacing: tối thiểu 1.15 để đảm bảo không bị đè
+        // Nếu user muốn spacing lớn hơn (> 1.0), ta scale thêm
+        val minInternalSpacing = 1.15f // Tối thiểu 115% để tránh đè
+        val userSpacingBoost = if (style.lineSpacingMultiplier > 0.7f) {
+            (style.lineSpacingMultiplier - 0.7f) / 0.3f * 0.15f // Thêm tối đa 15% nếu user chọn 100%
+        } else 0f
+        val internalLineSpacing = minInternalSpacing + userSpacingBoost
         val staticLayout = StaticLayout.Builder
             .obtain(text, 0, text.length, textPaint, paperWidth)
             .setAlignment(alignment)
-            .setLineSpacing(0f, internalLineSpacing) // Sử dụng line spacing từ config
+            .setLineSpacing(0f, internalLineSpacing) // Luôn >= 1.15 để tránh chữ đè
             .setIncludePad(false) // Bỏ padding thừa
             .build()
 
