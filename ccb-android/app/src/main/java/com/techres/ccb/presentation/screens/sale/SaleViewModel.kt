@@ -183,8 +183,8 @@ data class SaleUiState(
 
     /**
      * Tiền VAT (tách ra từ tổng để hiển thị trên hóa đơn)
-     * Công thức: VAT = Tổng - (Tổng / (1 + VAT_rate))
-     * Ví dụ: 48,000đ có VAT 8% → VAT = 48,000 - 48,000/1.08 = 3,556đ
+     * Công thức: VAT = Tổng - (Tổng / (1 + VAT_rate)).toLong()
+     * Làm tròn priceBeforeVat trước để đồng nhất với DiscountCalculator và OrderHistoryScreen
      */
     val taxAmount: Long
         get() {
@@ -193,8 +193,9 @@ data class SaleUiState(
                 return (totalAmount * taxRate / 100.0).toLong()
             }
             // Giá đã bao gồm VAT - tách VAT ra để hiển thị
-            val priceBeforeVat = totalAmount / (1 + taxRate / 100.0)
-            return (totalAmount - priceBeforeVat).toLong()
+            // Làm tròn priceBeforeVat trước (không phải làm tròn VAT sau)
+            val priceBeforeVat = (totalAmount / (1 + taxRate / 100.0)).toLong()
+            return totalAmount - priceBeforeVat
         }
 
     /**
@@ -2821,7 +2822,16 @@ class SaleViewModel @Inject constructor(
                 val finalSurchargeAmount = state.surchargeAmount.toDouble()  // Phụ thu
                 val finalTotalAmount = (orderSubtotal + finalSurchargeAmount - finalDiscountAmount).coerceAtLeast(0.0)
 
-                Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount")
+                // Tính VAT với cùng công thức như SaleUiState.taxAmount
+                // VAT = totalAmount - (totalAmount / 1.08).toLong()
+                val finalVatAmount = if (state.pricesIncludeVat) {
+                    val priceBeforeVat = (finalTotalAmount / (1 + state.taxRate / 100.0)).toLong()
+                    finalTotalAmount.toLong() - priceBeforeVat
+                } else {
+                    (finalTotalAmount * state.taxRate / 100.0).toLong()
+                }
+
+                Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount, vat: $finalVatAmount")
 
                 // Lưu thông tin cần thiết cho việc in bill
                 val completedOrder: OrderEntity
@@ -2835,7 +2845,7 @@ class SaleViewModel @Inject constructor(
                 val tableNameForPrint = state.selectedTable?.name
 
                 withContext(Dispatchers.IO) {
-                    // 1. Update order status to completed with correct discount, surcharge and total
+                    // 1. Update order status to completed with correct discount, surcharge, VAT and total
                     completedOrder = currentOrder.copy(
                         status = "completed",
                         paymentStatus = "paid",
@@ -2843,6 +2853,7 @@ class SaleViewModel @Inject constructor(
                         discountAmount = finalDiscountAmount,
                         discountReason = state.billDiscountDescription,
                         surchargeAmount = finalSurchargeAmount,
+                        vatAmount = finalVatAmount.toDouble(),  // Lưu VAT vào database
                         totalAmount = finalTotalAmount,
                         paidAmount = finalTotalAmount,
                         completedAt = now,
