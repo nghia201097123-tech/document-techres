@@ -3186,21 +3186,46 @@ class SaleViewModel @Inject constructor(
         // Tính totalAmount thực tế (sau tất cả giảm giá + phụ thu)
         val calculatedTotalAmount = (calculatedSubtotal + surchargeAmount - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
 
-        // ========== TÍNH VAT BẰNG CÁCH CỘNG TỪNG MÓN (giống VatDetailDialog) ==========
-        // Để đảm bảo bill in ra khớp với chi tiết VAT
+        // ========== TÍNH VAT BẰNG CÁCH CỘNG TỪNG MÓN + TOPPING RIÊNG BIỆT ==========
+        // Để đảm bảo bill in ra khớp với chi tiết VAT (VatDetailDialog)
         val afterDiscountRatio = if (calculatedSubtotal > 0) {
             ((calculatedSubtotal - totalItemDiscount - billDiscountAmount) / calculatedSubtotal).coerceIn(0.0, 1.0)
         } else 1.0
 
         var calculatedVatAmount = 0.0
 
-        // VAT của từng món (tính từ billItems)
-        billItems.forEach { item ->
-            val itemTotal = item.originalPrice * item.quantity
-            val itemAfterDiscount = (itemTotal * afterDiscountRatio).toLong()
-            if (item.vatRate > 0) {
-                val priceBeforeVatItem = (itemAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
-                calculatedVatAmount += (itemAfterDiscount - priceBeforeVatItem).toDouble()
+        // VAT của từng món - TÁCH RIÊNG món chính và toppings
+        orderItems.filter { !it.isComboChild }.forEach { item ->
+            // Parse toppings từ notes để tách riêng giá
+            val parts = item.notes?.split(" | ") ?: emptyList()
+            val variantsPart = parts.firstOrNull()?.takeIf { it.isNotEmpty() && !it.startsWith("Ghi chú:") } ?: ""
+
+            var toppingsTotal = 0L
+            variantsPart.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { variantStr ->
+                val colonIndex = variantStr.lastIndexOf(":")
+                if (colonIndex > 0) {
+                    val price = variantStr.substring(colonIndex + 1).toDoubleOrNull()?.toLong() ?: 0L
+                    if (price > 0) {
+                        // Tính VAT cho topping này
+                        val toppingTotal = price * item.quantity
+                        val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
+                        if (item.vatRate > 0) {
+                            val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                            calculatedVatAmount += (toppingAfterDiscount - priceBeforeVat).toDouble()
+                        }
+                        toppingsTotal += price
+                    }
+                }
+            }
+
+            // Tính VAT cho món chính (totalPrice - toppings)
+            val actualUnitPrice = (item.totalPrice / item.quantity).toLong()
+            val mainUnitPrice = (actualUnitPrice - toppingsTotal).coerceAtLeast(0L)
+            val mainPrice = mainUnitPrice * item.quantity
+            val mainAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+            if (item.vatRate > 0 && mainAfterDiscount > 0) {
+                val priceBeforeVat = (mainAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                calculatedVatAmount += (mainAfterDiscount - priceBeforeVat).toDouble()
             }
         }
 
