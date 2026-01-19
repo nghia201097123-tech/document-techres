@@ -463,12 +463,14 @@ object KitchenTicketPrintService {
             // Tổng số món
             val totalItems = ticket.items.sumOf { it.quantity }
             lineBold("TỔNG: $totalItems MÓN", BitmapTextStyle(centerAlign = true))
+            separator('=')
 
             // ═══════════════════════════════════════════
             // FEED, BEEP & CUT
-            // Feed 4 dòng để đảm bảo dòng TỔNG MÓN không bị cắt mất
+            // Feed 6 dòng để đảm bảo dòng TỔNG MÓN không bị cắt mất
+            // (khoảng cách từ đầu in đến dao cắt thường 20-25mm ~ 6-8 dòng)
             // ═══════════════════════════════════════════
-            feed(4)
+            feed(6)
             beep()
             // Cắt giấy dựa trên config
             if (kitchen.ticketCutAfterPrint) {
