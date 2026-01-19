@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// API Gateway URL - hardcoded to ensure correct routing
-const API_BASE_URL = "http://localhost:3002/api";
+// API Gateway URL - use environment variable for production deployment
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api";
 
 console.log("[API] Base URL:", API_BASE_URL);
 
