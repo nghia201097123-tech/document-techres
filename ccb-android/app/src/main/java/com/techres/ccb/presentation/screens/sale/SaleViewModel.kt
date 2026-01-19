@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.sale
 
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,6 +24,7 @@ import com.techres.ccb.data.local.dao.SurchargeDao
 import com.techres.ccb.presentation.screens.sale.dialogs.AppliedDiscount
 import com.techres.ccb.presentation.screens.sale.dialogs.SelectedSurcharge
 import com.techres.ccb.presentation.screens.sale.dialogs.DiscountTarget
+import com.techres.ccb.presentation.screens.sale.dialogs.PagerGridSize
 import com.techres.ccb.util.DiscountCalculator
 import com.techres.ccb.util.OrderItemForDiscount
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
@@ -155,6 +157,7 @@ data class SaleUiState(
     // Pager/Buzzer (Thẻ rung)
     val pagerNumber: Int? = null,            // Số thẻ rung hiện tại (1-99)
     val showPagerDialog: Boolean = false,    // Hiển thị dialog chỉnh sửa số thẻ rung
+    val pagerGridSize: PagerGridSize = PagerGridSize.SIZE_16, // Số lượng thẻ hiển thị
 
     // Messages
     val successMessage: String? = null,
@@ -356,11 +359,13 @@ class SaleViewModel @Inject constructor(
     private val billPrinterConfigDao: BillPrinterConfigDao,
     private val seasonalPriceDao: SeasonalPriceDao,
     private val seasonalPriceProductDao: SeasonalPriceProductDao,
-    private val surchargeDao: SurchargeDao
+    private val surchargeDao: SurchargeDao,
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "SaleViewModel"
+        private const val KEY_PAGER_GRID_SIZE = "pager_grid_size"
     }
 
     private val _uiState = MutableStateFlow(SaleUiState())
@@ -385,6 +390,7 @@ class SaleViewModel @Inject constructor(
 
     init {
         loadInitialData()
+        loadPagerGridSize()
     }
 
     private fun loadInitialData() {
@@ -1681,6 +1687,29 @@ class SaleViewModel @Inject constructor(
             pagerNumber = null,
             showPagerDialog = false
         )}
+    }
+
+    /**
+     * Update and save pager grid size preference
+     */
+    fun updatePagerGridSize(size: PagerGridSize) {
+        Log.d(TAG, "updatePagerGridSize - $size")
+        _uiState.update { it.copy(pagerGridSize = size) }
+        // Save to SharedPreferences
+        sharedPreferences.edit().putInt(KEY_PAGER_GRID_SIZE, size.count).apply()
+    }
+
+    /**
+     * Load saved pager grid size from SharedPreferences
+     */
+    private fun loadPagerGridSize() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val savedCount = sharedPreferences.getInt(KEY_PAGER_GRID_SIZE, PagerGridSize.SIZE_16.count)
+            val size = PagerGridSize.entries.find { it.count == savedCount } ?: PagerGridSize.SIZE_16
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(pagerGridSize = size) }
+            }
+        }
     }
 
     // ===== DISCOUNT / COUPON =====

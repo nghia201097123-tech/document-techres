@@ -573,10 +573,12 @@ fun SaleScreen(
         if (uiState.showPagerDialog) {
             PagerDialog(
                 currentPagerNumber = uiState.pagerNumber,
+                gridSize = uiState.pagerGridSize,
                 onDismiss = { viewModel.hidePagerDialog() },
                 onConfirm = { number -> viewModel.updatePagerNumber(number) },
                 onClear = { viewModel.clearPagerNumber() },
-                onAutoGenerate = { viewModel.initPagerNumber() }
+                onAutoGenerate = { viewModel.initPagerNumber() },
+                onGridSizeChanged = { size -> viewModel.updatePagerGridSize(size) }
             )
         }
 
