@@ -311,6 +311,7 @@ fun DashboardScreen(
                                                 // Navigate to SaleScreen with PaymentDialog auto-shown
                                                 onNavigateToSaleForPayment(order.id)
                                             },
+                                            gridColumns = gridColumns,
                                             currentTimeMillis = currentTimeMillis
                                         )
                                     }
@@ -881,6 +882,7 @@ private fun MobileDashboardContent(
                                         onConfirm = { onConfirmOrder(order.id) },
                                         onComplete = { onCompleteOrder(order) },
                                         isCompact = true,
+                                        gridColumns = gridColumns,
                                         currentTimeMillis = currentTimeMillis
                                     )
                                 }
@@ -1536,9 +1538,12 @@ private fun OrderCard(
     onConfirm: () -> Unit = {},
     onComplete: () -> Unit = {},
     isCompact: Boolean = false,
+    gridColumns: Int = 4, // Number of grid columns for layout adjustments
     currentTimeMillis: Long = System.currentTimeMillis() // Passed from parent for real-time updates
 ) {
     val statusColor = Color(order.status.color)
+    // Ultra compact mode for 5-6 columns - hide details, show only essentials
+    val isUltraCompact = gridColumns >= 5
 
     // Order type colors and icons
     val orderTypeConfig = remember(order.orderType) {
@@ -1557,10 +1562,18 @@ private fun OrderCard(
     val isUrgent = waitMinutes > 15
     val borderColor = if (isUrgent) Color(0xFFF44336) else statusColor
 
+    // Aspect ratio based on grid columns - taller cards for more columns
+    val aspectRatio = when {
+        gridColumns >= 6 -> 0.75f  // Taller for 6 columns
+        gridColumns >= 5 -> 0.80f  // Slightly taller for 5 columns
+        isCompact -> 0.85f
+        else -> 0.9f
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(if (isCompact) 0.85f else 0.9f)
+            .aspectRatio(aspectRatio)
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = Color.White
@@ -1583,7 +1596,7 @@ private fun OrderCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(if (isCompact) 8.dp else 10.dp),
+                    .padding(if (isUltraCompact) 6.dp else if (isCompact) 8.dp else 10.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Header: Order number + Wait time
@@ -1595,12 +1608,12 @@ private fun OrderCard(
                     // Order number badge
                     Box(
                         modifier = Modifier
-                            .background(statusColor, RoundedCornerShape(if (isCompact) 4.dp else 6.dp))
-                            .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = if (isCompact) 2.dp else 3.dp)
+                            .background(statusColor, RoundedCornerShape(if (isUltraCompact) 3.dp else if (isCompact) 4.dp else 6.dp))
+                            .padding(horizontal = if (isUltraCompact) 4.dp else if (isCompact) 6.dp else 8.dp, vertical = if (isUltraCompact) 1.dp else if (isCompact) 2.dp else 3.dp)
                     ) {
                         Text(
                             text = order.displayNumber,
-                            fontSize = if (isCompact) 11.sp else 13.sp,
+                            fontSize = if (isUltraCompact) 10.sp else if (isCompact) 11.sp else 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
@@ -1611,20 +1624,20 @@ private fun OrderCard(
                         modifier = Modifier
                             .background(
                                 if (isUrgent) Color(0xFFFFEBEE) else Color(0xFFF5F5F5),
-                                RoundedCornerShape(4.dp)
+                                RoundedCornerShape(if (isUltraCompact) 3.dp else 4.dp)
                             )
-                            .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                            .padding(horizontal = if (isUltraCompact) 3.dp else if (isCompact) 4.dp else 6.dp, vertical = if (isUltraCompact) 1.dp else 2.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
-                            modifier = Modifier.size(if (isCompact) 10.dp else 12.dp),
+                            modifier = Modifier.size(if (isUltraCompact) 8.dp else if (isCompact) 10.dp else 12.dp),
                             tint = if (isUrgent) Color(0xFFF44336) else Color.Gray
                         )
-                        Spacer(modifier = Modifier.width(2.dp))
+                        Spacer(modifier = Modifier.width(if (isUltraCompact) 1.dp else 2.dp))
                         Text(
                             text = "${waitMinutes}p",
-                            fontSize = if (isCompact) 9.sp else 11.sp,
+                            fontSize = if (isUltraCompact) 8.sp else if (isCompact) 9.sp else 11.sp,
                             fontWeight = if (isUrgent) FontWeight.Bold else FontWeight.Normal,
                             color = if (isUrgent) Color(0xFFF44336) else Color.Gray
                         )
@@ -1647,20 +1660,20 @@ private fun OrderCard(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .background(orderTypeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                                .background(orderTypeColor.copy(alpha = 0.15f), RoundedCornerShape(if (isUltraCompact) 3.dp else 4.dp))
+                                .padding(horizontal = if (isUltraCompact) 3.dp else if (isCompact) 4.dp else 6.dp, vertical = if (isUltraCompact) 1.dp else 2.dp)
                         ) {
                             Icon(
                                 imageVector = orderTypeIcon,
                                 contentDescription = null,
-                                modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
+                                modifier = Modifier.size(if (isUltraCompact) 10.dp else if (isCompact) 12.dp else 14.dp),
                                 tint = orderTypeColor
                             )
-                            Spacer(modifier = Modifier.width(3.dp))
+                            Spacer(modifier = Modifier.width(if (isUltraCompact) 2.dp else 3.dp))
                             Text(
                                 text = if (order.orderType == "dine_in" && order.tableName != null)
                                     order.tableName else orderTypeLabel,
-                                fontSize = if (isCompact) 11.sp else 13.sp,
+                                fontSize = if (isUltraCompact) 9.sp else if (isCompact) 11.sp else 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = orderTypeColor,
                                 maxLines = 1
@@ -1669,7 +1682,7 @@ private fun OrderCard(
 
                         // Pager number and Note indicator
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 2.dp else 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Note indicator
@@ -1677,7 +1690,7 @@ private fun OrderCard(
                                 Icon(
                                     imageVector = Icons.Default.StickyNote2,
                                     contentDescription = "Có ghi chú",
-                                    modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                                    modifier = Modifier.size(if (isUltraCompact) 12.dp else if (isCompact) 14.dp else 16.dp),
                                     tint = Color(0xFFFF9800)
                                 )
                             }
@@ -1686,19 +1699,19 @@ private fun OrderCard(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
-                                        .background(Color(0xFF9C27B0).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                                        .background(Color(0xFF9C27B0).copy(alpha = 0.15f), RoundedCornerShape(if (isUltraCompact) 3.dp else 4.dp))
+                                        .padding(horizontal = if (isUltraCompact) 3.dp else if (isCompact) 4.dp else 6.dp, vertical = if (isUltraCompact) 1.dp else 2.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Vibration,
                                         contentDescription = null,
-                                        modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
+                                        modifier = Modifier.size(if (isUltraCompact) 10.dp else if (isCompact) 12.dp else 14.dp),
                                         tint = Color(0xFF9C27B0)
                                     )
-                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Spacer(modifier = Modifier.width(if (isUltraCompact) 1.dp else 2.dp))
                                     Text(
                                         text = order.pagerNumber.toString(),
-                                        fontSize = if (isCompact) 10.sp else 12.sp,
+                                        fontSize = if (isUltraCompact) 9.sp else if (isCompact) 10.sp else 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF9C27B0)
                                     )
@@ -1706,11 +1719,12 @@ private fun OrderCard(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 6.dp))
+                    Spacer(modifier = Modifier.height(if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 6.dp))
 
-                    // Items list - hiển thị chi tiết món (tối đa 3 món)
+                    // Items list - show fewer items in ultra compact mode
                     val parentItems = order.items.filter { !it.isComboChild }
-                    parentItems.take(3).forEach { item ->
+                    val maxItemsToShow = if (isUltraCompact) 2 else 3
+                    parentItems.take(maxItemsToShow).forEach { item ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1720,13 +1734,13 @@ private fun OrderCard(
                                 // Tên món + số lượng
                                 Text(
                                     text = "${item.productName} x${item.quantity}",
-                                    fontSize = if (isCompact) 10.sp else 11.sp,
+                                    fontSize = if (isUltraCompact) 9.sp else if (isCompact) 10.sp else 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
-                                // Variants/notes nếu có
-                                if (!item.notes.isNullOrBlank() && item.notes != "null") {
+                                // Variants/notes - hide in ultra compact mode
+                                if (!isUltraCompact && !item.notes.isNullOrBlank() && item.notes != "null") {
                                     Text(
                                         text = item.notes.replace("\n", ", "),
                                         fontSize = if (isCompact) 8.sp else 9.sp,
@@ -1738,36 +1752,36 @@ private fun OrderCard(
                             }
                             Text(
                                 text = formatCurrency(item.totalPrice.toLong()),
-                                fontSize = if (isCompact) 10.sp else 11.sp,
+                                fontSize = if (isUltraCompact) 9.sp else if (isCompact) 10.sp else 11.sp,
                                 color = Color(0xFF1976D2)
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(if (isUltraCompact) 1.dp else 2.dp))
                     }
                     // Nếu còn nhiều món hơn
-                    if (parentItems.size > 3) {
+                    if (parentItems.size > maxItemsToShow) {
                         Text(
-                            text = "+${parentItems.size - 3} món khác...",
-                            fontSize = if (isCompact) 9.sp else 10.sp,
+                            text = "+${parentItems.size - maxItemsToShow} món khác...",
+                            fontSize = if (isUltraCompact) 8.sp else if (isCompact) 9.sp else 10.sp,
                             color = Color.Gray,
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 6.dp))
-                    // Total amount - Prominent
+                    Spacer(modifier = Modifier.height(if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 6.dp))
+                    // Total amount - Prominent - always visible
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             text = "Tổng:",
-                            fontSize = if (isCompact) 11.sp else 12.sp,
+                            fontSize = if (isUltraCompact) 10.sp else if (isCompact) 11.sp else 12.sp,
                             color = Color.Gray
                         )
                         Text(
                             text = formatCurrency(order.totalAmount),
-                            fontSize = if (isCompact) 13.sp else 15.sp,
+                            fontSize = if (isUltraCompact) 11.sp else if (isCompact) 13.sp else 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF1976D2)
                         )
@@ -1777,26 +1791,29 @@ private fun OrderCard(
                 // Footer: Quick action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
                 ) {
+                    val buttonHeight = if (isUltraCompact) 28.dp else if (isCompact) 32.dp else 36.dp
+                    val iconSize = if (isUltraCompact) 12.dp else if (isCompact) 14.dp else 16.dp
+
                     if (order.status == PosOrderStatus.DRAFT) {
                         // Draft order: Show confirm button
                         Button(
                             onClick = onConfirm,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(if (isCompact) 32.dp else 36.dp),
+                                .height(buttonHeight),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFFF9800)
                             ),
-                            contentPadding = PaddingValues(horizontal = if (isCompact) 4.dp else 8.dp)
+                            contentPadding = PaddingValues(horizontal = if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
                         ) {
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = null,
-                                modifier = Modifier.size(if (isCompact) 14.dp else 16.dp)
+                                modifier = Modifier.size(iconSize)
                             )
-                            if (!isCompact) {
+                            if (!isCompact && !isUltraCompact) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Xác nhận", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
@@ -1807,18 +1824,18 @@ private fun OrderCard(
                             onClick = onComplete,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(if (isCompact) 32.dp else 36.dp),
+                                .height(buttonHeight),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF4CAF50)
                             ),
-                            contentPadding = PaddingValues(horizontal = if (isCompact) 4.dp else 8.dp)
+                            contentPadding = PaddingValues(horizontal = if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
                         ) {
                             Icon(
                                 Icons.Default.Payment,
                                 contentDescription = null,
-                                modifier = Modifier.size(if (isCompact) 14.dp else 16.dp)
+                                modifier = Modifier.size(iconSize)
                             )
-                            if (!isCompact) {
+                            if (!isCompact && !isUltraCompact) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Thanh toán", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }

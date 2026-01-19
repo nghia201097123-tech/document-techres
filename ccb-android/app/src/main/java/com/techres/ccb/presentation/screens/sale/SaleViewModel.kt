@@ -1706,7 +1706,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * Update pager number manually
-     * Validates range 1-99
+     * Validates range 1-99 and saves to database immediately if order exists
      */
     fun updatePagerNumber(number: Int?) {
         val validNumber = number?.coerceIn(1, 99)
@@ -1715,6 +1715,8 @@ class SaleViewModel @Inject constructor(
             pagerNumber = validNumber,
             showPagerDialog = false
         )}
+        // Save to database immediately if order exists
+        savePagerNumberToDatabase(validNumber)
     }
 
     /**
@@ -1725,6 +1727,32 @@ class SaleViewModel @Inject constructor(
             pagerNumber = null,
             showPagerDialog = false
         )}
+        // Save to database immediately if order exists
+        savePagerNumberToDatabase(null)
+    }
+
+    /**
+     * Save pager number to database for existing order
+     */
+    private fun savePagerNumberToDatabase(pagerNumber: Int?) {
+        val currentOrder = _uiState.value.currentOrder ?: return
+        viewModelScope.launch {
+            try {
+                val now = getCurrentTimestamp()
+                val updatedOrder = currentOrder.copy(
+                    pagerNumber = pagerNumber,
+                    updatedAt = now
+                )
+                withContext(Dispatchers.IO) {
+                    orderRepository.updateOrder(updatedOrder)
+                }
+                // Update currentOrder in state to keep in sync
+                _uiState.update { it.copy(currentOrder = updatedOrder) }
+                Log.d(TAG, "savePagerNumberToDatabase - Saved pager=$pagerNumber for order=${currentOrder.orderNumber}")
+            } catch (e: Exception) {
+                Log.e(TAG, "savePagerNumberToDatabase - Error: ${e.message}", e)
+            }
+        }
     }
 
     /**
@@ -2865,6 +2893,7 @@ class SaleViewModel @Inject constructor(
                     val updatedOrder = currentOrder.copy(
                         subtotal = newSubtotal,
                         totalAmount = newTotal,
+                        pagerNumber = state.pagerNumber, // Save pager number to database
                         updatedAt = now
                     )
                     orderRepository.updateOrder(updatedOrder)
@@ -2881,7 +2910,12 @@ class SaleViewModel @Inject constructor(
                 _uiState.update { s ->
                     s.copy(
                         cartItems = emptyList(),
-                        currentOrder = currentOrder.copy(subtotal = newSubtotal, totalAmount = newTotal, updatedAt = now),
+                        currentOrder = currentOrder.copy(
+                            subtotal = newSubtotal,
+                            totalAmount = newTotal,
+                            pagerNumber = s.pagerNumber, // Keep pager number in sync
+                            updatedAt = now
+                        ),
                         currentOrderItems = allItems,
                         successMessage = "Đã thêm ${newItems.size} món"
                     )
