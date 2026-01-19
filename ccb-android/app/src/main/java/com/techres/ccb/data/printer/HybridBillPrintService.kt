@@ -411,6 +411,10 @@ object HybridBillPrintService {
             if (template.showTableName && billData.tableName != null) {
                 line("Bàn: ${billData.tableName}")
             }
+            // Pager number (Thẻ rung)
+            if (billData.pagerNumber != null) {
+                lineBold("Thẻ rung: ${billData.pagerNumber}")
+            }
             if (template.showStaffName && billData.staffName != null) {
                 line("NV: ${billData.staffName}")
             }

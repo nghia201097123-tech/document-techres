@@ -542,6 +542,7 @@ data class BillData(
     val orderNumber: String,
     val orderDate: Date,
     val tableName: String? = null,
+    val pagerNumber: Int? = null,  // Số thẻ rung (1-99)
     val staffName: String? = null,
     val customerName: String? = null,
     val items: List<BillItem>,

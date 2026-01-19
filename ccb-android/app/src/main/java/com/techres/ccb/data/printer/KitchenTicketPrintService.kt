@@ -78,6 +78,7 @@ object KitchenTicketPrintService {
         val kitchenName: String,        // Tên bếp (BAR, BẾP CHÍNH, ...)
         val orderNumber: String,        // Mã đơn hàng
         val tableName: String?,         // Tên bàn
+        val pagerNumber: Int? = null,   // Số thẻ rung (1-99)
         val orderTime: Date = Date(),   // Thời gian order
         val staffName: String?,         // Nhân viên order
         val items: List<KitchenItem>,   // Danh sách món
@@ -359,6 +360,11 @@ object KitchenTicketPrintService {
                 if (hasStaff) {
                     line("NV: ${ticket.staffName}")
                 }
+            }
+
+            // Thẻ rung (Pager) - hiển thị nổi bật nếu có
+            if (ticket.pagerNumber != null) {
+                lineDouble("THẺ RUNG: ${ticket.pagerNumber}", BitmapTextStyle(centerAlign = true))
             }
 
             separator('=')

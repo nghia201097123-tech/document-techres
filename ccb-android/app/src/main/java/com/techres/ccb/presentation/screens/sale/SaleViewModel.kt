@@ -152,6 +152,10 @@ data class SaleUiState(
     val showReprintMenu: Boolean = false,
     val reprintItemId: String? = null, // null = all items, specific ID = single item
 
+    // Pager/Buzzer (Thẻ rung)
+    val pagerNumber: Int? = null,            // Số thẻ rung hiện tại (1-99)
+    val showPagerDialog: Boolean = false,    // Hiển thị dialog chỉnh sửa số thẻ rung
+
     // Messages
     val successMessage: String? = null,
     val errorMessage: String? = null
@@ -1614,6 +1618,71 @@ class SaleViewModel @Inject constructor(
         }
     }
 
+    // ===== PAGER / THẺ RUNG =====
+
+    /**
+     * Generate next pager number for today
+     * Số thẻ rung tự động tăng và reset mỗi ngày (1-99)
+     */
+    suspend fun generateNextPagerNumber(): Int {
+        return withContext(Dispatchers.IO) {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val maxPager = orderRepository.getMaxPagerNumberForToday(branchId, today)
+            // Wrap around from 99 to 1
+            val nextPager = if (maxPager >= 99) 1 else maxPager + 1
+            Log.d(TAG, "generateNextPagerNumber - today=$today, maxPager=$maxPager, next=$nextPager")
+            nextPager
+        }
+    }
+
+    /**
+     * Initialize pager number when starting a new order
+     * Auto-generate the next available number
+     */
+    fun initPagerNumber() {
+        viewModelScope.launch {
+            val nextPager = generateNextPagerNumber()
+            _uiState.update { it.copy(pagerNumber = nextPager) }
+        }
+    }
+
+    /**
+     * Show dialog to manually edit pager number
+     */
+    fun showPagerDialog() {
+        _uiState.update { it.copy(showPagerDialog = true) }
+    }
+
+    /**
+     * Hide pager dialog
+     */
+    fun hidePagerDialog() {
+        _uiState.update { it.copy(showPagerDialog = false) }
+    }
+
+    /**
+     * Update pager number manually
+     * Validates range 1-99
+     */
+    fun updatePagerNumber(number: Int?) {
+        val validNumber = number?.coerceIn(1, 99)
+        Log.d(TAG, "updatePagerNumber - input=$number, validated=$validNumber")
+        _uiState.update { it.copy(
+            pagerNumber = validNumber,
+            showPagerDialog = false
+        )}
+    }
+
+    /**
+     * Clear pager number (không dùng thẻ rung)
+     */
+    fun clearPagerNumber() {
+        _uiState.update { it.copy(
+            pagerNumber = null,
+            showPagerDialog = false
+        )}
+    }
+
     // ===== DISCOUNT / COUPON =====
 
     /**
@@ -2587,6 +2656,7 @@ class SaleViewModel @Inject constructor(
                     orderNumber = orderNumber,
                     status = "pending",
                     orderType = state.orderType.dbValue,
+                    pagerNumber = state.pagerNumber,
                     subtotal = state.subtotal.toDouble(),
                     discountAmount = state.discountAmount.toDouble(),
                     discountReason = state.billDiscountDescription,
@@ -2628,6 +2698,7 @@ class SaleViewModel @Inject constructor(
                         cartItems = emptyList(),
                         currentOrder = orderEntity,
                         currentOrderItems = orderItems,
+                        pagerNumber = null, // Reset pager number after order created
                         successMessage = "Đặt món thành công! $orderNumber"
                     )
                 }
@@ -3337,6 +3408,7 @@ class SaleViewModel @Inject constructor(
             orderNumber = order.orderNumber,
             orderDate = orderDate,
             tableName = tableName,
+            pagerNumber = order.pagerNumber,
             staffName = staffName,
             customerName = customerName,
             items = billItems,

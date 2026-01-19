@@ -52,6 +52,7 @@ import com.techres.ccb.presentation.screens.sale.dialogs.CouponDisplayItem
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomItemDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.CustomerSelectionDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.NoteDialog
+import com.techres.ccb.presentation.screens.sale.dialogs.PagerDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentDialog
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentOrderItem
 import com.techres.ccb.presentation.screens.sale.dialogs.PaymentToppingItem
@@ -567,6 +568,17 @@ fun SaleScreen(
             )
         }
 
+        // Pager Dialog (Thẻ rung)
+        if (uiState.showPagerDialog) {
+            PagerDialog(
+                currentPagerNumber = uiState.pagerNumber,
+                onDismiss = { viewModel.hidePagerDialog() },
+                onConfirm = { number -> viewModel.updatePagerNumber(number) },
+                onClear = { viewModel.clearPagerNumber() },
+                onAutoGenerate = { viewModel.initPagerNumber() }
+            )
+        }
+
         // Note Dialog - use product-specific notes
         if (uiState.showNoteDialog && uiState.selectedCartItemForNote != null) {
             val selectedItem = uiState.cartItems.find { it.id == uiState.selectedCartItemForNote }
@@ -804,7 +816,9 @@ fun TabletLayout(
             onCustomItemClicked = { viewModel.showCustomItemDialog() },
             onSurchargeClicked = { viewModel.showSurchargeDialog() },
             surchargeAmount = uiState.surchargeAmount,
-            selectedSurcharges = uiState.selectedSurcharges
+            selectedSurcharges = uiState.selectedSurcharges,
+            pagerNumber = uiState.pagerNumber,
+            onPagerClicked = { viewModel.showPagerDialog() }
         )
     }
 }
@@ -915,6 +929,8 @@ fun CartDialog(
                     onSurchargeClicked = { viewModel.showSurchargeDialog() },
                     surchargeAmount = uiState.surchargeAmount,
                     selectedSurcharges = uiState.selectedSurcharges,
+                    pagerNumber = uiState.pagerNumber,
+                    onPagerClicked = { viewModel.showPagerDialog() },
                     isCompactMode = true // Don't show header in compact mode
                 )
             }
@@ -1260,6 +1276,8 @@ fun CartPanel(
     onSurchargeClicked: () -> Unit = {}, // Open surcharge dialog
     surchargeAmount: Long = 0, // Total surcharge amount
     selectedSurcharges: List<SelectedSurcharge> = emptyList(), // List of selected surcharges with details
+    pagerNumber: Int? = null, // Số thẻ rung (1-99)
+    onPagerClicked: () -> Unit = {}, // Open pager dialog
     isCompactMode: Boolean = false // Hide header when shown in dialog
 ) {
     val hasActiveOrder = currentOrder != null
@@ -1464,6 +1482,24 @@ fun CartPanel(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = if (selectedSurcharges.isNotEmpty()) "Phụ thu (${selectedSurcharges.size})" else "Phụ thu",
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+            }
+
+            // Pager button (Thẻ rung)
+            OutlinedButton(
+                onClick = onPagerClicked,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (pagerNumber != null) Color(0xFFFF5722) else MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.Vibration, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (pagerNumber != null) "Thẻ $pagerNumber" else "Thẻ rung",
                     fontSize = 12.sp,
                     maxLines = 1
                 )

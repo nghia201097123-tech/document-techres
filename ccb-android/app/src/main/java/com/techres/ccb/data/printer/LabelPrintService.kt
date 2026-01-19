@@ -69,6 +69,7 @@ object LabelPrintService {
         val toppings: List<String> = emptyList(), // Danh sách topping
         val note: String? = null,       // Ghi chú đặc biệt
         val tableName: String? = null,  // Tên bàn
+        val pagerNumber: Int? = null,   // Số thẻ rung (1-99)
         val orderNumber: String,        // Mã đơn hàng
         val orderTime: Date = Date(),   // Thời gian order
         val staffName: String? = null,  // Tên nhân viên
@@ -474,6 +475,20 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
             yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
+        }
+
+        // ========== PAGER NUMBER (Thẻ rung) ==========
+        if (label.pagerNumber != null) {
+            val pagerBitmap = renderTextBitmap(
+                text = "Thẻ: ${label.pagerNumber}",
+                width = contentWidth,
+                fontSize = fontBold,
+                bold = true,
+                centerAlign = true
+            )
+            output.write(bitmapToTspl(margin, yPos, pagerBitmap))
+            yPos += pagerBitmap.height + lineSpacingExtra
+            pagerBitmap.recycle()
         }
 
         // ========== SEPARATOR 1 ==========
@@ -1035,6 +1050,11 @@ object LabelPrintService {
                     separator('-')
                     lineBold("Bàn: $it")
                 }
+            }
+
+            // Pager number (Thẻ rung)
+            if (label.pagerNumber != null) {
+                lineBold("Thẻ: ${label.pagerNumber}", BitmapTextStyle(centerAlign = true))
             }
 
             // ========== SIZE với giá ==========

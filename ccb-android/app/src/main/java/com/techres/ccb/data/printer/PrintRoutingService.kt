@@ -47,6 +47,7 @@ object PrintRoutingService {
         val orderNumber: String,
         val tableName: String?,
         val staffName: String?,
+        val pagerNumber: Int? = null,  // Số thẻ rung (1-99)
         val orderTime: Date = Date(),
         val items: List<OrderItem>,
         val note: String? = null,
@@ -297,6 +298,7 @@ object PrintRoutingService {
             kitchenName = kitchen.name,
             orderNumber = order.orderNumber,
             tableName = order.tableName,
+            pagerNumber = order.pagerNumber,
             orderTime = order.orderTime,
             staffName = order.staffName,
             items = ticketItems,
@@ -352,6 +354,7 @@ object PrintRoutingService {
                 totalToppingPrice = totalToppingPrice,
                 note = item.note,
                 tableName = order.tableName,
+                pagerNumber = order.pagerNumber,
                 orderNumber = order.orderNumber,
                 orderTime = order.orderTime,
                 staffName = order.staffName,

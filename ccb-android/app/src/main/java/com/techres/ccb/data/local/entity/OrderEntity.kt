@@ -69,6 +69,11 @@ data class OrderEntity(
     @ColumnInfo(name = "order_type")
     val orderType: String = "dine_in", // dine_in, takeaway, delivery
 
+    // Số thẻ rung (1-99) để gọi khách khi order sẵn sàng
+    // Áp dụng cho tất cả loại order, tự động tăng và reset mỗi ngày
+    @ColumnInfo(name = "pager_number")
+    val pagerNumber: Int? = null,
+
     @ColumnInfo(name = "subtotal")
     val subtotal: Double = 0.0,
 

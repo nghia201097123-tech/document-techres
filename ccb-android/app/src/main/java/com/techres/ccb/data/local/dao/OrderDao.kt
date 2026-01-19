@@ -146,4 +146,15 @@ interface OrderDao {
         startDate: String,
         endDate: String
     ): Flow<List<OrderEntity>>
+
+    /**
+     * Get max pager number for today (reset mỗi ngày)
+     * Returns the highest pager_number used today for the branch
+     */
+    @Query("""
+        SELECT COALESCE(MAX(pager_number), 0) FROM orders
+        WHERE branch_id = :branchId
+        AND SUBSTR(created_at, 1, 10) = :today
+    """)
+    suspend fun getMaxPagerNumberForToday(branchId: String, today: String): Int
 }

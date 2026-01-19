@@ -188,4 +188,12 @@ class OrderRepository @Inject constructor(
     ): Flow<List<OrderEntity>> {
         return orderDao.getOrderHistoryFiltered(branchId, status, startDate, endDate)
     }
+
+    /**
+     * Get max pager number used today for pager/buzzer feature
+     * Returns 0 if no orders today
+     */
+    suspend fun getMaxPagerNumberForToday(branchId: String, today: String): Int {
+        return orderDao.getMaxPagerNumberForToday(branchId, today)
+    }
 }

@@ -878,6 +878,26 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 22 to 23
+     * Adds pager_number column to orders table for thẻ rung (customer pager/buzzer)
+     */
+    val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 22 to 23...")
+
+            // Add pager_number column to orders table
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN pager_number INTEGER DEFAULT NULL")
+                Log.d(TAG, "Added pager_number column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "pager_number column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 22 to 23 complete - Added pager_number to orders for thẻ rung feature")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -893,6 +913,7 @@ object DatabaseMigrations {
         MIGRATION_18_19,
         MIGRATION_19_20,
         MIGRATION_20_21,
-        MIGRATION_21_22
+        MIGRATION_21_22,
+        MIGRATION_22_23
     )
 }
