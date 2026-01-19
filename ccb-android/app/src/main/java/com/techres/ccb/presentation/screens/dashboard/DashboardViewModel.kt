@@ -30,7 +30,7 @@ data class PosOrder(
     val totalAmount: Long,
     val status: PosOrderStatus,
     val createdAt: Long,
-    val orderNumber: Int,
+    val orderNumber: String,
     val isPrinted: Boolean = false,
     val items: List<OrderItemEntity> = emptyList(), // Danh sách món để hiển thị
     val orderType: String = "dine_in", // dine_in, takeaway, delivery
@@ -209,7 +209,7 @@ class DashboardViewModel @Inject constructor(
                                 totalAmount = entity.totalAmount.toLong(),
                                 status = mapOrderStatus(entity.status),
                                 createdAt = parseTimestamp(entity.createdAt),
-                                orderNumber = parseOrderNumber(entity.orderNumber),
+                                orderNumber = entity.orderNumber,
                                 isPrinted = entity.isPrinted,
                                 items = orderItems, // Thêm items để hiển thị
                                 orderType = entity.orderType, // dine_in, takeaway, delivery
@@ -657,13 +657,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    private fun parseOrderNumber(orderNumber: String): Int {
-        return try {
-            orderNumber.replace(Regex("[^0-9]"), "").takeLast(4).toIntOrNull() ?: 0
-        } catch (e: Exception) {
-            0
-        }
-    }
 
     /**
      * Get count of active orders (pending, confirmed status)

@@ -392,7 +392,7 @@ fun DashboardScreen(
             title = { Text("Xác nhận huỷ đơn") },
             text = {
                 Column {
-                    Text("Bạn có chắc chắn muốn huỷ đơn #${selectedOrder!!.orderNumber.toString().padStart(3, '0')}?")
+                    Text("Bạn có chắc chắn muốn huỷ đơn ${selectedOrder!!.orderNumber}?")
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = cancelReason,
@@ -1599,7 +1599,7 @@ private fun OrderCard(
                             .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = if (isCompact) 2.dp else 3.dp)
                     ) {
                         Text(
-                            text = "#${order.orderNumber.toString().padStart(3, '0')}",
+                            text = order.orderNumber,
                             fontSize = if (isCompact) 11.sp else 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -1928,7 +1928,7 @@ private fun QuickPaymentDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Đơn #${order.orderNumber.toString().padStart(3, '0')} • ${order.tableName ?: "Mang đi"}",
+                    text = "Đơn ${order.orderNumber} • ${order.tableName ?: "Mang đi"}",
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
@@ -2089,7 +2089,7 @@ private fun OrderDetailDialog(
                 ) {
                     Column {
                         Text(
-                            text = "Đơn #${order.orderNumber.toString().padStart(3, '0')}",
+                            text = "Đơn ${order.orderNumber}",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
