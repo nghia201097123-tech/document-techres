@@ -383,18 +383,24 @@ object BitmapTextRenderer {
         val paddingRatio = minRatio + (effectiveLineSpacing - 0.3f) / 0.7f * (maxRatio - minRatio)
         val bottomPadding = (contentHeight * paddingRatio).toInt().coerceAtLeast(4)
 
-        // Crop content và thêm padding phía dưới
-        val cropTop = topRow
-        val newHeight = contentHeight + bottomPadding
+        // QUAN TRỌNG: Thêm top padding để tránh cắt mất dấu tiếng Việt (ă, â, ê, ô, ơ, ư)
+        // Top padding nhỏ hơn bottom padding, chỉ cần đủ cho dấu
+        val topPadding = (contentHeight * 0.08f).toInt().coerceAtLeast(2) // 8% hoặc tối thiểu 2px
+
+        // Crop content với top padding và bottom padding
+        val cropTop = (topRow - topPadding).coerceAtLeast(0)
+        val cropBottom = (bottomRow + 1).coerceAtMost(height)
+        val actualContentHeight = cropBottom - cropTop
+        val newHeight = actualContentHeight + bottomPadding
 
         // Tạo bitmap mới với padding
         val resultBitmap = Bitmap.createBitmap(width, newHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(resultBitmap)
         canvas.drawColor(Color.WHITE) // Fill với màu trắng
 
-        // Copy content từ bitmap gốc
-        val srcRect = android.graphics.Rect(0, cropTop, width, cropTop + contentHeight)
-        val dstRect = android.graphics.Rect(0, 0, width, contentHeight)
+        // Copy content từ bitmap gốc (bao gồm top padding)
+        val srcRect = android.graphics.Rect(0, cropTop, width, cropBottom)
+        val dstRect = android.graphics.Rect(0, 0, width, actualContentHeight)
         canvas.drawBitmap(bitmap, srcRect, dstRect, null)
 
         // Recycle bitmap gốc
