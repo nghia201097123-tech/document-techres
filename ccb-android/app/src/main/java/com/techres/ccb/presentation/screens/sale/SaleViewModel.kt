@@ -184,8 +184,8 @@ data class SaleUiState(
 
     /**
      * Tiền VAT (tách ra từ tổng để hiển thị trên hóa đơn)
-     * Công thức: VAT = Tổng - (Tổng / (1 + VAT_rate)).toLong()
-     * Làm tròn priceBeforeVat trước để đồng nhất với DiscountCalculator và OrderHistoryScreen
+     * Tính bằng cách cộng VAT từng món + topping + phụ thu
+     * Đảm bảo khớp chính xác với VatDetailDialog
      */
     val taxAmount: Long
         get() {
@@ -193,10 +193,54 @@ data class SaleUiState(
                 // Nếu giá chưa bao gồm VAT, tính VAT thêm
                 return (totalAmount * taxRate / 100.0).toLong()
             }
-            // Giá đã bao gồm VAT - tách VAT ra để hiển thị
-            // Làm tròn priceBeforeVat trước (không phải làm tròn VAT sau)
-            val priceBeforeVat = (totalAmount / (1 + taxRate / 100.0)).toLong()
-            return totalAmount - priceBeforeVat
+
+            // Nếu cartItems trống và có currentOrder, tính từ totalAmount (fallback)
+            // Trường hợp này xảy ra khi đang xem/edit order đã lưu
+            if (cartItems.isEmpty() && currentOrder != null) {
+                val priceBeforeVat = (totalAmount / (1 + taxRate / 100.0)).toLong()
+                return totalAmount - priceBeforeVat
+            }
+
+            // Giá đã bao gồm VAT - tính VAT bằng cách cộng từng món
+            // Tỷ lệ còn lại sau giảm giá (áp dụng cho items, không áp dụng cho surcharges)
+            val afterDiscountRatio = if (subtotal > 0) {
+                ((subtotal - discountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+            } else 1.0
+
+            var totalVat = 0L
+
+            // Tính VAT cho từng món trong giỏ hàng
+            cartItems.forEach { item ->
+                // VAT của món chính (sau giảm giá)
+                val mainPrice = item.product.price * item.quantity
+                val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+                if (item.product.vatRate > 0) {
+                    val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.product.vatRate / 100.0)).toLong()
+                    totalVat += mainPriceAfterDiscount - priceBeforeVat
+                }
+
+                // VAT của từng topping (sau giảm giá)
+                item.selectedVariants.forEach { variant ->
+                    val toppingPrice = variant.price * item.quantity
+                    val toppingPriceAfterDiscount = (toppingPrice * afterDiscountRatio).toLong()
+                    if (variant.vatRate > 0) {
+                        val priceBeforeVat = (toppingPriceAfterDiscount / (1 + variant.vatRate / 100.0)).toLong()
+                        totalVat += toppingPriceAfterDiscount - priceBeforeVat
+                    }
+                }
+            }
+
+            // Tính VAT cho phụ thu (không bị giảm giá)
+            selectedSurcharges.forEach { selected ->
+                val surcharge = selected.surcharge
+                val surchargeTotal = (surcharge.amount * selected.quantity).toLong()
+                if (surcharge.vatRate > 0) {
+                    val priceBeforeVat = (surchargeTotal / (1 + surcharge.vatRate / 100.0)).toLong()
+                    totalVat += surchargeTotal - priceBeforeVat
+                }
+            }
+
+            return totalVat
         }
 
     /**
