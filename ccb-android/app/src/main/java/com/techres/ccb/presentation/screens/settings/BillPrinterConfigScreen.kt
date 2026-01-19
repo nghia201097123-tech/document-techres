@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -1014,41 +1015,82 @@ private fun FontSizeSelectionDialog(
     }
 }
 
-// Line spacing options
-private val LINE_SPACING_OPTIONS = listOf(
-    LineSpacingOption(0.3f, "30%", "Rất sát"),
-    LineSpacingOption(0.4f, "40%", "Sát"),
-    LineSpacingOption(0.5f, "50%", "Chặt"),
-    LineSpacingOption(0.7f, "70%", "Bình thường"),
-    LineSpacingOption(1.0f, "100%", "Rộng")
-)
-
-private data class LineSpacingOption(val value: Float, val label: String, val description: String)
-
 @Composable
 private fun LineSpacingSelectionDialog(
     currentLineSpacing: Float,
     onDismiss: () -> Unit,
     onSelect: (Float) -> Unit
 ) {
+    var sliderValue by remember { mutableStateOf(currentLineSpacing.coerceIn(0.3f, 1.0f)) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.widthIn(max = 400.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Chọn khoảng cách dòng", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
-                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
-                    items(LINE_SPACING_OPTIONS) { option ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(option.value) }.padding(vertical = 12.dp)) {
-                            RadioButton(selected = currentLineSpacing == option.value, onClick = { onSelect(option.value) })
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(option.label, fontWeight = FontWeight.Medium)
-                                Text(option.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                            }
-                        }
-                    }
+                Text("Khoảng cách dòng", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+
+                // Current value display
+                Text(
+                    text = "${(sliderValue * 100).toInt()}%",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = primaryColor,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Slider with labels
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("30%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { sliderValue = it },
+                        valueRange = 0.3f..1.0f,
+                        steps = 6,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = primaryColor,
+                            activeTrackColor = primaryColor
+                        )
+                    )
+                    Text("100%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Đóng") }
+
+                // Description based on value
+                val description = when {
+                    sliderValue <= 0.35f -> "Rất sát - tiết kiệm giấy"
+                    sliderValue <= 0.5f -> "Sát - compact"
+                    sliderValue <= 0.7f -> "Bình thường"
+                    sliderValue <= 0.85f -> "Rộng - dễ đọc"
+                    else -> "Rất rộng"
+                }
+                Text(
+                    text = description,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Hủy") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onSelect(sliderValue) },
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    ) { Text("Áp dụng") }
+                }
             }
         }
     }
@@ -1157,7 +1199,6 @@ private fun BillPrinterAllSettingsDialog(
     // Dropdown expanded states
     var paperWidthExpanded by remember { mutableStateOf(false) }
     var fontSizeExpanded by remember { mutableStateOf(false) }
-    var lineSpacingExpanded by remember { mutableStateOf(false) }
     var copiesExpanded by remember { mutableStateOf(false) }
 
     // Options
@@ -1168,16 +1209,6 @@ private fun BillPrinterAllSettingsDialog(
         "medium" to "Vừa (1.0x)",
         "large" to "Lớn (1.2x)",
         "extra_large" to "Rất lớn (1.4x)"
-    )
-    val lineSpacingOptions = listOf(
-        0.5f to "50%",
-        0.6f to "60%",
-        0.7f to "70%",
-        0.8f to "80%",
-        0.9f to "90%",
-        1.0f to "100%",
-        1.1f to "110%",
-        1.2f to "120%"
     )
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1302,40 +1333,34 @@ private fun BillPrinterAllSettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Line Spacing Dropdown
-                Text("Khoảng cách dòng", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-                ExposedDropdownMenuBox(
-                    expanded = lineSpacingExpanded,
-                    onExpandedChange = { lineSpacingExpanded = it }
+                // Line Spacing Slider (30% - 100%, đồng bộ với web dashboard)
+                Text("Khoảng cách dòng", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = lineSpacingOptions.find { it.first == lineSpacing }?.second ?: "${(lineSpacing * 100).toInt()}%",
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = lineSpacingExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                        shape = RoundedCornerShape(12.dp)
+                    Text("30%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Slider(
+                        value = lineSpacing,
+                        onValueChange = { lineSpacing = it },
+                        valueRange = 0.3f..1.0f,
+                        steps = 6, // 30, 40, 50, 60, 70, 80, 90, 100 (7 điểm dừng = 6 steps)
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = primaryColor,
+                            activeTrackColor = primaryColor
+                        )
                     )
-                    ExposedDropdownMenu(
-                        expanded = lineSpacingExpanded,
-                        onDismissRequest = { lineSpacingExpanded = false }
-                    ) {
-                        lineSpacingOptions.forEach { (value, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    lineSpacing = value
-                                    lineSpacingExpanded = false
-                                },
-                                leadingIcon = {
-                                    if (value == lineSpacing) {
-                                        Icon(Icons.Default.Check, null, tint = primaryColor)
-                                    }
-                                }
-                            )
-                        }
-                    }
+                    Text("100%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
+                Text(
+                    text = "${(lineSpacing * 100).toInt()}%",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = primaryColor,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
