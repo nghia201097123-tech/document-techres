@@ -148,7 +148,7 @@ object HybridBillPrintService {
 
     /**
      * In bill qua Network (TCP/IP)
-     * Gửi dữ liệu theo từng chunk để máy in xử lý kịp, tránh giật
+     * Gửi toàn bộ data 1 lần rồi đợi máy in xử lý (giống kitchen ticket)
      */
     private suspend fun printViaNetwork(
         config: BillPrinterConfigEntity,
@@ -170,13 +170,20 @@ object HybridBillPrintService {
             socket.connect(InetSocketAddress(ip, config.printerPort), config.connectionTimeoutMs)
             outputStream = socket.getOutputStream()
 
-            // Gửi dữ liệu theo chunk để máy in kịp xử lý (giống cách in phiếu bếp)
-            writeChunked(outputStream, billContent)
+            // Gửi toàn bộ data 1 lần (giống kitchen ticket)
+            // KHÔNG dùng chunked writing vì có thể cắt GS v 0 command giữa chừng
+            outputStream.write(billContent)
+            outputStream.flush()
+
+            // Đợi máy in xử lý xong (giống kitchen ticket delay 500ms)
+            delay(500)
 
             // Print multiple copies if configured
             repeat(config.numberOfCopies - 1) {
                 delay(500)
-                writeChunked(outputStream, billContent)
+                outputStream.write(billContent)
+                outputStream.flush()
+                delay(500)
             }
 
             PrinterResult.Success("In bill thành công!")
@@ -191,27 +198,6 @@ object HybridBillPrintService {
                 socket?.close()
             } catch (e: Exception) {
                 Log.e(TAG, "Close error: ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * Gửi dữ liệu theo chunk để máy in không bị quá tải buffer
-     * Chunk size 4KB là kích thước tối ưu cho hầu hết máy in nhiệt
-     */
-    private suspend fun writeChunked(outputStream: OutputStream, data: ByteArray) {
-        val chunkSize = 4096 // 4KB mỗi chunk
-        var offset = 0
-
-        while (offset < data.size) {
-            val end = minOf(offset + chunkSize, data.size)
-            outputStream.write(data, offset, end - offset)
-            outputStream.flush()
-            offset = end
-
-            // Delay nhỏ giữa các chunk để máy in kịp xử lý
-            if (offset < data.size) {
-                delay(5) // 5ms delay - đủ cho máy in xử lý mà không làm chậm quá nhiều
             }
         }
     }
