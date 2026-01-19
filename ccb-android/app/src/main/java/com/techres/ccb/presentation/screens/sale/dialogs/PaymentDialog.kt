@@ -1803,7 +1803,7 @@ private fun VatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tổng VAT - sử dụng totalVatAmount được truyền vào (đồng nhất với màn hình thanh toán)
+                // Tổng VAT - cộng chính xác từ các món hiển thị trong dialog
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -1814,7 +1814,7 @@ private fun VatDetailDialog(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        formatCurrency(totalVatAmount),
+                        formatCurrency(calculatedTotalVat),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium

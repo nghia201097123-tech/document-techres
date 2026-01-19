@@ -1950,18 +1950,9 @@ private fun HistoryVatDetailDialog(
         }
     }
 
-    // Tính tổng VAT giống như summary (từ tổng tiền) để đảm bảo khớp
-    // Làm tròn priceBeforeVat trước để đồng nhất với tất cả các màn hình
-    val calculatedTotalVat = remember(subtotal, discountAmount, surchargeAmount) {
-        val vatRate = 8.0
-        val priceAfterDiscount = subtotal - discountAmount
-        val priceBeforeVatItems = (priceAfterDiscount / (1 + vatRate / 100.0)).toLong()
-        val itemsVat = priceAfterDiscount - priceBeforeVatItems
-        val surchargeVat = if (surchargeAmount > 0) {
-            val priceBeforeVatSurcharge = (surchargeAmount / (1 + vatRate / 100.0)).toLong()
-            surchargeAmount - priceBeforeVatSurcharge
-        } else 0L
-        itemsVat + surchargeVat
+    // Tính tổng VAT bằng cách cộng từ vatRows (khớp chính xác với các items hiển thị)
+    val calculatedTotalVat = remember(vatRows) {
+        vatRows.sumOf { it.vatAmount }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -2115,7 +2106,7 @@ private fun HistoryVatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tổng VAT - sử dụng totalVatAmount từ database (đồng nhất với tất cả các màn hình)
+                // Tổng VAT - cộng chính xác từ các món hiển thị trong dialog
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -2126,7 +2117,7 @@ private fun HistoryVatDetailDialog(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        formatCurrency(totalVatAmount),
+                        formatCurrency(calculatedTotalVat),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium

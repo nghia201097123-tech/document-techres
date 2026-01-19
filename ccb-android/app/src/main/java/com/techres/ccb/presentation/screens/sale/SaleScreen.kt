@@ -418,9 +418,44 @@ fun SaleScreen(
                 }
             }
 
-            // SỬ DỤNG VAT ĐÃ TÍNH TRONG SaleUiState (đồng nhất với tất cả các màn hình)
-            // Không tính lại từng món để tránh sai số làm tròn
-            val vatAmount = uiState.taxAmount
+            // Tính VAT bằng cách cộng từng món (khớp chính xác với VatDetailDialog)
+            // Sử dụng cùng dữ liệu orderItems để đảm bảo đồng nhất
+            val afterDiscountRatio = if (subtotal > 0) {
+                ((subtotal - uiState.discountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+            } else 1.0
+
+            var vatAmount = 0L
+
+            // VAT của từng món (main + toppings)
+            orderItems.forEach { item ->
+                // VAT món chính
+                val mainPrice = item.unitPrice * item.quantity
+                val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+                if (item.vatRate > 0) {
+                    val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                    vatAmount += mainPriceAfterDiscount - priceBeforeVat
+                }
+
+                // VAT từng topping
+                item.toppings.forEach { topping ->
+                    val toppingPrice = topping.price * item.quantity
+                    val toppingPriceAfterDiscount = (toppingPrice * afterDiscountRatio).toLong()
+                    if (topping.vatRate > 0) {
+                        val priceBeforeVat = (toppingPriceAfterDiscount / (1 + topping.vatRate / 100.0)).toLong()
+                        vatAmount += toppingPriceAfterDiscount - priceBeforeVat
+                    }
+                }
+            }
+
+            // VAT của phụ thu (không bị giảm giá)
+            uiState.selectedSurcharges.forEach { selected ->
+                val surcharge = selected.surcharge
+                val surchargeTotal = (surcharge.amount * selected.quantity).toLong()
+                if (surcharge.vatRate > 0) {
+                    val priceBeforeVat = (surchargeTotal / (1 + surcharge.vatRate / 100.0)).toLong()
+                    vatAmount += surchargeTotal - priceBeforeVat
+                }
+            }
 
             // Convert CouponEntity to CouponDisplayItem with availability status
             val couponDisplayItems = uiState.availableCoupons.map { coupon ->
