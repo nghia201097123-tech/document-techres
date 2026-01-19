@@ -211,4 +211,9 @@ class OrderRepository @Inject constructor(
     suspend fun getMaxDailyOrderNumberForToday(branchId: String, today: String): Int {
         return orderDao.getMaxDailyOrderNumberForToday(branchId, today)
     }
+
+    /**
+     * DEBUG: Get recent orders with their daily_order_number to verify database state
+     */
+    suspend fun getRecentOrdersDebug(branchId: String) = orderDao.getRecentOrdersDebug(branchId)
 }

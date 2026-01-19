@@ -1637,7 +1637,8 @@ class SaleViewModel @Inject constructor(
      */
     suspend fun generateNextPagerNumber(): Int {
         return withContext(Dispatchers.IO) {
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            // Use UTC date to match the created_at timestamp format
+            val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()
             val maxPager = orderRepository.getMaxPagerNumberForToday(branchId, today)
             // Wrap around from 99 to 1
             val nextPager = if (maxPager >= 99) 1 else maxPager + 1
@@ -1679,8 +1680,8 @@ class SaleViewModel @Inject constructor(
     private suspend fun loadUsedPagerNumbers(): Set<Int> {
         return withContext(Dispatchers.IO) {
             val branchId = authRepository.getBranchId() ?: return@withContext emptySet()
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val currentOrderId = _uiState.value.currentOrder?.id
+            // Use UTC date to match the created_at timestamp format
+            val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()
 
             val allUsed = orderRepository.getUsedPagerNumbersToday(branchId, today)
             // Exclude current order's pager if editing
@@ -3833,10 +3834,27 @@ class SaleViewModel @Inject constructor(
     private suspend fun generateDailyOrderNumber(): Int {
         return withContext(Dispatchers.IO) {
             val currentBranchId = authRepository.getBranchId() ?: branchId
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val maxNumber = orderRepository.getMaxDailyOrderNumberForToday(currentBranchId, today)
+            // Use UTC date to match the created_at timestamp format (Instant.now() is UTC)
+            val todayUtc = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()
+            // Also get local date for comparison
+            val todayLocal = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+            // DEBUG: Log recent orders to verify database state
+            try {
+                val recentOrders = orderRepository.getRecentOrdersDebug(currentBranchId)
+                Log.d(TAG, "generateDailyOrderNumber - DEBUG: todayUtc=$todayUtc, todayLocal=$todayLocal")
+                Log.d(TAG, "generateDailyOrderNumber - DEBUG: Recent orders in database:")
+                recentOrders.forEach { order ->
+                    val orderDate = order.createdAt.take(10)
+                    Log.d(TAG, "  - id=${order.id.take(8)}..., dailyOrderNumber=${order.dailyOrderNumber}, date=$orderDate, status=${order.status}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "generateDailyOrderNumber - DEBUG error: ${e.message}")
+            }
+
+            val maxNumber = orderRepository.getMaxDailyOrderNumberForToday(currentBranchId, todayUtc)
             val nextNumber = if (maxNumber >= 9999) 1 else maxNumber + 1
-            Log.d(TAG, "generateDailyOrderNumber - branchId=$currentBranchId, today=$today, maxNumber=$maxNumber, nextNumber=$nextNumber")
+            Log.d(TAG, "generateDailyOrderNumber - branchId=$currentBranchId, today=$todayUtc, maxNumber=$maxNumber, nextNumber=$nextNumber")
             nextNumber
         }
     }

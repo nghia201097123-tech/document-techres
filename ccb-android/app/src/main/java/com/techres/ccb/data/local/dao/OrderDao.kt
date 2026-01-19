@@ -181,4 +181,25 @@ interface OrderDao {
         AND SUBSTR(created_at, 1, 10) = :today
     """)
     suspend fun getMaxDailyOrderNumberForToday(branchId: String, today: String): Int
+
+    /**
+     * DEBUG: Get recent orders with their daily_order_number to verify database state
+     */
+    @Query("""
+        SELECT id, daily_order_number, created_at, status FROM orders
+        WHERE branch_id = :branchId
+        ORDER BY created_at DESC
+        LIMIT 10
+    """)
+    suspend fun getRecentOrdersDebug(branchId: String): List<OrderDebugInfo>
 }
+
+/**
+ * Debug data class to check order state
+ */
+data class OrderDebugInfo(
+    @ColumnInfo(name = "id") val id: String,
+    @ColumnInfo(name = "daily_order_number") val dailyOrderNumber: Int,
+    @ColumnInfo(name = "created_at") val createdAt: String,
+    @ColumnInfo(name = "status") val status: String
+)
