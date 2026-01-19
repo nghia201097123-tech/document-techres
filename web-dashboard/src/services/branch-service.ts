@@ -6,6 +6,7 @@ export interface Branch {
   code: string;
   brandId: string;
   isActive: boolean;
+  address?: string;
 }
 
 export const branchService = {
