@@ -22,8 +22,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Ẩn navigation bar trên Sunmi POS và các thiết bị tương tự
-        hideNavigationBarForPOS()
+        // Ẩn navigation bar cho tất cả thiết bị (đặc biệt quan trọng với máy POS)
+        hideNavigationBar()
 
         enableEdgeToEdge()
         setContent {
@@ -41,13 +41,20 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // Đảm bảo navigation bar luôn ẩn khi app có focus
-        if (hasFocus && isSunmiOrPOSDevice()) {
-            hideNavigationBarForPOS()
+        if (hasFocus) {
+            hideNavigationBar()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Đảm bảo navigation bar ẩn khi quay lại app
+        hideNavigationBar()
     }
 
     /**
      * Kiểm tra có phải thiết bị Sunmi POS hoặc thiết bị POS khác không
+     * Dùng để áp dụng các API đặc biệt của từng hãng
      */
     private fun isSunmiOrPOSDevice(): Boolean {
         val manufacturer = Build.MANUFACTURER.lowercase()
@@ -62,17 +69,24 @@ class MainActivity : ComponentActivity() {
                manufacturer.contains("newland") ||
                manufacturer.contains("pax") ||
                manufacturer.contains("verifone") ||
+               manufacturer.contains("telpo") ||
+               manufacturer.contains("urovo") ||
+               manufacturer.contains("aisino") ||
+               manufacturer.contains("wintec") ||
+               manufacturer.contains("bixolon") ||
+               manufacturer.contains("imin") ||
+               manufacturer.contains("商米") ||  // Sunmi Chinese name
                model.contains("pos") ||
-               model.contains("terminal")
+               model.contains("terminal") ||
+               model.contains("kiosk")
     }
 
     /**
-     * Ẩn navigation bar (3 nút điều hướng) trên thiết bị POS
+     * Ẩn navigation bar (3 nút điều hướng) - áp dụng cho TẤT CẢ thiết bị
      * Sử dụng immersive sticky mode để ẩn hoàn toàn
+     * Navigation bar sẽ hiện lại tạm thời khi user vuốt từ cạnh màn hình
      */
-    private fun hideNavigationBarForPOS() {
-        if (!isSunmiOrPOSDevice()) return
-
+    private fun hideNavigationBar() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 // Android 11+ (API 30+)
@@ -87,9 +101,7 @@ class MainActivity : ComponentActivity() {
                 window.decorView.systemUiVisibility = (
                     View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 )
             }
@@ -100,31 +112,32 @@ class MainActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
             )
 
-            // Thử gọi Sunmi API để ẩn navigation bar (nếu có)
-            hideSunmiNavigationBar()
+            // Thử gọi API đặc biệt của các hãng POS (nếu có)
+            if (isSunmiOrPOSDevice()) {
+                hidePOSNavigationBar()
+            }
         } catch (e: Exception) {
-            // Ignore errors on non-POS devices
+            // Ignore errors
         }
     }
 
     /**
-     * Gọi Sunmi API riêng để ẩn navigation bar
-     * Sunmi có API: Settings.System.putInt(contentResolver, "navigation_bar_visible", 0)
+     * Gọi API đặc biệt của các hãng POS để ẩn navigation bar
+     * Mỗi hãng có thể có API riêng
      */
-    private fun hideSunmiNavigationBar() {
+    private fun hidePOSNavigationBar() {
+        // Sunmi API
         try {
-            // Thử dùng Sunmi Settings API
             android.provider.Settings.System.putInt(
                 contentResolver,
                 "navigation_bar_visible",
                 0 // 0 = ẩn, 1 = hiện
             )
         } catch (e: Exception) {
-            // Fallback: Sunmi API không có sẵn, dùng immersive mode
+            // Sunmi API không có sẵn
         }
 
         try {
-            // Một số Sunmi dùng key khác
             android.provider.Settings.System.putInt(
                 contentResolver,
                 "hide_navigation_bar",
@@ -132,6 +145,17 @@ class MainActivity : ComponentActivity() {
             )
         } catch (e: Exception) {
             // Ignore
+        }
+
+        // iMin POS API
+        try {
+            android.provider.Settings.System.putInt(
+                contentResolver,
+                "imin_navigation_bar",
+                0 // 0 = ẩn
+            )
+        } catch (e: Exception) {
+            // iMin API không có sẵn
         }
     }
 }
