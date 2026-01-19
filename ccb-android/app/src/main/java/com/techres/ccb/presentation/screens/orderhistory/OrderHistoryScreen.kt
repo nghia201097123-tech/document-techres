@@ -338,10 +338,22 @@ fun OrderHistoryScreen(
                         val totalDiscount = completedOrders.sumOf { it.discountAmount }
                         val totalAfterDiscount = (totalSubtotal - totalDiscount).coerceAtLeast(0L)
                         val vatRate = 8.0
+                        // Tính VAT: nếu database có giá trị thì dùng, không thì tính từ giá sau giảm + phụ thu
                         val totalVat = completedOrders.sumOf { order ->
-                            val afterDiscount = (order.subtotal - order.discountAmount).coerceAtLeast(0L)
-                            val beforeVat = (afterDiscount / (1 + vatRate / 100)).toLong()
-                            afterDiscount - beforeVat
+                            if (order.vatAmount > 0) {
+                                order.vatAmount.toLong()
+                            } else {
+                                // Tính VAT từ giá sau giảm
+                                val afterDiscount = (order.subtotal - order.discountAmount).coerceAtLeast(0L)
+                                val beforeVat = (afterDiscount / (1 + vatRate / 100)).toLong()
+                                val itemsVat = afterDiscount - beforeVat
+                                // Tính VAT từ phụ thu
+                                val surchargeVat = if (order.surchargeAmount > 0) {
+                                    val surchargeBeforeVat = (order.surchargeAmount / (1 + vatRate / 100)).toLong()
+                                    order.surchargeAmount.toLong() - surchargeBeforeVat
+                                } else 0L
+                                itemsVat + surchargeVat
+                            }
                         }
                         val totalRevenue = completedOrders.sumOf { it.totalAmount }
 
@@ -768,9 +780,10 @@ private fun OrderTableRow(
             color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // VAT (Dùng VAT đã lưu trong database thay vì tính lại)
+        // VAT (Nếu database = 0 thì tính lại từ giá sau giảm + phụ thu)
+        val displayVat = if (order.vatAmount > 0) order.vatAmount.toLong() else calculatedVat
         Text(
-            text = formatCurrency(order.vatAmount),
+            text = formatCurrency(displayVat),
             modifier = Modifier.width(90.dp),
             fontSize = 11.sp,
             textAlign = TextAlign.End,
