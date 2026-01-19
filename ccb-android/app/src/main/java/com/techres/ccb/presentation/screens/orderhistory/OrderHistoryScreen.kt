@@ -1883,6 +1883,7 @@ private fun OrderDetailDialog(
             subtotal = order.subtotal.toLong(),
             discountAmount = order.discountAmount.toLong(),
             surchargeAmount = order.surchargeAmount.toLong(),
+            surchargesJson = order.surchargesJson,
             totalVatAmount = order.vatAmount.toLong(),
             onDismiss = { showVatDetail = false }
         )
@@ -1987,6 +1988,7 @@ private fun HistoryVatDetailDialog(
     subtotal: Long,
     discountAmount: Long,
     surchargeAmount: Long = 0,
+    surchargesJson: String? = null,
     totalVatAmount: Long,
     onDismiss: () -> Unit
 ) {
@@ -2047,7 +2049,7 @@ private fun HistoryVatDetailDialog(
     }
 
     // Build flat list: main items + their toppings with VAT (sau giảm giá)
-    val vatRows = remember(orderItems, afterDiscountRatio, surchargeAmount) {
+    val vatRows = remember(orderItems, afterDiscountRatio, surchargeAmount, surchargesJson) {
         buildList {
             // Only process active (non-cancelled, non-combo-child) items
             orderItems.filter { it.status != "cancelled" && !it.isComboChild }.forEach { item ->
@@ -2104,22 +2106,63 @@ private fun HistoryVatDetailDialog(
                 }
             }
 
-            // Thêm VAT của phụ thu (surcharges không bị giảm giá)
-            // Làm tròn priceBeforeVat trước để đồng nhất
+            // Thêm VAT của từng phụ thu riêng biệt (surcharges không bị giảm giá)
+            // Parse từ surchargesJson nếu có, nếu không thì fallback về tổng
             if (surchargeAmount > 0) {
-                val surchargeVat = if (surchargeVatRate > 0) {
-                    val priceBeforeVat = (surchargeAmount / (1 + surchargeVatRate / 100.0)).toLong()
-                    surchargeAmount - priceBeforeVat
-                } else 0L
+                // Try to parse individual surcharges from JSON
+                val parsedSurcharges: List<SurchargeDisplayItem> = try {
+                    if (!surchargesJson.isNullOrEmpty()) {
+                        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+                        val surchargesList: List<Map<String, Any>> = Gson().fromJson(surchargesJson, type)
+                        surchargesList.map { map ->
+                            SurchargeDisplayItem(
+                                id = map["id"] as? String ?: "",
+                                name = map["name"] as? String ?: "Phụ thu",
+                                amount = (map["amount"] as? Double) ?: 0.0,
+                                quantity = (map["quantity"] as? Double)?.toInt() ?: 1,
+                                vatRate = (map["vatRate"] as? Double) ?: 8.0
+                            )
+                        }
+                    } else emptyList()
+                } catch (e: Exception) {
+                    emptyList()
+                }
 
-                add(HistoryVatDisplayRow(
-                    name = "⊕ Phụ thu",
-                    quantity = 1,
-                    totalPrice = surchargeAmount,
-                    vatRate = surchargeVatRate,
-                    vatAmount = surchargeVat,
-                    isTopping = false
-                ))
+                if (parsedSurcharges.isNotEmpty()) {
+                    // Hiển thị từng phụ thu riêng biệt
+                    parsedSurcharges.forEach { surcharge ->
+                        val surchargeTotal = (surcharge.amount * surcharge.quantity).toLong()
+                        val vatRate = if (surcharge.vatRate > 0) surcharge.vatRate else surchargeVatRate
+                        val surchargeVat = if (vatRate > 0) {
+                            val priceBeforeVat = (surchargeTotal / (1 + vatRate / 100.0)).toLong()
+                            surchargeTotal - priceBeforeVat
+                        } else 0L
+
+                        add(HistoryVatDisplayRow(
+                            name = "⊕ ${surcharge.name}",
+                            quantity = surcharge.quantity,
+                            totalPrice = surchargeTotal,
+                            vatRate = vatRate,
+                            vatAmount = surchargeVat,
+                            isTopping = false
+                        ))
+                    }
+                } else {
+                    // Fallback: hiển thị tổng phụ thu nếu không có chi tiết
+                    val surchargeVat = if (surchargeVatRate > 0) {
+                        val priceBeforeVat = (surchargeAmount / (1 + surchargeVatRate / 100.0)).toLong()
+                        surchargeAmount - priceBeforeVat
+                    } else 0L
+
+                    add(HistoryVatDisplayRow(
+                        name = "⊕ Phụ thu",
+                        quantity = 1,
+                        totalPrice = surchargeAmount,
+                        vatRate = surchargeVatRate,
+                        vatAmount = surchargeVat,
+                        isTopping = false
+                    ))
+                }
             }
         }
     }
