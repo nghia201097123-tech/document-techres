@@ -366,13 +366,15 @@ object BitmapTextRenderer {
             return bitmap // Không cần crop
         }
 
-        // Tính padding phía dưới dựa trên lineSpacing
-        // lineSpacing: 0.3 = rất sát (2px padding), 1.0 = rộng (12px padding)
-        // Công thức: basePadding + (lineSpacing - 0.3) * extraPadding
+        // Tính padding phía dưới dựa trên lineSpacing VÀ contentHeight
+        // lineSpacing: 0.3 = rất sát, 1.0 = rộng
+        // Padding cần tỉ lệ với chiều cao font để tránh chữ bị đè
+        // Base ratio: 15% của contentHeight cho lineSpacing 0.3, 40% cho lineSpacing 1.0
         val effectiveLineSpacing = lineSpacing.coerceIn(0.3f, 1.0f)
-        val basePadding = 2 // Padding tối thiểu
-        val maxExtraPadding = 14 // Padding tối đa thêm vào (16 - 2 = 14)
-        val bottomPadding = (basePadding + (effectiveLineSpacing - 0.3f) / 0.7f * maxExtraPadding).toInt()
+        val minRatio = 0.15f // 15% của font height cho spacing tối thiểu
+        val maxRatio = 0.45f // 45% của font height cho spacing tối đa
+        val paddingRatio = minRatio + (effectiveLineSpacing - 0.3f) / 0.7f * (maxRatio - minRatio)
+        val bottomPadding = (contentHeight * paddingRatio).toInt().coerceAtLeast(4)
 
         // Crop content và thêm padding phía dưới
         val cropTop = topRow

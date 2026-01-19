@@ -534,61 +534,7 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Font size - clickable to open all settings
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
-                    ) {
-                        Icon(
-                            Icons.Default.FormatSize,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Cỡ chữ: ${getFontSizeLabel(config.fontSize)}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        )
-                    }
-
-                    // Line spacing - clickable to open all settings
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
-                    ) {
-                        Icon(
-                            Icons.Default.FormatLineSpacing,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Khoảng cách dòng: ${(config.lineSpacing * 100).toInt()}%",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        )
-                    }
-
-                    // Number of copies - clickable to open all settings
+                    // Số bản in
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -615,7 +561,7 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Print settings (cut paper, cash drawer, beep) - clickable to open all settings
+                    // Print settings summary (cut paper, cash drawer, beep)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -698,7 +644,7 @@ private fun PrinterConfigCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Actions
+            // Actions - Row 1: Test In + Mặc định
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -731,6 +677,21 @@ private fun PrinterConfigCard(
                         Text("Mặc định")
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Actions - Row 2: Cài đặt button (full width)
+            Button(
+                onClick = onAllSettingsClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = primaryColor
+                )
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cài đặt")
             }
         }
     }
