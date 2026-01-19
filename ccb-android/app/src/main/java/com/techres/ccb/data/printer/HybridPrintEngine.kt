@@ -286,19 +286,17 @@ object BitmapTextRenderer {
         }
 
         // Tạo StaticLayout để handle Vietnamese text đúng cách
-        // QUAN TRỌNG: Khoảng cách TRONG text wrap (khi text dài xuống dòng) phải >= 1.0
-        // để các dòng không bị đè nhau. Config lineSpacing chỉ ảnh hưởng padding GIỮA các dòng.
-        // Tính internal line spacing: tối thiểu 1.15 để đảm bảo không bị đè
-        // Nếu user muốn spacing lớn hơn (> 1.0), ta scale thêm
-        val minInternalSpacing = 1.15f // Tối thiểu 115% để tránh đè
-        val userSpacingBoost = if (style.lineSpacingMultiplier > 0.7f) {
-            (style.lineSpacingMultiplier - 0.7f) / 0.3f * 0.15f // Thêm tối đa 15% nếu user chọn 100%
+        // Internal line spacing cho text wrap (khi text dài xuống dòng)
+        // Giảm xuống 1.02 để tiết kiệm giấy hơn mà vẫn đảm bảo không bị đè chữ
+        val minInternalSpacing = 1.02f // Tối thiểu 102% - vừa đủ để không đè
+        val userSpacingBoost = if (style.lineSpacingMultiplier > 0.5f) {
+            (style.lineSpacingMultiplier - 0.3f) / 0.7f * 0.08f // Thêm tối đa 8% khi user chọn 100%
         } else 0f
         val internalLineSpacing = minInternalSpacing + userSpacingBoost
         val staticLayout = StaticLayout.Builder
             .obtain(text, 0, text.length, textPaint, paperWidth)
             .setAlignment(alignment)
-            .setLineSpacing(0f, internalLineSpacing) // Luôn >= 1.15 để tránh chữ đè
+            .setLineSpacing(0f, internalLineSpacing) // Đã giảm để tiết kiệm giấy
             .setIncludePad(false) // Bỏ padding thừa
             .build()
 
@@ -374,18 +372,17 @@ object BitmapTextRenderer {
         }
 
         // Tính padding phía dưới dựa trên lineSpacing VÀ contentHeight
-        // lineSpacing: 0.3 = rất sát, 1.0 = rộng
-        // Padding cần tỉ lệ với chiều cao font để tránh chữ bị đè
-        // Base ratio: 15% của contentHeight cho lineSpacing 0.3, 40% cho lineSpacing 1.0
+        // lineSpacing: 0.3 = rất sát (tiết kiệm giấy), 1.0 = rộng (dễ đọc)
+        // Giảm padding để tiết kiệm giấy hơn, đặc biệt với font lớn
         val effectiveLineSpacing = lineSpacing.coerceIn(0.3f, 1.0f)
-        val minRatio = 0.15f // 15% của font height cho spacing tối thiểu
-        val maxRatio = 0.45f // 45% của font height cho spacing tối đa
+        val minRatio = 0.03f // 3% của font height cho spacing tối thiểu (rất sát)
+        val maxRatio = 0.25f // 25% của font height cho spacing tối đa
         val paddingRatio = minRatio + (effectiveLineSpacing - 0.3f) / 0.7f * (maxRatio - minRatio)
-        val bottomPadding = (contentHeight * paddingRatio).toInt().coerceAtLeast(4)
+        val bottomPadding = (contentHeight * paddingRatio).toInt().coerceAtLeast(1)
 
-        // QUAN TRỌNG: Thêm top padding để tránh cắt mất dấu tiếng Việt (ă, â, ê, ô, ơ, ư)
-        // Top padding nhỏ hơn bottom padding, chỉ cần đủ cho dấu
-        val topPadding = (contentHeight * 0.08f).toInt().coerceAtLeast(2) // 8% hoặc tối thiểu 2px
+        // Top padding để tránh cắt mất dấu tiếng Việt (ă, â, ê, ô, ơ, ư)
+        // Giảm xuống 5% để tiết kiệm giấy hơn
+        val topPadding = (contentHeight * 0.05f).toInt().coerceAtLeast(1) // 5% hoặc tối thiểu 1px
 
         // Crop content với top padding và bottom padding
         val cropTop = (topRow - topPadding).coerceAtLeast(0)
