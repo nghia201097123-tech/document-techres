@@ -428,12 +428,42 @@ object LabelPrintService {
             storeBitmap.recycle()
         }
 
-        // ========== LINE 2: ORDER NUMBER + INDEX (if enabled) ==========
-        if (showOrderNumber) {
-            val labelCountText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
-            val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
-            val indexText = "$labelCountText $partText".trim()
+        // ========== SMART LAYOUT: Gộp Bàn + Mã đơn trên cùng 1 dòng để tiết kiệm không gian ==========
+        val hasTable = showTableName && !label.tableName.isNullOrBlank()
+        val hasOrder = showOrderNumber
 
+        // Index text (chỉ hiển thị khi không có bàn hoặc khi cần)
+        val labelCountText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
+        val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
+        val indexText = "$labelCountText $partText".trim()
+
+        if (hasTable && hasOrder) {
+            // SMART: Bàn bên trái + Mã đơn bên phải (trên cùng 1 dòng)
+            val orderWithIndex = if (indexText.isNotEmpty()) "${label.orderNumber} $indexText" else label.orderNumber
+            val headerBitmap = renderTwoColumnText(
+                "Bàn: ${label.tableName}",
+                orderWithIndex,
+                contentWidth,
+                fontSmall,
+                bold = true
+            )
+            output.write(bitmapToTspl(margin, yPos, headerBitmap))
+            yPos += headerBitmap.height + lineSpacingExtra
+            headerBitmap.recycle()
+        } else if (hasTable) {
+            // Chỉ có bàn, không có mã đơn
+            val tableBitmap = renderTextBitmap(
+                text = "Bàn: ${label.tableName}",
+                width = contentWidth,
+                fontSize = fontSmall,
+                bold = true,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, tableBitmap))
+            yPos += tableBitmap.height + lineSpacingExtra
+            tableBitmap.recycle()
+        } else if (hasOrder) {
+            // Chỉ có mã đơn, không có bàn (layout cũ)
             val orderHeaderBitmap = renderTwoColumnText(
                 label.orderNumber,
                 indexText,
@@ -444,20 +474,6 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
             yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
-        }
-
-        // ========== TABLE NAME (if enabled) ==========
-        if (showTableName && !label.tableName.isNullOrBlank()) {
-            val tableBitmap = renderTextBitmap(
-                text = "Bàn: ${label.tableName}",
-                width = contentWidth,
-                fontSize = fontNormal,
-                bold = true,
-                centerAlign = false
-            )
-            output.write(bitmapToTspl(margin, yPos, tableBitmap))
-            yPos += tableBitmap.height + lineSpacingExtra
-            tableBitmap.recycle()
         }
 
         // ========== SEPARATOR 1 ==========
