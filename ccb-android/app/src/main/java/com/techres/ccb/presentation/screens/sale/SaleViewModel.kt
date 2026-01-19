@@ -3098,58 +3098,33 @@ class SaleViewModel @Inject constructor(
         // Tính subtotal thực tế (tổng giá gốc các món TRƯỚC giảm giá)
         val calculatedSubtotal = billItems.sumOf { it.originalPrice * it.quantity }
 
-        // Tính VAT cho TỪNG MÓN rồi cộng lại (mỗi món có VAT rate riêng)
-        // Giá đã bao gồm VAT (inclusive): VAT = price - price/(1 + vatRate/100)
-        var itemsVatAmount = 0.0
-        var itemsPriceBeforeVat = 0.0
-        billItems.forEach { item ->
-            // Tính VAT cho từng món dựa trên vatRate của món đó
-            val itemPriceBeforeVat = item.totalPrice / (1 + item.vatRate / 100)
-            val itemVat = item.totalPrice - itemPriceBeforeVat
-            itemsPriceBeforeVat += itemPriceBeforeVat
-            itemsVatAmount += itemVat
-        }
-
-        // Tính VAT cho phụ thu (surcharges)
-        var surchargesVatAmount = 0.0
-        var surchargesPriceBeforeVat = 0.0
-        surcharges.forEach { selected ->
-            val surcharge = selected.surcharge
-            val totalAmount = surcharge.amount * selected.quantity
-            if (surcharge.vatRate > 0) {
-                val priceBeforeVat = totalAmount / (1 + surcharge.vatRate / 100)
-                surchargesPriceBeforeVat += priceBeforeVat
-                surchargesVatAmount += (totalAmount - priceBeforeVat)
-            } else {
-                surchargesPriceBeforeVat += totalAmount
-            }
-        }
-
-        // Tổng VAT và giá trước VAT
-        val totalVatAmount = itemsVatAmount + surchargesVatAmount
-        val totalPriceBeforeVat = itemsPriceBeforeVat + surchargesPriceBeforeVat
-
         // Tính totalAmount thực tế (sau tất cả giảm giá + phụ thu)
         val calculatedTotalAmount = (calculatedSubtotal + surchargeAmount - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
 
-        // Nếu có giảm giá bill, VAT của món cũng giảm theo tỷ lệ (phụ thu không bị giảm)
-        val totalItemsPrice = billItems.sumOf { it.totalPrice }
-        val itemsAfterDiscount = (totalItemsPrice - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
-        val discountRatio = if (totalItemsPrice > 0) itemsAfterDiscount / totalItemsPrice else 1.0
+        // ========== SỬ DỤNG VAT ĐÃ LƯU TRONG DATABASE ==========
+        // Nếu order đã có vatAmount (đã thanh toán), dùng luôn giá trị đó
+        // Để đảm bảo bill in ra giống với màn hình thanh toán và lịch sử đơn
+        val vatAmount: Double
+        val priceBeforeVat: Double
+        val displayVatRate: Double
 
-        // VAT của món giảm theo tỷ lệ, VAT của phụ thu giữ nguyên
-        val itemsVatAfterDiscount = itemsVatAmount * discountRatio
-        val itemsPriceBeforeVatAfterDiscount = itemsPriceBeforeVat * discountRatio
-
-        // Tổng VAT = VAT món sau giảm + VAT phụ thu (không giảm)
-        val vatAmount = itemsVatAfterDiscount + surchargesVatAmount
-        val priceBeforeVat = itemsPriceBeforeVatAfterDiscount + surchargesPriceBeforeVat
-
-        // Tính VAT rate trung bình để hiển thị trên bill (chỉ để hiển thị)
-        val displayVatRate = if (priceBeforeVat > 0) {
-            (vatAmount / priceBeforeVat) * 100
+        if (order.vatAmount > 0) {
+            // Dùng VAT đã lưu trong database (đồng nhất với thanh toán và lịch sử)
+            vatAmount = order.vatAmount.toDouble()
+            priceBeforeVat = calculatedTotalAmount - vatAmount
+            displayVatRate = if (priceBeforeVat > 0) {
+                (vatAmount / priceBeforeVat) * 100
+            } else {
+                8.0
+            }
         } else {
-            8.0 // Default F&B
+            // Tính VAT mới (cho đơn chưa thanh toán) - làm tròn như DiscountCalculator
+            val avgVatRate = if (billItems.isNotEmpty()) {
+                billItems.map { it.vatRate }.average()
+            } else 8.0
+            priceBeforeVat = (calculatedTotalAmount / (1 + avgVatRate / 100.0)).toLong().toDouble()
+            vatAmount = calculatedTotalAmount - priceBeforeVat
+            displayVatRate = avgVatRate
         }
 
         // Map payment method to display text
