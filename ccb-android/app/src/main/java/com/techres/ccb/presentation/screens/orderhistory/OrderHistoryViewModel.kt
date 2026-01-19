@@ -770,7 +770,8 @@ class OrderHistoryViewModel @Inject constructor(
             return null to null
         }
 
-        val zone = ZoneId.systemDefault()
+        // Use UTC timezone to match the created_at timestamp format (stored as Instant.now() in UTC)
+        val zone = java.time.ZoneOffset.UTC
         val today = LocalDate.now(zone)
 
         val (startLocalDate, endLocalDate) = when (dateFilter) {
@@ -790,19 +791,25 @@ class OrderHistoryViewModel @Inject constructor(
                 startOfMonth to today
             }
             DateFilter.CUSTOM -> {
-                val customStart = _uiState.value.customStartDate ?: today
-                val customEnd = _uiState.value.customEndDate ?: today
-                customStart to customEnd
+                // Custom dates: user selects in local time, but we need to convert to UTC range
+                // to match database timestamps. Since local date could span 2 UTC dates,
+                // we expand the range slightly for better UX
+                val localZone = ZoneId.systemDefault()
+                val customStart = _uiState.value.customStartDate ?: LocalDate.now(localZone)
+                val customEnd = _uiState.value.customEndDate ?: LocalDate.now(localZone)
+                // Convert local dates to UTC (may shift by 1 day)
+                val startUtc = customStart.atStartOfDay(localZone).withZoneSameInstant(zone).toLocalDate()
+                val endUtc = customEnd.plusDays(1).atStartOfDay(localZone).withZoneSameInstant(zone).toLocalDate()
+                startUtc to endUtc.minusDays(1)
             }
             else -> return null to null
         }
 
         // Format as simple date string for LIKE comparison: "2025-01-17"
-        // This ensures timezone issues don't affect the query
         val startDate = startLocalDate.toString() // "2025-01-17"
         val endDate = endLocalDate.plusDays(1).toString() // "2025-01-18" (exclusive)
 
-        Log.d(TAG, "getDateRange - filter: $dateFilter, startDate: $startDate, endDate: $endDate")
+        Log.d(TAG, "getDateRange - filter: $dateFilter, todayUtc: $today, startDate: $startDate, endDate: $endDate")
 
         return startDate to endDate
     }
