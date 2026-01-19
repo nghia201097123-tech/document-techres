@@ -418,50 +418,9 @@ fun SaleScreen(
                 }
             }
 
-            // Tính VAT từ từng món và topping (dựa trên vatRate riêng của mỗi item)
-            // Theo luật thuế VN: VAT tính trên giá SAU giảm giá (chiết khấu)
-            // Công thức: VAT = Giá sau giảm - (Giá sau giảm / (1 + VAT%))
-            val totalDiscount = uiState.discountAmount
-            // Tính tỷ lệ còn lại sau giảm giá (để phân bổ giảm giá cho từng item)
-            val afterDiscountRatio = if (subtotal > 0) {
-                ((subtotal - totalDiscount).toDouble() / subtotal).coerceIn(0.0, 1.0)
-            } else 1.0
-
-            val itemsVatAmount = orderItems.sumOf { item ->
-                // Áp dụng tỷ lệ giảm giá cho giá món chính
-                val mainItemPrice = item.unitPrice * item.quantity
-                val mainItemPriceAfterDiscount = (mainItemPrice * afterDiscountRatio).toLong()
-                val mainItemVat = if (item.vatRate > 0) {
-                    val priceBeforeVat = mainItemPriceAfterDiscount / (1 + item.vatRate / 100.0)
-                    (mainItemPriceAfterDiscount - priceBeforeVat).toLong()
-                } else 0L
-
-                // VAT của từng topping (cũng áp dụng tỷ lệ giảm giá)
-                val toppingsVat = item.toppings.sumOf { topping ->
-                    val toppingTotalPrice = topping.price * item.quantity
-                    val toppingPriceAfterDiscount = (toppingTotalPrice * afterDiscountRatio).toLong()
-                    if (topping.vatRate > 0) {
-                        val priceBeforeVat = toppingPriceAfterDiscount / (1 + topping.vatRate / 100.0)
-                        (toppingPriceAfterDiscount - priceBeforeVat).toLong()
-                    } else 0L
-                }
-
-                mainItemVat + toppingsVat
-            }
-
-            // Tính VAT từ phụ thu (surcharges)
-            // Phụ thu có giá đã gồm VAT, nên VAT = amount - amount/(1 + vatRate/100)
-            val surchargesVatAmount = uiState.selectedSurcharges.sumOf { selected ->
-                val surcharge = selected.surcharge
-                val totalAmount = surcharge.amount * selected.quantity
-                if (surcharge.vatRate > 0) {
-                    val priceBeforeVat = totalAmount / (1 + surcharge.vatRate / 100.0)
-                    (totalAmount - priceBeforeVat).toLong()
-                } else 0L
-            }
-
-            // Tổng VAT = VAT món + VAT phụ thu
-            val vatAmount = itemsVatAmount + surchargesVatAmount
+            // SỬ DỤNG VAT ĐÃ TÍNH TRONG SaleUiState (đồng nhất với tất cả các màn hình)
+            // Không tính lại từng món để tránh sai số làm tròn
+            val vatAmount = uiState.taxAmount
 
             // Convert CouponEntity to CouponDisplayItem with availability status
             val couponDisplayItems = uiState.availableCoupons.map { coupon ->
