@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.orderhistory
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -834,25 +835,35 @@ private fun PaginationControls(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Page size selector
+            // Page size selector - làm to hơn để dễ bấm
             var expanded by remember { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Hiển thị:", fontSize = 12.sp, color = Color.Gray)
-                Spacer(modifier = Modifier.width(4.dp))
+                Text("Hiển thị:", fontSize = 13.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.width(8.dp))
                 Box {
-                    Row(
-                        modifier = Modifier
-                            .clickable { expanded = true }
-                            .border(1.dp, Color.LightGray, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.height(40.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
-                        Text(pageSize.toString(), fontSize = 12.sp)
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "$pageSize đơn",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                     DropdownMenu(
                         expanded = expanded,
@@ -860,11 +871,19 @@ private fun PaginationControls(
                     ) {
                         listOf(5, 10, 20, 30, 50).forEach { size ->
                             DropdownMenuItem(
-                                text = { Text("$size đơn", fontSize = 13.sp) },
+                                text = {
+                                    Text(
+                                        "$size đơn",
+                                        fontSize = 14.sp,
+                                        fontWeight = if (size == pageSize) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (size == pageSize) MaterialTheme.colorScheme.primary else Color.Unspecified
+                                    )
+                                },
                                 onClick = {
                                     onPageSizeChange(size)
                                     expanded = false
-                                }
+                                },
+                                modifier = Modifier.height(44.dp)
                             )
                         }
                     }
