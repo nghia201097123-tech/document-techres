@@ -74,6 +74,7 @@ enum class SortOption(val displayName: String) {
 data class OrderHistoryItem(
     val id: String,
     val orderNumber: String,
+    val dailyOrderNumber: Int = 0,  // Mã đơn hàng theo ngày (#0001, #0002...)
     val tableName: String?,
     val customerName: String?,
     val itemCount: Int,
@@ -98,7 +99,15 @@ data class OrderHistoryItem(
     // Sync status
     val syncStatus: String = "pending", // pending, syncing, synced, failed
     val syncError: String? = null
-)
+) {
+    // Display number formatted as #0001
+    val displayNumber: String
+        get() = if (dailyOrderNumber > 0) {
+            "#${dailyOrderNumber.toString().padStart(4, '0')}"
+        } else {
+            "#${orderNumber.takeLast(8)}"  // Fallback to last 8 chars of order number
+        }
+}
 
 data class OrderHistoryUiState(
     val isLoading: Boolean = false,
@@ -232,6 +241,7 @@ class OrderHistoryViewModel @Inject constructor(
                         OrderHistoryItem(
                             id = entity.id,
                             orderNumber = entity.orderNumber,
+                            dailyOrderNumber = entity.dailyOrderNumber,
                             tableName = entity.tableName,
                             customerName = entity.customerName,
                             itemCount = itemCount,

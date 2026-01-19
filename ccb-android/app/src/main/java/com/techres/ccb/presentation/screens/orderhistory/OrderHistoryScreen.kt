@@ -696,17 +696,29 @@ private fun OrderTableRow(
             color = if (isCancelled) Color.Gray else Color.Unspecified
         )
 
-        // Mã hóa đơn (Full order number)
-        Text(
-            text = order.orderNumber,
-            modifier = Modifier.width(115.dp),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Start,
-            color = if (isCancelled) Color.Gray else Color(0xFF1976D2),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        // Mã hóa đơn (Daily order number + order ID)
+        Column(
+            modifier = Modifier.width(115.dp)
+        ) {
+            // Daily order number (#0001) - main display
+            Text(
+                text = order.displayNumber,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Start,
+                color = if (isCancelled) Color.Gray else Color(0xFFE65100),
+                maxLines = 1
+            )
+            // Full order number (HD...) - secondary
+            Text(
+                text = order.orderNumber,
+                fontSize = 9.sp,
+                textAlign = TextAlign.Start,
+                color = if (isCancelled) Color.Gray.copy(alpha = 0.7f) else Color(0xFF757575),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         // Ngày giờ (Date + Time)
         Column(
@@ -979,13 +991,18 @@ private fun OrderDetailDialog(
     var isOrderInfoExpanded by remember { mutableStateOf(false) }
 
     // Cancel confirmation dialog
+    val cancelDisplayNumber = if (order.dailyOrderNumber > 0) {
+        "#${order.dailyOrderNumber.toString().padStart(4, '0')}"
+    } else {
+        "#${order.orderNumber.takeLast(8)}"
+    }
     if (showCancelDialog) {
         AlertDialog(
             onDismissRequest = { showCancelDialog = false },
             title = { Text("Huỷ đơn hàng", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Bạn có chắc muốn huỷ đơn hàng #${order.orderNumber.takeLast(8)}?")
+                    Text("Bạn có chắc muốn huỷ đơn hàng $cancelDisplayNumber?")
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = cancelReason,
@@ -1047,11 +1064,25 @@ private fun OrderDetailDialog(
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "#${order.orderNumber.takeLast(8)}",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
+                        // Daily order number (primary) + order ID (secondary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val displayNumber = if (order.dailyOrderNumber > 0) {
+                                "#${order.dailyOrderNumber.toString().padStart(4, '0')}"
+                            } else {
+                                "#${order.orderNumber.takeLast(8)}"
+                            }
+                            Text(
+                                text = displayNumber,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFE65100)
+                            )
+                            Text(
+                                text = " · ${order.orderNumber}",
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
+                        }
                     }
 
                     Row(
