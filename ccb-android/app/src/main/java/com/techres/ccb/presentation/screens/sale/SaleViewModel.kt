@@ -2861,12 +2861,49 @@ class SaleViewModel @Inject constructor(
             try {
                 val now = getCurrentTimestamp()
 
-                // Calculate final amounts - SỬ DỤNG CÙNG NGUỒN DỮ LIỆU VỚI SaleUiState
-                // Để đảm bảo VAT khớp chính xác với màn hình thanh toán
-                val finalTotalAmount = state.totalAmount  // Long - giống với taxAmount
-                val finalVatAmount = state.taxAmount      // Long - đã tính đúng trong SaleUiState
+                // Calculate final amounts
+                val finalTotalAmount = state.totalAmount
                 val finalDiscountAmount = state.discountAmount
                 val finalSurchargeAmount = state.surchargeAmount
+
+                // Tính VAT bằng cách cộng từng món (giống SaleScreen và VatDetailDialog)
+                val subtotal = state.subtotal
+                val afterDiscountRatio = if (subtotal > 0) {
+                    ((subtotal - finalDiscountAmount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+                } else 1.0
+
+                var finalVatAmount = 0L
+
+                // VAT của từng món (main + toppings)
+                state.cartItems.forEach { item ->
+                    // VAT món chính
+                    val mainPrice = item.product.price * item.quantity
+                    val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+                    if (item.product.vatRate > 0) {
+                        val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.product.vatRate / 100.0)).toLong()
+                        finalVatAmount += mainPriceAfterDiscount - priceBeforeVat
+                    }
+
+                    // VAT từng topping
+                    item.selectedVariants.forEach { variant ->
+                        val toppingPrice = variant.price * item.quantity
+                        val toppingPriceAfterDiscount = (toppingPrice * afterDiscountRatio).toLong()
+                        if (variant.vatRate > 0) {
+                            val priceBeforeVat = (toppingPriceAfterDiscount / (1 + variant.vatRate / 100.0)).toLong()
+                            finalVatAmount += toppingPriceAfterDiscount - priceBeforeVat
+                        }
+                    }
+                }
+
+                // VAT của phụ thu (không bị giảm giá)
+                state.selectedSurcharges.forEach { selected ->
+                    val surcharge = selected.surcharge
+                    val surchargeTotal = (surcharge.amount * selected.quantity).toLong()
+                    if (surcharge.vatRate > 0) {
+                        val priceBeforeVat = (surchargeTotal / (1 + surcharge.vatRate / 100.0)).toLong()
+                        finalVatAmount += surchargeTotal - priceBeforeVat
+                    }
+                }
 
                 Log.d(TAG, "completeOrder - subtotal: ${state.subtotal}, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount, vat: $finalVatAmount")
 
@@ -3149,31 +3186,39 @@ class SaleViewModel @Inject constructor(
         // Tính totalAmount thực tế (sau tất cả giảm giá + phụ thu)
         val calculatedTotalAmount = (calculatedSubtotal + surchargeAmount - totalItemDiscount - billDiscountAmount).coerceAtLeast(0.0)
 
-        // ========== SỬ DỤNG VAT ĐÃ LƯU TRONG DATABASE ==========
-        // Nếu order đã có vatAmount (đã thanh toán), dùng luôn giá trị đó
-        // Để đảm bảo bill in ra giống với màn hình thanh toán và lịch sử đơn
-        val vatAmount: Double
-        val priceBeforeVat: Double
-        val displayVatRate: Double
+        // ========== TÍNH VAT BẰNG CÁCH CỘNG TỪNG MÓN (giống VatDetailDialog) ==========
+        // Để đảm bảo bill in ra khớp với chi tiết VAT
+        val afterDiscountRatio = if (calculatedSubtotal > 0) {
+            ((calculatedSubtotal - totalItemDiscount - billDiscountAmount) / calculatedSubtotal).coerceIn(0.0, 1.0)
+        } else 1.0
 
-        if (order.vatAmount > 0) {
-            // Dùng VAT đã lưu trong database (đồng nhất với thanh toán và lịch sử)
-            vatAmount = order.vatAmount.toDouble()
-            priceBeforeVat = calculatedTotalAmount - vatAmount
-            displayVatRate = if (priceBeforeVat > 0) {
-                (vatAmount / priceBeforeVat) * 100
-            } else {
-                8.0
+        var calculatedVatAmount = 0.0
+
+        // VAT của từng món (tính từ billItems)
+        billItems.forEach { item ->
+            val itemTotal = item.originalPrice * item.quantity
+            val itemAfterDiscount = (itemTotal * afterDiscountRatio).toLong()
+            if (item.vatRate > 0) {
+                val priceBeforeVatItem = (itemAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                calculatedVatAmount += (itemAfterDiscount - priceBeforeVatItem).toDouble()
             }
-        } else {
-            // Tính VAT mới (cho đơn chưa thanh toán) - làm tròn như DiscountCalculator
-            val avgVatRate = if (billItems.isNotEmpty()) {
-                billItems.map { it.vatRate }.average()
-            } else 8.0
-            priceBeforeVat = (calculatedTotalAmount / (1 + avgVatRate / 100.0)).toLong().toDouble()
-            vatAmount = calculatedTotalAmount - priceBeforeVat
-            displayVatRate = avgVatRate
         }
+
+        // VAT của phụ thu (không bị giảm giá)
+        surcharges.forEach { selected ->
+            val surcharge = selected.surcharge
+            val surchargeTotal = (surcharge.amount * selected.quantity).toLong()
+            if (surcharge.vatRate > 0) {
+                val priceBeforeVatSurcharge = (surchargeTotal / (1 + surcharge.vatRate / 100.0)).toLong()
+                calculatedVatAmount += (surchargeTotal - priceBeforeVatSurcharge).toDouble()
+            }
+        }
+
+        val vatAmount = calculatedVatAmount
+        val priceBeforeVat = calculatedTotalAmount - vatAmount
+        val displayVatRate = if (billItems.isNotEmpty()) {
+            billItems.map { it.vatRate }.average()
+        } else 8.0
 
         // Map payment method to display text
         val paymentMethodDisplay = when (paymentMethod.lowercase()) {

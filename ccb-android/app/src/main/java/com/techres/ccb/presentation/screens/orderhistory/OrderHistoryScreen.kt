@@ -1599,12 +1599,70 @@ private fun OrderDetailDialog(
                         .padding(12.dp)
                 ) {
                     // Calculate discount breakdown (exclude cancelled items)
-                    val activeOrderItems = orderItems.filter { it.status != "cancelled" }
+                    val activeOrderItems = orderItems.filter { it.status != "cancelled" && !it.isComboChild }
                     val itemDiscountTotal = activeOrderItems.sumOf { it.discountAmount }
                     val totalDiscount = order.discountAmount
 
-                    // Dùng VAT đã lưu trong database (đồng nhất với màn hình thanh toán)
-                    val vatAmount = order.vatAmount.toDouble()
+                    // Tính VAT bằng cách cộng từng món (giống VatDetailDialog)
+                    val subtotal = order.subtotal
+                    val afterDiscountRatio = if (subtotal > 0) {
+                        ((subtotal - totalDiscount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+                    } else 1.0
+
+                    // Helper function to parse variants from notes
+                    fun parseVariantsFromNotes(notes: String?, itemVatRate: Double): List<Pair<String, Long>> {
+                        if (notes.isNullOrEmpty()) return emptyList()
+                        val variants = mutableListOf<Pair<String, Long>>()
+                        val parts = notes.split(" | ").firstOrNull()?.takeIf { !it.startsWith("Ghi chú:") } ?: return emptyList()
+                        parts.split(",").forEach { part ->
+                            val trimmed = part.trim()
+                            if (trimmed.isEmpty()) return@forEach
+                            val priceMatch = Regex("\\(\\+?(\\d[\\d.,]*)\\)").find(trimmed)
+                            val price = priceMatch?.groupValues?.get(1)?.replace(".", "")?.replace(",", "")?.toLongOrNull() ?: 0L
+                            if (price > 0) {
+                                val name = trimmed.replace(priceMatch?.value ?: "", "").trim()
+                                    .removePrefix("+ ").removePrefix("+")
+                                    .let { if (it.contains(":")) it.substringAfter(":").trim() else it }
+                                variants.add(name to price)
+                            }
+                        }
+                        return variants
+                    }
+
+                    var vatAmount = 0.0
+                    activeOrderItems.forEach { item ->
+                        // Parse toppings từ notes
+                        val toppings = parseVariantsFromNotes(item.notes, item.vatRate)
+                        val toppingsTotal = toppings.sumOf { it.second }
+                        // Main item price (total - toppings)
+                        val actualUnitPrice = (item.totalPrice / item.quantity).toLong()
+                        val mainUnitPrice = (actualUnitPrice - toppingsTotal).coerceAtLeast(0L)
+                        val mainPrice = mainUnitPrice * item.quantity
+
+                        // VAT món chính
+                        val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+                        if (item.vatRate > 0 && mainPriceAfterDiscount > 0) {
+                            val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                            vatAmount += (mainPriceAfterDiscount - priceBeforeVat).toDouble()
+                        }
+
+                        // VAT từng topping
+                        toppings.forEach { (_, toppingPrice) ->
+                            val toppingTotal = toppingPrice * item.quantity
+                            val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
+                            if (item.vatRate > 0 && toppingAfterDiscount > 0) {
+                                val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                                vatAmount += (toppingAfterDiscount - priceBeforeVat).toDouble()
+                            }
+                        }
+                    }
+
+                    // VAT của phụ thu (8% mặc định, không bị giảm giá)
+                    if (order.surchargeAmount > 0) {
+                        val surchargeVatRate = 8.0
+                        val priceBeforeVat = (order.surchargeAmount / (1 + surchargeVatRate / 100.0)).toLong()
+                        vatAmount += order.surchargeAmount - priceBeforeVat
+                    }
 
                     // Parse applied coupons from JSON
                     val appliedCoupons: List<AppliedCouponInfo> = try {
