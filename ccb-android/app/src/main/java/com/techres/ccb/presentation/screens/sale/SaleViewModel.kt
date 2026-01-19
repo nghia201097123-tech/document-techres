@@ -1386,7 +1386,9 @@ class SaleViewModel @Inject constructor(
                         // Restore discount states
                         itemDiscounts = restoredItemDiscounts,
                         billDiscountAmount = restoredBillDiscount,
-                        billDiscountDescription = order.discountReason
+                        billDiscountDescription = order.discountReason,
+                        // Restore pager number from order
+                        pagerNumber = order.pagerNumber
                     )
                 }
 
@@ -1532,7 +1534,9 @@ class SaleViewModel @Inject constructor(
                     // Restore discount states
                     itemDiscounts = restoredItemDiscounts,
                     billDiscountAmount = restoredBillDiscount,
-                    billDiscountDescription = restoredBillDescription
+                    billDiscountDescription = restoredBillDescription,
+                    // Restore pager number from order
+                    pagerNumber = tableActiveOrder?.pagerNumber
                 )
             }
         }
@@ -3108,6 +3112,8 @@ class SaleViewModel @Inject constructor(
                         selectedSurcharges = emptyList(),
                         // Reset temp bill print count
                         tempBillPrintCount = 0,
+                        // Clear pager number
+                        pagerNumber = null,
                         successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
                     )
                 }
@@ -3531,6 +3537,7 @@ class SaleViewModel @Inject constructor(
                         currentOrderItems = emptyList(),
                         selectedTable = null,
                         selectedCustomer = null,
+                        pagerNumber = null,
                         successMessage = "Đã huỷ đơn hàng ${currentOrder.orderNumber}"
                     )
                 }
