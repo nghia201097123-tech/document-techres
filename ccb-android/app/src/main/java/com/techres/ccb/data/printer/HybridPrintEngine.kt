@@ -412,7 +412,8 @@ object BitmapTextRenderer {
     fun renderSeparator(
         char: Char = '-',
         paperWidth: Int = PAPER_WIDTH_80MM,
-        fontSize: Float = 16f // Giảm từ 24f xuống 16f để separator mỏng hơn
+        fontSize: Float = 16f,
+        lineSpacing: Float = 0.4f // Sử dụng lineSpacing từ config
     ): Bitmap {
         // Create a paint to measure actual character width
         val measurePaint = TextPaint().apply {
@@ -429,11 +430,10 @@ object BitmapTextRenderer {
         val availableWidth = paperWidth * 0.9f
         val charCount = (availableWidth / charWidth).toInt().coerceAtLeast(10)
 
-        // Sử dụng line spacing multiplier = 1.0 để có đủ padding với dòng tiếp theo
-        // Giá trị 1.0 đảm bảo đủ khoảng cách mà không cần thêm spacer line riêng biệt
+        // Sử dụng lineSpacing từ config để đồng bộ với các dòng khác
         return renderText(
             char.toString().repeat(charCount),
-            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 1.0f),
+            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = lineSpacing),
             paperWidth
         )
     }
@@ -768,7 +768,8 @@ class HybridBillBuilder(
         if (useBitmapMode) {
             // Sử dụng font nhỏ hơn (0.7x base) để separator mỏng hơn, tiết kiệm giấy
             val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
-            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize)
+            // Truyền lineSpacing để separator cũng tuân theo config của user
+            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize, lineSpacing)
             val imageData = if (useRasterBitmap) {
                 EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
             } else {
