@@ -446,14 +446,14 @@ object HybridBillPrintService {
                     line("   ${formatCurrency(basePrice)}")
                 }
 
-                // 3. Variants - dùng "•" prefix, chỉ hiện giá nếu != 0 và showUnitPrice
+                // 3. Variants - chỉ indent, không dùng bullet (chỉ toppings mới có "+")
                 if (item.variants.isNotEmpty()) {
                     item.variants.forEach { variant ->
                         if (template.showUnitPrice && variant.priceAdjustment != 0.0) {
                             val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
-                            lineKeyValue("   • ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
+                            lineKeyValue("   ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
                         } else {
-                            line("   • ${variant.name}")
+                            line("   ${variant.name}")
                         }
                     }
                 }
@@ -572,14 +572,14 @@ object HybridBillPrintService {
                     lineKeyValue("${template.priceBeforeVatLabel}:", formatCurrency(billData.priceBeforeVat))
                 }
                 if (template.showVat && billData.vatAmount > 0) {
-                    lineKeyValue("${template.vatLabel} (${billData.vatRate.toInt()}%):", formatCurrency(billData.vatAmount))
+                    lineKeyValue("${template.vatLabel}:", formatCurrency(billData.vatAmount))
                 }
                 if (template.showPriceAfterVat) {
                     lineKeyValue("${template.priceAfterVatLabel}:", formatCurrency(billData.priceAfterVat))
                 }
             } else if (template.showVat && billData.vatAmount > 0) {
                 // Chỉ hiện VAT nếu không hiện chi tiết
-                lineKeyValue("${template.vatLabel} (${billData.vatRate.toInt()}%):", formatCurrency(billData.vatAmount))
+                lineKeyValue("${template.vatLabel}:", formatCurrency(billData.vatAmount))
             }
 
             doubleSeparator()
@@ -643,8 +643,8 @@ object HybridBillPrintService {
             }
 
             // ============ PRINTER ACTIONS ============
-            // Feed vừa đủ để đẩy footer ra khỏi vị trí cắt (3 dòng - tiết kiệm giấy)
-            feed(3)
+            // Feed đủ để footer không bị cắt (5 dòng để đảm bảo "Hẹn gặp lại" không bị mất)
+            feed(5)
             if (template.cutPaper) {
                 cut()
             }
