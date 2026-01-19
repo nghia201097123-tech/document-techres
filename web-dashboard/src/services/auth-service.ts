@@ -3,7 +3,7 @@ import type { LoginResponse, Staff, Company } from "@/types";
 
 // API Gateway URL for tenant auth endpoints
 // Gateway routes /api/tenant/auth/* -> api-oauth /api/v1/auth/*
-const API_GATEWAY_URL = "http://localhost:4000/api/tenant";
+const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/tenant";
 
 // Create axios instance for auth via API Gateway
 const authApi = axios.create({
