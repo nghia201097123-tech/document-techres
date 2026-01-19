@@ -2163,9 +2163,14 @@ private fun OrderDetailDialog(
                 var allToppingsExpanded by remember { mutableStateOf(true) }
                 // Per-item expanded state (must be outside LazyColumn to avoid scroll issues)
                 val itemToppingsExpanded = remember { mutableStateMapOf<String, Boolean>() }
+                // State cho expand/collapse cancelled items
+                var showCancelledItems by remember { mutableStateOf(false) }
 
                 // Order Items - filter out combo children (they're shown under their parent)
                 val parentItems = orderItems.filter { !it.isComboChild }
+                // Tách active items và cancelled items
+                val activeItems = parentItems.filter { it.status != "cancelled" }
+                val cancelledItems = parentItems.filter { it.status == "cancelled" }
                 val comboChildrenMap = orderItems.filter { it.isComboChild }.groupBy { it.comboParentId }
 
                 LazyColumn(
@@ -2174,51 +2179,115 @@ private fun OrderDetailDialog(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                 ) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Danh sách món (${parentItems.size})",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            // Expand/Collapse all button
-                            TextButton(
-                                onClick = {
-                                    allToppingsExpanded = !allToppingsExpanded
-                                    itemToppingsExpanded.clear() // Reset per-item states
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                modifier = Modifier.height(28.dp)
+                    // Active items section
+                    if (activeItems.isNotEmpty()) {
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = if (allToppingsExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (allToppingsExpanded) "Thu gọn" else "Mở rộng",
-                                    fontSize = 12.sp
+                                    text = "Danh sách món (${activeItems.size})",
+                                    fontWeight = FontWeight.SemiBold
                                 )
+                                // Expand/Collapse all button
+                                TextButton(
+                                    onClick = {
+                                        allToppingsExpanded = !allToppingsExpanded
+                                        itemToppingsExpanded.clear() // Reset per-item states
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (allToppingsExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (allToppingsExpanded) "Thu gọn" else "Mở rộng",
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
+                        }
+
+                        items(activeItems, key = { it.id }) { item ->
+                            val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
+                            val isExpanded = itemToppingsExpanded[item.id] ?: allToppingsExpanded
+                            OrderItemRow(
+                                item = item,
+                                comboChildren = comboChildren,
+                                forceExpanded = isExpanded,
+                                onToppingsToggle = { itemToppingsExpanded[item.id] = !isExpanded }
+                            )
+                            HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                         }
                     }
 
-                    items(parentItems) { item ->
-                        val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
-                        val isExpanded = itemToppingsExpanded[item.id] ?: allToppingsExpanded
-                        OrderItemRow(
-                            item = item,
-                            comboChildren = comboChildren,
-                            forceExpanded = isExpanded,
-                            onToppingsToggle = { itemToppingsExpanded[item.id] = !isExpanded }
-                        )
-                        HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                    // Cancelled items section - collapsible
+                    if (cancelledItems.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showCancelledItems = !showCancelledItems },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFFFEBEE)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Cancel,
+                                            contentDescription = null,
+                                            tint = Color(0xFFF44336),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Đã huỷ (${cancelledItems.size} món)",
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 14.sp,
+                                            color = Color(0xFFF44336)
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = if (showCancelledItems) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF44336),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Cancelled items list - only show when expanded
+                        if (showCancelledItems) {
+                            items(cancelledItems, key = { "cancelled_${it.id}" }) { item ->
+                                val comboChildren = if (item.isComboParent) comboChildrenMap[item.id] ?: emptyList() else emptyList()
+                                val isExpanded = itemToppingsExpanded[item.id] ?: allToppingsExpanded
+                                OrderItemRow(
+                                    item = item,
+                                    comboChildren = comboChildren,
+                                    forceExpanded = isExpanded,
+                                    onToppingsToggle = { itemToppingsExpanded[item.id] = !isExpanded }
+                                )
+                                HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                            }
+                        }
                     }
 
                     if (orderItems.isEmpty()) {
