@@ -351,10 +351,11 @@ object HybridBillPrintService {
             else -> 1.0f // normal/medium
         }
 
-        // Sử dụng ESC * (bit image) thay vì GS v 0 (raster bitmap)
-        // ESC * tương thích tốt hơn với các máy in giá rẻ và in mượt hơn
-        // Giống cách in phiếu bếp đang hoạt động tốt
-        val useRasterBitmap = false
+        // Sử dụng GS v 0 (raster bitmap) thay vì ESC * để tránh khoảng trắng thừa
+        // GS v 0 gửi toàn bộ bitmap trong 1 lệnh, không có LF giữa các strip
+        // Điều này giúp loại bỏ hoàn toàn vấn đề line spacing giữa các bitmap
+        // (Giống cách in phiếu bếp đã được fix)
+        val useRasterBitmap = true
 
         val builder = HybridBillBuilder(
             paperWidth = paperWidth,
