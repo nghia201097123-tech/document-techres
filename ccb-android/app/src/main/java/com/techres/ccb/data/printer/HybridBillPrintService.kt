@@ -416,69 +416,89 @@ object HybridBillPrintService {
 
             separator()
 
-            // ============ ITEMS (theo đúng format web-dashboard preview) ============
+            // ============ ITEMS (format giống phiếu bếp - hiển thị giá tổng trên dòng đầu) ============
             billData.items.forEach { item ->
-                // 1. Dòng đầu: Tên món + badge số lượng bên phải (ví dụ: "Ô long macchiato" "x3")
-                lineKeyValue(item.name, "x${item.quantity}", BitmapTextStyle(bold = true))
+                // Tính topping total để biết giá gốc
+                val toppingTotal = item.variants.sumOf { it.priceAdjustment } +
+                                   item.toppings.sumOf { it.price * it.quantity }
+                val basePrice = if (toppingTotal > 0 && item.originalPrice > 0) {
+                    (item.originalPrice - toppingTotal).coerceAtLeast(0.0)
+                } else {
+                    item.originalPrice
+                }
 
-                // 2. Giá gốc (trước khi tính variant/discount)
-                line("Giá gốc: ${formatCurrency(item.originalPrice)}")
+                // 1. Dòng đầu: Tên món + Số lượng + Giá TỔNG (giống phiếu bếp)
+                val quantityPart = if (template.showQuantity) "x${item.quantity}" else ""
+                val pricePart = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
 
-                // 3. Variants - dùng "•" prefix, chỉ hiện giá nếu != 0
+                if (quantityPart.isNotEmpty() && pricePart.isNotEmpty()) {
+                    lineKeyValue(item.name, "$quantityPart  $pricePart", BitmapTextStyle(bold = true))
+                } else if (quantityPart.isNotEmpty()) {
+                    lineKeyValue(item.name, quantityPart, BitmapTextStyle(bold = true))
+                } else if (pricePart.isNotEmpty()) {
+                    lineKeyValue(item.name, pricePart, BitmapTextStyle(bold = true))
+                } else {
+                    lineBold(item.name)
+                }
+
+                // 2. Giá gốc bên trái (nếu có topping/variant có giá và showUnitPrice)
+                if (template.showUnitPrice && basePrice > 0 && toppingTotal > 0) {
+                    line("   ${formatCurrency(basePrice)}")
+                }
+
+                // 3. Variants - dùng "•" prefix, chỉ hiện giá nếu != 0 và showUnitPrice
                 if (item.variants.isNotEmpty()) {
                     item.variants.forEach { variant ->
-                        if (variant.priceAdjustment != 0.0) {
+                        if (template.showUnitPrice && variant.priceAdjustment != 0.0) {
                             val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
-                            lineKeyValue("• ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
+                            lineKeyValue("   • ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
                         } else {
-                            line("• ${variant.name}")
+                            line("   • ${variant.name}")
                         }
                     }
                 }
 
-                // 4. Item code (optional)
-                if (template.showItemCode && item.code != null) {
-                    line("Mã: ${item.code}")
-                }
-
-                // 5. Item note (optional)
-                if (template.showItemNote && item.note != null) {
-                    line("Ghi chú: ${item.note}")
-                }
-
-                // 6. Toppings - dùng "+" prefix
+                // 4. Toppings - dùng "+" prefix
                 if (item.toppings.isNotEmpty()) {
                     item.toppings.forEach { topping ->
                         val toppingPrice = topping.price * topping.quantity
-                        if (topping.quantity > 1) {
-                            lineKeyValue("+ ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
+                        if (template.showUnitPrice && toppingPrice > 0) {
+                            if (topping.quantity > 1) {
+                                lineKeyValue("   + ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
+                            } else {
+                                lineKeyValue("   + ${topping.name}", "+${formatCurrency(toppingPrice)}")
+                            }
                         } else {
-                            lineKeyValue("+ ${topping.name}", "+${formatCurrency(toppingPrice)}")
+                            if (topping.quantity > 1) {
+                                line("   + ${topping.name} x${topping.quantity}")
+                            } else {
+                                line("   + ${topping.name}")
+                            }
                         }
                     }
+                }
+
+                // 5. Item code (optional)
+                if (template.showItemCode && item.code != null) {
+                    line("   Mã: ${item.code}")
+                }
+
+                // 6. Item note (optional)
+                if (template.showItemNote && item.note != null) {
+                    line("   Ghi chú: ${item.note}")
                 }
 
                 // 7. Giảm giá trên món (nếu có)
                 val hasItemDiscount = item.discountAmount > 0
                 if (hasItemDiscount && template.showItemDiscount) {
-                    // discountType = "percent" thì hiển thị %, còn lại hiển thị số tiền
                     val discountLabel = if (item.discountType == "percent" && item.discountPercent > 0) {
-                        "→ Giảm ${item.discountPercent.toInt()}%:"
+                        "   → Giảm ${item.discountPercent.toInt()}%:"
                     } else {
-                        "→ Giảm ${formatCurrency(item.discountAmount)}:"
+                        "   → Giảm:"
                     }
                     lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
                 }
-
-                // 8. Thành tiền (cuối mỗi món)
-                if (item.quantity > 1) {
-                    // Hiển thị chi tiết: "Thành tiền (3 x 48,000): 144,000"
-                    val unitPriceAfterDiscount = item.totalPrice / item.quantity
-                    lineKeyValue("Thành tiền (${item.quantity} x ${formatCurrency(unitPriceAfterDiscount)}):", formatCurrency(item.totalPrice))
-                } else {
-                    lineKeyValue("Thành tiền:", formatCurrency(item.totalPrice))
-                }
-                // Bỏ dòng trống giữa các món để tiết kiệm giấy - các món vẫn rõ ràng nhờ bold
+                // Bỏ dòng "Thành tiền" vì đã hiển thị giá tổng trên dòng đầu (giống phiếu bếp)
             }
 
             separator()
