@@ -627,7 +627,7 @@ export default function KitchenPage() {
 
   // Group products by type
   const productsByType = React.useMemo(() => {
-    const groups: Record<string, Product[]> = {};
+    const groups: Record<string, ProductWithKitchens[]> = {};
     filteredProducts.forEach(p => {
       if (!groups[p.type]) {
         groups[p.type] = [];
