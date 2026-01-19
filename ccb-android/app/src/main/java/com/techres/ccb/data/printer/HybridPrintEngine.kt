@@ -286,11 +286,12 @@ object BitmapTextRenderer {
         }
 
         // Tạo StaticLayout để handle Vietnamese text đúng cách
-        // Sử dụng line spacing cố định 0.9 để text sát nhau hơn khi wrap nhiều dòng
+        // Sử dụng lineSpacingMultiplier từ config để điều chỉnh khoảng cách dòng trong text wrap
+        val internalLineSpacing = style.lineSpacingMultiplier.coerceIn(0.3f, 1.0f)
         val staticLayout = StaticLayout.Builder
             .obtain(text, 0, text.length, textPaint, paperWidth)
             .setAlignment(alignment)
-            .setLineSpacing(0f, 0.9f) // Line spacing 0.9 = 90% của default, giảm khoảng cách giữa các dòng
+            .setLineSpacing(0f, internalLineSpacing) // Sử dụng line spacing từ config
             .setIncludePad(false) // Bỏ padding thừa
             .build()
 
@@ -303,17 +304,16 @@ object BitmapTextRenderer {
         // Vẽ text
         staticLayout.draw(canvas)
 
-        // LUÔN crop bitmap để loại bỏ khoảng trắng thừa
-        // lineSpacing chỉ ảnh hưởng đến lượng padding được giữ lại
+        // Crop bitmap và thêm padding dựa trên lineSpacing
+        // lineSpacing ảnh hưởng đến khoảng cách giữa các dòng in
         return cropBitmapVertical(fullBitmap, style.lineSpacingMultiplier)
     }
 
     /**
      * Crop bitmap theo chiều dọc để loại bỏ khoảng trắng thừa
-     * LUÔN crop sát content (0 padding) để tránh khoảng trắng vô nghĩa
-     * Khoảng cách giữa các dòng sẽ được kiểm soát riêng qua lineSpacing
+     * Thêm padding phía dưới dựa trên lineSpacing để tạo khoảng cách giữa các dòng
      * @param bitmap Bitmap gốc
-     * @param lineSpacing Không sử dụng cho padding nữa, giữ để tương thích API
+     * @param lineSpacing Hệ số khoảng cách dòng (0.3 - 1.0), giá trị lớn hơn = khoảng cách lớn hơn
      */
     private fun cropBitmapVertical(bitmap: Bitmap, lineSpacing: Float): Bitmap {
         val width = bitmap.width
@@ -362,29 +362,36 @@ object BitmapTextRenderer {
 
         // Tính chiều cao content thực sự
         val contentHeight = bottomRow - topRow + 1
-        if (contentHeight <= 0 || contentHeight >= height) {
+        if (contentHeight <= 0) {
             return bitmap // Không cần crop
         }
 
-        // LUÔN crop sát content - KHÔNG thêm padding
-        // Điều này đảm bảo không có khoảng trắng vô nghĩa giữa các dòng
+        // Tính padding phía dưới dựa trên lineSpacing
+        // lineSpacing: 0.3 = rất sát (2px padding), 1.0 = rộng (12px padding)
+        // Công thức: basePadding + (lineSpacing - 0.3) * extraPadding
+        val effectiveLineSpacing = lineSpacing.coerceIn(0.3f, 1.0f)
+        val basePadding = 2 // Padding tối thiểu
+        val maxExtraPadding = 14 // Padding tối đa thêm vào (16 - 2 = 14)
+        val bottomPadding = (basePadding + (effectiveLineSpacing - 0.3f) / 0.7f * maxExtraPadding).toInt()
+
+        // Crop content và thêm padding phía dưới
         val cropTop = topRow
-        val cropBottom = bottomRow
-        val newHeight = cropBottom - cropTop + 1
+        val newHeight = contentHeight + bottomPadding
 
-        if (newHeight >= height || newHeight <= 0) {
-            return bitmap // Không cần crop
-        }
+        // Tạo bitmap mới với padding
+        val resultBitmap = Bitmap.createBitmap(width, newHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(resultBitmap)
+        canvas.drawColor(Color.WHITE) // Fill với màu trắng
 
-        // Tạo bitmap mới với chiều cao đã crop
-        val croppedBitmap = Bitmap.createBitmap(bitmap, 0, cropTop, width, newHeight)
+        // Copy content từ bitmap gốc
+        val srcRect = android.graphics.Rect(0, cropTop, width, cropTop + contentHeight)
+        val dstRect = android.graphics.Rect(0, 0, width, contentHeight)
+        canvas.drawBitmap(bitmap, srcRect, dstRect, null)
 
-        // Recycle bitmap gốc nếu đã tạo bitmap mới
-        if (croppedBitmap != bitmap) {
-            bitmap.recycle()
-        }
+        // Recycle bitmap gốc
+        bitmap.recycle()
 
-        return croppedBitmap
+        return resultBitmap
     }
 
     /**
