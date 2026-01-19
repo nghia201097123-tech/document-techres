@@ -1292,6 +1292,35 @@ private fun PrinterConfigDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         shape = RoundedCornerShape(12.dp)
                     )
+
+                    // Label line spacing slider
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Khoảng cách dòng: ${(labelLineSpacing * 100).toInt()}%",
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = when {
+                            labelLineSpacing <= 0.85f -> "Rất sát"
+                            labelLineSpacing <= 0.95f -> "Sát"
+                            labelLineSpacing <= 1.05f -> "Bình thường"
+                            labelLineSpacing <= 1.2f -> "Rộng"
+                            else -> "Rất rộng"
+                        },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Slider(
+                        value = labelLineSpacing,
+                        onValueChange = { labelLineSpacing = it },
+                        valueRange = 0.8f..1.5f,
+                        steps = 6,
+                        colors = SliderDefaults.colors(
+                            thumbColor = color,
+                            activeTrackColor = color
+                        )
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))

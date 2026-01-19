@@ -345,6 +345,7 @@ object LabelPrintService {
         val labelSize = kitchen.getLabelSize()
         val density = kitchen.printDensity
         val fontScale = kitchen.getEffectiveFontScale()
+        val lineSpacing = kitchen.labelLineSpacing.coerceIn(0.8f, 1.5f)
 
         // Label printing configs
         val showStoreName = kitchen.labelPrintStoreName
@@ -355,10 +356,16 @@ object LabelPrintService {
         val storeName = kitchen.labelStoreName ?: label.storeName
         val labelReverse = kitchen.labelReverse
 
+        // Calculate extra spacing based on lineSpacing multiplier (1.0 = no extra, 1.5 = 50% more)
+        // Base spacing is proportional to label height
+        val baseSpacing = (labelSize.heightMm * 0.3f).toInt() // ~3 pixels for 30mm label
+        val lineSpacingExtra = ((lineSpacing - 1.0f) * baseSpacing * 2).toInt().coerceAtLeast(0)
+
         Log.d(TAG, "=== Generating TSPL label ===")
         Log.d(TAG, "  - Size: ${labelSize.widthMm}x${labelSize.heightMm}mm")
         Log.d(TAG, "  - Density: $density")
         Log.d(TAG, "  - Font scale: $fontScale")
+        Log.d(TAG, "  - Line spacing: $lineSpacing (extra: $lineSpacingExtra px)")
         Log.d(TAG, "  - Item: ${label.itemName}")
         Log.d(TAG, "  - labelIndex: ${label.labelIndex}/${label.totalLabels}")
         Log.d(TAG, "  - partIndex: ${label.partIndex}/${label.totalParts}")
@@ -405,7 +412,7 @@ object LabelPrintService {
                 centerAlign = true
             )
             output.write(bitmapToTspl(margin, yPos, continuationBitmap))
-            yPos += continuationBitmap.height
+            yPos += continuationBitmap.height + lineSpacingExtra
             continuationBitmap.recycle()
         } else if (showStoreName && !storeName.isNullOrBlank()) {
             val storeBitmap = renderTextBitmap(
@@ -416,7 +423,7 @@ object LabelPrintService {
                 centerAlign = false
             )
             output.write(bitmapToTspl(margin, yPos, storeBitmap))
-            yPos += storeBitmap.height
+            yPos += storeBitmap.height + lineSpacingExtra
             storeBitmap.recycle()
         }
 
@@ -434,7 +441,7 @@ object LabelPrintService {
                 bold = false
             )
             output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
-            yPos += orderHeaderBitmap.height
+            yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
         }
 
@@ -453,7 +460,7 @@ object LabelPrintService {
                 bold = true
             )
             output.write(bitmapToTspl(margin, yPos, itemNamePriceBitmap))
-            yPos += itemNamePriceBitmap.height + 1
+            yPos += itemNamePriceBitmap.height + 1 + lineSpacingExtra
             itemNamePriceBitmap.recycle()
 
             // Giá gốc bên trái (nếu có topping/size có giá)
@@ -466,7 +473,7 @@ object LabelPrintService {
                     centerAlign = false
                 )
                 output.write(bitmapToTspl(margin, yPos, basePriceBitmap))
-                yPos += basePriceBitmap.height
+                yPos += basePriceBitmap.height + lineSpacingExtra
                 basePriceBitmap.recycle()
             }
         } else {
@@ -479,7 +486,7 @@ object LabelPrintService {
                 centerAlign = false
             )
             output.write(bitmapToTspl(margin, yPos, itemNameBitmap))
-            yPos += itemNameBitmap.height + 1
+            yPos += itemNameBitmap.height + 1 + lineSpacingExtra
             itemNameBitmap.recycle()
         }
 
@@ -504,7 +511,7 @@ object LabelPrintService {
                     bold = false
                 )
                 output.write(bitmapToTspl(margin, yPos, sizeBitmap))
-                yPos += sizeBitmap.height
+                yPos += sizeBitmap.height + lineSpacingExtra
                 sizeBitmap.recycle()
             } else {
                 val sizeBitmap = renderTextBitmap(
@@ -515,7 +522,7 @@ object LabelPrintService {
                     centerAlign = false
                 )
                 output.write(bitmapToTspl(margin, yPos, sizeBitmap))
-                yPos += sizeBitmap.height
+                yPos += sizeBitmap.height + lineSpacingExtra
                 sizeBitmap.recycle()
             }
         } else if (sizeToppingEntry != null) {
@@ -532,7 +539,7 @@ object LabelPrintService {
                     bold = false
                 )
                 output.write(bitmapToTspl(margin, yPos, sizeBitmap))
-                yPos += sizeBitmap.height
+                yPos += sizeBitmap.height + lineSpacingExtra
                 sizeBitmap.recycle()
             } else {
                 val sizeBitmap = renderTextBitmap(
@@ -543,7 +550,7 @@ object LabelPrintService {
                     centerAlign = false
                 )
                 output.write(bitmapToTspl(margin, yPos, sizeBitmap))
-                yPos += sizeBitmap.height
+                yPos += sizeBitmap.height + lineSpacingExtra
                 sizeBitmap.recycle()
             }
         }
@@ -558,7 +565,7 @@ object LabelPrintService {
                 centerAlign = false
             )
             output.write(bitmapToTspl(margin, yPos, iceBitmap))
-            yPos += iceBitmap.height
+            yPos += iceBitmap.height + lineSpacingExtra
             iceBitmap.recycle()
         }
 
@@ -572,7 +579,7 @@ object LabelPrintService {
                 centerAlign = false
             )
             output.write(bitmapToTspl(margin, yPos, sugarBitmap))
-            yPos += sugarBitmap.height
+            yPos += sugarBitmap.height + lineSpacingExtra
             sugarBitmap.recycle()
         }
 
@@ -598,7 +605,7 @@ object LabelPrintService {
                             bold = false
                         )
                         output.write(bitmapToTspl(margin, yPos, toppingBitmap))
-                        yPos += toppingBitmap.height
+                        yPos += toppingBitmap.height + lineSpacingExtra
                         toppingBitmap.recycle()
                     } else {
                         val toppingBitmap = renderTextBitmap(
@@ -609,7 +616,7 @@ object LabelPrintService {
                             centerAlign = false
                         )
                         output.write(bitmapToTspl(margin, yPos, toppingBitmap))
-                        yPos += toppingBitmap.height
+                        yPos += toppingBitmap.height + lineSpacingExtra
                         toppingBitmap.recycle()
                     }
                 }
@@ -629,7 +636,7 @@ object LabelPrintService {
                         centerAlign = false
                     )
                     output.write(bitmapToTspl(margin, yPos, toppingBitmap))
-                    yPos += toppingBitmap.height
+                    yPos += toppingBitmap.height + lineSpacingExtra
                     toppingBitmap.recycle()
                 }
             }
@@ -645,7 +652,7 @@ object LabelPrintService {
                 centerAlign = false
             )
             output.write(bitmapToTspl(margin, yPos, noteBitmap))
-            yPos += noteBitmap.height
+            yPos += noteBitmap.height + lineSpacingExtra
             noteBitmap.recycle()
         }
 
