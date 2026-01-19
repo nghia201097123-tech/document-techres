@@ -2816,22 +2816,14 @@ class SaleViewModel @Inject constructor(
             try {
                 val now = getCurrentTimestamp()
 
-                // Calculate final amounts with applied discounts and surcharges
-                val orderSubtotal = currentOrder.subtotal
-                val finalDiscountAmount = state.discountAmount.toDouble()  // Includes bill + item + coupon discounts
-                val finalSurchargeAmount = state.surchargeAmount.toDouble()  // Phụ thu
-                val finalTotalAmount = (orderSubtotal + finalSurchargeAmount - finalDiscountAmount).coerceAtLeast(0.0)
+                // Calculate final amounts - SỬ DỤNG CÙNG NGUỒN DỮ LIỆU VỚI SaleUiState
+                // Để đảm bảo VAT khớp chính xác với màn hình thanh toán
+                val finalTotalAmount = state.totalAmount  // Long - giống với taxAmount
+                val finalVatAmount = state.taxAmount      // Long - đã tính đúng trong SaleUiState
+                val finalDiscountAmount = state.discountAmount
+                val finalSurchargeAmount = state.surchargeAmount
 
-                // Tính VAT với cùng công thức như SaleUiState.taxAmount
-                // VAT = totalAmount - (totalAmount / 1.08).toLong()
-                val finalVatAmount = if (state.pricesIncludeVat) {
-                    val priceBeforeVat = (finalTotalAmount / (1 + state.taxRate / 100.0)).toLong()
-                    finalTotalAmount.toLong() - priceBeforeVat
-                } else {
-                    (finalTotalAmount * state.taxRate / 100.0).toLong()
-                }
-
-                Log.d(TAG, "completeOrder - subtotal: $orderSubtotal, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount, vat: $finalVatAmount")
+                Log.d(TAG, "completeOrder - subtotal: ${state.subtotal}, surcharge: $finalSurchargeAmount, discount: $finalDiscountAmount, total: $finalTotalAmount, vat: $finalVatAmount")
 
                 // Lưu thông tin cần thiết cho việc in bill
                 val completedOrder: OrderEntity
@@ -2850,12 +2842,12 @@ class SaleViewModel @Inject constructor(
                         status = "completed",
                         paymentStatus = "paid",
                         paymentMethod = paymentMethod,
-                        discountAmount = finalDiscountAmount,
+                        discountAmount = finalDiscountAmount.toDouble(),
                         discountReason = state.billDiscountDescription,
-                        surchargeAmount = finalSurchargeAmount,
-                        vatAmount = finalVatAmount.toDouble(),  // Lưu VAT vào database
-                        totalAmount = finalTotalAmount,
-                        paidAmount = finalTotalAmount,
+                        surchargeAmount = finalSurchargeAmount.toDouble(),
+                        vatAmount = finalVatAmount.toDouble(),  // Lưu VAT vào database (khớp với màn hình thanh toán)
+                        totalAmount = finalTotalAmount.toDouble(),
+                        paidAmount = finalTotalAmount.toDouble(),
                         completedAt = now,
                         updatedAt = now
                     )

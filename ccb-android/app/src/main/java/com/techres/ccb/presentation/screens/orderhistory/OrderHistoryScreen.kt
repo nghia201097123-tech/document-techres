@@ -1885,10 +1885,11 @@ private fun HistoryVatDetailDialog(
                 val mainPrice = mainUnitPrice * item.quantity
 
                 // VAT của món chính (giá sau giảm giá)
+                // Làm tròn priceBeforeVat trước để đồng nhất với tất cả các màn hình
                 val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
                 val mainVat = if (item.vatRate > 0 && mainPriceAfterDiscount > 0) {
-                    val priceBeforeVat = mainPriceAfterDiscount / (1 + item.vatRate / 100.0)
-                    (mainPriceAfterDiscount - priceBeforeVat).toLong()
+                    val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                    mainPriceAfterDiscount - priceBeforeVat
                 } else 0L
 
                 // Chỉ hiển thị món chính nếu có giá > 0
@@ -1904,12 +1905,13 @@ private fun HistoryVatDetailDialog(
                 }
 
                 // VAT của từng topping (cũng tính sau giảm giá)
+                // Làm tròn priceBeforeVat trước để đồng nhất
                 toppings.forEach { (toppingName, toppingPrice) ->
                     val toppingTotal = toppingPrice * item.quantity
                     val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
                     val toppingVat = if (item.vatRate > 0 && toppingAfterDiscount > 0) {
-                        val priceBeforeVat = toppingAfterDiscount / (1 + item.vatRate / 100.0)
-                        (toppingAfterDiscount - priceBeforeVat).toLong()
+                        val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                        toppingAfterDiscount - priceBeforeVat
                     } else 0L
 
                     // Chỉ hiển thị topping nếu có giá > 0
@@ -1927,10 +1929,11 @@ private fun HistoryVatDetailDialog(
             }
 
             // Thêm VAT của phụ thu (surcharges không bị giảm giá)
+            // Làm tròn priceBeforeVat trước để đồng nhất
             if (surchargeAmount > 0) {
                 val surchargeVat = if (surchargeVatRate > 0) {
-                    val priceBeforeVat = surchargeAmount / (1 + surchargeVatRate / 100.0)
-                    (surchargeAmount - priceBeforeVat).toLong()
+                    val priceBeforeVat = (surchargeAmount / (1 + surchargeVatRate / 100.0)).toLong()
+                    surchargeAmount - priceBeforeVat
                 } else 0L
 
                 add(HistoryVatDisplayRow(
@@ -1946,15 +1949,17 @@ private fun HistoryVatDetailDialog(
     }
 
     // Tính tổng VAT giống như summary (từ tổng tiền) để đảm bảo khớp
-    // Thay vì cộng từng món (có thể sai số làm tròn)
+    // Làm tròn priceBeforeVat trước để đồng nhất với tất cả các màn hình
     val calculatedTotalVat = remember(subtotal, discountAmount, surchargeAmount) {
         val vatRate = 8.0
         val priceAfterDiscount = subtotal - discountAmount
-        val itemsVat = priceAfterDiscount - (priceAfterDiscount / (1 + vatRate / 100.0))
+        val priceBeforeVatItems = (priceAfterDiscount / (1 + vatRate / 100.0)).toLong()
+        val itemsVat = priceAfterDiscount - priceBeforeVatItems
         val surchargeVat = if (surchargeAmount > 0) {
-            surchargeAmount - (surchargeAmount / (1 + vatRate / 100.0))
-        } else 0.0
-        (itemsVat + surchargeVat).toLong()
+            val priceBeforeVatSurcharge = (surchargeAmount / (1 + vatRate / 100.0)).toLong()
+            surchargeAmount - priceBeforeVatSurcharge
+        } else 0L
+        itemsVat + surchargeVat
     }
 
     Dialog(onDismissRequest = onDismiss) {

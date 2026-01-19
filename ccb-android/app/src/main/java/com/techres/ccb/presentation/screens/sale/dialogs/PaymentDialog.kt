@@ -1595,11 +1595,12 @@ private fun VatDetailDialog(
         buildList {
             orderItems.forEach { item ->
                 // VAT của món chính (giá sau giảm giá)
+                // Làm tròn priceBeforeVat trước để đồng nhất với tất cả các màn hình
                 val mainPrice = item.unitPrice * item.quantity
                 val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
                 val mainVat = if (item.vatRate > 0) {
-                    val priceBeforeVat = mainPriceAfterDiscount / (1 + item.vatRate / 100.0)
-                    (mainPriceAfterDiscount - priceBeforeVat).toLong()
+                    val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                    mainPriceAfterDiscount - priceBeforeVat
                 } else 0L
 
                 add(VatDisplayRow(
@@ -1612,12 +1613,13 @@ private fun VatDetailDialog(
                 ))
 
                 // VAT của từng topping (cũng tính sau giảm giá)
+                // Làm tròn priceBeforeVat trước để đồng nhất
                 item.toppings.forEach { topping ->
                     val toppingTotal = topping.price * item.quantity
                     val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
                     val toppingVat = if (topping.vatRate > 0) {
-                        val priceBeforeVat = toppingAfterDiscount / (1 + topping.vatRate / 100.0)
-                        (toppingAfterDiscount - priceBeforeVat).toLong()
+                        val priceBeforeVat = (toppingAfterDiscount / (1 + topping.vatRate / 100.0)).toLong()
+                        toppingAfterDiscount - priceBeforeVat
                     } else 0L
 
                     add(VatDisplayRow(
@@ -1632,12 +1634,13 @@ private fun VatDetailDialog(
             }
 
             // Thêm VAT của phụ thu (surcharges không bị giảm giá)
+            // Làm tròn priceBeforeVat trước để đồng nhất
             selectedSurcharges.forEach { selected ->
                 val surcharge = selected.surcharge
                 val totalPrice = (surcharge.amount * selected.quantity).toLong()
                 val surchargeVat = if (surcharge.vatRate > 0) {
-                    val priceBeforeVat = totalPrice / (1 + surcharge.vatRate / 100.0)
-                    (totalPrice - priceBeforeVat).toLong()
+                    val priceBeforeVat = (totalPrice / (1 + surcharge.vatRate / 100.0)).toLong()
+                    totalPrice - priceBeforeVat
                 } else 0L
 
                 add(VatDisplayRow(
