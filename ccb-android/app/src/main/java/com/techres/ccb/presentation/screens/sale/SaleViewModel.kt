@@ -2702,6 +2702,8 @@ class SaleViewModel @Inject constructor(
                 val orderNumber = generateOrderNumber()
                 val dailyOrderNumber = generateDailyOrderNumber()
 
+                Log.d(TAG, "placeOrder - dailyOrderNumber=$dailyOrderNumber, branchId=$branchId")
+
                 // Create order entity
                 val orderEntity = OrderEntity(
                     id = orderId,
@@ -3830,9 +3832,11 @@ class SaleViewModel @Inject constructor(
      */
     private suspend fun generateDailyOrderNumber(): Int {
         return withContext(Dispatchers.IO) {
+            val currentBranchId = authRepository.getBranchId() ?: branchId
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val maxNumber = orderRepository.getMaxDailyOrderNumberForToday(branchId, today)
+            val maxNumber = orderRepository.getMaxDailyOrderNumberForToday(currentBranchId, today)
             val nextNumber = if (maxNumber >= 9999) 1 else maxNumber + 1
+            Log.d(TAG, "generateDailyOrderNumber - branchId=$currentBranchId, today=$today, maxNumber=$maxNumber, nextNumber=$nextNumber")
             nextNumber
         }
     }
