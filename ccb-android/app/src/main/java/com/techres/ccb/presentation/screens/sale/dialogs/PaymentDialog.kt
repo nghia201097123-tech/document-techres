@@ -1821,6 +1821,15 @@ private fun VatDetailDialog(
                     )
                 }
 
+                // Ghi chú về làm tròn
+                Text(
+                    "* Tổng VAT tính trên tổng đơn hàng. Cộng từng món có thể chênh lệch nhỏ do làm tròn.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontStyle = FontStyle.Italic,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Close button
