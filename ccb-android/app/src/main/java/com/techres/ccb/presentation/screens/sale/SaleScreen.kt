@@ -982,8 +982,21 @@ fun ProductPanel(
                 )
             },
             navigationIcon = {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
+                // Nút quay về to hơn để thu ngân dễ thao tác
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Quay lại",
+                        modifier = Modifier.size(28.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
