@@ -348,16 +348,12 @@ object HybridBillPrintService {
             template.headerText?.let { lineCenter(it) }
 
             doubleSeparator()
-            // Spacer để tránh dòng tiếp theo bị cắt chữ
-            line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
 
             // ============ BILL TITLE - Phân biệt bill tạm và bill chính thức ============
             if (billData.isTemporaryBill) {
                 // Bill tạm - hiển thị khác biệt
                 lineDouble("*** BILL TẠM ***", BitmapTextStyle(centerAlign = true))
                 doubleSeparator()
-                // Spacer để tránh dòng tiếp theo bị cắt chữ
-                line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
 
                 // Hiển thị thông tin lần in và thời gian
                 lineCenter("Lần in thứ: ${billData.printCount}")
@@ -374,9 +370,6 @@ object HybridBillPrintService {
                 lineDouble("*** IN LẠI ***", BitmapTextStyle(centerAlign = true))
                 doubleSeparator()
 
-                // Spacer để tránh dòng tiếp theo bị cắt chữ
-                line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
-
                 // Hiển thị thời gian in lại
                 billData.reprintTime?.let { reprintTime ->
                     val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
@@ -390,14 +383,10 @@ object HybridBillPrintService {
                 separator()
                 lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
                 doubleSeparator()
-                // Spacer để tránh dòng tiếp theo bị cắt chữ
-                line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
             } else {
                 // Bill chính thức
                 lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
                 doubleSeparator()
-                // Spacer để tránh dòng tiếp theo bị cắt chữ
-                line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
             }
 
             // ============ ORDER INFO ============
@@ -434,10 +423,6 @@ object HybridBillPrintService {
             }
 
             separator()
-
-            // Thêm một dòng trống nhỏ để đảm bảo món đầu tiên không bị cắt chữ
-            // Đặc biệt cần thiết cho bill in lại từ lịch sử
-            line(" ", BitmapTextStyle(fontSize = 4f, lineSpacingMultiplier = 0.3f))
 
             // ============ ITEMS (format giống phiếu bếp - hiển thị giá tổng trên dòng đầu) ============
             billData.items.forEach { item ->

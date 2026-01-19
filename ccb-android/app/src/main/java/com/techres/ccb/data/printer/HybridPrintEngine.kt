@@ -432,11 +432,11 @@ object BitmapTextRenderer {
         val availableWidth = paperWidth * 0.9f
         val charCount = (availableWidth / charWidth).toInt().coerceAtLeast(10)
 
-        // Sử dụng line spacing multiplier đủ lớn để có padding với dòng tiếp theo
-        // 0.9f để đảm bảo đủ khoảng cách với dòng sau (đặc biệt quan trọng cho dòng đầu tiên)
+        // Sử dụng line spacing multiplier = 1.0 để có đủ padding với dòng tiếp theo
+        // Giá trị 1.0 đảm bảo đủ khoảng cách mà không cần thêm spacer line riêng biệt
         return renderText(
             char.toString().repeat(charCount),
-            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 0.9f),
+            BitmapTextStyle(fontSize = fontSize, centerAlign = true, lineSpacingMultiplier = 1.0f),
             paperWidth
         )
     }
