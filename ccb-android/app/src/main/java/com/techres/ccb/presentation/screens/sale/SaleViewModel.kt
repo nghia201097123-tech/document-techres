@@ -1364,8 +1364,10 @@ class SaleViewModel @Inject constructor(
                     _uiState.value.tables.find { it.id == order.tableId }
                 } else null
 
-                // Determine order type based on table
-                val orderType = if (selectedTable != null) OrderType.DINE_IN else OrderType.TAKE_AWAY
+                // Use order type from database, fallback to detecting from table
+                val orderType = OrderType.entries.find { it.dbValue == order.orderType }
+                    ?: if (selectedTable != null) OrderType.DINE_IN else OrderType.TAKE_AWAY
+                Log.d(TAG, "loadExistingOrder - orderType from db: ${order.orderType}, resolved: $orderType")
 
                 // Restore item discounts from order items
                 val restoredItemDiscounts = orderItems
@@ -3124,10 +3126,14 @@ class SaleViewModel @Inject constructor(
                     orderRepository.updateAllItemsStatusExcludeCancelled(currentOrder.id, "completed", now)
 
                     // 3. Update table status back to available
-                    state.selectedTable?.let { table ->
-                        tableRepository.updateTableStatus(table.id, "available", null, now)
+                    // Use currentOrder.tableId instead of state.selectedTable
+                    // because selectedTable may be null when order type was changed to takeaway/delivery
+                    val tableIdToRelease = currentOrder.tableId ?: state.selectedTable?.id
+                    if (tableIdToRelease != null) {
+                        tableRepository.updateTableStatus(tableIdToRelease, "available", null, now)
                         // Invalidate TableViewModel cache để TableScreen refresh ngay lập tức
                         TableViewModel.invalidateCache()
+                        Log.d(TAG, "completeOrder - Released table: $tableIdToRelease")
                     }
 
                     // 4. Update shift statistics with correct discount
@@ -3574,10 +3580,13 @@ class SaleViewModel @Inject constructor(
                     orderRepository.updateAllItemsStatus(currentOrder.id, "cancelled", now)
 
                     // 3. Update table status back to available
-                    state.selectedTable?.let { table ->
-                        tableRepository.updateTableStatus(table.id, "available", null, now)
+                    // Use currentOrder.tableId instead of state.selectedTable
+                    val tableIdToRelease = currentOrder.tableId ?: state.selectedTable?.id
+                    if (tableIdToRelease != null) {
+                        tableRepository.updateTableStatus(tableIdToRelease, "available", null, now)
                         // Invalidate TableViewModel cache để TableScreen refresh ngay lập tức
                         TableViewModel.invalidateCache()
+                        Log.d(TAG, "cancelOrder - Released table: $tableIdToRelease")
                     }
 
                     // 4. Update shift cancelled count
