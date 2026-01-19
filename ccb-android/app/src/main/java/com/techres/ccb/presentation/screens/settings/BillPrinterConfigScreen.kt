@@ -5,9 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -129,6 +131,21 @@ fun BillPrinterConfigScreen(
         )
     }
 
+    // All settings dialog (combined settings in one dialog)
+    if (uiState.showAllSettingsDialog && uiState.selectedConfig != null) {
+        BillPrinterAllSettingsDialog(
+            config = uiState.selectedConfig!!,
+            onDismiss = { viewModel.hideAllSettingsDialog() },
+            onSave = { paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint ->
+                viewModel.updateAllSettings(
+                    uiState.selectedConfig!!.id,
+                    paperWidth, fontSize, lineSpacing, numberOfCopies,
+                    cutPaper, openCashDrawer, beepAfterPrint
+                )
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -207,11 +224,7 @@ fun BillPrinterConfigScreen(
                         onTestClick = { viewModel.testPrinterConnection(config) },
                         onSetDefaultClick = { viewModel.setDefault(config.id) },
                         onTemplateClick = { viewModel.showTemplateSelector(config) },
-                        onPaperWidthClick = { viewModel.showPaperWidthSelector(config) },
-                        onFontSizeClick = { viewModel.showFontSizeSelector(config) },
-                        onLineSpacingClick = { viewModel.showLineSpacingSelector(config) },
-                        onNumberOfCopiesClick = { viewModel.showNumberOfCopiesSelector(config) },
-                        onPrintSettingsClick = { viewModel.showPrintSettingsDialog(config) },
+                        onAllSettingsClick = { viewModel.showAllSettingsDialog(config) },
                         onToggleAutoPrint = { viewModel.toggleAutoPrint(config) },
                         onToggleActive = { viewModel.toggleActiveStatus(config) }
                     )
@@ -271,11 +284,7 @@ private fun PrinterConfigCard(
     onTestClick: () -> Unit,
     onSetDefaultClick: () -> Unit,
     onTemplateClick: () -> Unit,
-    onPaperWidthClick: () -> Unit,
-    onFontSizeClick: () -> Unit,
-    onLineSpacingClick: () -> Unit,
-    onNumberOfCopiesClick: () -> Unit,
-    onPrintSettingsClick: () -> Unit,
+    onAllSettingsClick: () -> Unit,
     onToggleAutoPrint: () -> Unit,
     onToggleActive: () -> Unit
 ) {
@@ -498,11 +507,11 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Paper width
+                    // Paper width - clickable to open all settings
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onPaperWidthClick)
+                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
                     ) {
                         Icon(
                             Icons.Default.Straighten,
@@ -525,11 +534,11 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Font size
+                    // Font size - clickable to open all settings
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onFontSizeClick)
+                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
                     ) {
                         Icon(
                             Icons.Default.FormatSize,
@@ -552,11 +561,11 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Line spacing
+                    // Line spacing - clickable to open all settings
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onLineSpacingClick)
+                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
                     ) {
                         Icon(
                             Icons.Default.FormatLineSpacing,
@@ -579,11 +588,11 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Number of copies
+                    // Number of copies - clickable to open all settings
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onNumberOfCopiesClick)
+                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
                     ) {
                         Icon(
                             Icons.Default.ContentCopy,
@@ -606,11 +615,11 @@ private fun PrinterConfigCard(
                         )
                     }
 
-                    // Print settings (cut paper, cash drawer, beep)
+                    // Print settings (cut paper, cash drawer, beep) - clickable to open all settings
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onPrintSettingsClick)
+                        modifier = Modifier.clickable(onClick = onAllSettingsClick)
                     ) {
                         Icon(
                             Icons.Default.Tune,
@@ -1158,6 +1167,373 @@ private fun PrintSettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Đóng") }
+            }
+        }
+    }
+}
+
+/**
+ * All-in-one settings dialog for bill printer configuration
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BillPrinterAllSettingsDialog(
+    config: BillPrinterConfigEntity,
+    onDismiss: () -> Unit,
+    onSave: (paperWidth: Int, fontSize: String, lineSpacing: Float, numberOfCopies: Int, cutPaper: Boolean, openCashDrawer: Boolean, beepAfterPrint: Boolean) -> Unit
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    // Local state for all settings
+    var paperWidth by remember { mutableStateOf(config.paperWidth) }
+    var fontSize by remember { mutableStateOf(config.fontSize) }
+    var lineSpacing by remember { mutableStateOf(config.lineSpacing) }
+    var numberOfCopies by remember { mutableStateOf(config.numberOfCopies) }
+    var cutPaper by remember { mutableStateOf(config.cutPaper) }
+    var openCashDrawer by remember { mutableStateOf(config.openCashDrawer) }
+    var beepAfterPrint by remember { mutableStateOf(config.beepAfterPrint) }
+
+    // Dropdown expanded states
+    var paperWidthExpanded by remember { mutableStateOf(false) }
+    var fontSizeExpanded by remember { mutableStateOf(false) }
+    var lineSpacingExpanded by remember { mutableStateOf(false) }
+    var copiesExpanded by remember { mutableStateOf(false) }
+
+    // Options
+    val paperWidthOptions = listOf(58, 76, 80, 110, 112)
+    val fontSizeOptions = listOf(
+        "extra_small" to "Rất nhỏ (0.7x)",
+        "small" to "Nhỏ (0.85x)",
+        "medium" to "Vừa (1.0x)",
+        "large" to "Lớn (1.2x)",
+        "extra_large" to "Rất lớn (1.4x)"
+    )
+    val lineSpacingOptions = listOf(
+        0.5f to "50%",
+        0.6f to "60%",
+        0.7f to "70%",
+        0.8f to "80%",
+        0.9f to "90%",
+        1.0f to "100%",
+        1.1f to "110%",
+        1.2f to "120%"
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier.widthIn(max = 400.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 600.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(primaryColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = primaryColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "Cài đặt máy in",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = config.name,
+                            fontSize = 14.sp,
+                            color = primaryColor
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Paper Width Dropdown
+                Text("Khổ giấy", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = paperWidthExpanded,
+                    onExpandedChange = { paperWidthExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = "${paperWidth}mm",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = paperWidthExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = paperWidthExpanded,
+                        onDismissRequest = { paperWidthExpanded = false }
+                    ) {
+                        paperWidthOptions.forEach { width ->
+                            DropdownMenuItem(
+                                text = { Text("${width}mm") },
+                                onClick = {
+                                    paperWidth = width
+                                    paperWidthExpanded = false
+                                },
+                                leadingIcon = {
+                                    if (width == paperWidth) {
+                                        Icon(Icons.Default.Check, null, tint = primaryColor)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Font Size Dropdown
+                Text("Cỡ chữ", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = fontSizeExpanded,
+                    onExpandedChange = { fontSizeExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = fontSizeOptions.find { it.first == fontSize }?.second ?: "Vừa (1.0x)",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fontSizeExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = fontSizeExpanded,
+                        onDismissRequest = { fontSizeExpanded = false }
+                    ) {
+                        fontSizeOptions.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    fontSize = key
+                                    fontSizeExpanded = false
+                                },
+                                leadingIcon = {
+                                    if (key == fontSize) {
+                                        Icon(Icons.Default.Check, null, tint = primaryColor)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Line Spacing Dropdown
+                Text("Khoảng cách dòng", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = lineSpacingExpanded,
+                    onExpandedChange = { lineSpacingExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = lineSpacingOptions.find { it.first == lineSpacing }?.second ?: "${(lineSpacing * 100).toInt()}%",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = lineSpacingExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = lineSpacingExpanded,
+                        onDismissRequest = { lineSpacingExpanded = false }
+                    ) {
+                        lineSpacingOptions.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    lineSpacing = value
+                                    lineSpacingExpanded = false
+                                },
+                                leadingIcon = {
+                                    if (value == lineSpacing) {
+                                        Icon(Icons.Default.Check, null, tint = primaryColor)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Number of Copies Dropdown
+                Text("Số bản in", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = copiesExpanded,
+                    onExpandedChange = { copiesExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = "$numberOfCopies bản",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = copiesExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = copiesExpanded,
+                        onDismissRequest = { copiesExpanded = false }
+                    ) {
+                        (1..5).forEach { copies ->
+                            DropdownMenuItem(
+                                text = { Text("$copies bản") },
+                                onClick = {
+                                    numberOfCopies = copies
+                                    copiesExpanded = false
+                                },
+                                leadingIcon = {
+                                    if (copies == numberOfCopies) {
+                                        Icon(Icons.Default.Check, null, tint = primaryColor)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Toggle Settings Section
+                Text("Cài đặt bổ sung", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+
+                // Cut Paper Toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { cutPaper = !cutPaper }
+                        .padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentCut,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (cutPaper) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Cắt giấy tự động", fontWeight = FontWeight.Medium)
+                        Text("Tự động cắt giấy sau khi in", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(
+                        checked = cutPaper,
+                        onCheckedChange = { cutPaper = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryColor
+                        )
+                    )
+                }
+
+                // Open Cash Drawer Toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openCashDrawer = !openCashDrawer }
+                        .padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Inventory,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (openCashDrawer) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Mở két tiền", fontWeight = FontWeight.Medium)
+                        Text("Tự động mở két khi in bill", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(
+                        checked = openCashDrawer,
+                        onCheckedChange = { openCashDrawer = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryColor
+                        )
+                    )
+                }
+
+                // Beep After Print Toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { beepAfterPrint = !beepAfterPrint }
+                        .padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (beepAfterPrint) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Beep sau khi in", fontWeight = FontWeight.Medium)
+                        Text("Phát tiếng beep khi in xong", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(
+                        checked = beepAfterPrint,
+                        onCheckedChange = { beepAfterPrint = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryColor
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Hủy")
+                    }
+                    Button(
+                        onClick = {
+                            onSave(paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Lưu")
+                    }
+                }
             }
         }
     }

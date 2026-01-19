@@ -36,6 +36,7 @@ data class BillPrinterConfigUiState(
     val showLineSpacingSelector: Boolean = false,
     val showNumberOfCopiesSelector: Boolean = false,
     val showPrintSettingsDialog: Boolean = false,
+    val showAllSettingsDialog: Boolean = false,
     val testingPrinterId: String? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null
@@ -239,6 +240,56 @@ class BillPrinterConfigViewModel @Inject constructor(
 
     fun hidePrintSettingsDialog() {
         _uiState.update { it.copy(selectedConfig = null, showPrintSettingsDialog = false) }
+    }
+
+    fun showAllSettingsDialog(config: BillPrinterConfigEntity) {
+        _uiState.update { it.copy(selectedConfig = config, showAllSettingsDialog = true) }
+    }
+
+    fun hideAllSettingsDialog() {
+        _uiState.update { it.copy(selectedConfig = null, showAllSettingsDialog = false) }
+    }
+
+    /**
+     * Update all printer settings at once from the all-in-one settings dialog
+     */
+    fun updateAllSettings(
+        configId: String,
+        paperWidth: Int,
+        fontSize: String,
+        lineSpacing: Float,
+        numberOfCopies: Int,
+        cutPaper: Boolean,
+        openCashDrawer: Boolean,
+        beepAfterPrint: Boolean
+    ) {
+        viewModelScope.launch {
+            try {
+                val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                withContext(Dispatchers.IO) {
+                    val current = billPrinterConfigDao.getById(configId) ?: return@withContext
+                    val updated = current.copy(
+                        paperWidth = paperWidth,
+                        fontSize = fontSize,
+                        lineSpacing = lineSpacing,
+                        numberOfCopies = numberOfCopies,
+                        cutPaper = cutPaper,
+                        openCashDrawer = openCashDrawer,
+                        beepAfterPrint = beepAfterPrint,
+                        updatedAt = now
+                    )
+                    billPrinterConfigDao.update(updated)
+                }
+                _uiState.update { it.copy(
+                    successMessage = "Đã lưu cài đặt máy in",
+                    showAllSettingsDialog = false,
+                    selectedConfig = null
+                ) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating all settings: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi: ${e.message}") }
+            }
+        }
     }
 
     fun updatePrinterAddress(configId: String, ip: String, port: Int) {
