@@ -1450,13 +1450,13 @@ fun CartPanel(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = if (selectedSurchargesCount > 0) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                    contentColor = if (selectedSurcharges.isNotEmpty()) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
                 )
             ) {
                 Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = if (selectedSurchargesCount > 0) "Phụ thu ($selectedSurchargesCount)" else "Phụ thu",
+                    text = if (selectedSurcharges.isNotEmpty()) "Phụ thu (${selectedSurcharges.size})" else "Phụ thu",
                     fontSize = 12.sp,
                     maxLines = 1
                 )
