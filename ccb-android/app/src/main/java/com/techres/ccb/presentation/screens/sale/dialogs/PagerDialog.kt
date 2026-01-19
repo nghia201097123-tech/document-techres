@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,9 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -43,7 +40,7 @@ enum class PagerGridSize(val count: Int, val columns: Int) {
 
 /**
  * Dialog for selecting pager/buzzer number (Thẻ rung)
- * Optimized for easy selection with large touch targets
+ * One-tap selection - tap a number to select and close immediately
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,15 +53,7 @@ fun PagerDialog(
     onAutoGenerate: () -> Unit,
     onGridSizeChanged: ((PagerGridSize) -> Unit)? = null
 ) {
-    var inputText by remember(currentPagerNumber) {
-        mutableStateOf(currentPagerNumber?.toString() ?: "")
-    }
-    var isError by remember { mutableStateOf(false) }
     var selectedGridSize by remember { mutableStateOf(gridSize) }
-    var showGridSizeMenu by remember { mutableStateOf(false) }
-
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -77,7 +66,7 @@ fun PagerDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.85f),
+                .fillMaxHeight(0.8f),
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
@@ -87,7 +76,7 @@ fun PagerDialog(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // Header
+                // Header with close and clear buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -106,99 +95,78 @@ fun PagerDialog(
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Đóng")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Input row with current number and text field
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Current number display
-                    if (currentPagerNumber != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFFF5722).copy(alpha = 0.15f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        // Current number badge
+                        if (currentPagerNumber != null) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFFFF5722)
                             ) {
                                 Text(
-                                    text = "Hiện tại:",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
                                     text = "$currentPagerNumber",
-                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFFF5722)
+                                    fontSize = 16.sp
                                 )
                             }
                         }
                     }
 
-                    // Manual input
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { value ->
-                            if (value.isEmpty() || (value.all { it.isDigit() } && value.length <= 2)) {
-                                inputText = value
-                                isError = value.isNotEmpty() && (value.toIntOrNull() ?: 0) !in 1..99
-                            }
-                        },
-                        label = { Text("Nhập số (1-99)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        isError = isError,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Grid size selector row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Chọn nhanh:",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    // Grid size chips
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PagerGridSize.entries.forEach { size ->
-                            FilterChip(
-                                selected = selectedGridSize == size,
-                                onClick = {
-                                    selectedGridSize = size
-                                    onGridSizeChanged?.invoke(size)
-                                },
-                                label = { Text("${size.count}", fontSize = 12.sp) },
-                                modifier = Modifier.height(28.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFFF5722),
-                                    selectedLabelColor = Color.White
-                                )
+                    Row {
+                        // Clear/Skip button
+                        TextButton(
+                            onClick = { onClear() },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
                             )
+                        ) {
+                            Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Bỏ qua")
+                        }
+
+                        // Close button
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Đóng")
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Main grid - takes remaining space
+                // Grid size selector row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Số lượng:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    PagerGridSize.entries.forEach { size ->
+                        FilterChip(
+                            selected = selectedGridSize == size,
+                            onClick = {
+                                selectedGridSize = size
+                                onGridSizeChanged?.invoke(size)
+                            },
+                            label = { Text("${size.count}", fontSize = 13.sp) },
+                            modifier = Modifier.height(32.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFFF5722),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Main grid - takes remaining space, one-tap selection
                 val numbers = (1..selectedGridSize.count).toList()
 
                 LazyVerticalGrid(
@@ -211,23 +179,23 @@ fun PagerDialog(
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
                     items(numbers) { number ->
-                        val isSelected = inputText == number.toString()
+                        val isCurrentSelection = currentPagerNumber == number
                         Surface(
                             modifier = Modifier
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    inputText = number.toString()
-                                    isError = false
+                                    // One-tap: select and close immediately
+                                    onConfirm(number)
                                 }
                                 .then(
-                                    if (isSelected) Modifier.border(
-                                        2.dp,
+                                    if (isCurrentSelection) Modifier.border(
+                                        3.dp,
                                         Color(0xFFFF5722),
                                         RoundedCornerShape(8.dp)
                                     ) else Modifier
                                 ),
-                            color = if (isSelected) Color(0xFFFF5722).copy(alpha = 0.25f)
+                            color = if (isCurrentSelection) Color(0xFFFF5722).copy(alpha = 0.3f)
                                    else MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -238,79 +206,17 @@ fun PagerDialog(
                                 Text(
                                     text = "$number",
                                     fontSize = when {
-                                        selectedGridSize.columns <= 4 -> 20.sp
-                                        selectedGridSize.columns <= 8 -> 16.sp
+                                        selectedGridSize.columns <= 4 -> 22.sp
+                                        selectedGridSize.columns <= 8 -> 18.sp
                                         else -> 14.sp
                                     },
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color(0xFFFF5722)
+                                    fontWeight = if (isCurrentSelection) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isCurrentSelection) Color(0xFFFF5722)
                                            else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Bottom action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Auto generate button
-                    OutlinedButton(
-                        onClick = {
-                            onAutoGenerate()
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF2196F3)
-                        )
-                    ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Tự động")
-                    }
-
-                    // Clear button
-                    OutlinedButton(
-                        onClick = { onClear() },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Bỏ qua")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Confirm button
-                Button(
-                    onClick = {
-                        val number = inputText.toIntOrNull()
-                        if (number != null && number in 1..99) {
-                            onConfirm(number)
-                        } else if (inputText.isEmpty()) {
-                            onClear()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    enabled = !isError && (inputText.isEmpty() || inputText.toIntOrNull() in 1..99),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF5722)
-                    )
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Xác nhận", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
