@@ -1631,34 +1631,80 @@ private fun OrderCard(
                     }
                 }
 
-                // Center: Order type badge + Table + Items detail + Total
+                // Center: Order type badge + Pager/Note + Items detail + Total
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.Start,
                     verticalArrangement = Arrangement.Top
                 ) {
-                    // Order type badge with icon
+                    // Order type badge with icon + Pager number + Note indicator
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(orderTypeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = orderTypeIcon,
-                            contentDescription = null,
-                            modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
-                            tint = orderTypeColor
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = if (order.orderType == "dine_in" && order.tableName != null)
-                                order.tableName else orderTypeLabel,
-                            fontSize = if (isCompact) 11.sp else 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = orderTypeColor,
-                            maxLines = 1
-                        )
+                        // Order type badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(orderTypeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = orderTypeIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
+                                tint = orderTypeColor
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = if (order.orderType == "dine_in" && order.tableName != null)
+                                    order.tableName else orderTypeLabel,
+                                fontSize = if (isCompact) 11.sp else 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = orderTypeColor,
+                                maxLines = 1
+                            )
+                        }
+
+                        // Pager number and Note indicator
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Note indicator
+                            if (order.hasNotes) {
+                                Icon(
+                                    imageVector = Icons.Default.StickyNote2,
+                                    contentDescription = "Có ghi chú",
+                                    modifier = Modifier.size(if (isCompact) 14.dp else 16.dp),
+                                    tint = Color(0xFFFF9800)
+                                )
+                            }
+                            // Pager number badge
+                            if (order.pagerNumber != null && order.pagerNumber > 0) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .background(Color(0xFF9C27B0).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = if (isCompact) 4.dp else 6.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Vibration,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(if (isCompact) 12.dp else 14.dp),
+                                        tint = Color(0xFF9C27B0)
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = order.pagerNumber.toString(),
+                                        fontSize = if (isCompact) 10.sp else 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF9C27B0)
+                                    )
+                                }
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 6.dp))
 

@@ -38,11 +38,18 @@ data class PosOrder(
     // Discount fields
     val subtotal: Long = 0, // Tổng tiền trước giảm giá
     val discountAmount: Long = 0, // Tổng tiền giảm giá
-    val discountReason: String? = null // Mô tả giảm giá
+    val discountReason: String? = null, // Mô tả giảm giá
+    // Additional display fields
+    val pagerNumber: Int? = null, // Số thẻ rung
+    val notes: String? = null // Ghi chú đơn hàng
 ) {
     // Format daily order number for display: #0001, #0002, ...
     val displayNumber: String
         get() = "#${dailyOrderNumber.toString().padStart(4, '0')}"
+
+    // Check if order has notes
+    val hasNotes: Boolean
+        get() = !notes.isNullOrBlank()
 }
 
 enum class PosOrderStatus(val displayName: String, val color: Long) {
@@ -222,7 +229,10 @@ class DashboardViewModel @Inject constructor(
                                 // Discount fields
                                 subtotal = entity.subtotal.toLong(),
                                 discountAmount = entity.discountAmount.toLong(),
-                                discountReason = entity.discountReason
+                                discountReason = entity.discountReason,
+                                // Additional display fields
+                                pagerNumber = entity.pagerNumber,
+                                notes = entity.notes
                             )
                         }
 
