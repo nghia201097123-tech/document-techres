@@ -45,6 +45,7 @@ object PrintRoutingService {
      */
     data class OrderPrintData(
         val orderNumber: String,
+        val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (001-999)
         val tableName: String?,
         val staffName: String?,
         val pagerNumber: Int? = null,  // Số thẻ rung (1-99)
@@ -297,6 +298,7 @@ object PrintRoutingService {
         val ticketData = KitchenTicketPrintService.KitchenTicketData(
             kitchenName = kitchen.name,
             orderNumber = order.orderNumber,
+            dailyOrderNumber = order.dailyOrderNumber,
             tableName = order.tableName,
             pagerNumber = order.pagerNumber,
             orderTime = order.orderTime,
@@ -356,6 +358,7 @@ object PrintRoutingService {
                 tableName = order.tableName,
                 pagerNumber = order.pagerNumber,
                 orderNumber = order.orderNumber,
+                dailyOrderNumber = order.dailyOrderNumber,
                 orderTime = order.orderTime,
                 staffName = order.staffName,
                 // Price fields for label printing

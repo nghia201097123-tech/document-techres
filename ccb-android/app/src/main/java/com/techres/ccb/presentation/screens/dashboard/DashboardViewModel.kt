@@ -31,6 +31,7 @@ data class PosOrder(
     val status: PosOrderStatus,
     val createdAt: Long,
     val orderNumber: String,
+    val dailyOrderNumber: Int = 0, // Số thứ tự trong ngày (001-999)
     val isPrinted: Boolean = false,
     val items: List<OrderItemEntity> = emptyList(), // Danh sách món để hiển thị
     val orderType: String = "dine_in", // dine_in, takeaway, delivery
@@ -38,7 +39,11 @@ data class PosOrder(
     val subtotal: Long = 0, // Tổng tiền trước giảm giá
     val discountAmount: Long = 0, // Tổng tiền giảm giá
     val discountReason: String? = null // Mô tả giảm giá
-)
+) {
+    // Format daily order number for display: #001, #002, ...
+    val displayNumber: String
+        get() = "#${dailyOrderNumber.toString().padStart(3, '0')}"
+}
 
 enum class PosOrderStatus(val displayName: String, val color: Long) {
     DRAFT("Đang order", 0xFFFF9800),
@@ -210,6 +215,7 @@ class DashboardViewModel @Inject constructor(
                                 status = mapOrderStatus(entity.status),
                                 createdAt = parseTimestamp(entity.createdAt),
                                 orderNumber = entity.orderNumber,
+                                dailyOrderNumber = entity.dailyOrderNumber,
                                 isPrinted = entity.isPrinted,
                                 items = orderItems, // Thêm items để hiển thị
                                 orderType = entity.orderType, // dine_in, takeaway, delivery

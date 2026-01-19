@@ -170,4 +170,15 @@ interface OrderDao {
         AND pager_number IS NOT NULL
     """)
     suspend fun getUsedPagerNumbersToday(branchId: String, today: String): List<Int>
+
+    /**
+     * Get max daily order number for today
+     * Used to generate next sequential order number (001, 002, ...)
+     */
+    @Query("""
+        SELECT COALESCE(MAX(daily_order_number), 0) FROM orders
+        WHERE branch_id = :branchId
+        AND SUBSTR(created_at, 1, 10) = :today
+    """)
+    suspend fun getMaxDailyOrderNumberForToday(branchId: String, today: String): Int
 }

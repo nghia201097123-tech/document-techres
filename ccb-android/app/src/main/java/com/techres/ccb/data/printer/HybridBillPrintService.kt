@@ -406,7 +406,7 @@ object HybridBillPrintService {
 
             // ============ ORDER INFO ============
             if (template.showOrderNumber) {
-                line("Mã đơn: ${billData.orderNumber}")
+                line("Mã đơn: ${billData.displayNumber}")
             }
             if (template.showTableName && billData.tableName != null) {
                 line("Bàn: ${billData.tableName}")

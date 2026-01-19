@@ -169,7 +169,7 @@ object BillPrintService {
         b.left()
 
         if (template.showOrderNumber) {
-            b.text("Mã đơn: #${billData.orderNumber}")
+            b.text("Mã đơn: ${billData.displayNumber}")
         }
 
         if (template.showTableName && billData.tableName != null) {
@@ -540,6 +540,7 @@ class EscPosBillBuilder(paperWidth: Int) {
  */
 data class BillData(
     val orderNumber: String,
+    val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (001-999)
     val orderDate: Date,
     val tableName: String? = null,
     val pagerNumber: Int? = null,  // Số thẻ rung (1-99)
@@ -587,7 +588,11 @@ data class BillData(
     val isReprint: Boolean = false,
     val reprintTime: Date? = null,
     val reprintReason: String? = null
-)
+) {
+    // Format daily order number for display: #001, #002, ...
+    val displayNumber: String
+        get() = "#${dailyOrderNumber.toString().padStart(3, '0')}"
+}
 
 /**
  * Bill Item - Thông tin món

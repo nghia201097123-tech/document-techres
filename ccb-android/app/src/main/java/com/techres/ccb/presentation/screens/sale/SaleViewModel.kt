@@ -2700,6 +2700,7 @@ class SaleViewModel @Inject constructor(
 
                 val orderId = UUID.randomUUID().toString()
                 val orderNumber = generateOrderNumber()
+                val dailyOrderNumber = generateDailyOrderNumber()
 
                 // Create order entity
                 val orderEntity = OrderEntity(
@@ -2713,6 +2714,7 @@ class SaleViewModel @Inject constructor(
                     customerName = state.selectedCustomer?.name,
                     customerPhone = state.selectedCustomer?.phone,
                     orderNumber = orderNumber,
+                    dailyOrderNumber = dailyOrderNumber,
                     status = "pending",
                     orderType = state.orderType.dbValue,
                     pagerNumber = state.pagerNumber,
@@ -3820,6 +3822,19 @@ class SaleViewModel @Inject constructor(
         val timestamp = System.currentTimeMillis()
         val random = (1000..9999).random()
         return "HD${timestamp % 1000000}$random"
+    }
+
+    /**
+     * Generate next daily order number (001, 002, ...)
+     * Resets daily, max 999 per day
+     */
+    private suspend fun generateDailyOrderNumber(): Int {
+        return withContext(Dispatchers.IO) {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val maxNumber = orderRepository.getMaxDailyOrderNumberForToday(branchId, today)
+            val nextNumber = if (maxNumber >= 999) 1 else maxNumber + 1
+            nextNumber
+        }
     }
 
     /**

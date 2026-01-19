@@ -102,6 +102,7 @@ object OrderPrintingService {
         // Build OrderPrintData
         val orderPrintData = PrintRoutingService.OrderPrintData(
             orderNumber = order.orderNumber,
+            dailyOrderNumber = order.dailyOrderNumber,
             tableName = order.tableName,
             staffName = order.staffName,
             pagerNumber = order.pagerNumber,
@@ -163,6 +164,7 @@ object OrderPrintingService {
 
         val orderPrintData = PrintRoutingService.OrderPrintData(
             orderNumber = order.orderNumber,
+            dailyOrderNumber = order.dailyOrderNumber,
             tableName = order.tableName,
             staffName = order.staffName,
             pagerNumber = order.pagerNumber,

@@ -872,7 +872,9 @@ fun CartDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (uiState.currentOrder != null) uiState.currentOrder.orderNumber else "Giỏ hàng",
+                            text = if (uiState.currentOrder != null) {
+                                "#${uiState.currentOrder.dailyOrderNumber.toString().padStart(3, '0')}"
+                            } else "Giỏ hàng",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -1307,7 +1309,9 @@ fun CartPanel(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (hasActiveOrder) currentOrder?.orderNumber ?: "Đơn hàng" else "Đơn hàng mới",
+                        text = if (hasActiveOrder) {
+                            "#${currentOrder?.dailyOrderNumber?.toString()?.padStart(3, '0') ?: "---"}"
+                        } else "Đơn hàng mới",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

@@ -76,7 +76,8 @@ object KitchenTicketPrintService {
      */
     data class KitchenTicketData(
         val kitchenName: String,        // Tên bếp (BAR, BẾP CHÍNH, ...)
-        val orderNumber: String,        // Mã đơn hàng
+        val orderNumber: String,        // Mã đơn hàng gốc (cho kỹ thuật)
+        val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (001-999)
         val tableName: String?,         // Tên bàn
         val pagerNumber: Int? = null,   // Số thẻ rung (1-99)
         val orderTime: Date = Date(),   // Thời gian order
@@ -85,7 +86,11 @@ object KitchenTicketPrintService {
         val note: String? = null,       // Ghi chú chung cho đơn
         val isUrgent: Boolean = false,  // Đơn gấp
         val ticketType: String = "NEW"  // NEW, MODIFIED, CANCELLED
-    )
+    ) {
+        // Format daily order number for display: #001, #002, ...
+        val displayNumber: String
+            get() = "#${dailyOrderNumber.toString().padStart(3, '0')}"
+    }
 
     /**
      * In phiếu bếp
@@ -331,15 +336,15 @@ object KitchenTicketPrintService {
 
             if (hasTable && hasOrder) {
                 // Bàn bên trái (bold), Mã đơn bên phải
-                lineKeyValueBold("BÀN: ${ticket.tableName}", "#${ticket.orderNumber}")
+                lineKeyValueBold("BÀN: ${ticket.tableName}", ticket.displayNumber)
             } else if (hasTable) {
                 // Chỉ có bàn
                 lineBold("BÀN: ${ticket.tableName}")
             } else if (hasOrder && hasTime) {
                 // Không có bàn: Mã đơn + Thời gian
-                lineKeyValue("#${ticket.orderNumber}", timeFormat.format(ticket.orderTime))
+                lineKeyValue(ticket.displayNumber, timeFormat.format(ticket.orderTime))
             } else if (hasOrder) {
-                line("#${ticket.orderNumber}")
+                line(ticket.displayNumber)
             }
 
             // SMART LAYOUT: Gộp Thời gian + Nhân viên trên cùng 1 dòng (nếu có bàn)

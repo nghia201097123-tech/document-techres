@@ -203,4 +203,12 @@ class OrderRepository @Inject constructor(
     suspend fun getUsedPagerNumbersToday(branchId: String, today: String): List<Int> {
         return orderDao.getUsedPagerNumbersToday(branchId, today)
     }
+
+    /**
+     * Get max daily order number for today
+     * Used to generate next sequential order number
+     */
+    suspend fun getMaxDailyOrderNumberForToday(branchId: String, today: String): Int {
+        return orderDao.getMaxDailyOrderNumberForToday(branchId, today)
+    }
 }

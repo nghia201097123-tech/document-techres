@@ -898,6 +898,26 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 23 to 24
+     * Adds daily_order_number column to orders table for short display number
+     */
+    val MIGRATION_23_24 = object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 23 to 24...")
+
+            // Add daily_order_number column to orders table
+            try {
+                db.execSQL("ALTER TABLE orders ADD COLUMN daily_order_number INTEGER NOT NULL DEFAULT 0")
+                Log.d(TAG, "Added daily_order_number column to orders")
+            } catch (e: Exception) {
+                Log.d(TAG, "daily_order_number column may already exist: ${e.message}")
+            }
+
+            Log.d(TAG, "Migration 23 to 24 complete - Added daily_order_number for short display")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -914,6 +934,7 @@ object DatabaseMigrations {
         MIGRATION_19_20,
         MIGRATION_20_21,
         MIGRATION_21_22,
-        MIGRATION_22_23
+        MIGRATION_22_23,
+        MIGRATION_23_24
     )
 }
