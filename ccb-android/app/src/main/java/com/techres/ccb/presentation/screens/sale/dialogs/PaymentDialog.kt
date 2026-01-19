@@ -1803,18 +1803,18 @@ private fun VatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tổng VAT tính từ items + surcharges
+                // Tổng VAT - sử dụng totalVatAmount được truyền vào (đồng nhất với màn hình thanh toán)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        if (selectedSurcharges.isNotEmpty()) "Tổng VAT:" else "Tổng VAT (theo món):",
+                        "Tổng VAT:",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        formatCurrency(calculatedTotalVat),
+                        formatCurrency(totalVatAmount),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium

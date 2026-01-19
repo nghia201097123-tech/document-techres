@@ -1718,6 +1718,7 @@ private fun OrderDetailDialog(
             subtotal = order.subtotal.toLong(),
             discountAmount = order.discountAmount.toLong(),
             surchargeAmount = order.surchargeAmount.toLong(),
+            totalVatAmount = order.vatAmount.toLong(),
             onDismiss = { showVatDetail = false }
         )
     }
@@ -1812,6 +1813,7 @@ private fun HistoryVatDetailDialog(
     subtotal: Long,
     discountAmount: Long,
     surchargeAmount: Long = 0,
+    totalVatAmount: Long,
     onDismiss: () -> Unit
 ) {
     // Tính tỷ lệ còn lại sau giảm giá (VAT tính trên giá sau giảm - chỉ áp dụng cho items, không áp dụng cho surcharges)
@@ -2113,18 +2115,18 @@ private fun HistoryVatDetailDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tổng VAT tính từ items + surcharges
+                // Tổng VAT - sử dụng totalVatAmount từ database (đồng nhất với tất cả các màn hình)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        if (surchargeAmount > 0) "Tổng VAT:" else "Tổng VAT (theo món):",
+                        "Tổng VAT:",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        formatCurrency(calculatedTotalVat),
+                        formatCurrency(totalVatAmount),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
