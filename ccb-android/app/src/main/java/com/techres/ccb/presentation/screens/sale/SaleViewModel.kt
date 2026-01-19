@@ -1896,11 +1896,13 @@ class SaleViewModel @Inject constructor(
                 val newAppliedDiscounts = listOf(appliedDiscount)
                 val totalCouponDiscount = discountAmount
 
-                // Tính VAT (trên giá sau giảm - bao gồm tất cả các loại giảm giá)
+                // Tính VAT (tách từ giá đã bao gồm VAT)
+                // VAT = giá - (giá ÷ (1 + taxRate/100))
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
                 val totalAllDiscounts = state.itemDiscountTotal + state.billDiscountAmount + totalCouponDiscount
                 val priceAfterDiscount = (subtotal - totalAllDiscounts).coerceAtLeast(0L)
-                val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+                val priceBeforeVat = (priceAfterDiscount / (1 + state.taxRate / 100.0)).toLong()
+                val vatAmount = priceAfterDiscount - priceBeforeVat
 
                 _uiState.update {
                     it.copy(
@@ -1935,10 +1937,11 @@ class SaleViewModel @Inject constructor(
             val newAppliedDiscounts = state.appliedDiscounts.filter { it.couponId != couponId }
             val totalDiscount = newAppliedDiscounts.sumOf { it.discountAmount }
 
-            // Tính lại VAT
+            // Tính lại VAT (tách từ giá đã bao gồm VAT)
             val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
             val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
-            val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+            val priceBeforeVat = (priceAfterDiscount / (1 + state.taxRate / 100.0)).toLong()
+            val vatAmount = priceAfterDiscount - priceBeforeVat
 
             state.copy(
                 appliedDiscounts = newAppliedDiscounts,
@@ -2026,11 +2029,12 @@ class SaleViewModel @Inject constructor(
                 val newAppliedDiscounts = listOf(appliedDiscount)
                 val totalDiscount = discountAmount
 
-                // Tính VAT (trên giá sau giảm - bao gồm tất cả các loại giảm giá)
+                // Tính VAT (tách từ giá đã bao gồm VAT)
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
                 val totalAllDiscounts = state.itemDiscountTotal + state.billDiscountAmount + totalDiscount
                 val priceAfterDiscount = (subtotal - totalAllDiscounts).coerceAtLeast(0L)
-                val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+                val priceBeforeVat = (priceAfterDiscount / (1 + state.taxRate / 100.0)).toLong()
+                val vatAmount = priceAfterDiscount - priceBeforeVat
 
                 _uiState.update {
                     it.copy(
@@ -2142,10 +2146,11 @@ class SaleViewModel @Inject constructor(
                     totalDiscount += discountAmount
                 }
 
-                // Tính VAT
+                // Tính VAT (tách từ giá đã bao gồm VAT)
                 val subtotal = state.currentOrder?.subtotal?.toLong() ?: state.subtotal
                 val priceAfterDiscount = (subtotal - totalDiscount).coerceAtLeast(0L)
-                val vatAmount = (priceAfterDiscount * state.taxRate / 100.0).toLong()
+                val priceBeforeVat = (priceAfterDiscount / (1 + state.taxRate / 100.0)).toLong()
+                val vatAmount = priceAfterDiscount - priceBeforeVat
 
                 _uiState.update { s ->
                     s.copy(

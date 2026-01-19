@@ -110,13 +110,13 @@ fun PaymentScreen(
                             )
                         }
                     }
-                    // Show VAT
+                    // Show VAT (đã bao gồm trong giá)
                     if (uiState.vatAmount > 0) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("VAT (8%):")
+                            Text("Trong đó VAT (8%):")
                             Text(formatPrice(uiState.vatAmount))
                         }
                     }

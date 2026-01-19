@@ -69,10 +69,9 @@ data class OrderItemForDiscount(
  * DiscountCalculator - Tính giảm giá tuân thủ luật thuế Việt Nam
  *
  * Theo Nghị định 123/2020/NĐ-CP và Thông tư 78/2021/TT-BTC về hóa đơn điện tử:
- * - Giảm giá (chiết khấu) được trừ VÀO GIÁ TRƯỚC KHI TÍNH VAT
- * - Công thức: Giá tính thuế = Giá gốc - Chiết khấu
- *              VAT = Giá tính thuế × VAT rate
- *              Giá cuối = Giá tính thuế + VAT
+ * - GIÁ BÁN ĐÃ BAO GỒM VAT (theo thông lệ F&B Việt Nam)
+ * - Giảm giá được trừ trực tiếp vào giá bán
+ * - VAT được tách ra từ giá đã bao gồm VAT: VAT = Giá - (Giá ÷ 1.08)
  *
  * Hiện tại VAT F&B được giảm còn 8% (Nghị định 174/2025)
  */
@@ -161,11 +160,13 @@ object DiscountCalculator {
                 }
             }
 
-            // Áp dụng công thức thuế Việt Nam
+            // Áp dụng công thức thuế Việt Nam (giá đã bao gồm VAT)
+            // VAT = Giá - (Giá ÷ (1 + vatRate/100))
             val originalTotal = item.unitPrice * item.quantity
             val priceAfterDiscount = (originalTotal - itemDiscount).coerceAtLeast(0.0)
-            val vatAmount = priceAfterDiscount * (item.vatRate / 100.0)
-            val finalPrice = priceAfterDiscount + vatAmount
+            val priceBeforeVatItem = priceAfterDiscount / (1 + item.vatRate / 100.0)
+            val vatAmount = priceAfterDiscount - priceBeforeVatItem
+            val finalPrice = priceAfterDiscount // Giá cuối = giá sau giảm (đã bao gồm VAT)
 
             ItemDiscountResult(
                 productId = item.productId,
@@ -217,23 +218,17 @@ object DiscountCalculator {
         val totalItemDiscount = itemResults.sumOf { it.discountAmount }
         val totalDiscount = totalItemDiscount + billLevelDiscount
 
-        // Tính giá trước VAT (phân bổ giảm giá bill-level theo tỷ lệ)
-        val priceBeforeVat = itemResults.sumOf { item ->
-            val itemShare = if (subtotal > 0) {
-                item.priceAfterDiscount / subtotal * (subtotal - billLevelDiscount)
-            } else {
-                0.0
-            }
-            itemShare.coerceAtLeast(0.0)
-        }
+        // Tính tổng cộng (giá đã bao gồm VAT - giảm giá)
+        val grandTotal = (subtotal - totalDiscount).coerceAtLeast(0.0)
 
-        // Tính tổng VAT (trên giá sau giảm)
+        // Tính VAT theo phương pháp tách (giá đã bao gồm VAT)
+        // VAT = grandTotal - (grandTotal ÷ 1.08)
         val avgVatRate = if (items.isNotEmpty()) {
             items.map { it.vatRate }.average()
         } else 0.0
 
-        val totalVat = priceBeforeVat * (avgVatRate / 100.0)
-        val grandTotal = priceBeforeVat + totalVat
+        val priceBeforeVat = grandTotal / (1 + avgVatRate / 100.0)
+        val totalVat = grandTotal - priceBeforeVat
 
         return BillDiscountResult(
             items = itemResults,
