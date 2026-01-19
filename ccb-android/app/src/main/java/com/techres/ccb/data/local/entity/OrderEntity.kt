@@ -63,7 +63,7 @@ data class OrderEntity(
     @ColumnInfo(name = "order_number")
     val orderNumber: String,
 
-    // Số thứ tự đơn hàng trong ngày (001-999), reset mỗi ngày
+    // Số thứ tự đơn hàng trong ngày (0001-9999), reset mỗi ngày
     // Dùng để hiển thị cho nhân viên và khách hàng dễ nhớ
     @ColumnInfo(name = "daily_order_number")
     val dailyOrderNumber: Int = 0,

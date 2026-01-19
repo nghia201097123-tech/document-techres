@@ -3825,14 +3825,14 @@ class SaleViewModel @Inject constructor(
     }
 
     /**
-     * Generate next daily order number (001, 002, ...)
-     * Resets daily, max 999 per day
+     * Generate next daily order number (0001, 0002, ...)
+     * Resets daily, max 9999 per day
      */
     private suspend fun generateDailyOrderNumber(): Int {
         return withContext(Dispatchers.IO) {
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val maxNumber = orderRepository.getMaxDailyOrderNumberForToday(branchId, today)
-            val nextNumber = if (maxNumber >= 999) 1 else maxNumber + 1
+            val nextNumber = if (maxNumber >= 9999) 1 else maxNumber + 1
             nextNumber
         }
     }

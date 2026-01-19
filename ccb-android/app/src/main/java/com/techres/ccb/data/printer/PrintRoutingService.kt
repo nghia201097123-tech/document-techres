@@ -45,7 +45,7 @@ object PrintRoutingService {
      */
     data class OrderPrintData(
         val orderNumber: String,
-        val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (001-999)
+        val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (0001-9999)
         val tableName: String?,
         val staffName: String?,
         val pagerNumber: Int? = null,  // Số thẻ rung (1-99)

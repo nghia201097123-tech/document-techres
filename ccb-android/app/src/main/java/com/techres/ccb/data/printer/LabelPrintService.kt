@@ -71,7 +71,7 @@ object LabelPrintService {
         val tableName: String? = null,  // Tên bàn
         val pagerNumber: Int? = null,   // Số thẻ rung (1-99)
         val orderNumber: String,        // Mã đơn hàng gốc (cho kỹ thuật)
-        val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (001-999)
+        val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (0001-9999)
         val orderTime: Date = Date(),   // Thời gian order
         val staffName: String? = null,  // Tên nhân viên
         val labelIndex: Int = 1,        // Thứ tự tem (1/3, 2/3, 3/3)
@@ -91,9 +91,9 @@ object LabelPrintService {
         val partIndex: Int = 1,                 // Phần thứ mấy (1, 2, 3...)
         val totalParts: Int = 1                 // Tổng số phần
     ) {
-        // Format daily order number for display: #001, #002, ...
+        // Format daily order number for display: #0001, #0002, ...
         val displayNumber: String
-            get() = "#${dailyOrderNumber.toString().padStart(3, '0')}"
+            get() = "#${dailyOrderNumber.toString().padStart(4, '0')}"
     }
 
     // Default max toppings per label (fallback, will use config from kitchen)

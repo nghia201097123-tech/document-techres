@@ -540,7 +540,7 @@ class EscPosBillBuilder(paperWidth: Int) {
  */
 data class BillData(
     val orderNumber: String,
-    val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (001-999)
+    val dailyOrderNumber: Int = 0,  // Số thứ tự trong ngày (0001-9999)
     val orderDate: Date,
     val tableName: String? = null,
     val pagerNumber: Int? = null,  // Số thẻ rung (1-99)
@@ -589,9 +589,9 @@ data class BillData(
     val reprintTime: Date? = null,
     val reprintReason: String? = null
 ) {
-    // Format daily order number for display: #001, #002, ...
+    // Format daily order number for display: #0001, #0002, ...
     val displayNumber: String
-        get() = "#${dailyOrderNumber.toString().padStart(3, '0')}"
+        get() = "#${dailyOrderNumber.toString().padStart(4, '0')}"
 }
 
 /**
