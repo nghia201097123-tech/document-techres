@@ -314,38 +314,51 @@ object KitchenTicketPrintService {
             separator('=')
 
             // ═══════════════════════════════════════════
-            // SECTION 2: THÔNG TIN ĐƠN HÀNG (gọn gàng trên ít dòng)
+            // SECTION 2: THÔNG TIN ĐƠN HÀNG (thiết kế thông minh - gộp dòng để tránh đè layout)
             // ═══════════════════════════════════════════
-            // Tên cửa hàng (nếu có) - cùng dòng với tên bàn
+            // Tên cửa hàng (nếu có)
             if (showStoreName && !storeName.isNullOrBlank()) {
                 line(storeName)
             }
 
-            // Tên bàn (TO, ĐẬM, nổi bật) - nếu config cho phép
-            if (showTableName) {
-                ticket.tableName?.let {
-                    lineBold("BÀN: $it")
-                }
-            }
-
-            // Mã đơn + Thời gian (trên cùng 1 dòng) - theo config
+            // SMART LAYOUT: Gộp Bàn + Mã đơn trên cùng 1 dòng
             val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
-            val orderPart = if (showOrderNumber) "#${ticket.orderNumber}" else ""
-            val timePart = if (showTime) timeFormat.format(ticket.orderTime) else ""
+            val hasTable = showTableName && !ticket.tableName.isNullOrBlank()
+            val hasOrder = showOrderNumber
+            val hasTime = showTime
+            val hasStaff = !ticket.staffName.isNullOrBlank()
 
-            if (orderPart.isNotEmpty() || timePart.isNotEmpty()) {
-                if (orderPart.isNotEmpty() && timePart.isNotEmpty()) {
-                    lineKeyValue(orderPart, timePart)
-                } else if (orderPart.isNotEmpty()) {
-                    line(orderPart)
-                } else {
-                    line(timePart)
-                }
+            if (hasTable && hasOrder) {
+                // Bàn bên trái (bold), Mã đơn bên phải
+                lineKeyValueBold("BÀN: ${ticket.tableName}", "#${ticket.orderNumber}")
+            } else if (hasTable) {
+                // Chỉ có bàn
+                lineBold("BÀN: ${ticket.tableName}")
+            } else if (hasOrder && hasTime) {
+                // Không có bàn: Mã đơn + Thời gian
+                lineKeyValue("#${ticket.orderNumber}", timeFormat.format(ticket.orderTime))
+            } else if (hasOrder) {
+                line("#${ticket.orderNumber}")
             }
 
-            // Nhân viên
-            ticket.staffName?.let {
-                line("NV: $it")
+            // SMART LAYOUT: Gộp Thời gian + Nhân viên trên cùng 1 dòng (nếu có bàn)
+            if (hasTable) {
+                // Đã có bàn + mã đơn ở trên, giờ gộp time + staff
+                val timePart = if (hasTime) timeFormat.format(ticket.orderTime) else ""
+                val staffPart = if (hasStaff) "NV: ${ticket.staffName}" else ""
+
+                if (timePart.isNotEmpty() && staffPart.isNotEmpty()) {
+                    lineKeyValue(timePart, staffPart)
+                } else if (timePart.isNotEmpty()) {
+                    line(timePart)
+                } else if (staffPart.isNotEmpty()) {
+                    line(staffPart)
+                }
+            } else {
+                // Không có bàn: hiển thị staff riêng (time đã gộp với order ở trên)
+                if (hasStaff) {
+                    line("NV: ${ticket.staffName}")
+                }
             }
 
             separator('=')
