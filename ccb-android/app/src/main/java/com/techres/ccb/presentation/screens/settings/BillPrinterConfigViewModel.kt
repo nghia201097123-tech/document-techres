@@ -475,6 +475,7 @@ class BillPrinterConfigViewModel @Inject constructor(
                         // Create test bill data
                         val testBillData = com.techres.ccb.data.printer.BillData(
                             orderNumber = "TEST-${System.currentTimeMillis() % 10000}",
+                            dailyOrderNumber = (System.currentTimeMillis() % 9999).toInt() + 1,
                             orderDate = Date(),
                             tableName = "Bàn Test",
                             staffName = "Nhân viên Test",

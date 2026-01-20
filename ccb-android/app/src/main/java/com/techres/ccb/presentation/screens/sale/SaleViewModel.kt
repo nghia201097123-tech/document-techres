@@ -3226,7 +3226,7 @@ class SaleViewModel @Inject constructor(
                         tempBillPrintCount = 0,
                         // Clear pager number
                         pagerNumber = null,
-                        successMessage = "Thanh toán thành công! ${currentOrder.orderNumber}"
+                        successMessage = "Thanh toán thành công! #${String.format("%04d", currentOrder.dailyOrderNumber)}"
                     )
                 }
 
@@ -3592,6 +3592,7 @@ class SaleViewModel @Inject constructor(
 
         return BillData(
             orderNumber = order.orderNumber,
+            dailyOrderNumber = order.dailyOrderNumber,
             orderDate = orderDate,
             tableName = tableName,
             pagerNumber = order.pagerNumber,
@@ -3692,7 +3693,7 @@ class SaleViewModel @Inject constructor(
                         selectedTable = null,
                         selectedCustomer = null,
                         pagerNumber = null,
-                        successMessage = "Đã huỷ đơn hàng ${currentOrder.orderNumber}"
+                        successMessage = "Đã huỷ đơn hàng #${String.format("%04d", currentOrder.dailyOrderNumber)}"
                     )
                 }
 

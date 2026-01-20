@@ -590,6 +590,7 @@ class OrderHistoryViewModel @Inject constructor(
 
         return BillData(
             orderNumber = order.orderNumber,
+            dailyOrderNumber = order.dailyOrderNumber,
             orderDate = orderDate,
             tableName = order.tableName,
             pagerNumber = order.pagerNumber,
