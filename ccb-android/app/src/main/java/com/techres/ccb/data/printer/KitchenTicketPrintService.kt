@@ -328,7 +328,9 @@ object KitchenTicketPrintService {
             }
 
             // SMART LAYOUT: Gộp Bàn + Mã đơn + Thẻ rung trên cùng 1-2 dòng để tiết kiệm giấy
-            val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
+            val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            }
             val hasTable = showTableName && !ticket.tableName.isNullOrBlank()
             val hasOrder = showOrderNumber
             val hasTime = showTime

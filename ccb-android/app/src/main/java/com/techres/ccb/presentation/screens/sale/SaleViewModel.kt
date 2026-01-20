@@ -2932,7 +2932,11 @@ class SaleViewModel @Inject constructor(
                 }
 
                 // Print new items to kitchens in background - don't block success message
-                val printOrder = currentOrder.copy(updatedAt = now)
+                // Include pager number from state to ensure it's printed on labels and tickets
+                val printOrder = currentOrder.copy(
+                    pagerNumber = state.pagerNumber,
+                    updatedAt = now
+                )
                 val itemsToPrint = newItems.toList()
                 viewModelScope.launch {
                     try {

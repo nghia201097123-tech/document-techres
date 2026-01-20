@@ -750,7 +750,9 @@ object LabelPrintService {
             output.write("BAR $margin,$yPos,$contentWidth,1\r\n".toByteArray())
             yPos += 3
 
-            val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+            val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            }
             val dateBitmap = renderTextBitmap(
                 text = dateFormat.format(label.orderTime),
                 width = contentWidth,
@@ -1192,7 +1194,9 @@ object LabelPrintService {
             // ========== ORDER INFO + TIME (based on config) ==========
             if (showOrderNumber || showTime) {
                 separator('-')
-                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 val orderPart = if (showOrderNumber) label.displayNumber else ""
                 val timePart = if (showTime) timeFormat.format(label.orderTime) else ""
                 val orderInfo = listOf(orderPart, timePart).filter { it.isNotEmpty() }.joinToString(" - ")
@@ -1266,7 +1270,9 @@ object LabelPrintService {
         output.write("BAR 10,140,${widthDots - 20},2\r\n".toByteArray())
 
         // Date/time
-        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+        }.format(Date())
         output.write("TEXT 50,160,\"1\",0,1,1,\"$dateStr\"\r\n".toByteArray())
 
         output.write("PRINT 1,1\r\n".toByteArray())
@@ -1289,7 +1295,9 @@ object LabelPrintService {
         output.write("ABCDEFGHIJ\n".toByteArray())
         output.write("--------------------\n".toByteArray())
 
-        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+        }.format(Date())
         output.write("$dateStr\n".toByteArray())
 
         output.write(EscPosCommands.feedLines(4))

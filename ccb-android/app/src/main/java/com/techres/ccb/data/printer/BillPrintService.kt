@@ -194,18 +194,24 @@ object BillPrintService {
         }
 
         if (template.showDateTime) {
-            val df = SimpleDateFormat(template.dateFormat, Locale.getDefault())
+            val df = SimpleDateFormat(template.dateFormat, Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            }
             b.text("Giờ: ${df.format(billData.orderDate)}")
         }
 
         // Giờ vào/ra
         if (template.showCheckInTime && billData.checkInTime != null) {
-            val tf = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+            val tf = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            }
             b.text("${template.checkInLabel}: ${tf.format(billData.checkInTime)}")
         }
 
         if (template.showCheckOutTime && billData.checkOutTime != null) {
-            val tf = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+            val tf = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            }
             b.text("${template.checkOutLabel}: ${tf.format(billData.checkOutTime)}")
         }
 

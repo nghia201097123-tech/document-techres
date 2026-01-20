@@ -379,7 +379,9 @@ object HybridBillPrintService {
                 doubleSeparator()
                 lineCenter("Lần in thứ: ${billData.printCount}")
                 billData.printTime?.let { printTime ->
-                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                    }
                     lineCenter("Thời gian in: ${timeFormat.format(printTime)}")
                 }
                 lineCenter("(Chưa thanh toán)")
@@ -389,7 +391,9 @@ object HybridBillPrintService {
                 lineDouble("*** IN LẠI ***", BitmapTextStyle(centerAlign = true))
                 doubleSeparator()
                 billData.reprintTime?.let { reprintTime ->
-                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                    }
                     lineCenter("Thời gian in lại: ${timeFormat.format(reprintTime)}")
                 }
                 billData.reprintReason?.let { reason ->
@@ -421,17 +425,23 @@ object HybridBillPrintService {
                 line("Khách hàng: ${billData.customerName}")
             }
             if (template.showDateTime) {
-                val dateFormat = SimpleDateFormat(template.dateFormat, Locale.getDefault())
+                val dateFormat = SimpleDateFormat(template.dateFormat, Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 line("Giờ: ${dateFormat.format(billData.orderDate)}")
             }
 
             // ============ TIME TRACKING ============
             if (template.showCheckInTime && billData.checkInTime != null) {
-                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 line("${template.checkInLabel}: ${timeFormat.format(billData.checkInTime)}")
             }
             if (template.showCheckOutTime && billData.checkOutTime != null) {
-                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 line("${template.checkOutLabel}: ${timeFormat.format(billData.checkOutTime)}")
             }
 
@@ -739,7 +749,9 @@ object HybridBillPrintService {
                 // Hiển thị thông tin lần in và thời gian
                 lineCenter("Lần in thứ: ${billData.printCount}")
                 billData.printTime?.let { printTime ->
-                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                    }
                     lineCenter("Thời gian in: ${timeFormat.format(printTime)}")
                 }
                 lineCenter("(Chưa thanh toán)")
@@ -753,7 +765,9 @@ object HybridBillPrintService {
 
                 // Hiển thị thời gian in lại
                 billData.reprintTime?.let { reprintTime ->
-                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                    }
                     lineCenter("Thời gian in lại: ${timeFormat.format(reprintTime)}")
                 }
                 billData.reprintReason?.let { reason ->
@@ -788,17 +802,23 @@ object HybridBillPrintService {
                 line("Khách hàng: ${billData.customerName}")
             }
             if (template.showDateTime) {
-                val dateFormat = SimpleDateFormat(template.dateFormat, Locale.getDefault())
+                val dateFormat = SimpleDateFormat(template.dateFormat, Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 line("Giờ: ${dateFormat.format(billData.orderDate)}")
             }
 
             // ============ TIME TRACKING (theo config) ============
             if (template.showCheckInTime && billData.checkInTime != null) {
-                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 line("${template.checkInLabel}: ${timeFormat.format(billData.checkInTime)}")
             }
             if (template.showCheckOutTime && billData.checkOutTime != null) {
-                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                }
                 line("${template.checkOutLabel}: ${timeFormat.format(billData.checkOutTime)}")
             }
 
