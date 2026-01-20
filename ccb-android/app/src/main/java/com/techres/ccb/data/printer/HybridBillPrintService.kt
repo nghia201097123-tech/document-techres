@@ -115,13 +115,11 @@ object HybridBillPrintService {
     /**
      * In bill qua Sunmi Built-in Printer
      *
-     * STABILIZED CHUNKED WRITE: Gửi data theo từng phần nhỏ
-     * - Chia data thành các chunk 512 bytes (Sunmi buffer nhỏ hơn network printer)
-     * - Delay ngắn giữa các chunk (20ms)
-     * - Delay dài sau khi gửi xong để máy in xử lý hết
+     * SINGLE WRITE (giống phiếu bếp):
+     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
+     * - Đợi máy in xử lý sau khi gửi xong
      *
-     * Trade-off: In chậm hơn nhưng ỔN ĐỊNH, không giật, không mất chữ
-     * Flow: connect → write chunks → delay each → final delay → complete
+     * Flow: connect → single write → delay → complete
      */
     private suspend fun printViaSunmi(
         config: BillPrinterConfigEntity,
@@ -146,48 +144,29 @@ object HybridBillPrintService {
             )
             val billContent = generateHybridBill(config, template, billData, capability)
 
-            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes (STABILIZED)")
+            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes (SINGLE WRITE)")
 
             // In từng bản riêng biệt
             repeat(config.numberOfCopies) { copyIndex ->
-                // STABILIZED CHUNKED WRITE: Gửi từng chunk nhỏ với delay
-                // Sunmi có buffer nhỏ hơn, dùng chunk 512 bytes
-                val chunkSize = 512
-                var offset = 0
-                var chunkCount = 0
-
-                while (offset < billContent.size) {
-                    val end = minOf(offset + chunkSize, billContent.size)
-                    val chunk = billContent.copyOfRange(offset, end)
-
-                    val writeResult = adapter.write(chunk)
-                    if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
-                        Log.w(TAG, "Copy ${copyIndex + 1} chunk $chunkCount failed: ${writeResult.message}")
-                        return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
-                    }
-
-                    chunkCount++
-                    offset = end
-
-                    // Delay giữa các chunk để Sunmi AIDL xử lý kịp
-                    if (offset < billContent.size) {
-                        delay(20) // 20ms giữa các chunk cho Sunmi
-                    }
+                // SINGLE WRITE: Gửi toàn bộ data trong 1 lần (giống phiếu bếp)
+                val writeResult = adapter.write(billContent)
+                if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
+                    Log.w(TAG, "Copy ${copyIndex + 1} failed: ${writeResult.message}")
+                    return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
                 }
 
-                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${config.numberOfCopies}: $chunkCount chunks sent")
+                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${config.numberOfCopies}: ${billContent.size} bytes sent")
 
-                // Đợi máy in xử lý xong - thời gian dựa trên kích thước data
-                val processingDelay = calculateProcessingDelay(billContent.size)
-                delay(processingDelay)
+                // Đợi máy in xử lý xong
+                delay(800)
 
                 // Delay giữa các bản
                 if (copyIndex < config.numberOfCopies - 1) {
-                    delay(500)
+                    delay(300)
                 }
             }
 
-            Log.d(TAG, "Sunmi print successful (STABILIZED): ${config.numberOfCopies} copies")
+            Log.d(TAG, "Sunmi print successful (SINGLE WRITE): ${config.numberOfCopies} copies")
             PrinterResult.Success("In bill thành công!")
         } catch (e: Exception) {
             Log.e(TAG, "Sunmi print error: ${e.message}", e)
@@ -198,12 +177,11 @@ object HybridBillPrintService {
     /**
      * In bill qua Network (TCP/IP)
      *
-     * STABILIZED APPROACH:
-     * - Gửi data theo từng chunk 1KB với delay 15ms
-     * - tcpNoDelay = false: Cho phép Nagle buffer để ổn định hơn
-     * - Processing delay dựa trên kích thước data (800ms - 3000ms)
+     * SINGLE WRITE (giống phiếu bếp - đã proven hoạt động tốt):
+     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
+     * - tcpNoDelay = true: Gửi ngay, không đợi Nagle buffer
+     * - Delay sau khi gửi để máy in xử lý
      *
-     * Trade-off: In chậm hơn nhưng ỔN ĐỊNH, không giật, không mất chữ
      * Mỗi bản copy được in trong kết nối riêng để đảm bảo ổn định
      */
     private suspend fun printViaNetwork(
@@ -230,13 +208,12 @@ object HybridBillPrintService {
     /**
      * In 1 bản bill qua Network
      *
-     * STABILIZED WRITE: Gửi data theo từng phần nhỏ để đảm bảo máy in xử lý kịp
-     * - Chia data thành các chunk 1KB
-     * - Delay ngắn giữa các chunk (10ms)
-     * - Delay dài sau khi gửi xong (1000ms)
+     * SINGLE WRITE (giống phiếu bếp - đã proven hoạt động tốt):
+     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
+     * - tcpNoDelay = true để gửi ngay, không buffer
+     * - Delay sau khi gửi xong để máy in xử lý
      *
-     * Trade-off: In chậm hơn nhưng ỔN ĐỊNH, không giật, không mất chữ
-     * Flow: connect → write chunks → flush each → final delay → close
+     * Flow: connect → single write → flush → delay → close
      */
     private suspend fun printSingleCopy(
         ip: String,
@@ -247,7 +224,7 @@ object HybridBillPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
-        Log.d(TAG, "=== START PRINT BILL (NETWORK - STABILIZED) ===")
+        Log.d(TAG, "=== START PRINT BILL (NETWORK - SINGLE WRITE) ===")
         Log.d(TAG, "Target: $ip:$port")
         Log.d(TAG, "Content size: ${content.size} bytes")
 
@@ -256,11 +233,9 @@ object HybridBillPrintService {
             socket = Socket().apply {
                 reuseAddress = true
                 keepAlive = true
-                // tcpNoDelay = false: Cho phép Nagle buffer để gửi ổn định hơn
-                tcpNoDelay = false
-                setSoLinger(true, 5) // Tăng linger time để đảm bảo data được gửi hết
-                soTimeout = timeoutMs
-                sendBufferSize = 8192 // 8KB send buffer
+                // tcpNoDelay = true: Gửi ngay, không đợi Nagle buffer (giống phiếu bếp)
+                tcpNoDelay = true
+                setSoLinger(true, 2)
             }
 
             Log.d(TAG, "Connecting to $ip:$port...")
@@ -268,40 +243,20 @@ object HybridBillPrintService {
             Log.d(TAG, "Connected successfully!")
 
             outputStream = socket.getOutputStream()
-            Log.d(TAG, "Got output stream")
+            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
-            // STABILIZED WRITE: Gửi từng chunk nhỏ với delay
-            // Chunk size 1KB để đảm bảo printer buffer không bị tràn
-            val chunkSize = 1024
-            var offset = 0
-            var chunkCount = 0
+            // SINGLE WRITE: Gửi toàn bộ data trong 1 lần (giống phiếu bếp)
+            outputStream.write(content)
+            Log.d(TAG, "Write completed, flushing...")
+            outputStream.flush()
+            Log.d(TAG, "Flush completed!")
 
-            while (offset < content.size) {
-                val end = minOf(offset + chunkSize, content.size)
-                val chunk = content.copyOfRange(offset, end)
+            // Đợi máy in xử lý xong bitmap data
+            // Bill có nhiều content hơn phiếu bếp nên cần thời gian lâu hơn
+            Log.d(TAG, "Waiting 800ms for printer to process...")
+            delay(800)
 
-                outputStream.write(chunk)
-                outputStream.flush()
-                chunkCount++
-
-                offset = end
-
-                // Delay ngắn giữa các chunk để máy in xử lý kịp
-                // Chỉ delay nếu còn data để gửi
-                if (offset < content.size) {
-                    delay(15) // 15ms giữa các chunk
-                }
-            }
-
-            Log.d(TAG, "Write completed: $chunkCount chunks sent")
-
-            // Delay dài sau khi gửi xong để đảm bảo máy in xử lý hết
-            // Bill thường có nhiều bitmap (header, footer, items) nên cần thời gian
-            val processingDelay = calculateProcessingDelay(content.size)
-            Log.d(TAG, "Waiting ${processingDelay}ms for printer to process...")
-            delay(processingDelay)
-
-            Log.d(TAG, "=== PRINT BILL SUCCESS (STABILIZED) ===")
+            Log.d(TAG, "=== PRINT BILL SUCCESS (SINGLE WRITE) ===")
             PrinterResult.Success("OK")
         } catch (e: Exception) {
             Log.e(TAG, "=== PRINT BILL FAILED ===")
@@ -312,8 +267,6 @@ object HybridBillPrintService {
             try {
                 Log.d(TAG, "Closing connection...")
                 outputStream?.flush()
-                // Đợi thêm trước khi đóng socket để đảm bảo data đã được gửi hết
-                delay(100)
                 socket?.shutdownOutput()
                 outputStream?.close()
                 socket?.close()
@@ -322,20 +275,6 @@ object HybridBillPrintService {
                 Log.e(TAG, "Close error: ${e.message}")
             }
         }
-    }
-
-    /**
-     * Tính thời gian chờ dựa trên kích thước data
-     * Bill lớn (nhiều items, có QR, barcode) cần nhiều thời gian hơn
-     *
-     * Base: 800ms
-     * + 200ms cho mỗi 10KB data
-     * Max: 3000ms (3 giây)
-     */
-    private fun calculateProcessingDelay(contentSize: Int): Long {
-        val baseDelay = 800L
-        val additionalDelay = (contentSize / 10240) * 200L // 200ms per 10KB
-        return (baseDelay + additionalDelay).coerceAtMost(3000L)
     }
 
     /**
