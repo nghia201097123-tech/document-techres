@@ -114,10 +114,12 @@ object HybridBillPrintService {
 
     /**
      * In bill qua Sunmi Built-in Printer
-     * Sử dụng phương pháp giống kitchen ticket: Generate rồi gửi qua network-style
      *
-     * QUAN TRỌNG: Không dùng Sunmi SDK's AIDL interface trực tiếp vì có thể gây buffering issues.
-     * Thay vào đó, dùng cùng approach như kitchen ticket (đã chứng minh hoạt động tốt).
+     * CHUNKED WRITE: Gửi data theo từng chunk nhỏ để tránh buffer overflow và giật.
+     * Bill có header (logo, store info) và footer (QR, barcode) lớn,
+     * nên cần chia nhỏ để AIDL interface xử lý kịp.
+     *
+     * Flow: connect → warm-up delay → chunked write với delay → delay → complete
      */
     private suspend fun printViaSunmi(
         config: BillPrinterConfigEntity,
@@ -125,6 +127,9 @@ object HybridBillPrintService {
         billData: BillData
     ): PrinterResult {
         val adapter = sunmiAdapter ?: return PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
+
+        // Chunk size 4KB - đủ nhỏ để AIDL interface xử lý kịp
+        val chunkSize = 4096
 
         return try {
             // Kết nối đến máy in Sunmi
@@ -142,21 +147,41 @@ object HybridBillPrintService {
             )
             val billContent = generateHybridBill(config, template, billData, capability)
 
-            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes")
+            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes, chunk size: $chunkSize")
 
-            // In từng bản riêng biệt (giống kitchen ticket)
+            // WARM-UP: Delay 50ms sau khi connect để Sunmi sẵn sàng
+            delay(50)
+
+            // In từng bản riêng biệt
             repeat(config.numberOfCopies) { copyIndex ->
-                // Gửi data và đợi - giống kitchen ticket
-                val writeResult = adapter.write(billContent)
-                if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
-                    Log.w(TAG, "Copy ${copyIndex + 1} failed: ${writeResult.message}")
-                    return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
+                // CHUNKED WRITE: Gửi data theo từng chunk để tránh buffer overflow
+                // Điều này giúp AIDL interface có thời gian xử lý từng phần, tránh giật header/footer
+                var offset = 0
+                var chunkIndex = 0
+                while (offset < billContent.size) {
+                    val end = minOf(offset + chunkSize, billContent.size)
+                    val chunk = billContent.copyOfRange(offset, end)
+
+                    val writeResult = adapter.write(chunk)
+                    if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
+                        Log.w(TAG, "Copy ${copyIndex + 1} chunk $chunkIndex failed: ${writeResult.message}")
+                        return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
+                    }
+
+                    offset = end
+                    chunkIndex++
+
+                    // Delay nhỏ giữa các chunk để AIDL interface xử lý kịp
+                    // Không cần delay cho chunk cuối
+                    if (offset < billContent.size) {
+                        delay(10)  // 10ms giữa mỗi chunk
+                    }
                 }
 
-                // Đợi máy in xử lý xong (giống kitchen ticket delay 500ms)
-                delay(500)
+                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${config.numberOfCopies}: $chunkIndex chunks sent")
 
-                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${config.numberOfCopies}: Success")
+                // Đợi máy in xử lý xong
+                delay(500)
 
                 // Delay giữa các bản
                 if (copyIndex < config.numberOfCopies - 1) {
@@ -201,11 +226,11 @@ object HybridBillPrintService {
     /**
      * In 1 bản bill qua Network
      *
-     * GIỐNG Y HỆT KITCHEN TICKET: Gửi toàn bộ data 1 lần, không chunked write.
-     * Flow: connect → write all → flush → delay 500ms → close
+     * CHUNKED WRITE: Gửi data theo từng chunk nhỏ để tránh buffer overflow và giật.
+     * Bill có header (logo, store info) và footer (QR, barcode) lớn hơn kitchen ticket,
+     * nên cần chia nhỏ để máy in xử lý kịp.
      *
-     * Cách tiếp cận này đã được chứng minh hoạt động tốt với in phiếu bếp,
-     * nên áp dụng y chang cho in bill qua máy in rời (network printer).
+     * Flow: connect → warm-up delay → chunked write với delay → flush → delay → close
      */
     private suspend fun printSingleCopy(
         ip: String,
@@ -216,33 +241,56 @@ object HybridBillPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
+        // Chunk size 4KB - đủ nhỏ để máy in xử lý kịp, đủ lớn để không quá chậm
+        val chunkSize = 4096
+
         Log.d(TAG, "=== START PRINT BILL (NETWORK) ===")
         Log.d(TAG, "Target: $ip:$port")
-        Log.d(TAG, "Content size: ${content.size} bytes")
+        Log.d(TAG, "Content size: ${content.size} bytes, chunk size: $chunkSize")
 
         return try {
             Log.d(TAG, "Creating socket...")
             socket = Socket().apply {
                 reuseAddress = true
                 keepAlive = true
-                tcpNoDelay = true  // Disable Nagle's algorithm for real-time printing (giống kitchen ticket)
+                tcpNoDelay = false  // Enable Nagle's algorithm - buffer small packets for smoother send
                 setSoLinger(true, 2)
+                sendBufferSize = 8192  // 8KB send buffer
             }
 
             Log.d(TAG, "Connecting to $ip:$port...")
             socket.connect(InetSocketAddress(ip, port), timeoutMs)
             Log.d(TAG, "Connected successfully!")
 
+            // WARM-UP: Delay 50ms sau khi connect để máy in sẵn sàng nhận data
+            delay(50)
+
             outputStream = socket.getOutputStream()
-            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
-            // GIỐNG KITCHEN TICKET: Gửi toàn bộ data 1 lần
-            outputStream.write(content)
-            Log.d(TAG, "Write completed, flushing...")
-            outputStream.flush()
-            Log.d(TAG, "Flush completed!")
+            // CHUNKED WRITE: Gửi data theo từng chunk để tránh buffer overflow
+            // Điều này giúp máy in có thời gian xử lý từng phần, tránh giật header/footer
+            var offset = 0
+            var chunkIndex = 0
+            while (offset < content.size) {
+                val end = minOf(offset + chunkSize, content.size)
+                val chunk = content.copyOfRange(offset, end)
 
-            // Đợi máy in xử lý xong (giống kitchen ticket: 500ms)
+                outputStream.write(chunk)
+                outputStream.flush()  // Flush từng chunk để đảm bảo gửi ngay
+
+                offset = end
+                chunkIndex++
+
+                // Delay nhỏ giữa các chunk để máy in xử lý kịp
+                // Không cần delay cho chunk cuối
+                if (offset < content.size) {
+                    delay(10)  // 10ms giữa mỗi chunk
+                }
+            }
+
+            Log.d(TAG, "Write completed: $chunkIndex chunks sent")
+
+            // Đợi máy in xử lý xong toàn bộ data
             Log.d(TAG, "Waiting 500ms for printer to process...")
             delay(500)
 
