@@ -352,7 +352,7 @@ object KitchenTicketPrintService {
                 lineBold("BÀN: ${ticket.tableName}")
             } else if (hasOrder && hasPager) {
                 // Mã đơn + Thẻ rung (không có bàn)
-                val orderPagerPart = "$ticket.displayNumber $pagerText"
+                val orderPagerPart = "${ticket.displayNumber} $pagerText"
                 if (hasTime) {
                     lineKeyValue(orderPagerPart, timeFormat.format(ticket.orderTime))
                 } else {
