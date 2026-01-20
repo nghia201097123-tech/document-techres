@@ -305,16 +305,28 @@ object OrderPrintingService {
                 when {
                     // Toppings start with "+" (including "+" with space or without)
                     part.startsWith("+") || part.startsWith("+ ") -> {
-                        // Format: "+ Trân châu (+10000)" or "+ Trân châu" or "+Trân châu"
+                        // Format: "+ Trân châu (+10000)" or "+ Trân châu x2 (+20000)" or "+Trân châu"
                         // Also handle: "+ Topping: Trân châu" or "+ Addon: Pudding"
                         var toppingText = part.removePrefix("+").trim()
                         var toppingPrice = 0.0
+                        var toppingQuantity = 1
 
                         // Extract price if present: "(+10000)" or "(10000)"
                         val priceMatch = Regex("\\s*\\(\\+?(\\d+)\\)$").find(toppingText)
                         if (priceMatch != null) {
                             toppingPrice = priceMatch.groupValues[1].toDoubleOrNull() ?: 0.0
                             toppingText = toppingText.replace(priceMatch.value, "").trim()
+                        }
+
+                        // Extract quantity if present: "x2" or "x3" at the end (before price was removed)
+                        val quantityMatch = Regex("\\s+x(\\d+)$").find(toppingText)
+                        if (quantityMatch != null) {
+                            toppingQuantity = quantityMatch.groupValues[1].toIntOrNull() ?: 1
+                            toppingText = toppingText.replace(quantityMatch.value, "").trim()
+                            // If price was extracted, it's total price, so calculate unit price
+                            if (toppingPrice > 0 && toppingQuantity > 1) {
+                                toppingPrice = toppingPrice / toppingQuantity
+                            }
                         }
 
                         // Strip group name prefix if present (e.g., "Topping: Trân châu" -> "Trân châu")
@@ -332,8 +344,8 @@ object OrderPrintingService {
                         }
 
                         if (toppingText.isNotBlank()) {
-                            Log.d(TAG, "      -> TOPPING: '$toppingText' price=$toppingPrice")
-                            toppings.add(PrintRoutingService.ToppingInfo(name = toppingText, price = toppingPrice))
+                            Log.d(TAG, "      -> TOPPING: '$toppingText' price=$toppingPrice qty=$toppingQuantity")
+                            toppings.add(PrintRoutingService.ToppingInfo(name = toppingText, price = toppingPrice, quantity = toppingQuantity))
                         }
                     }
                     // Options with format "Key: Value" or "Key: Value (+price)"

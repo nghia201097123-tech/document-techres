@@ -80,7 +80,7 @@ object LabelPrintService {
 
         // ========== GIÁ TIỀN ==========
         val unitPrice: Double = 0.0,        // Giá đơn vị (chưa topping)
-        val toppingPrices: List<Pair<String, Double>> = emptyList(), // Topping + giá
+        val toppingPrices: List<Triple<String, Double, Int>> = emptyList(), // Topping + giá + số lượng (name, price, quantity)
         val totalToppingPrice: Double = 0.0, // Tổng giá topping
         val totalPrice: Double = 0.0,       // Giá tổng (unitPrice + toppings) * quantity
         val discountAmount: Double = 0.0,   // Giảm giá (nếu có)
@@ -231,7 +231,7 @@ object LabelPrintService {
         val toppingPriceChunks = if (toppingPrices.isNotEmpty()) {
             toppingPrices.chunked(effectiveMax)
         } else {
-            toppingChunks.map { emptyList() }
+            toppingChunks.map { emptyList<Triple<String, Double, Int>>() }
         }
 
         val totalParts = toppingChunks.size
@@ -240,7 +240,7 @@ object LabelPrintService {
         toppingChunks.forEachIndexed { index, chunk ->
             val isContinuation = index > 0
             val priceChunk = toppingPriceChunks.getOrElse(index) { emptyList() }
-            val chunkTotalPrice = priceChunk.sumOf { it.second }
+            val chunkTotalPrice = priceChunk.sumOf { it.second * it.third }
 
             Log.d(TAG, "  Part ${index + 1}/$totalParts: ${chunk.size} toppings: $chunk")
 
@@ -653,23 +653,31 @@ object LabelPrintService {
             sugarBitmap.recycle()
         }
 
-        // ========== TOPPINGS với giá ==========
+        // ========== TOPPINGS với giá và số lượng ==========
         if (label.toppingPrices.isNotEmpty()) {
             // Chỉ lọc bỏ topping đã hiển thị như SIZE (nếu có)
-            val filteredToppings = label.toppingPrices.filter { (name, _) ->
+            val filteredToppings = label.toppingPrices.filter { (name, _, _) ->
                 name != displayedSizeTopping
             }
 
-            filteredToppings.forEach { (toppingName, toppingPrice) ->
+            filteredToppings.forEach { (toppingName, toppingPrice, toppingQty) ->
                 // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
                 val normalizedName = normalizeText(toppingName)
 
                 // Bỏ qua topping name rỗng
                 if (normalizedName.isNotBlank()) {
-                    if (showPrice && toppingPrice > 0) {
+                    // Hiển thị số lượng nếu > 1
+                    val displayName = if (toppingQty > 1) {
+                        "$normalizedName x$toppingQty"
+                    } else {
+                        normalizedName
+                    }
+                    val totalToppingPrice = toppingPrice * toppingQty
+
+                    if (showPrice && totalToppingPrice > 0) {
                         val toppingBitmap = renderTwoColumnText(
-                            "+ $normalizedName",
-                            "+${formatVND(toppingPrice)}",
+                            "+ $displayName",
+                            "+${formatVND(totalToppingPrice)}",
                             contentWidth,
                             fontNormal,
                             bold = false
@@ -679,7 +687,7 @@ object LabelPrintService {
                         toppingBitmap.recycle()
                     } else {
                         val toppingBitmap = renderTextBitmap(
-                            text = "+ $normalizedName",
+                            text = "+ $displayName",
                             width = contentWidth,
                             fontSize = fontNormal,
                             bold = false,
@@ -1116,23 +1124,31 @@ object LabelPrintService {
             label.ice?.let { line("• $it") }
             label.sugar?.let { line("• $it") }
 
-            // ========== TOPPINGS với giá ==========
+            // ========== TOPPINGS với giá và số lượng ==========
             if (label.toppings.isNotEmpty() || label.toppingPrices.isNotEmpty()) {
                 if (label.toppingPrices.isNotEmpty()) {
                     // Chỉ lọc bỏ topping đã hiển thị như SIZE (nếu có)
-                    val filteredToppings = label.toppingPrices.filter { (name, _) ->
+                    val filteredToppings = label.toppingPrices.filter { (name, _, _) ->
                         name != displayedSizeTopping
                     }
-                    filteredToppings.forEach { (toppingName, toppingPrice) ->
+                    filteredToppings.forEach { (toppingName, toppingPrice, toppingQty) ->
                         // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
                         val normalizedName = normalizeText(toppingName)
 
                         // Bỏ qua topping name rỗng
                         if (normalizedName.isNotBlank()) {
-                            if (showPrice && toppingPrice > 0) {
-                                lineKeyValue("+ $normalizedName", "+${formatVND(toppingPrice)}")
+                            // Hiển thị số lượng nếu > 1
+                            val displayName = if (toppingQty > 1) {
+                                "$normalizedName x$toppingQty"
                             } else {
-                                line("+ $normalizedName")
+                                normalizedName
+                            }
+                            val totalToppingPrice = toppingPrice * toppingQty
+
+                            if (showPrice && totalToppingPrice > 0) {
+                                lineKeyValue("+ $displayName", "+${formatVND(totalToppingPrice)}")
+                            } else {
+                                line("+ $displayName")
                             }
                         }
                     }

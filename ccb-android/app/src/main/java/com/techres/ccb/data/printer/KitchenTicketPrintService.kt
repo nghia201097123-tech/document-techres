@@ -67,7 +67,7 @@ object KitchenTicketPrintService {
         val price: Double = 0.0,        // Giá món (để in khi ticketPrintPrice = true)
         val note: String? = null,       // Ghi chú riêng cho món
         val toppings: List<String> = emptyList(), // Topping names
-        val toppingPrices: List<Pair<String, Double>> = emptyList(), // Topping với giá (giống tem)
+        val toppingPrices: List<Triple<String, Double, Int>> = emptyList(), // Topping với giá và số lượng (name, price, quantity)
         val options: Map<String, String> = emptyMap() // Tùy chọn (Size, Đá, Đường...)
     )
 
@@ -442,25 +442,33 @@ object KitchenTicketPrintService {
                     }
                 }
 
-                // Topping - hiển thị tất cả toppings giống như in tem
+                // Topping - hiển thị tất cả toppings giống như in tem (với số lượng nếu > 1)
                 if (item.toppings.isNotEmpty() || item.toppingPrices.isNotEmpty()) {
                     val toppingCount = if (item.toppingPrices.isNotEmpty()) item.toppingPrices.size else item.toppings.size
                     Log.d(TAG, "  Printing $toppingCount toppings for ${item.name}")
 
                     // Hiển thị topping - chỉ hiển thị giá nếu showPrice = true
                     if (item.toppingPrices.isNotEmpty()) {
-                        item.toppingPrices.forEach { (toppingName, toppingPrice) ->
+                        item.toppingPrices.forEach { (toppingName, toppingPrice, toppingQty) ->
                             // Normalize topping name: loại bỏ tất cả Unicode whitespace thừa
                             val normalizedName = normalizeText(toppingName)
 
                             // Bỏ qua topping name rỗng
                             if (normalizedName.isNotBlank()) {
-                                if (showPrice && toppingPrice > 0) {
+                                // Hiển thị số lượng nếu > 1
+                                val displayName = if (toppingQty > 1) {
+                                    "$normalizedName x$toppingQty"
+                                } else {
+                                    normalizedName
+                                }
+                                val totalToppingPrice = toppingPrice * toppingQty
+
+                                if (showPrice && totalToppingPrice > 0) {
                                     // Hiển thị topping với giá khi config bật
-                                    lineKeyValue("   + $normalizedName", "+${formatPrice(toppingPrice)}")
+                                    lineKeyValue("   + $displayName", "+${formatPrice(totalToppingPrice)}")
                                 } else {
                                     // Chỉ hiển thị tên topping khi config tắt hoặc giá = 0
-                                    line("   + $normalizedName")
+                                    line("   + $displayName")
                                 }
                             }
                         }

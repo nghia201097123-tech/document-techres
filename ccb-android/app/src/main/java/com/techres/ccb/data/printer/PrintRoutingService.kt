@@ -37,7 +37,8 @@ object PrintRoutingService {
 
     data class ToppingInfo(
         val name: String,
-        val price: Double = 0.0
+        val price: Double = 0.0,
+        val quantity: Int = 1  // Số lượng topping (VD: 2 bánh flan)
     )
 
     /**
@@ -277,12 +278,12 @@ object PrintRoutingService {
         val ticketItems = items.map { item ->
             Log.d(TAG, "  Converting item: ${item.productName}")
             Log.d(TAG, "    - price: ${item.price}")
-            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})" }}")
+            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})x${it.quantity}" }}")
             Log.d(TAG, "    - options: ${item.options}")
             Log.d(TAG, "    - note: ${item.note}")
 
-            // Build toppingPrices giống như trong labels
-            val toppingPrices = item.toppings.map { Pair(it.name, it.price) }
+            // Build toppingPrices với quantity (name, price, quantity)
+            val toppingPrices = item.toppings.map { Triple(it.name, it.price, it.quantity) }
 
             KitchenTicketPrintService.KitchenItem(
                 name = item.productName,
@@ -290,7 +291,7 @@ object PrintRoutingService {
                 price = item.price, // Giá món để hiển thị khi ticketPrintPrice = true
                 note = item.note,
                 toppings = item.toppings.map { it.name },
-                toppingPrices = toppingPrices, // Pass topping prices giống như tem
+                toppingPrices = toppingPrices, // Pass topping prices với quantity
                 options = item.options
             )
         }
@@ -330,12 +331,12 @@ object PrintRoutingService {
             Log.d(TAG, "  Creating label for: ${item.productName}")
             Log.d(TAG, "    - quantity: ${item.quantity}")
             Log.d(TAG, "    - options: ${item.options}")
-            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})" }}")
+            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings.map { "${it.name}(${it.price})x${it.quantity}" }}")
             Log.d(TAG, "    - note: ${item.note}")
 
-            // Build toppingPrices list from toppings
-            val toppingPrices = item.toppings.map { Pair(it.name, it.price) }
-            val totalToppingPrice = item.toppings.sumOf { it.price }
+            // Build toppingPrices list with quantity (name, price, quantity)
+            val toppingPrices = item.toppings.map { Triple(it.name, it.price, it.quantity) }
+            val totalToppingPrice = item.toppings.sumOf { it.price * it.quantity }
 
             // Tính giá gốc (unitPrice) = giá tổng - tổng giá topping
             val unitPrice = if (item.price > 0 && totalToppingPrice > 0) {
