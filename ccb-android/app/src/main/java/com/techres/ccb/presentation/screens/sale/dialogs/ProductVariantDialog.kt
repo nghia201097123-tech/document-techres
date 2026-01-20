@@ -84,11 +84,14 @@ fun ProductVariantDialog(
     var note by remember { mutableStateOf("") }
     val selectedNotes = remember { mutableStateListOf<String>() }
 
-    // Calculate total price (including topping quantities)
+    // Calculate total price (including topping and size with price quantities)
     val variantPrice = product.variants.sumOf { group ->
         val selectedIds = selectedOptions[group.id] ?: emptyList()
         group.options.filter { it.id in selectedIds }.sumOf { option ->
-            val qty = if (group.type == VariantType.TOPPING) {
+            // Use quantity for topping or size with price
+            val hasQuantitySelector = group.type == VariantType.TOPPING ||
+                (group.type == VariantType.SIZE && option.price > 0)
+            val qty = if (hasQuantitySelector) {
                 toppingQuantities[option.id] ?: 1
             } else 1
             option.price * qty
@@ -198,6 +201,11 @@ fun ProductVariantDialog(
                             onOptionSelected = { optionId ->
                                 // Create a new list to trigger recomposition
                                 val currentSelected = (selectedOptions[group.id] ?: emptyList()).toMutableList()
+                                // Find option to check if it has price (for SIZE with price)
+                                val option = group.options.find { it.id == optionId }
+                                val hasQuantitySelector = group.type == VariantType.TOPPING ||
+                                    (group.type == VariantType.SIZE && (option?.price ?: 0) > 0)
+
                                 if (group.isMultiple) {
                                     // Toggle selection for multiple choice
                                     if (optionId in currentSelected) {
@@ -209,17 +217,20 @@ fun ProductVariantDialog(
                                         // Check maxSelect before adding
                                         if (currentSelected.size < group.maxSelect) {
                                             currentSelected.add(optionId)
-                                            // Initialize quantity to 1 when selected
-                                            if (group.type == VariantType.TOPPING) {
+                                            // Initialize quantity to 1 when selected (for topping or size with price)
+                                            if (hasQuantitySelector) {
                                                 toppingQuantities[optionId] = 1
                                             }
                                         }
                                         // Else: do nothing, max reached
                                     }
                                 } else {
-                                    // Single selection
+                                    // Single selection - also initialize quantity for size with price
                                     currentSelected.clear()
                                     currentSelected.add(optionId)
+                                    if (hasQuantitySelector) {
+                                        toppingQuantities[optionId] = 1
+                                    }
                                 }
                                 // Assign new list to trigger state update
                                 selectedOptions[group.id] = currentSelected
@@ -378,8 +389,10 @@ fun ProductVariantDialog(
                                 sortedVariants.forEach { group ->
                                     val selectedIds = selectedOptions[group.id] ?: emptyList()
                                     group.options.filter { it.id in selectedIds }.forEach { option ->
-                                        // Get topping quantity (default 1 for non-topping)
-                                        val qty = if (group.type == VariantType.TOPPING) {
+                                        // Get quantity for topping or size with price (default 1 for others)
+                                        val hasQuantitySelector = group.type == VariantType.TOPPING ||
+                                            (group.type == VariantType.SIZE && option.price > 0)
+                                        val qty = if (hasQuantitySelector) {
                                             toppingQuantities[option.id] ?: 1
                                         } else 1
                                         variants.add(
@@ -494,8 +507,12 @@ fun VariantGroupSection(
                 val isSelected = option.id in selectedIds
                 val quantity = toppingQuantities[option.id] ?: 1
 
-                if (group.type == VariantType.TOPPING) {
-                    // Topping with quantity selector
+                // Show quantity selector for TOPPING or SIZE with price > 0
+                val showQuantitySelector = group.type == VariantType.TOPPING ||
+                    (group.type == VariantType.SIZE && option.price > 0)
+
+                if (showQuantitySelector) {
+                    // Option with quantity selector (topping or size with price)
                     ToppingOptionChip(
                         option = option,
                         isSelected = isSelected,
@@ -504,7 +521,7 @@ fun VariantGroupSection(
                         onQuantityChange = { newQty -> onToppingQuantityChange(option.id, newQty) }
                     )
                 } else {
-                    // Regular variant chip
+                    // Regular variant chip (size without price, sugar, ice, etc.)
                     VariantOptionChip(
                         option = option,
                         isSelected = isSelected,

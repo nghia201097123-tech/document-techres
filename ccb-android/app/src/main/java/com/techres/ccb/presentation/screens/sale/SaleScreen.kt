@@ -2358,18 +2358,24 @@ fun VariantLineItem(variant: SelectedVariant) {
             modifier = Modifier.padding(end = 6.dp)
         )
 
-        // Variant name
+        // Variant name with quantity if > 1
+        val displayName = if (variant.quantity > 1) {
+            "${variant.name} x${variant.quantity}"
+        } else {
+            variant.name
+        }
         Text(
-            text = variant.name,
+            text = displayName,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
 
-        // Price if > 0
+        // Price if > 0 (show total price = unit price * quantity)
         if (variant.price > 0) {
+            val totalPrice = variant.price * variant.quantity
             Text(
-                text = "+${formatCurrency(variant.price)}",
+                text = "+${formatCurrency(totalPrice)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
