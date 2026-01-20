@@ -2604,13 +2604,13 @@ class SaleViewModel @Inject constructor(
 
             if (!isOptionGroup) {
                 // NOT an option -> treat as TOPPING (use "+" prefix)
-                // Include quantity if > 1 (e.g., "2 Bánh flan")
-                val qtyPrefix = if (variant.quantity > 1) "x${variant.quantity} " else ""
+                // Include quantity if > 1 (e.g., "Bánh flan x2") - quantity AFTER name for parser
+                val qtySuffix = if (variant.quantity > 1) " x${variant.quantity}" else ""
                 val totalToppingPrice = variant.price * variant.quantity
                 if (totalToppingPrice > 0) {
-                    "+ ${qtyPrefix}${variant.name} (+${totalToppingPrice})"
+                    "+ ${variant.name}${qtySuffix} (+${totalToppingPrice})"
                 } else {
-                    "+ ${qtyPrefix}${variant.name}"
+                    "+ ${variant.name}${qtySuffix}"
                 }
             } else {
                 // This is an option (Size, Sugar, Ice) - use "GroupName: Value" format
