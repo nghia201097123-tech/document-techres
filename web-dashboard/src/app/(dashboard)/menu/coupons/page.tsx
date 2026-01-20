@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Tag, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Copy, Check, ShieldCheck, X } from "lucide-react";
+import { Plus, Tag, Loader2, MoreHorizontal, Pencil, Power, Trash2, Percent, DollarSign, Copy, Check, ShieldCheck, X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,6 +85,15 @@ const defaultColumns: ColumnConfig[] = [
 ];
 
 type DialogMode = "create" | "edit" | null;
+
+// Generate random coupon code
+const generateCouponCode = (): string => {
+  const prefixes = ["GIAM", "SALE", "KM", "UU", "HOT"];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
+  const randomChar = String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
+  return `${prefix}${randomNum}${randomChar}`;
+};
 
 const initialFormData: CreateCouponDto = {
   code: "",
@@ -195,7 +204,12 @@ export default function CouponsPage() {
 
   // Handle dialog open/close
   const handleOpenCreate = () => {
-    setFormData(initialFormData);
+    // Auto-generate a unique coupon code
+    const generatedCode = generateCouponCode();
+    setFormData({
+      ...initialFormData,
+      code: generatedCode,
+    });
     setSelectedCoupon(null);
     setDialogMode("create");
   };
@@ -601,13 +615,26 @@ export default function CouponsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="code">Mã coupon *</Label>
-                  <Input
-                    id="code"
-                    placeholder="VD: GIAM10"
-                    value={formData.code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                    className="uppercase font-mono"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="code"
+                      placeholder="VD: GIAM10"
+                      value={formData.code}
+                      onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                      className="uppercase font-mono flex-1"
+                    />
+                    {dialogMode === "create" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setFormData(prev => ({ ...prev, code: generateCouponCode() }))}
+                        title="Tạo mã mới"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="name">Tên coupon *</Label>
