@@ -113,6 +113,7 @@ import java.time.ZoneId
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2479,22 +2480,30 @@ private fun formatCurrencyShort(amount: Long): String {
 }
 
 private fun formatTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
+    val sdf = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
     return sdf.format(Date(timestamp))
 }
 
 private fun formatTimeOnly(timestamp: Long): String {
-    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
     return sdf.format(Date(timestamp))
 }
 
 private fun formatDateShort(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
+    val sdf = SimpleDateFormat("dd/MM", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
     return sdf.format(Date(timestamp))
 }
 
 private fun formatDateTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
+    val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
     return sdf.format(Date(timestamp))
 }
 

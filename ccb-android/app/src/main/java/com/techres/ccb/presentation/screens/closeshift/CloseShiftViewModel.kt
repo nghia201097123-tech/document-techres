@@ -70,8 +70,12 @@ class CloseShiftViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CloseShiftUiState())
     val uiState: StateFlow<CloseShiftUiState> = _uiState.asStateFlow()
 
-    private val dateFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
-    private val timeParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+    private val dateFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
+    private val timeParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
 
     init {
         loadShiftSummary()

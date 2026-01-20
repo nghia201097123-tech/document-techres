@@ -43,7 +43,9 @@ class OpenShiftViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(OpenShiftUiState())
     val uiState: StateFlow<OpenShiftUiState> = _uiState.asStateFlow()
 
-    private val dateFormat = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
+    private val dateFormat = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
 
     init {
         loadBranchInfo()

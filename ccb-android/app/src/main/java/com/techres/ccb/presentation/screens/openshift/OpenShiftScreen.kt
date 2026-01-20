@@ -49,7 +49,9 @@ fun OpenShiftScreen(
     }
 
     val currentDateTime = remember {
-        SimpleDateFormat("EEEE, dd/MM/yyyy - HH:mm", Locale("vi")).format(Date())
+        SimpleDateFormat("EEEE, dd/MM/yyyy - HH:mm", Locale("vi")).apply {
+            timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+        }.format(Date())
     }
 
     Row(

@@ -71,7 +71,9 @@ class SettingsViewModel @Inject constructor(
     private fun loadSettings() {
         val lastSyncTimestamp = sharedPreferences.getLong(KEY_LAST_SYNC, 0)
         val lastSyncTime = if (lastSyncTimestamp > 0) {
-            val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+            val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            }
             dateFormat.format(Date(lastSyncTimestamp))
         } else null
 
@@ -140,7 +142,9 @@ class SettingsViewModel @Inject constructor(
                     val now = System.currentTimeMillis()
                     sharedPreferences.edit().putLong(KEY_LAST_SYNC, now).apply()
 
-                    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                    }
                     _uiState.update {
                         it.copy(
                             isSyncing = false,

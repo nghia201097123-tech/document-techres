@@ -73,8 +73,8 @@ fun DashboardScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     // Use gridColumns from ViewModel (persisted in SharedPreferences)
     val gridColumns = uiState.gridColumns
-    val currentTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
-    val currentDate = remember { SimpleDateFormat("EEEE, dd/MM", Locale("vi")).format(Date()) }
+    val currentTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).apply { timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh") }.format(Date()) }
+    val currentDate = remember { SimpleDateFormat("EEEE, dd/MM", Locale("vi")).apply { timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh") }.format(Date()) }
 
     // Order detail dialog state
     var showOrderDetailDialog by remember { mutableStateOf(false) }
@@ -2739,6 +2739,8 @@ private fun formatCompactCurrency(amount: Long): String {
 }
 
 private fun formatTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
     return sdf.format(Date(timestamp))
 }

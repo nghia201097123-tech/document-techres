@@ -970,6 +970,8 @@ fun formatTimeAgo(timestamp: Long): String {
 }
 
 fun formatDateTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
+    val sdf = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault()).apply {
+        timeZone = java.util.TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+    }
     return sdf.format(Date(timestamp))
 }
