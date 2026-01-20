@@ -23,11 +23,31 @@ import java.util.*
  * - Nếu có → dùng ESC/POS text thuần (nhanh, nhẹ)
  * - Nếu không → dùng BITMAP (đảm bảo 100% đúng)
  *
+ * SINGLE CANVAS RENDERING (v2.0):
+ * - Render toàn bộ bill trên 1 canvas duy nhất
+ * - Giảm GC pressure và jitter
+ * - In mượt hơn với line spacing đồng nhất
+ *
  * @author TechRes
  */
 object HybridBillPrintService {
     private const val TAG = "HybridBillPrintService"
     private val currencyFormat = DecimalFormat("#,###")
+
+    // Flag to enable Single Canvas Rendering (default: true for better performance)
+    private var useSingleCanvasRendering = true
+
+    /**
+     * Enable/disable Single Canvas Rendering mode
+     * Single Canvas: render toàn bộ bill trên 1 bitmap (ít jitter, mượt hơn)
+     * Legacy: render từng dòng riêng (compatible với máy in cũ)
+     */
+    fun setSingleCanvasMode(enabled: Boolean) {
+        useSingleCanvasRendering = enabled
+        Log.d(TAG, "Single Canvas Rendering: ${if (enabled) "ENABLED" else "DISABLED"}")
+    }
+
+    fun isSingleCanvasMode(): Boolean = useSingleCanvasRendering
 
     // Sunmi printer adapter instance (lazy init)
     private var sunmiAdapter: SunmiPrinterAdapter? = null
@@ -296,7 +316,360 @@ object HybridBillPrintService {
         val fontSize = printerConfig.fontSize
         val lineSpacing = printerConfig.lineSpacing
 
-        return generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode)
+        // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
+        return if (useSingleCanvasRendering && useBitmapMode) {
+            Log.d(TAG, "Using SINGLE CANVAS RENDERING mode")
+            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData)
+        } else {
+            Log.d(TAG, "Using LEGACY per-line rendering mode")
+            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode)
+        }
+    }
+
+    /**
+     * Generate bill sử dụng Single Canvas Rendering
+     *
+     * SINGLE CANVAS RENDERING:
+     * - Render toàn bộ bill trên 1 canvas/bitmap duy nhất
+     * - Giảm GC pressure (chỉ tạo 1 bitmap lớn thay vì nhiều bitmap nhỏ)
+     * - In mượt hơn (gửi 1 khối data liên tục)
+     * - Line spacing chính xác và đồng nhất
+     * - Tránh jitter do timing giữa các bitmap renders
+     */
+    private fun generateBillWithSingleCanvas(
+        paperWidth: Int,
+        fontSize: String,
+        lineSpacing: Float,
+        template: BillTemplateEntity,
+        billData: BillData
+    ): ByteArray {
+        Log.d(TAG, "Generating bill with SINGLE CANVAS: ${billData.displayNumber}, ${billData.items.size} items")
+
+        // Chuyển đổi fontSize từ string sang fontScale float
+        val fontScale = when (fontSize) {
+            "extra_small" -> 0.7f
+            "small" -> 0.85f
+            "large" -> 1.2f
+            "extra_large" -> 1.4f
+            else -> 1.0f // normal/medium
+        }
+
+        val builder = SingleCanvasBillBuilder(
+            paperWidth = paperWidth,
+            fontScale = fontScale,
+            lineSpacing = lineSpacing
+        )
+
+        builder.apply {
+            init()
+
+            // ============ HEADER ============
+            lineDouble(template.storeName, BitmapTextStyle(centerAlign = true))
+
+            template.storeAddress?.let { lineCenter(it) }
+            template.storePhone?.let { lineCenter("ĐT: $it") }
+            template.taxCode?.let { lineCenter("MST: $it") }
+            template.headerText?.let { lineCenter(it) }
+
+            doubleSeparator()
+
+            // ============ BILL TITLE ============
+            if (billData.isTemporaryBill) {
+                lineDouble("*** BILL TẠM ***", BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+                lineCenter("Lần in thứ: ${billData.printCount}")
+                billData.printTime?.let { printTime ->
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    lineCenter("Thời gian in: ${timeFormat.format(printTime)}")
+                }
+                lineCenter("(Chưa thanh toán)")
+                separator()
+            } else if (billData.isReprint) {
+                lineDouble("*** BẢN SAO ***", BitmapTextStyle(centerAlign = true))
+                lineDouble("*** IN LẠI ***", BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+                billData.reprintTime?.let { reprintTime ->
+                    val timeFormat = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+                    lineCenter("Thời gian in lại: ${timeFormat.format(reprintTime)}")
+                }
+                billData.reprintReason?.let { reason ->
+                    lineCenter("Lý do: $reason")
+                }
+                lineCenter("(Đây không phải bill gốc)")
+                separator()
+                lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+            } else {
+                lineDouble(template.billTitle, BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+            }
+
+            // ============ ORDER INFO ============
+            if (template.showOrderNumber) {
+                line("Mã đơn: ${billData.displayNumber}")
+            }
+            if (template.showTableName && billData.tableName != null) {
+                line("Bàn: ${billData.tableName}")
+            }
+            if (billData.pagerNumber != null) {
+                lineBold("Thẻ rung: ${billData.pagerNumber}")
+            }
+            if (template.showStaffName && billData.staffName != null) {
+                line("NV: ${billData.staffName}")
+            }
+            if (template.showCustomerName && billData.customerName != null) {
+                line("Khách hàng: ${billData.customerName}")
+            }
+            if (template.showDateTime) {
+                val dateFormat = SimpleDateFormat(template.dateFormat, Locale.getDefault())
+                line("Giờ: ${dateFormat.format(billData.orderDate)}")
+            }
+
+            // ============ TIME TRACKING ============
+            if (template.showCheckInTime && billData.checkInTime != null) {
+                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+                line("${template.checkInLabel}: ${timeFormat.format(billData.checkInTime)}")
+            }
+            if (template.showCheckOutTime && billData.checkOutTime != null) {
+                val timeFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
+                line("${template.checkOutLabel}: ${timeFormat.format(billData.checkOutTime)}")
+            }
+
+            // ============ ORDER NOTE ============
+            if (template.showOrderNote && billData.orderNote != null && billData.orderNote.isNotBlank()) {
+                lineItalic("Ghi chú: ${billData.orderNote}")
+            }
+
+            separator()
+
+            // ============ ITEMS ============
+            billData.items.forEach { item ->
+                val toppingTotal = item.variants.sumOf { it.priceAdjustment } +
+                        item.toppings.sumOf { it.price * it.quantity }
+                val basePrice = if (toppingTotal > 0 && item.originalPrice > 0) {
+                    (item.originalPrice - toppingTotal).coerceAtLeast(0.0)
+                } else {
+                    item.originalPrice
+                }
+
+                val quantityPart = if (template.showQuantity) "x${item.quantity}" else ""
+                val pricePart = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+                if (quantityPart.isNotEmpty() && pricePart.isNotEmpty()) {
+                    lineKeyValue(item.name, "$quantityPart  $pricePart", BitmapTextStyle(bold = true))
+                } else if (quantityPart.isNotEmpty()) {
+                    lineKeyValue(item.name, quantityPart, BitmapTextStyle(bold = true))
+                } else if (pricePart.isNotEmpty()) {
+                    lineKeyValue(item.name, pricePart, BitmapTextStyle(bold = true))
+                } else {
+                    lineBold(item.name)
+                }
+
+                if (template.showUnitPrice && basePrice > 0 && toppingTotal > 0) {
+                    line("   ${formatCurrency(basePrice)}")
+                }
+
+                if (item.variants.isNotEmpty()) {
+                    item.variants.forEach { variant ->
+                        if (template.showUnitPrice && variant.priceAdjustment != 0.0) {
+                            val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
+                            lineKeyValue("   ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
+                        } else {
+                            line("   ${variant.name}")
+                        }
+                    }
+                }
+
+                if (item.toppings.isNotEmpty()) {
+                    item.toppings.forEach { topping ->
+                        val toppingPrice = topping.price * topping.quantity
+                        if (template.showUnitPrice && toppingPrice > 0) {
+                            if (topping.quantity > 1) {
+                                lineKeyValue("   + ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
+                            } else {
+                                lineKeyValue("   + ${topping.name}", "+${formatCurrency(toppingPrice)}")
+                            }
+                        } else {
+                            if (topping.quantity > 1) {
+                                line("   + ${topping.name} x${topping.quantity}")
+                            } else {
+                                line("   + ${topping.name}")
+                            }
+                        }
+                    }
+                }
+
+                if (template.showItemCode && item.code != null) {
+                    line("   Mã: ${item.code}")
+                }
+
+                if (template.showItemNote && item.note != null) {
+                    lineItalic("   Ghi chú: ${item.note}")
+                }
+
+                val hasItemDiscount = item.discountAmount > 0
+                if (hasItemDiscount && template.showItemDiscount) {
+                    val discountLabel = if (item.discountType == "percent" && item.discountPercent > 0) {
+                        "   → Giảm ${item.discountPercent.toInt()}%:"
+                    } else {
+                        "   → Giảm:"
+                    }
+                    lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
+                }
+            }
+
+            separator()
+
+            // ============ TOTALS ============
+            if (template.showSubtotal) {
+                val itemCount = billData.items.size
+                lineKeyValue("Tạm tính ($itemCount món):", formatCurrency(billData.subtotal))
+            }
+
+            // ============ 4 LOẠI GIẢM GIÁ ============
+            if (template.showTotalItemDiscount && billData.itemDiscountAmount > 0) {
+                lineKeyValue("${template.itemDiscountLabel}:", "-${formatCurrency(billData.itemDiscountAmount)}")
+            }
+
+            if (template.showBillDiscount && billData.billDiscountAmount > 0) {
+                val billDiscountText = if (template.showDiscountPercent && billData.billDiscountPercent > 0) {
+                    "${template.billDiscountLabel} (${billData.billDiscountPercent.toInt()}%):"
+                } else {
+                    "${template.billDiscountLabel}:"
+                }
+                lineKeyValue(billDiscountText, "-${formatCurrency(billData.billDiscountAmount)}")
+            }
+
+            if (template.showCouponDiscount && billData.couponDiscountAmount > 0) {
+                val couponText = if (billData.couponCode != null) {
+                    "${template.couponDiscountLabel} (${billData.couponCode}):"
+                } else {
+                    "${template.couponDiscountLabel}:"
+                }
+                lineKeyValue(couponText, "-${formatCurrency(billData.couponDiscountAmount)}")
+            }
+
+            if (template.showVoucherDiscount && billData.voucherDiscountAmount > 0) {
+                val voucherText = if (billData.voucherCode != null) {
+                    "${template.voucherDiscountLabel} (${billData.voucherCode}):"
+                } else {
+                    "${template.voucherDiscountLabel}:"
+                }
+                lineKeyValue(voucherText, "-${formatCurrency(billData.voucherDiscountAmount)}")
+            }
+
+            if (template.showTotalDiscount && billData.totalDiscountAmount > 0) {
+                lineKeyValue("${template.totalDiscountLabel}:", "-${formatCurrency(billData.totalDiscountAmount)}")
+            }
+
+            // ============ PHỤ THU ============
+            if (billData.surchargeItems.isNotEmpty()) {
+                billData.surchargeItems.forEach { item ->
+                    val itemText = if (item.quantity > 1) {
+                        "Phụ thu: ${item.name} x${item.quantity}"
+                    } else {
+                        "Phụ thu: ${item.name}"
+                    }
+                    lineKeyValue(itemText, "+${formatCurrency(item.totalAmount)}")
+                }
+            } else if (billData.surchargeAmount > 0) {
+                lineKeyValue("Phụ thu:", "+${formatCurrency(billData.surchargeAmount)}")
+            }
+
+            // ============ PHÍ DỊCH VỤ ============
+            if (template.showServiceFee && billData.serviceFee > 0) {
+                val serviceFeeText = if (billData.serviceFeePercent > 0) {
+                    "Phí dịch vụ (${billData.serviceFeePercent.toInt()}%):"
+                } else {
+                    "Phí dịch vụ:"
+                }
+                lineKeyValue(serviceFeeText, formatCurrency(billData.serviceFee))
+            }
+
+            // ============ VAT INFO ============
+            if (template.showVatDetails) {
+                if (template.showPriceBeforeVat) {
+                    lineKeyValue("${template.priceBeforeVatLabel}:", formatCurrency(billData.priceBeforeVat))
+                }
+                if (template.showVat && billData.vatAmount > 0) {
+                    lineKeyValue("${template.vatLabel}:", formatCurrency(billData.vatAmount))
+                }
+                if (template.showPriceAfterVat) {
+                    lineKeyValue("${template.priceAfterVatLabel}:", formatCurrency(billData.priceAfterVat))
+                }
+            } else if (template.showVat && billData.vatAmount > 0) {
+                lineKeyValue("${template.vatLabel}:", formatCurrency(billData.vatAmount))
+            }
+
+            doubleSeparator()
+
+            // ============ TOTAL ============
+            if (billData.isTemporaryBill) {
+                lineKeyValue("TỔNG TẠM TÍNH:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
+            } else {
+                lineKeyValue("TỔNG CỘNG:", formatCurrency(billData.totalAmount), BitmapTextStyle(bold = true))
+            }
+
+            // ============ PAYMENT INFO ============
+            if (!billData.isTemporaryBill) {
+                if (template.showPaymentMethod) {
+                    lineKeyValue("Thanh toán:", billData.paymentMethod)
+                }
+                if (template.showReceivedAmount && billData.receivedAmount > 0) {
+                    lineKeyValue("Tiền khách:", formatCurrency(billData.receivedAmount))
+                }
+                if (template.showChangeAmount && billData.changeAmount > 0) {
+                    lineKeyValue("Tiền thừa:", formatCurrency(billData.changeAmount))
+                }
+            }
+
+            // ============ QR CODE ============
+            if (template.showQrCode) {
+                val qrContent = when (template.qrCodeType) {
+                    "order_id" -> billData.orderNumber
+                    "custom" -> template.qrCodeContent ?: billData.orderNumber
+                    else -> billData.orderNumber
+                }
+                qrCode(qrContent)
+            }
+
+            // ============ BARCODE ============
+            if (template.showBarcode) {
+                barcode(billData.orderNumber)
+            }
+
+            // ============ WIFI INFO ============
+            if (template.showWifiInfo && template.wifiName != null) {
+                separator()
+                lineCenter("WiFi: ${template.wifiName} / ${template.wifiPassword ?: ""}")
+            }
+
+            // ============ FOOTER ============
+            separator()
+            if (billData.isTemporaryBill) {
+                lineCenter("*** ĐÂY LÀ BILL TẠM ***")
+                lineCenter("Vui lòng thanh toán tại quầy")
+                lineCenter("để nhận hóa đơn chính thức")
+            } else {
+                lineCenter(template.thankYouMessage)
+                lineCenter(template.comebackMessage)
+                template.footerText?.let { lineCenter(it) }
+            }
+
+            // ============ PRINTER ACTIONS ============
+            feed(5)
+            if (template.cutPaper) {
+                cut()
+            }
+            if (template.openCashDrawer) {
+                openCashDrawer()
+            }
+            if (template.beepAfterPrint) {
+                beep()
+            }
+        }
+
+        return builder.build()
     }
 
     /**
