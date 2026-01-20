@@ -20,6 +20,19 @@ object OrderPrintingService {
     private const val TAG = "OrderPrintingService"
 
     /**
+     * Regex để match tất cả các ký tự whitespace Unicode và zero-width characters
+     * Dùng để normalize text trước khi parse để đảm bảo tính nhất quán
+     */
+    private val UNICODE_WHITESPACE_REGEX = Regex("[\\s\\u00A0\\u2000-\\u200A\\u200B-\\u200D\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+")
+
+    /**
+     * Normalize text: thay thế tất cả Unicode whitespace bằng single space
+     */
+    private fun normalizeWhitespace(text: String): String {
+        return text.replace(UNICODE_WHITESPACE_REGEX, " ").trim()
+    }
+
+    /**
      * In đơn hàng đến các bếp tương ứng
      *
      * @param order Thông tin order
@@ -307,7 +320,8 @@ object OrderPrintingService {
                     part.startsWith("+") || part.startsWith("+ ") -> {
                         // Format: "+ Trân châu (+10000)" or "+ Trân châu x2 (+20000)" or "+Trân châu"
                         // Also handle: "+ Topping: Trân châu" or "+ Addon: Pudding"
-                        var toppingText = part.removePrefix("+").trim()
+                        // Normalize Unicode whitespace to regular space before parsing
+                        var toppingText = normalizeWhitespace(part.removePrefix("+"))
                         var toppingPrice = 0.0
                         var toppingQuantity = 1
 
@@ -319,6 +333,7 @@ object OrderPrintingService {
                         }
 
                         // Extract quantity if present: "x2" or "x3" at the end (before price was removed)
+                        // Text is already normalized so we can use simple \\s+ pattern
                         val quantityMatch = Regex("\\s+x(\\d+)$").find(toppingText)
                         if (quantityMatch != null) {
                             toppingQuantity = quantityMatch.groupValues[1].toIntOrNull() ?: 1
