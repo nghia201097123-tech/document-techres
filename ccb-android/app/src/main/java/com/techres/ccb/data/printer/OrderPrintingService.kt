@@ -487,13 +487,20 @@ object OrderPrintingService {
 
     /**
      * Parse order time từ string
+     * Quan trọng: Server lưu thời gian theo múi giờ Việt Nam (Asia/Ho_Chi_Minh)
+     * nên phải set timezone khi parse để đảm bảo Date object có timestamp đúng
      */
     private fun parseOrderTime(timeStr: String): Date {
+        val vietnamTz = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
         return try {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: Date()
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+                timeZone = vietnamTz
+            }.parse(timeStr) ?: Date()
         } catch (e: Exception) {
             try {
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: Date()
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
+                    timeZone = vietnamTz
+                }.parse(timeStr) ?: Date()
             } catch (e2: Exception) {
                 Date()
             }
