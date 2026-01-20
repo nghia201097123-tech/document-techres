@@ -149,6 +149,7 @@ object HybridBillPrintService {
     /**
      * In bill qua Network (TCP/IP)
      * Gửi toàn bộ data 1 lần rồi đợi máy in xử lý (giống kitchen ticket)
+     * Mỗi bản copy được in trong kết nối riêng để tránh tràn buffer
      */
     private suspend fun printViaNetwork(
         config: BillPrinterConfigEntity,
@@ -156,37 +157,51 @@ object HybridBillPrintService {
     ): PrinterResult {
         val ip = config.printerIp ?: return PrinterResult.Error("Chưa cấu hình IP máy in")
 
+        // In từng bản trong kết nối riêng (giống kitchen ticket)
+        repeat(config.numberOfCopies) { copyIndex ->
+            val result = printSingleCopy(ip, config.printerPort, config.connectionTimeoutMs, billContent)
+            if (result is PrinterResult.Error) {
+                return result
+            }
+            // Delay giữa các bản
+            if (copyIndex < config.numberOfCopies - 1) {
+                delay(300)
+            }
+        }
+
+        return PrinterResult.Success("In bill thành công!")
+    }
+
+    /**
+     * In 1 bản bill qua Network - giống hệt kitchen ticket
+     */
+    private suspend fun printSingleCopy(
+        ip: String,
+        port: Int,
+        timeoutMs: Int,
+        content: ByteArray
+    ): PrinterResult {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
         return try {
             socket = Socket().apply {
-                // Cấu hình socket giống kitchen ticket để đảm bảo tương thích
                 reuseAddress = true
                 keepAlive = true
-                tcpNoDelay = true // Gửi ngay, không buffer
+                tcpNoDelay = true
                 setSoLinger(true, 2)
             }
-            socket.connect(InetSocketAddress(ip, config.printerPort), config.connectionTimeoutMs)
+            socket.connect(InetSocketAddress(ip, port), timeoutMs)
             outputStream = socket.getOutputStream()
 
             // Gửi toàn bộ data 1 lần (giống kitchen ticket)
-            // KHÔNG dùng chunked writing vì có thể cắt GS v 0 command giữa chừng
-            outputStream.write(billContent)
+            outputStream.write(content)
             outputStream.flush()
 
             // Đợi máy in xử lý xong (giống kitchen ticket delay 500ms)
             delay(500)
 
-            // Print multiple copies if configured
-            repeat(config.numberOfCopies - 1) {
-                delay(500)
-                outputStream.write(billContent)
-                outputStream.flush()
-                delay(500)
-            }
-
-            PrinterResult.Success("In bill thành công!")
+            PrinterResult.Success("OK")
         } catch (e: Exception) {
             Log.e(TAG, "Print error: ${e.message}")
             PrinterResult.Error("Lỗi in: ${e.message}")
@@ -242,90 +257,8 @@ object HybridBillPrintService {
         billData: BillData,
         useBitmapMode: Boolean
     ): ByteArray {
-        // ============ DEBUG LOGGING ============
-        Log.d(TAG, "========== BILL DATA DEBUG ==========")
-        Log.d(TAG, "paperWidth: ${paperWidth}mm, useBitmapMode: $useBitmapMode")
-
-        // Order info
-        Log.d(TAG, "orderNumber: ${billData.orderNumber}")
-        Log.d(TAG, "tableName: ${billData.tableName}")
-        Log.d(TAG, "staffName: ${billData.staffName}")
-        Log.d(TAG, "customerName: ${billData.customerName}")
-        Log.d(TAG, "checkInTime: ${billData.checkInTime}")
-        Log.d(TAG, "checkOutTime: ${billData.checkOutTime}")
-
-        // Items
-        Log.d(TAG, "items count: ${billData.items.size}")
-        billData.items.forEachIndexed { index, item ->
-            Log.d(TAG, "--- Item $index ---")
-            Log.d(TAG, "  name: ${item.name}")
-            Log.d(TAG, "  code: ${item.code}")
-            Log.d(TAG, "  quantity: ${item.quantity}")
-            Log.d(TAG, "  originalPrice: ${item.originalPrice}")
-            Log.d(TAG, "  unitPrice: ${item.unitPrice}")
-            Log.d(TAG, "  totalPrice: ${item.totalPrice}")
-            Log.d(TAG, "  discountAmount: ${item.discountAmount}")
-            Log.d(TAG, "  discountPercent: ${item.discountPercent}")
-            Log.d(TAG, "  discountType: ${item.discountType}")
-            Log.d(TAG, "  note: ${item.note}")
-            Log.d(TAG, "  variants: ${item.variants.map { "${it.name}:${it.priceAdjustment}" }}")
-            Log.d(TAG, "  toppings: ${item.toppings.map { "${it.name}:${it.price}x${it.quantity}" }}")
-        }
-
-        // Discounts
-        Log.d(TAG, "--- Discounts ---")
-        Log.d(TAG, "subtotal: ${billData.subtotal}")
-        Log.d(TAG, "itemDiscountAmount: ${billData.itemDiscountAmount}")
-        Log.d(TAG, "billDiscountAmount: ${billData.billDiscountAmount}")
-        Log.d(TAG, "billDiscountPercent: ${billData.billDiscountPercent}")
-        Log.d(TAG, "couponDiscountAmount: ${billData.couponDiscountAmount}")
-        Log.d(TAG, "couponCode: ${billData.couponCode}")
-        Log.d(TAG, "voucherDiscountAmount: ${billData.voucherDiscountAmount}")
-        Log.d(TAG, "voucherCode: ${billData.voucherCode}")
-        Log.d(TAG, "totalDiscountAmount: ${billData.totalDiscountAmount}")
-        Log.d(TAG, "totalItemDiscount (legacy): ${billData.totalItemDiscount}")
-        Log.d(TAG, "discountAmount (legacy): ${billData.discountAmount}")
-        Log.d(TAG, "discountPercent (legacy): ${billData.discountPercent}")
-
-        // VAT & Total
-        Log.d(TAG, "--- VAT & Total ---")
-        Log.d(TAG, "surchargeAmount: ${billData.surchargeAmount}")
-        Log.d(TAG, "serviceFee: ${billData.serviceFee}")
-        Log.d(TAG, "serviceFeePercent: ${billData.serviceFeePercent}")
-        Log.d(TAG, "vatRate: ${billData.vatRate}")
-        Log.d(TAG, "vatAmount: ${billData.vatAmount}")
-        Log.d(TAG, "priceBeforeVat: ${billData.priceBeforeVat}")
-        Log.d(TAG, "priceAfterVat: ${billData.priceAfterVat}")
-        Log.d(TAG, "totalAmount: ${billData.totalAmount}")
-
-        // Payment
-        Log.d(TAG, "--- Payment ---")
-        Log.d(TAG, "paymentMethod: ${billData.paymentMethod}")
-        Log.d(TAG, "receivedAmount: ${billData.receivedAmount}")
-        Log.d(TAG, "changeAmount: ${billData.changeAmount}")
-
-        // Template config
-        Log.d(TAG, "--- Template Config ---")
-        Log.d(TAG, "showItemDiscount: ${template.showItemDiscount}")
-        Log.d(TAG, "showTotalItemDiscount: ${template.showTotalItemDiscount}")
-        Log.d(TAG, "itemDiscountLabel: ${template.itemDiscountLabel}")
-        Log.d(TAG, "showBillDiscount: ${template.showBillDiscount}")
-        Log.d(TAG, "billDiscountLabel: ${template.billDiscountLabel}")
-        Log.d(TAG, "showCouponDiscount: ${template.showCouponDiscount}")
-        Log.d(TAG, "couponDiscountLabel: ${template.couponDiscountLabel}")
-        Log.d(TAG, "showVoucherDiscount: ${template.showVoucherDiscount}")
-        Log.d(TAG, "voucherDiscountLabel: ${template.voucherDiscountLabel}")
-        Log.d(TAG, "showTotalDiscount: ${template.showTotalDiscount}")
-        Log.d(TAG, "totalDiscountLabel: ${template.totalDiscountLabel}")
-        Log.d(TAG, "showCheckInTime: ${template.showCheckInTime}")
-        Log.d(TAG, "checkInLabel: ${template.checkInLabel}")
-        Log.d(TAG, "showCheckOutTime: ${template.showCheckOutTime}")
-        Log.d(TAG, "checkOutLabel: ${template.checkOutLabel}")
-        // Printer config settings (from app settings)
-        Log.d(TAG, "--- Printer Config (from app) ---")
-        Log.d(TAG, "fontSize: $fontSize")
-        Log.d(TAG, "lineSpacing: $lineSpacing")
-        Log.d(TAG, "========== END BILL DATA DEBUG ==========")
+        // Minimal logging for performance (chi tiết logging đã được disable để in mượt hơn)
+        Log.d(TAG, "Generating bill: ${billData.displayNumber}, ${billData.items.size} items, $paperWidth mm, bitmap=$useBitmapMode")
 
         // Chuyển đổi fontSize từ string sang fontScale float
         // Sử dụng fontSize từ printerConfig (user đã chọn trong app)
