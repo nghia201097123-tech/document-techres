@@ -89,6 +89,41 @@ const PrintOptions = React.memo(function PrintOptions({
   );
 });
 
+// Memoized Order Info component
+const OrderInfo = React.memo(function OrderInfo({
+  showOrderNumber,
+  showTableName,
+  showStaffName,
+  showCustomerName,
+  showDateTime,
+  showCheckInTime,
+  showCheckOutTime,
+  checkInLabel,
+  checkOutLabel,
+}: {
+  showOrderNumber?: boolean;
+  showTableName?: boolean;
+  showStaffName?: boolean;
+  showCustomerName?: boolean;
+  showDateTime?: boolean;
+  showCheckInTime?: boolean;
+  showCheckOutTime?: boolean;
+  checkInLabel?: string;
+  checkOutLabel?: string;
+}) {
+  return (
+    <div className="text-xs my-2">
+      {showOrderNumber && <p>Ma don: #123456</p>}
+      {showTableName && <p>Ban: A01</p>}
+      {showStaffName && <p>NV: Nguyen Van A</p>}
+      {showCustomerName && <p>Khach hang: Tran Van B</p>}
+      {showDateTime && <p>Gio: 15:30 01/01/2024</p>}
+      {showCheckInTime && <p>{checkInLabel || "Gio vao"}: 14:00</p>}
+      {showCheckOutTime && <p>{checkOutLabel || "Gio ra"}: 15:30</p>}
+    </div>
+  );
+});
+
 /**
  * Bill Preview Panel - Shows a live preview of the bill template
  * Renders a visual representation of how the bill will look when printed
@@ -122,6 +157,56 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
     return doubleSeparator.repeat(30);
   }, [template.doubleSeparatorChar]);
 
+  // Memoize header props object - only recreate when header-related values change
+  const headerProps = React.useMemo(() => ({
+    showLogo: template.showLogo,
+    storeName: template.storeName,
+    storeAddress: template.storeAddress,
+    storePhone: template.storePhone,
+    taxCode: template.taxCode,
+    headerText: template.headerText,
+  }), [template.showLogo, template.storeName, template.storeAddress, template.storePhone, template.taxCode, template.headerText]);
+
+  // Memoize footer props object - only recreate when footer-related values change
+  const footerProps = React.useMemo(() => ({
+    thankYouMessage: template.thankYouMessage,
+    comebackMessage: template.comebackMessage,
+    footerText: template.footerText,
+  }), [template.thankYouMessage, template.comebackMessage, template.footerText]);
+
+  // Memoize print options props object
+  const printOptionsProps = React.useMemo(() => ({
+    cutPaper: template.cutPaper,
+    openCashDrawer: template.openCashDrawer,
+    beepAfterPrint: template.beepAfterPrint,
+    numberOfCopies: template.numberOfCopies,
+  }), [template.cutPaper, template.openCashDrawer, template.beepAfterPrint, template.numberOfCopies]);
+
+  // Memoize order info props
+  const orderInfoProps = React.useMemo(() => ({
+    showOrderNumber: template.showOrderNumber,
+    showTableName: template.showTableName,
+    showStaffName: template.showStaffName,
+    showCustomerName: template.showCustomerName,
+    showDateTime: template.showDateTime,
+    showCheckInTime: template.showCheckInTime,
+    showCheckOutTime: template.showCheckOutTime,
+    checkInLabel: template.checkInLabel,
+    checkOutLabel: template.checkOutLabel,
+  }), [template.showOrderNumber, template.showTableName, template.showStaffName, template.showCustomerName, template.showDateTime, template.showCheckInTime, template.showCheckOutTime, template.checkInLabel, template.checkOutLabel]);
+
+  // Memoize bill title
+  const billTitle = React.useMemo(() => template.billTitle || "HOA DON BAN HANG", [template.billTitle]);
+
+  // Use deferred values for header, footer, order info to prevent jitter during rapid updates
+  const deferredHeaderProps = React.useDeferredValue(headerProps);
+  const deferredFooterProps = React.useDeferredValue(footerProps);
+  const deferredPrintOptionsProps = React.useDeferredValue(printOptionsProps);
+  const deferredOrderInfoProps = React.useDeferredValue(orderInfoProps);
+  const deferredBillTitle = React.useDeferredValue(billTitle);
+  const deferredSeparatorLine = React.useDeferredValue(separatorLine);
+  const deferredDoubleSeparatorLine = React.useDeferredValue(doubleSeparatorLine);
+
   return (
     <div className={className}>
       <div className="text-center text-xs text-muted-foreground mb-2">
@@ -131,38 +216,23 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${fontSizeClass}`}
         style={{ width: previewWidth }}
       >
-        {/* Header - Memoized component */}
-        <BillHeader
-          showLogo={template.showLogo}
-          storeName={template.storeName}
-          storeAddress={template.storeAddress}
-          storePhone={template.storePhone}
-          taxCode={template.taxCode}
-          headerText={template.headerText}
-        />
+        {/* Header - Memoized component with deferred props */}
+        <BillHeader {...deferredHeaderProps} />
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-1 overflow-hidden">
-          {doubleSeparatorLine}
+          {deferredDoubleSeparatorLine}
         </p>
 
         {/* Bill Title */}
-        <p className="text-center font-bold">{template.billTitle || "HOA DON BAN HANG"}</p>
+        <p className="text-center font-bold">{deferredBillTitle}</p>
 
-        {/* Order Info */}
-        <div className="text-xs my-2">
-          {template.showOrderNumber && <p>Ma don: #123456</p>}
-          {template.showTableName && <p>Ban: A01</p>}
-          {template.showStaffName && <p>NV: Nguyen Van A</p>}
-          {template.showCustomerName && <p>Khach hang: Tran Van B</p>}
-          {template.showDateTime && <p>Gio: 15:30 01/01/2024</p>}
-          {template.showCheckInTime && <p>{template.checkInLabel || "Gio vao"}: 14:00</p>}
-          {template.showCheckOutTime && <p>{template.checkOutLabel || "Gio ra"}: 15:30</p>}
-        </div>
+        {/* Order Info - Memoized component with deferred props */}
+        <OrderInfo {...deferredOrderInfoProps} />
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-1 overflow-hidden">
-          {separatorLine}
+          {deferredSeparatorLine}
         </p>
 
         {/* Items */}
@@ -223,7 +293,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-2 overflow-hidden">
-          {separatorLine}
+          {deferredSeparatorLine}
         </p>
 
         {/* Subtotal & Discounts */}
@@ -313,7 +383,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-2 overflow-hidden">
-          {doubleSeparatorLine}
+          {deferredDoubleSeparatorLine}
         </p>
 
         {/* Total */}
@@ -391,20 +461,11 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
           </div>
         )}
 
-        {/* Footer - Memoized component */}
-        <BillFooter
-          thankYouMessage={template.thankYouMessage}
-          comebackMessage={template.comebackMessage}
-          footerText={template.footerText}
-        />
+        {/* Footer - Memoized component with deferred props */}
+        <BillFooter {...deferredFooterProps} />
 
-        {/* Print Options Badges - Memoized component */}
-        <PrintOptions
-          cutPaper={template.cutPaper}
-          openCashDrawer={template.openCashDrawer}
-          beepAfterPrint={template.beepAfterPrint}
-          numberOfCopies={template.numberOfCopies}
-        />
+        {/* Print Options Badges - Memoized component with deferred props */}
+        <PrintOptions {...deferredPrintOptionsProps} />
       </div>
     </div>
   );
