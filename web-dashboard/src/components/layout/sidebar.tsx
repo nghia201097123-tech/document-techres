@@ -82,9 +82,12 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    title: "Bếp",
-    href: "/kitchen",
+    title: "Bếp & Máy in",
     icon: ChefHat,
+    children: [
+      { title: "Quản lý bếp", href: "/kitchen", icon: ChefHat },
+      { title: "Mẫu in Bill", href: "/settings/bill-template", icon: FileText },
+    ],
   },
   {
     title: "Kết nối",
@@ -102,13 +105,6 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    title: "Máy in",
-    icon: Printer,
-    children: [
-      { title: "Mẫu in Bill", href: "/settings/bill-template", icon: FileText },
-    ],
-  },
-  {
     title: "Báo cáo",
     href: "/reports",
     icon: BarChart3,
@@ -123,7 +119,7 @@ const menuItems: MenuItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { company } = useAuthStore();
-  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Kết nối", "Tài chính", "Máy in"]);
+  const [expandedItems, setExpandedItems] = React.useState<string[]>(["Nhân sự", "Menu", "Quản lý bàn", "Bếp & Máy in", "Kết nối", "Tài chính"]);
 
   const toggleExpand = (title: string) => {
     setExpandedItems((prev) =>
