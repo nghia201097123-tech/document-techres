@@ -198,45 +198,50 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
   // Memoize bill title
   const billTitle = React.useMemo(() => template.billTitle || "HOA DON BAN HANG", [template.billTitle]);
 
-  // Use deferred values for header, footer, order info to prevent jitter during rapid updates
-  const deferredHeaderProps = React.useDeferredValue(headerProps);
-  const deferredFooterProps = React.useDeferredValue(footerProps);
-  const deferredPrintOptionsProps = React.useDeferredValue(printOptionsProps);
-  const deferredOrderInfoProps = React.useDeferredValue(orderInfoProps);
-  const deferredBillTitle = React.useDeferredValue(billTitle);
-  const deferredSeparatorLine = React.useDeferredValue(separatorLine);
-  const deferredDoubleSeparatorLine = React.useDeferredValue(doubleSeparatorLine);
-
   return (
     <div className={className}>
       <div className="text-center text-xs text-muted-foreground mb-2">
         Xem truoc - {template.paperWidth || 80}mm
       </div>
+      {/*
+        CSS containment strategy for jitter-free preview:
+        - contain: layout style paint - isolates each section's rendering
+        - will-change: contents - hints browser to optimize for content changes
+        - transform: translateZ(0) - forces GPU layer for smoother updates
+      */}
       <div
         className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${fontSizeClass}`}
-        style={{ width: previewWidth }}
+        style={{
+          width: previewWidth,
+          contain: "layout style",
+          willChange: "contents"
+        }}
       >
-        {/* Header - Memoized component with deferred props */}
-        <BillHeader {...deferredHeaderProps} />
+        {/* Header - Memoized component with direct props */}
+        <div style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
+          <BillHeader {...headerProps} />
+        </div>
 
         {/* Separator */}
-        <p className="text-center text-muted-foreground my-1 overflow-hidden">
-          {deferredDoubleSeparatorLine}
+        <p className="text-center text-muted-foreground my-1 overflow-hidden" style={{ contain: "layout style" }}>
+          {doubleSeparatorLine}
         </p>
 
         {/* Bill Title */}
-        <p className="text-center font-bold">{deferredBillTitle}</p>
+        <p className="text-center font-bold" style={{ contain: "layout style" }}>{billTitle}</p>
 
-        {/* Order Info - Memoized component with deferred props */}
-        <OrderInfo {...deferredOrderInfoProps} />
+        {/* Order Info - Memoized component with direct props */}
+        <div style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
+          <OrderInfo {...orderInfoProps} />
+        </div>
 
         {/* Separator */}
-        <p className="text-center text-muted-foreground my-1 overflow-hidden">
-          {deferredSeparatorLine}
+        <p className="text-center text-muted-foreground my-1 overflow-hidden" style={{ contain: "layout style" }}>
+          {separatorLine}
         </p>
 
-        {/* Items */}
-        <div className="space-y-2 text-xs">
+        {/* Items - Main content section */}
+        <div className="space-y-2 text-xs" style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
           {/* Item 1 */}
           <div>
             <div className="flex justify-between items-start">
@@ -292,12 +297,12 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         </div>
 
         {/* Separator */}
-        <p className="text-center text-muted-foreground my-2 overflow-hidden">
-          {deferredSeparatorLine}
+        <p className="text-center text-muted-foreground my-2 overflow-hidden" style={{ contain: "layout style" }}>
+          {separatorLine}
         </p>
 
-        {/* Subtotal & Discounts */}
-        <div className="space-y-1 text-xs">
+        {/* Subtotal & Discounts - Price/VAT section */}
+        <div className="space-y-1 text-xs" style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
           {template.showSubtotal && (
             <div className="flex justify-between">
               <span>Tam tinh:</span>
@@ -382,41 +387,43 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         </div>
 
         {/* Separator */}
-        <p className="text-center text-muted-foreground my-2 overflow-hidden">
-          {deferredDoubleSeparatorLine}
+        <p className="text-center text-muted-foreground my-2 overflow-hidden" style={{ contain: "layout style" }}>
+          {doubleSeparatorLine}
         </p>
 
-        {/* Total */}
-        <div className="flex justify-between font-bold text-lg">
-          <span>TONG TIEN:</span>
-          <span>72,765</span>
+        {/* Total - Payment section */}
+        <div style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
+          <div className="flex justify-between font-bold text-lg">
+            <span>TONG TIEN:</span>
+            <span>72,765</span>
+          </div>
+
+          {/* Payment Info */}
+          {template.showPaymentMethod && (
+            <div className="flex justify-between text-xs mt-2">
+              <span>Thanh toan:</span>
+              <span>Tien mat</span>
+            </div>
+          )}
+
+          {template.showReceivedAmount && (
+            <div className="flex justify-between text-xs">
+              <span>Tien nhan:</span>
+              <span>100,000</span>
+            </div>
+          )}
+
+          {template.showChangeAmount && (
+            <div className="flex justify-between text-xs">
+              <span>Tien tra lai:</span>
+              <span>27,235</span>
+            </div>
+          )}
         </div>
-
-        {/* Payment Info */}
-        {template.showPaymentMethod && (
-          <div className="flex justify-between text-xs mt-2">
-            <span>Thanh toan:</span>
-            <span>Tien mat</span>
-          </div>
-        )}
-
-        {template.showReceivedAmount && (
-          <div className="flex justify-between text-xs">
-            <span>Tien nhan:</span>
-            <span>100,000</span>
-          </div>
-        )}
-
-        {template.showChangeAmount && (
-          <div className="flex justify-between text-xs">
-            <span>Tien tra lai:</span>
-            <span>27,235</span>
-          </div>
-        )}
 
         {/* Order Note - Ghi chú tổng bill */}
         {template.showOrderNote && (
-          <div className="border-t border-dashed pt-2 mt-2">
+          <div className="border-t border-dashed pt-2 mt-2" style={{ contain: "layout style" }}>
             <p className="text-xs font-medium">Ghi chu:</p>
             <p className="text-xs text-muted-foreground italic">Giao hang truoc 12h trua</p>
           </div>
@@ -424,7 +431,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* QR Code */}
         {template.showQrCode && (
-          <div className="text-center my-3">
+          <div className="text-center my-3" style={{ contain: "layout style" }}>
             <div className="inline-block border-2 border-gray-300 p-2 rounded">
               <div className="w-16 h-16 bg-gray-200 flex items-center justify-center">
                 <span className="text-xs">QR</span>
@@ -441,7 +448,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* Barcode */}
         {template.showBarcode && (
-          <div className="text-center my-3">
+          <div className="text-center my-3" style={{ contain: "layout style" }}>
             <div className="inline-block">
               <div className="h-8 w-32 bg-gray-300 flex items-center justify-center">
                 <span className="text-xs">|||||||||||</span>
@@ -453,7 +460,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* WiFi Info */}
         {template.showWifiInfo && template.wifiName && (
-          <div className="text-center text-xs my-2 p-2 bg-gray-50 rounded">
+          <div className="text-center text-xs my-2 p-2 bg-gray-50 rounded" style={{ contain: "layout style" }}>
             <p className="font-medium">WiFi</p>
             <p>
               WiFi: {template.wifiName} / {template.wifiPassword || "********"}
@@ -461,11 +468,15 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
           </div>
         )}
 
-        {/* Footer - Memoized component with deferred props */}
-        <BillFooter {...deferredFooterProps} />
+        {/* Footer - Memoized component with direct props */}
+        <div style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
+          <BillFooter {...footerProps} />
+        </div>
 
-        {/* Print Options Badges - Memoized component with deferred props */}
-        <PrintOptions {...deferredPrintOptionsProps} />
+        {/* Print Options Badges - Memoized component with direct props */}
+        <div style={{ contain: "layout style paint", transform: "translateZ(0)" }}>
+          <PrintOptions {...printOptionsProps} />
+        </div>
       </div>
     </div>
   );
