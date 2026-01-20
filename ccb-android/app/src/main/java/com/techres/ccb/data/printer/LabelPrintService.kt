@@ -444,8 +444,8 @@ object LabelPrintService {
         val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
         val indexText = "$labelCountText $partText".trim()
 
-        // Pager text compact: [5] thay vì "Thẻ: 5" để tiết kiệm không gian
-        val pagerText = if (hasPager) "▶${label.pagerNumber}" else ""
+        // Pager text: "Thẻ rung: X"
+        val pagerText = if (hasPager) "Thẻ rung: ${label.pagerNumber}" else ""
 
         if (hasTable && hasOrder) {
             // SMART: Bàn bên trái + Mã đơn + Thẻ rung bên phải (trên cùng 1 dòng)
@@ -502,13 +502,13 @@ object LabelPrintService {
             yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
         } else if (hasPager) {
-            // Không có bàn, không có mã đơn, chỉ có thẻ rung
-            val pagerBitmap = renderTextBitmap(
-                text = "▶${label.pagerNumber}",
-                width = contentWidth,
-                fontSize = fontSmall,
-                bold = true,
-                centerAlign = false
+            // Không có bàn, không có mã đơn, chỉ có thẻ rung - căn phải
+            val pagerBitmap = renderTwoColumnText(
+                "",
+                "Thẻ rung: ${label.pagerNumber}",
+                contentWidth,
+                fontSmall,
+                bold = true
             )
             output.write(bitmapToTspl(margin, yPos, pagerBitmap))
             yPos += pagerBitmap.height + lineSpacingExtra
@@ -1095,11 +1095,12 @@ object LabelPrintService {
                 separator('-')
                 if (hasTableInfo && hasPagerInfo) {
                     // Gộp: Bàn bên trái, thẻ rung bên phải
-                    lineKeyValueBold("Bàn: ${label.tableName}", "▶${label.pagerNumber}")
+                    lineKeyValueBold("Bàn: ${label.tableName}", "Thẻ rung: ${label.pagerNumber}")
                 } else if (hasTableInfo) {
                     lineBold("Bàn: ${label.tableName}")
                 } else if (hasPagerInfo) {
-                    lineBold("▶${label.pagerNumber}")
+                    // Chỉ có thẻ rung - căn phải
+                    lineKeyValueBold("", "Thẻ rung: ${label.pagerNumber}")
                 }
             }
 

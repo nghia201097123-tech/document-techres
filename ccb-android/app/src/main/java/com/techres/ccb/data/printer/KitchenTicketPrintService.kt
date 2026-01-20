@@ -337,8 +337,8 @@ object KitchenTicketPrintService {
             val hasStaff = !ticket.staffName.isNullOrBlank()
             val hasPager = ticket.pagerNumber != null
 
-            // Pager text compact: ▶5 thay vì "THẺ RUNG: 5" để tiết kiệm không gian
-            val pagerText = if (hasPager) "▶${ticket.pagerNumber}" else ""
+            // Pager text: "Thẻ rung: X"
+            val pagerText = if (hasPager) "Thẻ rung: ${ticket.pagerNumber}" else ""
 
             if (hasTable && hasOrder) {
                 // Bàn bên trái (bold), Mã đơn + Thẻ rung bên phải
@@ -366,8 +366,8 @@ object KitchenTicketPrintService {
             } else if (hasOrder) {
                 line(ticket.displayNumber)
             } else if (hasPager) {
-                // Chỉ có thẻ rung, không có bàn/mã đơn
-                lineBold("▶${ticket.pagerNumber}")
+                // Chỉ có thẻ rung, không có bàn/mã đơn - căn phải
+                lineKeyValueBold("", "Thẻ rung: ${ticket.pagerNumber}")
             }
 
             // SMART LAYOUT: Gộp Thời gian + Nhân viên trên cùng 1 dòng (nếu có bàn)
