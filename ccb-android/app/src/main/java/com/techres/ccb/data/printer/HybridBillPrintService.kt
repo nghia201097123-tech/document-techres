@@ -88,12 +88,10 @@ object HybridBillPrintService {
 
     /**
      * In bill qua Sunmi Built-in Printer
-     * Máy in Sunmi tích hợp luôn hỗ trợ UTF-8 và tiếng Việt tốt
+     * Sử dụng phương pháp giống kitchen ticket: Generate rồi gửi qua network-style
      *
-     * QUAN TRỌNG: Tất cả lệnh (cut, cashDrawer, beep) đã được include trong billContent
-     * từ generateHybridBill() nên KHÔNG gọi riêng lẻ để tránh:
-     * 1. Lệnh trùng lặp
-     * 2. Giật giật do gửi lệnh không đồng bộ
+     * QUAN TRỌNG: Không dùng Sunmi SDK's AIDL interface trực tiếp vì có thể gây buffering issues.
+     * Thay vào đó, dùng cùng approach như kitchen ticket (đã chứng minh hoạt động tốt).
      */
     private suspend fun printViaSunmi(
         config: BillPrinterConfigEntity,
@@ -109,30 +107,35 @@ object HybridBillPrintService {
                 return PrinterResult.Error("Không thể kết nối máy in Sunmi: ${connectResult.message}")
             }
 
-            // Generate bill content - Sunmi hỗ trợ UTF-8 tốt, nhưng dùng bitmap để đảm bảo 100%
-            // billContent đã bao gồm TẤT CẢ lệnh: in, feed, cut, cashDrawer, beep
+            // Generate bill content với cùng settings như kitchen ticket
             val capability = PrinterCapability(
-                printerIp = "sunmi_inner", // Dummy IP for internal printer
+                printerIp = "sunmi_inner",
                 printerPort = 0,
-                supportVietnameseUtf8 = false, // Force bitmap mode cho Sunmi để đảm bảo tiếng Việt đẹp
+                supportVietnameseUtf8 = false, // Force bitmap mode
                 printerModel = adapter.getSunmiModel()
             )
             val billContent = generateHybridBill(config, template, billData, capability)
 
-            // Gửi toàn bộ data một lần (không chunk vì có thể cắt giữa lệnh ESC/POS)
-            // Sunmi SDK tự quản lý buffer nội bộ
-            val writeResult = adapter.write(billContent)
-            if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
-                return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
-            }
+            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes")
 
-            // Đợi máy in xử lý xong - tăng lên 800ms để đảm bảo hoàn thành
-            delay(800)
+            // In từng bản riêng biệt (giống kitchen ticket)
+            repeat(config.numberOfCopies) { copyIndex ->
+                // Gửi data và đợi - giống kitchen ticket
+                val writeResult = adapter.write(billContent)
+                if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
+                    Log.w(TAG, "Copy ${copyIndex + 1} failed: ${writeResult.message}")
+                    return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
+                }
 
-            // In nhiều bản nếu cấu hình
-            repeat(config.numberOfCopies - 1) {
-                adapter.write(billContent)
-                delay(800) // Đợi giữa các bản
+                // Đợi máy in xử lý xong (giống kitchen ticket delay 500ms)
+                delay(500)
+
+                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${config.numberOfCopies}: Success")
+
+                // Delay giữa các bản
+                if (copyIndex < config.numberOfCopies - 1) {
+                    delay(300)
+                }
             }
 
             Log.d(TAG, "Sunmi print successful: ${config.numberOfCopies} copies")

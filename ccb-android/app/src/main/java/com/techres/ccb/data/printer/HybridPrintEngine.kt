@@ -584,41 +584,19 @@ class HybridBillBuilder(
 
     /**
      * Initialize printer
-     * Thêm "warm-up" bytes sau INIT để máy in có thời gian ổn định
-     * trước khi nhận bitmap data - giúp tránh jitter ở header
+     * Giống kitchen ticket - đơn giản nhất có thể để tránh issues
      */
     fun init(): HybridBillBuilder {
-        // Cancel any pending print data in buffer first
-        buffer.write(EscPosCommands.CANCEL)
-
-        // Reset printer to default state (clears buffer, resets settings)
+        // Reset printer to default state (giống kitchen ticket - không CANCEL)
         buffer.write(EscPosCommands.INIT)
 
-        // WARM-UP: Gửi 32 bytes NUL (0x00) để máy in có thời gian xử lý INIT
-        // NUL bytes được máy in bỏ qua nhưng tạo độ trễ trong data stream
-        // Điều này giúp tránh jitter khi gửi bitmap ngay sau INIT
-        val warmupBytes = ByteArray(32) { 0x00 }
-        buffer.write(warmupBytes)
-
-        // Set print area width to match paper width
-        // GS W - Set print area width
-        val widthL = (pixelWidth % 256).toByte()
-        val widthH = (pixelWidth / 256).toByte()
-        buffer.write(byteArrayOf(GS, 0x57, widthL, widthH))
-
-        // Set left margin to 0 for proper alignment
-        buffer.write(byteArrayOf(GS, 0x4C, 0x00, 0x00))
-
-        // Set line spacing to 0 for bitmap mode (prevents gaps between bitmap lines)
+        // Set line spacing to 0 for bitmap mode (giống kitchen ticket)
         if (useBitmapMode) {
             buffer.write(byteArrayOf(ESC, 0x33, 0x00)) // ESC 3 0 - Set line spacing to 0
         }
 
         // Ensure left alignment by default
         buffer.write(EscPosCommands.ALIGN_LEFT)
-
-        // Thêm warm-up bytes sau khi set xong các config
-        buffer.write(warmupBytes)
 
         return this
     }
