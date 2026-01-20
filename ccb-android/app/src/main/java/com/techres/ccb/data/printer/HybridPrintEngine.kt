@@ -584,6 +584,8 @@ class HybridBillBuilder(
 
     /**
      * Initialize printer
+     * Thêm "warm-up" bytes sau INIT để máy in có thời gian ổn định
+     * trước khi nhận bitmap data - giúp tránh jitter ở header
      */
     fun init(): HybridBillBuilder {
         // Cancel any pending print data in buffer first
@@ -592,8 +594,11 @@ class HybridBillBuilder(
         // Reset printer to default state (clears buffer, resets settings)
         buffer.write(EscPosCommands.INIT)
 
-        // Wait a bit for printer to reset (add empty bytes as delay)
-        // Some printers need time to process the INIT command
+        // WARM-UP: Gửi 32 bytes NUL (0x00) để máy in có thời gian xử lý INIT
+        // NUL bytes được máy in bỏ qua nhưng tạo độ trễ trong data stream
+        // Điều này giúp tránh jitter khi gửi bitmap ngay sau INIT
+        val warmupBytes = ByteArray(32) { 0x00 }
+        buffer.write(warmupBytes)
 
         // Set print area width to match paper width
         // GS W - Set print area width
@@ -611,6 +616,9 @@ class HybridBillBuilder(
 
         // Ensure left alignment by default
         buffer.write(EscPosCommands.ALIGN_LEFT)
+
+        // Thêm warm-up bytes sau khi set xong các config
+        buffer.write(warmupBytes)
 
         return this
     }

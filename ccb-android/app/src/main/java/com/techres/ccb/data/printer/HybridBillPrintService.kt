@@ -119,43 +119,20 @@ object HybridBillPrintService {
             )
             val billContent = generateHybridBill(config, template, billData, capability)
 
-            // Gửi dữ liệu theo từng chunk nhỏ để tránh tràn buffer máy in
-            // Điều này giúp máy in có thời gian xử lý từng phần, tránh giật giật
-            val chunkSize = 1024 // 1KB per chunk - đủ nhỏ để máy in xử lý kịp
-            var offset = 0
-            while (offset < billContent.size) {
-                val end = minOf(offset + chunkSize, billContent.size)
-                val chunk = billContent.copyOfRange(offset, end)
-
-                val writeResult = adapter.write(chunk)
-                if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
-                    return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
-                }
-
-                offset = end
-
-                // Delay nhỏ giữa các chunk để máy in xử lý kịp
-                if (offset < billContent.size) {
-                    delay(20) // 20ms giữa mỗi chunk
-                }
+            // Gửi toàn bộ data một lần (không chunk vì có thể cắt giữa lệnh ESC/POS)
+            // Sunmi SDK tự quản lý buffer nội bộ
+            val writeResult = adapter.write(billContent)
+            if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
+                return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
             }
 
-            // Đợi máy in xử lý xong toàn bộ buffer trước khi in bản tiếp theo
-            delay(500)
+            // Đợi máy in xử lý xong - tăng lên 800ms để đảm bảo hoàn thành
+            delay(800)
 
-            // In nhiều bản nếu cấu hình (mỗi bản cũng dùng chunked write)
+            // In nhiều bản nếu cấu hình
             repeat(config.numberOfCopies - 1) {
-                var copyOffset = 0
-                while (copyOffset < billContent.size) {
-                    val end = minOf(copyOffset + chunkSize, billContent.size)
-                    val chunk = billContent.copyOfRange(copyOffset, end)
-                    adapter.write(chunk)
-                    copyOffset = end
-                    if (copyOffset < billContent.size) {
-                        delay(20)
-                    }
-                }
-                delay(500) // Đợi giữa các bản
+                adapter.write(billContent)
+                delay(800) // Đợi giữa các bản
             }
 
             Log.d(TAG, "Sunmi print successful: ${config.numberOfCopies} copies")
