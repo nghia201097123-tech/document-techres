@@ -455,9 +455,9 @@ object KitchenTicketPrintService {
 
                             // Bỏ qua topping name rỗng
                             if (normalizedName.isNotBlank()) {
-                                // Hiển thị số lượng nếu > 1
+                                // Hiển thị số lượng nếu > 1 (số lượng đặt trước tên topping)
                                 val displayName = if (toppingQty > 1) {
-                                    "$normalizedName x$toppingQty"
+                                    "x$toppingQty $normalizedName"
                                 } else {
                                     normalizedName
                                 }
