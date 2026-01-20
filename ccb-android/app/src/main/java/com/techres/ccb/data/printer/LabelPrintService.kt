@@ -570,12 +570,17 @@ object LabelPrintService {
         if (sizeValue != null) {
             // SIZE từ options - tìm giá từ toppingPrices
             val sizePrice = sizeToppingEntry?.second ?: 0.0
+            val sizeQty = sizeToppingEntry?.third ?: 1
+            val totalSizePrice = sizePrice * sizeQty
             displayedSizeTopping = sizeToppingEntry?.first // Mark this topping as displayed
 
-            if (showPrice && sizePrice > 0) {
+            // Hiển thị số lượng nếu > 1
+            val sizeDisplayName = if (sizeQty > 1) "Size $sizeValue x$sizeQty" else "Size $sizeValue"
+
+            if (showPrice && totalSizePrice > 0) {
                 val sizeBitmap = renderTwoColumnText(
-                    "+ Size $sizeValue",
-                    "+${formatVND(sizePrice)}",
+                    "+ $sizeDisplayName",
+                    "+${formatVND(totalSizePrice)}",
                     contentWidth,
                     fontNormal,
                     bold = false
@@ -585,7 +590,7 @@ object LabelPrintService {
                 sizeBitmap.recycle()
             } else {
                 val sizeBitmap = renderTextBitmap(
-                    text = "+ Size $sizeValue",
+                    text = "+ $sizeDisplayName",
                     width = contentWidth,
                     fontSize = fontNormal,
                     bold = false,
@@ -597,13 +602,17 @@ object LabelPrintService {
             }
         } else if (sizeToppingEntry != null) {
             // Không có SIZE trong options nhưng có topping chứa "size" - hiển thị nó
-            val (sizeName, sizePrice) = sizeToppingEntry
+            val (sizeName, sizePrice, sizeQty) = sizeToppingEntry
             displayedSizeTopping = sizeName
+            val totalSizePrice = sizePrice * sizeQty
 
-            if (showPrice && sizePrice > 0) {
+            // Hiển thị số lượng nếu > 1
+            val sizeDisplayName = if (sizeQty > 1) "$sizeName x$sizeQty" else sizeName
+
+            if (showPrice && totalSizePrice > 0) {
                 val sizeBitmap = renderTwoColumnText(
-                    "+ $sizeName",
-                    "+${formatVND(sizePrice)}",
+                    "+ $sizeDisplayName",
+                    "+${formatVND(totalSizePrice)}",
                     contentWidth,
                     fontNormal,
                     bold = false
@@ -613,7 +622,7 @@ object LabelPrintService {
                 sizeBitmap.recycle()
             } else {
                 val sizeBitmap = renderTextBitmap(
-                    text = "+ $sizeName",
+                    text = "+ $sizeDisplayName",
                     width = contentWidth,
                     fontSize = fontNormal,
                     bold = false,
@@ -1101,22 +1110,31 @@ object LabelPrintService {
             if (sizeValue != null) {
                 // SIZE từ options - tìm giá từ toppingPrices
                 val sizePrice = sizeToppingEntry?.second ?: 0.0
+                val sizeQty = sizeToppingEntry?.third ?: 1
+                val totalSizePrice = sizePrice * sizeQty
                 displayedSizeTopping = sizeToppingEntry?.first
 
-                if (showPrice && sizePrice > 0) {
-                    lineKeyValue("+ Size $sizeValue", "+${formatVND(sizePrice)}")
+                // Hiển thị số lượng nếu > 1
+                val sizeDisplayName = if (sizeQty > 1) "Size $sizeValue x$sizeQty" else "Size $sizeValue"
+
+                if (showPrice && totalSizePrice > 0) {
+                    lineKeyValue("+ $sizeDisplayName", "+${formatVND(totalSizePrice)}")
                 } else {
-                    line("+ Size $sizeValue")
+                    line("+ $sizeDisplayName")
                 }
             } else if (sizeToppingEntry != null) {
                 // Không có SIZE trong options nhưng có topping chứa "size" - hiển thị nó
-                val (sizeName, sizePrice) = sizeToppingEntry
+                val (sizeName, sizePrice, sizeQty) = sizeToppingEntry
                 displayedSizeTopping = sizeName
+                val totalSizePrice = sizePrice * sizeQty
 
-                if (showPrice && sizePrice > 0) {
-                    lineKeyValue("+ $sizeName", "+${formatVND(sizePrice)}")
+                // Hiển thị số lượng nếu > 1
+                val sizeDisplayName = if (sizeQty > 1) "$sizeName x$sizeQty" else sizeName
+
+                if (showPrice && totalSizePrice > 0) {
+                    lineKeyValue("+ $sizeDisplayName", "+${formatVND(totalSizePrice)}")
                 } else {
-                    line("+ $sizeName")
+                    line("+ $sizeDisplayName")
                 }
             }
 
