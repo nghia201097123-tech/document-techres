@@ -41,6 +41,16 @@ object HybridBillPrintService {
 
     /**
      * In bill với template và config
+     *
+     * Hỗ trợ 2 loại máy in:
+     * 1. MÁY IN LIỀN THÂN (Sunmi built-in): connectionType = "sunmi"
+     *    - Sử dụng Sunmi SDK (AIDL interface)
+     *    - Không cần IP, tự động kết nối qua service
+     *
+     * 2. MÁY IN RỜI (Network printer): connectionType = "network"
+     *    - Sử dụng TCP/IP socket (giống kitchen ticket)
+     *    - Cần cấu hình IP và port
+     *    - Hỗ trợ các máy: EPSON, BIXOLON, XPRINTER, v.v.
      */
     suspend fun printBill(
         printerConfig: BillPrinterConfigEntity,
@@ -50,10 +60,18 @@ object HybridBillPrintService {
         return withContext(Dispatchers.IO) {
             var lastError: String? = null
 
-            // Xử lý riêng cho máy in Sunmi tích hợp
+            Log.d(TAG, "=== PRINT BILL ===")
+            Log.d(TAG, "Connection type: ${printerConfig.connectionType}")
+            Log.d(TAG, "Order: ${billData.displayNumber}, ${billData.items.size} items")
+
+            // ========== MÁY IN LIỀN THÂN (SUNMI) ==========
             if (printerConfig.connectionType == "sunmi") {
+                Log.d(TAG, "Using SUNMI BUILT-IN printer")
                 return@withContext printViaSunmi(printerConfig, template, billData)
             }
+
+            // ========== MÁY IN RỜI (NETWORK) ==========
+            Log.d(TAG, "Using NETWORK printer: ${printerConfig.printerIp}:${printerConfig.printerPort}")
 
             // Detect printer capability for network printers
             val ip = printerConfig.printerIp ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in")
