@@ -114,8 +114,12 @@ class SingleCanvasBillBuilder(
             }
         }
 
-        data class Feed(val lines: Int) : PrintElement() {
-            override fun measureHeight(pixelWidth: Int): Int = 0 // Handled in post-processing
+        data class Feed(val lines: Int, val lineHeight: Float = 24f) : PrintElement() {
+            override fun measureHeight(pixelWidth: Int): Int {
+                // Render feed lines as blank space on canvas (not separate segment)
+                // This eliminates jitter by keeping feed in the same canvas as footer
+                return (lines * lineHeight * 1.5f).toInt()
+            }
         }
 
         data class QrCode(val content: String, val size: Int = 6) : PrintElement() {
@@ -335,10 +339,10 @@ class SingleCanvasBillBuilder(
     }
 
     /**
-     * Feed lines
+     * Feed lines - rendered as blank space on canvas to prevent jitter
      */
     fun feed(lines: Int = 1): SingleCanvasBillBuilder {
-        elements.add(PrintElement.Feed(lines))
+        elements.add(PrintElement.Feed(lines, baseFontSize))
         return this
     }
 
@@ -434,10 +438,13 @@ class SingleCanvasBillBuilder(
                     Log.d(TAG, "Segment $index: Barcode")
                 }
                 is Segment.FeedSegment -> {
+                    // DEPRECATED: Feed now rendered as blank space on canvas (included in TextBatch)
+                    // This branch kept for backwards compatibility but should never be reached
+                    // vì groupElementsIntoSegments() không còn tạo FeedSegment nữa
                     output.write(EscPosCommands.LINE_SPACING_DEFAULT)
                     output.write(EscPosCommands.feedLines(segment.lines))
                     output.write(byteArrayOf(ESC, 0x33, 0x00)) // Reset line spacing
-                    Log.d(TAG, "Segment $index: Feed ${segment.lines} lines")
+                    Log.d(TAG, "Segment $index: Feed ${segment.lines} lines (DEPRECATED)")
                 }
             }
         }
@@ -467,8 +474,11 @@ class SingleCanvasBillBuilder(
 
     /**
      * Group elements into segments
-     * Text/KeyValue/Separator được gom thành TextBatch
-     * QR/Barcode/Feed là segment riêng
+     * Text/KeyValue/Separator/Feed được gom thành TextBatch (Feed rendered as blank space)
+     * QR/Barcode là segment riêng (vì dùng ESC/POS commands đặc biệt)
+     *
+     * QUAN TRỌNG: Feed được include trong TextBatch để tránh jitter ở footer
+     * Trước đây Feed tạo segment riêng -> gây delay giữa footer và feed -> jitter
      */
     private fun groupElementsIntoSegments(): List<Segment> {
         val segments = mutableListOf<Segment>()
@@ -476,7 +486,8 @@ class SingleCanvasBillBuilder(
 
         for (element in elements) {
             when (element) {
-                is PrintElement.Text, is PrintElement.KeyValue, is PrintElement.Separator -> {
+                // Text, KeyValue, Separator, Feed đều gom vào TextBatch
+                is PrintElement.Text, is PrintElement.KeyValue, is PrintElement.Separator, is PrintElement.Feed -> {
                     currentBatch.add(element)
                 }
                 is PrintElement.QrCode -> {
@@ -492,13 +503,6 @@ class SingleCanvasBillBuilder(
                         currentBatch.clear()
                     }
                     segments.add(Segment.BarcodeSegment(element.content))
-                }
-                is PrintElement.Feed -> {
-                    if (currentBatch.isNotEmpty()) {
-                        segments.add(Segment.TextBatch(currentBatch.toList()))
-                        currentBatch.clear()
-                    }
-                    segments.add(Segment.FeedSegment(element.lines))
                 }
             }
         }
@@ -565,7 +569,8 @@ class SingleCanvasBillBuilder(
             is PrintElement.Text -> renderTextOnCanvas(canvas, element, startY)
             is PrintElement.KeyValue -> renderKeyValueOnCanvas(canvas, element, startY)
             is PrintElement.Separator -> renderSeparatorOnCanvas(canvas, element, startY)
-            else -> { /* QR, Barcode, Feed handled separately */ }
+            is PrintElement.Feed -> { /* Feed rendered as blank space - no drawing needed, height already reserved */ }
+            else -> { /* QR, Barcode handled separately via special ESC/POS commands */ }
         }
     }
 
