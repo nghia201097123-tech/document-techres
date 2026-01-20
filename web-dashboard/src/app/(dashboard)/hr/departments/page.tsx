@@ -841,7 +841,7 @@ export default function DepartmentsPage() {
                   id="name"
                   placeholder="Bộ phận bếp, Quản lý, Phục vụ..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -852,7 +852,7 @@ export default function DepartmentsPage() {
                 <Select
                   value={formData.parentId || "none"}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, parentId: value === "none" ? undefined : value })
+                    setFormData(prev => ({ ...prev, parentId: value === "none" ? undefined : value }))
                   }
                   disabled={!!isEditingOwner}
                 >
@@ -887,7 +887,7 @@ export default function DepartmentsPage() {
                   id="description"
                   placeholder="Mô tả bộ phận..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
             </div>

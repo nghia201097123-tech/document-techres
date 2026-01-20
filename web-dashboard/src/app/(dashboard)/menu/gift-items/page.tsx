@@ -1136,7 +1136,7 @@ export default function GiftItemsPage() {
                     min="1"
                     placeholder="1"
                     value={formData.maxQuantity || 1}
-                    onChange={(e) => setFormData({ ...formData, maxQuantity: parseInt(e.target.value) || 1 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, maxQuantity: parseInt(e.target.value) || 1 }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1150,7 +1150,7 @@ export default function GiftItemsPage() {
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\./g, "");
                       const numValue = parseInt(rawValue, 10);
-                      setFormData({ ...formData, minOrderAmount: isNaN(numValue) ? 0 : numValue });
+                      setFormData(prev => ({ ...prev, minOrderAmount: isNaN(numValue) ? 0 : numValue }));
                     }}
                   />
                 </div>
@@ -1221,7 +1221,7 @@ export default function GiftItemsPage() {
                               className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${
                                 isSelected ? "bg-primary/10 border border-primary" : ""
                               }`}
-                              onClick={() => setFormData({ ...formData, productId: product.id })}
+                              onClick={() => setFormData(prev => ({ ...prev, productId: product.id }))}
                             >
                               <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
                                 isSelected ? "bg-primary border-primary" : "border-input"
@@ -1249,7 +1249,7 @@ export default function GiftItemsPage() {
                   id="editName"
                   placeholder="Để trống sẽ dùng tên món ăn"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 />
               </div>
 
@@ -1262,7 +1262,7 @@ export default function GiftItemsPage() {
                     min="1"
                     placeholder="1"
                     value={formData.maxQuantity || 1}
-                    onChange={(e) => setFormData({ ...formData, maxQuantity: parseInt(e.target.value) || 1 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, maxQuantity: parseInt(e.target.value) || 1 }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1276,7 +1276,7 @@ export default function GiftItemsPage() {
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\./g, "");
                       const numValue = parseInt(rawValue, 10);
-                      setFormData({ ...formData, minOrderAmount: isNaN(numValue) ? 0 : numValue });
+                      setFormData(prev => ({ ...prev, minOrderAmount: isNaN(numValue) ? 0 : numValue }));
                     }}
                   />
                 </div>
@@ -1288,7 +1288,7 @@ export default function GiftItemsPage() {
                   id="editDescription"
                   placeholder="Mô tả điều kiện tặng..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
 
@@ -1300,7 +1300,7 @@ export default function GiftItemsPage() {
                   min="0"
                   placeholder="0"
                   value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
                 />
               </div>
             </div>

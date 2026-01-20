@@ -420,7 +420,7 @@ export default function UnitsPage() {
                   id="name"
                   placeholder="Phần, Ly, Tô, Kg..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -430,7 +430,7 @@ export default function UnitsPage() {
                   id="description"
                   placeholder="Mô tả đơn vị tính..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
@@ -441,7 +441,7 @@ export default function UnitsPage() {
                   min="0"
                   placeholder="0"
                   value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
                 />
               </div>
             </div>

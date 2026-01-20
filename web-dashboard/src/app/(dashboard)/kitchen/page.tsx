@@ -797,7 +797,7 @@ export default function KitchenPage() {
                   id="name"
                   placeholder="Bếp chính, Bar, Bếp nướng..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -806,7 +806,7 @@ export default function KitchenPage() {
                   <Label htmlFor="kitchenType">Loại bếp</Label>
                   <Select
                     value={formData.kitchenType}
-                    onValueChange={(value: KitchenType) => setFormData({ ...formData, kitchenType: value })}
+                    onValueChange={(value: KitchenType) => setFormData(prev => ({ ...prev, kitchenType: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn loại bếp" />
@@ -824,7 +824,7 @@ export default function KitchenPage() {
                   <Label htmlFor="printMode">Chế độ in</Label>
                   <Select
                     value={formData.printMode}
-                    onValueChange={(value: KitchenPrintMode) => setFormData({ ...formData, printMode: value })}
+                    onValueChange={(value: KitchenPrintMode) => setFormData(prev => ({ ...prev, printMode: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn chế độ in" />
@@ -844,7 +844,7 @@ export default function KitchenPage() {
                   <Label htmlFor="printerProtocol">Loại máy in</Label>
                   <Select
                     value={formData.printerProtocol}
-                    onValueChange={(value: PrinterProtocol) => setFormData({ ...formData, printerProtocol: value })}
+                    onValueChange={(value: PrinterProtocol) => setFormData(prev => ({ ...prev, printerProtocol: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn loại máy in" />
@@ -862,7 +862,7 @@ export default function KitchenPage() {
                   <Label htmlFor="paperWidth">Khổ giấy</Label>
                   <Select
                     value={formData.paperWidth?.toString()}
-                    onValueChange={(value) => setFormData({ ...formData, paperWidth: parseInt(value) })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, paperWidth: parseInt(value) }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn khổ giấy" />
@@ -884,7 +884,7 @@ export default function KitchenPage() {
                     id="printerName"
                     placeholder="Kitchen Printer 1"
                     value={formData.printerName}
-                    onChange={(e) => setFormData({ ...formData, printerName: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, printerName: e.target.value }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -893,7 +893,7 @@ export default function KitchenPage() {
                     id="printerIp"
                     placeholder="192.168.1.100"
                     value={formData.printerIp}
-                    onChange={(e) => setFormData({ ...formData, printerIp: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, printerIp: e.target.value }))}
                   />
                 </div>
               </div>
@@ -905,14 +905,14 @@ export default function KitchenPage() {
                     type="number"
                     placeholder="9100"
                     value={formData.printerPort || ""}
-                    onChange={(e) => setFormData({ ...formData, printerPort: e.target.value ? parseInt(e.target.value) : undefined })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, printerPort: e.target.value ? parseInt(e.target.value) : undefined }))}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="paperWidth">Khổ giấy</Label>
                   <Select
                     value={formData.paperWidth?.toString()}
-                    onValueChange={(value) => setFormData({ ...formData, paperWidth: parseInt(value) })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, paperWidth: parseInt(value) }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn khổ giấy" />
@@ -933,7 +933,7 @@ export default function KitchenPage() {
                   id="description"
                   placeholder="Mô tả bếp..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
 
@@ -948,7 +948,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintOrderNumber"
                         checked={formData.ticketPrintOrderNumber}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintOrderNumber: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintOrderNumber: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintOrderNumber" className="text-sm cursor-pointer">
                         In mã đơn hàng
@@ -958,7 +958,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintTableName"
                         checked={formData.ticketPrintTableName}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintTableName: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintTableName: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintTableName" className="text-sm cursor-pointer">
                         In tên bàn
@@ -968,7 +968,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintTime"
                         checked={formData.ticketPrintTime}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintTime: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintTime: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintTime" className="text-sm cursor-pointer">
                         In thời gian
@@ -978,7 +978,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintNotes"
                         checked={formData.ticketPrintNotes}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintNotes: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintNotes: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintNotes" className="text-sm cursor-pointer">
                         In ghi chú
@@ -988,7 +988,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintPrice"
                         checked={formData.ticketPrintPrice}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintPrice: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintPrice: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintPrice" className="text-sm cursor-pointer">
                         In giá món
@@ -998,7 +998,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintStoreName"
                         checked={formData.ticketPrintStoreName}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintStoreName: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintStoreName: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintStoreName" className="text-sm cursor-pointer">
                         In tên cửa hàng
@@ -1008,7 +1008,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketCutAfterPrint"
                         checked={formData.ticketCutAfterPrint}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketCutAfterPrint: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketCutAfterPrint: !!checked }))}
                       />
                       <Label htmlFor="ticketCutAfterPrint" className="text-sm cursor-pointer">
                         Cắt giấy sau khi in
@@ -1018,7 +1018,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="ticketPrintItemsSeparately"
                         checked={formData.ticketPrintItemsSeparately}
-                        onCheckedChange={(checked) => setFormData({ ...formData, ticketPrintItemsSeparately: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ticketPrintItemsSeparately: !!checked }))}
                       />
                       <Label htmlFor="ticketPrintItemsSeparately" className="text-sm cursor-pointer">
                         In từng món riêng biệt
@@ -1034,7 +1034,7 @@ export default function KitchenPage() {
                         id="ticketStoreName"
                         placeholder="Tên cửa hàng trên phiếu..."
                         value={formData.ticketStoreName || ""}
-                        onChange={(e) => setFormData({ ...formData, ticketStoreName: e.target.value })}
+                        onChange={(e) => setFormData(prev => ({ ...prev, ticketStoreName: e.target.value }))}
                       />
                     </div>
                   )}
@@ -1045,7 +1045,7 @@ export default function KitchenPage() {
                       <Label htmlFor="ticketFontSize">Cỡ chữ</Label>
                       <Select
                         value={formData.ticketFontSize || "medium"}
-                        onValueChange={(value: TicketFontSize) => setFormData({ ...formData, ticketFontSize: value })}
+                        onValueChange={(value: TicketFontSize) => setFormData(prev => ({ ...prev, ticketFontSize: value }))}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn cỡ chữ" />
@@ -1067,7 +1067,7 @@ export default function KitchenPage() {
                         min={1}
                         max={5}
                         value={formData.ticketCopies || 1}
-                        onChange={(e) => setFormData({ ...formData, ticketCopies: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) })}
+                        onChange={(e) => setFormData(prev => ({ ...prev, ticketCopies: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) }))}
                       />
                     </div>
                   </div>
@@ -1085,7 +1085,7 @@ export default function KitchenPage() {
                       min={30}
                       max={100}
                       step={5}
-                      onValueChange={([value]) => setFormData({ ...formData, ticketLineSpacing: value / 100 })}
+                      onValueChange={([value]) => setFormData(prev => ({ ...prev, ticketLineSpacing: value / 100 }))}
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>30% (rất sát)</span>
@@ -1104,7 +1104,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="labelPrintPrice"
                         checked={formData.labelPrintPrice}
-                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintPrice: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, labelPrintPrice: !!checked }))}
                       />
                       <Label htmlFor="labelPrintPrice" className="text-sm cursor-pointer">
                         In giá
@@ -1114,7 +1114,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="labelPrintStoreName"
                         checked={formData.labelPrintStoreName}
-                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintStoreName: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, labelPrintStoreName: !!checked }))}
                       />
                       <Label htmlFor="labelPrintStoreName" className="text-sm cursor-pointer">
                         In tên cửa hàng
@@ -1124,7 +1124,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="labelPrintOrderNumber"
                         checked={formData.labelPrintOrderNumber}
-                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintOrderNumber: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, labelPrintOrderNumber: !!checked }))}
                       />
                       <Label htmlFor="labelPrintOrderNumber" className="text-sm cursor-pointer">
                         In mã đơn hàng
@@ -1134,7 +1134,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="labelPrintTableName"
                         checked={formData.labelPrintTableName}
-                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintTableName: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, labelPrintTableName: !!checked }))}
                       />
                       <Label htmlFor="labelPrintTableName" className="text-sm cursor-pointer">
                         In tên bàn
@@ -1144,7 +1144,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="labelPrintTime"
                         checked={formData.labelPrintTime}
-                        onCheckedChange={(checked) => setFormData({ ...formData, labelPrintTime: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, labelPrintTime: !!checked }))}
                       />
                       <Label htmlFor="labelPrintTime" className="text-sm cursor-pointer">
                         In thời gian
@@ -1154,7 +1154,7 @@ export default function KitchenPage() {
                       <Checkbox
                         id="labelReverse"
                         checked={formData.labelReverse}
-                        onCheckedChange={(checked) => setFormData({ ...formData, labelReverse: !!checked })}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, labelReverse: !!checked }))}
                       />
                       <Label htmlFor="labelReverse" className="text-sm cursor-pointer">
                         Đảo chiều tem (180°)
@@ -1168,7 +1168,7 @@ export default function KitchenPage() {
                         id="labelStoreName"
                         placeholder="Tên cửa hàng trên tem..."
                         value={formData.labelStoreName || ""}
-                        onChange={(e) => setFormData({ ...formData, labelStoreName: e.target.value })}
+                        onChange={(e) => setFormData(prev => ({ ...prev, labelStoreName: e.target.value }))}
                       />
                     </div>
                   )}
@@ -1220,7 +1220,7 @@ export default function KitchenPage() {
                         min={50}
                         max={200}
                         step={10}
-                        onValueChange={([value]) => setFormData({ ...formData, labelFontScale: value / 100 })}
+                        onValueChange={([value]) => setFormData(prev => ({ ...prev, labelFontScale: value / 100 }))}
                       />
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>0.5x</span>
@@ -1278,7 +1278,7 @@ export default function KitchenPage() {
                         min={80}
                         max={150}
                         step={5}
-                        onValueChange={([value]) => setFormData({ ...formData, labelLineSpacing: value / 100 })}
+                        onValueChange={([value]) => setFormData(prev => ({ ...prev, labelLineSpacing: value / 100 }))}
                       />
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>80% (sát)</span>

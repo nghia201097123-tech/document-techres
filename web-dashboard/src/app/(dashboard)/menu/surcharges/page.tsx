@@ -492,7 +492,7 @@ export default function SurchargesPage() {
                   id="name"
                   placeholder="Khách mang đồ ăn vào, Phí phục vụ..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -508,7 +508,7 @@ export default function SurchargesPage() {
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\./g, "");
                       const numValue = parseInt(rawValue, 10);
-                      setFormData({ ...formData, amount: isNaN(numValue) ? 0 : numValue });
+                      setFormData(prev => ({ ...prev, amount: isNaN(numValue) ? 0 : numValue }));
                     }}
                     required
                   />
@@ -532,7 +532,7 @@ export default function SurchargesPage() {
                         value = parts[0] + "." + parts.slice(1).join("");
                       }
                       setVatRateInput(value);
-                      setFormData({ ...formData, vatRate: parseFloat(value) || 0 });
+                      setFormData(prev => ({ ...prev, vatRate: parseFloat(value) || 0 }));
                     }}
                   />
                 </div>
@@ -567,7 +567,7 @@ export default function SurchargesPage() {
                   id="description"
                   placeholder="Mô tả phụ thu..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
@@ -578,7 +578,7 @@ export default function SurchargesPage() {
                   min="0"
                   placeholder="0"
                   value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
                 />
               </div>
             </div>

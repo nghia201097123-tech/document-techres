@@ -762,7 +762,7 @@ export default function SeasonalPricesPage() {
                   id="name"
                   placeholder="Giá mùa hè, Khuyến mãi Tết..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -772,7 +772,7 @@ export default function SeasonalPricesPage() {
                   <Label htmlFor="adjustmentType">Loại điều chỉnh *</Label>
                   <Select
                     value={formData.adjustmentType}
-                    onValueChange={(value: AdjustmentType) => setFormData({ ...formData, adjustmentType: value })}
+                    onValueChange={(value: AdjustmentType) => setFormData(prev => ({ ...prev, adjustmentType: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn loại" />
@@ -793,7 +793,7 @@ export default function SeasonalPricesPage() {
                     step={formData.adjustmentType === AdjustmentType.PERCENTAGE ? "0.5" : "1000"}
                     placeholder={formData.adjustmentType === AdjustmentType.PERCENTAGE ? "10" : "50000"}
                     value={formData.adjustmentValue || ""}
-                    onChange={(e) => setFormData({ ...formData, adjustmentValue: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, adjustmentValue: parseFloat(e.target.value) || 0 }))}
                     required
                   />
                   <p className="text-xs text-muted-foreground">
@@ -809,7 +809,7 @@ export default function SeasonalPricesPage() {
                     id="startDate"
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
                     required
                   />
                 </div>
@@ -819,7 +819,7 @@ export default function SeasonalPricesPage() {
                     id="endDate"
                     type="date"
                     value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
                     required
                   />
                 </div>
@@ -905,7 +905,7 @@ export default function SeasonalPricesPage() {
                   id="description"
                   placeholder="Mô tả giá thời vụ..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
             </div>

@@ -1041,12 +1041,12 @@ export default function StaffPage() {
 
   // Handle province change
   const handleProvinceChange = (provinceCode: string) => {
-    setFormData({ ...formData, provinceCode, wardCode: "" });
+    setFormData(prev => ({ ...prev, provinceCode, wardCode: "" }));
   };
 
   // Handle brand change
   const handleBrandChange = (brandId: string) => {
-    setFormData({ ...formData, brandId, branchId: "" });
+    setFormData(prev => ({ ...prev, brandId, branchId: "" }));
   };
 
   // Export to Excel with dropdowns
@@ -2839,7 +2839,7 @@ export default function StaffPage() {
                     <Label>Ảnh đại diện</Label>
                     <ImageUpload
                       value={formData.avatarUrl}
-                      onChange={(url) => setFormData({ ...formData, avatarUrl: url })}
+                      onChange={(url) => setFormData(prev => ({ ...prev, avatarUrl: url }))}
                       aspectRatio={1}
                       maxWidth={400}
                       maxHeight={400}
@@ -2859,7 +2859,7 @@ export default function StaffPage() {
                       id="name"
                       placeholder="Nguyễn Văn A"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       required
                     />
                   </div>
@@ -2873,7 +2873,7 @@ export default function StaffPage() {
                           maxLength={2}
                           className="w-20 text-center font-mono uppercase"
                           value={formData.usernamePrefix}
-                          onChange={(e) => setFormData({ ...formData, usernamePrefix: e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2) })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, usernamePrefix: e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2) }))}
                         />
                         <span className="text-muted-foreground font-mono">000001</span>
                         <span className="text-xs text-muted-foreground">(tự động)</span>
@@ -2896,7 +2896,7 @@ export default function StaffPage() {
                       id="birthDate"
                       type="date"
                       value={formData.birthDate}
-                      onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, birthDate: e.target.value }))}
                       required={dialogMode === "create"}
                     />
                   </div>
@@ -2904,7 +2904,7 @@ export default function StaffPage() {
                     <Label htmlFor="gender">Giới tính *</Label>
                     <Select
                       value={formData.gender}
-                      onValueChange={(value: Gender) => setFormData({ ...formData, gender: value })}
+                      onValueChange={(value: Gender) => setFormData(prev => ({ ...prev, gender: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Chọn giới tính" />
@@ -2933,7 +2933,7 @@ export default function StaffPage() {
                     <WardSelect
                       options={wards}
                       value={formData.wardCode || ""}
-                      onValueChange={(value) => setFormData({ ...formData, wardCode: value })}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, wardCode: value }))}
                       disabled={!formData.provinceCode || loadingWards}
                       loading={loadingWards}
                     />
@@ -2947,7 +2947,7 @@ export default function StaffPage() {
                     id="address"
                     placeholder="123 Nguyễn Văn Linh"
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
                   />
                 </div>
 
@@ -2976,7 +2976,7 @@ export default function StaffPage() {
                     <Label htmlFor="branchId">Chi nhánh chính *</Label>
                     <Select
                       value={formData.branchId}
-                      onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, branchId: value }))}
                       disabled={!formData.brandId || loadingBranches || branches.length === 0}
                     >
                       <SelectTrigger>
@@ -2998,7 +2998,7 @@ export default function StaffPage() {
                   <Label htmlFor="departmentId">Bộ phận {dialogMode === "create" ? "*" : ""}</Label>
                   <Select
                     value={formData.departmentId}
-                    onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, departmentId: value }))}
                     disabled={loadingDepartments}
                   >
                     <SelectTrigger>
@@ -3064,7 +3064,7 @@ export default function StaffPage() {
                       id="idNumber"
                       placeholder="001234567890"
                       value={formData.idNumber}
-                      onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, idNumber: e.target.value }))}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -3074,7 +3074,7 @@ export default function StaffPage() {
                       type="email"
                       placeholder="email@example.com"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -3086,7 +3086,7 @@ export default function StaffPage() {
                     id="phone"
                     placeholder="0909123456"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                   />
                 </div>
               </div>

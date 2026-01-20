@@ -754,7 +754,7 @@ export default function CategoriesPage() {
                   id="name"
                   placeholder="Phở, Cơm chiên, Trà sữa..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -762,7 +762,7 @@ export default function CategoriesPage() {
                 <Label htmlFor="productType">Loại món *</Label>
                 <Select
                   value={formData.productType}
-                  onValueChange={(value) => setFormData({ ...formData, productType: value as ProductType })}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, productType: value as ProductType }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn loại món" />
@@ -782,7 +782,7 @@ export default function CategoriesPage() {
                   id="description"
                   placeholder="Mô tả danh mục..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
@@ -793,7 +793,7 @@ export default function CategoriesPage() {
                   min="0"
                   placeholder="0"
                   value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
                 />
               </div>
             </div>

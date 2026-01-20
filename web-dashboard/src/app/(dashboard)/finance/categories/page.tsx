@@ -529,7 +529,7 @@ export default function TransactionCategoriesPage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
+                    setFormData(prev => ({ ...prev, name: e.target.value }))
                   }
                   placeholder="VD: Doanh thu bán hàng"
                 />
@@ -539,7 +539,7 @@ export default function TransactionCategoriesPage() {
                 <Select
                   value={formData.type}
                   onValueChange={(v) =>
-                    setFormData({ ...formData, type: v as TransactionType })
+                    setFormData(prev => ({ ...prev, type: v as TransactionType }))
                   }
                   disabled={dialogMode === "edit"}
                 >
@@ -568,7 +568,7 @@ export default function TransactionCategoriesPage() {
                   id="description"
                   value={formData.description}
                   onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
+                    setFormData(prev => ({ ...prev, description: e.target.value }))
                   }
                   placeholder="Mô tả chi tiết về danh mục..."
                   rows={3}

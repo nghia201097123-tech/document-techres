@@ -1273,7 +1273,7 @@ export default function TablesPage() {
                     id="name"
                     placeholder="Bàn 1, Bàn 2, Bàn VIP..."
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     required
                     autoFocus={dialogMode === "create" && continueCreating}
                   />
@@ -1287,7 +1287,7 @@ export default function TablesPage() {
                   min="1"
                   placeholder="4"
                   value={formData.capacity || 4}
-                  onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 4 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, capacity: parseInt(e.target.value) || 4 }))}
                 />
               </div>
               <div className="grid gap-2">
@@ -1298,7 +1298,7 @@ export default function TablesPage() {
                   min="0"
                   placeholder="0"
                   value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
                 />
               </div>
 

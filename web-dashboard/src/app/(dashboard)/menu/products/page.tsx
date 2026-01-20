@@ -1448,7 +1448,7 @@ export default function ProductsPage() {
 
   // Handle product type change - reset category when type changes
   const handleTypeChange = (type: ProductType) => {
-    setFormData({ ...formData, type, categoryId: "" });
+    setFormData(prev => ({ ...prev, type, categoryId: "" }));
   };
 
   // Format currency
@@ -3120,7 +3120,7 @@ export default function ProductsPage() {
                   <Label>Hình ảnh</Label>
                   <ImageUpload
                     value={formData.imageUrl}
-                    onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                    onChange={(url) => setFormData(prev => ({ ...prev, imageUrl: url }))}
                     aspectRatio={1}
                     maxWidth={500}
                     maxHeight={500}
@@ -3135,7 +3135,7 @@ export default function ProductsPage() {
                     id="name"
                     placeholder="Phở bò tái"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     required
                   />
                 </div>
@@ -3145,7 +3145,7 @@ export default function ProductsPage() {
                     id="abbreviation"
                     placeholder="VD: pbt (Phở Bò Tái), ccdc (Cơm Chiên Dương Châu)"
                     value={formData.abbreviation || ""}
-                    onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toLowerCase() })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, abbreviation: e.target.value.toLowerCase() }))}
                     maxLength={50}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -3273,7 +3273,7 @@ export default function ProductsPage() {
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\./g, "");
                       const numValue = parseInt(rawValue, 10);
-                      setFormData({ ...formData, price: isNaN(numValue) ? 0 : numValue });
+                      setFormData(prev => ({ ...prev, price: isNaN(numValue) ? 0 : numValue }));
                     }}
                   />
                 </div>
@@ -3287,7 +3287,7 @@ export default function ProductsPage() {
                     step="0.01"
                     placeholder="10"
                     value={formData.vatRate ?? ""}
-                    onChange={(e) => setFormData({ ...formData, vatRate: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 0 }))}
                   />
                 </div>
               </div>
@@ -3311,7 +3311,7 @@ export default function ProductsPage() {
                   type="url"
                   placeholder="https://example.com/image.jpg"
                   value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
                 />
               </div>
 
@@ -3322,7 +3322,7 @@ export default function ProductsPage() {
                   placeholder="Mô tả món ăn..."
                   rows={3}
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
 
@@ -3336,7 +3336,7 @@ export default function ProductsPage() {
                     min="0"
                     placeholder="15"
                     value={formData.preparationTime || ""}
-                    onChange={(e) => setFormData({ ...formData, preparationTime: Number(e.target.value) })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, preparationTime: Number(e.target.value) }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -3350,7 +3350,7 @@ export default function ProductsPage() {
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\./g, "");
                       const numValue = parseInt(rawValue, 10);
-                      setFormData({ ...formData, costPrice: isNaN(numValue) ? 0 : numValue });
+                      setFormData(prev => ({ ...prev, costPrice: isNaN(numValue) ? 0 : numValue }));
                     }}
                   />
                 </div>
@@ -3362,7 +3362,7 @@ export default function ProductsPage() {
                   <Label htmlFor="sellingType">Loại bán</Label>
                   <Select
                     value={formData.sellingType || SellingType.PORTION}
-                    onValueChange={(value) => setFormData({ ...formData, sellingType: value as SellingType })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, sellingType: value as SellingType }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn loại bán" />
@@ -3574,7 +3574,7 @@ export default function ProductsPage() {
                     <Checkbox
                       id="printDish"
                       checked={formData.printDish ?? true}
-                      onCheckedChange={(checked) => setFormData({ ...formData, printDish: !!checked })}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, printDish: !!checked }))}
                     />
                     <Label htmlFor="printDish" className="cursor-pointer">In món</Label>
                   </div>
@@ -3582,7 +3582,7 @@ export default function ProductsPage() {
                     <Checkbox
                       id="printLabel"
                       checked={formData.printLabel ?? false}
-                      onCheckedChange={(checked) => setFormData({ ...formData, printLabel: !!checked })}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, printLabel: !!checked }))}
                     />
                     <Label htmlFor="printLabel" className="cursor-pointer">In tem</Label>
                   </div>
@@ -3590,7 +3590,7 @@ export default function ProductsPage() {
                     <Checkbox
                       id="printSeafood"
                       checked={formData.printSeafood ?? false}
-                      onCheckedChange={(checked) => setFormData({ ...formData, printSeafood: !!checked })}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, printSeafood: !!checked }))}
                     />
                     <Label htmlFor="printSeafood" className="cursor-pointer">In hồ hải sản</Label>
                   </div>

@@ -158,7 +158,7 @@ export default function VouchersPage() {
     for (let i = 0; i < 8; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    setFormData({ ...formData, code });
+    setFormData(prev => ({ ...prev, code }));
   };
 
   // Copy code to clipboard
@@ -559,7 +559,7 @@ export default function VouchersPage() {
                     id="code"
                     placeholder="SALE20, NEWYEAR2025..."
                     value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
                     className="font-mono"
                     disabled={dialogMode === "edit"}
                     required
@@ -580,7 +580,7 @@ export default function VouchersPage() {
                   id="name"
                   placeholder="Giảm 20% đơn hàng, Khuyến mãi Tết..."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
@@ -589,7 +589,7 @@ export default function VouchersPage() {
                   <Label htmlFor="voucherType">Loại giảm giá *</Label>
                   <Select
                     value={formData.voucherType}
-                    onValueChange={(value: VoucherType) => setFormData({ ...formData, voucherType: value })}
+                    onValueChange={(value: VoucherType) => setFormData(prev => ({ ...prev, voucherType: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn loại" />
@@ -612,7 +612,7 @@ export default function VouchersPage() {
                     step={formData.voucherType === VoucherType.PERCENTAGE ? "1" : "1000"}
                     placeholder={formData.voucherType === VoucherType.PERCENTAGE ? "20" : "50000"}
                     value={formData.discountValue || ""}
-                    onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, discountValue: parseFloat(e.target.value) || 0 }))}
                     required
                   />
                 </div>
@@ -627,7 +627,7 @@ export default function VouchersPage() {
                     step="10000"
                     placeholder="100000"
                     value={formData.maxDiscount || ""}
-                    onChange={(e) => setFormData({ ...formData, maxDiscount: parseFloat(e.target.value) || undefined })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, maxDiscount: parseFloat(e.target.value) || undefined }))}
                   />
                   <p className="text-xs text-muted-foreground">
                     Để trống nếu không giới hạn số tiền giảm
@@ -644,7 +644,7 @@ export default function VouchersPage() {
                     step="10000"
                     placeholder="200000"
                     value={formData.minOrderAmount || ""}
-                    onChange={(e) => setFormData({ ...formData, minOrderAmount: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, minOrderAmount: parseFloat(e.target.value) || 0 }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -655,7 +655,7 @@ export default function VouchersPage() {
                     min="1"
                     placeholder="100"
                     value={formData.usageLimit || ""}
-                    onChange={(e) => setFormData({ ...formData, usageLimit: parseInt(e.target.value) || undefined })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, usageLimit: parseInt(e.target.value) || undefined }))}
                   />
                 </div>
               </div>
@@ -666,7 +666,7 @@ export default function VouchersPage() {
                     id="startDate"
                     type="date"
                     value={formData.startDate || ""}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -675,7 +675,7 @@ export default function VouchersPage() {
                     id="endDate"
                     type="date"
                     value={formData.endDate || ""}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
                   />
                 </div>
               </div>
@@ -685,7 +685,7 @@ export default function VouchersPage() {
                   id="description"
                   placeholder="Mô tả voucher..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
             </div>

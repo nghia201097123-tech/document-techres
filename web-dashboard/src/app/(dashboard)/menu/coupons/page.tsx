@@ -605,7 +605,7 @@ export default function CouponsPage() {
                     id="code"
                     placeholder="VD: GIAM10"
                     value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
                     className="uppercase font-mono"
                   />
                 </div>
@@ -615,7 +615,7 @@ export default function CouponsPage() {
                     id="name"
                     placeholder="VD: Giảm 10% cho VIP"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
               </div>
@@ -625,7 +625,7 @@ export default function CouponsPage() {
                   <Label>Loại giảm giá</Label>
                   <Select
                     value={formData.couponType}
-                    onValueChange={(v) => setFormData({ ...formData, couponType: v as CouponType })}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, couponType: v as CouponType }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -646,7 +646,7 @@ export default function CouponsPage() {
                     min="0"
                     step={formData.couponType === CouponType.PERCENTAGE ? "1" : "1000"}
                     value={formData.discountValue || ""}
-                    onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, discountValue: parseFloat(e.target.value) || 0 }))}
                   />
                 </div>
               </div>
@@ -661,7 +661,7 @@ export default function CouponsPage() {
                     step="1000"
                     placeholder="Không giới hạn"
                     value={formData.maxDiscount || ""}
-                    onChange={(e) => setFormData({ ...formData, maxDiscount: parseFloat(e.target.value) || undefined })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, maxDiscount: parseFloat(e.target.value) || undefined }))}
                   />
                 </div>
               )}
@@ -675,7 +675,7 @@ export default function CouponsPage() {
                   step="1000"
                   placeholder="0"
                   value={formData.minOrderAmount || ""}
-                  onChange={(e) => setFormData({ ...formData, minOrderAmount: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, minOrderAmount: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
 
@@ -688,7 +688,7 @@ export default function CouponsPage() {
                     min="1"
                     placeholder="Không giới hạn"
                     value={formData.usageLimit || ""}
-                    onChange={(e) => setFormData({ ...formData, usageLimit: parseInt(e.target.value) || undefined })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, usageLimit: parseInt(e.target.value) || undefined }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -699,7 +699,7 @@ export default function CouponsPage() {
                     min="1"
                     placeholder="Không giới hạn"
                     value={formData.dailyLimit || ""}
-                    onChange={(e) => setFormData({ ...formData, dailyLimit: parseInt(e.target.value) || undefined })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dailyLimit: parseInt(e.target.value) || undefined }))}
                   />
                 </div>
               </div>
@@ -711,7 +711,7 @@ export default function CouponsPage() {
                     id="startDate"
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -720,7 +720,7 @@ export default function CouponsPage() {
                     id="endDate"
                     type="date"
                     value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
                   />
                 </div>
               </div>
@@ -735,7 +735,7 @@ export default function CouponsPage() {
                   </div>
                   <Switch
                     checked={formData.requiresApproval}
-                    onCheckedChange={(checked) => setFormData({ ...formData, requiresApproval: checked })}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requiresApproval: checked }))}
                   />
                 </div>
                 {formData.requiresApproval && (
@@ -748,7 +748,7 @@ export default function CouponsPage() {
                       step="10000"
                       placeholder="Luôn cần phê duyệt"
                       value={formData.approvalThreshold || ""}
-                      onChange={(e) => setFormData({ ...formData, approvalThreshold: parseFloat(e.target.value) || undefined })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, approvalThreshold: parseFloat(e.target.value) || undefined }))}
                     />
                     <p className="text-xs text-muted-foreground">
                       Chỉ yêu cầu phê duyệt khi giảm giá lớn hơn ngưỡng này
@@ -763,7 +763,7 @@ export default function CouponsPage() {
                   id="description"
                   placeholder="Ghi chú về điều kiện sử dụng..."
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
             </div>

@@ -767,7 +767,7 @@ export default function TransactionVouchersPage() {
                     type="date"
                     value={formData.voucherDate}
                     onChange={(e) =>
-                      setFormData({ ...formData, voucherDate: e.target.value })
+                      setFormData(prev => ({ ...prev, voucherDate: e.target.value }))
                     }
                   />
                 </div>
@@ -776,7 +776,7 @@ export default function TransactionVouchersPage() {
                   <Select
                     value={formData.categoryId}
                     onValueChange={(v) =>
-                      setFormData({ ...formData, categoryId: v })
+                      setFormData(prev => ({ ...prev, categoryId: v }))
                     }
                   >
                     <SelectTrigger>
@@ -801,10 +801,10 @@ export default function TransactionVouchersPage() {
                     type="number"
                     value={formData.amount}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
+                      setFormData(prev => ({
+                        ...prev,
                         amount: parseFloat(e.target.value) || 0,
-                      })
+                      }))
                     }
                     min={0}
                   />
@@ -814,7 +814,7 @@ export default function TransactionVouchersPage() {
                   <Select
                     value={formData.paymentType}
                     onValueChange={(v) =>
-                      setFormData({ ...formData, paymentType: v as PaymentType })
+                      setFormData(prev => ({ ...prev, paymentType: v as PaymentType }))
                     }
                   >
                     <SelectTrigger>
@@ -848,7 +848,7 @@ export default function TransactionVouchersPage() {
                   id="counterpartyName"
                   value={formData.counterpartyName}
                   onChange={(e) =>
-                    setFormData({ ...formData, counterpartyName: e.target.value })
+                    setFormData(prev => ({ ...prev, counterpartyName: e.target.value }))
                   }
                   placeholder="Họ tên người nộp/nhận"
                 />
@@ -860,7 +860,7 @@ export default function TransactionVouchersPage() {
                   id="reason"
                   value={formData.reason}
                   onChange={(e) =>
-                    setFormData({ ...formData, reason: e.target.value })
+                    setFormData(prev => ({ ...prev, reason: e.target.value }))
                   }
                   placeholder={
                     formData.transactionType === TransactionType.INCOME
@@ -877,7 +877,7 @@ export default function TransactionVouchersPage() {
                   id="notes"
                   value={formData.notes}
                   onChange={(e) =>
-                    setFormData({ ...formData, notes: e.target.value })
+                    setFormData(prev => ({ ...prev, notes: e.target.value }))
                   }
                   placeholder="Ghi chú bổ sung..."
                   rows={2}
