@@ -14,6 +14,9 @@ import {
   LayoutDashboard,
   ChevronDown,
   ChevronRight,
+  Settings,
+  Landmark,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +70,14 @@ const navItems: NavItem[] = [
     title: "Quản trị viên",
     href: "/admins",
     icon: Users,
+  },
+  {
+    title: "Thiết lập",
+    icon: Settings,
+    children: [
+      { title: "Tài khoản ngân hàng", href: "/settings/bank-accounts" },
+      { title: "Phương thức thanh toán", href: "/settings/payment-methods" },
+    ],
   },
 ];
 
