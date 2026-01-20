@@ -548,6 +548,40 @@ class HybridBillBuilder(
     private val ESC = 0x1B.toByte()
     private val GS = 0x1D.toByte()
 
+    // Pre-rendered separators (lazy init để tránh render khi không cần)
+    // Điều này giúp tránh jitter do phải render bitmap nhiều lần trong quá trình build bill
+    private val cachedSingleSeparator: ByteArray by lazy {
+        prerenderSeparator('-')
+    }
+    private val cachedDoubleSeparator: ByteArray by lazy {
+        prerenderSeparator('=')
+    }
+
+    /**
+     * Pre-render separator thành byte array để tái sử dụng
+     * Chỉ gọi 1 lần khi cần, sau đó dùng lại từ cache
+     */
+    private fun prerenderSeparator(char: Char): ByteArray {
+        if (!useBitmapMode) {
+            // Text mode: trả về bytes trực tiếp
+            val textBytes = ByteArrayOutputStream()
+            textBytes.write(char.toString().repeat(lineWidth).toByteArray(Charsets.UTF_8))
+            textBytes.write(EscPosCommands.LF)
+            return textBytes.toByteArray()
+        }
+
+        // Bitmap mode: render 1 lần và cache
+        val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
+        val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize, lineSpacing)
+        val imageData = if (useRasterBitmap) {
+            EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+        } else {
+            EscPosCommands.printBitmap(bitmap, 0)
+        }
+        bitmap.recycle()
+        return imageData
+    }
+
     /**
      * Initialize printer
      */
@@ -762,33 +796,52 @@ class HybridBillBuilder(
     }
 
     /**
-     * In separator (đường kẻ ngang) - tối ưu chiều cao để tiết kiệm giấy
+     * In separator (đường kẻ ngang) - sử dụng pre-rendered cache để tránh jitter
+     *
+     * ĐÃ TỐI ƯU: Separator được render sẵn khi builder khởi tạo,
+     * sau đó tái sử dụng từ cache. Điều này giúp:
+     * - Tránh render bitmap nhiều lần gây jitter
+     * - Giảm GC pressure do không tạo/recycle bitmap liên tục
+     * - In mượt hơn vì data đã sẵn sàng
      */
     fun separator(char: Char = '-'): HybridBillBuilder {
-        if (useBitmapMode) {
-            // Sử dụng font nhỏ hơn (0.7x base) để separator mỏng hơn, tiết kiệm giấy
-            val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
-            // Truyền lineSpacing để separator cũng tuân theo config của user
-            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize, lineSpacing)
-            val imageData = if (useRasterBitmap) {
-                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
-            } else {
-                EscPosCommands.printBitmap(bitmap, 0)
-            }
-            buffer.write(imageData)
-            bitmap.recycle()
+        // Sử dụng cached data nếu là separator phổ biến (- hoặc =)
+        val cachedData = when (char) {
+            '-' -> cachedSingleSeparator
+            '=' -> cachedDoubleSeparator
+            else -> null
+        }
+
+        if (cachedData != null) {
+            // Dùng cached data - nhanh, không cần render
+            buffer.write(cachedData)
         } else {
-            buffer.write(char.toString().repeat(lineWidth).toByteArray(Charsets.UTF_8))
-            buffer.write(EscPosCommands.LF)
+            // Fallback: render separator cho ký tự khác (hiếm khi dùng)
+            if (useBitmapMode) {
+                val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
+                val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize, lineSpacing)
+                val imageData = if (useRasterBitmap) {
+                    EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+                } else {
+                    EscPosCommands.printBitmap(bitmap, 0)
+                }
+                buffer.write(imageData)
+                bitmap.recycle()
+            } else {
+                buffer.write(char.toString().repeat(lineWidth).toByteArray(Charsets.UTF_8))
+                buffer.write(EscPosCommands.LF)
+            }
         }
         return this
     }
 
     /**
-     * In double separator (===)
+     * In double separator (===) - sử dụng pre-rendered cache
      */
     fun doubleSeparator(): HybridBillBuilder {
-        return separator('=')
+        // Dùng trực tiếp cached data thay vì gọi separator('=')
+        buffer.write(cachedDoubleSeparator)
+        return this
     }
 
     /**

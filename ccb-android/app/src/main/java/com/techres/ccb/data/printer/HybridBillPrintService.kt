@@ -89,6 +89,11 @@ object HybridBillPrintService {
     /**
      * In bill qua Sunmi Built-in Printer
      * Máy in Sunmi tích hợp luôn hỗ trợ UTF-8 và tiếng Việt tốt
+     *
+     * QUAN TRỌNG: Tất cả lệnh (cut, cashDrawer, beep) đã được include trong billContent
+     * từ generateHybridBill() nên KHÔNG gọi riêng lẻ để tránh:
+     * 1. Lệnh trùng lặp
+     * 2. Giật giật do gửi lệnh không đồng bộ
      */
     private suspend fun printViaSunmi(
         config: BillPrinterConfigEntity,
@@ -105,6 +110,7 @@ object HybridBillPrintService {
             }
 
             // Generate bill content - Sunmi hỗ trợ UTF-8 tốt, nhưng dùng bitmap để đảm bảo 100%
+            // billContent đã bao gồm TẤT CẢ lệnh: in, feed, cut, cashDrawer, beep
             val capability = PrinterCapability(
                 printerIp = "sunmi_inner", // Dummy IP for internal printer
                 printerPort = 0,
@@ -113,32 +119,24 @@ object HybridBillPrintService {
             )
             val billContent = generateHybridBill(config, template, billData, capability)
 
-            // Gửi dữ liệu in
+            // Gửi TOÀN BỘ dữ liệu in một lần (bao gồm cả cut, cashDrawer, beep)
+            // KHÔNG gọi adapter.cutPaper() hay adapter.openCashDrawer() riêng lẻ
+            // vì đã có trong billContent rồi - tránh trùng lặp và giật giật
             val writeResult = adapter.write(billContent)
             if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
                 return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
             }
 
-            // Cắt giấy nếu được bật
-            if (config.cutPaper) {
-                adapter.cutPaper()
-            }
+            // Đợi máy in xử lý xong toàn bộ buffer trước khi in bản tiếp theo
+            delay(300)
 
-            // Mở ngăn kéo tiền nếu được bật
-            if (config.openCashDrawer) {
-                adapter.openCashDrawer()
-            }
-
-            // In nhiều bản nếu cấu hình
+            // In nhiều bản nếu cấu hình (mỗi bản là một buffer hoàn chỉnh)
             repeat(config.numberOfCopies - 1) {
-                delay(500)
                 adapter.write(billContent)
-                if (config.cutPaper) {
-                    adapter.cutPaper()
-                }
+                delay(300) // Đợi giữa các bản
             }
 
-            Log.d(TAG, "Sunmi print successful")
+            Log.d(TAG, "Sunmi print successful: ${config.numberOfCopies} copies")
             PrinterResult.Success("In bill thành công!")
         } catch (e: Exception) {
             Log.e(TAG, "Sunmi print error: ${e.message}", e)
