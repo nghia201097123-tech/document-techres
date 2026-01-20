@@ -27,6 +27,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
+import com.techres.ccb.presentation.components.PosTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,13 +150,9 @@ fun BillPrinterConfigScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = { Text("Máy in Bill") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                }
+                onBack = onNavigateBack
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }

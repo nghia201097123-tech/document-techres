@@ -63,17 +63,23 @@ fun SyncDataScreen(
                     .fillMaxSize()
                     .padding(32.dp)
             ) {
-                // Header with back button
+                // Header with back button - Extra padding for POS devices
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 8.dp) // Extra padding for POS devices
                 ) {
                     IconButton(
                         onClick = onBack,
+                        modifier = Modifier.size(48.dp), // Larger touch target for POS devices
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = Color.White
                         )
                     ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Quay lại",
+                            modifier = Modifier.size(28.dp) // Larger icon
+                        )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

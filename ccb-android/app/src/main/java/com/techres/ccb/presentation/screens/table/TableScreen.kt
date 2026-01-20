@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.techres.ccb.presentation.components.PosTopAppBar
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -90,7 +91,7 @@ fun TableScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = {
                     Column {
                         Text(
@@ -104,11 +105,7 @@ fun TableScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
+                onBack = onNavigateBack,
                 actions = {
                     // Refresh button - force refresh data
                     IconButton(onClick = { viewModel.refreshData() }) {

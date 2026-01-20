@@ -36,6 +36,7 @@ import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.printer.KitchenTicketPrintService
 import com.techres.ccb.data.printer.LabelPrintService
+import com.techres.ccb.presentation.components.PosTopAppBar
 import java.util.Date
 
 /**
@@ -79,18 +80,9 @@ fun KitchenPrinterScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = { Text("Quản lý Bếp & Máy in") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
+                onBack = onBack
             )
         }
     ) { paddingValues ->

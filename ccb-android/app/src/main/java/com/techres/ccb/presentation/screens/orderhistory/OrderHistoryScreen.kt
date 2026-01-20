@@ -29,7 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import com.techres.ccb.presentation.components.PosTopAppBar
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -124,13 +124,9 @@ fun OrderHistoryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = { Text("Lịch sử đơn hàng", fontSize = 16.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
+                onBack = onBack,
                 actions = {
                     // Compact stats in top bar
                     Row(
@@ -148,12 +144,7 @@ fun OrderHistoryScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                }
             )
         }
     ) { paddingValues ->

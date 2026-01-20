@@ -23,6 +23,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.data.repository.SyncStep
 import com.techres.ccb.data.repository.SyncStepStatus
+import com.techres.ccb.presentation.components.PosTopAppBar
 import com.techres.ccb.presentation.theme.Success
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,13 +55,9 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = { Text("Cài đặt") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                }
+                onBack = onNavigateBack
             )
         }
     ) { paddingValues ->

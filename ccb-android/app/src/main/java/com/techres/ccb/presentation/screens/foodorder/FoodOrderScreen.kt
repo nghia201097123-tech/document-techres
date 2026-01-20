@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.domain.model.*
+import com.techres.ccb.presentation.components.PosTopAppBar
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -56,7 +57,7 @@ fun FoodOrderScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = {
                     Column {
                         Text(
@@ -70,11 +71,7 @@ fun FoodOrderScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
+                onBack = onBack,
                 actions = {
                     // New orders badge
                     if (uiState.newOrdersCount > 0) {

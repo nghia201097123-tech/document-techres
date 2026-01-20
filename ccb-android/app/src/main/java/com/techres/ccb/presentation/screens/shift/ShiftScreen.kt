@@ -14,6 +14,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.techres.ccb.presentation.components.PosTopAppBar
 import com.techres.ccb.presentation.theme.Success
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,13 +32,9 @@ fun ShiftScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = { Text("Ca làm việc") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                }
+                onBack = onNavigateBack
             )
         }
     ) { paddingValues ->

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.techres.ccb.presentation.components.PosTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,13 +66,9 @@ fun CloseShiftScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PosTopAppBar(
                 title = { Text("Chốt ca làm việc") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
+                onBack = onBack,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFFF44336),
                     titleContentColor = Color.White,
