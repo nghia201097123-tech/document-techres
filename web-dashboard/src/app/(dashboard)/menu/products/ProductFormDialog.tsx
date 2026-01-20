@@ -40,7 +40,8 @@ import { cn } from "@/lib/utils";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useGlobalFilters } from "@/components/ui/brand-filter";
-import { productService, type CreateProductDto, ProductType, SellingType, type ProductNote, type Product } from "@/services/product-service";
+import { productService, type CreateProductDto, ProductType, SellingType, type ProductNote, type Product, type ComboItem } from "@/services/product-service";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { categoryService } from "@/services/category-service";
 import { unitService, type Unit } from "@/services/unit-service";
 
@@ -118,6 +119,12 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
   const [notePopoverOpen, setNotePopoverOpen] = React.useState(false);
   const [noteSearchValue, setNoteSearchValue] = React.useState("");
 
+  // Combo items state
+  const [availableComboProducts, setAvailableComboProducts] = React.useState<Product[]>([]);
+  const [loadingComboProducts, setLoadingComboProducts] = React.useState(false);
+  const [selectedComboItems, setSelectedComboItems] = React.useState<Map<string, number>>(new Map());
+  const [comboSearchQuery, setComboSearchQuery] = React.useState("");
+
   // Load data when dialog opens
   React.useEffect(() => {
     if (!open || !brandId) return;
@@ -191,6 +198,20 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
           // Load product notes
           const productNotes = await productService.getProductNotes(productId);
           setSelectedNoteIds(new Set(productNotes.map(pn => pn.noteId)));
+
+          // Load combo items if product is a combo
+          if (product.type === ProductType.COMBO) {
+            try {
+              const comboItems = await productService.getComboItems(productId);
+              const itemsMap = new Map<string, number>();
+              comboItems.forEach(item => {
+                itemsMap.set(item.productId, item.quantity);
+              });
+              setSelectedComboItems(itemsMap);
+            } catch (error) {
+              console.error("Error loading combo items:", error);
+            }
+          }
         } catch (error) {
           console.error("Error loading product:", error);
           toast({ title: "Lỗi", description: "Không thể tải thông tin món ăn", variant: "destructive" });
@@ -205,9 +226,37 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
       setCategorySearchValue("");
       setUnitSearchValue("");
       setSelectedNoteIds(new Set());
+      setSelectedComboItems(new Map());
+      setComboSearchQuery("");
     }
     setNoteSearchValue("");
   }, [open, mode, productId, toast]);
+
+  // Load available products for combo when type is COMBO
+  React.useEffect(() => {
+    if (!open || !brandId || formData.type !== ProductType.COMBO) {
+      setAvailableComboProducts([]);
+      return;
+    }
+
+    const loadComboProducts = async () => {
+      setLoadingComboProducts(true);
+      try {
+        const products = await productService.getAvailableProductsForCombo(brandId);
+        // Filter out the current product if editing
+        const filtered = productId
+          ? products.filter(p => p.id !== productId)
+          : products;
+        setAvailableComboProducts(filtered);
+      } catch (error) {
+        console.error("Error loading combo products:", error);
+      } finally {
+        setLoadingComboProducts(false);
+      }
+    };
+
+    loadComboProducts();
+  }, [open, brandId, formData.type, productId]);
 
   // Update category search value when formData.categoryId changes (for edit mode)
   React.useEffect(() => {
@@ -267,10 +316,49 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
       !availableNotes.some(n => n.name.toLowerCase() === noteSearchValue.toLowerCase());
   }, [noteSearchValue, availableNotes]);
 
-  // Handle type change - reset category
+  // Filter combo products by search
+  const filteredComboProducts = React.useMemo(() => {
+    if (!comboSearchQuery.trim()) return availableComboProducts;
+    return availableComboProducts.filter(p =>
+      p.name.toLowerCase().includes(comboSearchQuery.toLowerCase())
+    );
+  }, [availableComboProducts, comboSearchQuery]);
+
+  // Handle type change - reset category and combo items
   const handleTypeChange = (type: ProductType) => {
     setFormData(prev => ({ ...prev, type, categoryId: "" }));
     setCategorySearchValue("");
+    // Reset combo items when changing type
+    if (type !== ProductType.COMBO) {
+      setSelectedComboItems(new Map());
+      setComboSearchQuery("");
+    }
+  };
+
+  // Toggle combo item selection
+  const handleToggleComboItem = (productId: string) => {
+    setSelectedComboItems(prev => {
+      const newMap = new Map(prev);
+      if (newMap.has(productId)) {
+        newMap.delete(productId);
+      } else {
+        newMap.set(productId, 1);
+      }
+      return newMap;
+    });
+  };
+
+  // Update combo item quantity
+  const handleComboItemQuantityChange = (productId: string, quantity: number) => {
+    setSelectedComboItems(prev => {
+      const newMap = new Map(prev);
+      if (quantity > 0) {
+        newMap.set(productId, quantity);
+      } else {
+        newMap.delete(productId);
+      }
+      return newMap;
+    });
   };
 
   // Toggle note selection
@@ -396,6 +484,18 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
             console.error("Error assigning notes:", error);
           }
         }
+        // Assign combo items if this is a combo
+        if (formData.type === ProductType.COMBO && selectedComboItems.size > 0) {
+          try {
+            const items = Array.from(selectedComboItems.entries()).map(([productId, quantity]) => ({
+              productId,
+              quantity,
+            }));
+            await productService.assignComboItems(result.id, items);
+          } catch (error) {
+            console.error("Error assigning combo items:", error);
+          }
+        }
         toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });
 
         if (continueCreating) {
@@ -404,6 +504,8 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
           setCategorySearchValue("");
           setUnitSearchValue("");
           setSelectedNoteIds(new Set());
+          setSelectedComboItems(new Map());
+          setComboSearchQuery("");
           onSuccess(result);
         } else {
           onSuccess(result);
@@ -416,6 +518,18 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
           await productService.assignNotesToProduct(productId, Array.from(selectedNoteIds));
         } catch (error) {
           console.error("Error assigning notes:", error);
+        }
+        // Update combo items if this is a combo
+        if (formData.type === ProductType.COMBO) {
+          try {
+            const items = Array.from(selectedComboItems.entries()).map(([productId, quantity]) => ({
+              productId,
+              quantity,
+            }));
+            await productService.assignComboItems(productId, items);
+          } catch (error) {
+            console.error("Error assigning combo items:", error);
+          }
         }
         toast({ title: "Thành công", description: "Đã cập nhật thông tin món ăn" });
         onSuccess(result);
@@ -604,6 +718,121 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
                   )}
                 </div>
               </div>
+
+              {/* Combo Items Selection - only show when type is COMBO */}
+              {formData.type === ProductType.COMBO && (
+                <div className="grid gap-2">
+                  <Label>Món trong Combo *</Label>
+                  <div className="border rounded-lg p-3 space-y-3">
+                    {/* Search */}
+                    <div className="relative">
+                      <Input
+                        placeholder="Tìm kiếm món ăn..."
+                        value={comboSearchQuery}
+                        onChange={(e) => setComboSearchQuery(e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    {/* Selection info */}
+                    <div className="text-sm text-muted-foreground">
+                      Đã chọn: <strong>{selectedComboItems.size}</strong> món
+                      {availableComboProducts.length > 0 && ` / ${availableComboProducts.length} món có sẵn`}
+                    </div>
+
+                    {/* Product list */}
+                    <ScrollArea className="h-[200px] border rounded-md">
+                      {loadingComboProducts ? (
+                        <div className="flex items-center justify-center py-10">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : filteredComboProducts.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <p className="text-muted-foreground">
+                            {comboSearchQuery ? "Không tìm thấy món ăn phù hợp" : "Chưa có món ăn nào"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-2 space-y-1">
+                          {filteredComboProducts.map((product) => {
+                            const isSelected = selectedComboItems.has(product.id);
+                            const quantity = selectedComboItems.get(product.id) || 1;
+                            return (
+                              <div
+                                key={product.id}
+                                className={`flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors ${
+                                  isSelected ? "bg-primary/10" : ""
+                                }`}
+                              >
+                                <div
+                                  className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer ${
+                                    isSelected ? "bg-primary border-primary" : "border-input"
+                                  }`}
+                                  onClick={() => handleToggleComboItem(product.id)}
+                                >
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+                                </div>
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleToggleComboItem(product.id)}>
+                                  <p className="font-medium truncate">{product.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatCurrency(product.price)}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">SL:</span>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={quantity}
+                                      onChange={(e) => handleComboItemQuantityChange(product.id, parseInt(e.target.value) || 1)}
+                                      className="w-16 h-8 text-center"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </ScrollArea>
+
+                    {/* Selected items summary */}
+                    {selectedComboItems.size > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-sm font-medium mb-2">Món đã chọn:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from(selectedComboItems.entries()).map(([productId, qty]) => {
+                            const product = availableComboProducts.find(p => p.id === productId);
+                            return product ? (
+                              <Badge key={productId} variant="secondary" className="flex items-center gap-1">
+                                {product.name} x{qty}
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  className="ml-1 hover:text-destructive cursor-pointer"
+                                  onClick={() => handleToggleComboItem(productId)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      handleToggleComboItem(productId);
+                                    }
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </span>
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Chọn các món ăn sẽ có trong combo này
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
