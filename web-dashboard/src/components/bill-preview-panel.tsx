@@ -8,31 +8,119 @@ interface BillPreviewPanelProps {
   className?: string;
 }
 
+// Memoized Header component to prevent re-renders when only other sections change
+const BillHeader = React.memo(function BillHeader({
+  showLogo,
+  storeName,
+  storeAddress,
+  storePhone,
+  taxCode,
+  headerText,
+}: {
+  showLogo?: boolean;
+  storeName?: string;
+  storeAddress?: string;
+  storePhone?: string;
+  taxCode?: string;
+  headerText?: string;
+}) {
+  return (
+    <div className="text-center mb-2">
+      {showLogo && (
+        <div className="text-2xl mb-1">[LOGO]</div>
+      )}
+      <p className="font-bold text-base">{storeName || "TEN CUA HANG"}</p>
+      {storeAddress && (
+        <p className="text-xs">{storeAddress}</p>
+      )}
+      {storePhone && (
+        <p className="text-xs">DT: {storePhone}</p>
+      )}
+      {taxCode && (
+        <p className="text-xs">MST: {taxCode}</p>
+      )}
+      {headerText && (
+        <p className="text-xs">{headerText}</p>
+      )}
+    </div>
+  );
+});
+
+// Memoized Footer component to prevent re-renders when only other sections change
+const BillFooter = React.memo(function BillFooter({
+  thankYouMessage,
+  comebackMessage,
+  footerText,
+}: {
+  thankYouMessage?: string;
+  comebackMessage?: string;
+  footerText?: string;
+}) {
+  return (
+    <div className="text-center mt-3 space-y-1">
+      <p className="font-medium">{thankYouMessage || "Cam on quy khach!"}</p>
+      <p className="text-xs">{comebackMessage || "Hen gap lai!"}</p>
+      {footerText && (
+        <p className="text-xs text-muted-foreground">{footerText}</p>
+      )}
+    </div>
+  );
+});
+
+// Memoized Print Options component
+const PrintOptions = React.memo(function PrintOptions({
+  cutPaper,
+  openCashDrawer,
+  beepAfterPrint,
+  numberOfCopies,
+}: {
+  cutPaper?: boolean;
+  openCashDrawer?: boolean;
+  beepAfterPrint?: boolean;
+  numberOfCopies?: number;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 justify-center mt-3 text-xs">
+      {cutPaper && <span className="bg-gray-100 px-1 rounded">[Cut]</span>}
+      {openCashDrawer && <span className="bg-gray-100 px-1 rounded">[Drawer]</span>}
+      {beepAfterPrint && <span className="bg-gray-100 px-1 rounded">[Beep]</span>}
+      {(numberOfCopies || 1) > 1 && <span className="bg-gray-100 px-1 rounded">x{numberOfCopies}</span>}
+    </div>
+  );
+});
+
 /**
  * Bill Preview Panel - Shows a live preview of the bill template
  * Renders a visual representation of how the bill will look when printed
  * Memoized to prevent unnecessary re-renders during form input
  */
 export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template, className }: BillPreviewPanelProps) {
-  // Calculate preview width based on paper width
-  const getPreviewWidth = () => {
+  // Memoize calculated values to prevent recalculation on every render
+  const previewWidth = React.useMemo(() => {
     const paperWidth = template.paperWidth || 80;
     if (paperWidth <= 58) return "200px";
     if (paperWidth <= 80) return "280px";
     return "350px";
-  };
+  }, [template.paperWidth]);
 
-  // Get font size class
-  const getFontSizeClass = () => {
+  const fontSizeClass = React.useMemo(() => {
     switch (template.fontSize) {
       case "small": return "text-xs";
       case "large": return "text-base";
       default: return "text-sm";
     }
-  };
+  }, [template.fontSize]);
 
-  const separator = template.separatorChar || "-";
-  const doubleSeparator = template.doubleSeparatorChar || "=";
+  // Memoize separator strings
+  const separatorLine = React.useMemo(() => {
+    const separator = template.separatorChar || "-";
+    return separator.repeat(30);
+  }, [template.separatorChar]);
+
+  const doubleSeparatorLine = React.useMemo(() => {
+    const doubleSeparator = template.doubleSeparatorChar || "=";
+    return doubleSeparator.repeat(30);
+  }, [template.doubleSeparatorChar]);
 
   return (
     <div className={className}>
@@ -40,32 +128,22 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         Xem truoc - {template.paperWidth || 80}mm
       </div>
       <div
-        className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${getFontSizeClass()}`}
-        style={{ width: getPreviewWidth() }}
+        className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${fontSizeClass}`}
+        style={{ width: previewWidth }}
       >
-        {/* Header */}
-        <div className="text-center mb-2">
-          {template.showLogo && (
-            <div className="text-2xl mb-1">[LOGO]</div>
-          )}
-          <p className="font-bold text-base">{template.storeName || "TEN CUA HANG"}</p>
-          {template.storeAddress && (
-            <p className="text-xs">{template.storeAddress}</p>
-          )}
-          {template.storePhone && (
-            <p className="text-xs">DT: {template.storePhone}</p>
-          )}
-          {template.taxCode && (
-            <p className="text-xs">MST: {template.taxCode}</p>
-          )}
-          {template.headerText && (
-            <p className="text-xs">{template.headerText}</p>
-          )}
-        </div>
+        {/* Header - Memoized component */}
+        <BillHeader
+          showLogo={template.showLogo}
+          storeName={template.storeName}
+          storeAddress={template.storeAddress}
+          storePhone={template.storePhone}
+          taxCode={template.taxCode}
+          headerText={template.headerText}
+        />
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-1 overflow-hidden">
-          {doubleSeparator.repeat(30)}
+          {doubleSeparatorLine}
         </p>
 
         {/* Bill Title */}
@@ -84,7 +162,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-1 overflow-hidden">
-          {separator.repeat(30)}
+          {separatorLine}
         </p>
 
         {/* Items */}
@@ -145,7 +223,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-2 overflow-hidden">
-          {separator.repeat(30)}
+          {separatorLine}
         </p>
 
         {/* Subtotal & Discounts */}
@@ -235,7 +313,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
 
         {/* Separator */}
         <p className="text-center text-muted-foreground my-2 overflow-hidden">
-          {doubleSeparator.repeat(30)}
+          {doubleSeparatorLine}
         </p>
 
         {/* Total */}
@@ -313,22 +391,20 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
           </div>
         )}
 
-        {/* Footer */}
-        <div className="text-center mt-3 space-y-1">
-          <p className="font-medium">{template.thankYouMessage || "Cam on quy khach!"}</p>
-          <p className="text-xs">{template.comebackMessage || "Hen gap lai!"}</p>
-          {template.footerText && (
-            <p className="text-xs text-muted-foreground">{template.footerText}</p>
-          )}
-        </div>
+        {/* Footer - Memoized component */}
+        <BillFooter
+          thankYouMessage={template.thankYouMessage}
+          comebackMessage={template.comebackMessage}
+          footerText={template.footerText}
+        />
 
-        {/* Print Options Badges */}
-        <div className="flex flex-wrap gap-1 justify-center mt-3 text-xs">
-          {template.cutPaper && <span className="bg-gray-100 px-1 rounded">[Cut]</span>}
-          {template.openCashDrawer && <span className="bg-gray-100 px-1 rounded">[Drawer]</span>}
-          {template.beepAfterPrint && <span className="bg-gray-100 px-1 rounded">[Beep]</span>}
-          {(template.numberOfCopies || 1) > 1 && <span className="bg-gray-100 px-1 rounded">x{template.numberOfCopies}</span>}
-        </div>
+        {/* Print Options Badges - Memoized component */}
+        <PrintOptions
+          cutPaper={template.cutPaper}
+          openCashDrawer={template.openCashDrawer}
+          beepAfterPrint={template.beepAfterPrint}
+          numberOfCopies={template.numberOfCopies}
+        />
       </div>
     </div>
   );
