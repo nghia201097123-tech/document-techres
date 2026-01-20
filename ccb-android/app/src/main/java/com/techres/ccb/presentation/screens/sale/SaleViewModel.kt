@@ -2890,8 +2890,11 @@ class SaleViewModel @Inject constructor(
                 }
 
                 // Calculate new totals
-                val newSubtotal = currentOrder.subtotal + state.subtotal
-                val newTotal = currentOrder.totalAmount + state.totalAmount
+                // Note: state.subtotal and state.totalAmount already include currentOrder amounts,
+                // so use them directly instead of adding currentOrder amounts again
+                val cartItemsTotal = state.cartItems.sumOf { it.totalPrice }
+                val newSubtotal = currentOrder.subtotal + cartItemsTotal
+                val newTotal = currentOrder.totalAmount + cartItemsTotal
 
                 // Update order in database
                 withContext(Dispatchers.IO) {
