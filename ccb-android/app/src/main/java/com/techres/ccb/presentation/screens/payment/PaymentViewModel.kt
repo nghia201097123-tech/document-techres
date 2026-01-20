@@ -228,12 +228,14 @@ class PaymentViewModel @Inject constructor(
     }
 
     fun selectPaymentMethod(method: String) {
+        // All non-cash methods allow payment if grandTotal > 0
+        // Cash requires receivedAmount >= grandTotal
         _uiState.value = _uiState.value.copy(
             selectedPaymentMethod = method,
-            canProcessPayment = if (method == "cash") {
-                _uiState.value.receivedAmount >= _uiState.value.grandTotal
-            } else {
-                _uiState.value.grandTotal > 0
+            canProcessPayment = when (method) {
+                "cash" -> _uiState.value.receivedAmount >= _uiState.value.grandTotal
+                "bank_transfer", "credit_card", "e_wallet", "qr_code" -> _uiState.value.grandTotal > 0
+                else -> _uiState.value.grandTotal > 0
             }
         )
     }
