@@ -87,6 +87,7 @@ import {
   type TransactionCategory,
   type CreateTransactionVoucherDto,
 } from "@/services/transaction-service";
+import VoucherFormDialog from "./VoucherFormDialog";
 
 // Format currency
 const formatCurrency = (amount: number) => {
@@ -125,9 +126,7 @@ export default function TransactionVouchersPage() {
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [selectedVoucher, setSelectedVoucher] =
     React.useState<TransactionVoucher | null>(null);
-  const [formData, setFormData] =
-    React.useState<CreateTransactionVoucherDto>(initialFormData);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [defaultTransactionType, setDefaultTransactionType] = React.useState<TransactionType>(TransactionType.EXPENSE);
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
   const [cancelVoucher, setCancelVoucher] =
     React.useState<TransactionVoucher | null>(null);
@@ -220,27 +219,12 @@ export default function TransactionVouchersPage() {
   // Open dialogs
   const openCreateDialog = (type: TransactionType) => {
     setSelectedVoucher(null);
-    setFormData({
-      ...initialFormData,
-      transactionType: type,
-    });
+    setDefaultTransactionType(type);
     setDialogMode("create");
   };
 
   const openEditDialog = (voucher: TransactionVoucher) => {
     setSelectedVoucher(voucher);
-    setFormData({
-      transactionType: voucher.transactionType,
-      voucherDate: voucher.voucherDate.split("T")[0],
-      categoryId: voucher.categoryId || "",
-      amount: parseFloat(voucher.amount as any),
-      paymentType: voucher.paymentType,
-      counterpartyName: voucher.counterpartyName || "",
-      counterpartyAddress: voucher.counterpartyAddress || "",
-      counterpartyTaxCode: voucher.counterpartyTaxCode || "",
-      reason: voucher.reason,
-      notes: voucher.notes || "",
-    });
     setDialogMode("edit");
   };
 
@@ -249,36 +233,15 @@ export default function TransactionVouchersPage() {
     setDialogMode("view");
   };
 
-  // Handle submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  // Handle form dialog close
+  const handleCloseFormDialog = () => {
+    setDialogMode(null);
+    setSelectedVoucher(null);
+  };
 
-    try {
-      if (dialogMode === "create") {
-        await transactionVoucherService.create(formData);
-        toast({
-          title: "Thành công",
-          description: "Đã tạo phiếu mới",
-        });
-      } else if (selectedVoucher) {
-        await transactionVoucherService.update(selectedVoucher.id, formData);
-        toast({
-          title: "Thành công",
-          description: "Đã cập nhật phiếu",
-        });
-      }
-      setDialogMode(null);
-      fetchVouchers();
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Lỗi",
-        description: error.response?.data?.message || "Không thể lưu phiếu",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  // Handle form dialog success
+  const handleFormSuccess = () => {
+    fetchVouchers();
   };
 
   // Handle actions
@@ -356,11 +319,6 @@ export default function TransactionVouchersPage() {
       });
     }
   };
-
-  // Get filtered categories based on transaction type
-  const filteredCategories = categories.filter(
-    (c) => c.type === formData.transactionType
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -738,176 +696,14 @@ export default function TransactionVouchersPage() {
       </Card>
 
       {/* Create/Edit Dialog */}
-      <Dialog
+      <VoucherFormDialog
         open={dialogMode === "create" || dialogMode === "edit"}
-        onOpenChange={(open) => !open && setDialogMode(null)}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {dialogMode === "create"
-                ? formData.transactionType === TransactionType.INCOME
-                  ? "Tạo phiếu thu"
-                  : "Tạo phiếu chi"
-                : "Chỉnh sửa phiếu"}
-            </DialogTitle>
-            <DialogDescription>
-              {dialogMode === "create"
-                ? "Tạo phiếu thu chi mới"
-                : "Cập nhật thông tin phiếu"}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="voucherDate">Ngày lập phiếu *</Label>
-                  <Input
-                    id="voucherDate"
-                    type="date"
-                    value={formData.voucherDate}
-                    onChange={(e) =>
-                      setFormData(prev => ({ ...prev, voucherDate: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="categoryId">Danh mục</Label>
-                  <Select
-                    value={formData.categoryId}
-                    onValueChange={(v) =>
-                      setFormData(prev => ({ ...prev, categoryId: v }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn danh mục" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredCategories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Số tiền (VNĐ) *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    value={formData.amount}
-                    onChange={(e) =>
-                      setFormData(prev => ({
-                        ...prev,
-                        amount: parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                    min={0}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="paymentType">Phương thức *</Label>
-                  <Select
-                    value={formData.paymentType}
-                    onValueChange={(v) =>
-                      setFormData(prev => ({ ...prev, paymentType: v as PaymentType }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={PaymentType.CASH}>
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4" />
-                          Tiền mặt
-                        </div>
-                      </SelectItem>
-                      <SelectItem value={PaymentType.BANK}>
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
-                          Chuyển khoản
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="counterpartyName">
-                  {formData.transactionType === TransactionType.INCOME
-                    ? "Người nộp tiền"
-                    : "Người nhận tiền"}
-                </Label>
-                <Input
-                  id="counterpartyName"
-                  value={formData.counterpartyName}
-                  onChange={(e) =>
-                    setFormData(prev => ({ ...prev, counterpartyName: e.target.value }))
-                  }
-                  placeholder="Họ tên người nộp/nhận"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="reason">Lý do *</Label>
-                <Textarea
-                  id="reason"
-                  value={formData.reason}
-                  onChange={(e) =>
-                    setFormData(prev => ({ ...prev, reason: e.target.value }))
-                  }
-                  placeholder={
-                    formData.transactionType === TransactionType.INCOME
-                      ? "VD: Thu tiền bán hàng ngày 07/01/2026"
-                      : "VD: Chi mua nguyên vật liệu"
-                  }
-                  rows={2}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Ghi chú</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) =>
-                    setFormData(prev => ({ ...prev, notes: e.target.value }))
-                  }
-                  placeholder="Ghi chú bổ sung..."
-                  rows={2}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogMode(null)}
-              >
-                Hủy
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : dialogMode === "create" ? (
-                  "Tạo phiếu"
-                ) : (
-                  "Cập nhật"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        mode={dialogMode === "edit" ? "edit" : "create"}
+        voucherId={selectedVoucher?.id}
+        defaultTransactionType={defaultTransactionType}
+        onClose={handleCloseFormDialog}
+        onSuccess={handleFormSuccess}
+      />
 
       {/* View Dialog */}
       <Dialog

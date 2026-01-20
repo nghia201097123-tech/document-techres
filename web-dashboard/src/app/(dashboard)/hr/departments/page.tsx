@@ -47,6 +47,7 @@ import { permissionService, type Permission } from "@/services/permission-servic
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, Users, ArrowRight } from "lucide-react";
+import DepartmentFormDialog from "./DepartmentFormDialog";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -67,11 +68,7 @@ export default function DepartmentsPage() {
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
   const [selectedDepartment, setSelectedDepartment] = React.useState<Department | null>(null);
   const [continueCreating, setContinueCreating] = React.useState(false);
-  const [formData, setFormData] = React.useState<CreateDepartmentDto>({
-    name: "",
-    parentId: undefined,
-    description: "",
-  });
+  const [defaultParentId, setDefaultParentId] = React.useState<string | undefined>(undefined);
 
   // Permission states
   const [permissionDialogOpen, setPermissionDialogOpen] = React.useState(false);
@@ -135,21 +132,13 @@ export default function DepartmentsPage() {
   // Open create dialog
   const handleOpenCreate = (parentId?: string) => {
     setSelectedDepartment(null);
-    // If no parentId provided and owner exists, default to owner as parent
-    // This ensures no department can be created at the same level as owner
-    const defaultParentId = parentId || ownerDepartment?.id;
-    setFormData({ name: "", parentId: defaultParentId, description: "" });
+    setDefaultParentId(parentId || ownerDepartment?.id);
     setDialogMode("create");
   };
 
   // Open edit dialog
   const handleOpenEdit = (dept: Department) => {
     setSelectedDepartment(dept);
-    setFormData({
-      name: dept.name,
-      parentId: dept.parentId || undefined,
-      description: dept.description || "",
-    });
     setDialogMode("edit");
     // Remove badges when editing
     setNewDeptIds(prev => {
@@ -168,65 +157,23 @@ export default function DepartmentsPage() {
   const handleCloseDialog = () => {
     setDialogMode(null);
     setSelectedDepartment(null);
-    setFormData({ name: "", parentId: undefined, description: "" });
+    setDefaultParentId(undefined);
   };
 
-  // Handle form submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) return;
-
-    // Validate parent is required when owner exists (except when editing owner)
-    if (!canBeRootDepartment() && !formData.parentId) {
-      toast({
-        title: "Lỗi",
-        description: `Phải chọn bộ phận cha. Tất cả bộ phận phải nằm dưới "${OWNER_DEPARTMENT_NAME}"`,
-        variant: "destructive",
+  // Handle department success from dialog
+  const handleDepartmentSuccess = (department: Department, isNew: boolean) => {
+    if (isNew) {
+      setDepartments(prev => [department, ...prev]);
+      setExpandedIds(prev => new Set([...prev, department.id]));
+      setNewDeptIds(prev => new Set([...prev, department.id]));
+    } else {
+      setDepartments(prev => prev.map(d => d.id === department.id ? department : d));
+      setUpdatedDeptIds(prev => new Set([...prev, department.id]));
+      setNewDeptIds(prev => {
+        const next = new Set(prev);
+        next.delete(department.id);
+        return next;
       });
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      if (dialogMode === "create") {
-        const result = await departmentService.create(formData);
-        setDepartments((prev) => [result, ...prev]);
-        setExpandedIds(prev => new Set([...prev, result.id]));
-        setNewDeptIds(prev => new Set([...prev, result.id]));
-        toast({ title: "Thành công", description: `Đã tạo bộ phận "${result.name}"` });
-        if (continueCreating) {
-          setFormData({ name: "", parentId: formData.parentId, description: "" });
-          return;
-        }
-      } else if (dialogMode === "edit" && selectedDepartment) {
-        const updateData: UpdateDepartmentDto = {
-          name: formData.name,
-          parentId: formData.parentId,
-          description: formData.description,
-        };
-        const result = await departmentService.update(selectedDepartment.id, updateData);
-        setDepartments((prev) => prev.map((d) => (d.id === selectedDepartment.id ? result : d)));
-        setUpdatedDeptIds(prev => new Set([...prev, result.id]));
-        // Remove from new if it was there
-        setNewDeptIds(prev => {
-          const next = new Set(prev);
-          next.delete(result.id);
-          return next;
-        });
-        toast({ title: "Thành công", description: "Đã cập nhật bộ phận" });
-      }
-
-      handleCloseDialog();
-    } catch (error: any) {
-      console.error("Error saving department:", error);
-      toast({
-        title: "Lỗi",
-        description: error.response?.data?.message || "Có lỗi xảy ra khi lưu bộ phận",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -819,104 +766,17 @@ export default function DepartmentsPage() {
       </Card>
 
       {/* Create/Edit Department Dialog */}
-      <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {dialogMode === "create" ? "Thêm bộ phận mới" : "Chỉnh sửa bộ phận"}
-            </DialogTitle>
-            <DialogDescription>
-              {dialogMode === "create"
-                ? formData.parentId
-                  ? `Thêm bộ phận con cho "${getParentName(formData.parentId)}"`
-                  : "Nhập thông tin bộ phận. Có thể chọn bộ phận cha để tạo cấu trúc phân cấp."
-                : "Cập nhật thông tin bộ phận."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Tên bộ phận *</Label>
-                <Input
-                  id="name"
-                  placeholder="Bộ phận bếp, Quản lý, Phục vụ..."
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="parent">
-                  Bộ phận cha {!canBeRootDepartment() && <span className="text-destructive">*</span>}
-                </Label>
-                <Select
-                  value={formData.parentId || "none"}
-                  onValueChange={(value) =>
-                    setFormData(prev => ({ ...prev, parentId: value === "none" ? undefined : value }))
-                  }
-                  disabled={!!isEditingOwner}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn bộ phận cha" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {canBeRootDepartment() && (
-                      <SelectItem value="none">Không có (Bộ phận gốc)</SelectItem>
-                    )}
-                    {getAvailableParents().map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!canBeRootDepartment() && (
-                  <p className="text-xs text-muted-foreground">
-                    Tất cả bộ phận phải nằm dưới bộ phận "{OWNER_DEPARTMENT_NAME}"
-                  </p>
-                )}
-                {isEditingOwner && (
-                  <p className="text-xs text-amber-600">
-                    Bộ phận "{OWNER_DEPARTMENT_NAME}" luôn là bộ phận gốc, không thể thay đổi
-                  </p>
-                )}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Mô tả</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Mô tả bộ phận..."
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                />
-              </div>
-            </div>
-            <DialogFooter className="flex-col sm:flex-row gap-4">
-              {dialogMode === "create" && (
-                <div className="flex items-center gap-2 mr-auto">
-                  <Checkbox
-                    id="continueCreating"
-                    checked={continueCreating}
-                    onCheckedChange={(checked) => setContinueCreating(!!checked)}
-                  />
-                  <Label htmlFor="continueCreating" className="text-sm cursor-pointer">
-                    Tiếp tục tạo
-                  </Label>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                  Hủy
-                </Button>
-                <Button type="submit" disabled={saving || !formData.name.trim()}>
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {dialogMode === "create" ? "Tạo bộ phận" : "Cập nhật"}
-                </Button>
-              </div>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <DepartmentFormDialog
+        open={dialogMode === "create" || dialogMode === "edit"}
+        mode={dialogMode === "edit" ? "edit" : "create"}
+        departmentId={selectedDepartment?.id}
+        defaultParentId={defaultParentId}
+        departments={departments}
+        onClose={handleCloseDialog}
+        onSuccess={handleDepartmentSuccess}
+        continueCreating={continueCreating}
+        setContinueCreating={setContinueCreating}
+      />
 
       {/* Permission Assignment Dialog */}
       <Dialog open={permissionDialogOpen} onOpenChange={setPermissionDialogOpen}>

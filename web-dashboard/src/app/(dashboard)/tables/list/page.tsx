@@ -60,6 +60,7 @@ import { tableService, type Table, type CreateTableDto, type UpdateTableDto, Tab
 import { areaService, type Area } from "@/services/area-service";
 import { cn } from "@/lib/utils";
 import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
+import TableFormDialog from "./TableFormDialog";
 
 type DialogMode = "create" | "edit" | null;
 
@@ -94,41 +95,17 @@ export default function TablesPage() {
   const [areas, setAreas] = React.useState<Area[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
-  const [saving, setSaving] = React.useState(false);
   const [selectedTable, setSelectedTable] = React.useState<Table | null>(null);
   const [deleteTable, setDeleteTable] = React.useState<Table | null>(null);
   const [filterAreaId, setFilterAreaId] = React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
-  // Form data
-  const [formData, setFormData] = React.useState<CreateTableDto>({
-    areaId: "",
-    name: "",
-    capacity: 4,
-    sortOrder: 0,
-  });
-
   // Continue creating checkbox
   const [continueCreating, setContinueCreating] = React.useState(false);
-
-  // Bulk create mode
-  const [bulkCreateEnabled, setBulkCreateEnabled] = React.useState(false);
-  const [bulkCreateQuantity, setBulkCreateQuantity] = React.useState(5);
-  const [bulkCreateFormat, setBulkCreateFormat] = React.useState("Bàn ");
-  const [bulkCreateStartNumber, setBulkCreateStartNumber] = React.useState(1);
-  const [bulkCreateProgress, setBulkCreateProgress] = React.useState<BulkProgress>({
-    current: 0,
-    total: 0,
-    status: "idle",
-  });
 
   // Track newly created and updated table IDs for badges
   const [newTableIds, setNewTableIds] = React.useState<Set<string>>(new Set());
   const [updatedTableIds, setUpdatedTableIds] = React.useState<Set<string>>(new Set());
-
-  // Area combobox state
-  const [areaComboboxOpen, setAreaComboboxOpen] = React.useState(false);
-  const [areaSearchValue, setAreaSearchValue] = React.useState("");
 
   // Bulk operations state
   const [selectedTableIds, setSelectedTableIds] = React.useState<Set<string>>(new Set());
@@ -211,22 +188,12 @@ export default function TablesPage() {
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedTable(null);
-    setFormData({ areaId: "", name: "", capacity: 4, sortOrder: 0 });
-    setAreaSearchValue("");
     setDialogMode("create");
   };
 
   // Open edit dialog
   const handleOpenEdit = (table: Table) => {
     setSelectedTable(table);
-    setFormData({
-      areaId: table.areaId,
-      name: table.name,
-      capacity: table.capacity,
-      sortOrder: table.sortOrder,
-    });
-    const area = areas.find(a => a.id === table.areaId);
-    setAreaSearchValue(area?.name || "");
     setDialogMode("edit");
     // Remove badges when editing
     setNewTableIds(prev => { const next = new Set(prev); next.delete(table.id); return next; });
@@ -237,171 +204,27 @@ export default function TablesPage() {
   const handleCloseDialog = () => {
     setDialogMode(null);
     setSelectedTable(null);
-    setFormData({ areaId: "", name: "", capacity: 4, sortOrder: 0 });
-    setAreaSearchValue("");
-    setContinueCreating(false);
-    // Reset bulk create
-    setBulkCreateEnabled(false);
-    setBulkCreateProgress({ current: 0, total: 0, status: "idle" });
   };
 
-  // Preview for bulk create
-  const bulkCreatePreview = React.useMemo(() => {
-    if (!bulkCreateEnabled) return [];
-    return Array.from({ length: bulkCreateQuantity }, (_, index) => ({
-      name: `${bulkCreateFormat}${bulkCreateStartNumber + index}`,
-      index: bulkCreateStartNumber + index,
-    }));
-  }, [bulkCreateEnabled, bulkCreateQuantity, bulkCreateFormat, bulkCreateStartNumber]);
-
-  // Reset form for continue creating
-  const resetFormForContinue = () => {
-    // Keep the same areaId and search value, just reset name
-    setFormData(prev => ({
-      ...prev,
-      name: "",
-      sortOrder: (prev.sortOrder || 0) + 1,
-    }));
-  };
-
-  // Get or create area by name
-  const getOrCreateArea = async (areaName: string): Promise<string> => {
-    // Check if area already exists
-    const existingArea = areas.find(a => a.name.toLowerCase() === areaName.toLowerCase());
-    if (existingArea) {
-      return existingArea.id;
-    }
-
-    // Create new area
-    const newArea = await areaService.create({ name: areaName });
-    setAreas(prev => [newArea, ...prev]);
-    toast({ title: "Thành công", description: `Đã tạo khu vực "${areaName}"` });
-    return newArea.id;
-  };
-
-  // Handle form submit (create or update)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // For bulk create mode, we don't need a name
-    if (!bulkCreateEnabled && !formData.name.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập tên bàn", variant: "destructive" });
-      return;
-    }
-
-    // Check if we have an area selected or need to create one
-    if (!formData.areaId && !areaSearchValue.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập tên khu vực", variant: "destructive" });
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      // Get or create area if needed
-      let areaId = formData.areaId;
-      if (!areaId && areaSearchValue.trim()) {
-        areaId = await getOrCreateArea(areaSearchValue.trim());
-      }
-
-      if (dialogMode === "create") {
-        // Bulk create mode
-        if (bulkCreateEnabled) {
-          setBulkCreateProgress({ current: 0, total: bulkCreateQuantity, status: "processing" });
-
-          let successCount = 0;
-          let failCount = 0;
-          const newTables: Table[] = [];
-
-          for (let i = 0; i < bulkCreateQuantity; i++) {
-            const tableName = `${bulkCreateFormat}${bulkCreateStartNumber + i}`;
-            try {
-              const result = await tableService.create({
-                areaId,
-                name: tableName,
-                capacity: formData.capacity,
-                sortOrder: (formData.sortOrder || 0) + i,
-              });
-              newTables.push(result);
-              setNewTableIds(prev => new Set([...prev, result.id]));
-              successCount++;
-            } catch (error) {
-              console.error(`Error creating table ${tableName}:`, error);
-              failCount++;
-            }
-            setBulkCreateProgress(prev => ({ ...prev, current: i + 1 }));
-
-            // Small delay to prevent overwhelming the server
-            if (i < bulkCreateQuantity - 1) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-          }
-
-          // Add all new tables to state
-          setTables(prev => [...newTables, ...prev]);
-
-          setBulkCreateProgress(prev => ({
-            ...prev,
-            status: "completed",
-            message: `Tạo thành công ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
-          }));
-
-          toast({
-            title: "Hoàn tất",
-            description: `Đã tạo ${successCount} bàn${failCount > 0 ? `, thất bại ${failCount} bàn` : ""}`,
-          });
-
-          // Close dialog after a delay
-          setTimeout(() => {
-            handleCloseDialog();
-          }, 1500);
-        } else {
-          // Single table create
-          const result = await tableService.create({ ...formData, areaId });
-          setTables((prev) => [result, ...prev]);
-          setNewTableIds(prev => new Set([...prev, result.id]));
-          toast({ title: "Thành công", description: `Đã tạo bàn "${result.name}"` });
-
-          // If continue creating is checked, reset form but keep dialog open
-          if (continueCreating) {
-            setFormData(prev => ({
-              areaId: areaId,
-              name: "",
-              capacity: prev.capacity,
-              sortOrder: (prev.sortOrder || 0) + 1,
-            }));
-          } else {
-            handleCloseDialog();
-          }
-        }
-      } else if (dialogMode === "edit" && selectedTable) {
-        const updateData: UpdateTableDto = {
-          areaId: areaId,
-          name: formData.name,
-          capacity: formData.capacity,
-          sortOrder: formData.sortOrder,
-        };
-        const result = await tableService.update(selectedTable.id, updateData);
-        setTables((prev) => prev.map((t) => (t.id === selectedTable.id ? result : t)));
-        setUpdatedTableIds(prev => new Set([...prev, result.id]));
-        setNewTableIds(prev => {
-          const next = new Set(prev);
-          next.delete(result.id);
-          return next;
-        });
-        toast({ title: "Thành công", description: "Đã cập nhật bàn" });
-        handleCloseDialog();
-      }
-    } catch (error: any) {
-      console.error("Error saving table:", error);
-      toast({
-        title: "Lỗi",
-        description: error.response?.data?.message || "Có lỗi xảy ra khi lưu bàn",
-        variant: "destructive",
+  // Handle table success from dialog
+  const handleTableSuccess = (table: Table, isNew: boolean) => {
+    if (isNew) {
+      setTables(prev => [table, ...prev]);
+      setNewTableIds(prev => new Set([...prev, table.id]));
+    } else {
+      setTables(prev => prev.map(t => t.id === table.id ? table : t));
+      setUpdatedTableIds(prev => new Set([...prev, table.id]));
+      setNewTableIds(prev => {
+        const next = new Set(prev);
+        next.delete(table.id);
+        return next;
       });
-    } finally {
-      setSaving(false);
     }
+  };
+
+  // Handle area created from dialog
+  const handleAreaCreated = (area: Area) => {
+    setAreas(prev => [area, ...prev]);
   };
 
   // Handle toggle active
@@ -719,15 +542,6 @@ export default function TablesPage() {
       setBulkProgress({ current: 0, total: 0, status: "idle" });
     }, 1500);
   };
-
-  // Filter areas for combobox
-  const filteredAreas = areas.filter(area =>
-    area.name.toLowerCase().includes(areaSearchValue.toLowerCase())
-  );
-
-  // Check if search value is a new area
-  const isNewArea = areaSearchValue.trim() &&
-    !areas.some(a => a.name.toLowerCase() === areaSearchValue.toLowerCase());
 
   return (
     <div className="space-y-6">
@@ -1077,277 +891,18 @@ export default function TablesPage() {
       )}
 
       {/* Create/Edit Table Dialog */}
-      <Dialog open={dialogMode !== null} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{dialogMode === "create" ? "Thêm bàn mới" : "Chỉnh sửa bàn"}</DialogTitle>
-            <DialogDescription>
-              {dialogMode === "create"
-                ? "Nhập thông tin bàn. Nếu khu vực chưa tồn tại, hệ thống sẽ tự động tạo mới."
-                : "Cập nhật thông tin bàn."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Khu vực *</Label>
-                <Popover open={areaComboboxOpen} onOpenChange={setAreaComboboxOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={areaComboboxOpen}
-                      className="w-full justify-between font-normal"
-                    >
-                      {areaSearchValue || "Chọn hoặc nhập tên khu vực..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput
-                        placeholder="Tìm hoặc tạo khu vực..."
-                        value={areaSearchValue}
-                        onValueChange={(value) => {
-                          setAreaSearchValue(value);
-                          // Clear areaId if user is typing a new value
-                          if (!areas.some(a => a.name.toLowerCase() === value.toLowerCase())) {
-                            setFormData(prev => ({ ...prev, areaId: "" }));
-                          }
-                        }}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {areaSearchValue.trim() ? (
-                            <div className="py-2 px-4 text-sm">
-                              <span className="text-muted-foreground">Nhấn Enter hoặc chọn để tạo: </span>
-                              <span className="font-medium">&quot;{areaSearchValue}&quot;</span>
-                            </div>
-                          ) : (
-                            <div className="py-2 px-4 text-sm text-muted-foreground">
-                              Nhập tên khu vực để tìm hoặc tạo mới
-                            </div>
-                          )}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {/* Option to create new area if not exists */}
-                          {isNewArea && (
-                            <CommandItem
-                              value={`create-${areaSearchValue}`}
-                              onSelect={() => {
-                                setFormData(prev => ({ ...prev, areaId: "" }));
-                                setAreaComboboxOpen(false);
-                              }}
-                              className="text-primary"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Tạo mới: &quot;{areaSearchValue}&quot;
-                            </CommandItem>
-                          )}
-                          {filteredAreas.map((area) => (
-                            <CommandItem
-                              key={area.id}
-                              value={area.name}
-                              onSelect={() => {
-                                setFormData(prev => ({ ...prev, areaId: area.id }));
-                                setAreaSearchValue(area.name);
-                                setAreaComboboxOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.areaId === area.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {area.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {isNewArea && (
-                  <p className="text-xs text-muted-foreground">
-                    Khu vực &quot;{areaSearchValue}&quot; sẽ được tạo tự động khi lưu
-                  </p>
-                )}
-              </div>
-              {/* Bulk create toggle - only show in create mode */}
-              {dialogMode === "create" && (
-                <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <Checkbox
-                    id="bulkCreateEnabled"
-                    checked={bulkCreateEnabled}
-                    onCheckedChange={(checked) => setBulkCreateEnabled(checked === true)}
-                  />
-                  <Label
-                    htmlFor="bulkCreateEnabled"
-                    className="text-sm font-medium cursor-pointer text-blue-800"
-                  >
-                    Tạo nhanh nhiều bàn
-                  </Label>
-                </div>
-              )}
-
-              {/* Bulk create options */}
-              {dialogMode === "create" && bulkCreateEnabled ? (
-                <div className="grid gap-4 p-4 bg-gray-50 rounded-lg border">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label>Định dạng tên</Label>
-                      <Input
-                        value={bulkCreateFormat}
-                        onChange={(e) => setBulkCreateFormat(e.target.value)}
-                        placeholder="Bàn "
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Số lượng</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={bulkCreateQuantity}
-                        onChange={(e) => setBulkCreateQuantity(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                        className="bg-white"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Bắt đầu từ số</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={bulkCreateStartNumber}
-                      onChange={(e) => setBulkCreateStartNumber(parseInt(e.target.value) || 0)}
-                      className="w-32 bg-white"
-                    />
-                  </div>
-
-                  {/* Preview */}
-                  <div className="grid gap-2">
-                    <Label className="flex items-center justify-between">
-                      <span>Xem trước ({bulkCreateQuantity} bàn)</span>
-                    </Label>
-                    <ScrollArea className="h-[120px] border rounded-lg bg-white">
-                      <div className="p-2 flex flex-wrap gap-2">
-                        {bulkCreatePreview.map((item, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="bg-blue-100 text-blue-800"
-                          >
-                            {item.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </div>
-
-                  {/* Progress */}
-                  {bulkCreateProgress.status === "processing" && (
-                    <div className="space-y-2">
-                      <Progress value={(bulkCreateProgress.current / bulkCreateProgress.total) * 100} className="h-2" />
-                      <p className="text-sm text-center text-muted-foreground">
-                        Đang tạo: {bulkCreateProgress.current}/{bulkCreateProgress.total}
-                      </p>
-                    </div>
-                  )}
-
-                  {bulkCreateProgress.status === "completed" && bulkCreateProgress.message && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-700 font-medium flex items-center gap-2">
-                        <Check className="h-4 w-4" />
-                        {bulkCreateProgress.message}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Tên bàn *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Bàn 1, Bàn 2, Bàn VIP..."
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                    autoFocus={dialogMode === "create" && continueCreating}
-                  />
-                </div>
-              )}
-              <div className="grid gap-2">
-                <Label htmlFor="capacity">Số chỗ ngồi</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min="1"
-                  placeholder="4"
-                  value={formData.capacity || 4}
-                  onChange={(e) => setFormData(prev => ({ ...prev, capacity: parseInt(e.target.value) || 4 }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sortOrder">Thứ tự hiển thị</Label>
-                <Input
-                  id="sortOrder"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-
-              {/* Continue creating checkbox - only show in create mode when not bulk creating */}
-              {dialogMode === "create" && !bulkCreateEnabled && (
-                <div className="flex items-center space-x-2 pt-2">
-                  <Checkbox
-                    id="continueCreating"
-                    checked={continueCreating}
-                    onCheckedChange={(checked) => setContinueCreating(checked === true)}
-                  />
-                  <Label
-                    htmlFor="continueCreating"
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    Tiếp tục tạo bàn sau khi lưu
-                  </Label>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCloseDialog}
-                disabled={saving || bulkCreateProgress.status === "processing"}
-              >
-                Hủy
-              </Button>
-              <Button
-                type="submit"
-                disabled={
-                  saving ||
-                  bulkCreateProgress.status === "processing" ||
-                  (!bulkCreateEnabled && !formData.name.trim()) ||
-                  (!formData.areaId && !areaSearchValue.trim())
-                }
-              >
-                {(saving || bulkCreateProgress.status === "processing") && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {dialogMode === "create"
-                  ? bulkCreateEnabled
-                    ? `Tạo ${bulkCreateQuantity} bàn`
-                    : "Tạo bàn"
-                  : "Cập nhật"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <TableFormDialog
+        open={dialogMode === "create" || dialogMode === "edit"}
+        mode={dialogMode === "edit" ? "edit" : "create"}
+        tableId={selectedTable?.id}
+        branchId={filterBranchId}
+        areas={areas}
+        onClose={handleCloseDialog}
+        onSuccess={handleTableSuccess}
+        onAreaCreated={handleAreaCreated}
+        continueCreating={continueCreating}
+        setContinueCreating={setContinueCreating}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteTable !== null} onOpenChange={() => setDeleteTable(null)}>

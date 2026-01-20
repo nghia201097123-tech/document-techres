@@ -57,6 +57,8 @@ import { BrandBranchFilter, FilterRequiredPlaceholder, useGlobalFilters } from "
 import { useColumnConfig, type ColumnConfig } from "@/hooks/use-column-config";
 import { ColumnConfigDialog } from "@/components/ui/column-config-dialog";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
+import GiftItemCreateDialog from "./GiftItemCreateDialog";
+import GiftItemFormDialog from "./GiftItemFormDialog";
 
 // Format currency (no decimals for VND)
 const formatCurrency = (amount: number) => {
@@ -108,34 +110,12 @@ export default function GiftItemsPage() {
   const [selectedItem, setSelectedItem] = React.useState<GiftItem | null>(null);
   const [deleteItem, setDeleteItem] = React.useState<GiftItem | null>(null);
 
-  // Form data for edit mode (single product)
-  const [formData, setFormData] = React.useState<CreateGiftItemDto>({
-    productId: "",
-    name: "",
-    description: "",
-    maxQuantity: 1,
-    minOrderAmount: 0,
-    sortOrder: 0,
-  });
-
-  // Multi-select state for create mode
-  const [selectedProductIds, setSelectedProductIds] = React.useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = React.useState("");
-
   // Status filter state
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
   // Track newly created and updated IDs for badges
   const [newItemIds, setNewItemIds] = React.useState<Set<string>>(new Set());
   const [updatedItemIds, setUpdatedItemIds] = React.useState<Set<string>>(new Set());
-
-  // Progress state for batch creation
-  const [createProgress, setCreateProgress] = React.useState<{
-    current: number;
-    total: number;
-    batchNumber: number;
-    totalBatches: number;
-  } | null>(null);
 
   // Bulk operations state
   const [selectedItemIds, setSelectedItemIds] = React.useState<Set<string>>(new Set());
@@ -201,45 +181,18 @@ export default function GiftItemsPage() {
 
   // Get existing product IDs that are already gift items
   const existingProductIds = React.useMemo(() => {
-    return new Set(giftItems.map(item => item.productId).filter(Boolean));
+    return new Set(giftItems.map(item => item.productId).filter((id): id is string => Boolean(id)));
   }, [giftItems]);
-
-  // Filter products based on search and exclude already added
-  const filteredProducts = React.useMemo(() => {
-    return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const notAlreadyAdded = !existingProductIds.has(p.id);
-      return matchesSearch && notAlreadyAdded;
-    });
-  }, [products, searchQuery, existingProductIds]);
 
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedItem(null);
-    setSelectedProductIds(new Set());
-    setSearchQuery("");
-    setFormData({
-      productId: "",
-      name: "",
-      description: "",
-      maxQuantity: 1,
-      minOrderAmount: 0,
-      sortOrder: 0,
-    });
     setDialogMode("create");
   };
 
   // Open edit dialog
   const handleOpenEdit = (item: GiftItem) => {
     setSelectedItem(item);
-    setFormData({
-      productId: item.productId || "",
-      name: item.name || "",
-      description: item.description || "",
-      maxQuantity: Number(item.maxQuantity) || 1,
-      minOrderAmount: Number(item.minOrderAmount) || 0,
-      sortOrder: Number(item.sortOrder) || 0,
-    });
     setDialogMode("edit");
     // Remove badges when editing
     setNewItemIds(prev => { const next = new Set(prev); next.delete(item.id); return next; });
@@ -250,217 +203,25 @@ export default function GiftItemsPage() {
   const handleCloseDialog = () => {
     setDialogMode(null);
     setSelectedItem(null);
-    setSelectedProductIds(new Set());
-    setSearchQuery("");
-    setFormData({
-      productId: "",
-      name: "",
-      description: "",
-      maxQuantity: 1,
-      minOrderAmount: 0,
-      sortOrder: 0,
+  };
+
+  // Handle create success
+  const handleCreateSuccess = (createdItems: GiftItem[]) => {
+    setGiftItems(prev => [...createdItems, ...prev]);
+    createdItems.forEach(item => {
+      setNewItemIds(prev => new Set([...prev, item.id]));
     });
   };
 
-  // Toggle product selection
-  const toggleProductSelection = (productId: string) => {
-    setSelectedProductIds(prev => {
+  // Handle edit success
+  const handleEditSuccess = (updatedItem: GiftItem) => {
+    setGiftItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+    setUpdatedItemIds(prev => new Set([...prev, updatedItem.id]));
+    setNewItemIds(prev => {
       const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
+      next.delete(updatedItem.id);
       return next;
     });
-  };
-
-  // Select all filtered products
-  const selectAllFiltered = () => {
-    setSelectedProductIds(prev => {
-      const next = new Set(prev);
-      filteredProducts.forEach(p => next.add(p.id));
-      return next;
-    });
-  };
-
-  // Deselect all
-  const deselectAll = () => {
-    setSelectedProductIds(new Set());
-  };
-
-  // Handle form submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (dialogMode === "create") {
-      // Create mode - multiple products with batch processing
-      if (selectedProductIds.size === 0) {
-        toast({ title: "Lỗi", description: "Vui lòng chọn ít nhất một món ăn", variant: "destructive" });
-        return;
-      }
-
-      const productIdArray = Array.from(selectedProductIds);
-      const batchSize = 50;
-      const totalBatches = Math.ceil(productIdArray.length / batchSize);
-      const isLargeList = productIdArray.length > 10; // Use background for lists > 10
-      const progressId = `gift-items-${Date.now()}`;
-
-      // For large lists, close dialog and use background progress
-      if (isLargeList) {
-        handleCloseDialog();
-        addProgress({
-          id: progressId,
-          title: "Tạo món tặng",
-          current: 0,
-          total: productIdArray.length,
-          batchNumber: 1,
-          totalBatches,
-        });
-      } else {
-        setSaving(true);
-      }
-
-      try {
-        const createdItems: GiftItem[] = [];
-        const errors: string[] = [];
-
-        // Create gift items in batches
-        for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
-          const start = batchNum * batchSize;
-          const end = Math.min(start + batchSize, productIdArray.length);
-          const batch = productIdArray.slice(start, end);
-
-          if (isLargeList) {
-            updateProgress(progressId, {
-              current: start,
-              batchNumber: batchNum + 1,
-              totalBatches,
-            });
-          } else {
-            setCreateProgress({
-              current: start,
-              total: productIdArray.length,
-              batchNumber: batchNum + 1,
-              totalBatches,
-            });
-          }
-
-          // Process each product in batch
-          for (let i = 0; i < batch.length; i++) {
-            const productId = batch[i];
-            try {
-              const submitData = {
-                productId,
-                maxQuantity: Number(formData.maxQuantity) || 1,
-                minOrderAmount: Number(formData.minOrderAmount) || 0,
-                sortOrder: Number(formData.sortOrder) || 0,
-              };
-              const result = await giftItemService.create(submitData);
-              createdItems.push(result);
-
-              // Update progress within batch
-              if (isLargeList) {
-                updateProgress(progressId, {
-                  current: start + i + 1,
-                  batchNumber: batchNum + 1,
-                  totalBatches,
-                });
-              } else {
-                setCreateProgress({
-                  current: start + i + 1,
-                  total: productIdArray.length,
-                  batchNumber: batchNum + 1,
-                  totalBatches,
-                });
-              }
-            } catch (error: any) {
-              const product = products.find(p => p.id === productId);
-              errors.push(product?.name || productId);
-            }
-          }
-        }
-
-        if (createdItems.length > 0) {
-          setGiftItems(prev => [...createdItems, ...prev]);
-          createdItems.forEach(item => {
-            setNewItemIds(prev => new Set([...prev, item.id]));
-          });
-        }
-
-        if (isLargeList) {
-          if (errors.length > 0) {
-            completeProgress(progressId, `Thành công: ${createdItems.length}, Lỗi: ${errors.length}`);
-          } else {
-            completeProgress(progressId, `Đã tạo ${createdItems.length} món tặng`);
-          }
-        } else {
-          setCreateProgress(null);
-          if (createdItems.length > 0) {
-            toast({
-              title: "Thành công",
-              description: `Đã thêm ${createdItems.length} món tặng${errors.length > 0 ? `, ${errors.length} món lỗi` : ""}`
-            });
-          }
-          if (errors.length > 0 && createdItems.length === 0) {
-            toast({
-              title: "Lỗi",
-              description: `Không thể thêm món tặng: ${errors.join(", ")}`,
-              variant: "destructive"
-            });
-          }
-          handleCloseDialog();
-        }
-      } catch (error: any) {
-        console.error("Error creating gift items:", error);
-        if (isLargeList) {
-          errorProgress(progressId, error.response?.data?.message || "Có lỗi xảy ra");
-        } else {
-          toast({
-            title: "Lỗi",
-            description: error.response?.data?.message || "Có lỗi xảy ra khi thêm món tặng",
-            variant: "destructive",
-          });
-        }
-      } finally {
-        if (!isLargeList) {
-          setSaving(false);
-          setCreateProgress(null);
-        }
-      }
-    } else if (dialogMode === "edit" && selectedItem) {
-      // Edit mode - single product
-      try {
-        setSaving(true);
-        const submitData = {
-          productId: formData.productId,
-          name: formData.name || undefined,
-          description: formData.description || undefined,
-          maxQuantity: Number(formData.maxQuantity) || 1,
-          minOrderAmount: Number(formData.minOrderAmount) || 0,
-          sortOrder: Number(formData.sortOrder) || 0,
-        };
-        const result = await giftItemService.update(selectedItem.id, submitData);
-        setGiftItems(prev => prev.map(item => (item.id === selectedItem.id ? result : item)));
-        setUpdatedItemIds(prev => new Set([...prev, result.id]));
-        setNewItemIds(prev => {
-          const next = new Set(prev);
-          next.delete(result.id);
-          return next;
-        });
-        toast({ title: "Thành công", description: "Đã cập nhật món tặng" });
-        handleCloseDialog();
-      } catch (error: any) {
-        console.error("Error updating gift item:", error);
-        toast({
-          title: "Lỗi",
-          description: error.response?.data?.message || "Có lỗi xảy ra khi cập nhật món tặng",
-          variant: "destructive",
-        });
-      } finally {
-        setSaving(false);
-      }
-    }
   };
 
   // Handle toggle active
@@ -1046,276 +807,25 @@ export default function GiftItemsPage() {
         </CardContent>
       </Card>
 
-      {/* Create Dialog - Multi-select */}
-      <Dialog open={dialogMode === "create"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-2xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Thêm món tặng</DialogTitle>
-            <DialogDescription>
-              Chọn một hoặc nhiều món ăn từ thực đơn để làm món tặng kèm
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Tìm kiếm món ăn..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+      {/* Create Dialog */}
+      <GiftItemCreateDialog
+        open={dialogMode === "create"}
+        products={products}
+        loadingProducts={loadingProducts}
+        existingProductIds={existingProductIds}
+        onClose={handleCloseDialog}
+        onSuccess={handleCreateSuccess}
+      />
 
-              {/* Selection info and actions */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Đã chọn: <strong>{selectedProductIds.size}</strong> món
-                  {filteredProducts.length > 0 && ` / ${filteredProducts.length} món có sẵn`}
-                </span>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
-                    Chọn tất cả
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={deselectAll}>
-                    Bỏ chọn
-                  </Button>
-                </div>
-              </div>
-
-              {/* Product list with checkboxes */}
-              <ScrollArea className="h-[300px] border rounded-md">
-                {loadingProducts ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <p className="text-muted-foreground">
-                      {searchQuery ? "Không tìm thấy món ăn phù hợp" : "Tất cả món ăn đã được thêm vào danh sách món tặng"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-2 space-y-1">
-                    {filteredProducts.map((product) => {
-                      const isSelected = selectedProductIds.has(product.id);
-                      return (
-                        <div
-                          key={product.id}
-                          className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${
-                            isSelected ? "bg-primary/10" : ""
-                          }`}
-                          onClick={() => toggleProductSelection(product.id)}
-                        >
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center ${
-                            isSelected ? "bg-primary border-primary" : "border-input"
-                          }`}>
-                            {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatCurrency(Number(product.price))}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-
-              {/* Common settings for all selected items */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="maxQuantity">Số lượng tối đa (mỗi món)</Label>
-                  <Input
-                    id="maxQuantity"
-                    type="number"
-                    min="1"
-                    placeholder="1"
-                    value={formData.maxQuantity || 1}
-                    onChange={(e) => setFormData(prev => ({ ...prev, maxQuantity: parseInt(e.target.value) || 1 }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="minOrderAmount">Đơn tối thiểu (VNĐ)</Label>
-                  <Input
-                    id="minOrderAmount"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="500000"
-                    value={formData.minOrderAmount ? new Intl.NumberFormat("vi-VN").format(Math.floor(formData.minOrderAmount)) : ""}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/\./g, "");
-                      const numValue = parseInt(rawValue, 10);
-                      setFormData(prev => ({ ...prev, minOrderAmount: isNaN(numValue) ? 0 : numValue }));
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving || selectedProductIds.size === 0}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {createProgress
-                  ? `Đang xử lý... ${createProgress.current}/${createProgress.total} (batch ${createProgress.batchNumber}/${createProgress.totalBatches})`
-                  : `Thêm ${selectedProductIds.size > 0 ? `${selectedProductIds.size} món` : "món tặng"}`}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog - Single product */}
-      <Dialog open={dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Chỉnh sửa món tặng</DialogTitle>
-            <DialogDescription>
-              Cập nhật thông tin món tặng
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              {/* Select product */}
-              <div className="grid gap-2">
-                <Label>Món ăn *</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm kiếm món ăn..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <ScrollArea className="h-[200px] border rounded-md">
-                  {loadingProducts ? (
-                    <div className="flex items-center justify-center py-10">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : products.filter(p =>
-                    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    p.code?.toLowerCase().includes(searchQuery.toLowerCase())
-                  ).length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <p className="text-muted-foreground">Không tìm thấy món ăn</p>
-                    </div>
-                  ) : (
-                    <div className="p-2 space-y-1">
-                      {products
-                        .filter(p =>
-                          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.code?.toLowerCase().includes(searchQuery.toLowerCase())
-                        )
-                        .map((product) => {
-                          const isSelected = formData.productId === product.id;
-                          return (
-                            <div
-                              key={product.id}
-                              className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${
-                                isSelected ? "bg-primary/10 border border-primary" : ""
-                              }`}
-                              onClick={() => setFormData(prev => ({ ...prev, productId: product.id }))}
-                            >
-                              <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                isSelected ? "bg-primary border-primary" : "border-input"
-                              }`}>
-                                {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{product.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {product.code} - {formatCurrency(Number(product.price))}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-                </ScrollArea>
-              </div>
-
-              {/* Custom name (optional) */}
-              <div className="grid gap-2">
-                <Label htmlFor="editName">Tên hiển thị (tùy chọn)</Label>
-                <Input
-                  id="editName"
-                  placeholder="Để trống sẽ dùng tên món ăn"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="editMaxQuantity">Số lượng tối đa</Label>
-                  <Input
-                    id="editMaxQuantity"
-                    type="number"
-                    min="1"
-                    placeholder="1"
-                    value={formData.maxQuantity || 1}
-                    onChange={(e) => setFormData(prev => ({ ...prev, maxQuantity: parseInt(e.target.value) || 1 }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="editMinOrderAmount">Đơn tối thiểu (VNĐ)</Label>
-                  <Input
-                    id="editMinOrderAmount"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="500000"
-                    value={formData.minOrderAmount ? new Intl.NumberFormat("vi-VN").format(Math.floor(formData.minOrderAmount)) : ""}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/\./g, "");
-                      const numValue = parseInt(rawValue, 10);
-                      setFormData(prev => ({ ...prev, minOrderAmount: isNaN(numValue) ? 0 : numValue }));
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="editDescription">Mô tả</Label>
-                <Textarea
-                  id="editDescription"
-                  placeholder="Mô tả điều kiện tặng..."
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="editSortOrder">Thứ tự hiển thị</Label>
-                <Input
-                  id="editSortOrder"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={formData.sortOrder || 0}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Cập nhật
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Dialog */}
+      <GiftItemFormDialog
+        open={dialogMode === "edit"}
+        giftItemId={selectedItem?.id}
+        products={products}
+        existingProductIds={existingProductIds}
+        onClose={handleCloseDialog}
+        onSuccess={handleEditSuccess}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteItem !== null} onOpenChange={() => setDeleteItem(null)}>

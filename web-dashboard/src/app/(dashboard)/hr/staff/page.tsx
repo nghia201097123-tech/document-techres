@@ -56,6 +56,7 @@ import { ProvinceSelect, WardSelect, ProvinceFilter } from "@/components/ui/sear
 import { useAuthStore } from "@/stores/auth-store";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
 import { useStaffBatch, type StaffBatchOperationType } from "@/hooks/use-staff-batch";
+import StaffFormDialog from "./StaffFormDialog";
 
 // Default column configuration for staff table
 const defaultStaffColumns: ColumnConfig[] = [
@@ -229,10 +230,7 @@ export default function StaffPage() {
   const [staffList, setStaffList] = React.useState<Staff[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
-  const [saving, setSaving] = React.useState(false);
-  const [formData, setFormData] = React.useState<CreateStaffDto>(initialFormData);
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
-  const [createdStaff, setCreatedStaff] = React.useState<(Staff & { temporaryPassword: string }) | null>(null);
 
   // Track newly created staff IDs for "New" badge
   const [newStaffIds, setNewStaffIds] = React.useState<Set<string>>(new Set());
@@ -381,11 +379,6 @@ export default function StaffPage() {
     localStorage.setItem(DETAIL_FIELDS_STORAGE_KEY, JSON.stringify(newFields));
   };
 
-  // Derived state from Redux - for create/edit form
-  const branches = formData.brandId ? branchesByBrand[formData.brandId] || [] : [];
-  const wards = formData.provinceCode ? wardsByProvince[formData.provinceCode] || [] : [];
-  const loadingDropdowns = loadingBrands || loadingDepartments || loadingProvinces;
-
   // Derived state for import settings
   const importBranches = importSettings.brandId ? branchesByBrand[importSettings.brandId] || [] : [];
   const importWards = importSettings.provinceCode ? wardsByProvince[importSettings.provinceCode] || [] : [];
@@ -453,28 +446,6 @@ export default function StaffPage() {
     }
   }, [staffList, loadAllStaffBranchPermissions]);
 
-  // Load branches when brand changes (using Redux)
-  React.useEffect(() => {
-    if (formData.brandId) {
-      dispatch(fetchBranchesByBrand(formData.brandId));
-    }
-  }, [formData.brandId, dispatch]);
-
-  // Load wards when province changes (using Redux)
-  React.useEffect(() => {
-    if (formData.provinceCode) {
-      dispatch(fetchWardsByProvince(formData.provinceCode));
-    }
-  }, [formData.provinceCode, dispatch]);
-
-  // Load dropdowns when dialog opens (using Redux - cached data)
-  React.useEffect(() => {
-    if (dialogMode === "create" || dialogMode === "edit" || dialogMode === "import") {
-      dispatch(fetchDepartments());
-      dispatch(fetchBrands());
-      dispatch(fetchProvinces());
-    }
-  }, [dialogMode, dispatch]);
 
   // Load filter options when filter popover opens
   React.useEffect(() => {
@@ -514,8 +485,6 @@ export default function StaffPage() {
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedStaff(null);
-    setFormData(initialFormData);
-    setCreatedStaff(null);
     setDialogMode("create");
   };
 
@@ -531,114 +500,29 @@ export default function StaffPage() {
   // Open edit dialog
   const handleOpenEdit = (staff: Staff) => {
     setSelectedStaff(staff);
-    setFormData({
-      name: staff.name,
-      avatarUrl: staff.avatarUrl || "",
-      email: staff.email || "",
-      phone: staff.phone || "",
-      birthDate: staff.birthDate || "",
-      gender: staff.gender || "male",
-      idNumber: staff.idNumber || "",
-      address: staff.address || "",
-      provinceCode: staff.provinceCode || "",
-      wardCode: staff.wardCode || "",
-      departmentId: staff.departmentId || "",
-      brandId: staff.brandId || "",
-      branchId: staff.branchId || "",
-      usernamePrefix: "tr",
-    });
     setDialogMode("edit");
     // Remove badges when editing
     setNewStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
     setUpdatedStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
   };
 
-  // Handle form submit (create or update)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  // Handle staff created/updated from StaffFormDialog
+  const handleStaffSuccess = (staff: Staff) => {
     if (dialogMode === "create") {
-      // Validate required fields for create
-      if (!formData.name.trim() || !formData.birthDate || !formData.gender ||
-          !formData.departmentId || !formData.brandId || !formData.branchId) {
-        toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ các trường bắt buộc", variant: "destructive" });
-        return;
-      }
-
-      try {
-        setSaving(true);
-        const result = await staffService.create(formData);
-        setStaffList((prev) => [result, ...prev]);
-        // Mark as new staff
-        setNewStaffIds((prev) => new Set(prev).add(result.id));
-
-        if (continueCreating) {
-          // Reset form but keep brand, branch, department for continuous creation
-          setFormData({
-            ...initialFormData,
-            brandId: formData.brandId,
-            branchId: formData.branchId,
-            departmentId: formData.departmentId,
-            provinceCode: formData.provinceCode,
-            wardCode: formData.wardCode,
-          });
-          // Auto copy to clipboard
-          const copyText = `Tên định danh: ${tenantId}\nTài khoản: ${result.username}\nMật khẩu: ${result.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
-          navigator.clipboard.writeText(copyText);
-          toast({
-            title: "Thành công - Đã copy thông tin đăng nhập",
-            description: `Đã tạo ${result.name} (${result.username})`,
-          });
-        } else {
-          setCreatedStaff(result);
-          toast({ title: "Thành công", description: "Đã tạo nhân viên mới" });
-        }
-      } catch (error: any) {
-        console.error("Error creating staff:", error);
-        toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi tạo nhân viên", variant: "destructive" });
-      } finally {
-        setSaving(false);
-      }
-    } else if (dialogMode === "edit" && selectedStaff) {
-      const updateData: UpdateStaffDto = {
-        name: formData.name,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
-        birthDate: formData.birthDate || undefined,
-        gender: formData.gender,
-        idNumber: formData.idNumber || undefined,
-        address: formData.address || undefined,
-        provinceCode: formData.provinceCode || undefined,
-        wardCode: formData.wardCode || undefined,
-        departmentId: formData.departmentId || undefined,
-        avatarUrl: formData.avatarUrl || undefined,
-        brandId: formData.brandId || undefined,
-        branchId: formData.branchId || undefined,
-      };
-
-      try {
-        setSaving(true);
-        const result = await staffService.update(selectedStaff.id, updateData);
-        setStaffList((prev) => prev.map((s) => (s.id === selectedStaff.id ? result : s)));
-        // Mark as updated staff
-        setUpdatedStaffIds((prev) => new Set([...prev, result.id]));
-        // Remove from new if was new
-        setNewStaffIds((prev) => {
-          const next = new Set(prev);
-          next.delete(result.id);
-          return next;
-        });
-        toast({ title: "Thành công", description: "Đã cập nhật thông tin nhân viên" });
-        handleCloseDialog();
-      } catch (error: any) {
-        console.error("Error updating staff:", error);
-        toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra khi cập nhật nhân viên", variant: "destructive" });
-      } finally {
-        setSaving(false);
-      }
+      setStaffList((prev) => [staff, ...prev]);
+      setNewStaffIds((prev) => new Set(prev).add(staff.id));
+    } else if (dialogMode === "edit") {
+      setStaffList((prev) => prev.map((s) => (s.id === staff.id ? staff : s)));
+      setUpdatedStaffIds((prev) => new Set([...prev, staff.id]));
+      setNewStaffIds((prev) => {
+        const next = new Set(prev);
+        next.delete(staff.id);
+        return next;
+      });
     }
   };
 
+  // Handle form submit (create or update)
   // Handle toggle active
   const handleToggleActive = async (staff: Staff) => {
     try {
@@ -1022,9 +906,7 @@ export default function StaffPage() {
   // Close dialog and reset
   const handleCloseDialog = () => {
     setDialogMode(null);
-    setCreatedStaff(null);
     setSelectedStaff(null);
-    setFormData(initialFormData);
     setImportData([]);
     setImportErrors([]);
     setImportSettings(initialImportSettings);
@@ -1040,15 +922,6 @@ export default function StaffPage() {
   };
 
   // Handle province change
-  const handleProvinceChange = (provinceCode: string) => {
-    setFormData(prev => ({ ...prev, provinceCode, wardCode: "" }));
-  };
-
-  // Handle brand change
-  const handleBrandChange = (brandId: string) => {
-    setFormData(prev => ({ ...prev, brandId, branchId: "" }));
-  };
-
   // Export to Excel with dropdowns
   const handleExport = async () => {
     if (staffList.length === 0) {
@@ -2784,342 +2657,16 @@ export default function StaffPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create/Edit Staff Dialog */}
-      <Dialog open={dialogMode === "create" || dialogMode === "edit"} onOpenChange={() => handleCloseDialog()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{dialogMode === "create" ? "Thêm nhân viên mới" : "Chỉnh sửa nhân viên"}</DialogTitle>
-            <DialogDescription>
-              {dialogMode === "create"
-                ? "Nhập thông tin nhân viên. Hệ thống sẽ tự động tạo tài khoản và mật khẩu tạm thời."
-                : "Cập nhật thông tin nhân viên"}
-            </DialogDescription>
-          </DialogHeader>
-          {createdStaff ? (
-            <div className="space-y-4">
-              <div className="rounded-lg bg-green-50 p-4 border border-green-200">
-                <p className="text-sm font-medium text-green-800 mb-3">Tạo nhân viên thành công!</p>
-                <div className="space-y-2">
-                  <p className="text-sm text-green-700">
-                    Tên nhân viên: <strong>{createdStaff.name}</strong>
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Tên đăng nhập: <strong className="font-mono">{createdStaff.username}</strong>
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Mật khẩu tạm thời: <strong className="font-mono">{createdStaff.temporaryPassword}</strong>
-                  </p>
-                </div>
-                <p className="text-xs text-green-600 mt-3">
-                  Vui lòng ghi lại thông tin này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập lần đầu.
-                </p>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    const text = `Tên định danh: ${tenantId}\nTài khoản: ${createdStaff.username}\nMật khẩu: ${createdStaff.temporaryPassword}\nVui lòng ghi lại mật khẩu này và yêu cầu nhân viên đổi mật khẩu khi đăng nhập.`;
-                    navigator.clipboard.writeText(text);
-                    toast({ title: "Đã copy thông tin đăng nhập" });
-                  }}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy thông tin
-                </Button>
-                <Button onClick={handleCloseDialog}>Đóng</Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
-                {/* Avatar Upload */}
-                <div className="flex justify-center">
-                  <div className="grid gap-2 text-center">
-                    <Label>Ảnh đại diện</Label>
-                    <ImageUpload
-                      value={formData.avatarUrl}
-                      onChange={(url) => setFormData(prev => ({ ...prev, avatarUrl: url }))}
-                      aspectRatio={1}
-                      maxWidth={400}
-                      maxHeight={400}
-                      folder="staff"
-                      circular
-                      className="w-32 h-32 mx-auto"
-                      placeholder="Chọn ảnh"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 1: Name and Username Prefix */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Tên nhân viên *</Label>
-                    <Input
-                      id="name"
-                      placeholder="Nguyễn Văn A"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  {dialogMode === "create" && (
-                    <div className="grid gap-2">
-                      <Label htmlFor="usernamePrefix">Mã đăng nhập</Label>
-                      <div className="flex gap-2 items-center">
-                        <Input
-                          id="usernamePrefix"
-                          placeholder="tr"
-                          maxLength={2}
-                          className="w-20 text-center font-mono uppercase"
-                          value={formData.usernamePrefix}
-                          onChange={(e) => setFormData(prev => ({ ...prev, usernamePrefix: e.target.value.toLowerCase().replace(/[^a-z]/g, '').substring(0, 2) }))}
-                        />
-                        <span className="text-muted-foreground font-mono">000001</span>
-                        <span className="text-xs text-muted-foreground">(tự động)</span>
-                      </div>
-                    </div>
-                  )}
-                  {dialogMode === "edit" && selectedStaff && (
-                    <div className="grid gap-2">
-                      <Label>Username</Label>
-                      <Input value={selectedStaff.username} disabled className="font-mono" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Row 2: Birth Date and Gender */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="birthDate">Ngày sinh *</Label>
-                    <Input
-                      id="birthDate"
-                      type="date"
-                      value={formData.birthDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, birthDate: e.target.value }))}
-                      required={dialogMode === "create"}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="gender">Giới tính *</Label>
-                    <Select
-                      value={formData.gender}
-                      onValueChange={(value: Gender) => setFormData(prev => ({ ...prev, gender: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn giới tính" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Nam</SelectItem>
-                        <SelectItem value="female">Nữ</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Row 3: Province and Ward */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="provinceCode">Tỉnh/Thành phố</Label>
-                    <ProvinceSelect
-                      options={provinces}
-                      value={formData.provinceCode || ""}
-                      onValueChange={handleProvinceChange}
-                      loading={loadingProvinces}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="wardCode">Phường/Xã</Label>
-                    <WardSelect
-                      options={wards}
-                      value={formData.wardCode || ""}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, wardCode: value }))}
-                      disabled={!formData.provinceCode || loadingWards}
-                      loading={loadingWards}
-                    />
-                  </div>
-                </div>
-
-                {/* Row 4: Address */}
-                <div className="grid gap-2">
-                  <Label htmlFor="address">Địa chỉ chi tiết</Label>
-                  <Input
-                    id="address"
-                    placeholder="123 Nguyễn Văn Linh"
-                    value={formData.address}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  />
-                </div>
-
-                {/* Row 5: Brand and Branch */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="brandId">Thương hiệu *</Label>
-                    <Select
-                      value={formData.brandId}
-                      onValueChange={handleBrandChange}
-                      disabled={loadingBrands}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn thương hiệu" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brands.map((brand) => (
-                          <SelectItem key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="branchId">Chi nhánh chính *</Label>
-                    <Select
-                      value={formData.branchId}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, branchId: value }))}
-                      disabled={!formData.brandId || loadingBranches || branches.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn chi nhánh" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Row 6: Department */}
-                <div className="grid gap-2">
-                  <Label htmlFor="departmentId">Bộ phận {dialogMode === "create" ? "*" : ""}</Label>
-                  <Select
-                    value={formData.departmentId}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, departmentId: value }))}
-                    disabled={loadingDepartments}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn bộ phận" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Row 6.5: Branch Permissions (only in edit mode) */}
-                {dialogMode === "edit" && selectedStaff && (
-                  <div className="grid gap-2">
-                    <Label>Quyền chi nhánh</Label>
-                    <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
-                      {(() => {
-                        const permDisplay = getBranchPermissionsDisplay(selectedStaff.id);
-                        if (!permDisplay) {
-                          return (
-                            <span className="text-sm text-muted-foreground">
-                              Chưa gán quyền chi nhánh
-                            </span>
-                          );
-                        }
-                        return (
-                          <div className="flex items-center gap-2 flex-wrap flex-1">
-                            {permDisplay.defaultBranch && (
-                              <Badge variant="default" className="text-xs">
-                                {permDisplay.defaultBranch.branchName}
-                              </Badge>
-                            )}
-                            {permDisplay.otherBranches.length > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{permDisplay.otherBranches.length} chi nhánh khác
-                              </Badge>
-                            )}
-                          </div>
-                        );
-                      })()}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenBranchAssignment(selectedStaff)}
-                      >
-                        <Building2 className="h-4 w-4 mr-1" />
-                        Quản lý
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Row 7: ID Number and Email */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="idNumber">Căn cước công dân</Label>
-                    <Input
-                      id="idNumber"
-                      placeholder="001234567890"
-                      value={formData.idNumber}
-                      onChange={(e) => setFormData(prev => ({ ...prev, idNumber: e.target.value }))}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="email@example.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                {/* Row 8: Phone */}
-                <div className="grid gap-2">
-                  <Label htmlFor="phone">Số điện thoại</Label>
-                  <Input
-                    id="phone"
-                    placeholder="0909123456"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <DialogFooter className="flex-col sm:flex-row gap-4">
-                {dialogMode === "create" && (
-                  <div className="flex items-center space-x-2 mr-auto">
-                    <Checkbox
-                      id="continueCreating"
-                      checked={continueCreating}
-                      onCheckedChange={(checked) => setContinueCreating(checked === true)}
-                    />
-                    <Label htmlFor="continueCreating" className="text-sm font-normal cursor-pointer">
-                      Tiếp tục tạo sau khi lưu
-                    </Label>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                    Hủy
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={saving || (dialogMode === "create" && (!formData.name.trim() || !formData.birthDate || !formData.departmentId || !formData.brandId || !formData.branchId))}
-                  >
-                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {dialogMode === "create" ? "Tạo nhân viên" : "Cập nhật"}
-                  </Button>
-                </div>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Create/Edit Staff Dialog - Fully Isolated Component */}
+      <StaffFormDialog
+        open={dialogMode === "create" || dialogMode === "edit"}
+        mode={dialogMode === "edit" ? "edit" : "create"}
+        staffId={selectedStaff?.id}
+        onClose={handleCloseDialog}
+        onSuccess={handleStaffSuccess}
+        continueCreating={continueCreating}
+        setContinueCreating={setContinueCreating}
+      />
 
       {/* Reset Password Result Dialog */}
       <Dialog open={resetPasswordResult !== null} onOpenChange={() => setResetPasswordResult(null)}>
