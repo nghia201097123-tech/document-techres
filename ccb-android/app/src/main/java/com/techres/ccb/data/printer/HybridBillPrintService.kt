@@ -67,6 +67,14 @@ object HybridBillPrintService {
             // ========== MÁY IN LIỀN THÂN (SUNMI) ==========
             if (printerConfig.connectionType == "sunmi") {
                 Log.d(TAG, "Using SUNMI BUILT-IN printer")
+
+                // Cảnh báo nếu config sunmi nhưng có IP -> có thể cấu hình sai
+                if (!printerConfig.printerIp.isNullOrBlank()) {
+                    Log.w(TAG, "⚠️ CẢNH BÁO: connectionType='sunmi' nhưng có IP '${printerConfig.printerIp}'")
+                    Log.w(TAG, "⚠️ Nếu máy in rời (WiFi/LAN), hãy đổi connectionType='network' để in mượt hơn!")
+                    Log.w(TAG, "⚠️ Sunmi adapter có thể gây giật khi in qua AIDL interface")
+                }
+
                 return@withContext printViaSunmi(printerConfig, template, billData)
             }
 
@@ -192,6 +200,8 @@ object HybridBillPrintService {
 
     /**
      * In 1 bản bill qua Network - giống hệt kitchen ticket
+     * Socket settings: reuseAddress, keepAlive, tcpNoDelay, soLinger
+     * Flow: write() → flush() → delay(500ms) → close
      */
     private suspend fun printSingleCopy(
         ip: String,
@@ -202,33 +212,51 @@ object HybridBillPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
+        Log.d(TAG, "=== START PRINT BILL (NETWORK) ===")
+        Log.d(TAG, "Target: $ip:$port")
+        Log.d(TAG, "Content size: ${content.size} bytes")
+
         return try {
+            Log.d(TAG, "Creating socket...")
             socket = Socket().apply {
                 reuseAddress = true
                 keepAlive = true
-                tcpNoDelay = true
+                tcpNoDelay = true  // Disable Nagle's algorithm - gửi ngay không buffer
                 setSoLinger(true, 2)
             }
+
+            Log.d(TAG, "Connecting to $ip:$port...")
             socket.connect(InetSocketAddress(ip, port), timeoutMs)
+            Log.d(TAG, "Connected successfully!")
+
             outputStream = socket.getOutputStream()
+            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
             // Gửi toàn bộ data 1 lần (giống kitchen ticket)
             outputStream.write(content)
+            Log.d(TAG, "Write completed, flushing...")
             outputStream.flush()
+            Log.d(TAG, "Flush completed!")
 
             // Đợi máy in xử lý xong (giống kitchen ticket delay 500ms)
+            Log.d(TAG, "Waiting 500ms for printer to process...")
             delay(500)
 
+            Log.d(TAG, "=== PRINT BILL SUCCESS ===")
             PrinterResult.Success("OK")
         } catch (e: Exception) {
-            Log.e(TAG, "Print error: ${e.message}")
+            Log.e(TAG, "=== PRINT BILL FAILED ===")
+            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Error message: ${e.message}")
             PrinterResult.Error("Lỗi in: ${e.message}")
         } finally {
             try {
+                Log.d(TAG, "Closing connection...")
                 outputStream?.flush()
                 socket?.shutdownOutput()
                 outputStream?.close()
                 socket?.close()
+                Log.d(TAG, "Connection closed")
             } catch (e: Exception) {
                 Log.e(TAG, "Close error: ${e.message}")
             }
