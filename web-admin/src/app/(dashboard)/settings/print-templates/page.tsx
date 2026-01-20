@@ -17,6 +17,9 @@ import {
   Settings2,
   Receipt,
   Tag,
+  Package,
+  Wifi,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,39 +155,20 @@ interface Kitchen {
   ticketPrintPrice: boolean;
   labelWidthMm: number;
   labelHeightMm: number;
+  assignedProducts: number;
   isActive: boolean;
   createdAt: string;
 }
 
-// Mock data for kitchens
+// Mock data for kitchens - matching screenshot design
 const mockKitchens: Kitchen[] = [
   {
     id: "1",
-    name: "Bếp chính",
+    name: "Bếp In Tem",
     kitchenType: "kitchen",
-    description: "Bếp nấu món chính",
-    printerName: "EPSON TM-T82",
-    printerIp: "192.168.1.100",
-    printerPort: 9100,
-    paperWidth: 80,
-    printMode: "TICKET",
-    ticketCopies: 1,
-    ticketPrintOrderNumber: true,
-    ticketPrintTableName: true,
-    ticketPrintTime: true,
-    ticketPrintPrice: false,
-    labelWidthMm: 72,
-    labelHeightMm: 30,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "2",
-    name: "Quầy Bar",
-    kitchenType: "bar",
-    description: "Quầy pha chế đồ uống",
-    printerName: "Xprinter XP-370B",
-    printerIp: "192.168.1.101",
+    description: "In tem/sticker cho đồ uống",
+    printerName: "In tem",
+    printerIp: "172.16.0.126",
     printerPort: 9100,
     paperWidth: 80,
     printMode: "LABEL",
@@ -195,34 +179,78 @@ const mockKitchens: Kitchen[] = [
     ticketPrintPrice: false,
     labelWidthMm: 72,
     labelHeightMm: 30,
+    assignedProducts: 90,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "2",
+    name: "Bếp nấu",
+    kitchenType: "kitchen",
+    description: "Bếp nấu món chính",
+    printerName: "",
+    printerIp: "172.16.1.140",
+    printerPort: 9100,
+    paperWidth: 80,
+    printMode: "TICKET",
+    ticketCopies: 1,
+    ticketPrintOrderNumber: true,
+    ticketPrintTableName: true,
+    ticketPrintTime: true,
+    ticketPrintPrice: false,
+    labelWidthMm: 72,
+    labelHeightMm: 30,
+    assignedProducts: 90,
     isActive: true,
     createdAt: "2024-01-02T00:00:00Z",
   },
   {
     id: "3",
-    name: "Bếp nướng BBQ",
+    name: "BẾP NẤU 2",
     kitchenType: "grill",
-    description: "Bếp nướng thịt và hải sản",
-    printerName: "EPSON TM-T82",
-    printerIp: "192.168.1.102",
+    description: "Bếp nướng",
+    printerName: "NGHĨA",
+    printerIp: "172.16.1.140",
     printerPort: 9100,
     paperWidth: 80,
     printMode: "TICKET",
-    ticketCopies: 2,
+    ticketCopies: 1,
     ticketPrintOrderNumber: true,
     ticketPrintTableName: true,
     ticketPrintTime: true,
-    ticketPrintPrice: true,
+    ticketPrintPrice: false,
     labelWidthMm: 72,
     labelHeightMm: 30,
+    assignedProducts: 5,
     isActive: true,
     createdAt: "2024-01-03T00:00:00Z",
+  },
+  {
+    id: "4",
+    name: "BẾP NẤU 3",
+    kitchenType: "dessert",
+    description: "Tráng miệng",
+    printerName: "",
+    printerIp: "172.16.1.140",
+    printerPort: 9100,
+    paperWidth: 80,
+    printMode: "TICKET",
+    ticketCopies: 1,
+    ticketPrintOrderNumber: true,
+    ticketPrintTableName: true,
+    ticketPrintTime: true,
+    ticketPrintPrice: false,
+    labelWidthMm: 72,
+    labelHeightMm: 30,
+    assignedProducts: 4,
+    isActive: true,
+    createdAt: "2024-01-04T00:00:00Z",
   },
 ];
 
 // ================== COMPONENT ==================
 export default function PrintTemplatesPage() {
-  const [activeTab, setActiveTab] = React.useState("bill");
+  const [activeTab, setActiveTab] = React.useState("kitchen");
 
   // Bill templates state
   const [billTemplates, setBillTemplates] = React.useState<BillTemplate[]>(mockBillTemplates);
@@ -272,6 +300,7 @@ export default function PrintTemplatesPage() {
     ticketPrintPrice: false,
     labelWidthMm: 72,
     labelHeightMm: 30,
+    assignedProducts: 0,
   });
 
   // Filtered data
@@ -359,6 +388,7 @@ export default function PrintTemplatesPage() {
       ticketPrintPrice: false,
       labelWidthMm: 72,
       labelHeightMm: 30,
+      assignedProducts: 0,
     });
     setIsKitchenDialogOpen(true);
   };
@@ -381,6 +411,7 @@ export default function PrintTemplatesPage() {
       ticketPrintPrice: kitchen.ticketPrintPrice,
       labelWidthMm: kitchen.labelWidthMm,
       labelHeightMm: kitchen.labelHeightMm,
+      assignedProducts: kitchen.assignedProducts,
     });
     setIsKitchenDialogOpen(true);
   };
@@ -469,21 +500,21 @@ export default function PrintTemplatesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Mẫu in</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Quản lý bếp & Máy in</h2>
         <p className="text-muted-foreground">
-          Quản lý mẫu in hóa đơn và cấu hình in bếp/bar
+          Cấu hình bếp, gán món vào bếp và thiết lập máy in
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-2">
+          <TabsTrigger value="kitchen" className="flex items-center gap-2">
+            <ChefHat className="h-4 w-4" />
+            Bếp & Máy in
+          </TabsTrigger>
           <TabsTrigger value="bill" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             Mẫu in Bill
-          </TabsTrigger>
-          <TabsTrigger value="kitchen" className="flex items-center gap-2">
-            <ChefHat className="h-4 w-4" />
-            In Bếp
           </TabsTrigger>
         </TabsList>
 
@@ -659,191 +690,117 @@ export default function PrintTemplatesPage() {
 
         {/* ================== KITCHEN TAB ================== */}
         <TabsContent value="kitchen" className="space-y-4">
-          {/* Stats */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tổng số bếp
-                </CardTitle>
-                <ChefHat className="h-4 w-4 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{kitchens.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Đang hoạt động
-                </CardTitle>
-                <Check className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-500">
-                  {kitchens.filter((k) => k.isActive).length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  In phiếu (Ticket)
-                </CardTitle>
-                <Receipt className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {kitchens.filter((k) => k.printMode === "TICKET").length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  In tem (Label)
-                </CardTitle>
-                <Tag className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {kitchens.filter((k) => k.printMode === "LABEL").length}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Header with search and add button */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Danh sách bếp</h3>
+              <p className="text-sm text-muted-foreground">Tổng cộng {kitchens.length} bếp</p>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm bếp..."
+                  value={kitchenSearchQuery}
+                  onChange={(e) => setKitchenSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button onClick={handleOpenKitchenCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm bếp
+              </Button>
+            </div>
           </div>
 
-          {/* Kitchen Table */}
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle className="text-lg">
-                  Danh sách bếp/bar ({filteredKitchens.length})
-                </CardTitle>
-                <div className="flex gap-2">
-                  <div className="relative w-72">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Tìm kiếm bếp..."
-                      value={kitchenSearchQuery}
-                      onChange={(e) => setKitchenSearchQuery(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  <Button onClick={handleOpenKitchenCreate}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Thêm bếp
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tên bếp</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Máy in</TableHead>
-                    <TableHead>Chế độ in</TableHead>
-                    <TableHead>Khổ giấy</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredKitchens.map((kitchen) => (
-                    <TableRow key={kitchen.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${getKitchenTypeColor(kitchen.kitchenType)}`}>
-                            <ChefHat className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{kitchen.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {kitchen.description || "Không có mô tả"}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getKitchenTypeColor(kitchen.kitchenType)}>
-                          {getKitchenTypeLabel(kitchen.kitchenType)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{kitchen.printerName || "Chưa cấu hình"}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {kitchen.printerIp ? `${kitchen.printerIp}:${kitchen.printerPort}` : "-"}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={kitchen.printMode === "TICKET" ? "default" : "secondary"}>
-                          {kitchen.printMode === "TICKET" ? (
-                            <>
-                              <Receipt className="mr-1 h-3 w-3" />
-                              Phiếu
-                            </>
-                          ) : (
-                            <>
-                              <Tag className="mr-1 h-3 w-3" />
-                              Tem
-                            </>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {kitchen.printMode === "TICKET"
-                          ? `${kitchen.paperWidth}mm`
-                          : `${kitchen.labelWidthMm}x${kitchen.labelHeightMm}mm`
-                        }
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={kitchen.isActive ? "success" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => handleToggleKitchenStatus(kitchen)}
+          {/* Kitchen Cards Grid - matching screenshot design */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredKitchens.map((kitchen) => (
+              <Card key={kitchen.id} className="relative">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+                        kitchen.printMode === "LABEL"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-amber-100 text-amber-600"
+                      }`}>
+                        <ChefHat className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{kitchen.name}</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Máy in: {kitchen.printerName || "Chưa đặt tên"}
+                        </p>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenKitchenEdit(kitchen)}>
+                          <Settings2 className="mr-2 h-4 w-4" />
+                          Cấu hình
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenKitchenEdit(kitchen)}>
+                          <Package className="mr-2 h-4 w-4" />
+                          Gán món
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleOpenDelete("kitchen", kitchen)}
+                          className="text-destructive focus:text-destructive"
                         >
-                          {kitchen.isActive ? "Hoạt động" : "Tạm dừng"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenKitchenEdit(kitchen)}>
-                              <Settings2 className="mr-2 h-4 w-4" />
-                              Cấu hình
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleOpenDelete("kitchen", kitchen)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Xóa
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredKitchens.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center">
-                        Không tìm thấy bếp nào
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Xóa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Printer Info */}
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Wifi className="h-3.5 w-3.5" />
+                      <span>IP: {kitchen.printerIp}:{kitchen.printerPort}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Printer className="h-3.5 w-3.5" />
+                      <span>Giấy: {kitchen.paperWidth}mm | {kitchen.printMode === "TICKET" ? "In phiếu bếp" : "In tem/sticker"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ChefHat className="h-3.5 w-3.5" />
+                      <span>Loại: {getKitchenTypeLabel(kitchen.kitchenType)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Package className="h-3.5 w-3.5" />
+                      <span>{kitchen.assignedProducts} món được gán</span>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className="pt-2">
+                    <Badge
+                      variant={kitchen.isActive ? "success" : "secondary"}
+                      className="cursor-pointer"
+                      onClick={() => handleToggleKitchenStatus(kitchen)}
+                    >
+                      {kitchen.isActive ? "Hoạt động" : "Tạm dừng"}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {filteredKitchens.length === 0 && (
+              <div className="col-span-full flex h-32 items-center justify-center text-muted-foreground">
+                Không tìm thấy bếp nào
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 
