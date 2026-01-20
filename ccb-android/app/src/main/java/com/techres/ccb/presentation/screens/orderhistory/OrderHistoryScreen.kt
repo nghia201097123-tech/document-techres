@@ -959,6 +959,358 @@ private fun PaginationControls(
 }
 
 @Composable
+private fun OrderDetailDialogHeader(
+    dailyOrderNumber: Int,
+    orderNumber: String,
+    isCompleted: Boolean,
+    onDismiss: () -> Unit
+) {
+    val statusColor = remember(isCompleted) { if (isCompleted) Color(0xFF4CAF50) else Color(0xFFf44336) }
+    val statusText = remember(isCompleted) { if (isCompleted) "Hoàn tất" else "Đã hủy" }
+    val displayNumber = remember(dailyOrderNumber, orderNumber) {
+        if (dailyOrderNumber > 0) {
+            "#${dailyOrderNumber.toString().padStart(4, '0')}"
+        } else {
+            "#${orderNumber.takeLast(8)}"
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5F5F5))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "Chi tiết đơn hàng",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = displayNumber,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE65100)
+                )
+                Text(
+                    text = " · $orderNumber",
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Close, "Đóng", tint = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderDetailActionButtons(
+    isCompleted: Boolean,
+    syncStatus: String,
+    isPrinting: Boolean,
+    isSyncing: Boolean,
+    isCancelling: Boolean,
+    onSyncOrder: () -> Unit,
+    onReprintBill: () -> Unit,
+    onShowCancelDialog: () -> Unit
+) {
+    val syncInfo = remember(syncStatus) {
+        when (syncStatus) {
+            "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
+            "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang...")
+            "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi")
+            else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ")
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        IconButton(
+            onClick = onSyncOrder,
+            enabled = !isSyncing && syncStatus != "synced",
+            modifier = Modifier
+                .size(32.dp)
+                .background(syncInfo.second.copy(alpha = 0.1f), CircleShape)
+        ) {
+            Icon(syncInfo.first, syncInfo.third, tint = syncInfo.second, modifier = Modifier.size(18.dp))
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        if (isCompleted) {
+            OutlinedButton(
+                onClick = onReprintBill,
+                enabled = !isPrinting,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(if (isPrinting) "Đang in..." else "In lại", fontSize = 12.sp)
+            }
+
+            OutlinedButton(
+                onClick = onShowCancelDialog,
+                enabled = !isCancelling,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFf44336)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(Icons.Default.Cancel, null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(if (isCancelling) "Đang..." else "Huỷ đơn", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderDetailMessages(
+    printMessage: String?,
+    syncMessage: String?,
+    cancelMessage: String?
+) {
+    val messages = remember(printMessage, syncMessage, cancelMessage) {
+        listOf(
+            printMessage to (printMessage?.contains("thành công") == true),
+            syncMessage to (syncMessage?.contains("Lỗi") != true),
+            cancelMessage to (cancelMessage?.contains("thành công") == true)
+        ).filter { it.first != null }
+    }
+
+    if (messages.isNotEmpty()) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+            messages.forEach { (msg, isSuccess) ->
+                if (!msg.isNullOrEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp)
+                            .background(
+                                if (isSuccess) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Text(msg, fontSize = 12.sp, color = if (isSuccess) Color(0xFF2E7D32) else Color(0xFFC62828))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderDetailSummaryFooter(
+    order: OrderEntity,
+    orderItems: List<OrderItemEntity>,
+    isCompleted: Boolean,
+    onShowVatDetail: () -> Unit
+) {
+    // Memoize all calculations to prevent recalculation on every recomposition
+    val summaryData = remember(order, orderItems) {
+        val activeOrderItems = orderItems.filter { it.status != "cancelled" && !it.isComboChild }
+        val itemDiscountTotal = activeOrderItems.sumOf { it.discountAmount }
+        val totalDiscount = order.discountAmount
+
+        val subtotal = order.subtotal
+        val afterDiscountRatio = if (subtotal > 0) {
+            ((subtotal - totalDiscount).toDouble() / subtotal).coerceIn(0.0, 1.0)
+        } else 1.0
+
+        // Calculate VAT
+        var vatAmount = 0.0
+        activeOrderItems.forEach { item ->
+            val toppings = parseVariantsFromNotesStatic(item.notes)
+            val toppingsTotal = toppings.sumOf { it.second }
+            val actualUnitPrice = (item.totalPrice / item.quantity).toLong()
+            val mainUnitPrice = (actualUnitPrice - toppingsTotal).coerceAtLeast(0L)
+            val mainPrice = mainUnitPrice * item.quantity
+
+            val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
+            if (item.vatRate > 0 && mainPriceAfterDiscount > 0) {
+                val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                vatAmount += (mainPriceAfterDiscount - priceBeforeVat).toDouble()
+            }
+
+            toppings.forEach { (_, toppingPrice) ->
+                val toppingTotal = toppingPrice * item.quantity
+                val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
+                if (item.vatRate > 0 && toppingAfterDiscount > 0) {
+                    val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
+                    vatAmount += (toppingAfterDiscount - priceBeforeVat).toDouble()
+                }
+            }
+        }
+
+        if (order.surchargeAmount > 0) {
+            val surchargeVatRate = 8.0
+            val priceBeforeVat = (order.surchargeAmount / (1 + surchargeVatRate / 100.0)).toLong()
+            vatAmount += order.surchargeAmount - priceBeforeVat
+        }
+
+        // Parse applied coupons
+        val appliedCoupons: List<AppliedCouponInfo> = try {
+            if (!order.appliedCouponsJson.isNullOrEmpty()) {
+                val type = object : TypeToken<List<AppliedCouponInfo>>() {}.type
+                Gson().fromJson(order.appliedCouponsJson, type)
+            } else emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        val couponDiscountTotal = appliedCoupons.sumOf { it.discountAmount }
+        val billDiscount = (totalDiscount - itemDiscountTotal - couponDiscountTotal).coerceAtLeast(0.0)
+
+        SummaryFooterData(
+            subtotal = order.subtotal.toLong(),
+            itemDiscountTotal = itemDiscountTotal.toLong(),
+            appliedCoupons = appliedCoupons,
+            billDiscount = billDiscount.toLong(),
+            surchargeAmount = order.surchargeAmount.toLong(),
+            vatAmount = vatAmount.toLong(),
+            totalAmount = order.totalAmount.toLong(),
+            paidAmount = order.paidAmount.toLong(),
+            changeAmount = order.changeAmount.toLong()
+        )
+    }
+
+    Divider()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5F5F5))
+            .padding(12.dp)
+    ) {
+        SummaryRow("Tạm tính (đã gồm VAT)", formatCurrency(summaryData.subtotal))
+
+        if (summaryData.itemDiscountTotal > 0) {
+            SummaryRow("Giảm giá món", "-${formatCurrency(summaryData.itemDiscountTotal)}", Color(0xFF4CAF50))
+        }
+
+        summaryData.appliedCoupons.forEach { coupon ->
+            val couponLabel = buildString {
+                append("Coupon: ${coupon.code}")
+                when (coupon.discountType) {
+                    "percentage" -> append(" (${coupon.discountValue.toInt()}%)")
+                    "fixed" -> append(" (Tiền mặt)")
+                }
+            }
+            SummaryRow(couponLabel, "-${formatCurrency(coupon.discountAmount.toLong())}", Color(0xFF2196F3))
+        }
+
+        if (summaryData.billDiscount > 0) {
+            SummaryRow("Giảm giá HĐ", "-${formatCurrency(summaryData.billDiscount)}", Color(0xFF4CAF50))
+        }
+
+        if (summaryData.surchargeAmount > 0) {
+            SummaryRow("Phụ thu", "+${formatCurrency(summaryData.surchargeAmount)}", Color(0xFFFF9800))
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onShowVatDetail() }
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Trong đó VAT", fontSize = 13.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "Xem chi tiết VAT",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(formatCurrency(summaryData.vatAmount), fontSize = 13.sp, color = Color.Gray)
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        Divider()
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("TỔNG CỘNG", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(
+                formatCurrency(summaryData.totalAmount),
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray
+            )
+        }
+
+        if (isCompleted && summaryData.paidAmount > 0) {
+            SummaryRow("Khách đưa", formatCurrency(summaryData.paidAmount))
+            if (summaryData.changeAmount > 0) {
+                SummaryRow("Tiền thừa", formatCurrency(summaryData.changeAmount))
+            }
+        }
+    }
+}
+
+// Data class to hold summary footer calculations
+private data class SummaryFooterData(
+    val subtotal: Long,
+    val itemDiscountTotal: Long,
+    val appliedCoupons: List<AppliedCouponInfo>,
+    val billDiscount: Long,
+    val surchargeAmount: Long,
+    val vatAmount: Long,
+    val totalAmount: Long,
+    val paidAmount: Long,
+    val changeAmount: Long
+)
+
+// Static helper function for parsing variants (outside composable)
+private fun parseVariantsFromNotesStatic(notes: String?): List<Pair<String, Long>> {
+    if (notes.isNullOrEmpty()) return emptyList()
+    val variants = mutableListOf<Pair<String, Long>>()
+    val parts = notes.split(" | ").firstOrNull()?.takeIf { !it.startsWith("Ghi chú:") } ?: return emptyList()
+    parts.split(",").forEach { part ->
+        val trimmed = part.trim()
+        if (trimmed.isEmpty()) return@forEach
+        val priceMatch = Regex("\\(\\+?(\\d[\\d.,]*)\\)").find(trimmed)
+        val price = priceMatch?.groupValues?.get(1)?.replace(".", "")?.replace(",", "")?.toLongOrNull() ?: 0L
+        if (price > 0) {
+            val name = trimmed.replace(priceMatch?.value ?: "", "").trim()
+                .removePrefix("+ ").removePrefix("+")
+                .let { if (it.contains(":")) it.substringAfter(":").trim() else it }
+            variants.add(name to price)
+        }
+    }
+    return variants
+}
+
+@Composable
 private fun OrderDetailDialog(
     order: OrderEntity,
     orderItems: List<OrderItemEntity>,
@@ -1048,142 +1400,32 @@ private fun OrderDetailDialog(
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // ========== HEADER ==========
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF5F5F5))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Title + Order number
-                    Column {
-                        Text(
-                            text = "Chi tiết đơn hàng",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        // Daily order number (primary) + order ID (secondary)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val displayNumber = if (order.dailyOrderNumber > 0) {
-                                "#${order.dailyOrderNumber.toString().padStart(4, '0')}"
-                            } else {
-                                "#${order.orderNumber.takeLast(8)}"
-                            }
-                            Text(
-                                text = displayNumber,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE65100)
-                            )
-                            Text(
-                                text = " · ${order.orderNumber}",
-                                fontSize = 10.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
+                // ========== HEADER - Extracted composable ==========
+                OrderDetailDialogHeader(
+                    dailyOrderNumber = order.dailyOrderNumber,
+                    orderNumber = order.orderNumber,
+                    isCompleted = isCompleted,
+                    onDismiss = onDismiss
+                )
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Status badge
-                        Box(
-                            modifier = Modifier
-                                .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        }
+                // ========== ACTION BUTTONS - Extracted composable ==========
+                OrderDetailActionButtons(
+                    isCompleted = isCompleted,
+                    syncStatus = order.syncStatus,
+                    isPrinting = isPrinting,
+                    isSyncing = isSyncing,
+                    isCancelling = isCancelling,
+                    onSyncOrder = onSyncOrder,
+                    onReprintBill = onReprintBill,
+                    onShowCancelDialog = { showCancelDialog = true }
+                )
 
-                        // Close button
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Close, "Đóng", tint = Color.Gray)
-                        }
-                    }
-                }
-
-                // ========== ACTION BUTTONS (compact row) ==========
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Sync status icon (compact)
-                    val syncInfo = when (order.syncStatus) {
-                        "synced" -> Triple(Icons.Default.CloudDone, Color(0xFF4CAF50), "Đã đồng bộ")
-                        "syncing" -> Triple(Icons.Default.Sync, Color(0xFF2196F3), "Đang...")
-                        "failed" -> Triple(Icons.Default.CloudOff, Color(0xFFf44336), "Lỗi")
-                        else -> Triple(Icons.Default.Cloud, Color(0xFFFF9800), "Chờ")
-                    }
-                    IconButton(
-                        onClick = onSyncOrder,
-                        enabled = !isSyncing && order.syncStatus != "synced",
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(syncInfo.second.copy(alpha = 0.1f), CircleShape)
-                    ) {
-                        Icon(syncInfo.first, syncInfo.third, tint = syncInfo.second, modifier = Modifier.size(18.dp))
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Reprint button (compact)
-                    if (isCompleted) {
-                        OutlinedButton(
-                            onClick = onReprintBill,
-                            enabled = !isPrinting,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (isPrinting) "Đang in..." else "In lại", fontSize = 12.sp)
-                        }
-                    }
-
-                    // Cancel button (compact)
-                    if (isCompleted) {
-                        OutlinedButton(
-                            onClick = { showCancelDialog = true },
-                            enabled = !isCancelling,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFf44336)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Icon(Icons.Default.Cancel, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (isCancelling) "Đang..." else "Huỷ đơn", fontSize = 12.sp)
-                        }
-                    }
-                }
-
-                // ========== MESSAGES ==========
-                Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                    listOf(
-                        printMessage to (printMessage?.contains("thành công") == true),
-                        syncMessage to (syncMessage?.contains("Lỗi") != true),
-                        cancelMessage to (cancelMessage?.contains("thành công") == true)
-                    ).forEach { (msg, isSuccess) ->
-                        if (!msg.isNullOrEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 4.dp)
-                                    .background(
-                                        if (isSuccess) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(8.dp)
-                            ) {
-                                Text(msg, fontSize = 12.sp, color = if (isSuccess) Color(0xFF2E7D32) else Color(0xFFC62828))
-                            }
-                        }
-                    }
-                }
+                // ========== MESSAGES - Extracted composable ==========
+                OrderDetailMessages(
+                    printMessage = printMessage,
+                    syncMessage = syncMessage,
+                    cancelMessage = cancelMessage
+                )
 
                 Divider(color = Color.LightGray.copy(alpha = 0.5f))
 
@@ -1741,181 +1983,13 @@ private fun OrderDetailDialog(
                     item { Spacer(modifier = Modifier.height(12.dp)) }
                 }
 
-                // ========== SUMMARY FOOTER ==========
-                Divider()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF5F5F5))
-                        .padding(12.dp)
-                ) {
-                    // Calculate discount breakdown (exclude cancelled items)
-                    val activeOrderItems = orderItems.filter { it.status != "cancelled" && !it.isComboChild }
-                    val itemDiscountTotal = activeOrderItems.sumOf { it.discountAmount }
-                    val totalDiscount = order.discountAmount
-
-                    // Tính VAT bằng cách cộng từng món (giống VatDetailDialog)
-                    val subtotal = order.subtotal
-                    val afterDiscountRatio = if (subtotal > 0) {
-                        ((subtotal - totalDiscount).toDouble() / subtotal).coerceIn(0.0, 1.0)
-                    } else 1.0
-
-                    // Helper function to parse variants from notes
-                    fun parseVariantsFromNotes(notes: String?, itemVatRate: Double): List<Pair<String, Long>> {
-                        if (notes.isNullOrEmpty()) return emptyList()
-                        val variants = mutableListOf<Pair<String, Long>>()
-                        val parts = notes.split(" | ").firstOrNull()?.takeIf { !it.startsWith("Ghi chú:") } ?: return emptyList()
-                        parts.split(",").forEach { part ->
-                            val trimmed = part.trim()
-                            if (trimmed.isEmpty()) return@forEach
-                            val priceMatch = Regex("\\(\\+?(\\d[\\d.,]*)\\)").find(trimmed)
-                            val price = priceMatch?.groupValues?.get(1)?.replace(".", "")?.replace(",", "")?.toLongOrNull() ?: 0L
-                            if (price > 0) {
-                                val name = trimmed.replace(priceMatch?.value ?: "", "").trim()
-                                    .removePrefix("+ ").removePrefix("+")
-                                    .let { if (it.contains(":")) it.substringAfter(":").trim() else it }
-                                variants.add(name to price)
-                            }
-                        }
-                        return variants
-                    }
-
-                    var vatAmount = 0.0
-                    activeOrderItems.forEach { item ->
-                        // Parse toppings từ notes
-                        val toppings = parseVariantsFromNotes(item.notes, item.vatRate)
-                        val toppingsTotal = toppings.sumOf { it.second }
-                        // Main item price (total - toppings)
-                        val actualUnitPrice = (item.totalPrice / item.quantity).toLong()
-                        val mainUnitPrice = (actualUnitPrice - toppingsTotal).coerceAtLeast(0L)
-                        val mainPrice = mainUnitPrice * item.quantity
-
-                        // VAT món chính
-                        val mainPriceAfterDiscount = (mainPrice * afterDiscountRatio).toLong()
-                        if (item.vatRate > 0 && mainPriceAfterDiscount > 0) {
-                            val priceBeforeVat = (mainPriceAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
-                            vatAmount += (mainPriceAfterDiscount - priceBeforeVat).toDouble()
-                        }
-
-                        // VAT từng topping
-                        toppings.forEach { (_, toppingPrice) ->
-                            val toppingTotal = toppingPrice * item.quantity
-                            val toppingAfterDiscount = (toppingTotal * afterDiscountRatio).toLong()
-                            if (item.vatRate > 0 && toppingAfterDiscount > 0) {
-                                val priceBeforeVat = (toppingAfterDiscount / (1 + item.vatRate / 100.0)).toLong()
-                                vatAmount += (toppingAfterDiscount - priceBeforeVat).toDouble()
-                            }
-                        }
-                    }
-
-                    // VAT của phụ thu (8% mặc định, không bị giảm giá)
-                    if (order.surchargeAmount > 0) {
-                        val surchargeVatRate = 8.0
-                        val priceBeforeVat = (order.surchargeAmount / (1 + surchargeVatRate / 100.0)).toLong()
-                        vatAmount += order.surchargeAmount - priceBeforeVat
-                    }
-
-                    // Parse applied coupons from JSON
-                    val appliedCoupons: List<AppliedCouponInfo> = try {
-                        if (!order.appliedCouponsJson.isNullOrEmpty()) {
-                            val type = object : TypeToken<List<AppliedCouponInfo>>() {}.type
-                            Gson().fromJson(order.appliedCouponsJson, type)
-                        } else emptyList()
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-
-                    // Calculate coupon discount total
-                    val couponDiscountTotal = appliedCoupons.sumOf { it.discountAmount }
-                    // Bill discount (excluding items and coupons)
-                    val billDiscount = (totalDiscount - itemDiscountTotal - couponDiscountTotal).coerceAtLeast(0.0)
-
-                    // Subtotal (đã gồm VAT - giá bán đã bao gồm thuế)
-                    SummaryRow("Tạm tính (đã gồm VAT)", formatCurrency(order.subtotal.toLong()))
-
-                    // Item discounts
-                    if (itemDiscountTotal > 0) {
-                        SummaryRow("Giảm giá món", "-${formatCurrency(itemDiscountTotal.toLong())}", Color(0xFF4CAF50))
-                    }
-
-                    // Coupon discounts - hiển thị từng coupon riêng biệt
-                    appliedCoupons.forEach { coupon ->
-                        val couponLabel = buildString {
-                            append("Coupon: ${coupon.code}")
-                            when (coupon.discountType) {
-                                "percentage" -> append(" (${coupon.discountValue.toInt()}%)")
-                                "fixed" -> append(" (Tiền mặt)")
-                            }
-                        }
-                        SummaryRow(couponLabel, "-${formatCurrency(coupon.discountAmount.toLong())}", Color(0xFF2196F3))
-                    }
-
-                    // Bill discount (if any remaining after coupons)
-                    if (billDiscount > 0) {
-                        SummaryRow("Giảm giá HĐ", "-${formatCurrency(billDiscount.toLong())}", Color(0xFF4CAF50))
-                    }
-
-                    // Phụ thu (Surcharge)
-                    if (order.surchargeAmount > 0) {
-                        SummaryRow("Phụ thu", "+${formatCurrency(order.surchargeAmount.toLong())}", Color(0xFFFF9800))
-                    }
-
-                    // VAT - clickable to show detail (Trong đó VAT = VAT đã bao gồm trong tạm tính)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showVatDetail = true }
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "Trong đó VAT",
-                                fontSize = 13.sp,
-                                color = Color.Gray
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = "Xem chi tiết VAT",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Text(
-                            formatCurrency(vatAmount.toLong()),
-                            fontSize = 13.sp,
-                            color = Color.Gray
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Divider()
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Total
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("TỔNG CỘNG", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text(
-                            formatCurrency(order.totalAmount.toLong()),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = if (isCompleted) Color(0xFF4CAF50) else Color.Gray
-                        )
-                    }
-
-                    // Payment info
-                    if (isCompleted && order.paidAmount > 0) {
-                        SummaryRow("Khách đưa", formatCurrency(order.paidAmount.toLong()))
-                        if (order.changeAmount > 0) {
-                            SummaryRow("Tiền thừa", formatCurrency(order.changeAmount.toLong()))
-                        }
-                    }
-                }
+                // ========== SUMMARY FOOTER - Extracted composable ==========
+                OrderDetailSummaryFooter(
+                    order = order,
+                    orderItems = orderItems,
+                    isCompleted = isCompleted,
+                    onShowVatDetail = { showVatDetail = true }
+                )
             }
         }
     }
