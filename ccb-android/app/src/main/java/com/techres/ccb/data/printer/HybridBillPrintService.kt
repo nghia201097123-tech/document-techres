@@ -199,9 +199,12 @@ object HybridBillPrintService {
     }
 
     /**
-     * In 1 bản bill qua Network - giống hệt kitchen ticket
-     * Socket settings: reuseAddress, keepAlive, tcpNoDelay, soLinger
-     * Flow: write() → flush() → delay(500ms) → close
+     * In 1 bản bill qua Network
+     *
+     * QUAN TRỌNG: Bill có thể lớn (50KB+) nên cần chunked write để tránh buffer overflow.
+     * Flow: connect → warm-up delay → chunked write → flush → delay → close
+     *
+     * Socket settings: reuseAddress, keepAlive, tcpNoDelay=false (cho phép Nagle buffer), soLinger
      */
     private suspend fun printSingleCopy(
         ip: String,
@@ -212,35 +215,60 @@ object HybridBillPrintService {
         var socket: Socket? = null
         var outputStream: OutputStream? = null
 
+        // Chunk size 4KB - đủ nhỏ để máy in xử lý kịp, đủ lớn để không quá chậm
+        val chunkSize = 4096
+
         Log.d(TAG, "=== START PRINT BILL (NETWORK) ===")
         Log.d(TAG, "Target: $ip:$port")
-        Log.d(TAG, "Content size: ${content.size} bytes")
+        Log.d(TAG, "Content size: ${content.size} bytes, chunk size: $chunkSize")
 
         return try {
             Log.d(TAG, "Creating socket...")
             socket = Socket().apply {
                 reuseAddress = true
                 keepAlive = true
-                tcpNoDelay = true  // Disable Nagle's algorithm - gửi ngay không buffer
+                tcpNoDelay = false  // Enable Nagle's algorithm - buffer small packets for smoother send
                 setSoLinger(true, 2)
+                sendBufferSize = 8192  // 8KB send buffer
             }
 
             Log.d(TAG, "Connecting to $ip:$port...")
             socket.connect(InetSocketAddress(ip, port), timeoutMs)
             Log.d(TAG, "Connected successfully!")
 
+            // WARM-UP: Delay 100ms sau khi connect để máy in sẵn sàng nhận data
+            // Một số máy in cần thời gian để khởi tạo connection trước khi nhận print data
+            delay(100)
+
             outputStream = socket.getOutputStream()
-            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
-            // Gửi toàn bộ data 1 lần (giống kitchen ticket)
-            outputStream.write(content)
-            Log.d(TAG, "Write completed, flushing...")
-            outputStream.flush()
-            Log.d(TAG, "Flush completed!")
+            // CHUNKED WRITE: Gửi data theo từng chunk để tránh buffer overflow
+            // Điều này giúp máy in có thời gian xử lý từng phần, tránh jitter
+            var offset = 0
+            var chunkIndex = 0
+            while (offset < content.size) {
+                val end = minOf(offset + chunkSize, content.size)
+                val chunk = content.copyOfRange(offset, end)
 
-            // Đợi máy in xử lý xong (giống kitchen ticket delay 500ms)
-            Log.d(TAG, "Waiting 500ms for printer to process...")
-            delay(500)
+                outputStream.write(chunk)
+                outputStream.flush()  // Flush từng chunk để đảm bảo gửi ngay
+
+                offset = end
+                chunkIndex++
+
+                // Delay nhỏ giữa các chunk để máy in xử lý kịp
+                // Không cần delay cho chunk cuối
+                if (offset < content.size) {
+                    delay(10)  // 10ms giữa mỗi chunk
+                }
+            }
+
+            Log.d(TAG, "Write completed: $chunkIndex chunks sent")
+
+            // Đợi máy in xử lý xong toàn bộ data
+            // Tăng lên 800ms cho bill lớn (50KB+)
+            Log.d(TAG, "Waiting 800ms for printer to process...")
+            delay(800)
 
             Log.d(TAG, "=== PRINT BILL SUCCESS ===")
             PrinterResult.Success("OK")
