@@ -658,7 +658,7 @@ DB_DATABASE=fnbpos_oauth
 
 # JWT
 JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRES_IN=15m
+JWT_EXPIRES_IN=30d
 JWT_REFRESH_SECRET=your-super-secret-refresh-key
 JWT_REFRESH_EXPIRES_IN=7d
 

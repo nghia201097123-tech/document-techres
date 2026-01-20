@@ -735,7 +735,7 @@ DB_DATABASE=fnbpos_dashboard
 
 # JWT
 JWT_SECRET=your-secret-key
-JWT_EXPIRES_IN=1h
+JWT_EXPIRES_IN=30d
 JWT_REFRESH_EXPIRES_IN=7d
 
 # Server
