@@ -2622,10 +2622,13 @@ class SaleViewModel @Inject constructor(
                     groupNameLower.contains("độ đá") || groupNameLower.contains("mức đá") -> "Đá"
                     else -> variant.groupName
                 }
-                if (variant.price > 0) {
-                    "$displayGroupName: ${variant.name} (+${variant.price})"
+                // Include quantity suffix and total price for SIZE options with price (like toppings)
+                val optionQtySuffix = if (variant.quantity > 1) " x${variant.quantity}" else ""
+                val totalOptionPrice = variant.price * variant.quantity
+                if (totalOptionPrice > 0) {
+                    "$displayGroupName: ${variant.name}$optionQtySuffix (+${totalOptionPrice})"
                 } else {
-                    "$displayGroupName: ${variant.name}"
+                    "$displayGroupName: ${variant.name}$optionQtySuffix"
                 }
             }
         }
