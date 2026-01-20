@@ -713,7 +713,8 @@ fun PhoneLayout(
 
         // Show total amount if has items
         if (totalBadgeCount > 0) {
-            val orderTotal = (uiState.currentOrder?.totalAmount?.toLong() ?: 0L) + uiState.totalAmount
+            // uiState.totalAmount đã bao gồm currentOrder thông qua subtotal
+            val orderTotal = uiState.totalAmount
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -1755,10 +1756,10 @@ fun CartPanel(
         }
 
         // Cart Summary
-        // orderSubtotal = items trong order cũ + items mới trong cart
-        val orderSubtotal = (currentOrder?.subtotal?.toLong() ?: 0L) + subtotal
-        // orderTotal = orderSubtotal + phụ thu - giảm giá (KHÔNG dùng currentOrder.totalAmount vì nó đã có surcharge)
-        val orderTotal = (orderSubtotal + surchargeAmount - discountAmount).coerceAtLeast(0L)
+        // subtotal đã bao gồm currentOrder.subtotal rồi (xem định nghĩa subtotal trong SaleUiState)
+        val orderSubtotal = subtotal
+        // totalAmount đã bao gồm currentOrder thông qua subtotal
+        val orderTotal = totalAmount
 
         Card(
             modifier = Modifier

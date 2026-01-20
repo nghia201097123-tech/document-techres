@@ -336,11 +336,13 @@ data class SaleUiState(
         get() = currentOrder != null
 
     // Total from current order + new cart items
+    // subtotal đã bao gồm currentOrder.subtotal rồi (xem định nghĩa subtotal ở trên)
     val orderSubtotal: Long
-        get() = (currentOrder?.subtotal?.toLong() ?: 0L) + subtotal
+        get() = subtotal
 
+    // totalAmount đã bao gồm currentOrder thông qua subtotal
     val orderTotal: Long
-        get() = (currentOrder?.totalAmount?.toLong() ?: 0L) + totalAmount
+        get() = totalAmount
 }
 
 @HiltViewModel
@@ -1803,12 +1805,11 @@ class SaleViewModel @Inject constructor(
     // ===== DISCOUNT / COUPON =====
 
     /**
-     * Tổng tiền order thực tế = currentOrder.subtotal + cart.subtotal
+     * Tổng tiền order thực tế
+     * state.subtotal đã bao gồm currentOrder.subtotal rồi (xem định nghĩa subtotal trong SaleUiState)
      */
     private fun getOrderSubtotal(): Long {
-        val state = _uiState.value
-        val orderSubtotal = state.currentOrder?.subtotal?.toLong() ?: 0L
-        return orderSubtotal + state.subtotal
+        return _uiState.value.subtotal
     }
 
     /**
