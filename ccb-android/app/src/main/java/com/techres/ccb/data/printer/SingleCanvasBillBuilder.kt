@@ -364,9 +364,13 @@ class SingleCanvasBillBuilder(
 
     /**
      * Cắt giấy
+     * QUAN TRỌNG: Phải feed giấy trước khi cắt để footer không bị dao cắt luôn
+     * Khi dùng bitmap mode, khoảng trống trong bitmap không đủ - cần lệnh feed thật
      */
     fun cut(partial: Boolean = true): SingleCanvasBillBuilder {
         postCommands.write(EscPosCommands.LINE_SPACING_DEFAULT)
+        // Feed 7 dòng để đảm bảo footer không bị cắt (tăng từ 5 lên 7)
+        postCommands.write(EscPosCommands.feedLines(7))
         postCommands.write(if (partial) EscPosCommands.CUT_PARTIAL else EscPosCommands.CUT_FULL)
         return this
     }
