@@ -1462,9 +1462,9 @@ private fun TestPrintDialog(
                             note = "Ít đá",
                             toppings = emptyList(),
                             toppingPrices = listOf(
-                                "Size L" to 100000.0,
-                                "Trân châu cam" to 100000.0,
-                                "Trân châu vàng" to 100000.0
+                                Triple("Size L", 100000.0, 1),
+                                Triple("Trân châu cam", 100000.0, 2),  // x2 để test số lượng
+                                Triple("Trân châu vàng", 100000.0, 1)
                             ),
                             options = mapOf("Đá" to "50%", "Đường" to "30%") // Size đã có trong toppingPrices
                         ),
@@ -1504,8 +1504,8 @@ private fun TestPrintDialog(
                     ice = "Ít đá",
                     toppings = listOf("Trân châu đen", "Thạch dừa"),
                     toppingPrices = listOf(
-                        "Trân châu đen" to 10000.0,
-                        "Thạch dừa" to 8000.0
+                        Triple("Trân châu đen", 10000.0, 2),  // x2 để test số lượng
+                        Triple("Thạch dừa", 8000.0, 1)
                     ),
                     note = "Ít đá, không đường, mang đi",
                     tableName = "Bàn 5",
@@ -1514,9 +1514,9 @@ private fun TestPrintDialog(
                     staffName = "Nhân viên test",
                     // Price data for testing "In giá" option
                     unitPrice = 35000.0,
-                    totalToppingPrice = 18000.0,
-                    totalPrice = 53000.0,
-                    finalPrice = 45000.0,
+                    totalToppingPrice = 28000.0,  // (10000 x 2) + (8000 x 1)
+                    totalPrice = 63000.0,  // 35000 + 28000
+                    finalPrice = 55000.0,
                     discountAmount = 8000.0
                 )
                 LabelPrintService.printLabels(kitchen, labelData)
