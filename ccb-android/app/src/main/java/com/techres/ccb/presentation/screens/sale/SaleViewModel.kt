@@ -3371,7 +3371,7 @@ class SaleViewModel @Inject constructor(
                     BillVariant(name = name, priceAdjustment = price)
                 }
 
-            // Parse toppings (starting with "+", format: "+ x2 ToppingName (+price)" or "+ ToppingName (+price)")
+            // Parse toppings (starting with "+", format: "+ ToppingName x2 (+price)" or "+ ToppingName (+price)")
             val toppings = allParts
                 .filter { it.startsWith("+") }
                 .map { toppingStr ->
@@ -3393,12 +3393,12 @@ class SaleViewModel @Inject constructor(
                         text
                     }
 
-                    // Parse quantity from format "x2 ToppingName" or "ToppingName"
-                    val qtyRegex = Regex("^x(\\d+)\\s+(.+)$")
+                    // Parse quantity from format "ToppingName x2" or "ToppingName" (quantity AFTER name)
+                    val qtyRegex = Regex("^(.+?)\\s+x(\\d+)$")
                     val match = qtyRegex.find(nameWithQty)
                     val (quantity, name) = if (match != null) {
-                        val qty = match.groupValues[1].toIntOrNull() ?: 1
-                        val tName = match.groupValues[2]
+                        val qty = match.groupValues[2].toIntOrNull() ?: 1
+                        val tName = match.groupValues[1]
                         qty to tName
                     } else {
                         1 to nameWithQty
