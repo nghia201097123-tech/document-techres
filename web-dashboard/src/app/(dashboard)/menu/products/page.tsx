@@ -227,8 +227,6 @@ export default function ProductsPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
-  const [saving, setSaving] = React.useState(false);
-  const [formData, setFormData] = React.useState<CreateProductDto>(initialFormData);
   const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
 
   // Detail view field configuration state
@@ -431,22 +429,13 @@ export default function ProductsPage() {
   const [newGroupMaxSelection, setNewGroupMaxSelection] = React.useState(1);
   const [addingToGroupId, setAddingToGroupId] = React.useState<string | null>(null);
 
-  // Category combobox state
-  const [categoryComboboxOpen, setCategoryComboboxOpen] = React.useState(false);
-  const [categorySearchValue, setCategorySearchValue] = React.useState("");
-
-  // Unit combobox state
+  // Unit state (passed to ProductFormDialog)
   const [units, setUnits] = React.useState<Unit[]>([]);
   const [loadingUnits, setLoadingUnits] = React.useState(false);
-  const [unitComboboxOpen, setUnitComboboxOpen] = React.useState(false);
-  const [unitSearchValue, setUnitSearchValue] = React.useState("");
 
-  // Notes state
+  // Notes state (for bulk operations)
   const [availableNotes, setAvailableNotes] = React.useState<ProductNote[]>([]);
   const [loadingNotes, setLoadingNotes] = React.useState(false);
-  const [selectedNoteIds, setSelectedNoteIds] = React.useState<Set<string>>(new Set());
-  const [noteSearchValue, setNoteSearchValue] = React.useState("");
-  const [notePopoverOpen, setNotePopoverOpen] = React.useState(false);
   const [creatingNote, setCreatingNote] = React.useState(false);
 
   // All topping groups for assignment
@@ -481,12 +470,6 @@ export default function ProductsPage() {
   // Track newly created and updated product IDs for badges
   const [newProductIds, setNewProductIds] = React.useState<Set<string>>(new Set());
   const [updatedProductIds, setUpdatedProductIds] = React.useState<Set<string>>(new Set());
-
-  // Get categories based on selected product type
-  const availableCategories = React.useMemo(() => {
-    if (!formData.type) return categories.filter(c => c.isActive);
-    return categoriesByType[formData.type]?.filter(c => c.isActive) || [];
-  }, [formData.type, categories, categoriesByType]);
 
   // Load products - only when brand is selected
   const loadProducts = React.useCallback(async (brandId: string, branchId?: string) => {
@@ -567,11 +550,6 @@ export default function ProductsPage() {
   // Open create dialog
   const handleOpenCreate = () => {
     setSelectedProduct(null);
-    setFormData(initialFormData);
-    setCategorySearchValue("");
-    setUnitSearchValue("");
-    setSelectedNoteIds(new Set());
-    setNoteSearchValue("");
     setDialogMode("create");
   };
 
@@ -590,39 +568,8 @@ export default function ProductsPage() {
   };
 
   // Open edit dialog
-  const handleOpenEdit = async (product: Product) => {
+  const handleOpenEdit = (product: Product) => {
     setSelectedProduct(product);
-    setFormData({
-      name: product.name,
-      abbreviation: product.abbreviation || "",
-      type: product.type,
-      price: product.price,
-      vatRate: product.vatRate || 10,
-      categoryId: product.categoryId || "",
-      description: product.description || "",
-      imageUrl: product.imageUrl || "",
-      preparationTime: product.preparationTime || 0,
-      costPrice: product.costPrice || 0,
-      sellingType: product.sellingType || SellingType.PORTION,
-      unit: product.unit || "",
-      printDish: product.printDish ?? true,
-      printLabel: product.printLabel ?? false,
-      printSeafood: product.printSeafood ?? false,
-    });
-    // Set category search value
-    const category = categories.find(c => c.id === product.categoryId);
-    setCategorySearchValue(category?.name || "");
-    // Set unit search value
-    setUnitSearchValue(product.unit || "");
-    // Load product notes
-    try {
-      const productNotes = await productService.getProductNotes(product.id);
-      setSelectedNoteIds(new Set(productNotes.map(pn => pn.noteId)));
-    } catch (error) {
-      console.error("Error loading product notes:", error);
-      setSelectedNoteIds(new Set());
-    }
-    setNoteSearchValue("");
     setDialogMode("edit");
     // Remove badges when editing
     setNewProductIds(prev => { const next = new Set(prev); next.delete(product.id); return next; });
@@ -932,85 +879,25 @@ export default function ProductsPage() {
     }
   };
 
-  // Create note and add to selection
-  const handleCreateNote = async (noteName: string) => {
-    if (!noteName.trim()) return;
+  // Create note - returns created note (used for bulk operations)
+  const handleCreateNote = async (noteName: string): Promise<ProductNote | null> => {
+    if (!noteName.trim() || creatingNote) return null;
     setCreatingNote(true);
     try {
       const newNote = await productService.createNote({ name: noteName.trim() });
       setAvailableNotes(prev => [...prev, newNote]);
-      setSelectedNoteIds(prev => new Set([...prev, newNote.id]));
-      setNoteSearchValue("");
       toast({ title: "Thành công", description: `Đã tạo ghi chú "${noteName}"` });
+      return newNote;
     } catch (error: any) {
       console.error("Error creating note:", error);
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
+      return null;
     } finally {
       setCreatingNote(false);
     }
   };
 
-  // Toggle note selection
-  const handleToggleNote = (noteId: string) => {
-    setSelectedNoteIds(prev => {
-      const next = new Set(prev);
-      if (next.has(noteId)) {
-        next.delete(noteId);
-      } else {
-        next.add(noteId);
-      }
-      return next;
-    });
-  };
 
-  // Filter notes for selection
-  const filteredNotes = availableNotes.filter(note =>
-    note.name.toLowerCase().includes(noteSearchValue.toLowerCase())
-  );
-
-  // Check if search value is a new note
-  const isNewNote = noteSearchValue.trim() &&
-    !availableNotes.some(n => n.name.toLowerCase() === noteSearchValue.toLowerCase());
-
-  // Get or create category by name
-  const getOrCreateCategory = async (categoryName: string, productType: ProductType): Promise<string> => {
-    // Check if category already exists (case-insensitive)
-    const existingCategory = categories.find(
-      c => c.name.toLowerCase() === categoryName.toLowerCase() && c.productType === productType
-    );
-    if (existingCategory) {
-      return existingCategory.id;
-    }
-
-    // Create new category
-    const newCategory = await categoryService.create({
-      name: categoryName,
-      productType: productType,
-    });
-    // Refresh categories
-    dispatch(invalidateCategoriesCache());
-    dispatch(fetchCategories(filterBrandId));
-    toast({ title: "Thành công", description: `Đã tạo danh mục "${categoryName}"` });
-    return newCategory.id;
-  };
-
-  // Filter categories for combobox
-  const filteredCategories = availableCategories.filter(cat =>
-    cat.name.toLowerCase().includes(categorySearchValue.toLowerCase())
-  );
-
-  // Check if search value is a new category
-  const isNewCategory = categorySearchValue.trim() &&
-    !availableCategories.some(c => c.name.toLowerCase() === categorySearchValue.toLowerCase());
-
-  // Filter units for combobox
-  const filteredUnits = units.filter(unit =>
-    unit.name.toLowerCase().includes(unitSearchValue.toLowerCase())
-  );
-
-  // Check if search value is a new unit
-  const isNewUnit = unitSearchValue.trim() &&
-    !units.some(u => u.name.toLowerCase() === unitSearchValue.toLowerCase());
 
   // Filter units for bulk operation combobox
   const filteredBulkUnits = units.filter(unit =>
@@ -1043,102 +930,19 @@ export default function ProductsPage() {
     return newUnit.name;
   };
 
-  // Handle form submit (create or update)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name.trim() || formData.price < 0) {
-      toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ tên món và giá hợp lệ", variant: "destructive" });
-      return;
-    }
-
-    // Check if category is provided (either selected or will be created)
-    if (!formData.categoryId && !categorySearchValue.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng chọn hoặc nhập danh mục cho món", variant: "destructive" });
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      // Get or create category if needed
-      let categoryId = formData.categoryId;
-      if (!categoryId && categorySearchValue.trim()) {
-        categoryId = await getOrCreateCategory(categorySearchValue.trim(), formData.type);
-      }
-
-      // Get or create unit if needed
-      let unitName = formData.unit;
-      if (unitSearchValue.trim()) {
-        unitName = await getOrCreateUnit(unitSearchValue.trim());
-      }
-
-      // Prepare data with proper number types
-      const preparedData = {
-        name: formData.name,
-        abbreviation: formData.abbreviation?.trim() || undefined,
-        type: formData.type,
-        price: Number(formData.price) || 0,
-        vatRate: parseFloat(String(formData.vatRate)) || 0,
-        categoryId: categoryId,
-        description: formData.description || undefined,
-        imageUrl: formData.imageUrl || undefined,
-        preparationTime: Number(formData.preparationTime) || 0,
-        costPrice: Number(formData.costPrice) || 0,
-        sellingType: formData.sellingType,
-        unit: unitName || undefined,
-        printDish: formData.printDish ?? true,
-        printLabel: formData.printLabel ?? false,
-        printSeafood: formData.printSeafood ?? false,
-      };
-
-      if (dialogMode === "create") {
-        const result = await productService.create(preparedData);
-        // Assign notes to the new product
-        if (selectedNoteIds.size > 0) {
-          try {
-            await productService.assignNotesToProduct(result.id, Array.from(selectedNoteIds));
-          } catch (error) {
-            console.error("Error assigning notes:", error);
-          }
-        }
-        setProducts((prev) => [result, ...prev]);
-        // Mark as new product
-        setNewProductIds((prev) => new Set(prev).add(result.id));
-        toast({ title: "Thành công", description: `Đã tạo món "${result.name}" với mã ${result.code}` });
-        if (continueCreating) {
-          // Reset form for next creation
-          setFormData(initialFormData);
-          setCategorySearchValue("");
-          setUnitSearchValue("");
-          setSelectedNoteIds(new Set());
-          setNoteSearchValue("");
-        } else {
-          handleCloseDialog();
-        }
-      } else if (dialogMode === "edit" && selectedProduct) {
-        const result = await productService.update(selectedProduct.id, preparedData);
-        // Update notes assignment
-        try {
-          await productService.assignNotesToProduct(selectedProduct.id, Array.from(selectedNoteIds));
-        } catch (error) {
-          console.error("Error assigning notes:", error);
-        }
-        setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? result : p)));
-        setUpdatedProductIds(prev => new Set([...prev, result.id]));
-        setNewProductIds(prev => {
-          const next = new Set(prev);
-          next.delete(result.id);
-          return next;
-        });
-        toast({ title: "Thành công", description: "Đã cập nhật thông tin món ăn" });
-        handleCloseDialog();
-      }
-    } catch (error: any) {
-      console.error("Error saving product:", error);
-      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
-    } finally {
-      setSaving(false);
+  // Handle product created/updated from ProductFormDialog
+  const handleProductSuccess = (product: Product) => {
+    if (dialogMode === "create") {
+      setProducts((prev) => [product, ...prev]);
+      setNewProductIds((prev) => new Set(prev).add(product.id));
+    } else if (dialogMode === "edit") {
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? product : p)));
+      setUpdatedProductIds((prev) => new Set([...prev, product.id]));
+      setNewProductIds((prev) => {
+        const next = new Set(prev);
+        next.delete(product.id);
+        return next;
+      });
     }
   };
 
@@ -1198,11 +1002,6 @@ export default function ProductsPage() {
   const handleCloseDialog = () => {
     setDialogMode(null);
     setSelectedProduct(null);
-    setFormData(initialFormData);
-    setCategorySearchValue("");
-    setUnitSearchValue("");
-    setSelectedNoteIds(new Set());
-    setNoteSearchValue("");
     setAvailableToppings([]);
     setToppingGroups([]);
     setAllToppingGroups([]);
@@ -1445,11 +1244,6 @@ export default function ProductsPage() {
         }
       },
     });
-  };
-
-  // Handle product type change - reset category when type changes
-  const handleTypeChange = (type: ProductType) => {
-    setFormData(prev => ({ ...prev, type, categoryId: "" }));
   };
 
   // Format currency
@@ -3102,25 +2896,13 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create/Edit Product Dialog - Memoized Component */}
+      {/* Create/Edit Product Dialog - Fully Isolated Component */}
       <ProductFormDialog
         open={dialogMode === "create" || dialogMode === "edit"}
         mode={dialogMode === "edit" ? "edit" : "create"}
-        formData={formData}
-        setFormData={setFormData}
+        productId={selectedProduct?.id}
         onClose={handleCloseDialog}
-        onSubmit={handleSubmit}
-        saving={saving}
-        categories={availableCategories}
-        loadingCategories={loadingCategories}
-        units={units}
-        loadingUnits={loadingUnits}
-        availableNotes={availableNotes}
-        loadingNotes={loadingNotes}
-        selectedNoteIds={selectedNoteIds}
-        onToggleNote={handleToggleNote}
-        onCreateNote={handleCreateNote}
-        creatingNote={creatingNote}
+        onSuccess={handleProductSuccess}
         continueCreating={continueCreating}
         setContinueCreating={setContinueCreating}
       />
