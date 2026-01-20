@@ -2181,8 +2181,14 @@ fun CartItemRow(
                                     color = Color.Gray,
                                     modifier = Modifier.padding(end = 8.dp)
                                 )
+                                // Show topping name with quantity if > 1
+                                val displayName = if (variant.quantity > 1) {
+                                    "${variant.name} x${variant.quantity}"
+                                } else {
+                                    variant.name
+                                }
                                 Text(
-                                    text = variant.name,
+                                    text = displayName,
                                     fontSize = 14.sp,
                                     color = Color(0xFF424242)
                                 )
@@ -2192,8 +2198,10 @@ fun CartItemRow(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 if (variant.price > 0) {
+                                    // Show total price for topping (price * quantity)
+                                    val toppingTotalPrice = variant.price * variant.quantity
                                     Text(
-                                        text = "+${formatCurrency(variant.price)}",
+                                        text = "+${formatCurrency(toppingTotalPrice)}",
                                         fontSize = 14.sp,
                                         color = Color(0xFF1976D2),
                                         fontWeight = FontWeight.Medium

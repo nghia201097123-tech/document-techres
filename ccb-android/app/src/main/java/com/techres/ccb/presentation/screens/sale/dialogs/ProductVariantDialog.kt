@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -62,14 +63,36 @@ fun ProductVariantDialog(
         }
     }
 
+    // State for topping quantities (key: optionId, value: quantity)
+    val toppingQuantities = remember {
+        mutableStateMapOf<String, Int>().apply {
+            if (isAddingTopping && existingVariants.isNotEmpty()) {
+                // Initialize with existing topping quantities
+                existingVariants.forEach { variant ->
+                    val option = product.variants
+                        .flatMap { it.options }
+                        .find { it.name == variant.name }
+                    if (option != null) {
+                        this[option.id] = variant.quantity
+                    }
+                }
+            }
+        }
+    }
+
     var quantity by remember { mutableIntStateOf(1) }
     var note by remember { mutableStateOf("") }
     val selectedNotes = remember { mutableStateListOf<String>() }
 
-    // Calculate total price
+    // Calculate total price (including topping quantities)
     val variantPrice = product.variants.sumOf { group ->
         val selectedIds = selectedOptions[group.id] ?: emptyList()
-        group.options.filter { it.id in selectedIds }.sumOf { it.price }
+        group.options.filter { it.id in selectedIds }.sumOf { option ->
+            val qty = if (group.type == VariantType.TOPPING) {
+                toppingQuantities[option.id] ?: 1
+            } else 1
+            option.price * qty
+        }
     }
     val unitPrice = product.price + variantPrice
     val totalPrice = unitPrice * quantity
@@ -171,6 +194,7 @@ fun ProductVariantDialog(
                         VariantGroupSection(
                             group = group,
                             selectedIds = selectedOptions[group.id] ?: emptyList(),
+                            toppingQuantities = toppingQuantities,
                             onOptionSelected = { optionId ->
                                 // Create a new list to trigger recomposition
                                 val currentSelected = (selectedOptions[group.id] ?: emptyList()).toMutableList()
@@ -179,10 +203,16 @@ fun ProductVariantDialog(
                                     if (optionId in currentSelected) {
                                         // Always allow deselect
                                         currentSelected.remove(optionId)
+                                        // Remove quantity when deselected
+                                        toppingQuantities.remove(optionId)
                                     } else {
                                         // Check maxSelect before adding
                                         if (currentSelected.size < group.maxSelect) {
                                             currentSelected.add(optionId)
+                                            // Initialize quantity to 1 when selected
+                                            if (group.type == VariantType.TOPPING) {
+                                                toppingQuantities[optionId] = 1
+                                            }
                                         }
                                         // Else: do nothing, max reached
                                     }
@@ -193,6 +223,11 @@ fun ProductVariantDialog(
                                 }
                                 // Assign new list to trigger state update
                                 selectedOptions[group.id] = currentSelected
+                            },
+                            onToppingQuantityChange = { optionId, newQuantity ->
+                                if (newQuantity >= 1) {
+                                    toppingQuantities[optionId] = newQuantity
+                                }
                             }
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -343,6 +378,10 @@ fun ProductVariantDialog(
                                 sortedVariants.forEach { group ->
                                     val selectedIds = selectedOptions[group.id] ?: emptyList()
                                     group.options.filter { it.id in selectedIds }.forEach { option ->
+                                        // Get topping quantity (default 1 for non-topping)
+                                        val qty = if (group.type == VariantType.TOPPING) {
+                                            toppingQuantities[option.id] ?: 1
+                                        } else 1
                                         variants.add(
                                             SelectedVariant(
                                                 groupId = group.id,
@@ -350,7 +389,8 @@ fun ProductVariantDialog(
                                                 optionId = option.id,
                                                 name = option.name,
                                                 price = option.price,
-                                                vatRate = option.vatRate
+                                                vatRate = option.vatRate,
+                                                quantity = qty
                                             )
                                         )
                                     }
@@ -393,7 +433,9 @@ fun ProductVariantDialog(
 fun VariantGroupSection(
     group: ProductVariantGroup,
     selectedIds: List<String>,
-    onOptionSelected: (String) -> Unit
+    toppingQuantities: Map<String, Int> = emptyMap(),
+    onOptionSelected: (String) -> Unit,
+    onToppingQuantityChange: (String, Int) -> Unit = { _, _ -> }
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -450,11 +492,25 @@ fun VariantGroupSection(
         ) {
             group.options.forEach { option ->
                 val isSelected = option.id in selectedIds
-                VariantOptionChip(
-                    option = option,
-                    isSelected = isSelected,
-                    onClick = { onOptionSelected(option.id) }
-                )
+                val quantity = toppingQuantities[option.id] ?: 1
+
+                if (group.type == VariantType.TOPPING) {
+                    // Topping with quantity selector
+                    ToppingOptionChip(
+                        option = option,
+                        isSelected = isSelected,
+                        quantity = quantity,
+                        onToggle = { onOptionSelected(option.id) },
+                        onQuantityChange = { newQty -> onToppingQuantityChange(option.id, newQty) }
+                    )
+                } else {
+                    // Regular variant chip
+                    VariantOptionChip(
+                        option = option,
+                        isSelected = isSelected,
+                        onClick = { onOptionSelected(option.id) }
+                    )
+                }
             }
         }
     }
@@ -499,6 +555,101 @@ fun VariantOptionChip(
                     style = MaterialTheme.typography.labelSmall,
                     color = if (option.price > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun ToppingOptionChip(
+    option: ProductVariantOption,
+    isSelected: Boolean,
+    quantity: Int,
+    onToggle: () -> Unit,
+    onQuantityChange: (Int) -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+        ) {
+            // Topping name and price - clickable to toggle
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clickable { onToggle() }
+                    .padding(vertical = 6.dp)
+            ) {
+                Text(
+                    text = option.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+                if (option.price != 0L) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (option.price > 0) "+${formatCurrency(option.price)}" else formatCurrency(option.price),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (option.price > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Quantity selector (only show when selected)
+            if (isSelected) {
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Minus button
+                IconButton(
+                    onClick = { if (quantity > 1) onQuantityChange(quantity - 1) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = "Giảm",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (quantity > 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                    )
+                }
+
+                // Quantity display
+                Text(
+                    text = quantity.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.widthIn(min = 20.dp),
+                    textAlign = TextAlign.Center
+                )
+
+                // Plus button
+                IconButton(
+                    onClick = { onQuantityChange(quantity + 1) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Tăng",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

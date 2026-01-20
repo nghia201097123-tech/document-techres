@@ -230,9 +230,9 @@ data class SaleUiState(
                     totalVat += mainPriceAfterDiscount - priceBeforeVat
                 }
 
-                // VAT của từng topping (sau giảm giá)
+                // VAT của từng topping (sau giảm giá) - tính cả số lượng topping
                 item.selectedVariants.forEach { variant ->
-                    val toppingPrice = variant.price * item.quantity
+                    val toppingPrice = variant.price * variant.quantity * item.quantity
                     val toppingPriceAfterDiscount = (toppingPrice * afterDiscountRatio).toLong()
                     if (variant.vatRate > 0) {
                         val priceBeforeVat = (toppingPriceAfterDiscount / (1 + variant.vatRate / 100.0)).toLong()
@@ -2604,10 +2604,13 @@ class SaleViewModel @Inject constructor(
 
             if (!isOptionGroup) {
                 // NOT an option -> treat as TOPPING (use "+" prefix)
-                if (variant.price > 0) {
-                    "+ ${variant.name} (+${variant.price})"
+                // Include quantity if > 1 (e.g., "2 Bánh flan")
+                val qtyPrefix = if (variant.quantity > 1) "x${variant.quantity} " else ""
+                val totalToppingPrice = variant.price * variant.quantity
+                if (totalToppingPrice > 0) {
+                    "+ ${qtyPrefix}${variant.name} (+${totalToppingPrice})"
                 } else {
-                    "+ ${variant.name}"
+                    "+ ${qtyPrefix}${variant.name}"
                 }
             } else {
                 // This is an option (Size, Sugar, Ice) - use "GroupName: Value" format
@@ -3090,9 +3093,9 @@ class SaleViewModel @Inject constructor(
                         finalVatAmount += mainPriceAfterDiscount - priceBeforeVat
                     }
 
-                    // VAT từng topping
+                    // VAT từng topping - tính cả số lượng topping
                     item.selectedVariants.forEach { variant ->
-                        val toppingPrice = variant.price * item.quantity
+                        val toppingPrice = variant.price * variant.quantity * item.quantity
                         val toppingPriceAfterDiscount = (toppingPrice * afterDiscountRatio).toLong()
                         if (variant.vatRate > 0) {
                             val priceBeforeVat = (toppingPriceAfterDiscount / (1 + variant.vatRate / 100.0)).toLong()
@@ -3342,10 +3345,14 @@ class SaleViewModel @Inject constructor(
             val userNote = parts.getOrNull(1)?.removePrefix("Ghi chú: ")
                 ?: parts.firstOrNull()?.takeIf { it.startsWith("Ghi chú:") }?.removePrefix("Ghi chú: ")
 
-            // Parse as variants (shown with • prefix on bill)
-            val variants = variantsPart.split(",")
+            // Parse as variants (shown with • prefix on bill) and toppings (with + prefix)
+            val allParts = variantsPart.split(",")
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
+
+            // Parse variants (options like Size, Sugar, Ice - NOT starting with "+")
+            val variants = allParts
+                .filter { !it.startsWith("+") }
                 .map { variantStr ->
                     // Parse price from format "(+price)" at the end
                     val priceStart = variantStr.lastIndexOf("(+")
@@ -3364,9 +3371,44 @@ class SaleViewModel @Inject constructor(
                     BillVariant(name = name, priceAdjustment = price)
                 }
 
-            // Toppings - currently not stored separately, will be empty
-            // In future, toppings can be stored in a separate field if needed
-            val toppings = emptyList<BillTopping>()
+            // Parse toppings (starting with "+", format: "+ x2 ToppingName (+price)" or "+ ToppingName (+price)")
+            val toppings = allParts
+                .filter { it.startsWith("+") }
+                .map { toppingStr ->
+                    var text = toppingStr.removePrefix("+").trim()
+
+                    // Parse price from format "(+price)" at the end
+                    val priceStart = text.lastIndexOf("(+")
+                    val priceEnd = text.lastIndexOf(")")
+                    val totalPrice = if (priceStart > 0 && priceEnd > priceStart) {
+                        text.substring(priceStart + 2, priceEnd).toDoubleOrNull() ?: 0.0
+                    } else {
+                        0.0
+                    }
+
+                    // Get name part without price suffix
+                    val nameWithQty = if (priceStart > 0) {
+                        text.substring(0, priceStart).trim()
+                    } else {
+                        text
+                    }
+
+                    // Parse quantity from format "x2 ToppingName" or "ToppingName"
+                    val qtyRegex = Regex("^x(\\d+)\\s+(.+)$")
+                    val match = qtyRegex.find(nameWithQty)
+                    val (quantity, name) = if (match != null) {
+                        val qty = match.groupValues[1].toIntOrNull() ?: 1
+                        val tName = match.groupValues[2]
+                        qty to tName
+                    } else {
+                        1 to nameWithQty
+                    }
+
+                    // Calculate unit price from total price and quantity
+                    val unitPrice = if (quantity > 0) totalPrice / quantity else totalPrice
+
+                    BillTopping(name = name, price = unitPrice, quantity = quantity)
+                }
 
             // Lấy giảm giá món từ UI state (itemDiscounts) hoặc từ OrderItemEntity
             val itemDiscountFromState = itemDiscounts[item.id]?.toDouble() ?: 0.0

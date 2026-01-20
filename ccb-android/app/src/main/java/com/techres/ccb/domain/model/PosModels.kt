@@ -67,7 +67,7 @@ data class CartItem(
     val comboItems: List<ComboChildItem> = emptyList()  // Các món con trong combo
 ) {
     val unitPrice: Long
-        get() = product.price + selectedVariants.sumOf { it.price }
+        get() = product.price + selectedVariants.sumOf { it.price * it.quantity }
 
     val totalPrice: Long
         get() = unitPrice * quantity
@@ -85,7 +85,8 @@ data class SelectedVariant(
     val optionId: String,
     val name: String,
     val price: Long,
-    val vatRate: Double = 0.0   // VAT rate của topping (%)
+    val vatRate: Double = 0.0,   // VAT rate của topping (%)
+    val quantity: Int = 1        // Số lượng topping (VD: 2 bánh flan)
 )
 
 // ===== COMBO CHILD ITEM =====
