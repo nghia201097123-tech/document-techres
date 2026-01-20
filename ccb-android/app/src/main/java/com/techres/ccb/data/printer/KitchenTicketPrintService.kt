@@ -327,24 +327,45 @@ object KitchenTicketPrintService {
                 line(storeName)
             }
 
-            // SMART LAYOUT: Gộp Bàn + Mã đơn trên cùng 1 dòng
+            // SMART LAYOUT: Gộp Bàn + Mã đơn + Thẻ rung trên cùng 1-2 dòng để tiết kiệm giấy
             val timeFormat = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
             val hasTable = showTableName && !ticket.tableName.isNullOrBlank()
             val hasOrder = showOrderNumber
             val hasTime = showTime
             val hasStaff = !ticket.staffName.isNullOrBlank()
+            val hasPager = ticket.pagerNumber != null
+
+            // Pager text compact: ▶5 thay vì "THẺ RUNG: 5" để tiết kiệm không gian
+            val pagerText = if (hasPager) "▶${ticket.pagerNumber}" else ""
 
             if (hasTable && hasOrder) {
-                // Bàn bên trái (bold), Mã đơn bên phải
-                lineKeyValueBold("BÀN: ${ticket.tableName}", ticket.displayNumber)
+                // Bàn bên trái (bold), Mã đơn + Thẻ rung bên phải
+                val orderPagerPart = listOf(ticket.displayNumber, pagerText)
+                    .filter { it.isNotEmpty() }
+                    .joinToString(" ")
+                lineKeyValueBold("BÀN: ${ticket.tableName}", orderPagerPart)
+            } else if (hasTable && hasPager) {
+                // Chỉ có bàn + thẻ rung
+                lineKeyValueBold("BÀN: ${ticket.tableName}", pagerText)
             } else if (hasTable) {
                 // Chỉ có bàn
                 lineBold("BÀN: ${ticket.tableName}")
+            } else if (hasOrder && hasPager) {
+                // Mã đơn + Thẻ rung (không có bàn)
+                val orderPagerPart = "$ticket.displayNumber $pagerText"
+                if (hasTime) {
+                    lineKeyValue(orderPagerPart, timeFormat.format(ticket.orderTime))
+                } else {
+                    lineBold(orderPagerPart)
+                }
             } else if (hasOrder && hasTime) {
                 // Không có bàn: Mã đơn + Thời gian
                 lineKeyValue(ticket.displayNumber, timeFormat.format(ticket.orderTime))
             } else if (hasOrder) {
                 line(ticket.displayNumber)
+            } else if (hasPager) {
+                // Chỉ có thẻ rung, không có bàn/mã đơn
+                lineBold("▶${ticket.pagerNumber}")
             }
 
             // SMART LAYOUT: Gộp Thời gian + Nhân viên trên cùng 1 dòng (nếu có bàn)
@@ -365,11 +386,6 @@ object KitchenTicketPrintService {
                 if (hasStaff) {
                     line("NV: ${ticket.staffName}")
                 }
-            }
-
-            // Thẻ rung (Pager) - hiển thị nổi bật nếu có
-            if (ticket.pagerNumber != null) {
-                lineDouble("THẺ RUNG: ${ticket.pagerNumber}", BitmapTextStyle(centerAlign = true))
             }
 
             separator('=')

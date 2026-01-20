@@ -168,8 +168,17 @@ object BillPrintService {
         // ==================== 3. THÔNG TIN ĐƠN ====================
         b.left()
 
-        if (template.showOrderNumber) {
+        // SMART LAYOUT: Gộp Mã đơn + Thẻ rung trên cùng 1 dòng để tiết kiệm giấy
+        val hasPager = billData.pagerNumber != null
+        val pagerText = if (hasPager) "▶${billData.pagerNumber}" else ""
+
+        if (template.showOrderNumber && hasPager) {
+            // Mã đơn bên trái, thẻ rung bên phải
+            b.row("Mã đơn: ${billData.displayNumber}", pagerText)
+        } else if (template.showOrderNumber) {
             b.text("Mã đơn: ${billData.displayNumber}")
+        } else if (hasPager) {
+            b.text("▶${billData.pagerNumber}")
         }
 
         if (template.showTableName && billData.tableName != null) {

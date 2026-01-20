@@ -434,21 +434,27 @@ object LabelPrintService {
             storeBitmap.recycle()
         }
 
-        // ========== SMART LAYOUT: Gộp Bàn + Mã đơn trên cùng 1 dòng để tiết kiệm không gian ==========
+        // ========== SMART LAYOUT: Gộp Bàn + Mã đơn + Thẻ rung trên cùng 1-2 dòng để tiết kiệm không gian ==========
         val hasTable = showTableName && !label.tableName.isNullOrBlank()
         val hasOrder = showOrderNumber
+        val hasPager = label.pagerNumber != null
 
         // Index text (chỉ hiển thị khi không có bàn hoặc khi cần)
         val labelCountText = if (label.totalLabels > 1) "${label.labelIndex}/${label.totalLabels}" else ""
         val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
         val indexText = "$labelCountText $partText".trim()
 
+        // Pager text compact: [5] thay vì "Thẻ: 5" để tiết kiệm không gian
+        val pagerText = if (hasPager) "▶${label.pagerNumber}" else ""
+
         if (hasTable && hasOrder) {
-            // SMART: Bàn bên trái + Mã đơn bên phải (trên cùng 1 dòng)
-            val orderWithIndex = if (indexText.isNotEmpty()) "${label.displayNumber} $indexText" else label.displayNumber
+            // SMART: Bàn bên trái + Mã đơn + Thẻ rung bên phải (trên cùng 1 dòng)
+            val orderPagerPart = listOf(label.displayNumber, pagerText, indexText)
+                .filter { it.isNotEmpty() }
+                .joinToString(" ")
             val headerBitmap = renderTwoColumnText(
                 "Bàn: ${label.tableName}",
-                orderWithIndex,
+                orderPagerPart,
                 contentWidth,
                 fontSmall,
                 bold = true
@@ -457,22 +463,37 @@ object LabelPrintService {
             yPos += headerBitmap.height + lineSpacingExtra
             headerBitmap.recycle()
         } else if (hasTable) {
-            // Chỉ có bàn, không có mã đơn
-            val tableBitmap = renderTextBitmap(
-                text = "Bàn: ${label.tableName}",
-                width = contentWidth,
-                fontSize = fontSmall,
-                bold = true,
-                centerAlign = false
-            )
-            output.write(bitmapToTspl(margin, yPos, tableBitmap))
-            yPos += tableBitmap.height + lineSpacingExtra
-            tableBitmap.recycle()
+            // Chỉ có bàn, gộp thẻ rung bên phải nếu có
+            val rightPart = if (hasPager) pagerText else ""
+            if (rightPart.isNotEmpty()) {
+                val tablePagerBitmap = renderTwoColumnText(
+                    "Bàn: ${label.tableName}",
+                    rightPart,
+                    contentWidth,
+                    fontSmall,
+                    bold = true
+                )
+                output.write(bitmapToTspl(margin, yPos, tablePagerBitmap))
+                yPos += tablePagerBitmap.height + lineSpacingExtra
+                tablePagerBitmap.recycle()
+            } else {
+                val tableBitmap = renderTextBitmap(
+                    text = "Bàn: ${label.tableName}",
+                    width = contentWidth,
+                    fontSize = fontSmall,
+                    bold = true,
+                    centerAlign = false
+                )
+                output.write(bitmapToTspl(margin, yPos, tableBitmap))
+                yPos += tableBitmap.height + lineSpacingExtra
+                tableBitmap.recycle()
+            }
         } else if (hasOrder) {
-            // Chỉ có mã đơn, không có bàn (layout cũ)
+            // Chỉ có mã đơn, gộp thẻ rung + index
+            val rightPart = listOf(pagerText, indexText).filter { it.isNotEmpty() }.joinToString(" ")
             val orderHeaderBitmap = renderTwoColumnText(
                 label.displayNumber,
-                indexText,
+                rightPart,
                 contentWidth,
                 fontSmall,
                 bold = false
@@ -480,16 +501,14 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
             yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
-        }
-
-        // ========== PAGER NUMBER (Thẻ rung) ==========
-        if (label.pagerNumber != null) {
+        } else if (hasPager) {
+            // Không có bàn, không có mã đơn, chỉ có thẻ rung
             val pagerBitmap = renderTextBitmap(
-                text = "Thẻ: ${label.pagerNumber}",
+                text = "▶${label.pagerNumber}",
                 width = contentWidth,
-                fontSize = fontBold,
+                fontSize = fontSmall,
                 bold = true,
-                centerAlign = true
+                centerAlign = false
             )
             output.write(bitmapToTspl(margin, yPos, pagerBitmap))
             yPos += pagerBitmap.height + lineSpacingExtra
@@ -1049,17 +1068,20 @@ object LabelPrintService {
                 lineCenter("(Phần ${label.partIndex}/${label.totalParts})")
             }
 
-            // Table name (if enabled)
-            if (showTableName) {
-                label.tableName?.let {
-                    separator('-')
-                    lineBold("Bàn: $it")
-                }
-            }
+            // Table name + Pager number (gộp trên 1 dòng để tiết kiệm không gian)
+            val hasTableInfo = showTableName && !label.tableName.isNullOrBlank()
+            val hasPagerInfo = label.pagerNumber != null
 
-            // Pager number (Thẻ rung)
-            if (label.pagerNumber != null) {
-                lineBold("Thẻ: ${label.pagerNumber}", BitmapTextStyle(centerAlign = true))
+            if (hasTableInfo || hasPagerInfo) {
+                separator('-')
+                if (hasTableInfo && hasPagerInfo) {
+                    // Gộp: Bàn bên trái, thẻ rung bên phải
+                    lineKeyValueBold("Bàn: ${label.tableName}", "▶${label.pagerNumber}")
+                } else if (hasTableInfo) {
+                    lineBold("Bàn: ${label.tableName}")
+                } else if (hasPagerInfo) {
+                    lineBold("▶${label.pagerNumber}")
+                }
             }
 
             // ========== SIZE với giá ==========
