@@ -651,7 +651,8 @@ class SaleViewModel @Inject constructor(
                 isMultiple = firstTopping.isMultiple,
                 minSelect = firstTopping.minSelect,
                 maxSelect = firstTopping.maxSelect,
-                options = groupToppings.mapNotNull { topping ->
+                // Sort by sortOrder to preserve the order set by admin
+                options = groupToppings.sortedBy { it.sortOrder }.mapNotNull { topping ->
                     val toppingProduct = productEntityMap[topping.toppingId]
                     if (toppingProduct != null) {
                         // Tính giá topping: nếu có extraPrice thì dùng, không thì dùng giá sản phẩm
@@ -677,7 +678,7 @@ class SaleViewModel @Inject constructor(
                             vatRate = toppingProduct.vatRate
                         )
                     } else null
-                }.sortedBy { it.name }
+                }
             )
         }.sortedBy { it.name }
     }

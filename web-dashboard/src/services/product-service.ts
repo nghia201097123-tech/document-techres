@@ -314,6 +314,11 @@ export const productService = {
     return response.data;
   },
 
+  reorderToppingItems: async (groupId: string, itemIds: string[]): Promise<ToppingGroup> => {
+    const response = await api.put<ToppingGroup>(`/products/topping-groups/${groupId}/items/reorder`, { itemIds });
+    return response.data;
+  },
+
   // === Product Topping Group Assignment ===
 
   getProductToppingGroups: async (productId: string): Promise<ToppingGroup[]> => {

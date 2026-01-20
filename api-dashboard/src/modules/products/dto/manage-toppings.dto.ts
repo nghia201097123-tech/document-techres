@@ -101,6 +101,14 @@ export class UpdateToppingItemDto {
   sortOrder?: number;
 }
 
+// DTO for reordering topping items in a group
+export class ReorderToppingItemsDto {
+  @ApiProperty({ description: 'Danh sách ID topping items theo thứ tự mới', type: [String] })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  itemIds: string[];
+}
+
 // DTO for assigning topping groups to a product
 export class AssignToppingGroupsDto {
   @ApiProperty({ description: 'Danh sách ID nhóm topping cần gán', type: [String] })

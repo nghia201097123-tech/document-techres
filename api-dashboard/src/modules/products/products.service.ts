@@ -581,6 +581,24 @@ export class ProductsService {
     return this.getToppingGroupById(tenantId, groupId);
   }
 
+  // Reorder topping items within a group
+  async reorderToppingItems(tenantId: string, groupId: string, itemIds: string[]) {
+    // Verify group exists
+    await this.getToppingGroupById(tenantId, groupId);
+
+    // Update sortOrder for each item
+    await Promise.all(
+      itemIds.map((itemId, index) =>
+        this.toppingGroupItemRepository.update(
+          { tenantId, groupId, id: itemId },
+          { sortOrder: index },
+        ),
+      ),
+    );
+
+    return this.getToppingGroupById(tenantId, groupId);
+  }
+
   // === Product Topping Group Assignment ===
 
   // Get topping groups assigned to a product

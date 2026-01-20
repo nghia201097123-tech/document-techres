@@ -12,6 +12,7 @@ import {
   UpdateToppingGroupDto,
   AddToppingItemDto,
   UpdateToppingItemDto,
+  ReorderToppingItemsDto,
   CreateProductNoteDto,
   UpdateProductNoteDto,
   AssignNotesToProductDto,
@@ -152,6 +153,16 @@ export class ProductsController {
     @Param('itemId') itemId: string,
   ) {
     return this.productsService.removeToppingItem(req.user.tenantId, groupId, itemId);
+  }
+
+  @Put('topping-groups/:groupId/items/reorder')
+  @ApiOperation({ summary: 'Sắp xếp lại thứ tự topping trong nhóm' })
+  reorderToppingItems(
+    @Request() req,
+    @Param('groupId') groupId: string,
+    @Body() dto: ReorderToppingItemsDto,
+  ) {
+    return this.productsService.reorderToppingItems(req.user.tenantId, groupId, dto.itemIds);
   }
 
   // === Product Topping Group Assignment ===

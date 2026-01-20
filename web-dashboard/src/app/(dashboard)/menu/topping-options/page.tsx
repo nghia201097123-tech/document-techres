@@ -1,7 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, Loader2, Cherry, X, Trash2, ChevronDown, ChevronRight, ChevronLeft, UtensilsCrossed, Pencil, Check, Package } from "lucide-react";
+import { Plus, Search, Loader2, Cherry, X, Trash2, ChevronDown, ChevronRight, ChevronLeft, UtensilsCrossed, Pencil, Check, Package, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,9 +51,77 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { productService, type Product, ProductType, type ToppingGroup } from "@/services/product-service";
+import { productService, type Product, ProductType, type ToppingGroup, type ToppingItem } from "@/services/product-service";
 import { BrandFilter, FilterRequiredPlaceholder, useGlobalFilters } from "@/components/ui/brand-filter";
 import { useBackgroundProgress } from "@/components/ui/background-progress";
+
+// Sortable Topping Item Component
+interface SortableToppingItemProps {
+  item: ToppingItem;
+  formatCurrency: (value: number) => string;
+  onRemove: (itemId: string) => void;
+  disabled?: boolean;
+}
+
+function SortableToppingItem({ item, formatCurrency, onRemove, disabled }: SortableToppingItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded bg-muted/20 ${isDragging ? "shadow-lg" : ""}`}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-5 w-5" />
+        </button>
+        <Cherry className="h-5 w-5 text-purple-500" />
+        <div>
+          <div className="font-medium">{item.topping.name}</div>
+          <div className="text-xs text-muted-foreground">{item.topping.code}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="text-right">
+          <div className="text-sm font-medium text-green-600">
+            {item.priceAdjustment > 0 ? "+" : ""}{formatCurrency(item.priceAdjustment || item.topping.price)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Tối đa: {item.maxQuantity}
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onRemove(item.id)}
+          disabled={disabled}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function ToppingOptionsPage() {
   const { toast } = useToast();
@@ -302,6 +387,55 @@ export default function ToppingOptionsPage() {
       toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
     } finally {
       setSavingGroups(false);
+    }
+  };
+
+  // DnD Sensors for drag and drop reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end to reorder topping items
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || !selectedGroup || active.id === over.id) return;
+
+    const oldIndex = selectedGroup.items.findIndex(item => item.id === active.id);
+    const newIndex = selectedGroup.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Optimistic update
+    const newItems = arrayMove(selectedGroup.items, oldIndex, newIndex);
+    const updatedGroup = { ...selectedGroup, items: newItems };
+    setSelectedGroup(updatedGroup);
+
+    // Update in database
+    try {
+      const newItemIds = newItems.map(item => item.id);
+      const updated = await productService.reorderToppingItems(selectedGroup.id, newItemIds);
+
+      // Update topping groups list to reflect the change
+      setToppingGroups(prev =>
+        prev.map(g => g.id === updated.id ? updated : g)
+      );
+      setSelectedGroup(updated);
+    } catch (error: any) {
+      console.error("Error reordering topping items:", error);
+      toast({ title: "Lỗi", description: "Không thể sắp xếp lại thứ tự", variant: "destructive" });
+      // Revert on error
+      const groups = await productService.getAllToppingGroups();
+      setToppingGroups(groups);
+      const revertedGroup = groups.find(g => g.id === selectedGroup.id);
+      if (revertedGroup) setSelectedGroup(revertedGroup);
     }
   };
 
@@ -879,39 +1013,28 @@ export default function ToppingOptionsPage() {
                                 Chưa có topping nào trong nhóm
                               </p>
                             ) : (
-                              selectedGroup.items.map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center justify-between p-3 rounded bg-muted/20"
+                              <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                              >
+                                <SortableContext
+                                  items={selectedGroup.items.map(item => item.id)}
+                                  strategy={verticalListSortingStrategy}
                                 >
-                                  <div className="flex items-center gap-3">
-                                    <Cherry className="h-5 w-5 text-purple-500" />
-                                    <div>
-                                      <div className="font-medium">{item.topping.name}</div>
-                                      <div className="text-xs text-muted-foreground">{item.topping.code}</div>
-                                    </div>
+                                  <div className="space-y-2">
+                                    {selectedGroup.items.map((item) => (
+                                      <SortableToppingItem
+                                        key={item.id}
+                                        item={item}
+                                        formatCurrency={formatCurrency}
+                                        onRemove={handleRemoveToppingFromGroup}
+                                        disabled={savingGroups}
+                                      />
+                                    ))}
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="text-right">
-                                      <div className="text-sm font-medium text-green-600">
-                                        {item.priceAdjustment > 0 ? "+" : ""}{formatCurrency(item.priceAdjustment || item.topping.price)}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        Tối đa: {item.maxQuantity}
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => handleRemoveToppingFromGroup(item.id)}
-                                      disabled={savingGroups}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))
+                                </SortableContext>
+                              </DndContext>
                             )}
                           </div>
                         )}
