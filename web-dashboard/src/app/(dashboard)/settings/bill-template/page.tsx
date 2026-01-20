@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { BillPreviewPanel } from "@/components/bill-preview-panel";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
   Dialog,
   DialogContent,
@@ -112,6 +113,9 @@ export default function BillTemplatePage() {
     templateType: BillTemplateType.CLASSIC,
     ...DEFAULT_BILL_TEMPLATE,
   });
+
+  // Debounce template form for smooth preview rendering
+  const debouncedTemplateForm = useDebouncedValue(templateForm, 100);
 
   const [printerForm, setPrinterForm] = React.useState<CreateBillPrinterConfigDto>({
     branchId: "",
@@ -1471,7 +1475,7 @@ export default function BillTemplatePage() {
             {/* Live Preview Section - 1/3 width */}
             <div className="hidden lg:block border-l pl-6 overflow-y-auto h-full">
               <h3 className="font-medium text-sm text-muted-foreground mb-3 sticky top-0 bg-background py-1">Xem trước trực tiếp</h3>
-              <BillPreviewPanel template={templateForm} />
+              <BillPreviewPanel template={debouncedTemplateForm} />
             </div>
           </div>
           <DialogFooter>

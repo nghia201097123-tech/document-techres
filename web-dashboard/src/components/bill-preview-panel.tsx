@@ -11,8 +11,9 @@ interface BillPreviewPanelProps {
 /**
  * Bill Preview Panel - Shows a live preview of the bill template
  * Renders a visual representation of how the bill will look when printed
+ * Memoized to prevent unnecessary re-renders during form input
  */
-export function BillPreviewPanel({ template, className }: BillPreviewPanelProps) {
+export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template, className }: BillPreviewPanelProps) {
   // Calculate preview width based on paper width
   const getPreviewWidth = () => {
     const paperWidth = template.paperWidth || 80;
@@ -331,4 +332,4 @@ export function BillPreviewPanel({ template, className }: BillPreviewPanelProps)
       </div>
     </div>
   );
-}
+});
