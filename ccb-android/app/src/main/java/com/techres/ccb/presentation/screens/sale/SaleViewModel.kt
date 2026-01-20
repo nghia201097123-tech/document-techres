@@ -61,6 +61,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 import javax.inject.Inject
 
@@ -1130,8 +1131,9 @@ class SaleViewModel @Inject constructor(
                         tableName = currentOrder.tableName,
                         orderNumber = currentOrder.orderNumber,
                         orderTime = try {
-                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                                .parse(currentOrder.createdAt) ?: Date()
+                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+                                timeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+                            }.parse(currentOrder.createdAt) ?: Date()
                         } catch (e: Exception) { Date() }
                     )
                 }
@@ -3338,11 +3340,20 @@ class SaleViewModel @Inject constructor(
         receivedAmount: Double,
         changeAmount: Double
     ): BillData {
-        // Parse order date
+        // Parse order date - dữ liệu lưu theo múi giờ Việt Nam
+        val vietnamTz = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
         val orderDate = try {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(order.createdAt) ?: Date()
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                timeZone = vietnamTz
+            }.parse(order.createdAt) ?: Date()
         } catch (e: Exception) {
-            Date()
+            try {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+                    timeZone = vietnamTz
+                }.parse(order.createdAt) ?: Date()
+            } catch (e2: Exception) {
+                Date()
+            }
         }
 
         // Convert order items to bill items (exclude combo children - they're already shown in combo parent)

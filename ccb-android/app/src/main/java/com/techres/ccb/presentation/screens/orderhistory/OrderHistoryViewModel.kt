@@ -33,6 +33,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
@@ -502,15 +503,35 @@ class OrderHistoryViewModel @Inject constructor(
     }
 
     private fun buildBillDataFromOrder(order: OrderEntity, orderItems: List<OrderItemEntity>): BillData {
+        // Dữ liệu lưu theo múi giờ Việt Nam
+        val vietnamTz = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
         val orderDate = try {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(order.createdAt) ?: Date()
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                timeZone = vietnamTz
+            }.parse(order.createdAt) ?: Date()
         } catch (e: Exception) {
-            Date()
+            try {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+                    timeZone = vietnamTz
+                }.parse(order.createdAt) ?: Date()
+            } catch (e2: Exception) {
+                Date()
+            }
         }
 
         val checkInTime = orderDate
         val checkOutTime = order.completedAt?.let {
-            try { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(it) } catch (e: Exception) { null }
+            try {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                    timeZone = vietnamTz
+                }.parse(it)
+            } catch (e: Exception) {
+                try {
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+                        timeZone = vietnamTz
+                    }.parse(it)
+                } catch (e2: Exception) { null }
+            }
         }
 
         val billItems = orderItems.filter { !it.isComboChild }.map { item ->
