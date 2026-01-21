@@ -645,38 +645,38 @@ object HybridBillPrintService {
             }
 
             // ============ QR CODE ============
-            if (template.showQrCode) {
+            // Nếu thanh toán chuyển khoản (paymentMethod chứa "Chuyển khoản") -> luôn in QR thanh toán
+            // Ngược lại -> in QR theo cài đặt template
+            val isBankTransfer = billData.paymentMethod.contains("Chuyển khoản", ignoreCase = true) ||
+                billData.paymentMethod.contains("Bank", ignoreCase = true) ||
+                billData.paymentMethod.contains("Transfer", ignoreCase = true)
+
+            if (isBankTransfer && paymentBankAccount != null) {
+                // Thanh toán chuyển khoản - LUÔN in QR code
+                separator()
+                lineCenter("THANH TOÁN CHUYỂN KHOẢN")
+                lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
+                lineCenter("STK: ${paymentBankAccount.accountNumber}")
+                lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
+                lineCenter("Số tiền: ${formatCurrency(billData.totalAmount)}")
+                val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
+                lineCenter("Nội dung: $transferContent")
+                feed(1)
+                // Tạo VietQR content
+                val bankBin = paymentBankAccount.bankBin
+                    ?: getBankBinFromCode(paymentBankAccount.bankCode)
+                    ?: paymentBankAccount.bankCode
+                val vietQrContent = generateVietQrContent(
+                    bankBin = bankBin,
+                    accountNumber = paymentBankAccount.accountNumber,
+                    amount = billData.totalAmount.toLong(),
+                    description = transferContent,
+                    accountName = paymentBankAccount.accountName
+                )
+                qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
+            } else if (template.showQrCode) {
+                // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
-                    "payment" -> {
-                        // QR thanh toán - cần có thông tin tài khoản ngân hàng
-                        if (paymentBankAccount != null) {
-                            separator()
-                            lineCenter("THANH TOÁN CHUYỂN KHOẢN")
-                            lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
-                            lineCenter("STK: ${paymentBankAccount.accountNumber}")
-                            lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
-                            lineCenter("Số tiền: ${formatCurrency(billData.totalAmount)}")
-                            val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
-                            lineCenter("Nội dung: $transferContent")
-                            feed(1)
-                            // Tạo VietQR content
-                            val bankBin = paymentBankAccount.bankBin
-                                ?: getBankBinFromCode(paymentBankAccount.bankCode)
-                                ?: paymentBankAccount.bankCode
-                            val vietQrContent = generateVietQrContent(
-                                bankBin = bankBin,
-                                accountNumber = paymentBankAccount.accountNumber,
-                                amount = billData.totalAmount.toLong(),
-                                description = transferContent,
-                                accountName = paymentBankAccount.accountName
-                            )
-                            qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
-                        } else {
-                            // Không có bank account - hiển thị QR mã đơn hàng thay thế
-                            Log.w(TAG, "Payment QR requested but no bank account provided, falling back to order_id")
-                            qrCode(billData.orderNumber)
-                        }
-                    }
                     "order_id" -> qrCode(billData.orderNumber)
                     "custom" -> qrCode(template.qrCodeContent ?: billData.orderNumber)
                     else -> qrCode(billData.orderNumber)
@@ -1072,39 +1072,39 @@ object HybridBillPrintService {
                 }
             }
 
-            // ============ QR CODE (theo config) ============
-            if (template.showQrCode) {
+            // ============ QR CODE ============
+            // Nếu thanh toán chuyển khoản (paymentMethod chứa "Chuyển khoản") -> luôn in QR thanh toán
+            // Ngược lại -> in QR theo cài đặt template
+            val isBankTransfer = billData.paymentMethod.contains("Chuyển khoản", ignoreCase = true) ||
+                billData.paymentMethod.contains("Bank", ignoreCase = true) ||
+                billData.paymentMethod.contains("Transfer", ignoreCase = true)
+
+            if (isBankTransfer && paymentBankAccount != null) {
+                // Thanh toán chuyển khoản - LUÔN in QR code
+                separator()
+                lineCenter("THANH TOÁN CHUYỂN KHOẢN", BitmapTextStyle(bold = true))
+                lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
+                lineCenter("STK: ${paymentBankAccount.accountNumber}")
+                lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
+                lineCenter("Số tiền: ${formatCurrency(billData.totalAmount)}")
+                val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
+                lineCenter("Nội dung: $transferContent")
+                feed(1)
+                // Tạo VietQR content
+                val bankBin = paymentBankAccount.bankBin
+                    ?: getBankBinFromCode(paymentBankAccount.bankCode)
+                    ?: paymentBankAccount.bankCode
+                val vietQrContent = generateVietQrContent(
+                    bankBin = bankBin,
+                    accountNumber = paymentBankAccount.accountNumber,
+                    amount = billData.totalAmount.toLong(),
+                    description = transferContent,
+                    accountName = paymentBankAccount.accountName
+                )
+                qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
+            } else if (template.showQrCode) {
+                // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
-                    "payment" -> {
-                        // QR thanh toán - cần có thông tin tài khoản ngân hàng
-                        if (paymentBankAccount != null) {
-                            separator()
-                            lineCenter("THANH TOÁN CHUYỂN KHOẢN", BitmapTextStyle(bold = true))
-                            lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
-                            lineCenter("STK: ${paymentBankAccount.accountNumber}")
-                            lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
-                            lineCenter("Số tiền: ${formatCurrency(billData.totalAmount)}")
-                            val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
-                            lineCenter("Nội dung: $transferContent")
-                            feed(1)
-                            // Tạo VietQR content
-                            val bankBin = paymentBankAccount.bankBin
-                                ?: getBankBinFromCode(paymentBankAccount.bankCode)
-                                ?: paymentBankAccount.bankCode
-                            val vietQrContent = generateVietQrContent(
-                                bankBin = bankBin,
-                                accountNumber = paymentBankAccount.accountNumber,
-                                amount = billData.totalAmount.toLong(),
-                                description = transferContent,
-                                accountName = paymentBankAccount.accountName
-                            )
-                            qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
-                        } else {
-                            // Không có bank account - hiển thị QR mã đơn hàng thay thế
-                            Log.w(TAG, "Payment QR requested but no bank account provided, falling back to order_id")
-                            qrCode(billData.orderNumber)
-                        }
-                    }
                     "order_id" -> qrCode(billData.orderNumber)
                     "custom" -> qrCode(template.qrCodeContent ?: billData.orderNumber)
                     else -> qrCode(billData.orderNumber)
