@@ -4,7 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,9 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.KitchenPrintMode
+import com.techres.ccb.data.local.entity.LabelSize
+import com.techres.ccb.data.local.entity.PrinterProtocol
 import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.presentation.components.PosTopAppBar
@@ -445,9 +450,14 @@ private fun LabelPrinterSettingsDialog(
     val color = Color(0xFF4CAF50)
 
     // Printer connection state
-    var printerProtocol by remember { mutableStateOf(printer.printerProtocol) }
+    var selectedProtocol by remember { mutableStateOf(printer.getPrinterProtocolEnum()) }
     var printerIp by remember { mutableStateOf(printer.printerIp ?: "") }
     var printerPort by remember { mutableStateOf(printer.printerPort.toString()) }
+
+    // Label size
+    var selectedLabelSize by remember { mutableStateOf(printer.getLabelSize()) }
+    var labelGapMm by remember { mutableStateOf(printer.labelGapMm.toString()) }
+    var printDensity by remember { mutableStateOf(printer.printDensity) }
 
     // Label display options
     var labelPrintPrice by remember { mutableStateOf(printer.labelPrintPrice) }
@@ -458,374 +468,511 @@ private fun LabelPrinterSettingsDialog(
     var labelStoreName by remember { mutableStateOf(printer.labelStoreName ?: "") }
     var labelReverse by remember { mutableStateOf(printer.labelReverse) }
 
-    // Label size - use LabelSize for dropdown
-    var selectedLabelSize by remember {
-        mutableStateOf(
-            com.techres.ccb.data.local.entity.LabelSize.ALL_SIZES.find {
-                it.widthMm == printer.labelWidthMm && it.heightMm == printer.labelHeightMm
-            } ?: com.techres.ccb.data.local.entity.LabelSize.SIZE_72x30
-        )
-    }
-    var labelGapMm by remember { mutableStateOf(printer.labelGapMm.toString()) }
-
     // Font and spacing
     var labelFontScale by remember { mutableStateOf(printer.labelFontScale) }
-    var labelMaxToppings by remember { mutableStateOf(printer.labelMaxToppings.toString()) }
+    var labelMaxToppings by remember { mutableStateOf(printer.labelMaxToppings) }
     var labelLineSpacing by remember { mutableStateOf(printer.labelLineSpacing) }
 
     // Dropdown expanded states
     var protocolExpanded by remember { mutableStateOf(false) }
     var labelSizeExpanded by remember { mutableStateOf(false) }
+    var fontScaleExpanded by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Settings,
-                    contentDescription = null,
-                    tint = color
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Cài đặt tem - ${printer.name}")
-            }
-        },
-        text = {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 500.dp)
+                    .width(360.dp)
+                    .heightIn(max = 600.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp)
             ) {
-                LazyColumn(
+                // Header
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // ========== PRINTER CONNECTION SECTION ==========
-                    item {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(color.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Label,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = color
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
                         Text(
-                            text = "Kết nối máy in",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = color
+                            text = "Cấu hình máy in tem",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Printer Protocol dropdown
-                    item {
-                        ExposedDropdownMenuBox(
-                            expanded = protocolExpanded,
-                            onExpandedChange = { protocolExpanded = it }
-                        ) {
-                            OutlinedTextField(
-                                value = when (printerProtocol) {
-                                    "TSPL" -> "TSPL (Máy in tem)"
-                                    else -> "ESC/POS (Máy in hóa đơn)"
-                                },
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Loại máy in") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = protocolExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = protocolExpanded,
-                                onDismissRequest = { protocolExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("TSPL (Máy in tem)") },
-                                    onClick = {
-                                        printerProtocol = "TSPL"
-                                        protocolExpanded = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("ESC/POS (Máy in hóa đơn)") },
-                                    onClick = {
-                                        printerProtocol = "ESCPOS"
-                                        protocolExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    // IP and Port
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = printerIp,
-                                onValueChange = { printerIp = it },
-                                label = { Text("IP máy in") },
-                                placeholder = { Text("192.168.1.100") },
-                                modifier = Modifier.weight(2f),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = printerPort,
-                                onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
-                                label = { Text("Cổng") },
-                                placeholder = { Text("9100") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                        }
-                    }
-
-                    // ========== LABEL SIZE SECTION ==========
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Kích thước tem",
-                            fontWeight = FontWeight.SemiBold,
+                            text = printer.name,
                             fontSize = 14.sp,
-                            color = color
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Label size dropdown
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            ExposedDropdownMenuBox(
-                                expanded = labelSizeExpanded,
-                                onExpandedChange = { labelSizeExpanded = it },
-                                modifier = Modifier.weight(2f)
-                            ) {
-                                OutlinedTextField(
-                                    value = selectedLabelSize.displayName,
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Kích thước") },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = labelSizeExpanded) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor()
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = labelSizeExpanded,
-                                    onDismissRequest = { labelSizeExpanded = false }
-                                ) {
-                                    com.techres.ccb.data.local.entity.LabelSize.ALL_SIZES.forEach { size ->
-                                        DropdownMenuItem(
-                                            text = { Text(size.displayName) },
-                                            onClick = {
-                                                selectedLabelSize = size
-                                                labelSizeExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            OutlinedTextField(
-                                value = labelGapMm,
-                                onValueChange = { labelGapMm = it.filter { c -> c.isDigit() } },
-                                label = { Text("Gap (mm)") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                        }
-                    }
-
-                    // Max toppings per label
-                    item {
-                        OutlinedTextField(
-                            value = labelMaxToppings,
-                            onValueChange = { labelMaxToppings = it.filter { c -> c.isDigit() } },
-                            label = { Text("Số topping tối đa / tem (0 = tự động)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                    }
-
-                    // Font scale slider
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Cỡ chữ: ${String.format("%.1f", labelFontScale)}x",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = color
-                        )
-                        Slider(
-                            value = labelFontScale,
-                            onValueChange = { labelFontScale = it },
-                            valueRange = 0.5f..2.0f,
-                            steps = 14,
-                            colors = SliderDefaults.colors(
-                                thumbColor = color,
-                                activeTrackColor = color
-                            )
-                        )
-                    }
-
-                    // Line spacing slider
-                    item {
-                        Text(
-                            text = "Khoảng cách dòng: ${String.format("%.1f", labelLineSpacing)}x",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = color
-                        )
-                        Slider(
-                            value = labelLineSpacing,
-                            onValueChange = { labelLineSpacing = it },
-                            valueRange = 0.5f..2.0f,
-                            steps = 14,
-                            colors = SliderDefaults.colors(
-                                thumbColor = color,
-                                activeTrackColor = color
-                            )
-                        )
-                    }
-
-                    // Store name
-                    item {
-                        OutlinedTextField(
-                            value = labelStoreName,
-                            onValueChange = { labelStoreName = it },
-                            label = { Text("Tên cửa hàng hiển thị") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                    }
-
-                    // ========== DISPLAY OPTIONS SECTION ==========
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Hiển thị trên tem",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
-                            label = "In giá",
-                            checked = labelPrintPrice,
-                            onCheckedChange = { labelPrintPrice = it },
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
-                            label = "In tên cửa hàng",
-                            checked = labelPrintStoreName,
-                            onCheckedChange = { labelPrintStoreName = it },
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
-                            label = "In mã đơn hàng",
-                            checked = labelPrintOrderNumber,
-                            onCheckedChange = { labelPrintOrderNumber = it },
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
-                            label = "In tên bàn",
-                            checked = labelPrintTableName,
-                            onCheckedChange = { labelPrintTableName = it },
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
-                            label = "In thời gian",
-                            checked = labelPrintTime,
-                            onCheckedChange = { labelPrintTime = it },
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
-                            label = "Đảo chiều tem (180°)",
-                            checked = labelReverse,
-                            onCheckedChange = { labelReverse = it },
                             color = color
                         )
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val updatedPrinter = printer.copy(
-                        printerProtocol = printerProtocol,
-                        printerIp = printerIp.ifBlank { null },
-                        printerPort = printerPort.toIntOrNull() ?: 9100,
-                        labelPrintPrice = labelPrintPrice,
-                        labelPrintStoreName = labelPrintStoreName,
-                        labelPrintOrderNumber = labelPrintOrderNumber,
-                        labelPrintTableName = labelPrintTableName,
-                        labelPrintTime = labelPrintTime,
-                        labelStoreName = labelStoreName.ifBlank { null },
-                        labelReverse = labelReverse,
-                        labelWidthMm = selectedLabelSize.widthMm,
-                        labelHeightMm = selectedLabelSize.heightMm,
-                        labelGapMm = labelGapMm.toIntOrNull() ?: 3,
-                        labelFontScale = labelFontScale,
-                        labelMaxToppings = labelMaxToppings.toIntOrNull() ?: 0,
-                        labelLineSpacing = labelLineSpacing
-                    )
-                    onSave(updatedPrinter)
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = color
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ========== PRINTER CONNECTION SECTION ==========
+                Text(
+                    text = "Loại máy in (Protocol)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            ) {
-                Text("Lưu")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Hủy")
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = protocolExpanded,
+                    onExpandedChange = { protocolExpanded = !protocolExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedProtocol.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = protocolExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = color,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = protocolExpanded,
+                        onDismissRequest = { protocolExpanded = false }
+                    ) {
+                        PrinterProtocol.entries.forEach { protocol ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = protocol.displayName,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = when (protocol) {
+                                                PrinterProtocol.ESCPOS -> "Máy in hóa đơn (EPSON, BIXOLON...)"
+                                                PrinterProtocol.TSPL -> "Máy in tem (XPRINTER, TSC, GAINSCHA...)"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedProtocol = protocol
+                                    protocolExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (protocol) {
+                                            PrinterProtocol.ESCPOS -> Icons.Default.Receipt
+                                            PrinterProtocol.TSPL -> Icons.Default.LocalOffer
+                                        },
+                                        contentDescription = null,
+                                        tint = if (selectedProtocol == protocol) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // IP Address and Port
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = printerIp,
+                        onValueChange = { printerIp = it },
+                        label = { Text("IP máy in") },
+                        placeholder = { Text("192.168.1.100") },
+                        modifier = Modifier.weight(2f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = printerPort,
+                        onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
+                        label = { Text("Cổng") },
+                        placeholder = { Text("9100") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ========== LABEL SIZE SECTION ==========
+                Text(
+                    text = "Cấu hình in tem",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = color
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Label size selection
+                Text(
+                    text = "Kích thước tem",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = labelSizeExpanded,
+                    onExpandedChange = { labelSizeExpanded = !labelSizeExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedLabelSize.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = labelSizeExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = labelSizeExpanded,
+                        onDismissRequest = { labelSizeExpanded = false }
+                    ) {
+                        LabelSize.ALL_SIZES.forEach { size ->
+                            DropdownMenuItem(
+                                text = { Text(size.displayName) },
+                                onClick = {
+                                    selectedLabelSize = size
+                                    labelSizeExpanded = false
+                                },
+                                trailingIcon = {
+                                    if (selectedLabelSize.widthMm == size.widthMm &&
+                                        selectedLabelSize.heightMm == size.heightMm) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = color
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Gap and density
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = labelGapMm,
+                        onValueChange = { labelGapMm = it.filter { c -> c.isDigit() } },
+                        label = { Text("Gap (mm)") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = if (labelMaxToppings == 0) "" else labelMaxToppings.toString(),
+                        onValueChange = { value ->
+                            labelMaxToppings = value.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 20) ?: 0
+                        },
+                        label = { Text("Max topping") },
+                        placeholder = { Text("0 = tự động") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Print density slider
+                Text(
+                    text = "Độ đậm: $printDensity",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Slider(
+                    value = printDensity.toFloat(),
+                    onValueChange = { printDensity = it.toInt() },
+                    valueRange = 0f..15f,
+                    steps = 14,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = color,
+                        activeTrackColor = color
+                    )
+                )
+                Text(
+                    text = "0 = nhạt, 15 = đậm nhất",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Font Scale Dropdown
+                val fontScaleOptions = listOf(
+                    0.7f to "Rất nhỏ (0.7x)",
+                    0.8f to "Nhỏ (0.8x)",
+                    0.9f to "Hơi nhỏ (0.9x)",
+                    1.0f to "Bình thường (1.0x)",
+                    1.1f to "Hơi lớn (1.1x)",
+                    1.2f to "Lớn (1.2x)",
+                    1.3f to "Rất lớn (1.3x)"
+                )
+                ExposedDropdownMenuBox(
+                    expanded = fontScaleExpanded,
+                    onExpandedChange = { fontScaleExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = fontScaleOptions.find { it.first == labelFontScale }?.second
+                            ?: "Bình thường (1.0x)",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Cỡ chữ") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fontScaleExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = fontScaleExpanded,
+                        onDismissRequest = { fontScaleExpanded = false }
+                    ) {
+                        fontScaleOptions.forEach { (scale, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    labelFontScale = scale
+                                    fontScaleExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Line spacing slider
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Khoảng cách dòng: ${(labelLineSpacing * 100).toInt()}%",
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = when {
+                        labelLineSpacing <= 0.85f -> "Rất sát"
+                        labelLineSpacing <= 0.95f -> "Sát"
+                        labelLineSpacing <= 1.05f -> "Bình thường"
+                        labelLineSpacing <= 1.2f -> "Rộng"
+                        else -> "Rất rộng"
+                    },
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Slider(
+                    value = labelLineSpacing,
+                    onValueChange = { labelLineSpacing = it },
+                    valueRange = 0.8f..1.5f,
+                    steps = 6,
+                    colors = SliderDefaults.colors(
+                        thumbColor = color,
+                        activeTrackColor = color
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ========== DISPLAY OPTIONS SECTION ==========
+                Text(
+                    text = "Hiển thị trên tem",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = color
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // In giá
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = labelPrintPrice,
+                        onCheckedChange = { labelPrintPrice = it },
+                        colors = CheckboxDefaults.colors(checkedColor = color)
+                    )
+                    Text(text = "In giá", fontSize = 14.sp)
+                }
+
+                // In tên cửa hàng
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = labelPrintStoreName,
+                        onCheckedChange = { labelPrintStoreName = it },
+                        colors = CheckboxDefaults.colors(checkedColor = color)
+                    )
+                    Text(text = "In tên cửa hàng", fontSize = 14.sp)
+                }
+
+                // Tên cửa hàng hiển thị (show only when labelPrintStoreName is checked)
+                if (labelPrintStoreName) {
+                    OutlinedTextField(
+                        value = labelStoreName,
+                        onValueChange = { labelStoreName = it },
+                        label = { Text("Tên cửa hàng hiển thị") },
+                        placeholder = { Text("VD: Quán Cà phê ABC") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 40.dp),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                // In mã đơn hàng
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = labelPrintOrderNumber,
+                        onCheckedChange = { labelPrintOrderNumber = it },
+                        colors = CheckboxDefaults.colors(checkedColor = color)
+                    )
+                    Text(text = "In mã đơn hàng", fontSize = 14.sp)
+                }
+
+                // In tên bàn
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = labelPrintTableName,
+                        onCheckedChange = { labelPrintTableName = it },
+                        colors = CheckboxDefaults.colors(checkedColor = color)
+                    )
+                    Text(text = "In tên bàn", fontSize = 14.sp)
+                }
+
+                // In thời gian
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = labelPrintTime,
+                        onCheckedChange = { labelPrintTime = it },
+                        colors = CheckboxDefaults.colors(checkedColor = color)
+                    )
+                    Text(text = "In thời gian", fontSize = 14.sp)
+                }
+
+                // Đảo chiều tem
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = labelReverse,
+                        onCheckedChange = { labelReverse = it },
+                        colors = CheckboxDefaults.colors(checkedColor = color)
+                    )
+                    Column {
+                        Text(text = "Đảo chiều tem (180°)", fontSize = 14.sp)
+                        Text(
+                            text = "In tem ngược 180° cho máy in đặt ngược",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Hủy")
+                    }
+
+                    Button(
+                        onClick = {
+                            val updatedPrinter = printer.copy(
+                                printerProtocol = selectedProtocol.name,
+                                printerIp = printerIp.ifBlank { null },
+                                printerPort = printerPort.toIntOrNull() ?: 9100,
+                                labelWidthMm = selectedLabelSize.widthMm,
+                                labelHeightMm = selectedLabelSize.heightMm,
+                                labelGapMm = labelGapMm.toIntOrNull() ?: 3,
+                                printDensity = printDensity,
+                                labelPrintPrice = labelPrintPrice,
+                                labelPrintStoreName = labelPrintStoreName,
+                                labelPrintOrderNumber = labelPrintOrderNumber,
+                                labelPrintTableName = labelPrintTableName,
+                                labelPrintTime = labelPrintTime,
+                                labelStoreName = labelStoreName.ifBlank { null },
+                                labelReverse = labelReverse,
+                                labelFontScale = labelFontScale,
+                                labelMaxToppings = labelMaxToppings,
+                                labelLineSpacing = labelLineSpacing
+                            )
+                            onSave(updatedPrinter)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = color
+                        )
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Lưu")
+                    }
+                }
             }
         }
-    )
-}
-
-@Composable
-private fun LabelSettingSwitch(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    color: Color
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.sp
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = color,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
-            )
-        )
     }
 }
