@@ -105,6 +105,7 @@ class SyncDataViewModel @Inject constructor(
             SyncItem("surcharges", "Phụ thu", "attach_money"),
             SyncItem("product_notes", "Ghi chú", "note"),
             SyncItem("bill_templates", "Mẫu in bill", "receipt"),
+            SyncItem("bank_accounts", "Tài khoản NH", "account_balance"),
             SyncItem("settings", "Cấu hình", "settings")
         )
         _uiState.update { it.copy(syncItems = items) }
@@ -170,6 +171,7 @@ class SyncDataViewModel @Inject constructor(
             SyncStep.SURCHARGES -> "surcharges"
             SyncStep.PRODUCT_NOTES -> "product_notes"
             SyncStep.BILL_TEMPLATES -> "bill_templates"
+            SyncStep.BANK_ACCOUNTS -> "bank_accounts"
         }
 
         if (itemId != null) {
