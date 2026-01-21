@@ -1113,6 +1113,26 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Bank accounts table created successfully');
       }
 
+      // 34.1. Add PayOS columns to bank_accounts table
+      const hasPaymentPartner = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'bank_accounts' AND column_name = 'payment_partner'
+        );
+      `);
+
+      if (!hasPaymentPartner[0].exists) {
+        this.logger.log('Adding PayOS columns to bank_accounts table...');
+        await queryRunner.query(`
+          ALTER TABLE bank_accounts
+          ADD COLUMN IF NOT EXISTS payment_partner VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS payos_client_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS payos_api_key VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS payos_checksum_key VARCHAR(255)
+        `);
+        this.logger.log('PayOS columns added to bank_accounts table');
+      }
+
       // 35. Create einvoice_provider enum and einvoice_configs table
       this.logger.log('Creating einvoice_provider enum...');
       await queryRunner.query(`
