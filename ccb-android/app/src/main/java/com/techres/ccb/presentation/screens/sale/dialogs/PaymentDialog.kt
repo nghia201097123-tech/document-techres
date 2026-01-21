@@ -2024,6 +2024,7 @@ private fun roundUp(amount: Long, unit: Long): Long {
  */
 private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, String?>> {
     val suggestions = mutableListOf<Pair<Long, String?>>()
+    val numberFormat = java.text.DecimalFormat("#,###")
 
     // 1. Số tiền chính xác (Đủ)
     suggestions.add(totalAmount to "Đủ")
@@ -2033,7 +2034,7 @@ private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, Stri
     smallRoundUps.forEach { unit ->
         val rounded = roundUp(totalAmount, unit)
         if (rounded > totalAmount && rounded !in suggestions.map { it.first }) {
-            suggestions.add(rounded to null)
+            suggestions.add(rounded to numberFormat.format(rounded))
         }
     }
 
@@ -2045,15 +2046,11 @@ private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, Stri
     )
     commonDenominations.forEach { denom ->
         if (denom >= totalAmount && denom !in suggestions.map { it.first }) {
-            val label = when {
-                denom >= 1000000L -> "${denom / 1000000}M"
-                else -> "${denom / 1000}k"
-            }
-            suggestions.add(denom to label)
+            suggestions.add(denom to numberFormat.format(denom))
         }
     }
 
-    // 4. Thêm các mốc tiền lẻ hữu ích cho số tiền lớn (VD: 1M + 100k, 1M + 200k)
+    // 4. Thêm các mốc tiền lẻ hữu ích cho số tiền lớn (VD: 1.100.000, 1.200.000)
     if (totalAmount > 500000L) {
         val baseAmounts = listOf(1000000L, 2000000L, 5000000L)
         val additions = listOf(100000L, 200000L, 500000L)
@@ -2061,17 +2058,7 @@ private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, Stri
             additions.forEach { add ->
                 val combined = base + add
                 if (combined > totalAmount && combined !in suggestions.map { it.first }) {
-                    val label = when {
-                        combined == 1100000L -> "1.1M"
-                        combined == 1200000L -> "1.2M"
-                        combined == 1500000L -> "1.5M"
-                        combined == 2100000L -> "2.1M"
-                        combined == 2200000L -> "2.2M"
-                        combined == 2500000L -> "2.5M"
-                        combined >= 1000000L -> "${combined / 1000}k"
-                        else -> "${combined / 1000}k"
-                    }
-                    suggestions.add(combined to label)
+                    suggestions.add(combined to numberFormat.format(combined))
                 }
             }
         }
