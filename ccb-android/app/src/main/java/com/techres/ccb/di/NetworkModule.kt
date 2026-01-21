@@ -176,7 +176,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun providePayOSApi(@GatewayRetrofit retrofit: Retrofit): PayOSApi {
+    fun providePayOSApi(@PosRetrofit retrofit: Retrofit): PayOSApi {
+        // PayOS is now in api-dashboard (same as POS API)
         return retrofit.create(PayOSApi::class.java)
     }
 }

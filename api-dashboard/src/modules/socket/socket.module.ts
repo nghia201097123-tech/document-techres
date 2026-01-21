@@ -1,7 +1,7 @@
-import { Module, Global } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { SocketGateway } from './socket.gateway';
 
-@Global() // Make SocketGateway available globally without importing
+@Global()
 @Module({
   providers: [SocketGateway],
   exports: [SocketGateway],

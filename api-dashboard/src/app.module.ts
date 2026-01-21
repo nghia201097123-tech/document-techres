@@ -27,6 +27,8 @@ import { TransactionVouchersModule } from "./modules/transaction-vouchers/transa
 import { StaffBranchModule } from "./modules/staff-branch/staff-branch.module";
 import { BillTemplatesModule } from "./modules/bill-templates/bill-templates.module";
 import { BillPrinterConfigsModule } from "./modules/bill-printer-configs/bill-printer-configs.module";
+import { SocketModule } from "./modules/socket/socket.module";
+import { PayosModule } from "./modules/payos/payos.module";
 import { DatabaseMigrationService } from "./database/database-migration.service";
 import {
   Company,
@@ -163,6 +165,8 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     StaffBranchModule,
     BillTemplatesModule,
     BillPrinterConfigsModule,
+    SocketModule,
+    PayosModule,
   ],
   providers: [DatabaseMigrationService],
 })

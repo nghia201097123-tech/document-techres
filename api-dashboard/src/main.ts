@@ -14,15 +14,21 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  // CORS - allow web-dashboard (port 3002)
+  // CORS - allow web-dashboard and POS apps
   app.enableCors({
-    origin: ['http://localhost:3001'],
+    origin: true, // Allow all origins for POS apps
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
 
-  // Global prefix
-  app.setGlobalPrefix('api');
+  // Global prefix - exclude PayOS routes for POS app compatibility
+  app.setGlobalPrefix('api', {
+    exclude: [
+      'payos',
+      'payos/(.*)',
+      'health',
+    ],
+  });
 
   // Validation pipe
   app.useGlobalPipes(

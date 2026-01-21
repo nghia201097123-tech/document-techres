@@ -14,14 +14,9 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  // Global prefix - exclude PayOS routes for backward compatibility with clients
-  // that call /payos/* directly without the /api prefix
+  // Global prefix
   app.setGlobalPrefix('api', {
-    exclude: [
-      'payos',
-      'payos/(.*)',
-      'health',
-    ],
+    exclude: ['health'],
   });
 
   // Swagger setup

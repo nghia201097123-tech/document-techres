@@ -36,7 +36,7 @@ export interface JoinRoomPayload {
 
 @WebSocketGateway({
   cors: {
-    origin: '*', // Configure properly in production
+    origin: '*',
     credentials: true,
   },
   namespace: '/payment',
@@ -50,7 +50,6 @@ export class SocketGateway
 
   private readonly logger = new Logger(SocketGateway.name);
 
-  // Track connected devices: socketId -> { branchId, deviceId, deviceType }
   private connectedDevices = new Map<
     string,
     { branchId: string; deviceId: string; deviceType: string }
@@ -84,13 +83,11 @@ export class SocketGateway
     const { branchId, deviceId, deviceType } = payload;
     const roomName = `branch:${branchId}`;
 
-    // Leave any previous rooms
     const previousInfo = this.connectedDevices.get(client.id);
     if (previousInfo) {
       client.leave(`branch:${previousInfo.branchId}`);
     }
 
-    // Join new room
     client.join(roomName);
     this.connectedDevices.set(client.id, { branchId, deviceId, deviceType });
 
@@ -98,7 +95,6 @@ export class SocketGateway
       `Device ${deviceId} (${deviceType}) joined room ${roomName}`,
     );
 
-    // Acknowledge join
     return {
       success: true,
       room: roomName,
@@ -126,8 +122,6 @@ export class SocketGateway
     return { event: 'pong', timestamp: Date.now() };
   }
 
-  // Methods to emit events (called from PayOS service)
-
   emitPaymentSuccess(branchId: string, payload: PaymentSuccessPayload) {
     const roomName = `branch:${branchId}`;
     this.server.to(roomName).emit('payment:success', payload);
@@ -150,7 +144,6 @@ export class SocketGateway
     this.logger.log(`Emitted payment:expired to ${roomName} for order ${orderCode}`);
   }
 
-  // Get connected devices count for a branch
   getBranchDeviceCount(branchId: string): number {
     let count = 0;
     for (const [, info] of this.connectedDevices) {
@@ -159,24 +152,5 @@ export class SocketGateway
       }
     }
     return count;
-  }
-
-  // Get all connected devices info
-  getConnectedDevices(): Array<{
-    socketId: string;
-    branchId: string;
-    deviceId: string;
-    deviceType: string;
-  }> {
-    const devices: Array<{
-      socketId: string;
-      branchId: string;
-      deviceId: string;
-      deviceType: string;
-    }> = [];
-    for (const [socketId, info] of this.connectedDevices) {
-      devices.push({ socketId, ...info });
-    }
-    return devices;
   }
 }

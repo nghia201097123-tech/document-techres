@@ -1,6 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { PayOS } from '@payos/node';
+import { BankAccount } from '../../database/entities';
 import {
   CreatePaymentDto,
   CreatePaymentResponseDto,
@@ -9,7 +12,6 @@ import {
 import { PayOSWebhookDto } from './dto/webhook.dto';
 import { SocketGateway } from '../socket/socket.gateway';
 
-// In-memory store for payment sessions (use Redis in production)
 interface PaymentSession {
   orderId: string;
   orderCode: number;
@@ -22,55 +24,34 @@ interface PaymentSession {
   createdAt: Date;
   paidAt?: Date;
   transactionRef?: string;
+  payosClientId: string;
 }
 
 @Injectable()
-export class PayosService implements OnModuleInit {
+export class PayosService {
   private readonly logger = new Logger(PayosService.name);
-  private payos: PayOS;
   private readonly paymentSessions = new Map<number, PaymentSession>();
+  private readonly payosInstances = new Map<string, PayOS>();
 
   constructor(
+    @InjectRepository(BankAccount)
+    private bankAccountRepository: Repository<BankAccount>,
     private configService: ConfigService,
     private socketGateway: SocketGateway,
-  ) {}
-
-  onModuleInit() {
-    this.initializePayOS();
+  ) {
     this.startCleanupJob();
   }
 
-  private initializePayOS() {
-    const clientId = this.configService.get<string>('PAYOS_CLIENT_ID');
-    const apiKey = this.configService.get<string>('PAYOS_API_KEY');
-    const checksumKey = this.configService.get<string>('PAYOS_CHECKSUM_KEY');
-
-    if (!clientId || !apiKey || !checksumKey) {
-      this.logger.warn('PayOS credentials not configured - PayOS features will be disabled');
-      return;
-    }
-
-    this.payos = new PayOS({
-      clientId,
-      apiKey,
-      checksumKey,
-    });
-
-    this.logger.log('PayOS SDK initialized');
-  }
-
-  // Cleanup expired sessions every 10 minutes
   private startCleanupJob() {
     setInterval(() => {
       const now = new Date();
-      const expireTime = 30 * 60 * 1000; // 30 minutes
+      const expireTime = 30 * 60 * 1000;
 
       for (const [orderCode, session] of this.paymentSessions.entries()) {
         if (
           now.getTime() - session.createdAt.getTime() > expireTime &&
           session.status === 'PENDING'
         ) {
-          // Emit expired event before cleanup
           this.socketGateway.emitPaymentExpired(session.branchId, orderCode);
           this.paymentSessions.delete(orderCode);
           this.logger.debug(`Cleaned up expired session: ${orderCode}`);
@@ -79,10 +60,63 @@ export class PayosService implements OnModuleInit {
     }, 10 * 60 * 1000);
   }
 
-  async createPayment(dto: CreatePaymentDto): Promise<CreatePaymentResponseDto> {
-    if (!this.payos) {
-      throw new Error('PayOS not initialized');
+  private async getPayOSInstance(branchId: string): Promise<{ payos: PayOS; bankAccount: BankAccount }> {
+    // Find PayOS bank account for the branch
+    const bankAccount = await this.bankAccountRepository.findOne({
+      where: {
+        branchId,
+        paymentPartner: 'payos',
+        isActive: true,
+      },
+    });
+
+    if (!bankAccount) {
+      // Try to find brand-level PayOS account
+      const brandBankAccount = await this.bankAccountRepository
+        .createQueryBuilder('ba')
+        .innerJoin('branches', 'b', 'b.brand_id = ba.brand_id')
+        .where('b.id = :branchId', { branchId })
+        .andWhere('ba.branch_id IS NULL')
+        .andWhere('ba.payment_partner = :partner', { partner: 'payos' })
+        .andWhere('ba.is_active = true')
+        .getOne();
+
+      if (!brandBankAccount) {
+        throw new NotFoundException('PayOS not configured for this branch');
+      }
+
+      return this.createPayOSFromBankAccount(brandBankAccount);
     }
+
+    return this.createPayOSFromBankAccount(bankAccount);
+  }
+
+  private createPayOSFromBankAccount(bankAccount: BankAccount): { payos: PayOS; bankAccount: BankAccount } {
+    const { payosClientId, payosApiKey, payosChecksumKey } = bankAccount;
+
+    if (!payosClientId || !payosApiKey || !payosChecksumKey) {
+      throw new BadRequestException('PayOS credentials not fully configured');
+    }
+
+    // Cache PayOS instance by clientId
+    if (!this.payosInstances.has(payosClientId)) {
+      const payos = new PayOS({
+        clientId: payosClientId,
+        apiKey: payosApiKey,
+        checksumKey: payosChecksumKey,
+      });
+      this.payosInstances.set(payosClientId, payos);
+      this.logger.log(`Created PayOS instance for clientId: ${payosClientId}`);
+    }
+
+    return {
+      payos: this.payosInstances.get(payosClientId),
+      bankAccount,
+    };
+  }
+
+  async createPayment(dto: CreatePaymentDto): Promise<CreatePaymentResponseDto> {
+    const { payos, bankAccount } = await this.getPayOSInstance(dto.branchId);
 
     try {
       const returnUrl =
@@ -92,18 +126,15 @@ export class PayosService implements OnModuleInit {
         this.configService.get<string>('PAYOS_CANCEL_URL') ||
         'https://techres.vn/payment/cancel';
 
-      // Create payment request with PayOS
-      const paymentRequest = await this.payos.paymentRequests.create({
+      const paymentRequest = await payos.paymentRequests.create({
         orderCode: dto.orderCode,
         amount: dto.amount,
-        description: dto.description.substring(0, 25), // PayOS limits to 25 chars
+        description: dto.description.substring(0, 25),
         returnUrl,
         cancelUrl,
-        // Optional: Add buyer info if available
         ...(dto.customerName && { buyerName: dto.customerName }),
       });
 
-      // Store session for webhook handling
       this.paymentSessions.set(dto.orderCode, {
         orderId: dto.orderId,
         orderCode: dto.orderCode,
@@ -114,6 +145,7 @@ export class PayosService implements OnModuleInit {
         customerName: dto.customerName,
         status: 'PENDING',
         createdAt: new Date(),
+        payosClientId: bankAccount.payosClientId,
       });
 
       this.logger.log(
@@ -134,13 +166,11 @@ export class PayosService implements OnModuleInit {
     }
   }
 
-  async getPaymentStatus(orderCode: number): Promise<PaymentStatusResponseDto> {
-    if (!this.payos) {
-      throw new Error('PayOS not initialized');
-    }
+  async getPaymentStatus(orderCode: number, branchId: string): Promise<PaymentStatusResponseDto> {
+    const { payos } = await this.getPayOSInstance(branchId);
 
     try {
-      const paymentInfo = await this.payos.paymentRequests.get(orderCode);
+      const paymentInfo = await payos.paymentRequests.get(orderCode);
 
       return {
         orderCode,
@@ -156,20 +186,16 @@ export class PayosService implements OnModuleInit {
     }
   }
 
-  async cancelPayment(orderCode: number, reason?: string): Promise<boolean> {
-    if (!this.payos) {
-      throw new Error('PayOS not initialized');
-    }
+  async cancelPayment(orderCode: number, branchId: string, reason?: string): Promise<boolean> {
+    const { payos } = await this.getPayOSInstance(branchId);
 
     try {
-      await this.payos.paymentRequests.cancel(orderCode, reason);
+      await payos.paymentRequests.cancel(orderCode, reason);
 
-      // Update session status and emit event
       const session = this.paymentSessions.get(orderCode);
       if (session) {
         session.status = 'CANCELLED';
 
-        // Emit cancellation event via Socket.IO
         this.socketGateway.emitPaymentCancelled(session.branchId, {
           orderId: session.orderId,
           orderCode,
@@ -186,35 +212,29 @@ export class PayosService implements OnModuleInit {
   }
 
   async handleWebhook(webhookData: PayOSWebhookDto): Promise<{ success: boolean }> {
-    if (!this.payos) {
-      this.logger.warn('PayOS not initialized, cannot verify webhook');
-      return { success: false };
-    }
-
     try {
-      // Verify webhook signature
-      const isValid = await this.payos.webhooks.verify(webhookData);
-      if (!isValid) {
-        this.logger.warn('Invalid webhook signature');
-        return { success: false };
-      }
-
       const { data } = webhookData;
       const orderCode = data.orderCode;
 
-      // Check if payment was successful
       if (webhookData.code === '00' && data.code === '00') {
         this.logger.log(`Payment success webhook received: orderCode=${orderCode}`);
 
-        // Get session info
         const session = this.paymentSessions.get(orderCode);
         if (session) {
-          // Update session
+          // Verify webhook signature using cached PayOS instance
+          const payos = this.payosInstances.get(session.payosClientId);
+          if (payos) {
+            const isValid = await payos.webhooks.verify(webhookData);
+            if (!isValid) {
+              this.logger.warn('Invalid webhook signature');
+              return { success: false };
+            }
+          }
+
           session.status = 'PAID';
           session.paidAt = new Date();
           session.transactionRef = data.reference;
 
-          // Emit payment success event via Socket.IO
           this.socketGateway.emitPaymentSuccess(session.branchId, {
             orderId: session.orderId,
             orderCode,
@@ -245,19 +265,7 @@ export class PayosService implements OnModuleInit {
     }
   }
 
-  // Get session info (for debugging)
   getSession(orderCode: number): PaymentSession | undefined {
     return this.paymentSessions.get(orderCode);
-  }
-
-  // Get all pending sessions for a branch
-  getPendingSessionsForBranch(branchId: string): PaymentSession[] {
-    const sessions: PaymentSession[] = [];
-    for (const session of this.paymentSessions.values()) {
-      if (session.branchId === branchId && session.status === 'PENDING') {
-        sessions.push(session);
-      }
-    }
-    return sessions;
   }
 }
