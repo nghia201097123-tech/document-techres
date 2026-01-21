@@ -1202,8 +1202,15 @@ class SaleViewModel @Inject constructor(
                 }
                 val products = productEntityMap.values.toList()
 
-                if (kitchens.isEmpty() || products.isEmpty()) {
-                    Log.w(TAG, "reprintKitchenTickets: No kitchens or products configured")
+                if (kitchens.isEmpty()) {
+                    Log.w(TAG, "reprintKitchenTickets: No kitchens configured")
+                    _uiState.update { it.copy(errorMessage = "Chưa có bếp nào được cấu hình") }
+                    return@launch
+                }
+
+                if (products.isEmpty()) {
+                    Log.w(TAG, "reprintKitchenTickets: No products loaded")
+                    _uiState.update { it.copy(errorMessage = "Chưa tải được danh sách sản phẩm") }
                     return@launch
                 }
 
@@ -1214,11 +1221,13 @@ class SaleViewModel @Inject constructor(
                     products = products
                 )
 
-                // Log result only (async - user already notified)
+                // Show result to user
                 if (result.success) {
                     Log.d(TAG, "reprintKitchenTickets: Success - ${result.message}")
+                    _uiState.update { it.copy(successMessage = "In lại phiếu bếp thành công") }
                 } else {
                     Log.e(TAG, "reprintKitchenTickets: Failed - ${result.message}")
+                    _uiState.update { it.copy(errorMessage = "Lỗi in phiếu: ${result.message}") }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "reprintKitchenTickets error: ${e.message}", e)

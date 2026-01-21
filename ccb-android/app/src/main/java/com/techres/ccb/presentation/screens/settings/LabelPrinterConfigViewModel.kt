@@ -10,32 +10,30 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class KitchenPrinterUiState(
-    val kitchens: List<KitchenEntity> = emptyList(),
+data class LabelPrinterUiState(
+    val labelPrinters: List<KitchenEntity> = emptyList(),
     val isLoading: Boolean = true,
-    val errorMessage: String? = null,
-    val isDebugDataInserted: Boolean = false
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
-class KitchenPrinterViewModel @Inject constructor(
+class LabelPrinterConfigViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val kitchenRepository: KitchenRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(KitchenPrinterUiState())
-    val uiState: StateFlow<KitchenPrinterUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(LabelPrinterUiState())
+    val uiState: StateFlow<LabelPrinterUiState> = _uiState.asStateFlow()
 
     init {
-        loadKitchens()
+        loadLabelPrinters()
     }
 
-    private fun loadKitchens() {
+    private fun loadLabelPrinters() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
@@ -51,19 +49,15 @@ class KitchenPrinterViewModel @Inject constructor(
                     return@launch
                 }
 
-                // NOTE: Không tự động thêm debug data khi không có bếp
-                // Chỉ hiển thị dữ liệu đã đồng bộ từ web
-                // Nếu muốn test có thể nhấn nút "Thêm dữ liệu debug" thủ công
-
                 kitchenRepository.getAllKitchens(branchId).collect { kitchens ->
-                    // Chỉ hiển thị bếp in phiếu (TICKET hoặc BOTH), không hiển thị bếp chỉ in tem (LABEL)
-                    val ticketKitchens = kitchens.filter { kitchen ->
-                        kitchen.printMode == KitchenPrintMode.TICKET.name ||
+                    // Chỉ hiển thị bếp in tem (LABEL hoặc BOTH)
+                    val labelPrinters = kitchens.filter { kitchen ->
+                        kitchen.printMode == KitchenPrintMode.LABEL.name ||
                         kitchen.printMode == KitchenPrintMode.BOTH.name
                     }
                     _uiState.update {
                         it.copy(
-                            kitchens = ticketKitchens,
+                            labelPrinters = labelPrinters,
                             isLoading = false,
                             errorMessage = null
                         )
@@ -75,27 +69,6 @@ class KitchenPrinterViewModel @Inject constructor(
                         isLoading = false,
                         errorMessage = e.message ?: "Lỗi tải dữ liệu"
                     )
-                }
-            }
-        }
-    }
-
-    /**
-     * Force insert debug kitchens (for testing)
-     */
-    fun insertDebugData() {
-        viewModelScope.launch {
-            try {
-                val branchId = authRepository.getBranchId()
-                if (!branchId.isNullOrEmpty()) {
-                    // Clear existing and insert fresh debug data
-                    kitchenRepository.clearByBranch(branchId)
-                    kitchenRepository.insertDebugKitchens(branchId)
-                    _uiState.update { it.copy(isDebugDataInserted = true) }
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Lỗi thêm dữ liệu debug")
                 }
             }
         }
@@ -119,9 +92,6 @@ class KitchenPrinterViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Update full printer config including protocol, label size, paper width, print mode and printing configs
-     */
     fun updateFullPrinterConfig(
         kitchenId: String,
         ip: String?,
@@ -135,12 +105,6 @@ class KitchenPrinterViewModel @Inject constructor(
         printDensity: Int,
         paperWidth: Int,
         printMode: String,
-        // Ticket printing config
-        ticketCutAfterPrint: Boolean = true,
-        ticketPrintItemsSeparately: Boolean = false,
-        ticketCopies: Int = 1,
-        ticketFontSize: String = "medium",
-        ticketLineSpacing: Float = 0.4f,
         // Label printing config
         labelPrintPrice: Boolean = false,
         labelPrintStoreName: Boolean = false,
@@ -168,11 +132,11 @@ class KitchenPrinterViewModel @Inject constructor(
                     printDensity = printDensity,
                     paperWidth = paperWidth,
                     printMode = printMode,
-                    ticketCutAfterPrint = ticketCutAfterPrint,
-                    ticketPrintItemsSeparately = ticketPrintItemsSeparately,
-                    ticketCopies = ticketCopies,
-                    ticketFontSize = ticketFontSize,
-                    ticketLineSpacing = ticketLineSpacing,
+                    ticketCutAfterPrint = true,
+                    ticketPrintItemsSeparately = false,
+                    ticketCopies = 1,
+                    ticketFontSize = "medium",
+                    ticketLineSpacing = 0.4f,
                     labelPrintPrice = labelPrintPrice,
                     labelPrintStoreName = labelPrintStoreName,
                     labelPrintOrderNumber = labelPrintOrderNumber,
@@ -192,9 +156,6 @@ class KitchenPrinterViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Toggle isActive status for a kitchen (enable/disable printing)
-     */
     fun toggleActiveStatus(kitchenId: String, isActive: Boolean) {
         viewModelScope.launch {
             try {

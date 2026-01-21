@@ -141,14 +141,15 @@ object OrderPrintingService {
     ): PrintRoutingService.RoutingResult = withContext(Dispatchers.IO) {
         Log.d(TAG, "reprintOrderToKitchens - Order #${order.orderNumber}")
 
+        // Chỉ lọc bếp có thể in phiếu (TICKET hoặc BOTH), active và có IP
         val activeKitchens = kitchens.filter { kitchen ->
-            kitchen.isActive && !kitchen.printerIp.isNullOrBlank()
+            kitchen.isActive && !kitchen.printerIp.isNullOrBlank() && kitchen.shouldPrintTicket()
         }
 
         if (activeKitchens.isEmpty()) {
             return@withContext PrintRoutingService.RoutingResult(
                 success = false,
-                message = "Không có bếp nào được cấu hình máy in",
+                message = "Không có bếp nào được cấu hình in phiếu",
                 kitchenResults = emptyList(),
                 totalKitchens = 0,
                 successfulKitchens = 0
