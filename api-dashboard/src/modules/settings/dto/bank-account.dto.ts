@@ -41,6 +41,23 @@ export class CreateBankAccountDto {
   @IsString()
   apiSecret?: string;
 
+  // Payment Partner integration (e.g., PayOS)
+  @IsOptional()
+  @IsString()
+  paymentPartner?: string;
+
+  @IsOptional()
+  @IsString()
+  payosClientId?: string;
+
+  @IsOptional()
+  @IsString()
+  payosApiKey?: string;
+
+  @IsOptional()
+  @IsString()
+  payosChecksumKey?: string;
+
   @IsOptional()
   @IsBoolean()
   isPrimary?: boolean;
@@ -90,6 +107,23 @@ export class UpdateBankAccountDto {
   @IsOptional()
   @IsString()
   apiSecret?: string;
+
+  // Payment Partner integration (e.g., PayOS)
+  @IsOptional()
+  @IsString()
+  paymentPartner?: string;
+
+  @IsOptional()
+  @IsString()
+  payosClientId?: string;
+
+  @IsOptional()
+  @IsString()
+  payosApiKey?: string;
+
+  @IsOptional()
+  @IsString()
+  payosChecksumKey?: string;
 
   @IsOptional()
   @IsBoolean()

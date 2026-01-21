@@ -49,6 +49,19 @@ export class BankAccount {
   @Column({ name: 'static_qr_url', type: 'text', nullable: true })
   staticQrUrl: string;
 
+  // Payment Partner integration (e.g., PayOS)
+  @Column({ name: 'payment_partner', length: 50, nullable: true })
+  paymentPartner: string;
+
+  @Column({ name: 'payos_client_id', length: 255, nullable: true })
+  payosClientId: string;
+
+  @Column({ name: 'payos_api_key', length: 255, nullable: true })
+  payosApiKey: string;
+
+  @Column({ name: 'payos_checksum_key', length: 255, nullable: true })
+  payosChecksumKey: string;
+
   @Column({ name: 'is_primary', default: false })
   isPrimary: boolean;
 
