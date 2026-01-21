@@ -24,6 +24,7 @@ import com.techres.ccb.presentation.screens.sale.SaleScreen
 import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.settings.KitchenPrinterScreen
 import com.techres.ccb.presentation.screens.settings.BillPrinterConfigScreen
+import com.techres.ccb.presentation.screens.settings.LabelPrinterConfigScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
@@ -73,6 +74,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object KitchenPrinter : Screen("kitchen_printer")
     object BillPrinter : Screen("bill_printer")
+    object LabelPrinter : Screen("label_printer")
     object DatabaseDebug : Screen("database_debug")
     object OrderHistory : Screen("order_history")
     object Table : Screen("table")  // Table List Screen
@@ -403,7 +405,8 @@ fun CCBNavHost() {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToDebug = { navController.navigate(Screen.DatabaseDebug.route) },
                 onNavigateToKitchenPrinter = { navController.navigate(Screen.KitchenPrinter.route) },
-                onNavigateToBillPrinter = { navController.navigate(Screen.BillPrinter.route) }
+                onNavigateToBillPrinter = { navController.navigate(Screen.BillPrinter.route) },
+                onNavigateToLabelPrinter = { navController.navigate(Screen.LabelPrinter.route) }
             )
         }
 
@@ -415,6 +418,12 @@ fun CCBNavHost() {
 
         composable(Screen.BillPrinter.route) {
             BillPrinterConfigScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.LabelPrinter.route) {
+            LabelPrinterConfigScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

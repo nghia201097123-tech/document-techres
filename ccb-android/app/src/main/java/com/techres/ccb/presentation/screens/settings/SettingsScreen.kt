@@ -33,6 +33,7 @@ fun SettingsScreen(
     onNavigateToDebug: () -> Unit = {},
     onNavigateToKitchenPrinter: () -> Unit = {},
     onNavigateToBillPrinter: () -> Unit = {},
+    onNavigateToLabelPrinter: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -109,19 +110,28 @@ fun SettingsScreen(
 
             item {
                 SettingsCard(
-                    icon = Icons.Default.Print,
-                    title = "Quản lý Bếp & Máy in",
-                    subtitle = "Gán máy in cho từng bếp",
-                    onClick = onNavigateToKitchenPrinter
+                    icon = Icons.Default.Receipt,
+                    title = "Máy in Bill",
+                    subtitle = "Cấu hình máy in hóa đơn thanh toán",
+                    onClick = onNavigateToBillPrinter
                 )
             }
 
             item {
                 SettingsCard(
-                    icon = Icons.Default.Receipt,
-                    title = "Máy in Bill",
-                    subtitle = "Cấu hình máy in hóa đơn",
-                    onClick = onNavigateToBillPrinter
+                    icon = Icons.Default.Label,
+                    title = "Máy in Tem",
+                    subtitle = "Cấu hình máy in tem/nhãn",
+                    onClick = onNavigateToLabelPrinter
+                )
+            }
+
+            item {
+                SettingsCard(
+                    icon = Icons.Default.Restaurant,
+                    title = "Máy in Món",
+                    subtitle = "Cấu hình máy in order cho bếp/bar",
+                    onClick = onNavigateToKitchenPrinter
                 )
             }
 
