@@ -3395,8 +3395,8 @@ class SaleViewModel @Inject constructor(
             }
         }
 
-        // Convert order items to bill items (exclude combo children - they're already shown in combo parent)
-        val filteredItems = orderItems.filter { !it.isComboChild }
+        // Convert order items to bill items (exclude combo children and cancelled items)
+        val filteredItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }
 
         val billItems = filteredItems.map { item ->
             // Parse variants from notes field

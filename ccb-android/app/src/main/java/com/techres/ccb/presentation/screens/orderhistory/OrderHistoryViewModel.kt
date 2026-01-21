@@ -534,7 +534,7 @@ class OrderHistoryViewModel @Inject constructor(
             }
         }
 
-        val billItems = orderItems.filter { !it.isComboChild }.map { item ->
+        val billItems = orderItems.filter { !it.isComboChild && it.status != "cancelled" }.map { item ->
             // Parse variants
             // Format trong notes: "+ ToppingName (+100000)" hoặc "Size: L (+10000)"
             val variants = if (!item.notes.isNullOrBlank()) {
