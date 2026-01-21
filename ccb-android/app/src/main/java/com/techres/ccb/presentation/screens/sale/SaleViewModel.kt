@@ -1523,7 +1523,7 @@ class SaleViewModel @Inject constructor(
                 }
 
                 // Reload tables to refresh UI (show old table as available)
-                loadTables()
+                refreshTables()
                 return@launch
             }
 
