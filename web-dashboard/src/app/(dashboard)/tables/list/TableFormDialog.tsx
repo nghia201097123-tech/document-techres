@@ -399,8 +399,15 @@ const TableFormDialog = React.memo(function TableFormDialog({
                       max="100"
                       value={bulkCreateQuantity || ""}
                       onChange={(e) => {
-                        const val = e.target.value === "" ? 1 : parseInt(e.target.value);
-                        setBulkCreateQuantity(Math.min(100, Math.max(1, val || 1)));
+                        const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                        setBulkCreateQuantity(val);
+                      }}
+                      onBlur={() => {
+                        if (!bulkCreateQuantity || bulkCreateQuantity < 1) {
+                          setBulkCreateQuantity(1);
+                        } else if (bulkCreateQuantity > 100) {
+                          setBulkCreateQuantity(100);
+                        }
                       }}
                       className="bg-white"
                     />
@@ -411,8 +418,8 @@ const TableFormDialog = React.memo(function TableFormDialog({
                   <Input
                     type="number"
                     min="0"
-                    value={bulkCreateStartNumber}
-                    onChange={(e) => setBulkCreateStartNumber(e.target.value === "" ? 0 : parseInt(e.target.value))}
+                    value={bulkCreateStartNumber || ""}
+                    onChange={(e) => setBulkCreateStartNumber(e.target.value === "" ? 0 : parseInt(e.target.value, 10))}
                     className="w-32 bg-white"
                   />
                 </div>
@@ -473,8 +480,13 @@ const TableFormDialog = React.memo(function TableFormDialog({
                 type="number"
                 min="1"
                 placeholder="4"
-                value={formData.capacity}
-                onChange={(e) => setFormData((prev) => ({ ...prev, capacity: e.target.value === "" ? 0 : parseInt(e.target.value) }))}
+                value={formData.capacity || ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, capacity: e.target.value === "" ? 0 : parseInt(e.target.value, 10) }))}
+                onBlur={(e) => {
+                  if (!formData.capacity || formData.capacity < 1) {
+                    setFormData((prev) => ({ ...prev, capacity: 4 }));
+                  }
+                }}
               />
             </div>
 
@@ -485,8 +497,8 @@ const TableFormDialog = React.memo(function TableFormDialog({
                 type="number"
                 min="0"
                 placeholder="0"
-                value={formData.sortOrder}
-                onChange={(e) => setFormData((prev) => ({ ...prev, sortOrder: e.target.value === "" ? 0 : parseInt(e.target.value) }))}
+                value={formData.sortOrder || ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, sortOrder: e.target.value === "" ? 0 : parseInt(e.target.value, 10) }))}
               />
             </div>
 
