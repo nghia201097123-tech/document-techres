@@ -94,7 +94,9 @@ data class FullSyncData(
     // Bill printer configs (cấu hình máy in bill)
     @SerializedName("billPrinterConfigs") val billPrinterConfigs: List<BillPrinterConfigDto>?,
     // Surcharges (phụ thu)
-    @SerializedName("surcharges") val surcharges: List<SurchargeDto>?
+    @SerializedName("surcharges") val surcharges: List<SurchargeDto>?,
+    // Bank accounts (tài khoản ngân hàng cho thanh toán chuyển khoản)
+    @SerializedName("bankAccounts") val bankAccounts: List<BankAccountDto>?
 )
 
 // ============ Master Data DTOs ============
@@ -876,4 +878,23 @@ data class SurchargeDto(
     @SerializedName("isActive") val isActive: Boolean = true,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String
+)
+
+// ============ Bank Account DTOs ============
+
+/**
+ * Tài khoản ngân hàng (Bank Account)
+ * Dùng cho thanh toán chuyển khoản, hiển thị mã QR
+ */
+data class BankAccountDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("bankCode") val bankCode: String,           // Mã ngân hàng (VCB, TCB, MB...)
+    @SerializedName("bankName") val bankName: String,           // Tên ngân hàng
+    @SerializedName("bankBin") val bankBin: String?,            // BIN ngân hàng cho VietQR
+    @SerializedName("accountNumber") val accountNumber: String, // Số tài khoản
+    @SerializedName("accountName") val accountName: String,     // Tên chủ tài khoản
+    @SerializedName("transferTemplate") val transferTemplate: String?, // Template nội dung chuyển khoản
+    @SerializedName("staticQrUrl") val staticQrUrl: String?,    // URL mã QR tĩnh (nếu có)
+    @SerializedName("isPrimary") val isPrimary: Boolean = false,// Tài khoản chính?
+    @SerializedName("isActive") val isActive: Boolean = true
 )

@@ -985,6 +985,39 @@ export class BillPrinterConfigDto {
   updatedAt: string;
 }
 
+// Bank Account DTO for sync
+export class BankAccountDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  bankCode: string;
+
+  @ApiProperty()
+  bankName: string;
+
+  @ApiProperty()
+  bankBin: string | null;
+
+  @ApiProperty()
+  accountNumber: string;
+
+  @ApiProperty()
+  accountName: string;
+
+  @ApiProperty()
+  transferTemplate: string | null;
+
+  @ApiProperty()
+  staticQrUrl: string | null;
+
+  @ApiProperty()
+  isPrimary: boolean;
+
+  @ApiProperty()
+  isActive: boolean;
+}
+
 export class FullSyncDataDto {
   @ApiProperty({ type: [CategoryDto] })
   categories: CategoryDto[];
@@ -1027,6 +1060,9 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [SurchargeDto], description: 'Danh sách phụ thu' })
   surcharges: SurchargeDto[];
+
+  @ApiProperty({ type: [BankAccountDto], description: 'Danh sách tài khoản ngân hàng thanh toán' })
+  bankAccounts: BankAccountDto[];
 }
 
 export class FullSyncResponseDto {

@@ -1,6 +1,7 @@
 package com.techres.ccb.data.repository
 
 import android.util.Log
+import com.techres.ccb.data.local.dao.BankAccountDao
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.ComboItemDao
@@ -42,7 +43,8 @@ enum class SyncStep {
     COUPONS,          // Mã giảm giá
     SURCHARGES,       // Phụ thu
     PRODUCT_NOTES,    // Ghi chú món ăn
-    BILL_TEMPLATES    // Mẫu hóa đơn
+    BILL_TEMPLATES,   // Mẫu hóa đơn
+    BANK_ACCOUNTS     // Tài khoản ngân hàng
 }
 
 enum class SyncStepStatus {
@@ -71,7 +73,8 @@ class SyncRepository @Inject constructor(
     private val tableDao: TableDao,
     private val billTemplateDao: BillTemplateDao,
     private val billPrinterConfigDao: BillPrinterConfigDao,
-    private val surchargeDao: SurchargeDao
+    private val surchargeDao: SurchargeDao,
+    private val bankAccountDao: BankAccountDao
 ) {
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
@@ -755,6 +758,32 @@ class SyncRepository @Inject constructor(
             billPrinterConfigDao.insertAll(billPrinterConfigsList)
             Log.d("SyncRepository", "Saved ${billPrinterConfigsList.size} bill printer configs to database")
         }
+
+        // Sync bank accounts
+        onProgress?.invoke(SyncStepProgress(SyncStep.BANK_ACCOUNTS, SyncStepStatus.IN_PROGRESS))
+        val bankAccountsList = syncData.bankAccounts?.map { dto ->
+            BankAccountEntity(
+                id = dto.id,
+                branchId = branchId,
+                bankCode = dto.bankCode,
+                bankName = dto.bankName,
+                bankBin = dto.bankBin,
+                accountNumber = dto.accountNumber,
+                accountName = dto.accountName,
+                transferTemplate = dto.transferTemplate,
+                staticQrUrl = dto.staticQrUrl,
+                isPrimary = dto.isPrimary,
+                isActive = dto.isActive,
+                syncStatus = "synced",
+                syncedAt = syncTime
+            )
+        } ?: emptyList()
+
+        bankAccountDao.syncBankAccounts(branchId, bankAccountsList)
+        if (bankAccountsList.isNotEmpty()) {
+            Log.d("SyncRepository", "Saved ${bankAccountsList.size} bank accounts to database")
+        }
+        onProgress?.invoke(SyncStepProgress(SyncStep.BANK_ACCOUNTS, SyncStepStatus.COMPLETED, bankAccountsList.size))
     }
 
     /**
@@ -823,5 +852,6 @@ class SyncRepository @Inject constructor(
         surchargeDao.deleteAllByBranch(branchId)
         billTemplateDao.deleteByBranch(branchId)
         billPrinterConfigDao.deleteByBranch(branchId)
+        bankAccountDao.deleteAllByBranch(branchId)
     }
 }

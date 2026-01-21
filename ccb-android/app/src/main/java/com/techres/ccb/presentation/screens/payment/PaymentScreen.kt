@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.presentation.theme.Success
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -329,7 +330,8 @@ fun PaymentScreen(
             if (uiState.selectedPaymentMethod == "bank_transfer" || uiState.selectedPaymentMethod == "qr_code") {
                 BankTransferSection(
                     grandTotal = uiState.grandTotal,
-                    orderNumber = uiState.order?.orderNumber ?: ""
+                    orderNumber = uiState.order?.orderNumber ?: "",
+                    bankAccount = uiState.bankAccount
                 )
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -464,22 +466,24 @@ private fun formatPrice(amount: Double): String {
 @Composable
 private fun BankTransferSection(
     grandTotal: Double,
-    orderNumber: String
+    orderNumber: String,
+    bankAccount: BankAccountEntity?
 ) {
     val clipboardManager = LocalClipboardManager.current
     var showCopiedMessage by remember { mutableStateOf(false) }
 
-    // Default bank account info (will be synced from server in production)
-    val bankCode = "VCB"
-    val bankName = "Vietcombank"
-    val accountNumber = "19039164318014"
-    val accountName = "CONG TY TNHH TECHRES"
-    val transferContent = "TT $orderNumber"
+    // Use synced bank account or fallback to defaults
+    val bankCode = bankAccount?.bankCode ?: "VCB"
+    val bankName = bankAccount?.bankName ?: "Vietcombank"
+    val accountNumber = bankAccount?.accountNumber ?: "19039164318014"
+    val accountName = bankAccount?.accountName ?: "CONG TY TNHH TECHRES"
+    val transferContent = bankAccount?.generateTransferContent(orderNumber) ?: "TT $orderNumber"
 
-    // Generate QR URL using qr.sepay.vn
-    val qrUrl = remember(grandTotal, orderNumber) {
+    // Generate QR URL using VietQR API
+    val qrUrl = remember(grandTotal, orderNumber, bankAccount) {
         val amount = grandTotal.toLong()
-        "https://qr.sepay.vn/img?bank=$bankCode&acc=$accountNumber&template=compact&amount=$amount&des=${java.net.URLEncoder.encode(transferContent, "UTF-8")}"
+        bankAccount?.generateQrUrl(amount, transferContent)
+            ?: "https://qr.sepay.vn/img?bank=$bankCode&acc=$accountNumber&template=compact&amount=$amount&des=${java.net.URLEncoder.encode(transferContent, "UTF-8")}"
     }
 
     Card(

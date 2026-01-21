@@ -3,7 +3,9 @@ package com.techres.ccb.presentation.screens.payment
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.BankAccountDao
 import com.techres.ccb.data.local.dao.CouponDao
+import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.data.local.entity.CouponEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
@@ -46,13 +48,16 @@ data class PaymentUiState(
     val subtotal: Double = 0.0,
     val priceBeforeVat: Double = 0.0,
     val vatAmount: Double = 0.0,
-    val grandTotal: Double = 0.0
+    val grandTotal: Double = 0.0,
+    // Bank account for transfer payment
+    val bankAccount: BankAccountEntity? = null
 )
 
 @HiltViewModel
 class PaymentViewModel @Inject constructor(
     private val orderRepository: OrderRepository,
     private val couponDao: CouponDao,
+    private val bankAccountDao: BankAccountDao,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -73,13 +78,19 @@ class PaymentViewModel @Inject constructor(
 
             val subtotal = items.sumOf { it.unitPrice * it.quantity }
 
+            // Load bank account for transfer payment
+            val bankAccount = branchId?.let { branch ->
+                bankAccountDao.getPrimaryBankAccount(branch)
+            }
+
             _uiState.value = _uiState.value.copy(
                 order = order,
                 orderItems = items,
                 itemCount = items.sumOf { it.quantity },
                 subtotal = subtotal,
                 grandTotal = order?.totalAmount ?: subtotal,
-                canProcessPayment = order != null && (order.totalAmount > 0 || subtotal > 0)
+                canProcessPayment = order != null && (order.totalAmount > 0 || subtotal > 0),
+                bankAccount = bankAccount
             )
 
             // Auto-apply coupons

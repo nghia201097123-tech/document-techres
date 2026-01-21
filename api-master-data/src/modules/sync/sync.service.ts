@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, ProductKitchen, BillTemplate, BillPrinterConfig, Surcharge } from '../../entities';
+import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, ProductKitchen, BillTemplate, BillPrinterConfig, Surcharge, BankAccount } from '../../entities';
 import {
   FullSyncResponseDto,
   IncrementalSyncResponseDto,
@@ -21,6 +21,7 @@ import {
   BillTemplateDto,
   BillPrinterConfigDto,
   SurchargeDto,
+  BankAccountDto,
 } from './dto/sync.dto';
 
 @Injectable()
@@ -74,6 +75,8 @@ export class SyncService {
     private billPrinterConfigRepository: Repository<BillPrinterConfig>,
     @InjectRepository(Surcharge)
     private surchargeRepository: Repository<Surcharge>,
+    @InjectRepository(BankAccount)
+    private bankAccountRepository: Repository<BankAccount>,
   ) {}
 
   /**
@@ -298,7 +301,7 @@ export class SyncService {
       const tenantId = branch.tenantId;
       console.log(`[SyncService.getFullSync] tenantId=${tenantId}, branchId=${branchId}, brandId=${brandId}`);
 
-      const [categories, branchProducts, areas, tables, staff, kitchens, productKitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs, surcharges] = await Promise.all([
+      const [categories, branchProducts, areas, tables, staff, kitchens, productKitchens, seasonalPrices, coupons, toppingGroups, productNotes, billTemplates, billPrinterConfigs, surcharges, bankAccounts] = await Promise.all([
         this.categoryRepository.find({
           where: { brandId, tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
@@ -363,6 +366,14 @@ export class SyncService {
           where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
         }) : Promise.resolve([]),
+        // Bank accounts for this branch (or brand-level if no branch-specific)
+        this.bankAccountRepository.find({
+          where: [
+            { branchId, isActive: true },
+            { brandId, branchId: null as any, isActive: true },
+          ],
+          order: { isPrimary: 'DESC' },
+        }).catch(() => []),
       ]);
 
       // Build product-kitchen mapping (productId -> comma-separated kitchenIds)
@@ -516,6 +527,7 @@ export class SyncService {
           billTemplates: billTemplates.map(bt => this.mapBillTemplate(bt)),
           billPrinterConfigs: billPrinterConfigs.map(bpc => this.mapBillPrinterConfig(bpc)),
           surcharges: surcharges.map(s => this.mapSurcharge(s)),
+          bankAccounts: bankAccounts.map(ba => this.mapBankAccount(ba)),
         },
         syncTime,
         message: null,
@@ -1049,6 +1061,21 @@ export class SyncService {
       isActive: s.isActive,
       createdAt: s.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: s.updatedAt.toISOString(),
+    };
+  }
+
+  private mapBankAccount(ba: BankAccount): BankAccountDto {
+    return {
+      id: ba.id,
+      bankCode: ba.bankCode,
+      bankName: ba.bankName,
+      bankBin: ba.bankBin || null,
+      accountNumber: ba.accountNumber,
+      accountName: ba.accountName,
+      transferTemplate: ba.transferTemplate || null,
+      staticQrUrl: ba.staticQrUrl || null,
+      isPrimary: ba.isPrimary,
+      isActive: ba.isActive,
     };
   }
 }
