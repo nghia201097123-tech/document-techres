@@ -4,12 +4,14 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.BankAccountDao
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.dao.ProductToppingDao
 import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
+import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.data.local.entity.ComboItemEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
@@ -163,7 +165,10 @@ data class SaleUiState(
 
     // Messages
     val successMessage: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+
+    // Bank account for payment QR
+    val bankAccount: BankAccountEntity? = null
 ) {
     // Computed properties
     // Subtotal = tổng tiền items đã order + items mới trong giỏ hàng
@@ -364,6 +369,7 @@ class SaleViewModel @Inject constructor(
     private val seasonalPriceDao: SeasonalPriceDao,
     private val seasonalPriceProductDao: SeasonalPriceProductDao,
     private val surchargeDao: SurchargeDao,
+    private val bankAccountDao: BankAccountDao,
     private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
@@ -430,6 +436,9 @@ class SaleViewModel @Inject constructor(
                     // Load surcharges (phụ thu)
                     val surchargesDeferred = async { surchargeDao.getActiveSurchargesList(branchId) }
 
+                    // Load bank account for payment QR
+                    val bankAccountDeferred = async { bankAccountDao.getPrimaryBankAccount() }
+
                     // Await all results
                     val categoryEntities = categoriesDeferred.await()
                     val allProducts = allProductsDeferred.await()
@@ -438,6 +447,8 @@ class SaleViewModel @Inject constructor(
                     val notes = notesDeferred.await()
                     val seasonalPrices = seasonalPricesDeferred.await()
                     val surcharges = surchargesDeferred.await()
+                    val bankAccount = bankAccountDeferred.await()
+                    Log.d(TAG, "loadInitialData - Bank account: ${bankAccount?.bankName ?: "none"}")
 
                     // Build seasonal price map: productId -> SeasonalPriceEntity
                     seasonalPriceMap = if (seasonalPrices.isNotEmpty()) {
@@ -545,6 +556,7 @@ class SaleViewModel @Inject constructor(
                             tables = tableList,
                             availableNotes = notes,
                             availableSurcharges = surcharges,
+                            bankAccount = bankAccount,
                             isLoading = false
                         )
                     }

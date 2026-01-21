@@ -525,6 +525,9 @@ fun SaleScreen(
                 onClearItemDiscounts = { viewModel.clearItemDiscounts() },
                 onClearBillDiscount = { viewModel.clearBillDiscount() },
                 onPrintTemporaryBill = { viewModel.printTemporaryBill() },
+                // Bank account for QR payment
+                bankAccount = uiState.bankAccount,
+                orderNumber = uiState.currentOrder?.orderNumber ?: "",
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)

@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.domain.model.Payment
 import com.techres.ccb.domain.model.PaymentMethod
 import com.techres.ccb.domain.model.PaymentStatus
@@ -149,6 +151,9 @@ fun PaymentDialog(
     onClearBillDiscount: () -> Unit = {},
     onPrintTemporaryBill: () -> Unit = {}, // In bill tạm (sau khi đã áp dụng giảm giá)
     lastPaymentMethod: PaymentMethod = PaymentMethod.CASH, // Phương thức thanh toán gần nhất
+    // Bank account for QR code payment
+    bankAccount: BankAccountEntity? = null,
+    orderNumber: String = "",
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
@@ -233,14 +238,19 @@ fun PaymentDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(PaymentMethod.CASH, PaymentMethod.BANK_TRANSFER).forEach { method ->
+                    listOf(
+                        PaymentMethod.CASH,
+                        PaymentMethod.BANK_TRANSFER,
+                        PaymentMethod.CARD,
+                        PaymentMethod.MOMO
+                    ).forEach { method ->
                         val isSelected = selectedMethod == method
                         Card(
                             modifier = Modifier
-                                .weight(1f)
                                 .clickable {
                                     selectedMethod = method
                                     receivedAmountText = if (method != PaymentMethod.CASH) totalAmount.toString() else ""
@@ -374,24 +384,118 @@ fun PaymentDialog(
                                 }
                             }
                         } else {
-                            // Bank transfer UI
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(selectedMethod.icon, fontSize = 56.sp)
+                            // Bank transfer / E-wallet / Card UI
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(selectedMethod.icon, fontSize = 40.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(selectedMethod.displayName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(formatCurrency(totalAmount), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                                // Show QR code for bank transfer
+                                if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount != null) {
                                     Spacer(modifier = Modifier.height(12.dp))
-                                    Text(selectedMethod.displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(formatCurrency(totalAmount), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(140.dp)
-                                            .background(Color.White, RoundedCornerShape(8.dp))
-                                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
+
+                                    // Generate QR URL
+                                    val transferContent = bankAccount.generateTransferContent(orderNumber)
+                                    val qrUrl = bankAccount.generateQrUrl(totalAmount, transferContent)
+
+                                    // QR Code
+                                    Card(
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White)
                                     ) {
-                                        Text("QR Code", color = MaterialTheme.colorScheme.outline)
+                                        AsyncImage(
+                                            model = qrUrl,
+                                            contentDescription = "QR Code thanh toán",
+                                            modifier = Modifier
+                                                .size(160.dp)
+                                                .padding(8.dp)
+                                        )
                                     }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Bank info
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text("Ngân hàng:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(bankAccount.bankName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text("Số TK:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(bankAccount.accountNumber, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text("Chủ TK:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(bankAccount.accountName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text("Nội dung:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(transferContent, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                            }
+                                        }
+                                    }
+                                } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null) {
+                                    // No bank account configured
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF9800))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                "Chưa cấu hình tài khoản ngân hàng.\nVui lòng cấu hình trong web-dashboard.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFFE65100)
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    // Card or E-wallet - show instruction
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = when (selectedMethod) {
+                                            PaymentMethod.CARD -> "Quẹt thẻ để thanh toán"
+                                            PaymentMethod.MOMO -> "Mở app MoMo để quét mã"
+                                            PaymentMethod.ZALOPAY -> "Mở app ZaloPay để quét mã"
+                                            PaymentMethod.VNPAY -> "Mở app ngân hàng để quét mã VNPay"
+                                            else -> "Thanh toán bằng ${selectedMethod.displayName}"
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
                             }
                         }
