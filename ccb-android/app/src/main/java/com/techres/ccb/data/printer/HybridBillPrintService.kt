@@ -658,19 +658,16 @@ object HybridBillPrintService {
                 val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
                 lineCenter("Nội dung: $transferContent")
                 feed(1)
-                // Tạo VietQR content
-                val bankBin = paymentBankAccount.bankBin
-                    ?: getBankBinFromCode(paymentBankAccount.bankCode)
-                    ?: paymentBankAccount.bankCode
+                // Tạo VietQR content sử dụng SePayVN
                 val vietQrContent = generateVietQrContent(
-                    bankBin = bankBin,
+                    bankCode = paymentBankAccount.bankCode,
                     accountNumber = paymentBankAccount.accountNumber,
                     amount = billData.totalAmount.toLong(),
                     description = transferContent,
                     accountName = paymentBankAccount.accountName
                 )
-                Log.d(TAG, "VietQR URL: $vietQrContent (length: ${vietQrContent.length})")
-                qrCode(vietQrContent, size = 4) // Giảm size từ 8 xuống 4 để tương thích với nhiều máy in hơn
+                Log.d(TAG, "SePayVN QR URL: $vietQrContent (length: ${vietQrContent.length})")
+                qrCode(vietQrContent, size = 4)
             } else if (template.showQrCode) {
                 // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
@@ -1083,18 +1080,15 @@ object HybridBillPrintService {
                 val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
                 lineCenter("Nội dung: $transferContent")
                 feed(1)
-                // Tạo VietQR content
-                val bankBin = paymentBankAccount.bankBin
-                    ?: getBankBinFromCode(paymentBankAccount.bankCode)
-                    ?: paymentBankAccount.bankCode
+                // Tạo VietQR content sử dụng SePayVN
                 val vietQrContent = generateVietQrContent(
-                    bankBin = bankBin,
+                    bankCode = paymentBankAccount.bankCode,
                     accountNumber = paymentBankAccount.accountNumber,
                     amount = billData.totalAmount.toLong(),
                     description = transferContent,
                     accountName = paymentBankAccount.accountName
                 )
-                qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
+                qrCode(vietQrContent, size = 4)
             } else if (template.showQrCode) {
                 // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
@@ -1171,21 +1165,58 @@ object HybridBillPrintService {
      * @param accountName Tên chủ tài khoản (optional)
      */
     private fun generateVietQrContent(
-        bankBin: String,
+        bankCode: String,
         accountNumber: String,
         amount: Long,
         description: String,
         accountName: String = ""
     ): String {
-        // Sử dụng VietQR URL format ngắn gọn - phù hợp với máy in nhiệt
-        // Format ngắn: https://img.vietqr.io/image/{BANK_BIN}-{ACCOUNT}-compact.jpg?amount={AMOUNT}&addInfo={ORDER_NUMBER}
-        // Lưu ý: Dùng compact template và chỉ truyền mã đơn hàng để URL ngắn nhất
+        // Sử dụng SePayVN QR URL format
+        // Format: https://qr.sepay.vn/img?bank={BANK_CODE}&acc={ACCOUNT}&template=compact&amount={AMOUNT}&des={DESCRIPTION}
+
+        // Lấy tên ngân hàng từ bank code
+        val bankName = getBankNameFromCode(bankCode)
 
         // Chỉ lấy mã đơn hàng từ description (bỏ tiếng Việt có dấu)
-        val orderCode = description.replace(Regex("[^A-Za-z0-9#-]"), "").take(20)
+        val orderCode = description.replace(Regex("[^A-Za-z0-9#-]"), "").take(25)
 
-        // Xây dựng URL ngắn gọn
-        return "https://img.vietqr.io/image/$bankBin-$accountNumber-compact.jpg?amount=$amount&addInfo=$orderCode"
+        // Xây dựng URL theo format sepay.vn
+        return "https://qr.sepay.vn/img?bank=$bankName&acc=$accountNumber&template=compact&amount=$amount&des=$orderCode"
+    }
+
+    /**
+     * Map bank code to bank name for SePayVN
+     */
+    private fun getBankNameFromCode(bankCode: String): String {
+        return when (bankCode.uppercase()) {
+            "TCB", "TECHCOMBANK" -> "Techcombank"
+            "VCB", "VIETCOMBANK" -> "Vietcombank"
+            "BIDV" -> "BIDV"
+            "VTB", "VIETINBANK", "CTG" -> "Vietinbank"
+            "ACB" -> "ACB"
+            "MB", "MBBANK", "MBB" -> "MBBank"
+            "TPB", "TPBANK" -> "TPBank"
+            "STB", "SACOMBANK" -> "Sacombank"
+            "HDB", "HDBANK" -> "HDBank"
+            "VPB", "VPBANK" -> "VPBank"
+            "SHB" -> "SHB"
+            "MSB", "MARITIMEBANK" -> "MSB"
+            "EIB", "EXIMBANK" -> "Eximbank"
+            "LPB", "LIENVIETPOSTBANK" -> "LienVietPostBank"
+            "OCB" -> "OCB"
+            "NAB", "NAMABANK" -> "NamABank"
+            "NCB" -> "NCB"
+            "SEAB", "SEABANK" -> "SeABank"
+            "ABB", "ABBANK" -> "ABBank"
+            "BAB", "BACABANK" -> "BacABank"
+            "PGB", "PGBANK" -> "PGBank"
+            "VIB" -> "VIB"
+            "KLB", "KIENLONGBANK" -> "KienLongBank"
+            "SCB" -> "SCB"
+            "AGRIBANK", "AGR" -> "Agribank"
+            "VBSP" -> "VBSP"
+            else -> bankCode // Fallback to original code
+        }
     }
 
     /**
