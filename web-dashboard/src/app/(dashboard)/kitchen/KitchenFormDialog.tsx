@@ -299,24 +299,27 @@ const KitchenFormDialog = React.memo(function KitchenFormDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="paperWidth">Khổ giấy</Label>
-                    <Select
-                      value={formData.paperWidth?.toString()}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, paperWidth: parseInt(value) }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn khổ giấy" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAPER_WIDTH_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value.toString()}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Chỉ hiển thị Khổ giấy khi chọn ESC/POS (máy in hóa đơn) */}
+                  {formData.printerProtocol === "ESC_POS" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="paperWidth">Khổ giấy</Label>
+                      <Select
+                        value={formData.paperWidth?.toString()}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, paperWidth: parseInt(value) }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn khổ giấy" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAPER_WIDTH_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value.toString()}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
