@@ -1300,12 +1300,22 @@ object HybridBillPrintService {
             )
             Log.d(TAG, "QR URL: $qrUrl")
 
+            // Compute font scale from fontSize setting
+            val fontScale = when (printerConfig.fontSize) {
+                "extra_small" -> 0.7f
+                "small" -> 0.85f
+                "normal" -> 1.0f
+                "large" -> 1.15f
+                "extra_large" -> 1.3f
+                else -> 1.0f
+            }
+
             // Build phiếu QR thanh toán
             val builder = HybridBillBuilder(
                 paperWidth = printerConfig.paperWidth,
                 useBitmapMode = true,
-                useRasterBitmap = printerConfig.useRasterBitmap,
-                fontScale = printerConfig.fontScale,
+                useRasterBitmap = false, // Default: use ESC * for better compatibility
+                fontScale = fontScale,
                 lineSpacing = printerConfig.lineSpacing
             )
 
@@ -1367,13 +1377,12 @@ object HybridBillPrintService {
                 }
 
                 repeat(copies) { copy ->
-                    try {
-                        adapter.printRaw(content)
-                        if (copy < copies - 1) delay(500)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Sunmi print error: ${e.message}")
-                        return@withContext PrinterResult.Error("Lỗi in Sunmi: ${e.message}")
+                    val result = adapter.write(content)
+                    if (result is PrinterResult.Error) {
+                        Log.e(TAG, "Sunmi print error: ${result.message}")
+                        return@withContext result
                     }
+                    if (copy < copies - 1) delay(500)
                 }
                 PrinterResult.Success("In QR thanh toán thành công!")
             } else {

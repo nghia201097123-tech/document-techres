@@ -357,8 +357,18 @@ class PaymentViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isPrintingQr = true, printQrMessage = null)
 
             try {
+                // Lấy branch ID
+                val currentBranchId = authRepository.getBranchId()
+                if (currentBranchId == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isPrintingQr = false,
+                        printQrMessage = "Không xác định được chi nhánh"
+                    )
+                    return@launch
+                }
+
                 // Lấy printer config
-                val printerConfig = billPrinterConfigDao.getBillPrinterConfig()
+                val printerConfig = billPrinterConfigDao.getDefaultByBranch(currentBranchId)
                 if (printerConfig == null) {
                     _uiState.value = _uiState.value.copy(
                         isPrintingQr = false,
@@ -368,8 +378,7 @@ class PaymentViewModel @Inject constructor(
                 }
 
                 // Lấy tên cửa hàng
-                val branchId = authRepository.getBranchId()
-                val branch = branchId?.let { branchDao.getBranchById(it) }
+                val branch = branchDao.getById(currentBranchId)
                 val storeName = branch?.name ?: ""
 
                 // In QR thanh toán
@@ -377,7 +386,7 @@ class PaymentViewModel @Inject constructor(
                     printerConfig = printerConfig,
                     bankAccount = bankAccount,
                     amount = grandTotal.toLong(),
-                    orderNumber = order.displayNumber,
+                    orderNumber = order.orderNumber,
                     storeName = storeName,
                     copies = 1
                 )
