@@ -52,10 +52,12 @@ import {
   BankAccount,
   EInvoiceConfig,
   PaymentMethodType,
+  PaymentPartner,
   EInvoiceProvider,
   VIETNAM_BANKS,
   EINVOICE_PROVIDER_LABELS,
   PAYMENT_METHOD_TYPE_LABELS,
+  PAYMENT_PARTNER_LABELS,
   CreatePaymentMethodDto,
   CreateBankAccountDto,
   CreateEInvoiceConfigDto,
@@ -110,6 +112,7 @@ export default function SettingsPage() {
     bankName: "",
     accountNumber: "",
     accountName: "",
+    paymentPartner: PaymentPartner.NONE,
   });
 
   const [invoiceForm, setInvoiceForm] = React.useState<CreateEInvoiceConfigDto>({
@@ -236,10 +239,20 @@ export default function SettingsPage() {
         bankBin: bank.bankBin,
         transferTemplate: bank.transferTemplate,
         isPrimary: bank.isPrimary,
+        paymentPartner: bank.paymentPartner || PaymentPartner.NONE,
+        payosClientId: bank.payosClientId,
+        payosApiKey: bank.payosApiKey,
+        payosChecksumKey: bank.payosChecksumKey,
       });
     } else {
       setEditingBank(null);
-      setBankForm({ bankCode: "", bankName: "", accountNumber: "", accountName: "" });
+      setBankForm({
+        bankCode: "",
+        bankName: "",
+        accountNumber: "",
+        accountName: "",
+        paymentPartner: PaymentPartner.NONE,
+      });
     }
     setBankDialog(mode);
   };
@@ -582,6 +595,11 @@ export default function SettingsPage() {
                                 Chính
                               </Badge>
                             )}
+                            {bank.paymentPartner === PaymentPartner.PAYOS && (
+                              <Badge variant="default" className="bg-blue-500">
+                                PayOS
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <span className="font-mono">{bank.accountNumber}</span>
@@ -842,13 +860,72 @@ export default function SettingsPage() {
 
       {/* Bank Account Dialog */}
       <Dialog open={bankDialog !== null} onOpenChange={() => setBankDialog(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {bankDialog === "create" ? "Thêm tài khoản ngân hàng" : "Sửa tài khoản ngân hàng"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Payment Partner Selection */}
+            <div className="space-y-2">
+              <Label>Đối tác thanh toán</Label>
+              <Select
+                value={bankForm.paymentPartner || PaymentPartner.NONE}
+                onValueChange={(value) => setBankForm({ ...bankForm, paymentPartner: value as PaymentPartner })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn đối tác" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PAYMENT_PARTNER_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* PayOS Configuration - Show when PayOS is selected */}
+            {bankForm.paymentPartner === PaymentPartner.PAYOS && (
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">
+                  Vui lòng liên hệ PayOS để được cung cấp các thông tin sau
+                </p>
+                <div className="space-y-2">
+                  <Label>CONFIG_PAYOS_CLIENT_ID *</Label>
+                  <Input
+                    value={bankForm.payosClientId || ""}
+                    onChange={(e) => setBankForm({ ...bankForm, payosClientId: e.target.value })}
+                    placeholder="Nhập Client ID từ PayOS"
+                    className="font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CONFIG_PAYOS_API_KEY *</Label>
+                  <Input
+                    value={bankForm.payosApiKey || ""}
+                    onChange={(e) => setBankForm({ ...bankForm, payosApiKey: e.target.value })}
+                    placeholder="Nhập API Key từ PayOS"
+                    className="font-mono"
+                    type="password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CONFIG_PAYOS_CHECKSUM_KEY *</Label>
+                  <Input
+                    value={bankForm.payosChecksumKey || ""}
+                    onChange={(e) => setBankForm({ ...bankForm, payosChecksumKey: e.target.value })}
+                    placeholder="Nhập Checksum Key từ PayOS"
+                    className="font-mono"
+                    type="password"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Bank Selection - Only show when NOT using PayOS or always show */}
             <div className="space-y-2">
               <Label>Ngân hàng *</Label>
               <Select
@@ -909,7 +986,7 @@ export default function SettingsPage() {
                 checked={bankForm.isPrimary || false}
                 onCheckedChange={(checked) => setBankForm({ ...bankForm, isPrimary: checked })}
               />
-              <Label>Đặt làm tài khoản chính</Label>
+              <Label>Cài đặt tài khoản này làm mặc định</Label>
             </div>
           </div>
           <DialogFooter>
@@ -918,7 +995,13 @@ export default function SettingsPage() {
             </Button>
             <Button
               onClick={handleSaveBank}
-              disabled={savingBank || !bankForm.bankCode || !bankForm.accountNumber}
+              disabled={
+                savingBank ||
+                !bankForm.bankCode ||
+                !bankForm.accountNumber ||
+                (bankForm.paymentPartner === PaymentPartner.PAYOS &&
+                  (!bankForm.payosClientId || !bankForm.payosApiKey || !bankForm.payosChecksumKey))
+              }
             >
               {savingBank && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {bankDialog === "create" ? "Thêm" : "Lưu"}

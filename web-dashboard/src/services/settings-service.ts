@@ -10,6 +10,11 @@ export enum PaymentMethodType {
   QR_CODE = 'qr_code',
 }
 
+export enum PaymentPartner {
+  NONE = 'none',
+  PAYOS = 'payos',
+}
+
 export enum EInvoiceProvider {
   FPT = 'fpt',
   VNPT = 'vnpt',
@@ -57,6 +62,11 @@ export interface BankAccount {
   apiKey?: string;
   apiSecret?: string;
   staticQrUrl?: string;
+  // Payment Partner integration
+  paymentPartner?: PaymentPartner;
+  payosClientId?: string;
+  payosApiKey?: string;
+  payosChecksumKey?: string;
   isPrimary: boolean;
   isActive: boolean;
   createdAt: string;
@@ -125,6 +135,11 @@ export interface CreateBankAccountDto {
   webhookSecret?: string;
   apiKey?: string;
   apiSecret?: string;
+  // Payment Partner integration
+  paymentPartner?: PaymentPartner;
+  payosClientId?: string;
+  payosApiKey?: string;
+  payosChecksumKey?: string;
   isPrimary?: boolean;
 }
 
@@ -303,4 +318,10 @@ export const PAYMENT_METHOD_TYPE_LABELS: Record<PaymentMethodType, string> = {
   [PaymentMethodType.CREDIT_CARD]: 'Thẻ tín dụng',
   [PaymentMethodType.E_WALLET]: 'Ví điện tử',
   [PaymentMethodType.QR_CODE]: 'Mã QR',
+};
+
+// Payment partner labels
+export const PAYMENT_PARTNER_LABELS: Record<PaymentPartner, string> = {
+  [PaymentPartner.NONE]: 'Không có (VietQR)',
+  [PaymentPartner.PAYOS]: 'Đối tác PayOS',
 };
