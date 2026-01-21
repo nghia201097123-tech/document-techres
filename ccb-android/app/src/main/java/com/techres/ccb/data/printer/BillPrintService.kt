@@ -99,7 +99,8 @@ object BillPrintService {
             outputStream.write(billContent)
             outputStream.flush()
 
-            repeat(config.numberOfCopies - 1) {
+            // Sử dụng numberOfCopies từ template (đồng bộ từ web-dashboard)
+            repeat(template.numberOfCopies - 1) {
                 delay(500)
                 outputStream.write(billContent)
                 outputStream.flush()
@@ -127,7 +128,11 @@ object BillPrintService {
      * Generate bill - CHÍNH XÁC theo web preview
      */
     private fun generateBill(template: BillTemplateEntity, billData: BillData): ByteArray {
-        val b = EscPosBillBuilder(template.paperWidth)
+        val b = EscPosBillBuilder(
+            paperWidth = template.paperWidth,
+            separatorChar = template.separatorChar.firstOrNull() ?: '-',
+            doubleSeparatorChar = template.doubleSeparatorChar.firstOrNull() ?: '='
+        )
 
         b.init()
 
@@ -453,11 +458,15 @@ object BillPrintService {
 /**
  * ESC/POS Bill Builder - Tạo lệnh in ESC/POS
  */
-class EscPosBillBuilder(paperWidth: Int) {
+class EscPosBillBuilder(
+    paperWidth: Int,
+    separatorChar: Char = '-',
+    doubleSeparatorChar: Char = '='
+) {
     private val buf = mutableListOf<Byte>()
     private val width = if (paperWidth == 58) 32 else 48
-    private val sep = "-".repeat(width)
-    private val doubleSep = "=".repeat(width)
+    private val sep = separatorChar.toString().repeat(width)
+    private val doubleSep = doubleSeparatorChar.toString().repeat(width)
 
     // ESC/POS Commands
     private val CMD_INIT = byteArrayOf(0x1B, 0x40)

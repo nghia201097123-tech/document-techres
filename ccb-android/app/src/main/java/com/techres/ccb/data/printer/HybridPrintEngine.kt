@@ -532,7 +532,9 @@ class HybridBillBuilder(
     private val useBitmapMode: Boolean = true, // Mặc định dùng bitmap để đảm bảo
     private val useRasterBitmap: Boolean = false, // false = ESC * (XPRINTER compatible), true = GS v 0 (EPSON)
     private val fontScale: Float = 1.0f, // Tỷ lệ font: 0.85 = small, 1.0 = medium, 1.2 = large
-    private val lineSpacing: Float = 0.4f // Line spacing multiplier: 0.3-1.0, default 0.4 = tight
+    private val lineSpacing: Float = 0.4f, // Line spacing multiplier: 0.3-1.0, default 0.4 = tight
+    private val separatorChar: Char = '-', // Ký tự phân cách đơn (từ template config)
+    private val doubleSeparatorChar: Char = '=' // Ký tự phân cách kép (từ template config)
 ) {
     private val buffer = ByteArrayOutputStream()
     private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
@@ -549,12 +551,12 @@ class HybridBillBuilder(
     private val GS = 0x1D.toByte()
 
     // Pre-rendered separators (lazy init để tránh render khi không cần)
-    // Điều này giúp tránh jitter do phải render bitmap nhiều lần trong quá trình build bill
+    // Sử dụng separatorChar và doubleSeparatorChar từ constructor (từ template config)
     private val cachedSingleSeparator: ByteArray by lazy {
-        prerenderSeparator('-')
+        prerenderSeparator(separatorChar)
     }
     private val cachedDoubleSeparator: ByteArray by lazy {
-        prerenderSeparator('=')
+        prerenderSeparator(doubleSeparatorChar)
     }
 
     /**
@@ -790,11 +792,11 @@ class HybridBillBuilder(
      * - Giảm GC pressure do không tạo/recycle bitmap liên tục
      * - In mượt hơn vì data đã sẵn sàng
      */
-    fun separator(char: Char = '-'): HybridBillBuilder {
-        // Sử dụng cached data nếu là separator phổ biến (- hoặc =)
+    fun separator(char: Char = separatorChar): HybridBillBuilder {
+        // Sử dụng cached data nếu char trùng với separatorChar hoặc doubleSeparatorChar
         val cachedData = when (char) {
-            '-' -> cachedSingleSeparator
-            '=' -> cachedDoubleSeparator
+            separatorChar -> cachedSingleSeparator
+            doubleSeparatorChar -> cachedDoubleSeparator
             else -> null
         }
 
@@ -822,11 +824,17 @@ class HybridBillBuilder(
     }
 
     /**
-     * In double separator (===) - sử dụng pre-rendered cache
+     * In double separator - sử dụng doubleSeparatorChar từ constructor (từ template config)
+     * Dùng pre-rendered cache nếu char trùng với doubleSeparatorChar
      */
-    fun doubleSeparator(): HybridBillBuilder {
-        // Dùng trực tiếp cached data thay vì gọi separator('=')
-        buffer.write(cachedDoubleSeparator)
+    fun doubleSeparator(char: Char = doubleSeparatorChar): HybridBillBuilder {
+        if (char == doubleSeparatorChar) {
+            // Dùng cached data
+            buffer.write(cachedDoubleSeparator)
+        } else {
+            // Render mới cho ký tự khác
+            separator(char)
+        }
         return this
     }
 

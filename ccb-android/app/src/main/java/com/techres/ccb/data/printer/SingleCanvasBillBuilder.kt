@@ -32,7 +32,9 @@ import java.io.ByteArrayOutputStream
 class SingleCanvasBillBuilder(
     private val paperWidth: Int = 80,
     private val fontScale: Float = 1.0f,
-    private val lineSpacing: Float = 0.4f
+    private val lineSpacing: Float = 0.4f,
+    private val separatorChar: Char = '-',
+    private val doubleSeparatorChar: Char = '='
 ) {
     companion object {
         private const val TAG = "SingleCanvasBillBuilder"
@@ -323,19 +325,19 @@ class SingleCanvasBillBuilder(
     }
 
     /**
-     * In separator
+     * In separator - sử dụng separatorChar từ constructor (từ template config)
      */
-    fun separator(char: Char = '-'): SingleCanvasBillBuilder {
+    fun separator(char: Char = separatorChar): SingleCanvasBillBuilder {
         val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
         elements.add(PrintElement.Separator(char, separatorFontSize, lineSpacing))
         return this
     }
 
     /**
-     * In double separator
+     * In double separator - sử dụng doubleSeparatorChar từ constructor (từ template config)
      */
-    fun doubleSeparator(): SingleCanvasBillBuilder {
-        return separator('=')
+    fun doubleSeparator(char: Char = doubleSeparatorChar): SingleCanvasBillBuilder {
+        return separator(char)
     }
 
     /**

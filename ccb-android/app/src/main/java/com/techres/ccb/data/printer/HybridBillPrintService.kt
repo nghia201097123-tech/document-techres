@@ -106,13 +106,13 @@ object HybridBillPrintService {
             val capability = PrinterCapabilityDetector.detect(ip, printerConfig.printerPort)
 
             // Generate bill content với Hybrid builder
-            // Sử dụng paperWidth từ printerConfig (ưu tiên) hoặc template
+            // Sử dụng paperWidth, fontSize, lineSpacing từ template (web-dashboard)
             val billContent = generateHybridBill(printerConfig, template, billData, capability)
 
             // Retry logic
             repeat(printerConfig.retryCount) { attempt ->
                 val result = when (printerConfig.connectionType) {
-                    "network" -> printViaNetwork(printerConfig, billContent)
+                    "network" -> printViaNetwork(printerConfig, template, billContent)
                     else -> PrinterResult.Error("Loại kết nối không được hỗ trợ: ${printerConfig.connectionType}")
                 }
 
@@ -166,8 +166,8 @@ object HybridBillPrintService {
 
             Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes (SINGLE WRITE)")
 
-            // In từng bản riêng biệt
-            repeat(config.numberOfCopies) { copyIndex ->
+            // In từng bản riêng biệt - sử dụng numberOfCopies từ template (web-dashboard)
+            repeat(template.numberOfCopies) { copyIndex ->
                 // SINGLE WRITE: Gửi toàn bộ data trong 1 lần (giống phiếu bếp)
                 val writeResult = adapter.write(billContent)
                 if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
@@ -175,18 +175,18 @@ object HybridBillPrintService {
                     return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
                 }
 
-                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${config.numberOfCopies}: ${billContent.size} bytes sent")
+                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${template.numberOfCopies}: ${billContent.size} bytes sent")
 
                 // Đợi máy in xử lý xong
                 delay(800)
 
                 // Delay giữa các bản
-                if (copyIndex < config.numberOfCopies - 1) {
+                if (copyIndex < template.numberOfCopies - 1) {
                     delay(300)
                 }
             }
 
-            Log.d(TAG, "Sunmi print successful (SINGLE WRITE): ${config.numberOfCopies} copies")
+            Log.d(TAG, "Sunmi print successful (SINGLE WRITE): ${template.numberOfCopies} copies")
             PrinterResult.Success("In bill thành công!")
         } catch (e: Exception) {
             Log.e(TAG, "Sunmi print error: ${e.message}", e)
@@ -206,18 +206,19 @@ object HybridBillPrintService {
      */
     private suspend fun printViaNetwork(
         config: BillPrinterConfigEntity,
+        template: BillTemplateEntity,
         billContent: ByteArray
     ): PrinterResult {
         val ip = config.printerIp ?: return PrinterResult.Error("Chưa cấu hình IP máy in")
 
-        // In từng bản trong kết nối riêng (giống kitchen ticket)
-        repeat(config.numberOfCopies) { copyIndex ->
+        // In từng bản trong kết nối riêng - sử dụng numberOfCopies từ template (web-dashboard)
+        repeat(template.numberOfCopies) { copyIndex ->
             val result = printSingleCopy(ip, config.printerPort, config.connectionTimeoutMs, billContent)
             if (result is PrinterResult.Error) {
                 return result
             }
             // Delay giữa các bản
-            if (copyIndex < config.numberOfCopies - 1) {
+            if (copyIndex < template.numberOfCopies - 1) {
                 delay(300)
             }
         }
@@ -299,8 +300,8 @@ object HybridBillPrintService {
 
     /**
      * Generate bill content với Hybrid approach
-     * Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user config trong app)
-     * Các config hiển thị (labels, show flags) từ template (web dashboard)
+     * Sử dụng paperWidth, fontSize, lineSpacing từ template (web dashboard)
+     * Các config hiển thị (labels, show flags) cũng từ template
      */
     private fun generateHybridBill(
         printerConfig: BillPrinterConfigEntity,
@@ -311,10 +312,10 @@ object HybridBillPrintService {
         // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
         val useBitmapMode = !capability.supportVietnameseUtf8
 
-        // Sử dụng settings từ printerConfig (đã được user chọn trong app)
-        val paperWidth = printerConfig.paperWidth
-        val fontSize = printerConfig.fontSize
-        val lineSpacing = printerConfig.lineSpacing
+        // Sử dụng settings từ template (đồng bộ từ web-dashboard)
+        val paperWidth = template.paperWidth
+        val fontSize = template.fontSize
+        val lineSpacing = template.lineSpacing
 
         // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
         return if (useSingleCanvasRendering && useBitmapMode) {
@@ -357,7 +358,9 @@ object HybridBillPrintService {
         val builder = SingleCanvasBillBuilder(
             paperWidth = paperWidth,
             fontScale = fontScale,
-            lineSpacing = lineSpacing
+            lineSpacing = lineSpacing,
+            separatorChar = template.separatorChar.firstOrNull() ?: '-',
+            doubleSeparatorChar = template.doubleSeparatorChar.firstOrNull() ?: '='
         )
 
         builder.apply {
@@ -724,7 +727,9 @@ object HybridBillPrintService {
             useBitmapMode = useBitmapMode,
             useRasterBitmap = useRasterBitmap,
             fontScale = fontScale,
-            lineSpacing = lineSpacing // Sử dụng lineSpacing từ printerConfig
+            lineSpacing = lineSpacing, // Sử dụng lineSpacing từ template (web-dashboard)
+            separatorChar = template.separatorChar.firstOrNull() ?: '-',
+            doubleSeparatorChar = template.doubleSeparatorChar.firstOrNull() ?: '='
         )
 
         builder.apply {
