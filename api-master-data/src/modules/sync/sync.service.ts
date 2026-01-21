@@ -366,14 +366,25 @@ export class SyncService {
           where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
         }) : Promise.resolve([]),
-        // Bank accounts for this branch (or brand-level if no branch-specific)
-        this.bankAccountRepository.find({
-          where: [
-            { branchId, isActive: true },
-            { brandId, branchId: null as any, isActive: true },
-          ],
+        // Bank accounts for this brand (branch-specific or brand-level)
+        brandId ? this.bankAccountRepository.find({
+          where: { brandId, isActive: true },
           order: { isPrimary: 'DESC' },
-        }).catch(() => []),
+        }).then(accounts => {
+          console.log(`[SyncService.getFullSync] Found ${accounts.length} bank accounts for brandId=${brandId}`);
+          if (accounts.length > 0) {
+            console.log(`[SyncService.getFullSync] Bank accounts:`, accounts.map(a => ({
+              id: a.id,
+              bankCode: a.bankCode,
+              accountNumber: a.accountNumber,
+              isPrimary: a.isPrimary
+            })));
+          }
+          return accounts;
+        }).catch(err => {
+          console.error(`[SyncService.getFullSync] Error fetching bank accounts:`, err);
+          return [];
+        }) : Promise.resolve([]),
       ]);
 
       // Build product-kitchen mapping (productId -> comma-separated kitchenIds)
