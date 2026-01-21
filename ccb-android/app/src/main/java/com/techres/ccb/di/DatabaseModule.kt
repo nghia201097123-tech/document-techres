@@ -185,4 +185,11 @@ object DatabaseModule {
     fun provideSurchargeDao(database: CCBDatabase): SurchargeDao {
         return database.surchargeDao()
     }
+
+    // Bank account DAO
+    @Provides
+    @Singleton
+    fun provideBankAccountDao(database: CCBDatabase): BankAccountDao {
+        return database.bankAccountDao()
+    }
 }
