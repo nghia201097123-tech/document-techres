@@ -79,9 +79,7 @@ class PaymentViewModel @Inject constructor(
             val subtotal = items.sumOf { it.unitPrice * it.quantity }
 
             // Load bank account for transfer payment
-            val bankAccount = branchId?.let { branch ->
-                bankAccountDao.getPrimaryBankAccount(branch)
-            }
+            val bankAccount = bankAccountDao.getPrimaryBankAccount()
 
             _uiState.value = _uiState.value.copy(
                 order = order,

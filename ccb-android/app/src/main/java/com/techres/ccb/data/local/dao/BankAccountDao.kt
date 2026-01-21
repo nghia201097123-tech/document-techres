@@ -37,12 +37,11 @@ interface BankAccountDao {
     suspend fun getActiveBankAccountsList(branchId: String): List<BankAccountEntity>
 
     /**
-     * Get the primary bank account for a branch
+     * Get the primary bank account
      * Falls back to first active account if no primary is set
-     * Also checks for brand-level accounts (branchId is null or empty)
      */
     @Query("SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY is_primary DESC LIMIT 1")
-    suspend fun getPrimaryBankAccount(branchId: String): BankAccountEntity?
+    suspend fun getPrimaryBankAccount(): BankAccountEntity?
 
     /**
      * Get all bank accounts for a branch
