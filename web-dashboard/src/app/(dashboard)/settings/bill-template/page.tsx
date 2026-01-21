@@ -1760,7 +1760,14 @@ export default function BillTemplatePage() {
           </DialogHeader>
           {previewTemplate && (
             <ScrollArea className="max-h-[70vh]">
-              <div className="bg-white p-4 border rounded-lg font-mono text-sm mx-auto" style={{ width: previewTemplate.paperWidth <= 58 ? "200px" : previewTemplate.paperWidth <= 80 ? "280px" : "350px" }}>
+              <div
+                className="bg-white p-4 border rounded-lg font-mono text-sm mx-auto"
+                style={{
+                  width: previewTemplate.paperWidth <= 58 ? "200px" : previewTemplate.paperWidth <= 80 ? "280px" : "350px",
+                  lineHeight: 1 + (previewTemplate.lineSpacing || 0.7),
+                  fontSize: previewTemplate.fontSize === "small" ? "11px" : previewTemplate.fontSize === "large" ? "15px" : "13px"
+                }}
+              >
                 {/* ============ HEADER ============ */}
                 <div className="text-center space-y-1">
                   {previewTemplate.showLogo && (

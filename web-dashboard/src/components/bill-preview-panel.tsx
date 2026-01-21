@@ -235,11 +235,13 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
   // Memoize bill title
   const billTitle = React.useMemo(() => activeTemplate.billTitle || "HOA DON BAN HANG", [activeTemplate.billTitle]);
 
-  // Memoize container style with dynamic width
+  // Memoize container style with dynamic width, lineHeight and fontSize
   const containerStyleWithWidth = React.useMemo(() => ({
     ...CONTAINER_STYLE,
-    width: previewWidth
-  }), [previewWidth]);
+    width: previewWidth,
+    lineHeight: 1 + (activeTemplate.lineSpacing || 0.7),
+    fontSize: activeTemplate.fontSize === "small" ? "11px" : activeTemplate.fontSize === "large" ? "15px" : "13px"
+  }), [previewWidth, activeTemplate.lineSpacing, activeTemplate.fontSize]);
 
   return (
     <div className={className}>
@@ -257,7 +259,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         5. CSS containment isolates repaints
       */}
       <div
-        className={`bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm ${fontSizeClass}`}
+        className="bg-white p-4 border rounded-lg font-mono mx-auto shadow-sm"
         style={containerStyleWithWidth}
       >
         {/* Header - Memoized component with stable style */}
