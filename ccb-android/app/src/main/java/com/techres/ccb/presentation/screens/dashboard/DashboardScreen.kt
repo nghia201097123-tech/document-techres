@@ -227,7 +227,7 @@ fun DashboardScreen(
                 StatsCardsRow(
                     draftCount = uiState.draftPosCount,
                     confirmedCount = uiState.confirmedPosCount,
-                    completedCount = uiState.todayOrderCount,
+                    completedCount = uiState.completedOrderCount,
                     foodAppCount = uiState.foodAppOrderCount
                 )
 

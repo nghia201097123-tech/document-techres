@@ -84,6 +84,7 @@ data class DashboardUiState(
     val totalActiveOrders: Int = 0,
     val todayRevenue: Long = 0,
     val todayOrderCount: Int = 0,
+    val completedOrderCount: Int = 0, // Số đơn đã hoàn tất
 
     // Grid settings
     val gridColumns: Int = 4,
@@ -242,7 +243,19 @@ class DashboardViewModel @Inject constructor(
                     val todayRevenue = currentShift?.totalRevenue?.toLong() ?: 0L
                     val todayOrderCount = currentShift?.totalOrders ?: orderEntities.size
 
-                    Log.d(TAG, "loadData - Loaded ${posOrders.size} active orders")
+                    // Query actual completed order count from database
+                    val completedOrderCount = if (currentShift != null) {
+                        try {
+                            orderRepository.getCompletedOrderCountByShift(branchId, currentShift.id)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error getting completed order count: ${e.message}")
+                            0
+                        }
+                    } else {
+                        0
+                    }
+
+                    Log.d(TAG, "loadData - Loaded ${posOrders.size} active orders, $completedOrderCount completed orders")
 
                     _uiState.update {
                         it.copy(
@@ -254,6 +267,7 @@ class DashboardViewModel @Inject constructor(
                             totalActiveOrders = posOrders.size,
                             todayRevenue = todayRevenue,
                             todayOrderCount = todayOrderCount,
+                            completedOrderCount = completedOrderCount,
                             error = null
                         )
                     }
@@ -415,7 +429,8 @@ class DashboardViewModel @Inject constructor(
                     state.copy(
                         posOrders = state.posOrders.filter { it.id != orderId },
                         todayRevenue = state.todayRevenue + (completedOrder?.totalAmount ?: 0),
-                        todayOrderCount = state.todayOrderCount + 1
+                        todayOrderCount = state.todayOrderCount + 1,
+                        completedOrderCount = state.completedOrderCount + 1
                     )
                 }
                 recalculateCounts()
@@ -622,7 +637,8 @@ class DashboardViewModel @Inject constructor(
                     state.copy(
                         posOrders = state.posOrders.filter { it.id != orderId },
                         todayRevenue = state.todayRevenue + finalTotal.toLong(),
-                        todayOrderCount = state.todayOrderCount + 1
+                        todayOrderCount = state.todayOrderCount + 1,
+                        completedOrderCount = state.completedOrderCount + 1
                     )
                 }
                 recalculateCounts()
