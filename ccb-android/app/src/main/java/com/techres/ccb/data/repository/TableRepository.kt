@@ -59,6 +59,14 @@ class TableRepository @Inject constructor(
         tableDao.updateStatus(tableId, status, orderId, updatedAt)
     }
 
+    /**
+     * Release a table - set status to "available" and clear orderId
+     */
+    suspend fun releaseTable(tableId: String) {
+        val now = java.time.Instant.now().toString()
+        tableDao.updateStatus(tableId, "available", null, now)
+    }
+
     suspend fun getAreasCount(branchId: String): Int {
         return areaDao.getCount(branchId)
     }

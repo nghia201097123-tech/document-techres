@@ -1318,30 +1318,44 @@ class SaleViewModel @Inject constructor(
         viewModelScope.launch {
             val currentState = _uiState.value
             val existingOrder = currentState.currentOrder
+            val previousTable = currentState.selectedTable
 
             // If there's an existing order and we're changing type away from DINE_IN,
-            // update the order to remove table association
-            if (existingOrder != null && orderType != OrderType.DINE_IN && currentState.selectedTable != null) {
-                Log.d(TAG, "setOrderType - Updating order ${existingOrder.orderNumber} from DINE_IN to ${orderType.name}")
+            // update the order to remove table association AND release the table
+            if (existingOrder != null && orderType != OrderType.DINE_IN && previousTable != null) {
+                Log.d(TAG, "setOrderType - Updating order ${existingOrder.orderNumber} from DINE_IN to ${orderType.name}, releasing table ${previousTable.name}")
 
                 val updatedOrder = existingOrder.copy(
                     tableId = null,
                     tableName = null,
                     orderType = orderType.dbValue,
+                    // Keep pagerNumber unchanged when switching order type!
                     updatedAt = java.time.Instant.now().toString()
                 )
 
-                // Save to database
+                // Save to database AND release the table
                 withContext(Dispatchers.IO) {
                     orderRepository.updateOrder(updatedOrder)
+                    // Release the table - set status back to available
+                    tableRepository.releaseTable(previousTable.id)
+                }
+
+                // Update tables list to reflect the released table
+                val updatedTables = currentState.tables.map { table ->
+                    if (table.id == previousTable.id) {
+                        table.copy(status = TableStatus.AVAILABLE, currentOrderId = null)
+                    } else {
+                        table
+                    }
                 }
 
                 _uiState.update { state ->
                     state.copy(
                         orderType = orderType,
                         selectedTable = null,
-                        currentOrder = updatedOrder
-                        // Keep currentOrderItems, cartItems, discounts unchanged!
+                        currentOrder = updatedOrder,
+                        tables = updatedTables
+                        // Keep currentOrderItems, cartItems, discounts, pagerNumber unchanged!
                     )
                 }
             } else {

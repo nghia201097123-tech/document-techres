@@ -360,11 +360,12 @@ fun SaleScreen(
 
             // Tạo danh sách món cho item-level discount
             // CHỈ bao gồm món đã order, KHÔNG bao gồm cart items chưa thêm
+            // LOẠI TRỪ các món đã bị huỷ (status = "cancelled")
             val orderItems = buildList {
                 if (currentOrder != null) {
-                    // Có order đang active - chỉ lấy món từ order (filter combo children)
+                    // Có order đang active - chỉ lấy món từ order (filter combo children và cancelled items)
                     uiState.currentOrderItems
-                        .filter { !it.isComboChild }
+                        .filter { !it.isComboChild && it.status != "cancelled" }
                         .forEach { item ->
                             // Parse all variants (options and toppings) from notes field
                             val variants = parseVariantsFromNotes(item.notes, item.vatRate)
