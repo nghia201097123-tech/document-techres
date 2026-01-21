@@ -8,6 +8,9 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Log
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import com.techres.ccb.printer.core.EscPosCommands
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
@@ -536,6 +539,10 @@ class HybridBillBuilder(
     private val separatorChar: Char = '-', // Ký tự phân cách đơn (từ template config)
     private val doubleSeparatorChar: Char = '=' // Ký tự phân cách kép (từ template config)
 ) {
+    companion object {
+        private const val TAG = "HybridBillBuilder"
+    }
+
     private val buffer = ByteArrayOutputStream()
     private val pixelWidth = BitmapTextRenderer.getPixelWidth(paperWidth)
     val lineWidth = BitmapTextRenderer.getLineWidth(paperWidth)
@@ -856,13 +863,59 @@ class HybridBillBuilder(
     }
 
     /**
-     * In QR Code
+     * In QR Code - sử dụng bitmap để tương thích với nhiều máy in hơn
      */
     fun qrCode(content: String, size: Int = 6): HybridBillBuilder {
-        buffer.write(EscPosCommands.ALIGN_CENTER)
-        buffer.write(EscPosCommands.printQRCode(content, size))
-        buffer.write(EscPosCommands.ALIGN_LEFT)
+        try {
+            // Generate QR code bitmap using ZXing
+            val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300) // 60% of paper width
+            val qrBitmap = generateQrCodeBitmap(content, qrSize)
+            if (qrBitmap != null) {
+                buffer.write(EscPosCommands.ALIGN_CENTER)
+                buffer.write(EscPosCommands.printRasterBitmap(qrBitmap, qrSize))
+                buffer.write(EscPosCommands.ALIGN_LEFT)
+                Log.d(TAG, "QR code printed as bitmap: ${qrBitmap.width}x${qrBitmap.height}")
+                qrBitmap.recycle()
+            } else {
+                // Fallback to ESC/POS QR command
+                Log.w(TAG, "QR bitmap generation failed, using ESC/POS command")
+                buffer.write(EscPosCommands.ALIGN_CENTER)
+                buffer.write(EscPosCommands.printQRCode(content, size))
+                buffer.write(EscPosCommands.ALIGN_LEFT)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "QR code error: ${e.message}, using ESC/POS command")
+            buffer.write(EscPosCommands.ALIGN_CENTER)
+            buffer.write(EscPosCommands.printQRCode(content, size))
+            buffer.write(EscPosCommands.ALIGN_LEFT)
+        }
         return this
+    }
+
+    /**
+     * Generate QR code bitmap using ZXing library
+     */
+    private fun generateQrCodeBitmap(content: String, size: Int): Bitmap? {
+        return try {
+            val hints = mapOf(
+                EncodeHintType.CHARACTER_SET to "UTF-8",
+                EncodeHintType.MARGIN to 1
+            )
+            val qrCodeWriter = QRCodeWriter()
+            val bitMatrix = qrCodeWriter.encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+            val width = bitMatrix.width
+            val height = bitMatrix.height
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE)
+                }
+            }
+            bitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to generate QR bitmap: ${e.message}")
+            null
+        }
     }
 
     /**
