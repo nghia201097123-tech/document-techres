@@ -670,70 +670,70 @@ fun PaymentDialog(
                                                 }
                                             )
                                         }
-                                    }
 
-                                    // Nút in mã QR thanh toán - đặt ngay dưới QR code
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    OutlinedButton(
-                                        onClick = onPrintPaymentQr,
-                                        enabled = !isPrintingQr,
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1976D2))
-                                    ) {
-                                        if (isPrintingQr) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(14.dp),
-                                                strokeWidth = 2.dp,
-                                                color = Color(0xFF1976D2)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Đang in...", fontSize = 12.sp)
-                                        } else {
-                                            Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("In mã QR", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        // Print button for VietQR
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        OutlinedButton(
+                                            onClick = onPrintPaymentQr,
+                                            enabled = !isPrintingQr,
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1976D2))
+                                        ) {
+                                            if (isPrintingQr) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(14.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = Color(0xFF1976D2)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Đang in...", fontSize = 12.sp)
+                                            } else {
+                                                Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("In mã QR", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                            }
                                         }
-                                    }
 
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                        Spacer(modifier = Modifier.height(12.dp))
 
-                                    // Bank info
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text("Ngân hàng:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text(bankAccount.bankName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text("Số TK:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text(bankAccount.accountNumber, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text("Chủ TK:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text(bankAccount.accountName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text("Nội dung:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text(transferContent, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                        // Bank info card
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text("Ngân hàng:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(bankAccount.bankName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text("Số TK:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(bankAccount.accountNumber, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text("Chủ TK:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(bankAccount.accountName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text("Nội dung:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(transferContent, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                                }
                                             }
                                         }
                                     }

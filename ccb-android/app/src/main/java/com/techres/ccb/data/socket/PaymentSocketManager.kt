@@ -183,19 +183,19 @@ class PaymentSocketManager @Inject constructor() {
             put("deviceType", "android")
         }
 
-        socket?.emit("join:branch", payload) { response ->
-            val result = response.getOrNull(0) as? JSONObject
+        socket?.emit("join:branch", payload, io.socket.client.Ack { response ->
+            val result = (response as? Array<*>)?.firstOrNull() as? JSONObject
             if (result?.optBoolean("success") == true) {
                 Timber.d("Joined branch room: $branchId")
             } else {
                 Timber.w("Failed to join branch room: ${result?.optString("message")}")
             }
-        }
+        })
     }
 
     private val onPaymentSuccess = Emitter.Listener { args ->
         try {
-            val data = args.getOrNull(0) as? JSONObject ?: return@Listener
+            val data = args.firstOrNull() as? JSONObject ?: return@Listener
             val event = PaymentSuccessEvent(
                 orderId = data.optString("orderId"),
                 orderCode = data.optLong("orderCode"),
@@ -219,7 +219,7 @@ class PaymentSocketManager @Inject constructor() {
 
     private val onPaymentCancelled = Emitter.Listener { args ->
         try {
-            val data = args.getOrNull(0) as? JSONObject ?: return@Listener
+            val data = args.firstOrNull() as? JSONObject ?: return@Listener
             val event = PaymentCancelledEvent(
                 orderId = data.optString("orderId"),
                 orderCode = data.optLong("orderCode"),
@@ -238,7 +238,7 @@ class PaymentSocketManager @Inject constructor() {
 
     private val onPaymentExpired = Emitter.Listener { args ->
         try {
-            val data = args.getOrNull(0) as? JSONObject ?: return@Listener
+            val data = args.firstOrNull() as? JSONObject ?: return@Listener
             val event = PaymentExpiredEvent(
                 orderCode = data.optLong("orderCode")
             )
