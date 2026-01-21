@@ -669,7 +669,8 @@ object HybridBillPrintService {
                     description = transferContent,
                     accountName = paymentBankAccount.accountName
                 )
-                qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
+                Log.d(TAG, "VietQR URL: $vietQrContent (length: ${vietQrContent.length})")
+                qrCode(vietQrContent, size = 4) // Giảm size từ 8 xuống 4 để tương thích với nhiều máy in hơn
             } else if (template.showQrCode) {
                 // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
