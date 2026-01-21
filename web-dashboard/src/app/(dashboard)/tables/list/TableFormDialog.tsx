@@ -397,10 +397,11 @@ const TableFormDialog = React.memo(function TableFormDialog({
                       type="number"
                       min="1"
                       max="100"
-                      value={bulkCreateQuantity}
-                      onChange={(e) =>
-                        setBulkCreateQuantity(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
-                      }
+                      value={bulkCreateQuantity || ""}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? 1 : parseInt(e.target.value);
+                        setBulkCreateQuantity(Math.min(100, Math.max(1, val || 1)));
+                      }}
                       className="bg-white"
                     />
                   </div>
@@ -411,7 +412,7 @@ const TableFormDialog = React.memo(function TableFormDialog({
                     type="number"
                     min="0"
                     value={bulkCreateStartNumber}
-                    onChange={(e) => setBulkCreateStartNumber(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setBulkCreateStartNumber(e.target.value === "" ? 0 : parseInt(e.target.value))}
                     className="w-32 bg-white"
                   />
                 </div>
@@ -472,8 +473,8 @@ const TableFormDialog = React.memo(function TableFormDialog({
                 type="number"
                 min="1"
                 placeholder="4"
-                value={formData.capacity || 4}
-                onChange={(e) => setFormData((prev) => ({ ...prev, capacity: parseInt(e.target.value) || 4 }))}
+                value={formData.capacity}
+                onChange={(e) => setFormData((prev) => ({ ...prev, capacity: e.target.value === "" ? 0 : parseInt(e.target.value) }))}
               />
             </div>
 
@@ -484,8 +485,8 @@ const TableFormDialog = React.memo(function TableFormDialog({
                 type="number"
                 min="0"
                 placeholder="0"
-                value={formData.sortOrder || 0}
-                onChange={(e) => setFormData((prev) => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
+                value={formData.sortOrder}
+                onChange={(e) => setFormData((prev) => ({ ...prev, sortOrder: e.target.value === "" ? 0 : parseInt(e.target.value) }))}
               />
             </div>
 
