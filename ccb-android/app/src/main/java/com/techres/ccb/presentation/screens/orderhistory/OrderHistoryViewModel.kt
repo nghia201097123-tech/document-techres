@@ -3,6 +3,7 @@ package com.techres.ccb.presentation.screens.orderhistory
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.BankAccountDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.entity.OrderEntity
@@ -154,7 +155,8 @@ class OrderHistoryViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val orderRepository: OrderRepository,
     private val printerConfigDao: BillPrinterConfigDao,
-    private val billTemplateDao: BillTemplateDao
+    private val billTemplateDao: BillTemplateDao,
+    private val bankAccountDao: BankAccountDao
 ) : ViewModel() {
 
     companion object {
@@ -485,8 +487,11 @@ class OrderHistoryViewModel @Inject constructor(
                     // Build BillData from order
                     val billData = buildBillDataFromOrder(order, orderItems)
 
+                    // Get primary bank account for payment QR (if enabled)
+                    val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
+
                     // Print
-                    val result = HybridBillPrintService.printBill(printerConfig, template, billData)
+                    val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount)
                     val message = when (result) {
                         is PrinterResult.Success -> "In lại bill thành công!"
                         is PrinterResult.Error -> "Lỗi in: ${result.message}"

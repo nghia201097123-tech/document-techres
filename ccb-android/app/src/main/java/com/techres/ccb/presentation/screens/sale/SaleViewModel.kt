@@ -3079,8 +3079,11 @@ class SaleViewModel @Inject constructor(
                                 printTime = Date()
                             )
 
+                            // Get primary bank account for payment QR (if enabled)
+                            val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
+
                             // Print temporary bill
-                            val result = HybridBillPrintService.printBill(printerConfig, template, billData)
+                            val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount)
                             when (result) {
                                 is PrinterResult.Success -> {
                                     Log.d(TAG, "printTemporaryBill - Success, printCount: $newPrintCount")
@@ -3331,8 +3334,11 @@ class SaleViewModel @Inject constructor(
                                     changeAmount = changeAmount
                                 )
 
+                                // Get primary bank account for payment QR (if enabled)
+                                val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
+
                                 // Print bill using Hybrid approach (supports Vietnamese diacritics)
-                                val result = HybridBillPrintService.printBill(printerConfig, template, billData)
+                                val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount)
                                 when (result) {
                                     is PrinterResult.Success -> {
                                         Log.d(TAG, "completeOrder - Bill printed successfully")

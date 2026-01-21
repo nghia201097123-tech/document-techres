@@ -1,6 +1,7 @@
 package com.techres.ccb.data.printer
 
 import android.util.Log
+import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.local.entity.BillTemplateType
@@ -75,7 +76,8 @@ object HybridBillPrintService {
     suspend fun printBill(
         printerConfig: BillPrinterConfigEntity,
         template: BillTemplateEntity,
-        billData: BillData
+        billData: BillData,
+        paymentBankAccount: BankAccountEntity? = null // Tài khoản ngân hàng cho QR thanh toán
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             var lastError: String? = null
@@ -83,6 +85,9 @@ object HybridBillPrintService {
             Log.d(TAG, "=== PRINT BILL ===")
             Log.d(TAG, "Connection type: ${printerConfig.connectionType}")
             Log.d(TAG, "Order: ${billData.displayNumber}, ${billData.items.size} items")
+            if (paymentBankAccount != null) {
+                Log.d(TAG, "Payment QR bank: ${paymentBankAccount.bankName} - ${paymentBankAccount.accountNumber}")
+            }
 
             // ========== MÁY IN LIỀN THÂN (SUNMI) ==========
             if (printerConfig.connectionType == "sunmi") {
@@ -95,7 +100,7 @@ object HybridBillPrintService {
                     Log.w(TAG, "⚠️ Sunmi adapter có thể gây giật khi in qua AIDL interface")
                 }
 
-                return@withContext printViaSunmi(printerConfig, template, billData)
+                return@withContext printViaSunmi(printerConfig, template, billData, paymentBankAccount)
             }
 
             // ========== MÁY IN RỜI (NETWORK) ==========
@@ -107,7 +112,7 @@ object HybridBillPrintService {
 
             // Generate bill content với Hybrid builder
             // Sử dụng paperWidth, fontSize, lineSpacing từ template (web-dashboard)
-            val billContent = generateHybridBill(printerConfig, template, billData, capability)
+            val billContent = generateHybridBill(printerConfig, template, billData, capability, paymentBankAccount)
 
             // Retry logic
             repeat(printerConfig.retryCount) { attempt ->
@@ -144,7 +149,8 @@ object HybridBillPrintService {
     private suspend fun printViaSunmi(
         config: BillPrinterConfigEntity,
         template: BillTemplateEntity,
-        billData: BillData
+        billData: BillData,
+        paymentBankAccount: BankAccountEntity? = null
     ): PrinterResult {
         val adapter = sunmiAdapter ?: return PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
 
@@ -162,7 +168,7 @@ object HybridBillPrintService {
                 supportVietnameseUtf8 = false, // Force bitmap mode
                 printerModel = adapter.getSunmiModel()
             )
-            val billContent = generateHybridBill(config, template, billData, capability)
+            val billContent = generateHybridBill(config, template, billData, capability, paymentBankAccount)
 
             Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes (SINGLE WRITE)")
 
@@ -307,7 +313,8 @@ object HybridBillPrintService {
         printerConfig: BillPrinterConfigEntity,
         template: BillTemplateEntity,
         billData: BillData,
-        capability: PrinterCapability
+        capability: PrinterCapability,
+        paymentBankAccount: BankAccountEntity? = null
     ): ByteArray {
         // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
         val useBitmapMode = !capability.supportVietnameseUtf8
@@ -320,10 +327,10 @@ object HybridBillPrintService {
         // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
         return if (useSingleCanvasRendering && useBitmapMode) {
             Log.d(TAG, "Using SINGLE CANVAS RENDERING mode")
-            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData)
+            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData, paymentBankAccount)
         } else {
             Log.d(TAG, "Using LEGACY per-line rendering mode")
-            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode)
+            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode, paymentBankAccount)
         }
     }
 
@@ -342,7 +349,8 @@ object HybridBillPrintService {
         fontSize: String,
         lineSpacing: Float,
         template: BillTemplateEntity,
-        billData: BillData
+        billData: BillData,
+        paymentBankAccount: BankAccountEntity? = null
     ): ByteArray {
         Log.d(TAG, "Generating bill with SINGLE CANVAS: ${billData.displayNumber}, ${billData.items.size} items")
 
@@ -638,12 +646,37 @@ object HybridBillPrintService {
 
             // ============ QR CODE ============
             if (template.showQrCode) {
-                val qrContent = when (template.qrCodeType) {
-                    "order_id" -> billData.orderNumber
-                    "custom" -> template.qrCodeContent ?: billData.orderNumber
-                    else -> billData.orderNumber
+                when (template.qrCodeType) {
+                    "payment" -> {
+                        // QR thanh toán - cần có thông tin tài khoản ngân hàng
+                        if (paymentBankAccount != null) {
+                            separator()
+                            lineCenter("THANH TOÁN CHUYỂN KHOẢN")
+                            lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
+                            lineCenter("STK: ${paymentBankAccount.accountNumber}")
+                            lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
+                            lineCenter("Số tiền: ${formatCurrency(billData.totalAmount)}")
+                            val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
+                            lineCenter("Nội dung: $transferContent")
+                            feed(1)
+                            // Tạo VietQR content
+                            val vietQrContent = generateVietQrContent(
+                                bankBin = paymentBankAccount.bankBin ?: paymentBankAccount.bankCode,
+                                accountNumber = paymentBankAccount.accountNumber,
+                                amount = billData.totalAmount.toLong(),
+                                description = transferContent
+                            )
+                            qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
+                        } else {
+                            // Không có bank account - hiển thị QR mã đơn hàng thay thế
+                            Log.w(TAG, "Payment QR requested but no bank account provided, falling back to order_id")
+                            qrCode(billData.orderNumber)
+                        }
+                    }
+                    "order_id" -> qrCode(billData.orderNumber)
+                    "custom" -> qrCode(template.qrCodeContent ?: billData.orderNumber)
+                    else -> qrCode(billData.orderNumber)
                 }
-                qrCode(qrContent)
             }
 
             // ============ BARCODE ============
@@ -701,7 +734,8 @@ object HybridBillPrintService {
         lineSpacing: Float,
         template: BillTemplateEntity,
         billData: BillData,
-        useBitmapMode: Boolean
+        useBitmapMode: Boolean,
+        paymentBankAccount: BankAccountEntity? = null
     ): ByteArray {
         // Minimal logging for performance (chi tiết logging đã được disable để in mượt hơn)
         Log.d(TAG, "Generating bill: ${billData.displayNumber}, ${billData.items.size} items, $paperWidth mm, bitmap=$useBitmapMode")
@@ -1036,13 +1070,37 @@ object HybridBillPrintService {
 
             // ============ QR CODE (theo config) ============
             if (template.showQrCode) {
-                // Bỏ feed(1) để tiết kiệm giấy
-                val qrContent = when (template.qrCodeType) {
-                    "order_id" -> billData.orderNumber
-                    "custom" -> template.qrCodeContent ?: billData.orderNumber
-                    else -> billData.orderNumber
+                when (template.qrCodeType) {
+                    "payment" -> {
+                        // QR thanh toán - cần có thông tin tài khoản ngân hàng
+                        if (paymentBankAccount != null) {
+                            separator()
+                            lineCenter("THANH TOÁN CHUYỂN KHOẢN", BitmapTextStyle(bold = true))
+                            lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
+                            lineCenter("STK: ${paymentBankAccount.accountNumber}")
+                            lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
+                            lineCenter("Số tiền: ${formatCurrency(billData.totalAmount)}")
+                            val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
+                            lineCenter("Nội dung: $transferContent")
+                            feed(1)
+                            // Tạo VietQR content
+                            val vietQrContent = generateVietQrContent(
+                                bankBin = paymentBankAccount.bankBin ?: paymentBankAccount.bankCode,
+                                accountNumber = paymentBankAccount.accountNumber,
+                                amount = billData.totalAmount.toLong(),
+                                description = transferContent
+                            )
+                            qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
+                        } else {
+                            // Không có bank account - hiển thị QR mã đơn hàng thay thế
+                            Log.w(TAG, "Payment QR requested but no bank account provided, falling back to order_id")
+                            qrCode(billData.orderNumber)
+                        }
+                    }
+                    "order_id" -> qrCode(billData.orderNumber)
+                    "custom" -> qrCode(template.qrCodeContent ?: billData.orderNumber)
+                    else -> qrCode(billData.orderNumber)
                 }
-                qrCode(qrContent)
             }
 
             // ============ BARCODE (theo config) ============
@@ -1097,5 +1155,119 @@ object HybridBillPrintService {
 
     private fun formatCurrency(amount: Long): String {
         return "${currencyFormat.format(amount)}đ"
+    }
+
+    /**
+     * Generate VietQR EMVCo content for payment QR code
+     *
+     * VietQR format: https://www.vietqr.io/emvco-qr-code-specifications
+     * Simplified format để máy in có thể render QR code
+     *
+     * @param bankBin BIN code của ngân hàng (970436 cho Vietcombank, etc.)
+     * @param accountNumber Số tài khoản
+     * @param amount Số tiền (VND)
+     * @param description Nội dung chuyển khoản
+     */
+    private fun generateVietQrContent(
+        bankBin: String,
+        accountNumber: String,
+        amount: Long,
+        description: String
+    ): String {
+        // Sử dụng VietQR URL format để dễ scan bằng app ngân hàng
+        // Format: https://img.vietqr.io/image/{BANK_ID}-{ACCOUNT_NO}-{TEMPLATE}.png?amount={AMOUNT}&addInfo={DESC}
+        // Tuy nhiên, máy in QR chỉ có thể in text content, không phải URL
+        // Nên sử dụng EMVCo format
+
+        // EMVCo QR format cho VietQR:
+        // 00 - Payload Format Indicator (02 characters)
+        // 01 - Point of Initiation Method (02 = dynamic)
+        // 38 - Merchant Account Information (VietQR specific)
+        //   - 00 - GUID (A000000727)
+        //   - 01 - Beneficiary Organization (bank BIN + account)
+        //   - 02 - Service Code (QRIBFTTA = transfer to account)
+        // 52 - Merchant Category Code
+        // 53 - Transaction Currency (704 = VND)
+        // 54 - Transaction Amount
+        // 58 - Country Code (VN)
+        // 62 - Additional Data Field
+        //   - 08 - Purpose of Transaction
+        // 63 - CRC
+
+        // Simplified: Sử dụng VietQR deep link format mà các app ngân hàng có thể đọc
+        // Format tương thích với NAPAS VietQR
+        val encodedDesc = description.replace(" ", "%20")
+
+        // Build EMVCo QR content
+        val sb = StringBuilder()
+
+        // Payload Format Indicator - mandatory
+        sb.append("000201") // ID 00, length 02, value "01"
+
+        // Point of Initiation Method - 12 for dynamic QR
+        sb.append("010212") // ID 01, length 02, value "12" (dynamic)
+
+        // Merchant Account Information for VietQR (ID 38)
+        val guid = "A000000727" // NAPAS GUID
+        val beneficiary = "01$bankBin$accountNumber" // Bank BIN + Account
+        val serviceCode = "QRIBFTTA" // Transfer to account
+
+        val merchantInfo = buildString {
+            append("0010$guid") // SubID 00: GUID
+            append("01${beneficiary.length.toString().padStart(2, '0')}$beneficiary") // SubID 01: Bank + Account
+            append("0208$serviceCode") // SubID 02: Service code
+        }
+        sb.append("38${merchantInfo.length.toString().padStart(2, '0')}$merchantInfo")
+
+        // Merchant Category Code
+        sb.append("52045812") // Generic services
+
+        // Transaction Currency (704 = VND)
+        sb.append("5303704")
+
+        // Transaction Amount
+        if (amount > 0) {
+            val amountStr = amount.toString()
+            sb.append("54${amountStr.length.toString().padStart(2, '0')}$amountStr")
+        }
+
+        // Country Code
+        sb.append("5802VN")
+
+        // Additional Data Field (ID 62) - Purpose of transaction
+        if (description.isNotEmpty()) {
+            val purposeField = "08${description.length.toString().padStart(2, '0')}$description"
+            sb.append("62${purposeField.length.toString().padStart(2, '0')}$purposeField")
+        }
+
+        // CRC placeholder (ID 63) - will be calculated
+        sb.append("6304")
+
+        // Calculate CRC16 CCITT
+        val crc = calculateCRC16(sb.toString())
+
+        return sb.toString() + crc
+    }
+
+    /**
+     * Calculate CRC16 CCITT for EMVCo QR
+     */
+    private fun calculateCRC16(data: String): String {
+        var crc = 0xFFFF
+        val polynomial = 0x1021
+
+        for (byte in data.toByteArray(Charsets.UTF_8)) {
+            var b = byte.toInt() and 0xFF
+            for (i in 0 until 8) {
+                val bit = ((b shr (7 - i)) and 1) == 1
+                val c15 = ((crc shr 15) and 1) == 1
+                crc = crc shl 1
+                if (c15 xor bit) {
+                    crc = crc xor polynomial
+                }
+            }
+        }
+        crc = crc and 0xFFFF
+        return crc.toString(16).uppercase().padStart(4, '0')
     }
 }
