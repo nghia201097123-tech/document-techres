@@ -1322,49 +1322,10 @@ object HybridBillPrintService {
             val content = builder.apply {
                 init()
 
-                // Header - Tên cửa hàng (nếu có)
-                if (storeName.isNotBlank()) {
-                    lineDouble(storeName, BitmapTextStyle(centerAlign = true))
-                    feed(1)
-                }
-
-                // Tiêu đề
-                doubleSeparator()
-                lineDouble("THANH TOÁN", BitmapTextStyle(centerAlign = true))
-                lineDouble("CHUYỂN KHOẢN", BitmapTextStyle(centerAlign = true))
-                doubleSeparator()
-
-                feed(1)
-
-                // Thông tin ngân hàng
-                lineCenter("Ngân hàng: ${bankAccount.bankName}", BitmapTextStyle(bold = true))
-                lineCenter("Số TK: ${bankAccount.accountNumber}")
-                lineCenter("Chủ TK: ${bankAccount.accountName}")
-
-                separator()
-
-                // Số tiền
-                lineCenter("SỐ TIỀN CẦN THANH TOÁN", BitmapTextStyle(bold = true))
-                lineDouble(formatCurrency(amount.toDouble()), BitmapTextStyle(centerAlign = true, bold = true))
-
-                separator()
-
-                // Nội dung chuyển khoản
-                lineCenter("Nội dung CK:")
-                lineCenter(transferContent, BitmapTextStyle(bold = true))
-
-                feed(1)
-
-                // QR Code thanh toán (tải từ SePayVN với logo)
-                lineCenter("QUÉT MÃ ĐỂ THANH TOÁN", BitmapTextStyle(bold = true))
+                // Chỉ in mã QR thanh toán (tiết kiệm giấy)
                 feed(1)
                 qrCode(qrUrl, size = 8)
-
-                feed(1)
-                separator()
-                lineCenter("Cảm ơn quý khách!")
-
-                feed(3)
+                feed(2)
                 cut()
             }.build()
 
