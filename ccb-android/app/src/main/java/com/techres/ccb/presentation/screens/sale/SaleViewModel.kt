@@ -3530,8 +3530,8 @@ class SaleViewModel @Inject constructor(
 
         var calculatedVatAmount = 0.0
 
-        // VAT của từng món - TÁCH RIÊNG món chính và toppings
-        orderItems.filter { !it.isComboChild }.forEach { item ->
+        // VAT của từng món - TÁCH RIÊNG món chính và toppings (chỉ tính món chưa huỷ)
+        orderItems.filter { !it.isComboChild && it.status != "cancelled" }.forEach { item ->
             // Parse toppings từ notes để tách riêng giá
             val parts = item.notes?.split(" | ") ?: emptyList()
             val variantsPart = parts.firstOrNull()?.takeIf { it.isNotEmpty() && !it.startsWith("Ghi chú:") } ?: ""
