@@ -421,6 +421,29 @@ fun PaymentDialog(
                                         )
                                     }
 
+                                    // Nút in mã QR thanh toán - đặt ngay dưới QR code
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    OutlinedButton(
+                                        onClick = onPrintPaymentQr,
+                                        enabled = !isPrintingQr,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1976D2))
+                                    ) {
+                                        if (isPrintingQr) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(14.dp),
+                                                strokeWidth = 2.dp,
+                                                color = Color(0xFF1976D2)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Đang in...", fontSize = 12.sp)
+                                        } else {
+                                            Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("In mã QR", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                    }
+
                                     Spacer(modifier = Modifier.height(12.dp))
 
                                     // Bank info
@@ -461,29 +484,6 @@ fun PaymentDialog(
                                                 Text("Nội dung:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                 Text(transferContent, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                                             }
-                                        }
-                                    }
-
-                                    // Nút in mã QR thanh toán
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedButton(
-                                        onClick = onPrintPaymentQr,
-                                        enabled = !isPrintingQr,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1976D2))
-                                    ) {
-                                        if (isPrintingQr) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = Color(0xFF1976D2)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Đang in...", fontSize = 13.sp)
-                                        } else {
-                                            Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("In mã QR thanh toán", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                         }
                                     }
                                 } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null) {
