@@ -863,22 +863,35 @@ class HybridBillBuilder(
     }
 
     /**
-     * In QR Code - sử dụng bitmap để tương thích với nhiều máy in hơn
+     * In QR Code - hỗ trợ cả URL hình ảnh và nội dung QR
+     * Nếu content là URL (https://qr.sepay.vn/...) -> tải hình ảnh từ URL
+     * Nếu không -> generate QR code bằng ZXing
      */
     fun qrCode(content: String, size: Int = 6): HybridBillBuilder {
         try {
-            // Generate QR code bitmap using ZXing
             val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300) // 60% of paper width
-            val qrBitmap = generateQrCodeBitmap(content, qrSize)
+
+            // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
+            val qrBitmap = if (content.startsWith("https://qr.sepay.vn/") ||
+                               content.startsWith("https://img.vietqr.io/")) {
+                // Tải hình ảnh QR từ URL
+                Log.d(TAG, "Downloading QR image from URL: $content")
+                downloadQrImageFromUrl(content, qrSize)
+            } else {
+                // Generate QR code bằng ZXing
+                Log.d(TAG, "Generating QR code with ZXing: $content")
+                generateQrCodeBitmap(content, qrSize)
+            }
+
             if (qrBitmap != null) {
                 buffer.write(EscPosCommands.ALIGN_CENTER)
-                buffer.write(EscPosCommands.printRasterBitmap(qrBitmap, qrSize))
+                buffer.write(EscPosCommands.printRasterBitmap(qrBitmap, qrBitmap.width))
                 buffer.write(EscPosCommands.ALIGN_LEFT)
                 Log.d(TAG, "QR code printed as bitmap: ${qrBitmap.width}x${qrBitmap.height}")
                 qrBitmap.recycle()
             } else {
                 // Fallback to ESC/POS QR command
-                Log.w(TAG, "QR bitmap generation failed, using ESC/POS command")
+                Log.w(TAG, "QR bitmap failed, using ESC/POS command")
                 buffer.write(EscPosCommands.ALIGN_CENTER)
                 buffer.write(EscPosCommands.printQRCode(content, size))
                 buffer.write(EscPosCommands.ALIGN_LEFT)
@@ -893,7 +906,51 @@ class HybridBillBuilder(
     }
 
     /**
-     * Generate QR code bitmap using ZXing library
+     * Tải hình ảnh QR từ URL (sepay.vn, vietqr.io)
+     * Hình ảnh đã có logo ngân hàng và VietQR branding
+     */
+    private fun downloadQrImageFromUrl(url: String, targetSize: Int): Bitmap? {
+        return try {
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            connection.doInput = true
+            connection.connect()
+
+            if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                val inputStream = connection.inputStream
+                val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                connection.disconnect()
+
+                if (originalBitmap != null) {
+                    // Scale bitmap to target size while maintaining aspect ratio
+                    val scale = targetSize.toFloat() / originalBitmap.width.coerceAtLeast(originalBitmap.height)
+                    val newWidth = (originalBitmap.width * scale).toInt()
+                    val newHeight = (originalBitmap.height * scale).toInt()
+                    val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+                    if (scaledBitmap != originalBitmap) {
+                        originalBitmap.recycle()
+                    }
+                    Log.d(TAG, "Downloaded QR image: ${scaledBitmap.width}x${scaledBitmap.height}")
+                    scaledBitmap
+                } else {
+                    Log.e(TAG, "Failed to decode QR image from URL")
+                    null
+                }
+            } else {
+                Log.e(TAG, "Failed to download QR image: HTTP ${connection.responseCode}")
+                connection.disconnect()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error downloading QR image: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Generate QR code bitmap using ZXing library (fallback)
      */
     private fun generateQrCodeBitmap(content: String, size: Int): Bitmap? {
         return try {

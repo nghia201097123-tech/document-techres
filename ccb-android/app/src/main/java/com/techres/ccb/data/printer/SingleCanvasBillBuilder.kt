@@ -432,20 +432,31 @@ class SingleCanvasBillBuilder(
                     }
                 }
                 is Segment.QrCodeSegment -> {
-                    // Render QR code as bitmap (more compatible than ESC/POS QR commands)
+                    // Render QR code - support both URL images and generated QR
                     try {
                         val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300) // 60% of paper width
-                        val qrBitmap = generateQrCodeBitmap(segment.content, qrSize)
+
+                        // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
+                        val qrBitmap = if (segment.content.startsWith("https://qr.sepay.vn/") ||
+                                           segment.content.startsWith("https://img.vietqr.io/")) {
+                            // Tải hình ảnh QR từ URL (có logo ngân hàng)
+                            Log.d(TAG, "Segment $index: Downloading QR image from URL")
+                            downloadQrImageFromUrl(segment.content, qrSize)
+                        } else {
+                            // Generate QR code bằng ZXing
+                            generateQrCodeBitmap(segment.content, qrSize)
+                        }
+
                         if (qrBitmap != null) {
                             // Center align before printing
                             output.write(EscPosCommands.ALIGN_CENTER)
-                            val qrData = EscPosCommands.printRasterBitmap(qrBitmap, qrSize)
+                            val qrData = EscPosCommands.printRasterBitmap(qrBitmap, qrBitmap.width)
                             output.write(qrData)
                             output.write(EscPosCommands.ALIGN_LEFT)
                             Log.d(TAG, "Segment $index: QRCode as bitmap (${qrBitmap.width}x${qrBitmap.height})")
                             qrBitmap.recycle()
                         } else {
-                            Log.e(TAG, "Segment $index: QRCode bitmap generation failed, trying ESC/POS command")
+                            Log.e(TAG, "Segment $index: QRCode bitmap failed, trying ESC/POS command")
                             // Fallback to ESC/POS command
                             output.write(EscPosCommands.ALIGN_CENTER)
                             output.write(EscPosCommands.printQRCode(segment.content, segment.size))
@@ -687,6 +698,50 @@ class SingleCanvasBillBuilder(
             bitmap
         } catch (e: Exception) {
             Log.e(TAG, "Failed to generate QR code bitmap: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Tải hình ảnh QR từ URL (sepay.vn, vietqr.io)
+     * Hình ảnh đã có logo ngân hàng và VietQR branding
+     */
+    private fun downloadQrImageFromUrl(url: String, targetSize: Int): Bitmap? {
+        return try {
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            connection.doInput = true
+            connection.connect()
+
+            if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                val inputStream = connection.inputStream
+                val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                connection.disconnect()
+
+                if (originalBitmap != null) {
+                    // Scale bitmap to target size while maintaining aspect ratio
+                    val scale = targetSize.toFloat() / originalBitmap.width.coerceAtLeast(originalBitmap.height)
+                    val newWidth = (originalBitmap.width * scale).toInt()
+                    val newHeight = (originalBitmap.height * scale).toInt()
+                    val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+                    if (scaledBitmap != originalBitmap) {
+                        originalBitmap.recycle()
+                    }
+                    Log.d(TAG, "Downloaded QR image: ${scaledBitmap.width}x${scaledBitmap.height}")
+                    scaledBitmap
+                } else {
+                    Log.e(TAG, "Failed to decode QR image from URL")
+                    null
+                }
+            } else {
+                Log.e(TAG, "Failed to download QR image: HTTP ${connection.responseCode}")
+                connection.disconnect()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error downloading QR image: ${e.message}")
             null
         }
     }
