@@ -100,11 +100,7 @@ export class PayosService {
 
     // Cache PayOS instance by clientId
     if (!this.payosInstances.has(payosClientId)) {
-      const payos = new PayOS({
-        clientId: payosClientId,
-        apiKey: payosApiKey,
-        checksumKey: payosChecksumKey,
-      });
+      const payos = new PayOS(payosClientId, payosApiKey, payosChecksumKey);
       this.payosInstances.set(payosClientId, payos);
       this.logger.log(`Created PayOS instance for clientId: ${payosClientId}`);
     }
@@ -126,7 +122,7 @@ export class PayosService {
         this.configService.get<string>('PAYOS_CANCEL_URL') ||
         'https://techres.vn/payment/cancel';
 
-      const paymentRequest = await payos.paymentRequests.create({
+      const paymentRequest = await payos.createPaymentLink({
         orderCode: dto.orderCode,
         amount: dto.amount,
         description: dto.description.substring(0, 25),
@@ -170,7 +166,7 @@ export class PayosService {
     const { payos } = await this.getPayOSInstance(branchId);
 
     try {
-      const paymentInfo = await payos.paymentRequests.get(orderCode);
+      const paymentInfo = await payos.getPaymentLinkInformation(orderCode);
 
       return {
         orderCode,
@@ -190,7 +186,7 @@ export class PayosService {
     const { payos } = await this.getPayOSInstance(branchId);
 
     try {
-      await payos.paymentRequests.cancel(orderCode, reason);
+      await payos.cancelPaymentLink(orderCode, reason);
 
       const session = this.paymentSessions.get(orderCode);
       if (session) {
@@ -224,7 +220,7 @@ export class PayosService {
           // Verify webhook signature using cached PayOS instance
           const payos = this.payosInstances.get(session.payosClientId);
           if (payos) {
-            const isValid = await payos.webhooks.verify(webhookData);
+            const isValid = payos.verifyPaymentWebhookData(webhookData);
             if (!isValid) {
               this.logger.warn('Invalid webhook signature');
               return { success: false };
