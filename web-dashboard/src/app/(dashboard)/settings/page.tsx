@@ -258,17 +258,37 @@ export default function SettingsPage() {
   };
 
   const handleSaveBank = async () => {
-    if (!filterBrandId || !bankForm.bankCode || !bankForm.accountNumber) return;
+    if (!filterBrandId) return;
+
+    // Validate based on payment partner type
+    const isPayOS = bankForm.paymentPartner === PaymentPartner.PAYOS;
+    if (isPayOS) {
+      if (!bankForm.payosClientId || !bankForm.payosApiKey || !bankForm.payosChecksumKey) return;
+    } else {
+      if (!bankForm.bankCode || !bankForm.accountNumber) return;
+    }
+
     setSavingBank(true);
     try {
+      // For PayOS, set placeholder values for required bank fields
+      const dataToSave = isPayOS
+        ? {
+            ...bankForm,
+            bankCode: "PAYOS",
+            bankName: "PayOS",
+            accountNumber: bankForm.payosClientId || "",
+            accountName: "PayOS Account",
+          }
+        : bankForm;
+
       if (bankDialog === "create") {
-        const newBank = await settingsService.createBankAccount(filterBrandId, bankForm);
+        const newBank = await settingsService.createBankAccount(filterBrandId, dataToSave);
         setBankAccounts((prev) => [...prev, newBank]);
-        toast({ title: "Thành công", description: "Đã thêm tài khoản ngân hàng" });
+        toast({ title: "Thành công", description: isPayOS ? "Đã thêm tài khoản PayOS" : "Đã thêm tài khoản ngân hàng" });
       } else if (editingBank) {
-        const updated = await settingsService.updateBankAccount(editingBank.id, bankForm);
+        const updated = await settingsService.updateBankAccount(editingBank.id, dataToSave);
         setBankAccounts((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
-        toast({ title: "Thành công", description: "Đã cập nhật tài khoản ngân hàng" });
+        toast({ title: "Thành công", description: isPayOS ? "Đã cập nhật tài khoản PayOS" : "Đã cập nhật tài khoản ngân hàng" });
       }
       setBankDialog(null);
     } catch (error: any) {
@@ -863,13 +883,13 @@ export default function SettingsPage() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {bankDialog === "create" ? "Thêm tài khoản ngân hàng" : "Sửa tài khoản ngân hàng"}
+              {bankDialog === "create" ? "Thêm tài khoản" : "Sửa tài khoản"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Payment Partner Selection */}
             <div className="space-y-2">
-              <Label>Đối tác thanh toán</Label>
+              <Label>Đối tác thanh toán *</Label>
               <Select
                 value={bankForm.paymentPartner || PaymentPartner.NONE}
                 onValueChange={(value) => setBankForm({ ...bankForm, paymentPartner: value as PaymentPartner })}
@@ -922,72 +942,83 @@ export default function SettingsPage() {
                     type="password"
                   />
                 </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={bankForm.isPrimary || false}
+                    onCheckedChange={(checked) => setBankForm({ ...bankForm, isPrimary: checked })}
+                  />
+                  <Label>Cài đặt tài khoản này làm mặc định</Label>
+                </div>
               </div>
             )}
 
-            {/* Bank Selection - Only show when NOT using PayOS or always show */}
-            <div className="space-y-2">
-              <Label>Ngân hàng *</Label>
-              <Select
-                value={bankForm.bankCode}
-                onValueChange={(value) => {
-                  const bank = VIETNAM_BANKS.find((b) => b.code === value);
-                  setBankForm({
-                    ...bankForm,
-                    bankCode: value,
-                    bankName: bank?.name || "",
-                    bankBin: bank?.bin,
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn ngân hàng" />
-                </SelectTrigger>
-                <SelectContent>
-                  {VIETNAM_BANKS.map((bank) => (
-                    <SelectItem key={bank.code} value={bank.code}>
-                      {bank.name} ({bank.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Số tài khoản *</Label>
-              <Input
-                value={bankForm.accountNumber}
-                onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
-                placeholder="VD: 1234567890"
-                className="font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Tên chủ tài khoản *</Label>
-              <Input
-                value={bankForm.accountName}
-                onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
-                placeholder="VD: NGUYEN VAN A"
-                className="uppercase"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Mẫu nội dung chuyển khoản</Label>
-              <Input
-                value={bankForm.transferTemplate || ""}
-                onChange={(e) => setBankForm({ ...bankForm, transferTemplate: e.target.value })}
-                placeholder="VD: TT {order_code}"
-              />
-              <p className="text-xs text-muted-foreground">
-                Sử dụng {"{order_code}"} để thay thế mã đơn hàng
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={bankForm.isPrimary || false}
-                onCheckedChange={(checked) => setBankForm({ ...bankForm, isPrimary: checked })}
-              />
-              <Label>Cài đặt tài khoản này làm mặc định</Label>
-            </div>
+            {/* Bank fields - Only show when NOT using PayOS */}
+            {bankForm.paymentPartner !== PaymentPartner.PAYOS && (
+              <>
+                <div className="space-y-2">
+                  <Label>Ngân hàng *</Label>
+                  <Select
+                    value={bankForm.bankCode}
+                    onValueChange={(value) => {
+                      const bank = VIETNAM_BANKS.find((b) => b.code === value);
+                      setBankForm({
+                        ...bankForm,
+                        bankCode: value,
+                        bankName: bank?.name || "",
+                        bankBin: bank?.bin,
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn ngân hàng" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VIETNAM_BANKS.map((bank) => (
+                        <SelectItem key={bank.code} value={bank.code}>
+                          {bank.name} ({bank.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Số tài khoản *</Label>
+                  <Input
+                    value={bankForm.accountNumber}
+                    onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                    placeholder="VD: 1234567890"
+                    className="font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tên chủ tài khoản *</Label>
+                  <Input
+                    value={bankForm.accountName}
+                    onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
+                    placeholder="VD: NGUYEN VAN A"
+                    className="uppercase"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mẫu nội dung chuyển khoản</Label>
+                  <Input
+                    value={bankForm.transferTemplate || ""}
+                    onChange={(e) => setBankForm({ ...bankForm, transferTemplate: e.target.value })}
+                    placeholder="VD: TT {order_code}"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sử dụng {"{order_code}"} để thay thế mã đơn hàng
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={bankForm.isPrimary || false}
+                    onCheckedChange={(checked) => setBankForm({ ...bankForm, isPrimary: checked })}
+                  />
+                  <Label>Cài đặt tài khoản này làm mặc định</Label>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBankDialog(null)}>
@@ -997,14 +1028,13 @@ export default function SettingsPage() {
               onClick={handleSaveBank}
               disabled={
                 savingBank ||
-                !bankForm.bankCode ||
-                !bankForm.accountNumber ||
-                (bankForm.paymentPartner === PaymentPartner.PAYOS &&
-                  (!bankForm.payosClientId || !bankForm.payosApiKey || !bankForm.payosChecksumKey))
+                (bankForm.paymentPartner === PaymentPartner.PAYOS
+                  ? !bankForm.payosClientId || !bankForm.payosApiKey || !bankForm.payosChecksumKey
+                  : !bankForm.bankCode || !bankForm.accountNumber)
               }
             >
               {savingBank && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {bankDialog === "create" ? "Thêm" : "Lưu"}
+              {bankDialog === "create" ? "Lưu lại" : "Lưu"}
             </Button>
           </DialogFooter>
         </DialogContent>
