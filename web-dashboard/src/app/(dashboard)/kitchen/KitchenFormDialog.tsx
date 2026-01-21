@@ -205,6 +205,9 @@ const KitchenFormDialog = React.memo(function KitchenFormDialog({
     return (
       <Dialog open={open} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Đang tải...</DialogTitle>
+          </DialogHeader>
           <div className="flex items-center justify-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
