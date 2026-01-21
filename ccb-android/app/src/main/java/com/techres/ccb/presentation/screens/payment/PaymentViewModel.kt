@@ -4,11 +4,15 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techres.ccb.data.local.dao.BankAccountDao
+import com.techres.ccb.data.local.dao.BillPrinterConfigDao
+import com.techres.ccb.data.local.dao.BranchDao
 import com.techres.ccb.data.local.dao.CouponDao
 import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.data.local.entity.CouponEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
+import com.techres.ccb.data.printer.HybridBillPrintService
+import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.util.AppliedCouponInfo
@@ -50,7 +54,10 @@ data class PaymentUiState(
     val vatAmount: Double = 0.0,
     val grandTotal: Double = 0.0,
     // Bank account for transfer payment
-    val bankAccount: BankAccountEntity? = null
+    val bankAccount: BankAccountEntity? = null,
+    // QR printing state
+    val isPrintingQr: Boolean = false,
+    val printQrMessage: String? = null
 )
 
 @HiltViewModel
@@ -58,7 +65,9 @@ class PaymentViewModel @Inject constructor(
     private val orderRepository: OrderRepository,
     private val couponDao: CouponDao,
     private val bankAccountDao: BankAccountDao,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val billPrinterConfigDao: BillPrinterConfigDao,
+    private val branchDao: BranchDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PaymentUiState())
@@ -320,5 +329,80 @@ class PaymentViewModel @Inject constructor(
 
     private fun formatPrice(amount: Double): String {
         return String.format(Locale.US, "%,.0f đ", amount)
+    }
+
+    /**
+     * In riêng mã QR thanh toán cho khách hàng
+     */
+    fun printPaymentQrCode() {
+        val bankAccount = _uiState.value.bankAccount
+        val order = _uiState.value.order
+        val grandTotal = _uiState.value.grandTotal
+
+        if (bankAccount == null) {
+            _uiState.value = _uiState.value.copy(
+                printQrMessage = "Chưa cấu hình tài khoản ngân hàng"
+            )
+            return
+        }
+
+        if (order == null || grandTotal <= 0) {
+            _uiState.value = _uiState.value.copy(
+                printQrMessage = "Không có đơn hàng để in"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isPrintingQr = true, printQrMessage = null)
+
+            try {
+                // Lấy printer config
+                val printerConfig = billPrinterConfigDao.getBillPrinterConfig()
+                if (printerConfig == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isPrintingQr = false,
+                        printQrMessage = "Chưa cấu hình máy in bill"
+                    )
+                    return@launch
+                }
+
+                // Lấy tên cửa hàng
+                val branchId = authRepository.getBranchId()
+                val branch = branchId?.let { branchDao.getBranchById(it) }
+                val storeName = branch?.name ?: ""
+
+                // In QR thanh toán
+                val result = HybridBillPrintService.printPaymentQrCode(
+                    printerConfig = printerConfig,
+                    bankAccount = bankAccount,
+                    amount = grandTotal.toLong(),
+                    orderNumber = order.displayNumber,
+                    storeName = storeName,
+                    copies = 1
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isPrintingQr = false,
+                    printQrMessage = when (result) {
+                        is PrinterResult.Success -> "In QR thanh toán thành công!"
+                        is PrinterResult.Error -> result.message
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("PaymentViewModel", "Error printing QR code", e)
+                _uiState.value = _uiState.value.copy(
+                    isPrintingQr = false,
+                    printQrMessage = "Lỗi in: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Xóa thông báo in QR
+     */
+    fun clearPrintQrMessage() {
+        _uiState.value = _uiState.value.copy(printQrMessage = null)
     }
 }

@@ -1263,4 +1263,190 @@ object HybridBillPrintService {
             else -> null
         }
     }
+
+    /**
+     * In riêng mã QR thanh toán cho khách hàng
+     *
+     * Phiếu QR thanh toán gồm:
+     * - Tiêu đề "THANH TOÁN CHUYỂN KHOẢN"
+     * - Thông tin ngân hàng
+     * - Số tiền cần thanh toán
+     * - Mã QR thanh toán (có logo ngân hàng từ SePayVN)
+     * - Nội dung chuyển khoản
+     */
+    suspend fun printPaymentQrCode(
+        printerConfig: BillPrinterConfigEntity,
+        bankAccount: BankAccountEntity,
+        amount: Long,
+        orderNumber: String,
+        storeName: String = "",
+        copies: Int = 1
+    ): PrinterResult {
+        return withContext(Dispatchers.IO) {
+            Log.d(TAG, "=== PRINT PAYMENT QR CODE ===")
+            Log.d(TAG, "Bank: ${bankAccount.bankName} - ${bankAccount.accountNumber}")
+            Log.d(TAG, "Amount: $amount, Order: $orderNumber")
+
+            // Tạo nội dung chuyển khoản
+            val transferContent = bankAccount.generateTransferContent(orderNumber)
+
+            // Tạo URL QR code từ SePayVN
+            val qrUrl = generateVietQrContent(
+                bankCode = bankAccount.bankCode,
+                accountNumber = bankAccount.accountNumber,
+                amount = amount,
+                description = transferContent,
+                accountName = bankAccount.accountName
+            )
+            Log.d(TAG, "QR URL: $qrUrl")
+
+            // Build phiếu QR thanh toán
+            val builder = HybridBillBuilder(
+                paperWidth = printerConfig.paperWidth,
+                useBitmapMode = true,
+                useRasterBitmap = printerConfig.useRasterBitmap,
+                fontScale = printerConfig.fontScale,
+                lineSpacing = printerConfig.lineSpacing
+            )
+
+            val content = builder.apply {
+                init()
+
+                // Header - Tên cửa hàng (nếu có)
+                if (storeName.isNotBlank()) {
+                    lineDouble(storeName, BitmapTextStyle(centerAlign = true))
+                    feed(1)
+                }
+
+                // Tiêu đề
+                doubleSeparator()
+                lineDouble("THANH TOÁN", BitmapTextStyle(centerAlign = true))
+                lineDouble("CHUYỂN KHOẢN", BitmapTextStyle(centerAlign = true))
+                doubleSeparator()
+
+                feed(1)
+
+                // Thông tin ngân hàng
+                lineCenter("Ngân hàng: ${bankAccount.bankName}", BitmapTextStyle(bold = true))
+                lineCenter("Số TK: ${bankAccount.accountNumber}")
+                lineCenter("Chủ TK: ${bankAccount.accountName}")
+
+                separator()
+
+                // Số tiền
+                lineCenter("SỐ TIỀN CẦN THANH TOÁN", BitmapTextStyle(bold = true))
+                lineDouble(formatCurrency(amount.toDouble()), BitmapTextStyle(centerAlign = true, bold = true))
+
+                separator()
+
+                // Nội dung chuyển khoản
+                lineCenter("Nội dung CK:")
+                lineCenter(transferContent, BitmapTextStyle(bold = true))
+
+                feed(1)
+
+                // QR Code thanh toán (tải từ SePayVN với logo)
+                lineCenter("QUÉT MÃ ĐỂ THANH TOÁN", BitmapTextStyle(bold = true))
+                feed(1)
+                qrCode(qrUrl, size = 8)
+
+                feed(1)
+                separator()
+                lineCenter("Cảm ơn quý khách!")
+
+                feed(3)
+                cut()
+            }.build()
+
+            // In phiếu
+            if (printerConfig.connectionType == "sunmi") {
+                // Sunmi built-in printer
+                val adapter = sunmiAdapter
+                if (adapter == null) {
+                    return@withContext PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
+                }
+
+                repeat(copies) { copy ->
+                    try {
+                        adapter.printRaw(content)
+                        if (copy < copies - 1) delay(500)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Sunmi print error: ${e.message}")
+                        return@withContext PrinterResult.Error("Lỗi in Sunmi: ${e.message}")
+                    }
+                }
+                PrinterResult.Success("In QR thanh toán thành công!")
+            } else {
+                // Network printer
+                val ip = printerConfig.printerIp
+                val port = printerConfig.printerPort
+
+                if (ip.isNullOrBlank()) {
+                    return@withContext PrinterResult.Error("Chưa cấu hình IP máy in")
+                }
+
+                repeat(copies) { copy ->
+                    val result = printToNetworkPrinter(ip, port, content)
+                    if (result is PrinterResult.Error) {
+                        return@withContext result
+                    }
+                    if (copy < copies - 1) delay(500)
+                }
+                PrinterResult.Success("In QR thanh toán thành công!")
+            }
+        }
+    }
+
+    /**
+     * In QR thanh toán qua network printer
+     */
+    private suspend fun printToNetworkPrinter(
+        ip: String,
+        port: Int,
+        content: ByteArray,
+        maxRetries: Int = 3
+    ): PrinterResult {
+        var lastError: String? = null
+
+        repeat(maxRetries) { attempt ->
+            var socket: Socket? = null
+            var outputStream: OutputStream? = null
+            try {
+                socket = Socket().apply {
+                    reuseAddress = true
+                    keepAlive = true
+                    tcpNoDelay = true
+                    setSoLinger(true, 2)
+                }
+                socket.connect(InetSocketAddress(ip, port), 5000)
+
+                outputStream = socket.getOutputStream()
+                outputStream.write(content)
+                outputStream.flush()
+
+                delay(300)
+
+                return PrinterResult.Success("In thành công!")
+
+            } catch (e: Exception) {
+                lastError = e.message
+                Log.e(TAG, "Print attempt ${attempt + 1} failed: ${e.message}")
+
+                if (attempt < maxRetries - 1) {
+                    delay(500L * (attempt + 1))
+                }
+            } finally {
+                try {
+                    outputStream?.flush()
+                    socket?.shutdownOutput()
+                    outputStream?.close()
+                    socket?.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Close error: ${e.message}")
+                }
+            }
+        }
+
+        return PrinterResult.Error("Lỗi in: $lastError")
+    }
 }

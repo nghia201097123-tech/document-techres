@@ -331,8 +331,27 @@ fun PaymentScreen(
                 BankTransferSection(
                     grandTotal = uiState.grandTotal,
                     orderNumber = uiState.order?.orderNumber ?: "",
-                    bankAccount = uiState.bankAccount
+                    bankAccount = uiState.bankAccount,
+                    isPrintingQr = uiState.isPrintingQr,
+                    onPrintQrCode = { viewModel.printPaymentQrCode() }
                 )
+
+                // Hiển thị thông báo in QR
+                uiState.printQrMessage?.let { message ->
+                    LaunchedEffect(message) {
+                        kotlinx.coroutines.delay(3000)
+                        viewModel.clearPrintQrMessage()
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        fontSize = 14.sp,
+                        color = if (message.contains("thành công")) Success else MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
@@ -467,7 +486,9 @@ private fun formatPrice(amount: Double): String {
 private fun BankTransferSection(
     grandTotal: Double,
     orderNumber: String,
-    bankAccount: BankAccountEntity?
+    bankAccount: BankAccountEntity?,
+    isPrintingQr: Boolean = false,
+    onPrintQrCode: () -> Unit = {}
 ) {
     val clipboardManager = LocalClipboardManager.current
     var showCopiedMessage by remember { mutableStateOf(false) }
@@ -582,6 +603,32 @@ private fun BankTransferSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Nút in QR code
+            OutlinedButton(
+                onClick = onPrintQrCode,
+                enabled = !isPrintingQr && bankAccount != null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isPrintingQr) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Đang in...")
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Print,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("In mã QR thanh toán")
+                }
+            }
         }
     }
 }
