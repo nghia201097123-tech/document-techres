@@ -660,11 +660,15 @@ object HybridBillPrintService {
                             lineCenter("Nội dung: $transferContent")
                             feed(1)
                             // Tạo VietQR content
+                            val bankBin = paymentBankAccount.bankBin
+                                ?: getBankBinFromCode(paymentBankAccount.bankCode)
+                                ?: paymentBankAccount.bankCode
                             val vietQrContent = generateVietQrContent(
-                                bankBin = paymentBankAccount.bankBin ?: paymentBankAccount.bankCode,
+                                bankBin = bankBin,
                                 accountNumber = paymentBankAccount.accountNumber,
                                 amount = billData.totalAmount.toLong(),
-                                description = transferContent
+                                description = transferContent,
+                                accountName = paymentBankAccount.accountName
                             )
                             qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
                         } else {
@@ -1084,11 +1088,15 @@ object HybridBillPrintService {
                             lineCenter("Nội dung: $transferContent")
                             feed(1)
                             // Tạo VietQR content
+                            val bankBin = paymentBankAccount.bankBin
+                                ?: getBankBinFromCode(paymentBankAccount.bankCode)
+                                ?: paymentBankAccount.bankCode
                             val vietQrContent = generateVietQrContent(
-                                bankBin = paymentBankAccount.bankBin ?: paymentBankAccount.bankCode,
+                                bankBin = bankBin,
                                 accountNumber = paymentBankAccount.accountNumber,
                                 amount = billData.totalAmount.toLong(),
-                                description = transferContent
+                                description = transferContent,
+                                accountName = paymentBankAccount.accountName
                             )
                             qrCode(vietQrContent, size = 8) // QR thanh toán cần lớn hơn để dễ quét
                         } else {
@@ -1158,116 +1166,101 @@ object HybridBillPrintService {
     }
 
     /**
-     * Generate VietQR EMVCo content for payment QR code
+     * Generate VietQR content for payment QR code
      *
-     * VietQR format: https://www.vietqr.io/emvco-qr-code-specifications
-     * Simplified format để máy in có thể render QR code
+     * Sử dụng VietQR URL format - đơn giản và tương thích với tất cả app ngân hàng
+     * Khi scan QR, app ngân hàng sẽ mở URL và tự động điền thông tin chuyển khoản
      *
-     * @param bankBin BIN code của ngân hàng (970436 cho Vietcombank, etc.)
+     * @param bankBin BIN code của ngân hàng (970407 cho Techcombank, 970436 cho Vietcombank, etc.)
      * @param accountNumber Số tài khoản
      * @param amount Số tiền (VND)
      * @param description Nội dung chuyển khoản
+     * @param accountName Tên chủ tài khoản (optional)
      */
     private fun generateVietQrContent(
         bankBin: String,
         accountNumber: String,
         amount: Long,
-        description: String
+        description: String,
+        accountName: String = ""
     ): String {
-        // Sử dụng VietQR URL format để dễ scan bằng app ngân hàng
-        // Format: https://img.vietqr.io/image/{BANK_ID}-{ACCOUNT_NO}-{TEMPLATE}.png?amount={AMOUNT}&addInfo={DESC}
-        // Tuy nhiên, máy in QR chỉ có thể in text content, không phải URL
-        // Nên sử dụng EMVCo format
+        // Sử dụng VietQR URL format - tương thích với tất cả app ngân hàng Việt Nam
+        // Format: https://img.vietqr.io/image/{BANK_BIN}-{ACCOUNT}-print.png?amount={AMOUNT}&addInfo={DESC}&accountName={NAME}
 
-        // EMVCo QR format cho VietQR:
-        // 00 - Payload Format Indicator (02 characters)
-        // 01 - Point of Initiation Method (02 = dynamic)
-        // 38 - Merchant Account Information (VietQR specific)
-        //   - 00 - GUID (A000000727)
-        //   - 01 - Beneficiary Organization (bank BIN + account)
-        //   - 02 - Service Code (QRIBFTTA = transfer to account)
-        // 52 - Merchant Category Code
-        // 53 - Transaction Currency (704 = VND)
-        // 54 - Transaction Amount
-        // 58 - Country Code (VN)
-        // 62 - Additional Data Field
-        //   - 08 - Purpose of Transaction
-        // 63 - CRC
-
-        // Simplified: Sử dụng VietQR deep link format mà các app ngân hàng có thể đọc
-        // Format tương thích với NAPAS VietQR
-        val encodedDesc = description.replace(" ", "%20")
-
-        // Build EMVCo QR content
-        val sb = StringBuilder()
-
-        // Payload Format Indicator - mandatory
-        sb.append("000201") // ID 00, length 02, value "01"
-
-        // Point of Initiation Method - 12 for dynamic QR
-        sb.append("010212") // ID 01, length 02, value "12" (dynamic)
-
-        // Merchant Account Information for VietQR (ID 38)
-        val guid = "A000000727" // NAPAS GUID
-        val beneficiary = "01$bankBin$accountNumber" // Bank BIN + Account
-        val serviceCode = "QRIBFTTA" // Transfer to account
-
-        val merchantInfo = buildString {
-            append("0010$guid") // SubID 00: GUID
-            append("01${beneficiary.length.toString().padStart(2, '0')}$beneficiary") // SubID 01: Bank + Account
-            append("0208$serviceCode") // SubID 02: Service code
-        }
-        sb.append("38${merchantInfo.length.toString().padStart(2, '0')}$merchantInfo")
-
-        // Merchant Category Code
-        sb.append("52045812") // Generic services
-
-        // Transaction Currency (704 = VND)
-        sb.append("5303704")
-
-        // Transaction Amount
-        if (amount > 0) {
-            val amountStr = amount.toString()
-            sb.append("54${amountStr.length.toString().padStart(2, '0')}$amountStr")
+        val encodedDesc = try {
+            java.net.URLEncoder.encode(description, "UTF-8")
+        } catch (e: Exception) {
+            description.replace(" ", "%20")
         }
 
-        // Country Code
-        sb.append("5802VN")
-
-        // Additional Data Field (ID 62) - Purpose of transaction
-        if (description.isNotEmpty()) {
-            val purposeField = "08${description.length.toString().padStart(2, '0')}$description"
-            sb.append("62${purposeField.length.toString().padStart(2, '0')}$purposeField")
+        val encodedName = try {
+            java.net.URLEncoder.encode(accountName, "UTF-8")
+        } catch (e: Exception) {
+            accountName.replace(" ", "%20")
         }
 
-        // CRC placeholder (ID 63) - will be calculated
-        sb.append("6304")
+        // Xây dựng URL
+        val urlBuilder = StringBuilder()
+        urlBuilder.append("https://img.vietqr.io/image/")
+        urlBuilder.append(bankBin)
+        urlBuilder.append("-")
+        urlBuilder.append(accountNumber)
+        urlBuilder.append("-print.png")
+        urlBuilder.append("?amount=")
+        urlBuilder.append(amount)
+        urlBuilder.append("&addInfo=")
+        urlBuilder.append(encodedDesc)
 
-        // Calculate CRC16 CCITT
-        val crc = calculateCRC16(sb.toString())
+        if (accountName.isNotBlank()) {
+            urlBuilder.append("&accountName=")
+            urlBuilder.append(encodedName)
+        }
 
-        return sb.toString() + crc
+        return urlBuilder.toString()
     }
 
     /**
-     * Calculate CRC16 CCITT for EMVCo QR
+     * Map bank code to VietQR BIN code
+     * BIN code được sử dụng trong VietQR URL format
+     *
+     * Danh sách BIN code phổ biến: https://www.vietqr.io/danh-sach-ngan-hang
      */
-    private fun calculateCRC16(data: String): String {
-        var crc = 0xFFFF
-        val polynomial = 0x1021
+    private fun getBankBinFromCode(bankCode: String): String? {
+        return when (bankCode.uppercase()) {
+            // Ngân hàng thương mại cổ phần
+            "TCB", "TECHCOMBANK" -> "970407"
+            "VCB", "VIETCOMBANK" -> "970436"
+            "BIDV" -> "970418"
+            "VTB", "VIETINBANK" -> "970415"
+            "ACB" -> "970416"
+            "MB", "MBBANK", "MBB" -> "970422"
+            "TPB", "TPBANK" -> "970423"
+            "STB", "SACOMBANK" -> "970403"
+            "HDB", "HDBANK" -> "970437"
+            "VPB", "VPBANK" -> "970432"
+            "SHB" -> "970443"
+            "MSB", "MARITIMEBANK" -> "970426"
+            "EIB", "EXIMBANK" -> "970431"
+            "LPB", "LIENVIETPOSTBANK" -> "970449"
+            "OCB" -> "970448"
+            "NAB", "NAMABANK" -> "970428"
+            "NCB" -> "970419"
+            "SEAB", "SEABANK" -> "970440"
+            "ABB", "ABBANK" -> "970425"
+            "BAB", "BACABANK" -> "970409"
+            "PGB", "PGBANK" -> "970430"
+            "VIB" -> "970441"
+            "KLB", "KIENLONGBANK" -> "970452"
+            "SCB" -> "970429"
+            "VBSP" -> "970405"
+            "AGRIBANK", "AGR" -> "970405"
 
-        for (byte in data.toByteArray(Charsets.UTF_8)) {
-            var b = byte.toInt() and 0xFF
-            for (i in 0 until 8) {
-                val bit = ((b shr (7 - i)) and 1) == 1
-                val c15 = ((crc shr 15) and 1) == 1
-                crc = crc shl 1
-                if (c15 xor bit) {
-                    crc = crc xor polynomial
-                }
-            }
+            // Ví điện tử
+            "MOMO" -> "momo"
+            "ZALOPAY" -> "zalopay"
+            "VNPAY" -> "vnpay"
+
+            else -> null
         }
-        crc = crc and 0xFFFF
-        return crc.toString(16).uppercase().padStart(4, '0')
     }
 }
