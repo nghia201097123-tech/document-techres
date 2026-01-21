@@ -34,10 +34,12 @@ fun LabelPrinterConfigScreen(
     viewModel: LabelPrinterConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var selectedPrinter by remember { mutableStateOf<KitchenEntity?>(null) }
-    var showTestPrintDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var printingPrinterId by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -45,7 +47,8 @@ fun LabelPrinterConfigScreen(
                 title = { Text("Máy in Tem") },
                 onBack = onNavigateBack
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -150,16 +153,53 @@ fun LabelPrinterConfigScreen(
                         items(uiState.labelPrinters) { printer ->
                             LabelPrinterCard(
                                 printer = printer,
-                                onTestPrint = {
+                                isPrinting = printingPrinterId == printer.id,
+                                onConfigurePrinter = {
                                     selectedPrinter = printer
-                                    showTestPrintDialog = true
+                                    showSettingsDialog = true
+                                },
+                                onTestPrint = {
+                                    if (printingPrinterId != null) return@LabelPrinterCard
+                                    printingPrinterId = printer.id
+
+                                    coroutineScope.launch {
+                                        try {
+                                            val testLabel = LabelPrintService.LabelData(
+                                                itemName = "TEM THỬ - TEST LABEL",
+                                                quantity = 1,
+                                                orderNumber = "TEST-001",
+                                                dailyOrderNumber = 1,
+                                                tableName = "Bàn Test",
+                                                pagerNumber = 99,
+                                                orderTime = Date(),
+                                                toppings = listOf("Topping 1", "Topping 2"),
+                                                note = "Đây là tem in thử",
+                                                storeName = printer.labelStoreName,
+                                                labelIndex = 1,
+                                                totalLabels = 1
+                                            )
+
+                                            val result = LabelPrintService.printLabels(
+                                                kitchen = printer,
+                                                labelData = testLabel
+                                            )
+
+                                            when (result) {
+                                                is PrinterResult.Success -> {
+                                                    snackbarHostState.showSnackbar("In tem thử thành công!")
+                                                }
+                                                is PrinterResult.Error -> {
+                                                    snackbarHostState.showSnackbar("Lỗi: ${result.message}")
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            snackbarHostState.showSnackbar("Lỗi: ${e.message}")
+                                        }
+                                        printingPrinterId = null
+                                    }
                                 },
                                 onToggleActive = { isActive ->
                                     viewModel.toggleActiveStatus(printer.id, isActive)
-                                },
-                                onSettings = {
-                                    selectedPrinter = printer
-                                    showSettingsDialog = true
                                 }
                             )
                         }
@@ -171,14 +211,6 @@ fun LabelPrinterConfigScreen(
                 }
             }
         }
-    }
-
-    // Test print dialog
-    if (showTestPrintDialog && selectedPrinter != null) {
-        LabelTestPrintDialog(
-            printer = selectedPrinter!!,
-            onDismiss = { showTestPrintDialog = false }
-        )
     }
 
     // Settings dialog
@@ -197,9 +229,10 @@ fun LabelPrinterConfigScreen(
 @Composable
 private fun LabelPrinterCard(
     printer: KitchenEntity,
+    isPrinting: Boolean = false,
+    onConfigurePrinter: () -> Unit,
     onTestPrint: () -> Unit,
-    onToggleActive: (Boolean) -> Unit,
-    onSettings: () -> Unit
+    onToggleActive: (Boolean) -> Unit
 ) {
     val color = Color(0xFF4CAF50)
 
@@ -255,15 +288,6 @@ private fun LabelPrinterCard(
                         text = "Máy in tem",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-
-                // Settings button
-                IconButton(onClick = onSettings) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = "Cài đặt",
-                        tint = color
                     )
                 }
 
@@ -338,23 +362,52 @@ private fun LabelPrinterCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Test print button
-            Button(
-                onClick = onTestPrint,
+            // Action buttons - same layout as KitchenPrinterCard
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = printer.printerIp != null,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = color
-                )
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    Icons.Default.Print,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("In thử tem")
+                // Configure button
+                OutlinedButton(
+                    onClick = onConfigurePrinter,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Cấu hình")
+                }
+
+                // Test print button - enabled when IP is configured and not printing
+                Button(
+                    onClick = onTestPrint,
+                    modifier = Modifier.weight(1f),
+                    enabled = !printer.printerIp.isNullOrBlank() && !isPrinting,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = color
+                    )
+                ) {
+                    if (isPrinting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Print,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (isPrinting) "Đang in..." else "In thử")
+                }
             }
         }
     }
@@ -380,127 +433,6 @@ private fun LabelPrinterInfoRow(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurface
         )
     }
-}
-
-@Composable
-private fun LabelTestPrintDialog(
-    printer: KitchenEntity,
-    onDismiss: () -> Unit
-) {
-    var printStatus by remember { mutableStateOf<String?>(null) }
-    var isPrinting by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Print,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("In thử tem")
-            }
-        },
-        text = {
-            Column {
-                Text("Máy in: ${printer.name}")
-                Text("IP: ${printer.printerIp}:${printer.printerPort}")
-                Text("Protocol: ${printer.getPrinterProtocolEnum().displayName}")
-                Text("Kích thước: ${printer.getLabelSize().displayName}")
-
-                if (isPrinting) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Đang in tem thử...")
-                    }
-                }
-
-                printStatus?.let { status ->
-                    Spacer(modifier = Modifier.height(16.dp))
-                    val isSuccess = status.contains("thành công", ignoreCase = true)
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSuccess) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
-                                contentDescription = null,
-                                tint = if (isSuccess) Color(0xFF4CAF50) else Color(0xFFF44336)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = status,
-                                color = if (isSuccess) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            val coroutineScope = rememberCoroutineScope()
-            Button(
-                onClick = {
-                    isPrinting = true
-                    printStatus = null
-
-                    // Test print label với đúng cấu trúc LabelData
-                    val testLabel = LabelPrintService.LabelData(
-                        itemName = "TEM THỬ - TEST LABEL",
-                        quantity = 1,
-                        orderNumber = "TEST-001",
-                        dailyOrderNumber = 1,
-                        tableName = "Bàn Test",
-                        pagerNumber = 99,
-                        orderTime = Date(),
-                        toppings = listOf("Topping 1", "Topping 2"),
-                        note = "Đây là tem in thử",
-                        storeName = printer.labelStoreName,
-                        labelIndex = 1,
-                        totalLabels = 1
-                    )
-
-                    coroutineScope.launch {
-                        try {
-                            val result = LabelPrintService.printLabels(
-                                kitchen = printer,
-                                labelData = testLabel
-                            )
-
-                            printStatus = when (result) {
-                                is PrinterResult.Success -> "In tem thành công!"
-                                is PrinterResult.Error -> "Lỗi: ${result.message}"
-                            }
-                        } catch (e: Exception) {
-                            printStatus = "Lỗi: ${e.message}"
-                        }
-                        isPrinting = false
-                    }
-                },
-                enabled = !isPrinting,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50)
-                )
-            ) {
-                Text("In thử")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Đóng")
-            }
-        }
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
