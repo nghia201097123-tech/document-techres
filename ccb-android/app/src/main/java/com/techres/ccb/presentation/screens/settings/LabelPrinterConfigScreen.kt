@@ -444,7 +444,12 @@ private fun LabelPrinterSettingsDialog(
 ) {
     val color = Color(0xFF4CAF50)
 
-    // Local state for editable fields
+    // Printer connection state
+    var printerProtocol by remember { mutableStateOf(printer.printerProtocol) }
+    var printerIp by remember { mutableStateOf(printer.printerIp ?: "") }
+    var printerPort by remember { mutableStateOf(printer.printerPort.toString()) }
+
+    // Label display options
     var labelPrintPrice by remember { mutableStateOf(printer.labelPrintPrice) }
     var labelPrintStoreName by remember { mutableStateOf(printer.labelPrintStoreName) }
     var labelPrintOrderNumber by remember { mutableStateOf(printer.labelPrintOrderNumber) }
@@ -452,10 +457,25 @@ private fun LabelPrinterSettingsDialog(
     var labelPrintTime by remember { mutableStateOf(printer.labelPrintTime) }
     var labelStoreName by remember { mutableStateOf(printer.labelStoreName ?: "") }
     var labelReverse by remember { mutableStateOf(printer.labelReverse) }
-    var labelWidthMm by remember { mutableStateOf(printer.labelWidthMm.toString()) }
-    var labelHeightMm by remember { mutableStateOf(printer.labelHeightMm.toString()) }
+
+    // Label size - use LabelSize for dropdown
+    var selectedLabelSize by remember {
+        mutableStateOf(
+            com.techres.ccb.data.local.entity.LabelSize.ALL_SIZES.find {
+                it.widthMm == printer.labelWidthMm && it.heightMm == printer.labelHeightMm
+            } ?: com.techres.ccb.data.local.entity.LabelSize.SIZE_72x30
+        )
+    }
     var labelGapMm by remember { mutableStateOf(printer.labelGapMm.toString()) }
+
+    // Font and spacing
     var labelFontScale by remember { mutableStateOf(printer.labelFontScale) }
+    var labelMaxToppings by remember { mutableStateOf(printer.labelMaxToppings.toString()) }
+    var labelLineSpacing by remember { mutableStateOf(printer.labelLineSpacing) }
+
+    // Dropdown expanded states
+    var protocolExpanded by remember { mutableStateOf(false) }
+    var labelSizeExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -474,14 +494,90 @@ private fun LabelPrinterSettingsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 450.dp)
+                    .heightIn(max = 500.dp)
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Label size section
+                    // ========== PRINTER CONNECTION SECTION ==========
                     item {
+                        Text(
+                            text = "Kết nối máy in",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = color
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Printer Protocol dropdown
+                    item {
+                        ExposedDropdownMenuBox(
+                            expanded = protocolExpanded,
+                            onExpandedChange = { protocolExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = when (printerProtocol) {
+                                    "TSPL" -> "TSPL (Máy in tem)"
+                                    else -> "ESC/POS (Máy in hóa đơn)"
+                                },
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Loại máy in") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = protocolExpanded) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = protocolExpanded,
+                                onDismissRequest = { protocolExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("TSPL (Máy in tem)") },
+                                    onClick = {
+                                        printerProtocol = "TSPL"
+                                        protocolExpanded = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("ESC/POS (Máy in hóa đơn)") },
+                                    onClick = {
+                                        printerProtocol = "ESCPOS"
+                                        protocolExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // IP and Port
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = printerIp,
+                                onValueChange = { printerIp = it },
+                                label = { Text("IP máy in") },
+                                placeholder = { Text("192.168.1.100") },
+                                modifier = Modifier.weight(2f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = printerPort,
+                                onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
+                                label = { Text("Cổng") },
+                                placeholder = { Text("9100") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+                    }
+
+                    // ========== LABEL SIZE SECTION ==========
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Kích thước tem",
                             fontWeight = FontWeight.SemiBold,
@@ -489,24 +585,42 @@ private fun LabelPrinterSettingsDialog(
                             color = color
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Label size dropdown
+                    item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedTextField(
-                                value = labelWidthMm,
-                                onValueChange = { labelWidthMm = it.filter { c -> c.isDigit() } },
-                                label = { Text("Rộng (mm)") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = labelHeightMm,
-                                onValueChange = { labelHeightMm = it.filter { c -> c.isDigit() } },
-                                label = { Text("Cao (mm)") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
+                            ExposedDropdownMenuBox(
+                                expanded = labelSizeExpanded,
+                                onExpandedChange = { labelSizeExpanded = it },
+                                modifier = Modifier.weight(2f)
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedLabelSize.displayName,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Kích thước") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = labelSizeExpanded) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = labelSizeExpanded,
+                                    onDismissRequest = { labelSizeExpanded = false }
+                                ) {
+                                    com.techres.ccb.data.local.entity.LabelSize.ALL_SIZES.forEach { size ->
+                                        DropdownMenuItem(
+                                            text = { Text(size.displayName) },
+                                            onClick = {
+                                                selectedLabelSize = size
+                                                labelSizeExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                             OutlinedTextField(
                                 value = labelGapMm,
                                 onValueChange = { labelGapMm = it.filter { c -> c.isDigit() } },
@@ -515,6 +629,17 @@ private fun LabelPrinterSettingsDialog(
                                 singleLine = true
                             )
                         }
+                    }
+
+                    // Max toppings per label
+                    item {
+                        OutlinedTextField(
+                            value = labelMaxToppings,
+                            onValueChange = { labelMaxToppings = it.filter { c -> c.isDigit() } },
+                            label = { Text("Số topping tối đa / tem (0 = tự động)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
                     }
 
                     // Font scale slider
@@ -538,24 +663,53 @@ private fun LabelPrinterSettingsDialog(
                         )
                     }
 
+                    // Line spacing slider
+                    item {
+                        Text(
+                            text = "Khoảng cách dòng: ${String.format("%.1f", labelLineSpacing)}x",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = color
+                        )
+                        Slider(
+                            value = labelLineSpacing,
+                            onValueChange = { labelLineSpacing = it },
+                            valueRange = 0.5f..2.0f,
+                            steps = 14,
+                            colors = SliderDefaults.colors(
+                                thumbColor = color,
+                                activeTrackColor = color
+                            )
+                        )
+                    }
+
                     // Store name
                     item {
                         OutlinedTextField(
                             value = labelStoreName,
                             onValueChange = { labelStoreName = it },
-                            label = { Text("Tên cửa hàng trên tem") },
+                            label = { Text("Tên cửa hàng hiển thị") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
                     }
 
-                    // Display options section
+                    // ========== DISPLAY OPTIONS SECTION ==========
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Hiển thị trên tem",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "In giá",
+                            checked = labelPrintPrice,
+                            onCheckedChange = { labelPrintPrice = it },
                             color = color
                         )
                     }
@@ -598,15 +752,6 @@ private fun LabelPrinterSettingsDialog(
 
                     item {
                         LabelSettingSwitch(
-                            label = "In giá",
-                            checked = labelPrintPrice,
-                            onCheckedChange = { labelPrintPrice = it },
-                            color = color
-                        )
-                    }
-
-                    item {
-                        LabelSettingSwitch(
                             label = "Đảo chiều tem (180°)",
                             checked = labelReverse,
                             onCheckedChange = { labelReverse = it },
@@ -620,6 +765,9 @@ private fun LabelPrinterSettingsDialog(
             Button(
                 onClick = {
                     val updatedPrinter = printer.copy(
+                        printerProtocol = printerProtocol,
+                        printerIp = printerIp.ifBlank { null },
+                        printerPort = printerPort.toIntOrNull() ?: 9100,
                         labelPrintPrice = labelPrintPrice,
                         labelPrintStoreName = labelPrintStoreName,
                         labelPrintOrderNumber = labelPrintOrderNumber,
@@ -627,10 +775,12 @@ private fun LabelPrinterSettingsDialog(
                         labelPrintTime = labelPrintTime,
                         labelStoreName = labelStoreName.ifBlank { null },
                         labelReverse = labelReverse,
-                        labelWidthMm = labelWidthMm.toIntOrNull() ?: 72,
-                        labelHeightMm = labelHeightMm.toIntOrNull() ?: 30,
+                        labelWidthMm = selectedLabelSize.widthMm,
+                        labelHeightMm = selectedLabelSize.heightMm,
                         labelGapMm = labelGapMm.toIntOrNull() ?: 3,
-                        labelFontScale = labelFontScale
+                        labelFontScale = labelFontScale,
+                        labelMaxToppings = labelMaxToppings.toIntOrNull() ?: 0,
+                        labelLineSpacing = labelLineSpacing
                     )
                     onSave(updatedPrinter)
                 },

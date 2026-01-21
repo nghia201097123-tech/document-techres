@@ -176,6 +176,9 @@ class LabelPrinterConfigViewModel @Inject constructor(
             try {
                 kitchenRepository.updateLabelSettings(
                     kitchenId = printer.id,
+                    printerIp = printer.printerIp,
+                    printerPort = printer.printerPort,
+                    printerProtocol = printer.printerProtocol,
                     labelPrintPrice = printer.labelPrintPrice,
                     labelPrintStoreName = printer.labelPrintStoreName,
                     labelPrintOrderNumber = printer.labelPrintOrderNumber,
@@ -186,7 +189,9 @@ class LabelPrinterConfigViewModel @Inject constructor(
                     labelWidthMm = printer.labelWidthMm,
                     labelHeightMm = printer.labelHeightMm,
                     labelGapMm = printer.labelGapMm,
-                    labelFontScale = printer.labelFontScale
+                    labelFontScale = printer.labelFontScale,
+                    labelMaxToppings = printer.labelMaxToppings,
+                    labelLineSpacing = printer.labelLineSpacing
                 )
             } catch (e: Exception) {
                 _uiState.update {

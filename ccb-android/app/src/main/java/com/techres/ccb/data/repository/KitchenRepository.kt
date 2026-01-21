@@ -97,6 +97,9 @@ class KitchenRepository @Inject constructor(
      */
     suspend fun updateLabelSettings(
         kitchenId: String,
+        printerIp: String?,
+        printerPort: Int,
+        printerProtocol: String,
         labelPrintPrice: Boolean,
         labelPrintStoreName: Boolean,
         labelPrintOrderNumber: Boolean,
@@ -107,12 +110,16 @@ class KitchenRepository @Inject constructor(
         labelWidthMm: Int,
         labelHeightMm: Int,
         labelGapMm: Int,
-        labelFontScale: Float
+        labelFontScale: Float,
+        labelMaxToppings: Int,
+        labelLineSpacing: Float
     ) {
         kitchenDao.updateLabelSettings(
-            kitchenId, labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
+            kitchenId, printerIp, printerPort, printerProtocol,
+            labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
             labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
-            labelWidthMm, labelHeightMm, labelGapMm, labelFontScale
+            labelWidthMm, labelHeightMm, labelGapMm, labelFontScale,
+            labelMaxToppings, labelLineSpacing
         )
     }
 
