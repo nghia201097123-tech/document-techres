@@ -58,6 +58,13 @@ class KitchenRepository @Inject constructor(
         ticketCopies: Int = 1,
         ticketFontSize: String = "medium",
         ticketLineSpacing: Float = 0.4f,
+        ticketPrintOrderNumber: Boolean = true,
+        ticketPrintTableName: Boolean = true,
+        ticketPrintTime: Boolean = true,
+        ticketPrintNotes: Boolean = true,
+        ticketPrintPrice: Boolean = false,
+        ticketPrintStoreName: Boolean = false,
+        ticketStoreName: String? = null,
         // Label printing config
         labelPrintPrice: Boolean = false,
         labelPrintStoreName: Boolean = false,
@@ -75,6 +82,8 @@ class KitchenRepository @Inject constructor(
             protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity,
             paperWidth, printMode,
             ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
+            ticketPrintOrderNumber, ticketPrintTableName, ticketPrintTime, ticketPrintNotes,
+            ticketPrintPrice, ticketPrintStoreName, ticketStoreName,
             labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
             labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
             labelFontScale, labelMaxToppings, labelLineSpacing

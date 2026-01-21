@@ -298,6 +298,8 @@ fun KitchenPrinterScreen(
             onDismiss = { showPrinterDialog = false },
             onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
                        ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
+                       ticketPrintOrderNumber, ticketPrintTableName, ticketPrintTime, ticketPrintNotes,
+                       ticketPrintPrice, ticketPrintStoreName, ticketStoreName,
                        labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
                        labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
                        labelFontScale, labelMaxToppings, labelLineSpacing ->
@@ -319,6 +321,13 @@ fun KitchenPrinterScreen(
                     ticketCopies = ticketCopies,
                     ticketFontSize = ticketFontSize,
                     ticketLineSpacing = ticketLineSpacing,
+                    ticketPrintOrderNumber = ticketPrintOrderNumber,
+                    ticketPrintTableName = ticketPrintTableName,
+                    ticketPrintTime = ticketPrintTime,
+                    ticketPrintNotes = ticketPrintNotes,
+                    ticketPrintPrice = ticketPrintPrice,
+                    ticketPrintStoreName = ticketPrintStoreName,
+                    ticketStoreName = ticketStoreName.ifBlank { null },
                     labelPrintPrice = labelPrintPrice,
                     labelPrintStoreName = labelPrintStoreName,
                     labelPrintOrderNumber = labelPrintOrderNumber,
@@ -592,6 +601,8 @@ private fun PrinterConfigDialog(
     onDismiss: () -> Unit,
     onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
              ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String, ticketLineSpacing: Float,
+             ticketPrintOrderNumber: Boolean, ticketPrintTableName: Boolean, ticketPrintTime: Boolean, ticketPrintNotes: Boolean,
+             ticketPrintPrice: Boolean, ticketPrintStoreName: Boolean, ticketStoreName: String,
              labelPrintPrice: Boolean, labelPrintStoreName: Boolean, labelPrintOrderNumber: Boolean,
              labelPrintTableName: Boolean, labelPrintTime: Boolean, labelStoreName: String, labelReverse: Boolean,
              labelFontScale: Float, labelMaxToppings: Int, labelLineSpacing: Float) -> Unit
@@ -614,6 +625,13 @@ private fun PrinterConfigDialog(
     var ticketFontSize by remember { mutableStateOf(kitchen.ticketFontSize ?: "medium") }
     var ticketFontSizeExpanded by remember { mutableStateOf(false) }
     var ticketLineSpacing by remember { mutableStateOf(kitchen.ticketLineSpacing) }
+    var ticketPrintOrderNumber by remember { mutableStateOf(kitchen.ticketPrintOrderNumber) }
+    var ticketPrintTableName by remember { mutableStateOf(kitchen.ticketPrintTableName) }
+    var ticketPrintTime by remember { mutableStateOf(kitchen.ticketPrintTime) }
+    var ticketPrintNotes by remember { mutableStateOf(kitchen.ticketPrintNotes) }
+    var ticketPrintPrice by remember { mutableStateOf(kitchen.ticketPrintPrice) }
+    var ticketPrintStoreName by remember { mutableStateOf(kitchen.ticketPrintStoreName) }
+    var ticketStoreName by remember { mutableStateOf(kitchen.ticketStoreName ?: "") }
 
     // Label printing config
     var labelPrintPrice by remember { mutableStateOf(kitchen.labelPrintPrice) }
@@ -1028,7 +1046,113 @@ private fun PrinterConfigDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Ticket cut after print
+                    // Display options section
+                    Text(
+                        text = "Hiển thị trên phiếu",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // In mã đơn hàng
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintOrderNumber,
+                            onCheckedChange = { ticketPrintOrderNumber = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In mã đơn hàng", fontSize = 14.sp)
+                    }
+
+                    // In tên bàn
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintTableName,
+                            onCheckedChange = { ticketPrintTableName = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In tên bàn", fontSize = 14.sp)
+                    }
+
+                    // In thời gian
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintTime,
+                            onCheckedChange = { ticketPrintTime = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In thời gian", fontSize = 14.sp)
+                    }
+
+                    // In ghi chú
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintNotes,
+                            onCheckedChange = { ticketPrintNotes = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In ghi chú", fontSize = 14.sp)
+                    }
+
+                    // In giá món
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintPrice,
+                            onCheckedChange = { ticketPrintPrice = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In giá món", fontSize = 14.sp)
+                    }
+
+                    // In tên cửa hàng
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ticketPrintStoreName,
+                            onCheckedChange = { ticketPrintStoreName = it },
+                            colors = CheckboxDefaults.colors(checkedColor = color)
+                        )
+                        Text(text = "In tên cửa hàng", fontSize = 14.sp)
+                    }
+
+                    // Tên cửa hàng hiển thị (show only when ticketPrintStoreName is checked)
+                    if (ticketPrintStoreName) {
+                        OutlinedTextField(
+                            value = ticketStoreName,
+                            onValueChange = { ticketStoreName = it },
+                            label = { Text("Tên cửa hàng hiển thị") },
+                            placeholder = { Text("VD: Quán Cà phê ABC") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 40.dp),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Cắt giấy sau khi in
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -1045,7 +1169,7 @@ private fun PrinterConfigDialog(
                         )
                     }
 
-                    // Print items separately
+                    // In từng món riêng biệt
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -1062,7 +1186,7 @@ private fun PrinterConfigDialog(
                         )
                     }
 
-                    // Ticket copies
+                    // Số bản in
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1098,7 +1222,7 @@ private fun PrinterConfigDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Font size selection
+                    // Cỡ chữ
                     Text(
                         text = "Cỡ chữ:",
                         fontSize = 14.sp
@@ -1143,7 +1267,7 @@ private fun PrinterConfigDialog(
                         }
                     }
 
-                    // Ticket line spacing slider
+                    // Khoảng cách dòng
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Khoảng cách dòng: ${(ticketLineSpacing * 100).toInt()}%",
@@ -1401,6 +1525,13 @@ private fun PrinterConfigDialog(
                                 ticketCopies,
                                 ticketFontSize,
                                 ticketLineSpacing,
+                                ticketPrintOrderNumber,
+                                ticketPrintTableName,
+                                ticketPrintTime,
+                                ticketPrintNotes,
+                                ticketPrintPrice,
+                                ticketPrintStoreName,
+                                ticketStoreName,
                                 labelPrintPrice,
                                 labelPrintStoreName,
                                 labelPrintOrderNumber,
