@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { PayOS } from '@payos/node';
+import PayOS = require('@payos/node');
 import { BankAccount } from '../../database/entities';
 import {
   CreatePaymentDto,
