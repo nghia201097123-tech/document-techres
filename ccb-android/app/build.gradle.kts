@@ -122,6 +122,9 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
+    // QR Code Generation
+    implementation("com.google.zxing:core:3.5.2")
+
     // Gson
     implementation(libs.gson)
 

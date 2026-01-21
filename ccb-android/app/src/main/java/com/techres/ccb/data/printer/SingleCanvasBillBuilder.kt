@@ -9,6 +9,9 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Log
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import com.techres.ccb.printer.core.EscPosCommands
 import java.io.ByteArrayOutputStream
 
@@ -429,10 +432,32 @@ class SingleCanvasBillBuilder(
                     }
                 }
                 is Segment.QrCodeSegment -> {
-                    output.write(EscPosCommands.ALIGN_CENTER)
-                    output.write(EscPosCommands.printQRCode(segment.content, segment.size))
-                    output.write(EscPosCommands.ALIGN_LEFT)
-                    Log.d(TAG, "Segment $index: QRCode")
+                    // Render QR code as bitmap (more compatible than ESC/POS QR commands)
+                    try {
+                        val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300) // 60% of paper width
+                        val qrBitmap = generateQrCodeBitmap(segment.content, qrSize)
+                        if (qrBitmap != null) {
+                            // Center align before printing
+                            output.write(EscPosCommands.ALIGN_CENTER)
+                            val qrData = EscPosCommands.printRasterBitmap(qrBitmap, qrSize)
+                            output.write(qrData)
+                            output.write(EscPosCommands.ALIGN_LEFT)
+                            Log.d(TAG, "Segment $index: QRCode as bitmap (${qrBitmap.width}x${qrBitmap.height})")
+                            qrBitmap.recycle()
+                        } else {
+                            Log.e(TAG, "Segment $index: QRCode bitmap generation failed, trying ESC/POS command")
+                            // Fallback to ESC/POS command
+                            output.write(EscPosCommands.ALIGN_CENTER)
+                            output.write(EscPosCommands.printQRCode(segment.content, segment.size))
+                            output.write(EscPosCommands.ALIGN_LEFT)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Segment $index: QRCode error: ${e.message}, trying ESC/POS command")
+                        // Fallback to ESC/POS command
+                        output.write(EscPosCommands.ALIGN_CENTER)
+                        output.write(EscPosCommands.printQRCode(segment.content, segment.size))
+                        output.write(EscPosCommands.ALIGN_LEFT)
+                    }
                 }
                 is Segment.BarcodeSegment -> {
                     output.write(EscPosCommands.ALIGN_CENTER)
@@ -630,5 +655,39 @@ class SingleCanvasBillBuilder(
         canvas.translate(0f, startY + topPadding)
         layout.draw(canvas)
         canvas.restore()
+    }
+
+    /**
+     * Generate QR code bitmap using ZXing library
+     * @param content The content to encode in QR code
+     * @param size The desired size of the QR code in pixels
+     * @return Bitmap of the QR code, or null if generation fails
+     */
+    private fun generateQrCodeBitmap(content: String, size: Int): Bitmap? {
+        return try {
+            val hints = mapOf(
+                EncodeHintType.CHARACTER_SET to "UTF-8",
+                EncodeHintType.MARGIN to 1 // Minimal margin
+            )
+
+            val qrCodeWriter = QRCodeWriter()
+            val bitMatrix = qrCodeWriter.encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+
+            val width = bitMatrix.width
+            val height = bitMatrix.height
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE)
+                }
+            }
+
+            Log.d(TAG, "QR code bitmap generated: ${width}x${height}, content length: ${content.length}")
+            bitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to generate QR code bitmap: ${e.message}")
+            null
+        }
     }
 }
