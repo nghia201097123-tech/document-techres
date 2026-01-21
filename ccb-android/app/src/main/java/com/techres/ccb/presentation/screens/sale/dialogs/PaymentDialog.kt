@@ -150,6 +150,8 @@ fun PaymentDialog(
     onClearItemDiscounts: () -> Unit = {},
     onClearBillDiscount: () -> Unit = {},
     onPrintTemporaryBill: () -> Unit = {}, // In bill tạm (sau khi đã áp dụng giảm giá)
+    onPrintPaymentQr: () -> Unit = {}, // In riêng mã QR thanh toán
+    isPrintingQr: Boolean = false, // Đang in QR
     lastPaymentMethod: PaymentMethod = PaymentMethod.CASH, // Phương thức thanh toán gần nhất
     // Bank account for QR code payment
     bankAccount: BankAccountEntity? = null,
@@ -459,6 +461,29 @@ fun PaymentDialog(
                                                 Text("Nội dung:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                 Text(transferContent, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                                             }
+                                        }
+                                    }
+
+                                    // Nút in mã QR thanh toán
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedButton(
+                                        onClick = onPrintPaymentQr,
+                                        enabled = !isPrintingQr,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1976D2))
+                                    ) {
+                                        if (isPrintingQr) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                                color = Color(0xFF1976D2)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Đang in...", fontSize = 13.sp)
+                                        } else {
+                                            Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("In mã QR thanh toán", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                         }
                                     }
                                 } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null) {
