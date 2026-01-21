@@ -434,7 +434,7 @@ object LabelPrintService {
             storeBitmap.recycle()
         }
 
-        // ========== SMART LAYOUT: Gộp Bàn + Mã đơn + Thẻ rung trên cùng 1-2 dòng để tiết kiệm không gian ==========
+        // ========== SMART LAYOUT: Mã đơn trên 1 dòng, Thẻ rung trên dòng riêng (căn phải) ==========
         val hasTable = showTableName && !label.tableName.isNullOrBlank()
         val hasOrder = showOrderNumber
         val hasPager = label.pagerNumber != null
@@ -444,17 +444,15 @@ object LabelPrintService {
         val partText = if (label.totalParts > 1 && !label.isContinuation) "(P${label.partIndex}/${label.totalParts})" else ""
         val indexText = "$labelCountText $partText".trim()
 
-        // Pager text: "Thẻ rung: X"
-        val pagerText = if (hasPager) "Thẻ rung: ${label.pagerNumber}" else ""
-
+        // Dòng 1: Bàn + Mã đơn (hoặc chỉ mã đơn)
         if (hasTable && hasOrder) {
-            // SMART: Bàn bên trái + Mã đơn + Thẻ rung bên phải (trên cùng 1 dòng)
-            val orderPagerPart = listOf(label.displayNumber, pagerText, indexText)
+            // Bàn bên trái + Mã đơn bên phải
+            val orderPart = listOf(label.displayNumber, indexText)
                 .filter { it.isNotEmpty() }
                 .joinToString(" ")
             val headerBitmap = renderTwoColumnText(
                 "Bàn: ${label.tableName}",
-                orderPagerPart,
+                orderPart,
                 contentWidth,
                 fontSmall,
                 bold = true
@@ -463,34 +461,20 @@ object LabelPrintService {
             yPos += headerBitmap.height + lineSpacingExtra
             headerBitmap.recycle()
         } else if (hasTable) {
-            // Chỉ có bàn, gộp thẻ rung bên phải nếu có
-            val rightPart = if (hasPager) pagerText else ""
-            if (rightPart.isNotEmpty()) {
-                val tablePagerBitmap = renderTwoColumnText(
-                    "Bàn: ${label.tableName}",
-                    rightPart,
-                    contentWidth,
-                    fontSmall,
-                    bold = true
-                )
-                output.write(bitmapToTspl(margin, yPos, tablePagerBitmap))
-                yPos += tablePagerBitmap.height + lineSpacingExtra
-                tablePagerBitmap.recycle()
-            } else {
-                val tableBitmap = renderTextBitmap(
-                    text = "Bàn: ${label.tableName}",
-                    width = contentWidth,
-                    fontSize = fontSmall,
-                    bold = true,
-                    centerAlign = false
-                )
-                output.write(bitmapToTspl(margin, yPos, tableBitmap))
-                yPos += tableBitmap.height + lineSpacingExtra
-                tableBitmap.recycle()
-            }
+            // Chỉ có bàn
+            val tableBitmap = renderTextBitmap(
+                text = "Bàn: ${label.tableName}",
+                width = contentWidth,
+                fontSize = fontSmall,
+                bold = true,
+                centerAlign = false
+            )
+            output.write(bitmapToTspl(margin, yPos, tableBitmap))
+            yPos += tableBitmap.height + lineSpacingExtra
+            tableBitmap.recycle()
         } else if (hasOrder) {
-            // Chỉ có mã đơn, gộp thẻ rung + index
-            val rightPart = listOf(pagerText, indexText).filter { it.isNotEmpty() }.joinToString(" ")
+            // Chỉ có mã đơn + index
+            val rightPart = indexText
             val orderHeaderBitmap = renderTwoColumnText(
                 label.displayNumber,
                 rightPart,
@@ -501,11 +485,13 @@ object LabelPrintService {
             output.write(bitmapToTspl(margin, yPos, orderHeaderBitmap))
             yPos += orderHeaderBitmap.height + lineSpacingExtra
             orderHeaderBitmap.recycle()
-        } else if (hasPager) {
-            // Không có bàn, không có mã đơn, chỉ có thẻ rung - căn phải
+        }
+
+        // Dòng 2: Thẻ rung luôn trên dòng riêng, căn phải (nếu có)
+        if (hasPager) {
             val pagerBitmap = renderTwoColumnText(
                 "",
-                "Thẻ rung: ${label.pagerNumber}",
+                "Thẻ: ${label.pagerNumber}",
                 contentWidth,
                 fontSmall,
                 bold = true
@@ -1087,20 +1073,19 @@ object LabelPrintService {
                 lineCenter("(Phần ${label.partIndex}/${label.totalParts})")
             }
 
-            // Table name + Pager number (gộp trên 1 dòng để tiết kiệm không gian)
+            // Table name + Pager number (mỗi thông tin trên 1 dòng riêng)
             val hasTableInfo = showTableName && !label.tableName.isNullOrBlank()
             val hasPagerInfo = label.pagerNumber != null
 
             if (hasTableInfo || hasPagerInfo) {
                 separator('-')
-                if (hasTableInfo && hasPagerInfo) {
-                    // Gộp: Bàn bên trái, thẻ rung bên phải
-                    lineKeyValueBold("Bàn: ${label.tableName}", "Thẻ rung: ${label.pagerNumber}")
-                } else if (hasTableInfo) {
+                // Dòng 1: Bàn (nếu có)
+                if (hasTableInfo) {
                     lineBold("Bàn: ${label.tableName}")
-                } else if (hasPagerInfo) {
-                    // Chỉ có thẻ rung - căn phải
-                    lineKeyValueBold("", "Thẻ rung: ${label.pagerNumber}")
+                }
+                // Dòng 2: Thẻ rung (căn phải, nếu có)
+                if (hasPagerInfo) {
+                    lineKeyValueBold("", "Thẻ: ${label.pagerNumber}")
                 }
             }
 
