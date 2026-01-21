@@ -1788,58 +1788,44 @@ private fun OrderCard(
                     }
                 }
 
-                // Footer: Quick action buttons
+                // Footer: Quick action buttons - always show payment button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
                 ) {
                     val buttonHeight = if (isUltraCompact) 28.dp else if (isCompact) 32.dp else 36.dp
                     val iconSize = if (isUltraCompact) 12.dp else if (isCompact) 14.dp else 16.dp
+                    val textSize = if (isUltraCompact) 9.sp else if (isCompact) 10.sp else 12.sp
 
-                    if (order.status == PosOrderStatus.DRAFT) {
-                        // Draft order: Show confirm button
-                        Button(
-                            onClick = onConfirm,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(buttonHeight),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFF9800)
-                            ),
-                            contentPadding = PaddingValues(horizontal = if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(iconSize)
-                            )
-                            if (!isCompact && !isUltraCompact) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Xác nhận", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    // Always show payment button - auto confirm if draft
+                    Button(
+                        onClick = {
+                            if (order.status == PosOrderStatus.DRAFT) {
+                                // Auto confirm then complete
+                                onConfirm()
                             }
-                        }
-                    } else {
-                        // Confirmed order: Show complete button (payment)
-                        Button(
-                            onClick = onComplete,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(buttonHeight),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF4CAF50)
-                            ),
-                            contentPadding = PaddingValues(horizontal = if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Payment,
-                                contentDescription = null,
-                                modifier = Modifier.size(iconSize)
-                            )
-                            if (!isCompact && !isUltraCompact) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Thanh toán", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
+                            onComplete()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(buttonHeight),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50)
+                        ),
+                        contentPadding = PaddingValues(horizontal = if (isUltraCompact) 2.dp else if (isCompact) 4.dp else 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Payment,
+                            contentDescription = null,
+                            modifier = Modifier.size(iconSize)
+                        )
+                        Spacer(modifier = Modifier.width(if (isUltraCompact) 2.dp else 4.dp))
+                        Text(
+                            text = "Thanh toán",
+                            fontSize = textSize,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
                     }
                 }
             }
