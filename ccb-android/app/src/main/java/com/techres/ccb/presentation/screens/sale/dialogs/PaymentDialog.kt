@@ -2020,55 +2020,43 @@ private fun roundUp(amount: Long, unit: Long): Long {
 
 /**
  * Tạo danh sách gợi ý số tiền nhanh dựa trên tổng tiền
- * Gợi ý các mệnh giá phổ biến và làm tròn hợp lý
+ * Giới hạn 5 gợi ý, hiển thị đầy đủ số tiền với đơn vị "đ"
  */
 private fun buildQuickAmountSuggestions(totalAmount: Long): List<Pair<Long, String?>> {
     val suggestions = mutableListOf<Pair<Long, String?>>()
     val numberFormat = java.text.DecimalFormat("#,###")
 
+    // Hàm format số tiền với "đ"
+    fun formatWithDong(amount: Long): String = "${numberFormat.format(amount)}đ"
+
     // 1. Số tiền chính xác (Đủ)
     suggestions.add(totalAmount to "Đủ")
 
-    // 2. Làm tròn lên các mốc nhỏ (nếu khác totalAmount)
-    val smallRoundUps = listOf(10000L, 20000L, 50000L, 100000L)
+    // 2. Làm tròn lên 10k, 50k, 100k (chỉ lấy 2 mốc gần nhất)
+    val smallRoundUps = listOf(10000L, 50000L, 100000L)
     smallRoundUps.forEach { unit ->
         val rounded = roundUp(totalAmount, unit)
-        if (rounded > totalAmount && rounded !in suggestions.map { it.first }) {
-            suggestions.add(rounded to numberFormat.format(rounded))
+        if (rounded > totalAmount && rounded !in suggestions.map { it.first } && suggestions.size < 3) {
+            suggestions.add(rounded to formatWithDong(rounded))
         }
     }
 
-    // 3. Các mệnh giá tiền phổ biến (làm tròn lên)
+    // 3. Các mệnh giá tiền phổ biến (lấy 2-3 mốc tiếp theo)
     val commonDenominations = listOf(
-        100000L, 200000L, 500000L,
-        1000000L, 1500000L, 2000000L,
+        500000L, 1000000L, 1500000L, 2000000L,
         3000000L, 5000000L, 10000000L
     )
     commonDenominations.forEach { denom ->
-        if (denom >= totalAmount && denom !in suggestions.map { it.first }) {
-            suggestions.add(denom to numberFormat.format(denom))
+        if (denom > totalAmount && denom !in suggestions.map { it.first } && suggestions.size < 5) {
+            suggestions.add(denom to formatWithDong(denom))
         }
     }
 
-    // 4. Thêm các mốc tiền lẻ hữu ích cho số tiền lớn (VD: 1.100.000, 1.200.000)
-    if (totalAmount > 500000L) {
-        val baseAmounts = listOf(1000000L, 2000000L, 5000000L)
-        val additions = listOf(100000L, 200000L, 500000L)
-        baseAmounts.forEach { base ->
-            additions.forEach { add ->
-                val combined = base + add
-                if (combined > totalAmount && combined !in suggestions.map { it.first }) {
-                    suggestions.add(combined to numberFormat.format(combined))
-                }
-            }
-        }
-    }
-
-    // Sắp xếp theo số tiền và lấy tối đa 8 gợi ý
+    // Sắp xếp theo số tiền và lấy tối đa 5 gợi ý
     return suggestions
         .distinctBy { it.first }
         .sortedBy { it.first }
-        .take(8)
+        .take(5)
 }
 
 /**
