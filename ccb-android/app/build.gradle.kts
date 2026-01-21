@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
 }
 
 android {
@@ -132,9 +131,8 @@ dependencies {
     // Logging
     implementation(libs.timber)
 
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.messaging)
+    // Socket.IO Client (for real-time payment notifications)
+    implementation(libs.socket.io.client)
 
     // Testing
     testImplementation(libs.junit)

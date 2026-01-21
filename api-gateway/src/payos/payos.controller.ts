@@ -38,8 +38,8 @@ export class PayosController {
     this.logger.log(`Creating payment: orderId=${dto.orderId}, amount=${dto.amount}`);
 
     // Validate required fields
-    if (!dto.orderId || !dto.orderCode || !dto.amount || !dto.deviceId || !dto.fcmToken) {
-      throw new BadRequestException('Missing required fields');
+    if (!dto.orderId || !dto.orderCode || !dto.amount || !dto.branchId) {
+      throw new BadRequestException('Missing required fields: orderId, orderCode, amount, branchId');
     }
 
     if (dto.amount < 1000) {

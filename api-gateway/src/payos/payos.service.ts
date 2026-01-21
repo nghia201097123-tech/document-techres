@@ -7,7 +7,7 @@ import {
   PaymentStatusResponseDto,
 } from './dto/create-payment.dto';
 import { PayOSWebhookDto } from './dto/webhook.dto';
-import { FcmService, PaymentNotificationData } from './fcm.service';
+import { SocketGateway } from '../socket/socket.gateway';
 
 // In-memory store for payment sessions (use Redis in production)
 interface PaymentSession {
@@ -16,7 +16,6 @@ interface PaymentSession {
   amount: number;
   branchId: string;
   deviceId: string;
-  fcmToken: string;
   tableName?: string;
   customerName?: string;
   status: 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED';
@@ -33,7 +32,7 @@ export class PayosService implements OnModuleInit {
 
   constructor(
     private configService: ConfigService,
-    private fcmService: FcmService,
+    private socketGateway: SocketGateway,
   ) {}
 
   onModuleInit() {
@@ -47,8 +46,8 @@ export class PayosService implements OnModuleInit {
     const checksumKey = this.configService.get<string>('PAYOS_CHECKSUM_KEY');
 
     if (!clientId || !apiKey || !checksumKey) {
-      this.logger.error('PayOS credentials not configured');
-      throw new Error('PayOS credentials not configured');
+      this.logger.warn('PayOS credentials not configured - PayOS features will be disabled');
+      return;
     }
 
     this.payos = new PayOS({
@@ -67,7 +66,12 @@ export class PayosService implements OnModuleInit {
       const expireTime = 30 * 60 * 1000; // 30 minutes
 
       for (const [orderCode, session] of this.paymentSessions.entries()) {
-        if (now.getTime() - session.createdAt.getTime() > expireTime && session.status === 'PENDING') {
+        if (
+          now.getTime() - session.createdAt.getTime() > expireTime &&
+          session.status === 'PENDING'
+        ) {
+          // Emit expired event before cleanup
+          this.socketGateway.emitPaymentExpired(session.branchId, orderCode);
           this.paymentSessions.delete(orderCode);
           this.logger.debug(`Cleaned up expired session: ${orderCode}`);
         }
@@ -76,9 +80,17 @@ export class PayosService implements OnModuleInit {
   }
 
   async createPayment(dto: CreatePaymentDto): Promise<CreatePaymentResponseDto> {
+    if (!this.payos) {
+      throw new Error('PayOS not initialized');
+    }
+
     try {
-      const returnUrl = this.configService.get<string>('PAYOS_RETURN_URL') || 'https://techres.vn/payment/success';
-      const cancelUrl = this.configService.get<string>('PAYOS_CANCEL_URL') || 'https://techres.vn/payment/cancel';
+      const returnUrl =
+        this.configService.get<string>('PAYOS_RETURN_URL') ||
+        'https://techres.vn/payment/success';
+      const cancelUrl =
+        this.configService.get<string>('PAYOS_CANCEL_URL') ||
+        'https://techres.vn/payment/cancel';
 
       // Create payment request with PayOS
       const paymentRequest = await this.payos.paymentRequests.create({
@@ -98,14 +110,15 @@ export class PayosService implements OnModuleInit {
         amount: dto.amount,
         branchId: dto.branchId,
         deviceId: dto.deviceId,
-        fcmToken: dto.fcmToken,
         tableName: dto.tableName,
         customerName: dto.customerName,
         status: 'PENDING',
         createdAt: new Date(),
       });
 
-      this.logger.log(`Created payment: orderCode=${dto.orderCode}, amount=${dto.amount}`);
+      this.logger.log(
+        `Created payment: orderCode=${dto.orderCode}, amount=${dto.amount}, branch=${dto.branchId}`,
+      );
 
       return {
         success: true,
@@ -122,9 +135,12 @@ export class PayosService implements OnModuleInit {
   }
 
   async getPaymentStatus(orderCode: number): Promise<PaymentStatusResponseDto> {
+    if (!this.payos) {
+      throw new Error('PayOS not initialized');
+    }
+
     try {
       const paymentInfo = await this.payos.paymentRequests.get(orderCode);
-      const session = this.paymentSessions.get(orderCode);
 
       return {
         orderCode,
@@ -141,13 +157,24 @@ export class PayosService implements OnModuleInit {
   }
 
   async cancelPayment(orderCode: number, reason?: string): Promise<boolean> {
+    if (!this.payos) {
+      throw new Error('PayOS not initialized');
+    }
+
     try {
       await this.payos.paymentRequests.cancel(orderCode, reason);
 
-      // Update session status
+      // Update session status and emit event
       const session = this.paymentSessions.get(orderCode);
       if (session) {
         session.status = 'CANCELLED';
+
+        // Emit cancellation event via Socket.IO
+        this.socketGateway.emitPaymentCancelled(session.branchId, {
+          orderId: session.orderId,
+          orderCode,
+          reason,
+        });
       }
 
       this.logger.log(`Cancelled payment: orderCode=${orderCode}`);
@@ -159,6 +186,11 @@ export class PayosService implements OnModuleInit {
   }
 
   async handleWebhook(webhookData: PayOSWebhookDto): Promise<{ success: boolean }> {
+    if (!this.payos) {
+      this.logger.warn('PayOS not initialized, cannot verify webhook');
+      return { success: false };
+    }
+
     try {
       // Verify webhook signature
       const isValid = await this.payos.webhooks.verify(webhookData);
@@ -182,30 +214,28 @@ export class PayosService implements OnModuleInit {
           session.paidAt = new Date();
           session.transactionRef = data.reference;
 
-          // Send FCM notification to the device
-          const notificationData: PaymentNotificationData = {
-            type: 'PAYMENT_SUCCESS',
+          // Emit payment success event via Socket.IO
+          this.socketGateway.emitPaymentSuccess(session.branchId, {
             orderId: session.orderId,
-            orderCode: orderCode.toString(),
-            amount: data.amount.toString(),
+            orderCode,
+            amount: data.amount,
             transactionRef: data.reference,
             transactionDateTime: data.transactionDateTime,
             counterAccountName: data.counterAccountName,
             counterAccountNumber: data.counterAccountNumber,
             counterAccountBankName: data.counterAccountBankName,
-          };
+          });
 
-          await this.fcmService.sendPaymentNotification(
-            session.fcmToken,
-            notificationData,
+          this.logger.log(
+            `Socket.IO event emitted for orderCode=${orderCode} to branch=${session.branchId}`,
           );
-
-          this.logger.log(`FCM notification sent for orderCode=${orderCode}`);
         } else {
           this.logger.warn(`No session found for orderCode=${orderCode}`);
         }
       } else {
-        this.logger.log(`Payment webhook with code: ${webhookData.code}, data.code: ${data.code}`);
+        this.logger.log(
+          `Payment webhook with code: ${webhookData.code}, data.code: ${data.code}`,
+        );
       }
 
       return { success: true };
@@ -218,5 +248,16 @@ export class PayosService implements OnModuleInit {
   // Get session info (for debugging)
   getSession(orderCode: number): PaymentSession | undefined {
     return this.paymentSessions.get(orderCode);
+  }
+
+  // Get all pending sessions for a branch
+  getPendingSessionsForBranch(branchId: string): PaymentSession[] {
+    const sessions: PaymentSession[] = [];
+    for (const session of this.paymentSessions.values()) {
+      if (session.branchId === branchId && session.status === 'PENDING') {
+        sessions.push(session);
+      }
+    }
+    return sessions;
   }
 }

@@ -13,14 +13,11 @@ export class CreatePaymentDto {
   @ApiProperty({ description: 'Order description', example: 'Thanh toan don hang #ORD-20250121-001' })
   description: string;
 
-  @ApiProperty({ description: 'Branch ID', example: 'branch-123' })
+  @ApiProperty({ description: 'Branch ID for Socket.IO room', example: 'branch-123' })
   branchId: string;
 
-  @ApiProperty({ description: 'Device ID for FCM notification', example: 'device-abc-123' })
+  @ApiProperty({ description: 'Device ID', example: 'device-abc-123' })
   deviceId: string;
-
-  @ApiProperty({ description: 'FCM token for push notification', example: 'fcm-token-xyz' })
-  fcmToken: string;
 
   @ApiProperty({ description: 'Table name (optional)', example: 'Ban 5', required: false })
   tableName?: string;
