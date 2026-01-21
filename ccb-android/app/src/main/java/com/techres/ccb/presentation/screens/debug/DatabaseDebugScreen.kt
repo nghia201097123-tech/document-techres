@@ -47,7 +47,9 @@ import com.techres.ccb.data.local.dao.KitchenDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.ComboItemDao
+import com.techres.ccb.data.local.dao.BankAccountDao
 import com.techres.ccb.data.local.entity.ProductNoteEntity
+import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.data.repository.*
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -73,7 +75,8 @@ enum class DebugTab(val title: String) {
     SEASONAL_PRICES("Giá thời vụ"),
     COUPONS("Coupon"),
     BILL_TEMPLATES("Mẫu in bill"),
-    BILL_PRINTER_CONFIGS("Cấu hình máy in")
+    BILL_PRINTER_CONFIGS("Cấu hình máy in"),
+    BANK_ACCOUNTS("Tài khoản NH")
 }
 
 data class DebugUiState(
@@ -97,6 +100,7 @@ data class DebugUiState(
     val coupons: List<CouponEntity> = emptyList(),
     val billTemplates: List<BillTemplateEntity> = emptyList(),
     val billPrinterConfigs: List<BillPrinterConfigEntity> = emptyList(),
+    val bankAccounts: List<BankAccountEntity> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -119,7 +123,8 @@ class DatabaseDebugViewModel @Inject constructor(
     private val orderItemDao: OrderItemDao,
     private val kitchenDao: KitchenDao,
     private val billTemplateDao: BillTemplateDao,
-    private val billPrinterConfigDao: BillPrinterConfigDao
+    private val billPrinterConfigDao: BillPrinterConfigDao,
+    private val bankAccountDao: BankAccountDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebugUiState())
@@ -370,6 +375,17 @@ class DatabaseDebugViewModel @Inject constructor(
                 Log.e(TAG, "Exception loading combo items", e)
             }
         }
+
+        // Bank accounts (not branch-specific)
+        viewModelScope.launch {
+            try {
+                val bankAccounts = bankAccountDao.getAllForDebug()
+                Log.d(TAG, "Found ${bankAccounts.size} bank accounts")
+                _uiState.update { it.copy(bankAccounts = bankAccounts) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading bank accounts", e)
+            }
+        }
     }
 
     companion object {
@@ -453,6 +469,7 @@ fun DatabaseDebugScreen(
                         DebugTab.COUPONS -> uiState.coupons.size
                         DebugTab.BILL_TEMPLATES -> uiState.billTemplates.size
                         DebugTab.BILL_PRINTER_CONFIGS -> uiState.billPrinterConfigs.size
+                        DebugTab.BANK_ACCOUNTS -> uiState.bankAccounts.size
                     }
                     Tab(
                         selected = uiState.selectedTab == tab,
@@ -490,6 +507,7 @@ fun DatabaseDebugScreen(
                     DebugTab.COUPONS -> CouponsTable(uiState.coupons)
                     DebugTab.BILL_TEMPLATES -> BillTemplatesTable(uiState.billTemplates)
                     DebugTab.BILL_PRINTER_CONFIGS -> BillPrinterConfigsTable(uiState.billPrinterConfigs)
+                    DebugTab.BANK_ACCOUNTS -> BankAccountsTable(uiState.bankAccounts)
                 }
             }
         }
@@ -903,6 +921,26 @@ fun ComboItemsTable(items: List<ComboItemEntity>) {
                 item.quantity.toString(),
                 item.sortOrder.toString(),
                 if (item.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun BankAccountsTable(accounts: List<BankAccountEntity>) {
+    DataTable(
+        headers = listOf("ID", "Ngân hàng", "Mã NH", "Số TK", "Chủ TK", "BIN", "Primary", "Active"),
+        data = accounts,
+        rowContent = { account ->
+            listOf(
+                account.id.take(8) + "...",
+                account.bankName.take(15),
+                account.bankCode,
+                account.accountNumber,
+                account.accountName.take(20),
+                account.bankBin ?: "-",
+                if (account.isPrimary) "✓" else "✗",
+                if (account.isActive) "✓" else "✗"
             )
         }
     )

@@ -61,6 +61,12 @@ interface BankAccountDao {
     @Query("SELECT COUNT(*) FROM bank_accounts WHERE is_active = 1")
     suspend fun countAllActive(): Int
 
+    /**
+     * Get all bank accounts (for debug purposes)
+     */
+    @Query("SELECT * FROM bank_accounts ORDER BY is_primary DESC")
+    suspend fun getAllForDebug(): List<BankAccountEntity>
+
     @Transaction
     suspend fun syncBankAccounts(branchId: String, bankAccounts: List<BankAccountEntity>) {
         // Clear all bank accounts and insert fresh data
