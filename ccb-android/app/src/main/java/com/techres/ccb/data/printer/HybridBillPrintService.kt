@@ -1176,39 +1176,15 @@ object HybridBillPrintService {
         description: String,
         accountName: String = ""
     ): String {
-        // Sử dụng VietQR URL format - tương thích với tất cả app ngân hàng Việt Nam
-        // Format: https://img.vietqr.io/image/{BANK_BIN}-{ACCOUNT}-print.png?amount={AMOUNT}&addInfo={DESC}&accountName={NAME}
+        // Sử dụng VietQR URL format ngắn gọn - phù hợp với máy in nhiệt
+        // Format ngắn: https://img.vietqr.io/image/{BANK_BIN}-{ACCOUNT}-compact.jpg?amount={AMOUNT}&addInfo={ORDER_NUMBER}
+        // Lưu ý: Dùng compact template và chỉ truyền mã đơn hàng để URL ngắn nhất
 
-        val encodedDesc = try {
-            java.net.URLEncoder.encode(description, "UTF-8")
-        } catch (e: Exception) {
-            description.replace(" ", "%20")
-        }
+        // Chỉ lấy mã đơn hàng từ description (bỏ tiếng Việt có dấu)
+        val orderCode = description.replace(Regex("[^A-Za-z0-9#-]"), "").take(20)
 
-        val encodedName = try {
-            java.net.URLEncoder.encode(accountName, "UTF-8")
-        } catch (e: Exception) {
-            accountName.replace(" ", "%20")
-        }
-
-        // Xây dựng URL
-        val urlBuilder = StringBuilder()
-        urlBuilder.append("https://img.vietqr.io/image/")
-        urlBuilder.append(bankBin)
-        urlBuilder.append("-")
-        urlBuilder.append(accountNumber)
-        urlBuilder.append("-print.png")
-        urlBuilder.append("?amount=")
-        urlBuilder.append(amount)
-        urlBuilder.append("&addInfo=")
-        urlBuilder.append(encodedDesc)
-
-        if (accountName.isNotBlank()) {
-            urlBuilder.append("&accountName=")
-            urlBuilder.append(encodedName)
-        }
-
-        return urlBuilder.toString()
+        // Xây dựng URL ngắn gọn
+        return "https://img.vietqr.io/image/$bankBin-$accountNumber-compact.jpg?amount=$amount&addInfo=$orderCode"
     }
 
     /**
