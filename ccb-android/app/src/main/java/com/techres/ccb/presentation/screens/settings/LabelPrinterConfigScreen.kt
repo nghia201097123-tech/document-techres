@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,12 +21,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.KitchenPrintMode
-import com.techres.ccb.data.local.entity.PrinterProtocol
 import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.data.printer.PrinterResult
-import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.presentation.components.PosTopAppBar
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -422,60 +421,34 @@ private fun LabelTestPrintDialog(
             }
         },
         confirmButton = {
+            val coroutineScope = rememberCoroutineScope()
             Button(
                 onClick = {
                     isPrinting = true
                     printStatus = null
 
-                    // Test print label
+                    // Test print label với đúng cấu trúc LabelData
                     val testLabel = LabelPrintService.LabelData(
-                        kitchenName = printer.name,
                         itemName = "TEM THỬ - TEST LABEL",
                         quantity = 1,
-                        totalQuantity = 1,
-                        labelIndex = 1,
-                        displayNumber = "TEST-001",
+                        orderNumber = "TEST-001",
+                        dailyOrderNumber = 1,
                         tableName = "Bàn Test",
                         pagerNumber = 99,
                         orderTime = Date(),
                         toppings = listOf("Topping 1", "Topping 2"),
-                        notes = "Đây là tem in thử",
+                        note = "Đây là tem in thử",
                         storeName = printer.labelStoreName,
-                        showPrice = printer.labelPrintPrice,
-                        price = 50000,
-                        showStoreName = printer.labelPrintStoreName,
-                        showOrderNumber = printer.labelPrintOrderNumber,
-                        showTableName = printer.labelPrintTableName,
-                        showTime = printer.labelPrintTime
+                        labelIndex = 1,
+                        totalLabels = 1
                     )
 
-                    val printerIp = printer.printerIp ?: ""
-                    val printerPort = printer.printerPort
-
-                    Thread {
+                    coroutineScope.launch {
                         try {
-                            val result = if (printer.getPrinterProtocolEnum() == PrinterProtocol.TSPL) {
-                                LabelPrintService.printLabelTspl(
-                                    printerIp = printerIp,
-                                    printerPort = printerPort,
-                                    label = testLabel,
-                                    labelWidthMm = printer.labelWidthMm,
-                                    labelHeightMm = printer.labelHeightMm,
-                                    labelGapMm = printer.labelGapMm,
-                                    printDensity = printer.printDensity,
-                                    reverse = printer.labelReverse,
-                                    fontScale = printer.labelFontScale,
-                                    maxToppings = printer.labelMaxToppings,
-                                    lineSpacing = printer.labelLineSpacing
-                                )
-                            } else {
-                                LabelPrintService.printLabelEscPos(
-                                    printerIp = printerIp,
-                                    printerPort = printerPort,
-                                    label = testLabel,
-                                    paperWidth = printer.paperWidth
-                                )
-                            }
+                            val result = LabelPrintService.printLabels(
+                                kitchen = printer,
+                                labelData = testLabel
+                            )
 
                             printStatus = when (result) {
                                 is PrinterResult.Success -> "In tem thành công!"
@@ -485,7 +458,7 @@ private fun LabelTestPrintDialog(
                             printStatus = "Lỗi: ${e.message}"
                         }
                         isPrinting = false
-                    }.start()
+                    }
                 },
                 enabled = !isPrinting,
                 colors = ButtonDefaults.buttonColors(
