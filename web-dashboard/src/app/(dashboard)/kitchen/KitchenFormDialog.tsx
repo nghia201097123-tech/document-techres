@@ -686,6 +686,7 @@ const KitchenFormDialog = React.memo(function KitchenFormDialog({
                   <TicketPreview
                     paperWidth={formData.paperWidth || 80}
                     fontSize={formData.ticketFontSize || "medium"}
+                    lineSpacing={1 + (formData.ticketLineSpacing || 0.4)}
                     showStoreName={formData.ticketPrintStoreName}
                     showOrderNumber={formData.ticketPrintOrderNumber}
                     showTableName={formData.ticketPrintTableName}
@@ -702,6 +703,7 @@ const KitchenFormDialog = React.memo(function KitchenFormDialog({
                     heightMm={formData.labelHeightMm || 30}
                     fontScale={formData.labelFontScale || 1.0}
                     maxToppings={(formData.labelMaxToppings || 0) > 0 ? formData.labelMaxToppings! : getRecommendedMaxToppings(formData.labelWidthMm || 72, formData.labelHeightMm || 30)}
+                    lineSpacing={1 + (formData.labelLineSpacing || 1.0)}
                     showStoreName={formData.labelPrintStoreName}
                     showOrderNumber={formData.labelPrintOrderNumber}
                     showTableName={formData.labelPrintTableName}

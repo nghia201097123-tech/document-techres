@@ -8,6 +8,7 @@ interface LabelPreviewProps {
   heightMm: number;
   fontScale: number;
   maxToppings: number;
+  lineSpacing?: number;
   showStoreName?: boolean;
   showOrderNumber?: boolean;
   showTableName?: boolean;
@@ -46,6 +47,7 @@ interface SingleLabelProps {
   heightMm: number;
   fonts: { bold: number; normal: number; small: number };
   scale: number;
+  lineSpacing: number;
   showStoreName: boolean;
   showOrderNumber: boolean;
   showTime: boolean;
@@ -63,6 +65,7 @@ function SingleLabel({
   heightMm,
   fonts,
   scale,
+  lineSpacing,
   showStoreName,
   showOrderNumber,
   showTime,
@@ -89,6 +92,7 @@ function SingleLabel({
         width: `${width}px`,
         height: `${height}px`,
         fontFamily: "monospace",
+        lineHeight: lineSpacing,
       }}
     >
       <div className="p-1" style={{ fontSize: `${fonts.small}px` }}>
@@ -222,6 +226,7 @@ export function LabelPreview({
   heightMm,
   fontScale,
   maxToppings,
+  lineSpacing = 1.4,
   showStoreName = false,
   showOrderNumber = true,
   showTableName = true,
@@ -356,6 +361,7 @@ export function LabelPreview({
             heightMm={heightMm}
             fonts={fonts}
             scale={SCALE}
+            lineSpacing={lineSpacing}
             showStoreName={showStoreName}
             showOrderNumber={showOrderNumber}
             showTime={showTime}

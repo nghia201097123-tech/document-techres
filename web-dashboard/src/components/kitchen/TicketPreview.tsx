@@ -7,6 +7,7 @@ import { TicketFontSize } from "@/services/kitchen-service";
 interface TicketPreviewProps {
   paperWidth: number; // 58, 80, etc.
   fontSize: TicketFontSize;
+  lineSpacing?: number;
   showStoreName?: boolean;
   showOrderNumber?: boolean;
   showTableName?: boolean;
@@ -70,6 +71,7 @@ const SAMPLE_DATA = {
 export function TicketPreview({
   paperWidth,
   fontSize,
+  lineSpacing = 1.4,
   showStoreName = false,
   showOrderNumber = true,
   showTableName = true,
@@ -108,6 +110,7 @@ export function TicketPreview({
         width: `${width}px`,
         fontFamily: "monospace",
         padding: "8px",
+        lineHeight: lineSpacing,
       }}
     >
       {/* Store Name */}
