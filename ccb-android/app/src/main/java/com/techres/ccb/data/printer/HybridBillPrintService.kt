@@ -1325,7 +1325,7 @@ object HybridBillPrintService {
                 // Chỉ in mã QR thanh toán (tiết kiệm giấy)
                 feed(1)
                 qrCode(qrUrl, size = 8)
-                feed(2)
+                feed(6) // Đủ khoảng cách để QR không bị cắt
                 cut()
             }.build()
 
