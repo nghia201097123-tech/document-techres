@@ -645,14 +645,10 @@ object HybridBillPrintService {
             }
 
             // ============ QR CODE ============
-            // Nếu thanh toán chuyển khoản (paymentMethod chứa "Chuyển khoản") -> luôn in QR thanh toán
+            // Nếu có paymentBankAccount -> luôn in QR thanh toán (cho cả bill tạm và bill chính thức)
             // Ngược lại -> in QR theo cài đặt template
-            val isBankTransfer = billData.paymentMethod.contains("Chuyển khoản", ignoreCase = true) ||
-                billData.paymentMethod.contains("Bank", ignoreCase = true) ||
-                billData.paymentMethod.contains("Transfer", ignoreCase = true)
-
-            if (isBankTransfer && paymentBankAccount != null) {
-                // Thanh toán chuyển khoản - LUÔN in QR code
+            if (paymentBankAccount != null) {
+                // Có tài khoản ngân hàng - LUÔN in QR code thanh toán
                 separator()
                 lineCenter("THANH TOÁN CHUYỂN KHOẢN")
                 lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
@@ -1073,14 +1069,10 @@ object HybridBillPrintService {
             }
 
             // ============ QR CODE ============
-            // Nếu thanh toán chuyển khoản (paymentMethod chứa "Chuyển khoản") -> luôn in QR thanh toán
+            // Nếu có paymentBankAccount -> luôn in QR thanh toán (cho cả bill tạm và bill chính thức)
             // Ngược lại -> in QR theo cài đặt template
-            val isBankTransfer = billData.paymentMethod.contains("Chuyển khoản", ignoreCase = true) ||
-                billData.paymentMethod.contains("Bank", ignoreCase = true) ||
-                billData.paymentMethod.contains("Transfer", ignoreCase = true)
-
-            if (isBankTransfer && paymentBankAccount != null) {
-                // Thanh toán chuyển khoản - LUÔN in QR code
+            if (paymentBankAccount != null) {
+                // Có tài khoản ngân hàng - LUÔN in QR code thanh toán
                 separator()
                 lineCenter("THANH TOÁN CHUYỂN KHOẢN", BitmapTextStyle(bold = true))
                 lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
