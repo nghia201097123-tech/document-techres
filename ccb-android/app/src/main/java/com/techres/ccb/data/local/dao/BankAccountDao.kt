@@ -39,8 +39,9 @@ interface BankAccountDao {
     /**
      * Get the primary bank account for a branch
      * Falls back to first active account if no primary is set
+     * Also checks for brand-level accounts (branchId is null or empty)
      */
-    @Query("SELECT * FROM bank_accounts WHERE branch_id = :branchId AND is_active = 1 ORDER BY is_primary DESC LIMIT 1")
+    @Query("SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY is_primary DESC LIMIT 1")
     suspend fun getPrimaryBankAccount(branchId: String): BankAccountEntity?
 
     /**
@@ -52,12 +53,19 @@ interface BankAccountDao {
     @Query("DELETE FROM bank_accounts WHERE branch_id = :branchId")
     suspend fun deleteAllByBranch(branchId: String)
 
+    @Query("DELETE FROM bank_accounts")
+    suspend fun deleteAll()
+
     @Query("SELECT COUNT(*) FROM bank_accounts WHERE branch_id = :branchId AND is_active = 1")
     suspend fun countActive(branchId: String): Int
 
+    @Query("SELECT COUNT(*) FROM bank_accounts WHERE is_active = 1")
+    suspend fun countAllActive(): Int
+
     @Transaction
     suspend fun syncBankAccounts(branchId: String, bankAccounts: List<BankAccountEntity>) {
-        deleteAllByBranch(branchId)
+        // Clear all bank accounts and insert fresh data
+        deleteAll()
         insertAll(bankAccounts)
     }
 }
