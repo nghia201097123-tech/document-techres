@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.PrinterProtocol
