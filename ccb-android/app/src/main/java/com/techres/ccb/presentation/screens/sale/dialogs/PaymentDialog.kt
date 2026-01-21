@@ -38,7 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.domain.model.Payment
 import com.techres.ccb.domain.model.PaymentMethod
@@ -403,21 +407,71 @@ fun PaymentDialog(
                                 if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount != null) {
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    // Generate QR URL
-                                    val transferContent = bankAccount.generateTransferContent(orderNumber)
-                                    val qrUrl = bankAccount.generateQrUrl(totalAmount, transferContent)
+                                    // Generate QR URL - memoized to prevent regeneration
+                                    val transferContent = remember(bankAccount.id, orderNumber) {
+                                        bankAccount.generateTransferContent(orderNumber)
+                                    }
+                                    val qrUrl = remember(bankAccount.id, totalAmount, orderNumber) {
+                                        bankAccount.generateQrUrl(totalAmount, transferContent)
+                                    }
 
-                                    // QR Code
+                                    // QR Code with caching and loading state
+                                    val context = LocalContext.current
+                                    val imageRequest = remember(qrUrl) {
+                                        ImageRequest.Builder(context)
+                                            .data(qrUrl)
+                                            .memoryCachePolicy(CachePolicy.ENABLED)
+                                            .diskCachePolicy(CachePolicy.ENABLED)
+                                            .crossfade(true)
+                                            .build()
+                                    }
+
                                     Card(
                                         shape = RoundedCornerShape(12.dp),
                                         colors = CardDefaults.cardColors(containerColor = Color.White)
                                     ) {
-                                        AsyncImage(
-                                            model = qrUrl,
+                                        SubcomposeAsyncImage(
+                                            model = imageRequest,
                                             contentDescription = "QR Code thanh toán",
                                             modifier = Modifier
                                                 .size(160.dp)
-                                                .padding(8.dp)
+                                                .padding(8.dp),
+                                            loading = {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(32.dp),
+                                                        strokeWidth = 3.dp,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            },
+                                            error = {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(
+                                                            Icons.Default.Warning,
+                                                            contentDescription = null,
+                                                            tint = Color.Red,
+                                                            modifier = Modifier.size(24.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text(
+                                                            "Lỗi tải QR",
+                                                            fontSize = 10.sp,
+                                                            color = Color.Red
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            success = {
+                                                SubcomposeAsyncImageContent()
+                                            }
                                         )
                                     }
 

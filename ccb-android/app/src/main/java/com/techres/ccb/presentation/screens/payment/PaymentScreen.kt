@@ -29,7 +29,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.presentation.theme.Success
 
@@ -500,11 +504,22 @@ private fun BankTransferSection(
     val accountName = bankAccount?.accountName ?: "CONG TY TNHH TECHRES"
     val transferContent = bankAccount?.generateTransferContent(orderNumber) ?: "TT $orderNumber"
 
-    // Generate QR URL using VietQR API
-    val qrUrl = remember(grandTotal, orderNumber, bankAccount) {
+    // Generate QR URL using VietQR API - memoized with proper keys
+    val qrUrl = remember(grandTotal, orderNumber, bankAccount?.id) {
         val amount = grandTotal.toLong()
         bankAccount?.generateQrUrl(amount, transferContent)
             ?: "https://qr.sepay.vn/img?bank=$bankCode&acc=$accountNumber&template=compact&amount=$amount&des=${java.net.URLEncoder.encode(transferContent, "UTF-8")}"
+    }
+
+    // Build ImageRequest with caching
+    val context = LocalContext.current
+    val imageRequest = remember(qrUrl) {
+        ImageRequest.Builder(context)
+            .data(qrUrl)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .crossfade(true)
+            .build()
     }
 
     Card(
@@ -525,19 +540,55 @@ private fun BankTransferSection(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // QR Code Image
+            // QR Code Image with caching and loading state
             Card(
                 modifier = Modifier.size(200.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                AsyncImage(
-                    model = qrUrl,
+                SubcomposeAsyncImage(
+                    model = imageRequest,
                     contentDescription = "QR Code thanh toán",
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(8.dp),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
+                    loading = {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(40.dp),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    error = {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Color.Red,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Lỗi tải mã QR",
+                                    fontSize = 12.sp,
+                                    color = Color.Red
+                                )
+                            }
+                        }
+                    },
+                    success = {
+                        SubcomposeAsyncImageContent()
+                    }
                 )
             }
 
