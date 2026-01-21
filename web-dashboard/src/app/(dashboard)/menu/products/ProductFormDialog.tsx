@@ -125,6 +125,35 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
   const [selectedComboItems, setSelectedComboItems] = React.useState<Map<string, number>>(new Map());
   const [comboSearchQuery, setComboSearchQuery] = React.useState("");
 
+  // Function to reload categories and units from server
+  const reloadCategoriesAndUnits = React.useCallback(async () => {
+    if (!brandId) return;
+
+    // Reload categories
+    try {
+      const cats = await categoryService.getAll(brandId);
+      setCategories(cats.filter(c => c.isActive));
+    } catch (error) {
+      console.error("Error reloading categories:", error);
+    }
+
+    // Reload units
+    try {
+      const unitsData = await unitService.getAll(brandId);
+      setUnits(unitsData);
+    } catch (error) {
+      console.error("Error reloading units:", error);
+    }
+
+    // Reload notes
+    try {
+      const notes = await productService.getAllNotes(brandId);
+      setAvailableNotes(notes);
+    } catch (error) {
+      console.error("Error reloading notes:", error);
+    }
+  }, [brandId]);
+
   // Load data when dialog opens
   React.useEffect(() => {
     if (!open || !brandId) return;
@@ -506,6 +535,8 @@ const ProductFormDialog = React.memo(function ProductFormDialog({
           setSelectedNoteIds(new Set());
           setSelectedComboItems(new Map());
           setComboSearchQuery("");
+          // Reload categories and units to include newly created ones
+          await reloadCategoriesAndUnits();
           onSuccess(result);
         } else {
           onSuccess(result);
