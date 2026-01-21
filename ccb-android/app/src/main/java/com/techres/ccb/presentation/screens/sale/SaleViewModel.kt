@@ -1491,6 +1491,15 @@ class SaleViewModel @Inject constructor(
                 // Update current order's table - DON'T clear items!
                 Log.d(TAG, "selectTable - Updating existing order ${existingOrder.orderNumber} to table ${table.name}")
 
+                // Release old table if switching from another table
+                val oldTableId = existingOrder.tableId
+                if (oldTableId != null && oldTableId != table.id) {
+                    Log.d(TAG, "selectTable - Releasing old table: $oldTableId")
+                    withContext(Dispatchers.IO) {
+                        tableRepository.releaseTable(oldTableId)
+                    }
+                }
+
                 val updatedOrder = existingOrder.copy(
                     tableId = table.id,
                     tableName = table.name,
@@ -1512,6 +1521,9 @@ class SaleViewModel @Inject constructor(
                         // Keep currentOrderItems, cartItems, discounts unchanged!
                     )
                 }
+
+                // Reload tables to refresh UI (show old table as available)
+                refreshTables()
                 return@launch
             }
 
