@@ -5,6 +5,7 @@ import android.util.Log
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.remote.api.AuthApi
 import com.techres.ccb.data.remote.api.MasterDataApi
+import com.techres.ccb.data.remote.api.PayOSApi
 import com.techres.ccb.data.remote.api.PosApi
 import com.techres.ccb.data.remote.api.SyncApi
 import dagger.Module
@@ -38,6 +39,10 @@ annotation class TenantRetrofit
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class PosRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class GatewayRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -135,6 +140,18 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @GatewayRetrofit
+    fun provideGatewayRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        Log.d(TAG, "API Gateway URL: ${BuildConfig.API_GATEWAY_URL}")
+        return Retrofit.Builder()
+            .baseUrl(BuildConfig.API_GATEWAY_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
     fun provideAuthApi(@TenantRetrofit retrofit: Retrofit): AuthApi {
         return retrofit.create(AuthApi::class.java)
     }
@@ -155,6 +172,12 @@ object NetworkModule {
     @Singleton
     fun providePosApi(@PosRetrofit retrofit: Retrofit): PosApi {
         return retrofit.create(PosApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun providePayOSApi(@GatewayRetrofit retrofit: Retrofit): PayOSApi {
+        return retrofit.create(PayOSApi::class.java)
     }
 }
 

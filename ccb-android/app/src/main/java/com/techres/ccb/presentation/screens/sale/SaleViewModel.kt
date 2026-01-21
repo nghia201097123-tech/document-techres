@@ -43,9 +43,15 @@ import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.CategoryRepository
 import com.techres.ccb.data.repository.KitchenRepository
 import com.techres.ccb.data.repository.OrderRepository
+import com.techres.ccb.data.repository.PayOSRepository
+import com.techres.ccb.data.repository.PayOSResult
 import com.techres.ccb.data.repository.ProductRepository
 import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
+import com.techres.ccb.data.socket.PaymentAnnouncementService
+import com.techres.ccb.data.socket.PaymentSocketManager
+import com.techres.ccb.data.socket.SocketConnectionState
+import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.printer.OrderPrintingService
 import com.techres.ccb.presentation.screens.table.TableViewModel
 import com.techres.ccb.domain.model.*
@@ -172,7 +178,17 @@ data class SaleUiState(
     val bankAccount: BankAccountEntity? = null,
 
     // QR printing state
-    val isPrintingQr: Boolean = false
+    val isPrintingQr: Boolean = false,
+
+    // PayOS Payment State
+    val payosQrCodeUrl: String? = null,           // PayOS QR code image URL
+    val payosCheckoutUrl: String? = null,         // PayOS checkout URL for printing
+    val payosPaymentLinkId: String? = null,       // PayOS payment link ID
+    val payosOrderCode: Long? = null,             // PayOS order code for tracking
+    val isCreatingPayosPayment: Boolean = false,  // Loading state for creating payment
+    val payosError: String? = null,               // PayOS error message
+    val isPayosPaymentMode: Boolean = false,      // Using PayOS instead of VietQR
+    val socketConnectionState: SocketConnectionState = SocketConnectionState.DISCONNECTED
 ) {
     // Computed properties
     // Subtotal = tổng tiền items đã order + items mới trong giỏ hàng
@@ -375,7 +391,10 @@ class SaleViewModel @Inject constructor(
     private val surchargeDao: SurchargeDao,
     private val bankAccountDao: BankAccountDao,
     private val branchDao: BranchDao,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val payOSRepository: PayOSRepository,
+    private val paymentSocketManager: PaymentSocketManager,
+    private val paymentAnnouncementService: PaymentAnnouncementService
 ) : ViewModel() {
 
     companion object {
@@ -408,6 +427,7 @@ class SaleViewModel @Inject constructor(
         loadInitialData()
         loadPagerGridSize()
         loadOrderType()
+        setupPaymentSocketListeners()
     }
 
     private fun loadInitialData() {
@@ -3125,6 +3145,7 @@ class SaleViewModel @Inject constructor(
 
     /**
      * In riêng mã QR thanh toán
+     * Hỗ trợ cả VietQR (từ bank account) và PayOS (từ checkout URL)
      */
     fun printPaymentQrCode() {
         val state = _uiState.value
@@ -3132,9 +3153,23 @@ class SaleViewModel @Inject constructor(
             _uiState.update { it.copy(errorMessage = "Không có order để in QR") }
             return
         }
-        val bankAccount = state.bankAccount ?: run {
-            _uiState.update { it.copy(errorMessage = "Chưa cấu hình tài khoản ngân hàng") }
-            return
+
+        // Check if we're in PayOS mode or VietQR mode
+        val isPayosMode = state.isPayosPaymentMode
+        val payosCheckoutUrl = state.payosCheckoutUrl
+        val bankAccount = state.bankAccount
+
+        // Validate based on mode
+        if (isPayosMode) {
+            if (payosCheckoutUrl.isNullOrEmpty()) {
+                _uiState.update { it.copy(errorMessage = "Chưa tạo mã QR PayOS") }
+                return
+            }
+        } else {
+            if (bankAccount == null) {
+                _uiState.update { it.copy(errorMessage = "Chưa cấu hình tài khoản ngân hàng") }
+                return
+            }
         }
 
         viewModelScope.launch {
@@ -3157,15 +3192,29 @@ class SaleViewModel @Inject constructor(
                         // Get total amount
                         val totalAmount = state.totalAmount
 
-                        // Print QR code
-                        val result = HybridBillPrintService.printPaymentQrCode(
-                            printerConfig = printerConfig,
-                            bankAccount = bankAccount,
-                            amount = totalAmount,
-                            orderNumber = currentOrder.orderNumber,
-                            storeName = storeName,
-                            copies = 1
-                        )
+                        // Print QR code based on mode
+                        val result = if (isPayosMode && payosCheckoutUrl != null) {
+                            // PayOS mode - print checkout URL as QR
+                            HybridBillPrintService.printPayosQrCode(
+                                printerConfig = printerConfig,
+                                checkoutUrl = payosCheckoutUrl,
+                                amount = totalAmount,
+                                orderCode = state.payosOrderCode ?: 0L,
+                                copies = 1
+                            )
+                        } else if (bankAccount != null) {
+                            // VietQR mode - print bank QR
+                            HybridBillPrintService.printPaymentQrCode(
+                                printerConfig = printerConfig,
+                                bankAccount = bankAccount,
+                                amount = totalAmount,
+                                orderNumber = currentOrder.orderNumber,
+                                storeName = storeName,
+                                copies = 1
+                            )
+                        } else {
+                            PrinterResult.Error("Không có thông tin thanh toán")
+                        }
 
                         withContext(Dispatchers.Main) {
                             when (result) {
@@ -4280,5 +4329,287 @@ class SaleViewModel @Inject constructor(
                 successMessage = "Đã xoá phụ thu"
             )
         }
+    }
+
+    // ============ PAYOS PAYMENT FUNCTIONS ============
+
+    /**
+     * Setup Socket.IO listeners for payment events
+     */
+    private fun setupPaymentSocketListeners() {
+        viewModelScope.launch {
+            // Listen for connection state changes
+            paymentSocketManager.connectionState.collect { state ->
+                _uiState.update { it.copy(socketConnectionState = state) }
+                Log.d(TAG, "Socket connection state: $state")
+            }
+        }
+
+        viewModelScope.launch {
+            // Listen for payment success events
+            paymentSocketManager.paymentSuccess.collect { event ->
+                Log.d(TAG, "Payment success received: orderCode=${event.orderCode}, amount=${event.amount}")
+
+                // Check if this is for our current payment
+                val currentOrderCode = _uiState.value.payosOrderCode
+                if (currentOrderCode == event.orderCode) {
+                    // Announce via TTS
+                    paymentAnnouncementService.announcePaymentSuccess(event.amount, event.orderCode)
+
+                    // Auto-complete the bill
+                    autoCompleteBillAfterPayment(event.orderId, event.amount, event.transactionRef)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            // Listen for payment cancelled events
+            paymentSocketManager.paymentCancelled.collect { event ->
+                Log.d(TAG, "Payment cancelled received: orderCode=${event.orderCode}")
+
+                val currentOrderCode = _uiState.value.payosOrderCode
+                if (currentOrderCode == event.orderCode) {
+                    paymentAnnouncementService.announcePaymentCancelled(event.orderCode)
+                    _uiState.update {
+                        it.copy(
+                            payosError = "Thanh toán đã bị hủy",
+                            isCreatingPayosPayment = false
+                        )
+                    }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            // Listen for payment expired events
+            paymentSocketManager.paymentExpired.collect { event ->
+                Log.d(TAG, "Payment expired received: orderCode=${event.orderCode}")
+
+                val currentOrderCode = _uiState.value.payosOrderCode
+                if (currentOrderCode == event.orderCode) {
+                    paymentAnnouncementService.announcePaymentExpired(event.orderCode)
+                    _uiState.update {
+                        it.copy(
+                            payosError = "Mã thanh toán đã hết hạn",
+                            isCreatingPayosPayment = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Connect to Socket.IO server for payment notifications
+     */
+    fun connectPaymentSocket() {
+        viewModelScope.launch {
+            val deviceId = authRepository.getDeviceId() ?: UUID.randomUUID().toString()
+            val currentBranchId = branchId.ifEmpty { authRepository.getBranchId() ?: "" }
+
+            if (currentBranchId.isNotEmpty()) {
+                paymentSocketManager.connect(
+                    serverUrl = BuildConfig.SOCKET_URL,
+                    branchId = currentBranchId,
+                    deviceId = deviceId
+                )
+                Log.d(TAG, "Connecting to payment socket: branchId=$currentBranchId")
+            } else {
+                Log.w(TAG, "Cannot connect to socket: branchId is empty")
+            }
+        }
+    }
+
+    /**
+     * Disconnect from Socket.IO server
+     */
+    fun disconnectPaymentSocket() {
+        paymentSocketManager.disconnect()
+    }
+
+    /**
+     * Create a PayOS payment link for the current order
+     */
+    fun createPayOSPayment() {
+        val state = _uiState.value
+        val totalAmount = state.totalAmount
+
+        if (totalAmount <= 0) {
+            _uiState.update { it.copy(payosError = "Số tiền thanh toán không hợp lệ") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isCreatingPayosPayment = true,
+                    payosError = null,
+                    isPayosPaymentMode = true
+                )
+            }
+
+            try {
+                // Ensure socket is connected
+                if (!paymentSocketManager.isConnected()) {
+                    connectPaymentSocket()
+                }
+
+                val currentBranchId = branchId.ifEmpty { authRepository.getBranchId() ?: "" }
+                val deviceId = authRepository.getDeviceId() ?: UUID.randomUUID().toString()
+
+                // Generate order code (unique numeric identifier)
+                val orderCode = System.currentTimeMillis()
+
+                // Get order ID or generate one
+                val orderId = state.currentOrder?.id ?: "NEW-${UUID.randomUUID()}"
+
+                // Build description
+                val tableName = state.selectedTable?.name ?: ""
+                val description = if (tableName.isNotEmpty()) {
+                    "TT $tableName"
+                } else {
+                    "TT #$orderCode"
+                }
+
+                val result = payOSRepository.createPayment(
+                    orderId = orderId,
+                    orderCode = orderCode,
+                    amount = totalAmount,
+                    description = description,
+                    branchId = currentBranchId,
+                    deviceId = deviceId,
+                    tableName = tableName.takeIf { it.isNotEmpty() },
+                    customerName = null
+                )
+
+                when (result) {
+                    is PayOSResult.Success -> {
+                        val response = result.data
+                        _uiState.update {
+                            it.copy(
+                                payosQrCodeUrl = response.qrCode,
+                                payosCheckoutUrl = response.checkoutUrl,
+                                payosPaymentLinkId = response.paymentLinkId,
+                                payosOrderCode = response.orderCode,
+                                isCreatingPayosPayment = false,
+                                payosError = null
+                            )
+                        }
+                        Log.d(TAG, "PayOS payment created: orderCode=${response.orderCode}, checkoutUrl=${response.checkoutUrl}")
+                    }
+                    is PayOSResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isCreatingPayosPayment = false,
+                                payosError = result.message
+                            )
+                        }
+                        Log.e(TAG, "PayOS payment creation failed: ${result.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "PayOS payment error", e)
+                _uiState.update {
+                    it.copy(
+                        isCreatingPayosPayment = false,
+                        payosError = "Lỗi tạo thanh toán: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Cancel the current PayOS payment
+     */
+    fun cancelPayOSPayment() {
+        val orderCode = _uiState.value.payosOrderCode ?: return
+
+        viewModelScope.launch {
+            try {
+                val result = payOSRepository.cancelPayment(orderCode, "User cancelled")
+                if (result is PayOSResult.Success) {
+                    clearPayOSPaymentState()
+                    Log.d(TAG, "PayOS payment cancelled: orderCode=$orderCode")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to cancel PayOS payment", e)
+            }
+        }
+    }
+
+    /**
+     * Clear PayOS payment state
+     */
+    fun clearPayOSPaymentState() {
+        _uiState.update {
+            it.copy(
+                payosQrCodeUrl = null,
+                payosCheckoutUrl = null,
+                payosPaymentLinkId = null,
+                payosOrderCode = null,
+                isCreatingPayosPayment = false,
+                payosError = null,
+                isPayosPaymentMode = false
+            )
+        }
+    }
+
+    /**
+     * Switch to PayOS payment mode
+     */
+    fun enablePayOSPaymentMode() {
+        _uiState.update { it.copy(isPayosPaymentMode = true) }
+        createPayOSPayment()
+    }
+
+    /**
+     * Switch to VietQR payment mode (existing bank transfer)
+     */
+    fun disablePayOSPaymentMode() {
+        cancelPayOSPayment()
+        _uiState.update { it.copy(isPayosPaymentMode = false) }
+    }
+
+    /**
+     * Auto-complete the bill after receiving payment confirmation
+     */
+    private fun autoCompleteBillAfterPayment(orderId: String, amount: Long, transactionRef: String?) {
+        Log.d(TAG, "Auto-completing bill: orderId=$orderId, amount=$amount, ref=$transactionRef")
+
+        viewModelScope.launch {
+            try {
+                // Clear PayOS state
+                clearPayOSPaymentState()
+
+                // Hide payment dialog
+                hidePaymentDialog()
+
+                // Complete the order with bank_transfer method
+                completeOrder(
+                    paymentMethod = "bank_transfer",
+                    receivedAmount = amount.toDouble(),
+                    changeAmount = 0.0
+                )
+
+                // Show success message
+                _uiState.update {
+                    it.copy(successMessage = "Đã nhận thanh toán ${formatCurrency(amount)}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to auto-complete bill", e)
+                _uiState.update {
+                    it.copy(errorMessage = "Lỗi hoàn tất đơn hàng: ${e.message}")
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Disconnect socket when ViewModel is cleared
+        disconnectPaymentSocket()
+        // Shutdown TTS
+        paymentAnnouncementService.shutdown()
     }
 }

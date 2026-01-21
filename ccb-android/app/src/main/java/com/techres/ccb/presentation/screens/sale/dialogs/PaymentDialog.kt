@@ -160,6 +160,14 @@ fun PaymentDialog(
     // Bank account for QR code payment
     bankAccount: BankAccountEntity? = null,
     orderNumber: String = "",
+    // PayOS payment options
+    isPayosPaymentMode: Boolean = false,
+    payosQrCodeUrl: String? = null,
+    payosOrderCode: Long? = null,
+    isCreatingPayosPayment: Boolean = false,
+    payosError: String? = null,
+    onEnablePayOS: () -> Unit = {},
+    onDisablePayOS: () -> Unit = {},
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
@@ -404,75 +412,264 @@ fun PaymentDialog(
                                 Text(formatCurrency(totalAmount), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 
                                 // Show QR code for bank transfer
-                                if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount != null) {
+                                if (selectedMethod == PaymentMethod.BANK_TRANSFER) {
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    // Generate QR URL - memoized to prevent regeneration
-                                    val transferContent = remember(bankAccount.id, orderNumber) {
-                                        bankAccount.generateTransferContent(orderNumber)
-                                    }
-                                    val qrUrl = remember(bankAccount.id, totalAmount, orderNumber) {
-                                        bankAccount.generateQrUrl(totalAmount, transferContent)
-                                    }
-
-                                    // QR Code with caching and loading state
-                                    val context = LocalContext.current
-                                    val imageRequest = remember(qrUrl) {
-                                        ImageRequest.Builder(context)
-                                            .data(qrUrl)
-                                            .memoryCachePolicy(CachePolicy.ENABLED)
-                                            .diskCachePolicy(CachePolicy.ENABLED)
-                                            .crossfade(true)
-                                            .build()
-                                    }
-
-                                    Card(
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                                    // PayOS/VietQR mode toggle
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        SubcomposeAsyncImage(
-                                            model = imageRequest,
-                                            contentDescription = "QR Code thanh toán",
-                                            modifier = Modifier
-                                                .size(160.dp)
-                                                .padding(8.dp),
-                                            loading = {
+                                        FilterChip(
+                                            selected = !isPayosPaymentMode,
+                                            onClick = onDisablePayOS,
+                                            label = { Text("VietQR", fontSize = 11.sp) },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        FilterChip(
+                                            selected = isPayosPaymentMode,
+                                            onClick = onEnablePayOS,
+                                            label = { Text("PayOS", fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFF1976D2),
+                                                selectedLabelColor = Color.White
+                                            ),
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // QR Code display - PayOS or VietQR
+                                    val context = LocalContext.current
+
+                                    if (isPayosPaymentMode) {
+                                        // PayOS QR Code
+                                        if (isCreatingPayosPayment) {
+                                            // Loading state
+                                            Card(
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                                            ) {
                                                 Box(
-                                                    modifier = Modifier.fillMaxSize(),
+                                                    modifier = Modifier
+                                                        .size(160.dp)
+                                                        .padding(8.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(32.dp),
-                                                        strokeWidth = 3.dp,
-                                                        color = MaterialTheme.colorScheme.primary
-                                                    )
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(32.dp),
+                                                            strokeWidth = 3.dp,
+                                                            color = Color(0xFF1976D2)
+                                                        )
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Text("Đang tạo mã...", fontSize = 12.sp, color = Color.Gray)
+                                                    }
                                                 }
-                                            },
-                                            error = {
+                                            }
+                                        } else if (payosError != null) {
+                                            // Error state
+                                            Card(
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+                                            ) {
                                                 Box(
-                                                    modifier = Modifier.fillMaxSize(),
+                                                    modifier = Modifier
+                                                        .size(160.dp)
+                                                        .padding(8.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                         Icon(
                                                             Icons.Default.Warning,
                                                             contentDescription = null,
-                                                            tint = Color.Red,
-                                                            modifier = Modifier.size(24.dp)
+                                                            tint = Color(0xFFE65100),
+                                                            modifier = Modifier.size(32.dp)
                                                         )
                                                         Spacer(modifier = Modifier.height(4.dp))
                                                         Text(
-                                                            "Lỗi tải QR",
+                                                            payosError,
                                                             fontSize = 10.sp,
-                                                            color = Color.Red
+                                                            color = Color(0xFFE65100),
+                                                            textAlign = TextAlign.Center
                                                         )
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        TextButton(onClick = onEnablePayOS) {
+                                                            Text("Thử lại", fontSize = 12.sp)
+                                                        }
                                                     }
                                                 }
-                                            },
-                                            success = {
-                                                SubcomposeAsyncImageContent()
                                             }
-                                        )
+                                        } else if (payosQrCodeUrl != null) {
+                                            // PayOS QR Code image
+                                            val payosImageRequest = remember(payosQrCodeUrl) {
+                                                ImageRequest.Builder(context)
+                                                    .data(payosQrCodeUrl)
+                                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                                    .crossfade(true)
+                                                    .build()
+                                            }
+
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                // PayOS badge
+                                                Card(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1976D2))
+                                                ) {
+                                                    Text(
+                                                        "PayOS - Tự động xác nhận",
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                        fontSize = 10.sp,
+                                                        color = Color.White
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+
+                                                Card(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                                ) {
+                                                    SubcomposeAsyncImage(
+                                                        model = payosImageRequest,
+                                                        contentDescription = "PayOS QR Code",
+                                                        modifier = Modifier
+                                                            .size(160.dp)
+                                                            .padding(8.dp),
+                                                        loading = {
+                                                            Box(
+                                                                modifier = Modifier.fillMaxSize(),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                CircularProgressIndicator(
+                                                                    modifier = Modifier.size(32.dp),
+                                                                    strokeWidth = 3.dp,
+                                                                    color = Color(0xFF1976D2)
+                                                                )
+                                                            }
+                                                        },
+                                                        error = {
+                                                            Box(
+                                                                modifier = Modifier.fillMaxSize(),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                                    Icon(
+                                                                        Icons.Default.Warning,
+                                                                        contentDescription = null,
+                                                                        tint = Color.Red,
+                                                                        modifier = Modifier.size(24.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                                    Text("Lỗi tải QR", fontSize = 10.sp, color = Color.Red)
+                                                                }
+                                                            }
+                                                        },
+                                                        success = {
+                                                            SubcomposeAsyncImageContent()
+                                                        }
+                                                    )
+                                                }
+
+                                                // Order code for reference
+                                                payosOrderCode?.let { code ->
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        "Mã: $code",
+                                                        fontSize = 10.sp,
+                                                        color = Color.Gray
+                                                    )
+                                                }
+
+                                                // Print PayOS QR button
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                OutlinedButton(
+                                                    onClick = onPrintPaymentQr,
+                                                    enabled = !isPrintingQr,
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1976D2))
+                                                ) {
+                                                    if (isPrintingQr) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(14.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = Color(0xFF1976D2)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("Đang in...", fontSize = 12.sp)
+                                                    } else {
+                                                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("In mã QR", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else if (bankAccount != null && !isPayosPaymentMode) {
+                                        // VietQR mode (original)
+                                        val transferContent = remember(bankAccount.id, orderNumber) {
+                                            bankAccount.generateTransferContent(orderNumber)
+                                        }
+                                        val qrUrl = remember(bankAccount.id, totalAmount, orderNumber) {
+                                            bankAccount.generateQrUrl(totalAmount, transferContent)
+                                        }
+
+                                        val imageRequest = remember(qrUrl) {
+                                            ImageRequest.Builder(context)
+                                                .data(qrUrl)
+                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                .crossfade(true)
+                                                .build()
+                                        }
+
+                                        Card(
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                                        ) {
+                                            SubcomposeAsyncImage(
+                                                model = imageRequest,
+                                                contentDescription = "QR Code thanh toán",
+                                                modifier = Modifier
+                                                    .size(160.dp)
+                                                    .padding(8.dp),
+                                                loading = {
+                                                    Box(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(32.dp),
+                                                            strokeWidth = 3.dp,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                },
+                                                error = {
+                                                    Box(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                            Icon(
+                                                                Icons.Default.Warning,
+                                                                contentDescription = null,
+                                                                tint = Color.Red,
+                                                                modifier = Modifier.size(24.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Text("Lỗi tải QR", fontSize = 10.sp, color = Color.Red)
+                                                        }
+                                                    }
+                                                },
+                                                success = {
+                                                    SubcomposeAsyncImageContent()
+                                                }
+                                            )
+                                        }
                                     }
 
                                     // Nút in mã QR thanh toán - đặt ngay dưới QR code
@@ -540,8 +737,8 @@ fun PaymentDialog(
                                             }
                                         }
                                     }
-                                } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null) {
-                                    // No bank account configured
+                                } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null && !isPayosPaymentMode) {
+                                    // No bank account configured (only show for VietQR mode)
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
@@ -554,7 +751,7 @@ fun PaymentDialog(
                                             Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF9800))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                "Chưa cấu hình tài khoản ngân hàng.\nVui lòng cấu hình trong web-dashboard.",
+                                                "Chưa cấu hình tài khoản ngân hàng.\nVui lòng cấu hình trong web-dashboard hoặc sử dụng PayOS.",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = Color(0xFFE65100)
                                             )

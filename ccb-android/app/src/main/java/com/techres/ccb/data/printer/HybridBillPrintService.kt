@@ -1368,6 +1368,92 @@ object HybridBillPrintService {
     }
 
     /**
+     * In mã QR PayOS cho thanh toán
+     *
+     * Phiếu QR PayOS gồm:
+     * - Mã QR chứa checkout URL của PayOS
+     * - Khi quét sẽ mở trang thanh toán PayOS
+     */
+    suspend fun printPayosQrCode(
+        printerConfig: BillPrinterConfigEntity,
+        checkoutUrl: String,
+        amount: Long,
+        orderCode: Long,
+        copies: Int = 1
+    ): PrinterResult {
+        return withContext(Dispatchers.IO) {
+            Log.d(TAG, "=== PRINT PAYOS QR CODE ===")
+            Log.d(TAG, "CheckoutUrl: $checkoutUrl")
+            Log.d(TAG, "Amount: $amount, OrderCode: $orderCode")
+
+            // Compute font scale from fontSize setting
+            val fontScale = when (printerConfig.fontSize) {
+                "extra_small" -> 0.7f
+                "small" -> 0.85f
+                "normal" -> 1.0f
+                "large" -> 1.15f
+                "extra_large" -> 1.3f
+                else -> 1.0f
+            }
+
+            // Build phiếu QR PayOS
+            val builder = HybridBillBuilder(
+                paperWidth = printerConfig.paperWidth,
+                useBitmapMode = true,
+                useRasterBitmap = false,
+                fontScale = fontScale,
+                lineSpacing = printerConfig.lineSpacing
+            )
+
+            val content = builder.apply {
+                init()
+
+                // Chỉ in mã QR PayOS (tiết kiệm giấy)
+                feed(1)
+                qrCode(checkoutUrl, size = 8)
+                feed(6) // Đủ khoảng cách để QR không bị cắt
+                cut()
+            }.build()
+
+            // In phiếu
+            if (printerConfig.connectionType == "sunmi") {
+                // Sunmi built-in printer
+                val adapter = sunmiAdapter
+                if (adapter == null) {
+                    return@withContext PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
+                }
+
+                repeat(copies) { copy ->
+                    val result = adapter.write(content)
+                    if (result is PrinterResult.Error) {
+                        Log.e(TAG, "Sunmi print error: ${result.message}")
+                        return@withContext result
+                    }
+                    if (copy < copies - 1) delay(500)
+                }
+                PrinterResult.Success("In QR PayOS thành công!")
+            } else {
+                // Network printer
+                val ip = printerConfig.printerIp
+                val port = printerConfig.printerPort
+
+                if (ip.isNullOrBlank()) {
+                    return@withContext PrinterResult.Error("Chưa cấu hình IP máy in")
+                }
+
+                repeat(copies) { copy ->
+                    val result = printToNetworkPrinter(ip, port, content)
+                    if (result is PrinterResult.Error) {
+                        return@withContext result
+                    }
+                    if (copy < copies - 1) delay(500)
+                }
+                PrinterResult.Success("In QR PayOS thành công!")
+            }
+        }
+    }
+
+    /**
      * In QR thanh toán qua network printer
      */
     private suspend fun printToNetworkPrinter(
