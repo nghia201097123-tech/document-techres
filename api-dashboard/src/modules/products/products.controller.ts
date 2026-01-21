@@ -134,6 +134,16 @@ export class ProductsController {
     return this.productsService.addToppingItem(req.user.tenantId, groupId, dto);
   }
 
+  @Put('topping-groups/:groupId/items/reorder')
+  @ApiOperation({ summary: 'Sắp xếp lại thứ tự topping trong nhóm' })
+  reorderToppingItems(
+    @Request() req,
+    @Param('groupId') groupId: string,
+    @Body() dto: ReorderToppingItemsDto,
+  ) {
+    return this.productsService.reorderToppingItems(req.user.tenantId, groupId, dto.itemIds);
+  }
+
   @Put('topping-groups/:groupId/items/:itemId')
   @ApiOperation({ summary: 'Cập nhật topping trong nhóm' })
   updateToppingItem(
@@ -153,16 +163,6 @@ export class ProductsController {
     @Param('itemId') itemId: string,
   ) {
     return this.productsService.removeToppingItem(req.user.tenantId, groupId, itemId);
-  }
-
-  @Put('topping-groups/:groupId/items/reorder')
-  @ApiOperation({ summary: 'Sắp xếp lại thứ tự topping trong nhóm' })
-  reorderToppingItems(
-    @Request() req,
-    @Param('groupId') groupId: string,
-    @Body() dto: ReorderToppingItemsDto,
-  ) {
-    return this.productsService.reorderToppingItems(req.user.tenantId, groupId, dto.itemIds);
   }
 
   // === Product Topping Group Assignment ===
