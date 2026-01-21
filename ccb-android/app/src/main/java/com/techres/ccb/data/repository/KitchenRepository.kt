@@ -92,6 +92,30 @@ class KitchenRepository @Inject constructor(
         kitchenDao.updateActiveStatus(kitchenId, isActive)
     }
 
+    /**
+     * Update label settings for a kitchen
+     */
+    suspend fun updateLabelSettings(
+        kitchenId: String,
+        labelPrintPrice: Boolean,
+        labelPrintStoreName: Boolean,
+        labelPrintOrderNumber: Boolean,
+        labelPrintTableName: Boolean,
+        labelPrintTime: Boolean,
+        labelStoreName: String?,
+        labelReverse: Boolean,
+        labelWidthMm: Int,
+        labelHeightMm: Int,
+        labelGapMm: Int,
+        labelFontScale: Float
+    ) {
+        kitchenDao.updateLabelSettings(
+            kitchenId, labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
+            labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
+            labelWidthMm, labelHeightMm, labelGapMm, labelFontScale
+        )
+    }
+
     suspend fun clearByBranch(branchId: String) {
         kitchenDao.deleteAllByBranch(branchId)
     }

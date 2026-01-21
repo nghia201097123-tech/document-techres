@@ -37,6 +37,7 @@ fun LabelPrinterConfigScreen(
 
     var selectedPrinter by remember { mutableStateOf<KitchenEntity?>(null) }
     var showTestPrintDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -155,6 +156,10 @@ fun LabelPrinterConfigScreen(
                                 },
                                 onToggleActive = { isActive ->
                                     viewModel.toggleActiveStatus(printer.id, isActive)
+                                },
+                                onSettings = {
+                                    selectedPrinter = printer
+                                    showSettingsDialog = true
                                 }
                             )
                         }
@@ -175,13 +180,26 @@ fun LabelPrinterConfigScreen(
             onDismiss = { showTestPrintDialog = false }
         )
     }
+
+    // Settings dialog
+    if (showSettingsDialog && selectedPrinter != null) {
+        LabelPrinterSettingsDialog(
+            printer = selectedPrinter!!,
+            onDismiss = { showSettingsDialog = false },
+            onSave = { updatedPrinter ->
+                viewModel.updateLabelPrinterSettings(updatedPrinter)
+                showSettingsDialog = false
+            }
+        )
+    }
 }
 
 @Composable
 private fun LabelPrinterCard(
     printer: KitchenEntity,
     onTestPrint: () -> Unit,
-    onToggleActive: (Boolean) -> Unit
+    onToggleActive: (Boolean) -> Unit,
+    onSettings: () -> Unit
 ) {
     val color = Color(0xFF4CAF50)
 
@@ -237,6 +255,15 @@ private fun LabelPrinterCard(
                         text = "Máy in tem",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+
+                // Settings button
+                IconButton(onClick = onSettings) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "Cài đặt",
+                        tint = color
                     )
                 }
 
@@ -474,4 +501,249 @@ private fun LabelTestPrintDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LabelPrinterSettingsDialog(
+    printer: KitchenEntity,
+    onDismiss: () -> Unit,
+    onSave: (KitchenEntity) -> Unit
+) {
+    val color = Color(0xFF4CAF50)
+
+    // Local state for editable fields
+    var labelPrintPrice by remember { mutableStateOf(printer.labelPrintPrice) }
+    var labelPrintStoreName by remember { mutableStateOf(printer.labelPrintStoreName) }
+    var labelPrintOrderNumber by remember { mutableStateOf(printer.labelPrintOrderNumber) }
+    var labelPrintTableName by remember { mutableStateOf(printer.labelPrintTableName) }
+    var labelPrintTime by remember { mutableStateOf(printer.labelPrintTime) }
+    var labelStoreName by remember { mutableStateOf(printer.labelStoreName ?: "") }
+    var labelReverse by remember { mutableStateOf(printer.labelReverse) }
+    var labelWidthMm by remember { mutableStateOf(printer.labelWidthMm.toString()) }
+    var labelHeightMm by remember { mutableStateOf(printer.labelHeightMm.toString()) }
+    var labelGapMm by remember { mutableStateOf(printer.labelGapMm.toString()) }
+    var labelFontScale by remember { mutableStateOf(printer.labelFontScale) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = color
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cài đặt tem - ${printer.name}")
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 450.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Label size section
+                    item {
+                        Text(
+                            text = "Kích thước tem",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = color
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = labelWidthMm,
+                                onValueChange = { labelWidthMm = it.filter { c -> c.isDigit() } },
+                                label = { Text("Rộng (mm)") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = labelHeightMm,
+                                onValueChange = { labelHeightMm = it.filter { c -> c.isDigit() } },
+                                label = { Text("Cao (mm)") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = labelGapMm,
+                                onValueChange = { labelGapMm = it.filter { c -> c.isDigit() } },
+                                label = { Text("Gap (mm)") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+                    }
+
+                    // Font scale slider
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Cỡ chữ: ${String.format("%.1f", labelFontScale)}x",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = color
+                        )
+                        Slider(
+                            value = labelFontScale,
+                            onValueChange = { labelFontScale = it },
+                            valueRange = 0.5f..2.0f,
+                            steps = 14,
+                            colors = SliderDefaults.colors(
+                                thumbColor = color,
+                                activeTrackColor = color
+                            )
+                        )
+                    }
+
+                    // Store name
+                    item {
+                        OutlinedTextField(
+                            value = labelStoreName,
+                            onValueChange = { labelStoreName = it },
+                            label = { Text("Tên cửa hàng trên tem") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+
+                    // Display options section
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Hiển thị trên tem",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "In tên cửa hàng",
+                            checked = labelPrintStoreName,
+                            onCheckedChange = { labelPrintStoreName = it },
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "In mã đơn hàng",
+                            checked = labelPrintOrderNumber,
+                            onCheckedChange = { labelPrintOrderNumber = it },
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "In tên bàn",
+                            checked = labelPrintTableName,
+                            onCheckedChange = { labelPrintTableName = it },
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "In thời gian",
+                            checked = labelPrintTime,
+                            onCheckedChange = { labelPrintTime = it },
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "In giá",
+                            checked = labelPrintPrice,
+                            onCheckedChange = { labelPrintPrice = it },
+                            color = color
+                        )
+                    }
+
+                    item {
+                        LabelSettingSwitch(
+                            label = "Đảo chiều tem (180°)",
+                            checked = labelReverse,
+                            onCheckedChange = { labelReverse = it },
+                            color = color
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val updatedPrinter = printer.copy(
+                        labelPrintPrice = labelPrintPrice,
+                        labelPrintStoreName = labelPrintStoreName,
+                        labelPrintOrderNumber = labelPrintOrderNumber,
+                        labelPrintTableName = labelPrintTableName,
+                        labelPrintTime = labelPrintTime,
+                        labelStoreName = labelStoreName.ifBlank { null },
+                        labelReverse = labelReverse,
+                        labelWidthMm = labelWidthMm.toIntOrNull() ?: 72,
+                        labelHeightMm = labelHeightMm.toIntOrNull() ?: 30,
+                        labelGapMm = labelGapMm.toIntOrNull() ?: 3,
+                        labelFontScale = labelFontScale
+                    )
+                    onSave(updatedPrinter)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = color
+                )
+            ) {
+                Text("Lưu")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy")
+            }
+        }
+    )
+}
+
+@Composable
+private fun LabelSettingSwitch(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    color: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = color,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+            )
+        )
+    }
 }

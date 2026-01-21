@@ -45,6 +45,36 @@ interface KitchenDao {
 
     @Query("""
         UPDATE kitchens SET
+            label_print_price = :labelPrintPrice,
+            label_print_store_name = :labelPrintStoreName,
+            label_print_order_number = :labelPrintOrderNumber,
+            label_print_table_name = :labelPrintTableName,
+            label_print_time = :labelPrintTime,
+            label_store_name = :labelStoreName,
+            label_reverse = :labelReverse,
+            label_width_mm = :labelWidthMm,
+            label_height_mm = :labelHeightMm,
+            label_gap_mm = :labelGapMm,
+            label_font_scale = :labelFontScale
+        WHERE id = :kitchenId
+    """)
+    suspend fun updateLabelSettings(
+        kitchenId: String,
+        labelPrintPrice: Boolean,
+        labelPrintStoreName: Boolean,
+        labelPrintOrderNumber: Boolean,
+        labelPrintTableName: Boolean,
+        labelPrintTime: Boolean,
+        labelStoreName: String?,
+        labelReverse: Boolean,
+        labelWidthMm: Int,
+        labelHeightMm: Int,
+        labelGapMm: Int,
+        labelFontScale: Float
+    )
+
+    @Query("""
+        UPDATE kitchens SET
             printer_ip = :ip,
             printer_port = :port,
             printer_name = :name,

@@ -168,6 +168,34 @@ class LabelPrinterConfigViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Update label printer settings
+     */
+    fun updateLabelPrinterSettings(printer: KitchenEntity) {
+        viewModelScope.launch {
+            try {
+                kitchenRepository.updateLabelSettings(
+                    kitchenId = printer.id,
+                    labelPrintPrice = printer.labelPrintPrice,
+                    labelPrintStoreName = printer.labelPrintStoreName,
+                    labelPrintOrderNumber = printer.labelPrintOrderNumber,
+                    labelPrintTableName = printer.labelPrintTableName,
+                    labelPrintTime = printer.labelPrintTime,
+                    labelStoreName = printer.labelStoreName,
+                    labelReverse = printer.labelReverse,
+                    labelWidthMm = printer.labelWidthMm,
+                    labelHeightMm = printer.labelHeightMm,
+                    labelGapMm = printer.labelGapMm,
+                    labelFontScale = printer.labelFontScale
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: "Lỗi cập nhật cài đặt tem")
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }
