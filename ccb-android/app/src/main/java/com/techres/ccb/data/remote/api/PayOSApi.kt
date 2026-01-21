@@ -13,18 +13,21 @@ interface PayOSApi {
 
     /**
      * Create a new PayOS payment link
+     * Note: PayOS routes are excluded from /api prefix in API Gateway
      */
     @POST("payos/create-payment")
     suspend fun createPayment(@Body request: CreatePaymentRequest): Response<CreatePaymentResponse>
 
     /**
      * Get payment status by order code
+     * Note: PayOS routes are excluded from /api prefix in API Gateway
      */
     @GET("payos/payment-status/{orderCode}")
     suspend fun getPaymentStatus(@Path("orderCode") orderCode: Long): Response<PaymentStatusResponse>
 
     /**
      * Cancel a pending payment
+     * Note: PayOS routes are excluded from /api prefix in API Gateway
      */
     @POST("payos/cancel-payment")
     suspend fun cancelPayment(@Body request: CancelPaymentRequest): Response<CancelPaymentResponse>
