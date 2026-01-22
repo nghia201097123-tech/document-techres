@@ -9,14 +9,32 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiProperty } from '@nestjs/swagger';
+import { IsNumber, IsString, IsOptional, Min } from 'class-validator';
 import { ConfigStoreService, RegisterConfigDto } from './config-store.service';
 
 class RegisterConfigRequestDto {
+  @ApiProperty({ description: 'PayOS order code', example: 1234567890 })
+  @IsNumber()
   orderCode: number;
+
+  @ApiProperty({ description: 'PayOS checksum key for signature verification' })
+  @IsString()
   checksumKey: string;
+
+  @ApiProperty({ description: 'Branch ID', example: 'uuid-branch-id' })
+  @IsString()
   branchId: string;
+
+  @ApiProperty({ description: 'Brand ID (optional)', required: false })
+  @IsString()
+  @IsOptional()
   brandId?: string;
+
+  @ApiProperty({ description: 'TTL in minutes (default: 60)', required: false, default: 60 })
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
   ttlMinutes?: number;
 }
 
