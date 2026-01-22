@@ -870,6 +870,9 @@ class HybridBillBuilder(
      * QR size được scale theo paperWidth:
      * - 58mm: pixelWidth=384, qrSize=230px (60% width, capped 150-300)
      * - 80mm: pixelWidth=576, qrSize=300px
+     *
+     * QR code được căn giữa bằng cách tạo bitmap full-width với QR ở giữa
+     * (ESC/POS ALIGN_CENTER không hoạt động với GS v 0 raster bitmap)
      */
     fun qrCode(content: String, size: Int = 6): HybridBillBuilder {
         try {
@@ -890,12 +893,16 @@ class HybridBillBuilder(
             }
 
             if (qrBitmap != null) {
-                buffer.write(EscPosCommands.ALIGN_CENTER)
-                // Scale bitmap to match paper pixelWidth for correct printing
-                buffer.write(EscPosCommands.printRasterBitmap(qrBitmap, pixelWidth))
-                buffer.write(EscPosCommands.ALIGN_LEFT)
-                Log.d(TAG, "QR code printed: bitmap=${qrBitmap.width}x${qrBitmap.height}, targetWidth=$pixelWidth")
+                // Tạo bitmap full-width với QR code căn giữa
+                // ESC/POS ALIGN_CENTER không hoạt động với GS v 0 raster bitmap
+                // nên phải căn giữa bằng cách thêm padding vào bitmap
+                val centeredBitmap = centerQrBitmap(qrBitmap, pixelWidth)
                 qrBitmap.recycle()
+
+                // In bitmap đã căn giữa (không scale vì đã đúng kích thước)
+                buffer.write(EscPosCommands.printRasterBitmap(centeredBitmap, 0))
+                Log.d(TAG, "QR code printed centered: qr=${qrSize}x${qrSize}, canvas=${centeredBitmap.width}x${centeredBitmap.height}")
+                centeredBitmap.recycle()
             } else {
                 // Fallback to ESC/POS QR command
                 Log.w(TAG, "QR bitmap failed, using ESC/POS command")
@@ -910,6 +917,37 @@ class HybridBillBuilder(
             buffer.write(EscPosCommands.ALIGN_LEFT)
         }
         return this
+    }
+
+    /**
+     * Tạo bitmap full-width với QR code căn giữa
+     * @param qrBitmap QR code bitmap (nhỏ hơn targetWidth)
+     * @param targetWidth Độ rộng của khổ giấy (pixels)
+     * @return Bitmap mới với QR code căn giữa trên nền trắng
+     */
+    private fun centerQrBitmap(qrBitmap: Bitmap, targetWidth: Int): Bitmap {
+        val qrWidth = qrBitmap.width
+        val qrHeight = qrBitmap.height
+
+        // Nếu QR đã bằng hoặc lớn hơn targetWidth, không cần căn giữa
+        if (qrWidth >= targetWidth) {
+            return qrBitmap.copy(Bitmap.Config.ARGB_8888, false)
+        }
+
+        // Tạo canvas với chiều rộng = targetWidth
+        val centeredBitmap = Bitmap.createBitmap(targetWidth, qrHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(centeredBitmap)
+
+        // Fill nền trắng
+        canvas.drawColor(Color.WHITE)
+
+        // Tính vị trí x để căn giữa QR
+        val leftPadding = (targetWidth - qrWidth) / 2f
+
+        // Vẽ QR code căn giữa
+        canvas.drawBitmap(qrBitmap, leftPadding, 0f, null)
+
+        return centeredBitmap
     }
 
     /**
