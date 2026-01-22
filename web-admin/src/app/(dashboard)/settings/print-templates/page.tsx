@@ -558,7 +558,7 @@ export default function PrintTemplatesPage() {
           </TabsTrigger>
           <TabsTrigger value="bill" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
-            Mẫu in Bill
+            Máy in & Mẫu Bill
           </TabsTrigger>
         </TabsList>
 
