@@ -13,6 +13,7 @@ import {
   Star,
   Copy,
   Check,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,11 @@ interface BankAccount {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // PayOS integration
+  paymentPartner?: string;
+  payosClientId?: string;
+  payosApiKey?: string;
+  payosChecksumKey?: string;
 }
 
 // Mock data
@@ -128,6 +134,11 @@ interface BankAccountFormData {
   accountName: string;
   transferTemplate: string;
   isPrimary: boolean;
+  // PayOS integration
+  paymentPartner: string;
+  payosClientId: string;
+  payosApiKey: string;
+  payosChecksumKey: string;
 }
 
 const initialFormData: BankAccountFormData = {
@@ -138,6 +149,11 @@ const initialFormData: BankAccountFormData = {
   accountName: "",
   transferTemplate: "TT {order_code}",
   isPrimary: false,
+  // PayOS integration
+  paymentPartner: "",
+  payosClientId: "",
+  payosApiKey: "",
+  payosChecksumKey: "",
 };
 
 export default function BankAccountsPage() {
@@ -178,6 +194,10 @@ export default function BankAccountsPage() {
       accountName: account.accountName,
       transferTemplate: account.transferTemplate || "",
       isPrimary: account.isPrimary,
+      paymentPartner: account.paymentPartner || "",
+      payosClientId: account.payosClientId || "",
+      payosApiKey: account.payosApiKey || "",
+      payosChecksumKey: account.payosChecksumKey || "",
     });
     setIsViewMode(false);
     setIsDialogOpen(true);
@@ -193,6 +213,10 @@ export default function BankAccountsPage() {
       accountName: account.accountName,
       transferTemplate: account.transferTemplate || "",
       isPrimary: account.isPrimary,
+      paymentPartner: account.paymentPartner || "",
+      payosClientId: account.payosClientId || "",
+      payosApiKey: account.payosApiKey || "",
+      payosChecksumKey: account.payosChecksumKey || "",
     });
     setIsViewMode(true);
     setIsDialogOpen(true);
@@ -231,18 +255,27 @@ export default function BankAccountsPage() {
       updatedAccounts = updatedAccounts.map((a) => ({ ...a, isPrimary: false }));
     }
 
+    // Clean up PayOS fields if not using PayOS
+    const submitData = {
+      ...formData,
+      paymentPartner: formData.paymentPartner === "none" ? "" : formData.paymentPartner,
+      payosClientId: formData.paymentPartner === "payos" ? formData.payosClientId : "",
+      payosApiKey: formData.paymentPartner === "payos" ? formData.payosApiKey : "",
+      payosChecksumKey: formData.paymentPartner === "payos" ? formData.payosChecksumKey : "",
+    };
+
     if (selectedAccount) {
       setAccounts(
         updatedAccounts.map((a) =>
           a.id === selectedAccount.id
-            ? { ...a, ...formData, updatedAt: new Date().toISOString() }
+            ? { ...a, ...submitData, updatedAt: new Date().toISOString() }
             : a
         )
       );
     } else {
       const newAccount: BankAccount = {
         id: String(Date.now()),
-        ...formData,
+        ...submitData,
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -306,7 +339,7 @@ export default function BankAccountsPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Tài khoản ngân hàng</h2>
           <p className="text-muted-foreground">
-            Thiết lập tài khoản ngân hàng để nhận thanh toán chuyển khoản và tạo mã QR VietQR
+            Thiết lập tài khoản ngân hàng, tạo mã QR VietQR hoặc tích hợp PayOS để tự động xác nhận thanh toán
           </p>
         </div>
         <Button onClick={handleOpenCreate}>
@@ -316,7 +349,7 @@ export default function BankAccountsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -338,6 +371,19 @@ export default function BankAccountsPage() {
           <CardContent>
             <div className="text-2xl font-bold text-green-500">
               {accounts.filter((a) => a.isActive).length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              PayOS tự động
+            </CardTitle>
+            <CreditCard className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-500">
+              {accounts.filter((a) => a.paymentPartner === "payos").length}
             </div>
           </CardContent>
         </Card>
@@ -380,6 +426,7 @@ export default function BankAccountsPage() {
                 <TableHead>Ngân hàng</TableHead>
                 <TableHead>Số tài khoản</TableHead>
                 <TableHead>Chủ tài khoản</TableHead>
+                <TableHead>Thanh toán</TableHead>
                 <TableHead>Mặc định</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Ngày tạo</TableHead>
@@ -404,6 +451,17 @@ export default function BankAccountsPage() {
                   </TableCell>
                   <TableCell className="font-mono">{account.accountNumber}</TableCell>
                   <TableCell>{account.accountName}</TableCell>
+                  <TableCell>
+                    {account.paymentPartner === "payos" ? (
+                      <Badge variant="default" className="bg-blue-500">
+                        PayOS
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        VietQR
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {account.isPrimary ? (
                       <Badge variant="default" className="bg-yellow-500">
@@ -467,7 +525,7 @@ export default function BankAccountsPage() {
               ))}
               {filteredAccounts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     Không tìm thấy tài khoản ngân hàng nào
                   </TableCell>
                 </TableRow>
@@ -575,6 +633,92 @@ export default function BankAccountsPage() {
                   disabled={isViewMode}
                 />
                 <Label htmlFor="isPrimary">Đặt làm tài khoản mặc định</Label>
+              </div>
+
+              {/* PayOS Configuration Section */}
+              <div className="border-t pt-4 mt-4">
+                <div className="space-y-2 mb-4">
+                  <Label htmlFor="paymentPartner">Đối tác thanh toán tự động</Label>
+                  <Select
+                    value={formData.paymentPartner}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, paymentPartner: value }))
+                    }
+                    disabled={isViewMode}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn đối tác (không bắt buộc)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Không sử dụng</SelectItem>
+                      <SelectItem value="payos">PayOS - Thanh toán tự động xác nhận</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    PayOS giúp tự động xác nhận thanh toán khi khách chuyển khoản
+                  </p>
+                </div>
+
+                {formData.paymentPartner === "payos" && (
+                  <div className="space-y-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium">Cấu hình PayOS</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Đăng ký tài khoản PayOS tại{" "}
+                      <a
+                        href="https://payos.vn"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        payos.vn
+                      </a>{" "}
+                      để lấy thông tin API
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="payosClientId">Client ID *</Label>
+                      <Input
+                        id="payosClientId"
+                        name="payosClientId"
+                        value={formData.payosClientId}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        placeholder="VD: 12345678"
+                        required={formData.paymentPartner === "payos"}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payosApiKey">API Key *</Label>
+                      <Input
+                        id="payosApiKey"
+                        name="payosApiKey"
+                        type="password"
+                        value={formData.payosApiKey}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        placeholder="Nhập API Key từ PayOS"
+                        required={formData.paymentPartner === "payos"}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payosChecksumKey">Checksum Key *</Label>
+                      <Input
+                        id="payosChecksumKey"
+                        name="payosChecksumKey"
+                        type="password"
+                        value={formData.payosChecksumKey}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        placeholder="Nhập Checksum Key từ PayOS"
+                        required={formData.paymentPartner === "payos"}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
