@@ -422,22 +422,30 @@ export default function BillTemplatePage() {
         />
       </div>
 
-      {/* Bill Templates Section */}
-      <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Mẫu Bill</CardTitle>
-                  <CardDescription>Thiết kế và quản lý các mẫu hóa đơn bán hàng</CardDescription>
+      {/* Bill Templates & Printers Section - Combined */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cấu hình in Bill</CardTitle>
+          <CardDescription>Quản lý mẫu hóa đơn và máy in bill cho thương hiệu</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Mẫu Bill Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                  <FileText className="h-5 w-5 text-blue-500" />
                 </div>
-                <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Thêm mẫu bill
-                </Button>
+                <div>
+                  <h3 className="font-semibold">Mẫu Bill</h3>
+                  <p className="text-sm text-muted-foreground">Thiết kế mẫu hóa đơn</p>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
+              <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId}>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm mẫu bill
+              </Button>
+            </div>
               {loadingTemplates ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -532,24 +540,28 @@ export default function BillTemplatePage() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </div>
 
-        {/* Printer Configs Section */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Máy in Bill</CardTitle>
-                  <CardDescription>Cấu hình máy in hóa đơn cho thu ngân</CardDescription>
+          {/* Divider */}
+          <div className="border-t" />
+
+          {/* Máy in Bill Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+                  <Printer className="h-5 w-5 text-green-500" />
                 </div>
-                <Button onClick={() => openPrinterDialog("create")} disabled={!filterBrandId}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Thêm máy in
-                </Button>
+                <div>
+                  <h3 className="font-semibold">Máy in Bill</h3>
+                  <p className="text-sm text-muted-foreground">Cấu hình máy in hóa đơn</p>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
+              <Button onClick={() => openPrinterDialog("create")} disabled={!filterBrandId}>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm máy in
+              </Button>
+            </div>
               {loadingPrinters ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -656,9 +668,9 @@ export default function BillTemplatePage() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Bill Template Dialog */}
       <Dialog open={templateDialog !== null} onOpenChange={() => setTemplateDialog(null)}>
