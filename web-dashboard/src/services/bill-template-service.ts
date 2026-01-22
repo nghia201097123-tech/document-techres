@@ -176,7 +176,7 @@ export interface BillPrinterConfig {
 // ==================== DTOs ====================
 
 export interface CreateBillTemplateDto {
-  branchId: string;
+  branchId?: string;
   name: string;
   templateType: BillTemplateType;
   description?: string;
@@ -272,6 +272,18 @@ export interface CreateBillTemplateDto {
   beepAfterPrint?: boolean;
   numberOfCopies?: number;
 
+  // Printer config (embedded)
+  connectionType?: PrinterConnectionType;
+  printerIp?: string;
+  printerPort?: number;
+  printerMac?: string;
+  printerUsbPath?: string;
+  autoPrintOnPayment?: boolean;
+  printPreview?: boolean;
+  retryCount?: number;
+  retryDelayMs?: number;
+  connectionTimeoutMs?: number;
+
   sortOrder?: number;
 }
 
@@ -281,7 +293,7 @@ export interface UpdateBillTemplateDto extends Partial<CreateBillTemplateDto> {
 }
 
 export interface CreateBillPrinterConfigDto {
-  branchId: string;
+  branchId?: string;
   name: string;
   description?: string;
 
@@ -542,6 +554,14 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   openCashDrawer: false,
   beepAfterPrint: false,
   numberOfCopies: 1,
+  // Printer config defaults
+  connectionType: PrinterConnectionType.NETWORK,
+  printerPort: 9100,
+  autoPrintOnPayment: true,
+  printPreview: false,
+  retryCount: 3,
+  retryDelayMs: 1000,
+  connectionTimeoutMs: 5000,
 };
 
 export const DEFAULT_PRINTER_CONFIG: Partial<CreateBillPrinterConfigDto> = {

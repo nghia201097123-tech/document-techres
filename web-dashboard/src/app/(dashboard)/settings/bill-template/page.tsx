@@ -31,39 +31,27 @@ import { useToast } from "@/hooks/use-toast";
 import { BrandFilter, useGlobalFilters } from "@/components/ui/brand-filter";
 import {
   FileText,
-  Printer,
   Plus,
   Pencil,
   Trash2,
   Loader2,
   Star,
-  Power,
-  Wifi,
-  Settings2,
   Eye,
-  TestTube,
-  CheckCircle,
-  XCircle,
-  Copy,
 } from "lucide-react";
 import {
   billTemplateService,
   BillTemplate,
-  BillPrinterConfig,
   BillTemplateType,
   PrinterConnectionType,
   CreateBillTemplateDto,
-  CreateBillPrinterConfigDto,
   BILL_TEMPLATE_TYPE_LABELS,
   BILL_TEMPLATE_TYPE_DESCRIPTIONS,
   PRINTER_CONNECTION_TYPE_LABELS,
   PAPER_WIDTH_OPTIONS,
   FONT_SIZE_OPTIONS,
-  LINE_SPACING_OPTIONS,
   DATE_FORMAT_OPTIONS,
   QR_CODE_TYPE_LABELS,
   DEFAULT_BILL_TEMPLATE,
-  DEFAULT_PRINTER_CONFIG,
 } from "@/services/bill-template-service";
 
 type DialogMode = "create" | "edit" | null;
@@ -80,14 +68,6 @@ export default function BillTemplatePage() {
   const [savingTemplate, setSavingTemplate] = React.useState(false);
   const [previewTemplate, setPreviewTemplate] = React.useState<BillTemplate | null>(null);
 
-  // Printer Configs state
-  const [printerConfigs, setPrinterConfigs] = React.useState<BillPrinterConfig[]>([]);
-  const [loadingPrinters, setLoadingPrinters] = React.useState(false);
-  const [printerDialog, setPrinterDialog] = React.useState<DialogMode>(null);
-  const [editingPrinter, setEditingPrinter] = React.useState<BillPrinterConfig | null>(null);
-  const [savingPrinter, setSavingPrinter] = React.useState(false);
-  const [testingPrinter, setTestingPrinter] = React.useState<string | null>(null);
-
   // Form states
   const [templateForm, setTemplateForm] = React.useState<CreateBillTemplateDto>({
     name: "",
@@ -100,12 +80,6 @@ export default function BillTemplatePage() {
   // This is more performant than debounce because React defers updates without blocking UI
   const deferredTemplateForm = React.useDeferredValue(templateForm);
 
-  const [printerForm, setPrinterForm] = React.useState<CreateBillPrinterConfigDto>({
-    name: "",
-    connectionType: PrinterConnectionType.NETWORK,
-    ...DEFAULT_PRINTER_CONFIG,
-  });
-
   // Active tab for template form
   const [formTab, setFormTab] = React.useState("header");
 
@@ -113,7 +87,6 @@ export default function BillTemplatePage() {
   React.useEffect(() => {
     if (filterBrandId) {
       loadTemplates();
-      loadPrinterConfigs();
     }
   }, [filterBrandId]);
 
@@ -128,20 +101,6 @@ export default function BillTemplatePage() {
       toast({ title: "Lỗi", description: "Không thể tải danh sách mẫu bill", variant: "destructive" });
     } finally {
       setLoadingTemplates(false);
-    }
-  };
-
-  const loadPrinterConfigs = async () => {
-    if (!filterBrandId) return;
-    setLoadingPrinters(true);
-    try {
-      const data = await billTemplateService.getAllPrinterConfigs(filterBrandId);
-      setPrinterConfigs(data);
-    } catch (error) {
-      console.error("Error loading printer configs:", error);
-      toast({ title: "Lỗi", description: "Không thể tải danh sách máy in", variant: "destructive" });
-    } finally {
-      setLoadingPrinters(false);
     }
   };
 
@@ -225,6 +184,17 @@ export default function BillTemplatePage() {
         beepAfterPrint: template.beepAfterPrint,
         numberOfCopies: template.numberOfCopies,
         sortOrder: template.sortOrder,
+        // Printer config
+        connectionType: (template as any).connectionType || PrinterConnectionType.NETWORK,
+        printerIp: (template as any).printerIp || "",
+        printerPort: (template as any).printerPort || 9100,
+        printerMac: (template as any).printerMac || "",
+        printerUsbPath: (template as any).printerUsbPath || "",
+        autoPrintOnPayment: (template as any).autoPrintOnPayment ?? true,
+        printPreview: (template as any).printPreview ?? false,
+        retryCount: (template as any).retryCount || 3,
+        retryDelayMs: (template as any).retryDelayMs || 1000,
+        connectionTimeoutMs: (template as any).connectionTimeoutMs || 5000,
       });
     } else {
       setEditingTemplate(null);
@@ -297,116 +267,6 @@ export default function BillTemplatePage() {
     }
   };
 
-  // Printer handlers
-  const openPrinterDialog = (mode: DialogMode, printer?: BillPrinterConfig) => {
-    if (mode === "edit" && printer) {
-      setEditingPrinter(printer);
-      setPrinterForm({
-        name: printer.name,
-        description: printer.description,
-        connectionType: printer.connectionType,
-        printerIp: printer.printerIp,
-        printerPort: printer.printerPort,
-        printerMac: printer.printerMac,
-        printerUsbPath: printer.printerUsbPath,
-        templateId: printer.templateId,
-        paperWidth: printer.paperWidth,
-        autoPrintOnPayment: printer.autoPrintOnPayment,
-        printPreview: printer.printPreview,
-        numberOfCopies: printer.numberOfCopies,
-        cutPaper: printer.cutPaper,
-        openCashDrawer: printer.openCashDrawer,
-        beepAfterPrint: printer.beepAfterPrint,
-        retryCount: printer.retryCount,
-        retryDelayMs: printer.retryDelayMs,
-        connectionTimeoutMs: printer.connectionTimeoutMs,
-        sortOrder: printer.sortOrder,
-      });
-    } else {
-      setEditingPrinter(null);
-      setPrinterForm({
-        name: "",
-        connectionType: PrinterConnectionType.NETWORK,
-        ...DEFAULT_PRINTER_CONFIG,
-      });
-    }
-    setPrinterDialog(mode);
-  };
-
-  const handleSavePrinter = async () => {
-    if (!filterBrandId || !printerForm.name) {
-      return;
-    }
-    setSavingPrinter(true);
-    try {
-      if (printerDialog === "create") {
-        const newPrinter = await billTemplateService.createPrinterConfig(filterBrandId, printerForm);
-        setPrinterConfigs((prev) => [...prev, newPrinter]);
-        toast({ title: "Thành công", description: "Đã thêm máy in bill mới" });
-      } else if (editingPrinter) {
-        const updated = await billTemplateService.updatePrinterConfig(editingPrinter.id, printerForm);
-        setPrinterConfigs((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-        toast({ title: "Thành công", description: "Đã cập nhật cấu hình máy in" });
-      }
-      setPrinterDialog(null);
-    } catch (error: any) {
-      toast({ title: "Lỗi", description: error.response?.data?.message || "Có lỗi xảy ra", variant: "destructive" });
-    } finally {
-      setSavingPrinter(false);
-    }
-  };
-
-  const handleTogglePrinter = async (id: string) => {
-    try {
-      const updated = await billTemplateService.togglePrinterConfig(id);
-      setPrinterConfigs((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    } catch (error) {
-      toast({ title: "Lỗi", description: "Không thể cập nhật trạng thái", variant: "destructive" });
-    }
-  };
-
-  const handleSetDefaultPrinter = async (id: string) => {
-    try {
-      const updated = await billTemplateService.setDefaultPrinterConfig(id);
-      setPrinterConfigs((prev) =>
-        prev.map((p) => ({
-          ...p,
-          isDefault: p.id === updated.id,
-        }))
-      );
-      toast({ title: "Thành công", description: "Đã đặt làm máy in mặc định" });
-    } catch (error) {
-      toast({ title: "Lỗi", description: "Không thể đặt làm mặc định", variant: "destructive" });
-    }
-  };
-
-  const handleDeletePrinter = async (id: string) => {
-    if (!confirm("Bạn có chắc muốn xóa cấu hình máy in này?")) return;
-    try {
-      await billTemplateService.deletePrinterConfig(id);
-      setPrinterConfigs((prev) => prev.filter((p) => p.id !== id));
-      toast({ title: "Thành công", description: "Đã xóa cấu hình máy in" });
-    } catch (error) {
-      toast({ title: "Lỗi", description: "Không thể xóa", variant: "destructive" });
-    }
-  };
-
-  const handleTestPrinter = async (id: string) => {
-    setTestingPrinter(id);
-    try {
-      const result = await billTemplateService.testPrinterConnection(id);
-      if (result.success) {
-        toast({ title: "Thành công", description: result.message });
-      } else {
-        toast({ title: "Lỗi kết nối", description: result.message, variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Lỗi", description: error.response?.data?.message || "Không thể kiểm tra kết nối", variant: "destructive" });
-    } finally {
-      setTestingPrinter(null);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -422,30 +282,21 @@ export default function BillTemplatePage() {
         />
       </div>
 
-      {/* Bill Templates & Printers Section - Combined */}
+      {/* Bill Templates Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Cấu hình in Bill</CardTitle>
-          <CardDescription>Quản lý mẫu hóa đơn và máy in bill cho thương hiệu</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          {/* Mẫu Bill Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                  <FileText className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Mẫu Bill</h3>
-                  <p className="text-sm text-muted-foreground">Thiết kế mẫu hóa đơn</p>
-                </div>
-              </div>
-              <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId}>
-                <Plus className="mr-2 h-4 w-4" />
-                Thêm mẫu bill
-              </Button>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Mẫu Bill & Máy in</CardTitle>
+              <CardDescription>Quản lý mẫu hóa đơn (bao gồm cấu hình máy in) cho thương hiệu</CardDescription>
             </div>
+            <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId}>
+              <Plus className="mr-2 h-4 w-4" />
+              Thêm mẫu bill
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
               {loadingTemplates ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -540,135 +391,6 @@ export default function BillTemplatePage() {
                   ))}
                 </div>
               )}
-          </div>
-
-          {/* Divider */}
-          <div className="border-t" />
-
-          {/* Máy in Bill Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-                  <Printer className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Máy in Bill</h3>
-                  <p className="text-sm text-muted-foreground">Cấu hình máy in hóa đơn</p>
-                </div>
-              </div>
-              <Button onClick={() => openPrinterDialog("create")} disabled={!filterBrandId}>
-                <Plus className="mr-2 h-4 w-4" />
-                Thêm máy in
-              </Button>
-            </div>
-              {loadingPrinters ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : printerConfigs.length === 0 ? (
-                <div className="text-center py-8">
-                  <Printer className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground mb-2">Chưa có máy in bill nào</p>
-                  <p className="text-xs text-muted-foreground">
-                    Thêm máy in để in hóa đơn khi thanh toán
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {printerConfigs.map((printer) => (
-                    <div
-                      key={printer.id}
-                      className={`flex items-center justify-between p-4 border rounded-lg ${
-                        printer.isDefault ? "border-primary bg-primary/5" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${printer.isDefault ? "bg-primary/10" : "bg-muted"}`}>
-                          <Printer className={`h-5 w-5 ${printer.isDefault ? "text-primary" : "text-muted-foreground"}`} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{printer.name}</p>
-                            {printer.isDefault && (
-                              <Badge variant="default" className="gap-1">
-                                <Star className="h-3 w-3" />
-                                Mặc định
-                              </Badge>
-                            )}
-                            <Badge variant="outline">
-                              {PRINTER_CONNECTION_TYPE_LABELS[printer.connectionType]}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                            {printer.connectionType === PrinterConnectionType.NETWORK && (
-                              <span className="font-mono">
-                                {printer.printerIp}:{printer.printerPort}
-                              </span>
-                            )}
-                            {printer.connectionType === PrinterConnectionType.BLUETOOTH && (
-                              <span className="font-mono">{printer.printerMac}</span>
-                            )}
-                            <span>• Giấy {printer.paperWidth}mm</span>
-                            {printer.autoPrintOnPayment && (
-                              <span>• Tự động in khi thanh toán</span>
-                            )}
-                          </div>
-                          {printer.template && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Mẫu: {printer.template.name}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTestPrinter(printer.id)}
-                          disabled={testingPrinter === printer.id}
-                        >
-                          {testingPrinter === printer.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                          ) : (
-                            <TestTube className="h-4 w-4 mr-1" />
-                          )}
-                          Test
-                        </Button>
-                        <Switch
-                          checked={printer.isActive}
-                          onCheckedChange={() => handleTogglePrinter(printer.id)}
-                        />
-                        {!printer.isDefault && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleSetDefaultPrinter(printer.id)}
-                            title="Đặt làm mặc định"
-                          >
-                            <Star className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openPrinterDialog("edit", printer)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeletePrinter(printer.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-          </div>
         </CardContent>
       </Card>
 
@@ -731,13 +453,14 @@ export default function BillTemplatePage() {
               </div>
 
               <Tabs value={formTab} onValueChange={setFormTab}>
-                <TabsList className="grid w-full grid-cols-6">
+                <TabsList className="grid w-full grid-cols-7">
                   <TabsTrigger value="header">Header</TabsTrigger>
                   <TabsTrigger value="content">Nội dung</TabsTrigger>
                   <TabsTrigger value="price">Giá & VAT</TabsTrigger>
                   <TabsTrigger value="payment">Thanh toán</TabsTrigger>
                   <TabsTrigger value="footer">Footer</TabsTrigger>
                   <TabsTrigger value="style">Kiểu in</TabsTrigger>
+                  <TabsTrigger value="printer">Máy in</TabsTrigger>
                 </TabsList>
 
                 {/* Header Config */}
@@ -1415,6 +1138,138 @@ export default function BillTemplatePage() {
                     </div>
                   </div>
                 </TabsContent>
+
+                {/* Printer Config */}
+                <TabsContent value="printer" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Loại kết nối</Label>
+                      <Select
+                        value={templateForm.connectionType || PrinterConnectionType.NETWORK}
+                        onValueChange={(value: PrinterConnectionType) =>
+                          setTemplateForm({ ...templateForm, connectionType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(PRINTER_CONNECTION_TYPE_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Network connection */}
+                  {(templateForm.connectionType === PrinterConnectionType.NETWORK || !templateForm.connectionType) && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Địa chỉ IP</Label>
+                        <Input
+                          value={templateForm.printerIp || ""}
+                          onChange={(e) => setTemplateForm({ ...templateForm, printerIp: e.target.value })}
+                          placeholder="192.168.1.100"
+                          className="font-mono"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Port</Label>
+                        <Input
+                          type="number"
+                          value={templateForm.printerPort || 9100}
+                          onChange={(e) => setTemplateForm({ ...templateForm, printerPort: Number(e.target.value) })}
+                          placeholder="9100"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bluetooth connection */}
+                  {templateForm.connectionType === PrinterConnectionType.BLUETOOTH && (
+                    <div className="space-y-2">
+                      <Label>MAC Address</Label>
+                      <Input
+                        value={templateForm.printerMac || ""}
+                        onChange={(e) => setTemplateForm({ ...templateForm, printerMac: e.target.value })}
+                        placeholder="00:11:22:33:44:55"
+                        className="font-mono"
+                      />
+                    </div>
+                  )}
+
+                  {/* USB connection */}
+                  {templateForm.connectionType === PrinterConnectionType.USB && (
+                    <div className="space-y-2">
+                      <Label>USB Path</Label>
+                      <Input
+                        value={templateForm.printerUsbPath || ""}
+                        onChange={(e) => setTemplateForm({ ...templateForm, printerUsbPath: e.target.value })}
+                        placeholder="/dev/usb/lp0"
+                        className="font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3">Tùy chọn in tự động</h4>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.autoPrintOnPayment || false}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, autoPrintOnPayment: checked })}
+                        />
+                        <Label>Tự động in khi thanh toán</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={templateForm.printPreview || false}
+                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, printPreview: checked })}
+                        />
+                        <Label>Xem trước khi in</Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3">Cấu hình kết nối</h4>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label>Số lần thử lại</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={templateForm.retryCount || 3}
+                          onChange={(e) => setTemplateForm({ ...templateForm, retryCount: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Delay giữa lần thử (ms)</Label>
+                        <Input
+                          type="number"
+                          min={100}
+                          max={10000}
+                          value={templateForm.retryDelayMs || 1000}
+                          onChange={(e) => setTemplateForm({ ...templateForm, retryDelayMs: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Timeout kết nối (ms)</Label>
+                        <Input
+                          type="number"
+                          min={1000}
+                          max={30000}
+                          value={templateForm.connectionTimeoutMs || 5000}
+                          onChange={(e) => setTemplateForm({ ...templateForm, connectionTimeoutMs: Number(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
               </div>
             </div>
@@ -1432,247 +1287,6 @@ export default function BillTemplatePage() {
             <Button onClick={handleSaveTemplate} disabled={savingTemplate || !templateForm.name || !templateForm.storeName}>
               {savingTemplate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {templateDialog === "create" ? "Thêm" : "Lưu"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Printer Config Dialog */}
-      <Dialog open={printerDialog !== null} onOpenChange={() => setPrinterDialog(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {printerDialog === "create" ? "Thêm máy in bill" : "Sửa cấu hình máy in"}
-            </DialogTitle>
-            <DialogDescription>
-              Cấu hình kết nối và tùy chọn in cho máy in bill
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            <div className="space-y-4 pr-4">
-              <div className="space-y-2">
-                <Label>Tên máy in *</Label>
-                <Input
-                  value={printerForm.name}
-                  onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
-                  placeholder="VD: Máy in thu ngân"
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Loại kết nối</Label>
-                  <Select
-                    value={printerForm.connectionType}
-                    onValueChange={(value: PrinterConnectionType) =>
-                      setPrinterForm({ ...printerForm, connectionType: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PRINTER_CONNECTION_TYPE_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Connection details based on type */}
-              {printerForm.connectionType === PrinterConnectionType.NETWORK && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Địa chỉ IP *</Label>
-                    <Input
-                      value={printerForm.printerIp || ""}
-                      onChange={(e) => setPrinterForm({ ...printerForm, printerIp: e.target.value })}
-                      placeholder="192.168.1.100"
-                      className="font-mono"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Port</Label>
-                    <Input
-                      type="number"
-                      value={printerForm.printerPort || 9100}
-                      onChange={(e) => setPrinterForm({ ...printerForm, printerPort: Number(e.target.value) })}
-                      placeholder="9100"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {printerForm.connectionType === PrinterConnectionType.BLUETOOTH && (
-                <div className="space-y-2">
-                  <Label>MAC Address</Label>
-                  <Input
-                    value={printerForm.printerMac || ""}
-                    onChange={(e) => setPrinterForm({ ...printerForm, printerMac: e.target.value })}
-                    placeholder="00:11:22:33:44:55"
-                    className="font-mono"
-                  />
-                </div>
-              )}
-
-              {printerForm.connectionType === PrinterConnectionType.USB && (
-                <div className="space-y-2">
-                  <Label>USB Path</Label>
-                  <Input
-                    value={printerForm.printerUsbPath || ""}
-                    onChange={(e) => setPrinterForm({ ...printerForm, printerUsbPath: e.target.value })}
-                    placeholder="/dev/usb/lp0"
-                    className="font-mono"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Mẫu bill</Label>
-                <Select
-                  value={printerForm.templateId || "__none__"}
-                  onValueChange={(value) => setPrinterForm({ ...printerForm, templateId: value === "__none__" ? undefined : value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn mẫu bill..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Không chọn (dùng mẫu mặc định)</SelectItem>
-                    {templates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name} ({BILL_TEMPLATE_TYPE_LABELS[template.templateType]})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Mô tả</Label>
-                <Input
-                  value={printerForm.description || ""}
-                  onChange={(e) => setPrinterForm({ ...printerForm, description: e.target.value })}
-                  placeholder="Mô tả ngắn..."
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3">Tùy chọn in</h4>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Khổ giấy</Label>
-                    <Select
-                      value={String(printerForm.paperWidth || 80)}
-                      onValueChange={(value) => setPrinterForm({ ...printerForm, paperWidth: Number(value) })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAPER_WIDTH_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={String(opt.value)}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Số bản in</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={printerForm.numberOfCopies || 1}
-                      onChange={(e) => setPrinterForm({ ...printerForm, numberOfCopies: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 mt-4">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={printerForm.autoPrintOnPayment || false}
-                      onCheckedChange={(checked) => setPrinterForm({ ...printerForm, autoPrintOnPayment: checked })}
-                    />
-                    <Label>Tự động in khi thanh toán</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={printerForm.printPreview || false}
-                      onCheckedChange={(checked) => setPrinterForm({ ...printerForm, printPreview: checked })}
-                    />
-                    <Label>Xem trước khi in</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={printerForm.cutPaper || false}
-                      onCheckedChange={(checked) => setPrinterForm({ ...printerForm, cutPaper: checked })}
-                    />
-                    <Label>Cắt giấy tự động</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={printerForm.openCashDrawer || false}
-                      onCheckedChange={(checked) => setPrinterForm({ ...printerForm, openCashDrawer: checked })}
-                    />
-                    <Label>Mở ngăn kéo tiền</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={printerForm.beepAfterPrint || false}
-                      onCheckedChange={(checked) => setPrinterForm({ ...printerForm, beepAfterPrint: checked })}
-                    />
-                    <Label>Beep sau khi in</Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3">Cấu hình kết nối</h4>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>Số lần thử lại</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={10}
-                      value={printerForm.retryCount || 3}
-                      onChange={(e) => setPrinterForm({ ...printerForm, retryCount: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Delay giữa lần thử (ms)</Label>
-                    <Input
-                      type="number"
-                      min={100}
-                      max={10000}
-                      value={printerForm.retryDelayMs || 1000}
-                      onChange={(e) => setPrinterForm({ ...printerForm, retryDelayMs: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Timeout kết nối (ms)</Label>
-                    <Input
-                      type="number"
-                      min={1000}
-                      max={30000}
-                      value={printerForm.connectionTimeoutMs || 5000}
-                      onChange={(e) => setPrinterForm({ ...printerForm, connectionTimeoutMs: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPrinterDialog(null)}>
-              Hủy
-            </Button>
-            <Button onClick={handleSavePrinter} disabled={savingPrinter || !printerForm.name}>
-              {savingPrinter && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {printerDialog === "create" ? "Thêm" : "Lưu"}
             </Button>
           </DialogFooter>
         </DialogContent>
