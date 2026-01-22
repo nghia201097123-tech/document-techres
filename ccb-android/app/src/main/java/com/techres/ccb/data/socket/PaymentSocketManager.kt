@@ -131,6 +131,9 @@ class PaymentSocketManager @Inject constructor() {
                 on("payment:cancelled", onPaymentCancelled)
                 on("payment:expired", onPaymentExpired)
 
+                // Global payment update (broadcast from socket-service)
+                on("payment:update", onPaymentUpdate)
+
                 // Connection success event from server
                 on("connection:success", onConnectionSuccess)
 
@@ -237,21 +240,26 @@ class PaymentSocketManager @Inject constructor() {
 
     private val onPaymentSuccess = Emitter.Listener { args ->
         try {
+            val receivedAt = System.currentTimeMillis()
             val data = args.firstOrNull() as? JSONObject ?: return@Listener
 
-            Timber.d("════════════════════════════════════════════════════════════")
-            Timber.d("💰 [SOCKET] PAYMENT SUCCESS RECEIVED FROM SOCKET-SERVICE!")
-            Timber.d("════════════════════════════════════════════════════════════")
-            Timber.d("   📦 OrderCode: ${data.optLong("orderCode")}")
-            Timber.d("   💵 Amount: ${data.optLong("amount")} VND")
-            Timber.d("   🔖 Transaction Ref: ${data.optString("transactionRef")}")
-            Timber.d("   🏦 Bank: ${data.optString("counterAccountBankName")}")
-            Timber.d("   👤 From: ${data.optString("counterAccountName")}")
-            Timber.d("   🔢 Account: ${data.optString("counterAccountNumber")}")
-            Timber.d("   ⏰ Time: ${data.optString("transactionDateTime")}")
-            Timber.d("────────────────────────────────────────────────────────────")
-            Timber.d("   📄 Raw Data: $data")
-            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("╔══════════════════════════════════════════════════════════════════╗")
+            Timber.d("║  💰 [SOCKET] PAYMENT SUCCESS RECEIVED FROM SOCKET-SERVICE!       ║")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  🔑 Event Key: payment:success (ROOM/BRANCH SPECIFIC)            ║")
+            Timber.d("║  ⏱️  Received At: $receivedAt (${java.util.Date(receivedAt)})")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  💳 PAYMENT DATA:                                                 ║")
+            Timber.d("║     📦 OrderCode: ${data.optLong("orderCode")}")
+            Timber.d("║     💵 Amount: ${data.optLong("amount")} VND")
+            Timber.d("║     🔖 Transaction Ref: ${data.optString("transactionRef")}")
+            Timber.d("║     🏦 Bank: ${data.optString("counterAccountBankName")}")
+            Timber.d("║     👤 From: ${data.optString("counterAccountName")}")
+            Timber.d("║     🔢 Account: ${data.optString("counterAccountNumber")}")
+            Timber.d("║     ⏰ Transaction Time: ${data.optString("transactionDateTime")}")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  📄 RAW DATA: $data")
+            Timber.d("╚══════════════════════════════════════════════════════════════════╝")
 
             val event = PaymentSuccessEvent(
                 orderId = data.optString("orderId"),
@@ -277,15 +285,19 @@ class PaymentSocketManager @Inject constructor() {
 
     private val onPaymentCancelled = Emitter.Listener { args ->
         try {
+            val receivedAt = System.currentTimeMillis()
             val data = args.firstOrNull() as? JSONObject ?: return@Listener
 
-            Timber.d("════════════════════════════════════════════════════════════")
-            Timber.d("❌ [SOCKET] PAYMENT CANCELLED RECEIVED FROM SOCKET-SERVICE!")
-            Timber.d("════════════════════════════════════════════════════════════")
-            Timber.d("   📦 OrderCode: ${data.optLong("orderCode")}")
-            Timber.d("   📝 Reason: ${data.optString("reason")}")
-            Timber.d("   📄 Raw Data: $data")
-            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("╔══════════════════════════════════════════════════════════════════╗")
+            Timber.d("║  ❌ [SOCKET] PAYMENT CANCELLED RECEIVED FROM SOCKET-SERVICE!     ║")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  🔑 Event Key: payment:cancelled (ROOM/BRANCH SPECIFIC)          ║")
+            Timber.d("║  ⏱️  Received At: $receivedAt (${java.util.Date(receivedAt)})")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║     📦 OrderCode: ${data.optLong("orderCode")}")
+            Timber.d("║     📝 Reason: ${data.optString("reason")}")
+            Timber.d("║  📄 RAW DATA: $data")
+            Timber.d("╚══════════════════════════════════════════════════════════════════╝")
 
             val event = PaymentCancelledEvent(
                 orderId = data.optString("orderId"),
@@ -303,14 +315,18 @@ class PaymentSocketManager @Inject constructor() {
 
     private val onPaymentExpired = Emitter.Listener { args ->
         try {
+            val receivedAt = System.currentTimeMillis()
             val data = args.firstOrNull() as? JSONObject ?: return@Listener
 
-            Timber.d("════════════════════════════════════════════════════════════")
-            Timber.d("⏰ [SOCKET] PAYMENT EXPIRED RECEIVED FROM SOCKET-SERVICE!")
-            Timber.d("════════════════════════════════════════════════════════════")
-            Timber.d("   📦 OrderCode: ${data.optLong("orderCode")}")
-            Timber.d("   📄 Raw Data: $data")
-            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("╔══════════════════════════════════════════════════════════════════╗")
+            Timber.d("║  ⏰ [SOCKET] PAYMENT EXPIRED RECEIVED FROM SOCKET-SERVICE!       ║")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  🔑 Event Key: payment:expired (ROOM/BRANCH SPECIFIC)            ║")
+            Timber.d("║  ⏱️  Received At: $receivedAt (${java.util.Date(receivedAt)})")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║     📦 OrderCode: ${data.optLong("orderCode")}")
+            Timber.d("║  📄 RAW DATA: $data")
+            Timber.d("╚══════════════════════════════════════════════════════════════════╝")
 
             val event = PaymentExpiredEvent(
                 orderCode = data.optLong("orderCode")
@@ -321,6 +337,74 @@ class PaymentSocketManager @Inject constructor() {
             }
         } catch (e: Exception) {
             Timber.e("❌ [SOCKET] Error parsing payment:expired event: ${e.message}")
+        }
+    }
+
+    /**
+     * Handler for global payment:update event (broadcast from socket-service)
+     * This event is sent to ALL connected clients regardless of room
+     */
+    private val onPaymentUpdate = Emitter.Listener { args ->
+        try {
+            val receivedAt = System.currentTimeMillis()
+            val data = args.firstOrNull() as? JSONObject ?: return@Listener
+
+            Timber.d("╔══════════════════════════════════════════════════════════════════╗")
+            Timber.d("║  📡 [SOCKET] REALTIME EVENT RECEIVED FROM SOCKET-SERVICE!        ║")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  🔑 Event Key: payment:update (GLOBAL BROADCAST)                 ║")
+            Timber.d("║  ⏱️  Received At: $receivedAt (${java.util.Date(receivedAt)})")
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+
+            val eventType = data.optString("event")
+            val timestamp = data.optString("timestamp")
+            val paymentData = data.optJSONObject("data")
+
+            Timber.d("║  📌 Inner Event: $eventType")
+            Timber.d("║  🕐 Server Timestamp: $timestamp")
+
+            if (paymentData != null) {
+                Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+                Timber.d("║  💳 PAYMENT DATA:                                                 ║")
+                Timber.d("║     📦 OrderCode: ${paymentData.optLong("orderCode")}")
+                Timber.d("║     💰 Amount: ${paymentData.optLong("amount")} VND")
+                Timber.d("║     🔄 Status: ${paymentData.optString("status")}")
+                Timber.d("║     🔖 TransactionRef: ${paymentData.optString("transactionRef")}")
+                Timber.d("║     🏦 Bank: ${paymentData.optString("counterAccountBankName")}")
+                Timber.d("║     👤 From: ${paymentData.optString("counterAccountName")}")
+                Timber.d("║     🔢 Account: ${paymentData.optString("counterAccountNumber")}")
+            }
+
+            Timber.d("╠══════════════════════════════════════════════════════════════════╣")
+            Timber.d("║  📄 RAW DATA: $data")
+            Timber.d("╚══════════════════════════════════════════════════════════════════╝")
+
+            // If this is a payment:success event, also emit it through our flow
+            if (eventType == "payment:success" && paymentData != null) {
+                Timber.d("🔔 [SOCKET] Forwarding payment:success from global broadcast...")
+
+                val event = PaymentSuccessEvent(
+                    orderId = paymentData.optString("orderId"),
+                    orderCode = paymentData.optLong("orderCode"),
+                    amount = paymentData.optLong("amount"),
+                    transactionRef = paymentData.optString("transactionRef"),
+                    transactionDateTime = paymentData.optString("transactionDateTime"),
+                    counterAccountName = paymentData.optString("counterAccountName").takeIf { it.isNotEmpty() },
+                    counterAccountNumber = paymentData.optString("counterAccountNumber").takeIf { it.isNotEmpty() },
+                    counterAccountBankName = paymentData.optString("counterAccountBankName").takeIf { it.isNotEmpty() }
+                )
+
+                scope.launch {
+                    _paymentSuccess.emit(event)
+                    Timber.d("✅ [SOCKET] PaymentSuccessEvent emitted from global broadcast!")
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e("════════════════════════════════════════════════════════════")
+            Timber.e("❌ [SOCKET] Error parsing payment:update event!")
+            Timber.e("   ⚠️ Error: ${e.message}")
+            Timber.e("   📄 Args: ${args.contentToString()}")
+            Timber.e("════════════════════════════════════════════════════════════")
         }
     }
 }
