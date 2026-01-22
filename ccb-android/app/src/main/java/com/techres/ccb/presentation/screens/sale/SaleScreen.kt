@@ -5,8 +5,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -245,47 +243,6 @@ fun SaleScreen(
                         text = uiState.errorMessage ?: "",
                         color = Color.White,
                         fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        // Network offline warning banner - hiển thị ở đầu màn hình
-        AnimatedVisibility(
-            visible = !uiState.isOnline,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .zIndex(100f) // Đảm bảo hiển thị trên các thành phần khác
-        ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE65100) // Màu cam đậm hơn để dễ thấy
-                ),
-                shape = RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudOff,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "⚠ OFFLINE - Đơn hàng sẽ được đồng bộ khi có mạng",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
                     )
                 }
             }
