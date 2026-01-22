@@ -543,6 +543,9 @@ export class DatabaseMigrationService implements OnModuleInit {
     await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'show_total_discount', 'BOOLEAN DEFAULT true');
     await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'total_discount_label', "VARCHAR(50) DEFAULT 'Tổng giảm giá'");
 
+    // Item display layout column
+    await this.addColumnIfNotExists(queryRunner, 'bill_templates', 'item_display_layout', "VARCHAR(50) DEFAULT 'standard'");
+
     this.logger.log('Time tracking and discount config columns added to bill_templates');
   }
 
