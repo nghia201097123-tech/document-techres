@@ -28,9 +28,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { BrandBranchFilter, useGlobalFilters } from "@/components/ui/brand-filter";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchBranchesByBrand } from "@/store/slices/branchesSlice";
+import { BrandFilter, useGlobalFilters } from "@/components/ui/brand-filter";
 import {
   FileText,
   Printer,
@@ -72,21 +70,7 @@ type DialogMode = "create" | "edit" | null;
 
 export default function BillTemplatePage() {
   const { toast } = useToast();
-  const dispatch = useAppDispatch();
-  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
-  const { byBrandId: branchesByBrand, loading: loadingBranches } = useAppSelector((state) => state.branches);
-
-  // Get branches for the selected brand
-  const branches = filterBrandId && filterBrandId !== "all" && filterBrandId !== ""
-    ? branchesByBrand[filterBrandId] || []
-    : [];
-
-  // Load branches when brand changes
-  React.useEffect(() => {
-    if (filterBrandId && filterBrandId !== "all" && filterBrandId !== "") {
-      dispatch(fetchBranchesByBrand(filterBrandId));
-    }
-  }, [filterBrandId, dispatch]);
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
 
   // Bill Templates state
   const [templates, setTemplates] = React.useState<BillTemplate[]>([]);
@@ -106,7 +90,6 @@ export default function BillTemplatePage() {
 
   // Form states
   const [templateForm, setTemplateForm] = React.useState<CreateBillTemplateDto>({
-    branchId: "",
     name: "",
     storeName: "",
     templateType: BillTemplateType.CLASSIC,
@@ -118,7 +101,6 @@ export default function BillTemplatePage() {
   const deferredTemplateForm = React.useDeferredValue(templateForm);
 
   const [printerForm, setPrinterForm] = React.useState<CreateBillPrinterConfigDto>({
-    branchId: "",
     name: "",
     connectionType: PrinterConnectionType.NETWORK,
     ...DEFAULT_PRINTER_CONFIG,
@@ -168,7 +150,6 @@ export default function BillTemplatePage() {
     if (mode === "edit" && template) {
       setEditingTemplate(template);
       setTemplateForm({
-        branchId: template.branchId,
         name: template.name,
         templateType: template.templateType,
         description: template.description,
@@ -248,7 +229,6 @@ export default function BillTemplatePage() {
     } else {
       setEditingTemplate(null);
       setTemplateForm({
-        branchId: filterBranchId || "",
         name: "",
         storeName: "",
         templateType: BillTemplateType.CLASSIC,
@@ -260,10 +240,7 @@ export default function BillTemplatePage() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!filterBrandId || !templateForm.name || !templateForm.storeName || !templateForm.branchId) {
-      if (!templateForm.branchId) {
-        toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
-      }
+    if (!filterBrandId || !templateForm.name || !templateForm.storeName) {
       return;
     }
     setSavingTemplate(true);
@@ -325,7 +302,6 @@ export default function BillTemplatePage() {
     if (mode === "edit" && printer) {
       setEditingPrinter(printer);
       setPrinterForm({
-        branchId: printer.branchId,
         name: printer.name,
         description: printer.description,
         connectionType: printer.connectionType,
@@ -349,7 +325,6 @@ export default function BillTemplatePage() {
     } else {
       setEditingPrinter(null);
       setPrinterForm({
-        branchId: filterBranchId || "",
         name: "",
         connectionType: PrinterConnectionType.NETWORK,
         ...DEFAULT_PRINTER_CONFIG,
@@ -359,10 +334,7 @@ export default function BillTemplatePage() {
   };
 
   const handleSavePrinter = async () => {
-    if (!filterBrandId || !printerForm.name || !printerForm.branchId) {
-      if (!printerForm.branchId) {
-        toast({ title: "Lỗi", description: "Vui lòng chọn chi nhánh", variant: "destructive" });
-      }
+    if (!filterBrandId || !printerForm.name) {
       return;
     }
     setSavingPrinter(true);
@@ -442,15 +414,11 @@ export default function BillTemplatePage() {
           <h1 className="text-2xl font-bold">Mẫu Bill & Máy in</h1>
           <p className="text-muted-foreground">Quản lý mẫu hóa đơn và cấu hình máy in bill</p>
         </div>
-        <BrandBranchFilter
+        <BrandFilter
           selectedBrandId={filterBrandId}
-          selectedBranchId={filterBranchId}
           onBrandChange={setFilterBrandId}
-          onBranchChange={setFilterBranchId}
-          showAllBrandOption={false}
-          showAllBranchOption={false}
-          brandClassName="w-[180px]"
-          branchClassName="w-[180px]"
+          showAllOption={false}
+          className="w-[200px]"
         />
       </div>
 
@@ -463,7 +431,7 @@ export default function BillTemplatePage() {
                   <CardTitle>Mẫu Bill</CardTitle>
                   <CardDescription>Thiết kế và quản lý các mẫu hóa đơn bán hàng</CardDescription>
                 </div>
-                <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId || !filterBranchId}>
+                <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId}>
                   <Plus className="mr-2 h-4 w-4" />
                   Thêm mẫu bill
                 </Button>
@@ -575,7 +543,7 @@ export default function BillTemplatePage() {
                   <CardTitle>Máy in Bill</CardTitle>
                   <CardDescription>Cấu hình máy in hóa đơn cho thu ngân</CardDescription>
                 </div>
-                <Button onClick={() => openPrinterDialog("create")} disabled={!filterBrandId || !filterBranchId}>
+                <Button onClick={() => openPrinterDialog("create")} disabled={!filterBrandId}>
                   <Plus className="mr-2 h-4 w-4" />
                   Thêm máy in
                 </Button>
@@ -708,25 +676,7 @@ export default function BillTemplatePage() {
             <div className="lg:col-span-2 overflow-y-auto pr-2 h-full">
               <div className="space-y-4">
               {/* Basic info */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Chi nhánh *</Label>
-                  <Select
-                    value={templateForm.branchId}
-                    onValueChange={(value) => setTemplateForm({ ...templateForm, branchId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn chi nhánh" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.filter((b) => b.isActive).map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Tên mẫu *</Label>
                   <Input
@@ -1467,7 +1417,7 @@ export default function BillTemplatePage() {
             <Button variant="outline" onClick={() => setTemplateDialog(null)}>
               Hủy
             </Button>
-            <Button onClick={handleSaveTemplate} disabled={savingTemplate || !templateForm.name || !templateForm.storeName || !templateForm.branchId}>
+            <Button onClick={handleSaveTemplate} disabled={savingTemplate || !templateForm.name || !templateForm.storeName}>
               {savingTemplate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {templateDialog === "create" ? "Thêm" : "Lưu"}
             </Button>
@@ -1488,33 +1438,13 @@ export default function BillTemplatePage() {
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-4 pr-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Chi nhánh *</Label>
-                  <Select
-                    value={printerForm.branchId}
-                    onValueChange={(value) => setPrinterForm({ ...printerForm, branchId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn chi nhánh" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.filter((b) => b.isActive).map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tên máy in *</Label>
-                  <Input
-                    value={printerForm.name}
-                    onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
-                    placeholder="VD: Máy in thu ngân"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Tên máy in *</Label>
+                <Input
+                  value={printerForm.name}
+                  onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
+                  placeholder="VD: Máy in thu ngân"
+                />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -1728,7 +1658,7 @@ export default function BillTemplatePage() {
             <Button variant="outline" onClick={() => setPrinterDialog(null)}>
               Hủy
             </Button>
-            <Button onClick={handleSavePrinter} disabled={savingPrinter || !printerForm.name || !printerForm.branchId}>
+            <Button onClick={handleSavePrinter} disabled={savingPrinter || !printerForm.name}>
               {savingPrinter && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {printerDialog === "create" ? "Thêm" : "Lưu"}
             </Button>
