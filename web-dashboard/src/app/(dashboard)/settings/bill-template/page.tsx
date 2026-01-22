@@ -454,20 +454,8 @@ export default function BillTemplatePage() {
         />
       </div>
 
-      <Tabs defaultValue="templates" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="templates" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Mẫu Bill
-          </TabsTrigger>
-          <TabsTrigger value="printers" className="gap-2">
-            <Printer className="h-4 w-4" />
-            Máy in Bill
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Bill Templates Tab */}
-        <TabsContent value="templates">
+      {/* Bill Templates Section */}
+      <div className="space-y-6">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -578,10 +566,8 @@ export default function BillTemplatePage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Printer Configs Tab */}
-        <TabsContent value="printers">
+        {/* Printer Configs Section */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -704,8 +690,7 @@ export default function BillTemplatePage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Bill Template Dialog */}
       <Dialog open={templateDialog !== null} onOpenChange={() => setTemplateDialog(null)}>
