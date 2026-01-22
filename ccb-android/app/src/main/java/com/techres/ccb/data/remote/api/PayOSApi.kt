@@ -53,7 +53,8 @@ data class CreatePaymentRequest(
 data class CreatePaymentResponse(
     val success: Boolean,
     val paymentLinkId: String,
-    val qrCode: String,           // QR code image URL from PayOS
+    val qrCode: String,           // QR code image URL for display
+    val qrData: String? = null,   // Raw EMVCo QR data for printing (banking apps can scan)
     val checkoutUrl: String,      // Web checkout URL
     val orderCode: Long,
     val amount: Long

@@ -181,8 +181,9 @@ data class SaleUiState(
     val isPrintingQr: Boolean = false,
 
     // PayOS Payment State
-    val payosQrCodeUrl: String? = null,           // PayOS QR code image URL
-    val payosCheckoutUrl: String? = null,         // PayOS checkout URL for printing
+    val payosQrCodeUrl: String? = null,           // PayOS QR code image URL for display
+    val payosQrData: String? = null,              // PayOS EMVCo QR data for printing (banking apps can scan)
+    val payosCheckoutUrl: String? = null,         // PayOS checkout URL (web)
     val payosPaymentLinkId: String? = null,       // PayOS payment link ID
     val payosOrderCode: Long? = null,             // PayOS order code for tracking
     val isCreatingPayosPayment: Boolean = false,  // Loading state for creating payment
@@ -3156,12 +3157,12 @@ class SaleViewModel @Inject constructor(
 
         // Check if we're in PayOS mode or VietQR mode
         val isPayosMode = state.isPayosPaymentMode
-        val payosCheckoutUrl = state.payosCheckoutUrl
+        val payosQrData = state.payosQrData  // EMVCo QR data for banking apps
         val bankAccount = state.bankAccount
 
         // Validate based on mode
         if (isPayosMode) {
-            if (payosCheckoutUrl.isNullOrEmpty()) {
+            if (payosQrData.isNullOrEmpty()) {
                 _uiState.update { it.copy(errorMessage = "Chưa tạo mã QR PayOS") }
                 return
             }
@@ -3193,11 +3194,11 @@ class SaleViewModel @Inject constructor(
                         val totalAmount = state.totalAmount
 
                         // Print QR code based on mode
-                        val result = if (isPayosMode && payosCheckoutUrl != null) {
-                            // PayOS mode - print checkout URL as QR
+                        val result = if (isPayosMode && payosQrData != null) {
+                            // PayOS mode - print EMVCo QR data (banking apps can scan directly)
                             HybridBillPrintService.printPayosQrCode(
                                 printerConfig = printerConfig,
-                                checkoutUrl = payosCheckoutUrl,
+                                qrData = payosQrData,
                                 amount = totalAmount,
                                 orderCode = state.payosOrderCode ?: 0L,
                                 copies = 1
@@ -4505,6 +4506,7 @@ class SaleViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 payosQrCodeUrl = response.qrCode,
+                                payosQrData = response.qrData,
                                 payosCheckoutUrl = response.checkoutUrl,
                                 payosPaymentLinkId = response.paymentLinkId,
                                 payosOrderCode = response.orderCode,
@@ -4512,7 +4514,7 @@ class SaleViewModel @Inject constructor(
                                 payosError = null
                             )
                         }
-                        Log.d(TAG, "PayOS payment created: orderCode=${response.orderCode}, checkoutUrl=${response.checkoutUrl}")
+                        Log.d(TAG, "PayOS payment created: orderCode=${response.orderCode}, qrData=${response.qrData?.take(50)}...")
                     }
                     is PayOSResult.Error -> {
                         _uiState.update {
@@ -4562,6 +4564,7 @@ class SaleViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 payosQrCodeUrl = null,
+                payosQrData = null,
                 payosCheckoutUrl = null,
                 payosPaymentLinkId = null,
                 payosOrderCode = null,

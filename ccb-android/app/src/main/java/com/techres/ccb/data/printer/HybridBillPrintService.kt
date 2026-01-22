@@ -1371,19 +1371,21 @@ object HybridBillPrintService {
      * In mã QR PayOS cho thanh toán
      *
      * Phiếu QR PayOS gồm:
-     * - Mã QR chứa checkout URL của PayOS
-     * - Khi quét sẽ mở trang thanh toán PayOS
+     * - Mã QR chứa EMVCo data từ PayOS
+     * - Khi quét bằng app ngân hàng sẽ thanh toán trực tiếp
+     *
+     * @param qrData EMVCo QR data (not checkout URL) - this is what banking apps scan
      */
     suspend fun printPayosQrCode(
         printerConfig: BillPrinterConfigEntity,
-        checkoutUrl: String,
+        qrData: String,
         amount: Long,
         orderCode: Long,
         copies: Int = 1
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             Log.d(TAG, "=== PRINT PAYOS QR CODE ===")
-            Log.d(TAG, "CheckoutUrl: $checkoutUrl")
+            Log.d(TAG, "QR Data (EMVCo): ${qrData.take(50)}...")
             Log.d(TAG, "Amount: $amount, OrderCode: $orderCode")
 
             // Compute font scale from fontSize setting
@@ -1408,9 +1410,9 @@ object HybridBillPrintService {
             val content = builder.apply {
                 init()
 
-                // Chỉ in mã QR PayOS (tiết kiệm giấy)
+                // In mã QR PayOS (EMVCo data - app ngân hàng scan trực tiếp)
                 feed(1)
-                qrCode(checkoutUrl, size = 8)
+                qrCode(qrData, size = 8)
                 feed(6) // Đủ khoảng cách để QR không bị cắt
                 cut()
             }.build()
