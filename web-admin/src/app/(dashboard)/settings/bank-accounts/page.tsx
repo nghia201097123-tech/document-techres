@@ -3,29 +3,16 @@
 import * as React from "react";
 import {
   Landmark,
-  Plus,
-  Search,
-  MoreHorizontal,
   Pencil,
-  Trash2,
-  Eye,
   QrCode,
-  Star,
-  Copy,
   Check,
   CreditCard,
+  AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -35,22 +22,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { formatDateTime } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Danh sách ngân hàng Việt Nam phổ biến với bank code
 const vietnamBanks = [
@@ -96,41 +80,6 @@ interface BankAccount {
   payosChecksumKey?: string;
 }
 
-// Mock data
-const mockBankAccounts: BankAccount[] = [
-  {
-    id: "1",
-    bankCode: "VCB",
-    bankName: "Vietcombank - Ngân hàng TMCP Ngoại Thương Việt Nam",
-    bankBin: "970436",
-    accountNumber: "19039164318014",
-    accountName: "CONG TY TNHH TECHRES",
-    isPrimary: true,
-    isActive: true,
-    transferTemplate: "TT {order_code}",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-    // PayOS configuration
-    paymentPartner: "payos",
-    payosClientId: "309cd981-25b9-4139-91af-ebc55bf6256e",
-    payosApiKey: "85fc4cd5-6b4a-4402-ba4d-5ce8a915577b",
-    payosChecksumKey: "c028b7bba18cfe4e7dc5dfb5f4fe80a293776fb396eebb48025e5bcdca18aa9f",
-  },
-  {
-    id: "2",
-    bankCode: "TCB",
-    bankName: "Techcombank - Ngân hàng TMCP Kỹ Thương Việt Nam",
-    bankBin: "970407",
-    accountNumber: "19039988776655",
-    accountName: "CONG TY TNHH TECHRES",
-    isPrimary: false,
-    isActive: true,
-    transferTemplate: "TT {order_code}",
-    createdAt: "2024-01-05T00:00:00Z",
-    updatedAt: "2024-01-05T00:00:00Z",
-  },
-];
-
 interface BankAccountFormData {
   bankCode: string;
   bankName: string;
@@ -138,7 +87,6 @@ interface BankAccountFormData {
   accountNumber: string;
   accountName: string;
   transferTemplate: string;
-  isPrimary: boolean;
   // PayOS integration
   paymentPartner: string;
   payosClientId: string;
@@ -153,7 +101,6 @@ const initialFormData: BankAccountFormData = {
   accountNumber: "",
   accountName: "",
   transferTemplate: "TT {order_code}",
-  isPrimary: false,
   // PayOS integration
   paymentPartner: "",
   payosClientId: "",
@@ -162,81 +109,55 @@ const initialFormData: BankAccountFormData = {
 };
 
 export default function BankAccountsPage() {
-  const [accounts, setAccounts] = React.useState<BankAccount[]>(mockBankAccounts);
-  const [searchQuery, setSearchQuery] = React.useState("");
+  // Chỉ lưu 1 tài khoản mặc định duy nhất
+  const [defaultAccount, setDefaultAccount] = React.useState<BankAccount | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-  const [isQRDialogOpen, setIsQRDialogOpen] = React.useState(false);
-  const [selectedAccount, setSelectedAccount] = React.useState<BankAccount | null>(null);
   const [formData, setFormData] = React.useState<BankAccountFormData>(initialFormData);
-  const [isViewMode, setIsViewMode] = React.useState(false);
-  const [qrAmount, setQrAmount] = React.useState<string>("");
-  const [qrDescription, setQrDescription] = React.useState<string>("");
-  const [copied, setCopied] = React.useState(false);
+  const [qrAmount, setQrAmount] = React.useState<string>("100000");
 
-  const filteredAccounts = accounts.filter((account) => {
-    return (
-      account.bankName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      account.accountNumber.includes(searchQuery) ||
-      account.accountName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
+  // Load default account on mount (in real app, load from API)
+  React.useEffect(() => {
+    // Mock: load from localStorage or API
+    const saved = localStorage.getItem("defaultBankAccount");
+    if (saved) {
+      try {
+        setDefaultAccount(JSON.parse(saved));
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
 
-  const handleOpenCreate = () => {
-    setSelectedAccount(null);
-    setFormData(initialFormData);
-    setIsViewMode(false);
+  // Save to localStorage when changed (in real app, save to API)
+  React.useEffect(() => {
+    if (defaultAccount) {
+      localStorage.setItem("defaultBankAccount", JSON.stringify(defaultAccount));
+    } else {
+      localStorage.removeItem("defaultBankAccount");
+    }
+  }, [defaultAccount]);
+
+  const handleOpenSetup = () => {
+    if (defaultAccount) {
+      // Edit existing
+      setFormData({
+        bankCode: defaultAccount.bankCode,
+        bankName: defaultAccount.bankName,
+        bankBin: defaultAccount.bankBin,
+        accountNumber: defaultAccount.accountNumber,
+        accountName: defaultAccount.accountName,
+        transferTemplate: defaultAccount.transferTemplate || "TT {order_code}",
+        paymentPartner: defaultAccount.paymentPartner || "",
+        payosClientId: defaultAccount.payosClientId || "",
+        payosApiKey: defaultAccount.payosApiKey || "",
+        payosChecksumKey: defaultAccount.payosChecksumKey || "",
+      });
+    } else {
+      // Create new
+      setFormData(initialFormData);
+    }
     setIsDialogOpen(true);
-  };
-
-  const handleOpenEdit = (account: BankAccount) => {
-    setSelectedAccount(account);
-    setFormData({
-      bankCode: account.bankCode,
-      bankName: account.bankName,
-      bankBin: account.bankBin,
-      accountNumber: account.accountNumber,
-      accountName: account.accountName,
-      transferTemplate: account.transferTemplate || "",
-      isPrimary: account.isPrimary,
-      paymentPartner: account.paymentPartner || "",
-      payosClientId: account.payosClientId || "",
-      payosApiKey: account.payosApiKey || "",
-      payosChecksumKey: account.payosChecksumKey || "",
-    });
-    setIsViewMode(false);
-    setIsDialogOpen(true);
-  };
-
-  const handleOpenView = (account: BankAccount) => {
-    setSelectedAccount(account);
-    setFormData({
-      bankCode: account.bankCode,
-      bankName: account.bankName,
-      bankBin: account.bankBin,
-      accountNumber: account.accountNumber,
-      accountName: account.accountName,
-      transferTemplate: account.transferTemplate || "",
-      isPrimary: account.isPrimary,
-      paymentPartner: account.paymentPartner || "",
-      payosClientId: account.payosClientId || "",
-      payosApiKey: account.payosApiKey || "",
-      payosChecksumKey: account.payosChecksumKey || "",
-    });
-    setIsViewMode(true);
-    setIsDialogOpen(true);
-  };
-
-  const handleOpenDelete = (account: BankAccount) => {
-    setSelectedAccount(account);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleOpenQR = (account: BankAccount) => {
-    setSelectedAccount(account);
-    setQrAmount("");
-    setQrDescription("");
-    setIsQRDialogOpen(true);
   };
 
   const handleBankChange = (bankCode: string) => {
@@ -254,12 +175,6 @@ export default function BankAccountsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // If setting as primary, unset other primary accounts
-    let updatedAccounts = [...accounts];
-    if (formData.isPrimary) {
-      updatedAccounts = updatedAccounts.map((a) => ({ ...a, isPrimary: false }));
-    }
-
     // Clean up PayOS fields if not using PayOS
     const submitData = {
       ...formData,
@@ -269,52 +184,32 @@ export default function BankAccountsPage() {
       payosChecksumKey: formData.paymentPartner === "payos" ? formData.payosChecksumKey : "",
     };
 
-    if (selectedAccount) {
-      setAccounts(
-        updatedAccounts.map((a) =>
-          a.id === selectedAccount.id
-            ? { ...a, ...submitData, updatedAt: new Date().toISOString() }
-            : a
-        )
-      );
-    } else {
-      const newAccount: BankAccount = {
-        id: String(Date.now()),
-        ...submitData,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setAccounts([newAccount, ...updatedAccounts]);
-    }
+    const newAccount: BankAccount = {
+      id: defaultAccount?.id || String(Date.now()),
+      ...submitData,
+      isPrimary: true, // Luôn là tài khoản chính
+      isActive: true,
+      createdAt: defaultAccount?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setDefaultAccount(newAccount);
     setIsDialogOpen(false);
   };
 
   const handleDelete = () => {
-    if (selectedAccount) {
-      setAccounts((prev) => prev.filter((a) => a.id !== selectedAccount.id));
-      setIsDeleteDialogOpen(false);
-      setSelectedAccount(null);
-    }
+    setDefaultAccount(null);
+    setIsDeleteDialogOpen(false);
   };
 
-  const handleToggleStatus = (account: BankAccount) => {
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === account.id ? { ...a, isActive: !a.isActive } : a))
-    );
-  };
-
-  const handleSetPrimary = (account: BankAccount) => {
-    setAccounts((prev) =>
-      prev.map((a) => ({
-        ...a,
-        isPrimary: a.id === account.id,
-      }))
-    );
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
   };
 
   const generateQRUrl = (account: BankAccount, amount?: string, description?: string) => {
-    // Format: https://qr.sepay.vn/img?bank=BANK_CODE&acc=ACCOUNT_NUMBER&template=qronly&amount=AMOUNT&des=DESCRIPTION
     let url = `https://qr.sepay.vn/img?bank=${account.bankCode}&acc=${account.accountNumber}&template=compact`;
     if (amount) {
       url += `&amount=${amount.replace(/\./g, "").replace(/,/g, "")}`;
@@ -325,238 +220,167 @@ export default function BankAccountsPage() {
     return url;
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Tài khoản ngân hàng</h2>
-          <p className="text-muted-foreground">
-            Thiết lập tài khoản ngân hàng, tạo mã QR VietQR hoặc tích hợp PayOS để tự động xác nhận thanh toán
-          </p>
-        </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm tài khoản
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Tài khoản ngân hàng mặc định</h2>
+        <p className="text-muted-foreground">
+          Thiết lập tài khoản ngân hàng để in mã QR thanh toán trên bill
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tổng tài khoản
-            </CardTitle>
-            <Landmark className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accounts.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Đang hoạt động
-            </CardTitle>
-            <Check className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">
-              {accounts.filter((a) => a.isActive).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              PayOS tự động
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-500">
-              {accounts.filter((a) => a.paymentPartner === "payos").length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tài khoản chính
-            </CardTitle>
-            <Star className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">
-              {accounts.find((a) => a.isPrimary)?.bankCode || "Chưa thiết lập"}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Thông báo quan trọng */}
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Mã QR thanh toán trên Bill</AlertTitle>
+        <AlertDescription>
+          Khi in bill, mã QR chuyển khoản sẽ được tự động in kèm theo với số tiền và nội dung chuyển khoản.
+          Khách hàng chỉ cần quét mã QR bằng app ngân hàng để thanh toán nhanh chóng.
+        </AlertDescription>
+      </Alert>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg">
-              Danh sách tài khoản ({filteredAccounts.length})
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Card hiển thị tài khoản mặc định */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-blue-500" />
+              Tài khoản nhận thanh toán
             </CardTitle>
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm tài khoản..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ngân hàng</TableHead>
-                <TableHead>Số tài khoản</TableHead>
-                <TableHead>Chủ tài khoản</TableHead>
-                <TableHead>Thanh toán</TableHead>
-                <TableHead>Mặc định</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Ngày tạo</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAccounts.map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                        <Landmark className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{account.bankCode}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {account.bankName.split(" - ")[0]}
-                        </p>
-                      </div>
+            <CardDescription>
+              Tài khoản này sẽ được sử dụng để tạo mã QR trên tất cả bill
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {defaultAccount ? (
+              <div className="space-y-4">
+                {/* Thông tin tài khoản */}
+                <div className="rounded-lg border p-4 space-y-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Ngân hàng</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{defaultAccount.bankCode}</span>
+                      <Badge variant="success">Đang sử dụng</Badge>
                     </div>
-                  </TableCell>
-                  <TableCell className="font-mono">{account.accountNumber}</TableCell>
-                  <TableCell>{account.accountName}</TableCell>
-                  <TableCell>
-                    {account.paymentPartner === "payos" ? (
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Số tài khoản</span>
+                    <span className="font-mono font-semibold">{defaultAccount.accountNumber}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Chủ tài khoản</span>
+                    <span className="font-semibold">{defaultAccount.accountName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Nội dung CK</span>
+                    <span className="text-sm">{defaultAccount.transferTemplate || "TT {order_code}"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Thanh toán tự động</span>
+                    {defaultAccount.paymentPartner === "payos" ? (
                       <Badge variant="default" className="bg-blue-500">
+                        <CreditCard className="mr-1 h-3 w-3" />
                         PayOS
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-muted-foreground">
-                        VietQR
-                      </Badge>
+                      <Badge variant="outline">VietQR thủ công</Badge>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {account.isPrimary ? (
-                      <Badge variant="default" className="bg-yellow-500">
-                        <Star className="mr-1 h-3 w-3" />
-                        Chính
-                      </Badge>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSetPrimary(account)}
-                        className="text-muted-foreground"
-                      >
-                        Đặt làm chính
-                      </Button>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={account.isActive ? "success" : "secondary"}
-                      className="cursor-pointer"
-                      onClick={() => handleToggleStatus(account)}
-                    >
-                      {account.isActive ? "Hoạt động" : "Tạm dừng"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(account.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenQR(account)}>
-                          <QrCode className="mr-2 h-4 w-4" />
-                          Tạo mã QR
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenView(account)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Xem chi tiết
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEdit(account)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Chỉnh sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDelete(account)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredAccounts.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
-                    Không tìm thấy tài khoản ngân hàng nào
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </div>
+                </div>
 
-      {/* Create/Edit Dialog */}
+                {/* Nút chỉnh sửa và xóa */}
+                <div className="flex gap-2">
+                  <Button onClick={handleOpenSetup} className="flex-1">
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Chỉnh sửa
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 space-y-4">
+                <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                  <Landmark className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium">Chưa thiết lập tài khoản</p>
+                  <p className="text-sm text-muted-foreground">
+                    Thiết lập tài khoản ngân hàng để in mã QR thanh toán trên bill
+                  </p>
+                </div>
+                <Button onClick={handleOpenSetup}>
+                  <Landmark className="mr-2 h-4 w-4" />
+                  Thiết lập ngay
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card xem trước QR */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-green-500" />
+              Xem trước mã QR
+            </CardTitle>
+            <CardDescription>
+              Mã QR sẽ hiển thị trên bill khi in
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {defaultAccount ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="previewAmount">Số tiền mẫu (VND)</Label>
+                  <Input
+                    id="previewAmount"
+                    value={qrAmount}
+                    onChange={(e) => setQrAmount(e.target.value)}
+                    placeholder="VD: 100000"
+                    type="number"
+                  />
+                </div>
+                <div className="flex justify-center p-4 bg-white rounded-lg border">
+                  <img
+                    src={generateQRUrl(defaultAccount, qrAmount, "TT DH001")}
+                    alt="VietQR Code Preview"
+                    className="w-48 h-48 object-contain"
+                  />
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  Quét bằng app ngân hàng bất kỳ để thanh toán
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="mx-auto w-32 h-32 rounded-lg bg-muted flex items-center justify-center mb-4">
+                  <QrCode className="h-16 w-16 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Thiết lập tài khoản để xem trước mã QR
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Setup Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {isViewMode
-                ? "Chi tiết tài khoản"
-                : selectedAccount
-                ? "Chỉnh sửa tài khoản"
-                : "Thêm tài khoản ngân hàng"}
+              {defaultAccount ? "Chỉnh sửa tài khoản" : "Thiết lập tài khoản ngân hàng"}
             </DialogTitle>
             <DialogDescription>
-              {isViewMode
-                ? "Thông tin chi tiết tài khoản ngân hàng"
-                : selectedAccount
-                ? "Cập nhật thông tin tài khoản"
-                : "Nhập thông tin tài khoản ngân hàng để nhận thanh toán"}
+              Tài khoản này sẽ được sử dụng để tạo mã QR thanh toán trên tất cả bill
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -566,7 +390,6 @@ export default function BankAccountsPage() {
                 <Select
                   value={formData.bankCode}
                   onValueChange={handleBankChange}
-                  disabled={isViewMode}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn ngân hàng" />
@@ -594,7 +417,6 @@ export default function BankAccountsPage() {
                   value={formData.accountNumber}
                   onChange={handleChange}
                   required
-                  disabled={isViewMode}
                   placeholder="VD: 19039164318014"
                 />
               </div>
@@ -606,7 +428,6 @@ export default function BankAccountsPage() {
                   value={formData.accountName}
                   onChange={handleChange}
                   required
-                  disabled={isViewMode}
                   placeholder="VD: CONG TY TNHH ABC"
                   className="uppercase"
                 />
@@ -621,55 +442,40 @@ export default function BankAccountsPage() {
                   name="transferTemplate"
                   value={formData.transferTemplate}
                   onChange={handleChange}
-                  disabled={isViewMode}
                   placeholder="VD: TT {order_code}"
                 />
                 <p className="text-xs text-muted-foreground">
                   Sử dụng {"{order_code}"} để tự động điền mã đơn hàng
                 </p>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="isPrimary"
-                  checked={formData.isPrimary}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({ ...prev, isPrimary: checked }))
-                  }
-                  disabled={isViewMode}
-                />
-                <Label htmlFor="isPrimary">Đặt làm tài khoản mặc định</Label>
-              </div>
 
               {/* PayOS Configuration Section */}
-              <div className="border-t pt-4 mt-4">
+              <div className="border-t pt-4 mt-2">
                 <div className="space-y-2 mb-4">
-                  <Label htmlFor="paymentPartner">Đối tác thanh toán tự động</Label>
+                  <Label htmlFor="paymentPartner">Thanh toán tự động (tuỳ chọn)</Label>
                   <Select
                     value={formData.paymentPartner}
                     onValueChange={(value) =>
                       setFormData((prev) => ({ ...prev, paymentPartner: value }))
                     }
-                    disabled={isViewMode}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn đối tác (không bắt buộc)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Không sử dụng</SelectItem>
-                      <SelectItem value="payos">PayOS - Thanh toán tự động xác nhận</SelectItem>
+                      <SelectItem value="none">Không sử dụng - Xác nhận thủ công</SelectItem>
+                      <SelectItem value="payos">PayOS - Tự động xác nhận khi nhận tiền</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    PayOS giúp tự động xác nhận thanh toán khi khách chuyển khoản
+                    PayOS giúp tự động xác nhận đơn hàng khi khách chuyển khoản thành công
                   </p>
                 </div>
 
                 {formData.paymentPartner === "payos" && (
                   <div className="space-y-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
                     <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
+                      <CreditCard className="h-4 w-4" />
                       <span className="text-sm font-medium">Cấu hình PayOS</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -691,7 +497,6 @@ export default function BankAccountsPage() {
                         name="payosClientId"
                         value={formData.payosClientId}
                         onChange={handleChange}
-                        disabled={isViewMode}
                         placeholder="VD: 12345678"
                         required={formData.paymentPartner === "payos"}
                       />
@@ -704,7 +509,6 @@ export default function BankAccountsPage() {
                         type="password"
                         value={formData.payosApiKey}
                         onChange={handleChange}
-                        disabled={isViewMode}
                         placeholder="Nhập API Key từ PayOS"
                         required={formData.paymentPartner === "payos"}
                       />
@@ -717,7 +521,6 @@ export default function BankAccountsPage() {
                         type="password"
                         value={formData.payosChecksumKey}
                         onChange={handleChange}
-                        disabled={isViewMode}
                         placeholder="Nhập Checksum Key từ PayOS"
                         required={formData.paymentPartner === "payos"}
                       />
@@ -727,114 +530,19 @@ export default function BankAccountsPage() {
               </div>
             </div>
             <DialogFooter>
-              {isViewMode ? (
-                <Button type="button" onClick={() => setIsDialogOpen(false)}>
-                  Đóng
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Hủy
-                  </Button>
-                  <Button type="submit">
-                    {selectedAccount ? "Cập nhật" : "Thêm mới"}
-                  </Button>
-                </>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button type="submit">
+                <Check className="mr-2 h-4 w-4" />
+                {defaultAccount ? "Cập nhật" : "Lưu"}
+              </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* QR Code Dialog */}
-      <Dialog open={isQRDialogOpen} onOpenChange={setIsQRDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Tạo mã QR VietQR</DialogTitle>
-            <DialogDescription>
-              Tạo mã QR để khách hàng quét thanh toán nhanh chóng
-            </DialogDescription>
-          </DialogHeader>
-          {selectedAccount && (
-            <div className="space-y-4">
-              <div className="rounded-lg border p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Ngân hàng:</span>
-                  <span className="font-medium">{selectedAccount.bankCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Số tài khoản:</span>
-                  <span className="font-mono">{selectedAccount.accountNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Chủ tài khoản:</span>
-                  <span className="font-medium">{selectedAccount.accountName}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="qrAmount">Số tiền (VND)</Label>
-                <Input
-                  id="qrAmount"
-                  value={qrAmount}
-                  onChange={(e) => setQrAmount(e.target.value)}
-                  placeholder="VD: 200000"
-                  type="number"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="qrDescription">Nội dung chuyển khoản</Label>
-                <Input
-                  id="qrDescription"
-                  value={qrDescription}
-                  onChange={(e) => setQrDescription(e.target.value)}
-                  placeholder="VD: Thanh toan don hang 001"
-                />
-              </div>
-
-              <div className="flex justify-center p-4 bg-white rounded-lg">
-                <img
-                  src={generateQRUrl(selectedAccount, qrAmount, qrDescription)}
-                  alt="VietQR Code"
-                  className="w-64 h-64 object-contain"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Link QR Code</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={generateQRUrl(selectedAccount, qrAmount, qrDescription)}
-                    readOnly
-                    className="text-xs"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() =>
-                      copyToClipboard(generateQRUrl(selectedAccount, qrAmount, qrDescription))
-                    }
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsQRDialogOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -844,10 +552,8 @@ export default function BankAccountsPage() {
           <DialogHeader>
             <DialogTitle>Xác nhận xóa</DialogTitle>
             <DialogDescription>
-              Bạn có chắc chắn muốn xóa tài khoản{" "}
-              <span className="font-medium">{selectedAccount?.accountNumber}</span> tại{" "}
-              <span className="font-medium">{selectedAccount?.bankCode}</span>? Hành động
-              này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa tài khoản ngân hàng mặc định?
+              Mã QR thanh toán sẽ không được in trên bill cho đến khi bạn thiết lập lại.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -858,7 +564,7 @@ export default function BankAccountsPage() {
               Hủy
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
-              Xóa
+              Xóa tài khoản
             </Button>
           </DialogFooter>
         </DialogContent>
