@@ -880,14 +880,19 @@ class HybridBillBuilder(
             val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
             Log.d(TAG, "QR code: paperWidth-based pixelWidth=$pixelWidth, qrSize=$qrSize")
 
-            // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
-            val qrBitmap = if (content.startsWith("https://qr.sepay.vn/") ||
-                               content.startsWith("https://img.vietqr.io/")) {
+            // Kiểm tra nếu content là URL hình ảnh QR
+            // Hỗ trợ: sepay.vn, vietqr.io, payos.vn
+            val isQrImageUrl = content.startsWith("https://qr.sepay.vn/") ||
+                              content.startsWith("https://img.vietqr.io/") ||
+                              content.startsWith("https://api.payos.vn/") ||
+                              content.startsWith("https://pay.payos.vn/")
+
+            val qrBitmap = if (isQrImageUrl) {
                 // Tải hình ảnh QR từ URL
                 Log.d(TAG, "Downloading QR image from URL: $content")
                 downloadQrImageFromUrl(content, qrSize)
             } else {
-                // Generate QR code bằng ZXing
+                // Generate QR code bằng ZXing (EMVCo data hoặc nội dung text)
                 Log.d(TAG, "Generating QR code with ZXing: $content")
                 generateQrCodeBitmap(content, qrSize)
             }

@@ -440,14 +440,19 @@ class SingleCanvasBillBuilder(
                         // 80mm: pixelWidth=576, qrSize=300px
                         val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
 
-                        // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
-                        val qrBitmap = if (segment.content.startsWith("https://qr.sepay.vn/") ||
-                                           segment.content.startsWith("https://img.vietqr.io/")) {
+                        // Kiểm tra nếu content là URL hình ảnh QR
+                        // Hỗ trợ: sepay.vn, vietqr.io, payos.vn
+                        val isQrImageUrl = segment.content.startsWith("https://qr.sepay.vn/") ||
+                                          segment.content.startsWith("https://img.vietqr.io/") ||
+                                          segment.content.startsWith("https://api.payos.vn/") ||
+                                          segment.content.startsWith("https://pay.payos.vn/")
+
+                        val qrBitmap = if (isQrImageUrl) {
                             // Tải hình ảnh QR từ URL (có logo ngân hàng)
                             Log.d(TAG, "Segment $index: Downloading QR image from URL")
                             downloadQrImageFromUrl(segment.content, qrSize)
                         } else {
-                            // Generate QR code bằng ZXing
+                            // Generate QR code bằng ZXing (EMVCo data hoặc nội dung text)
                             generateQrCodeBitmap(segment.content, qrSize)
                         }
 

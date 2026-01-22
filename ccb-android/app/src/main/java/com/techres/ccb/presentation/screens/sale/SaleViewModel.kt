@@ -4617,7 +4617,7 @@ class SaleViewModel @Inject constructor(
      * Tạo PayOS payment cho bill và trả về QR code URL
      * Hàm này chạy synchronously để dùng trong bill printing flow
      *
-     * @return QR code URL nếu thành công, null nếu thất bại
+     * @return QR data (EMVCo format) nếu thành công, null nếu thất bại
      */
     private suspend fun createPayOSPaymentForBill(
         orderId: String,
@@ -4646,9 +4646,11 @@ class SaleViewModel @Inject constructor(
 
             when (result) {
                 is PayOSResult.Success -> {
-                    val qrCode = result.data.qrCode
-                    Log.d(TAG, "PayOS payment created for bill: qrCode=${qrCode.take(50)}...")
-                    qrCode
+                    // Ưu tiên dùng qrData (EMVCo raw data) để in QR - banking apps có thể quét trực tiếp
+                    // Nếu không có qrData, dùng qrCode (URL hình ảnh) và thêm vào danh sách URL hỗ trợ
+                    val qrContent = result.data.qrData ?: result.data.qrCode
+                    Log.d(TAG, "PayOS payment created for bill: qrContent=${qrContent.take(80)}...")
+                    qrContent
                 }
                 is PayOSResult.Error -> {
                     Log.e(TAG, "PayOS payment failed for bill: ${result.message}")
