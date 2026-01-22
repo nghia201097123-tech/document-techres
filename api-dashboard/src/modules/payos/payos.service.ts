@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import PayOS = require('@payos/node');
 import axios from 'axios';
+import * as QRCode from 'qrcode';
 import { BankAccount } from '../../database/entities';
 import {
   CreatePaymentDto,
@@ -194,14 +195,19 @@ export class PayosService {
       );
 
       // PayOS returns QR code as EMVCo data string, not image URL
-      // Convert to image URL using QR code generation service
+      // Generate QR code as base64 locally to avoid external API dependency
+      // This ensures QR code works on devices without internet (e.g., Sunmi T1-G on LAN)
       const qrData = paymentRequest.qrCode;
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+      const qrBase64 = await QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: 'M',
+        width: 300,
+        margin: 2,
+      });
 
       return {
         success: true,
         paymentLinkId: paymentRequest.paymentLinkId,
-        qrCode: qrImageUrl,
+        qrCode: qrBase64, // Base64 data URL (data:image/png;base64,...)
         qrData: qrData, // Keep original QR data for clients that can render locally
         checkoutUrl: paymentRequest.checkoutUrl,
         orderCode: dto.orderCode,
