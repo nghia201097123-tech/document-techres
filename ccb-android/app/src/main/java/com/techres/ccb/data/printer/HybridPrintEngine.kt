@@ -866,10 +866,16 @@ class HybridBillBuilder(
      * In QR Code - hỗ trợ cả URL hình ảnh và nội dung QR
      * Nếu content là URL (https://qr.sepay.vn/...) -> tải hình ảnh từ URL
      * Nếu không -> generate QR code bằng ZXing
+     *
+     * QR size được scale theo paperWidth:
+     * - 58mm: pixelWidth=384, qrSize=230px (60% width, capped 150-300)
+     * - 80mm: pixelWidth=576, qrSize=300px
      */
     fun qrCode(content: String, size: Int = 6): HybridBillBuilder {
         try {
-            val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300) // 60% of paper width
+            // QR size = 60% of paper width, capped between 150-300 pixels
+            val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
+            Log.d(TAG, "QR code: paperWidth-based pixelWidth=$pixelWidth, qrSize=$qrSize")
 
             // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
             val qrBitmap = if (content.startsWith("https://qr.sepay.vn/") ||
@@ -885,9 +891,10 @@ class HybridBillBuilder(
 
             if (qrBitmap != null) {
                 buffer.write(EscPosCommands.ALIGN_CENTER)
-                buffer.write(EscPosCommands.printRasterBitmap(qrBitmap, qrBitmap.width))
+                // Scale bitmap to match paper pixelWidth for correct printing
+                buffer.write(EscPosCommands.printRasterBitmap(qrBitmap, pixelWidth))
                 buffer.write(EscPosCommands.ALIGN_LEFT)
-                Log.d(TAG, "QR code printed as bitmap: ${qrBitmap.width}x${qrBitmap.height}")
+                Log.d(TAG, "QR code printed: bitmap=${qrBitmap.width}x${qrBitmap.height}, targetWidth=$pixelWidth")
                 qrBitmap.recycle()
             } else {
                 // Fallback to ESC/POS QR command
