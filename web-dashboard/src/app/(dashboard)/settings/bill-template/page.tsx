@@ -55,12 +55,20 @@ import {
   DEFAULT_BILL_TEMPLATE,
   DEFAULT_PRINTER_CONFIG,
 } from "@/services/bill-template-service";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchBranchesByBrand } from "@/store/slices/branchesSlice";
 
 type DialogMode = "create" | "edit" | null;
 
 export default function BillTemplatePage() {
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
   const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
+
+  // Get branches from Redux store
+  const branches = useAppSelector((state) =>
+    filterBrandId ? state.branches.byBrandId[filterBrandId] || [] : []
+  );
 
   // Bill Templates state
   const [templates, setTemplates] = React.useState<BillTemplate[]>([]);
@@ -93,8 +101,10 @@ export default function BillTemplatePage() {
   React.useEffect(() => {
     if (filterBrandId) {
       loadTemplates();
+      // Also fetch branches for this brand
+      dispatch(fetchBranchesByBrand(filterBrandId));
     }
-  }, [filterBrandId]);
+  }, [filterBrandId, dispatch]);
 
   const loadTemplates = async () => {
     if (!filterBrandId) return;
@@ -226,6 +236,13 @@ export default function BillTemplatePage() {
     if (!filterBrandId || !templateForm.name || !templateForm.storeName) {
       return;
     }
+
+    // Check if we have branches available
+    if (branches.length === 0) {
+      toast({ title: "Lỗi", description: "Không tìm thấy chi nhánh nào cho thương hiệu này", variant: "destructive" });
+      return;
+    }
+
     setSavingTemplate(true);
     try {
       // Extract template data (without printer fields)
@@ -243,10 +260,17 @@ export default function BillTemplatePage() {
         ...templateData
       } = templateForm;
 
+      // Use the first branch for branchId (required by backend)
+      const defaultBranchId = branches[0].id;
+      const templateDataWithBranch = {
+        ...templateData,
+        branchId: defaultBranchId,
+      };
+
       let savedTemplate: BillTemplate;
 
       if (templateDialog === "create") {
-        savedTemplate = await billTemplateService.createTemplate(filterBrandId, templateData);
+        savedTemplate = await billTemplateService.createTemplate(filterBrandId, templateDataWithBranch);
         setTemplates((prev) => [...prev, savedTemplate]);
 
         // Create associated printer config
@@ -274,7 +298,12 @@ export default function BillTemplatePage() {
 
         toast({ title: "Thành công", description: "Đã thêm mẫu bill mới" });
       } else if (editingTemplate) {
-        savedTemplate = await billTemplateService.updateTemplate(editingTemplate.id, templateData);
+        // Keep existing branchId when updating
+        const updateData = {
+          ...templateData,
+          branchId: editingTemplate.branchId,
+        };
+        savedTemplate = await billTemplateService.updateTemplate(editingTemplate.id, updateData);
         setTemplates((prev) => prev.map((t) => (t.id === savedTemplate.id ? savedTemplate : t)));
 
         // Update or create printer config
