@@ -138,9 +138,10 @@ fun BillPrinterConfigScreen(
         BillPrinterAllSettingsDialog(
             config = uiState.selectedConfig!!,
             onDismiss = { viewModel.hideAllSettingsDialog() },
-            onSave = { paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint ->
+            onSave = { connectionType, printerIp, printerPort, paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint ->
                 viewModel.updateAllSettings(
                     uiState.selectedConfig!!.id,
+                    connectionType, printerIp, printerPort,
                     paperWidth, fontSize, lineSpacing, numberOfCopies,
                     cutPaper, openCashDrawer, beepAfterPrint
                 )
@@ -1180,11 +1181,14 @@ private fun PrintSettingsDialog(
 private fun BillPrinterAllSettingsDialog(
     config: BillPrinterConfigEntity,
     onDismiss: () -> Unit,
-    onSave: (paperWidth: Int, fontSize: String, lineSpacing: Float, numberOfCopies: Int, cutPaper: Boolean, openCashDrawer: Boolean, beepAfterPrint: Boolean) -> Unit
+    onSave: (connectionType: String, printerIp: String?, printerPort: Int, paperWidth: Int, fontSize: String, lineSpacing: Float, numberOfCopies: Int, cutPaper: Boolean, openCashDrawer: Boolean, beepAfterPrint: Boolean) -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
 
     // Local state for all settings
+    var connectionType by remember { mutableStateOf(config.connectionType) }
+    var printerIp by remember { mutableStateOf(config.printerIp ?: "") }
+    var printerPort by remember { mutableStateOf(config.printerPort.toString()) }
     var paperWidth by remember { mutableStateOf(config.paperWidth) }
     var fontSize by remember { mutableStateOf(config.fontSize) }
     var lineSpacing by remember { mutableStateOf(config.lineSpacing) }
@@ -1194,11 +1198,18 @@ private fun BillPrinterAllSettingsDialog(
     var beepAfterPrint by remember { mutableStateOf(config.beepAfterPrint) }
 
     // Dropdown expanded states
+    var connectionTypeExpanded by remember { mutableStateOf(false) }
     var paperWidthExpanded by remember { mutableStateOf(false) }
     var fontSizeExpanded by remember { mutableStateOf(false) }
     var copiesExpanded by remember { mutableStateOf(false) }
 
     // Options
+    val connectionTypeOptions = listOf(
+        "network" to "Mạng LAN (Network)",
+        "bluetooth" to "Bluetooth",
+        "usb" to "USB",
+        "sunmi" to "Sunmi (Tích hợp)"
+    )
     val paperWidthOptions = listOf(58, 76, 80, 110, 112)
     val fontSizeOptions = listOf(
         "extra_small" to "Rất nhỏ (0.7x)",
@@ -1255,6 +1266,70 @@ private fun BillPrinterAllSettingsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
+
+                // Connection Type Dropdown
+                Text("Loại kết nối", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = connectionTypeExpanded,
+                    onExpandedChange = { connectionTypeExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = connectionTypeOptions.find { it.first == connectionType }?.second ?: "Mạng LAN (Network)",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = connectionTypeExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = connectionTypeExpanded,
+                        onDismissRequest = { connectionTypeExpanded = false }
+                    ) {
+                        connectionTypeOptions.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    connectionType = key
+                                    connectionTypeExpanded = false
+                                },
+                                leadingIcon = {
+                                    if (key == connectionType) {
+                                        Icon(Icons.Default.Check, null, tint = primaryColor)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // IP and Port fields (only for network type)
+                if (connectionType == "network") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Địa chỉ IP", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                    OutlinedTextField(
+                        value = printerIp,
+                        onValueChange = { printerIp = it },
+                        placeholder = { Text("192.168.1.100") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Port", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                    OutlinedTextField(
+                        value = printerPort,
+                        onValueChange = { printerPort = it },
+                        placeholder = { Text("9100") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Paper Width Dropdown
                 Text("Khổ giấy", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
@@ -1506,7 +1581,7 @@ private fun BillPrinterAllSettingsDialog(
                     }
                     Button(
                         onClick = {
-                            onSave(paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint)
+                            onSave(connectionType, printerIp.ifBlank { null }, printerPort.toIntOrNull() ?: 9100, paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint)
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),

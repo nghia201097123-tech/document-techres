@@ -706,6 +706,9 @@ export class BillTemplateDto {
   @ApiProperty({ description: 'Hiển thị ghi chú đơn hàng' })
   showOrderNote: boolean;
 
+  @ApiProperty({ description: 'Kiểu hiển thị danh sách món: standard, compact, detailed, two_line, price_right, with_index, grouped, grid_2_col, minimal, dotted, boxed, table' })
+  itemDisplayLayout: string;
+
   @ApiProperty()
   showUnitPrice: boolean;
 

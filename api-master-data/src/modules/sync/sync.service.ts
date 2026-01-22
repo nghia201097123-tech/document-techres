@@ -966,6 +966,7 @@ export class SyncService {
       showUnitPrice: bt.showUnitPrice,
       showQuantity: bt.showQuantity,
       showOrderNote: bt.showOrderNote,
+      itemDisplayLayout: bt.itemDisplayLayout || 'standard',
       // Price config
       showSubtotal: bt.showSubtotal,
       // Discount config (4 loại giảm giá)

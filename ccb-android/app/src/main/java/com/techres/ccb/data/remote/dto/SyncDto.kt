@@ -768,6 +768,7 @@ data class BillTemplateDto(
     @SerializedName("showItemCode") val showItemCode: Boolean = false,
     @SerializedName("showItemNote") val showItemNote: Boolean = true,
     @SerializedName("showOrderNote") val showOrderNote: Boolean = true, // Hiển thị ghi chú đơn hàng
+    @SerializedName("itemDisplayLayout") val itemDisplayLayout: String? = "standard", // Kiểu hiển thị danh sách món
     @SerializedName("showUnitPrice") val showUnitPrice: Boolean = true,
     @SerializedName("showQuantity") val showQuantity: Boolean = true,
     // Price config

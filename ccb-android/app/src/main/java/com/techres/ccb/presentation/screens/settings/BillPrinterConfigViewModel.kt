@@ -255,6 +255,9 @@ class BillPrinterConfigViewModel @Inject constructor(
      */
     fun updateAllSettings(
         configId: String,
+        connectionType: String,
+        printerIp: String?,
+        printerPort: Int,
         paperWidth: Int,
         fontSize: String,
         lineSpacing: Float,
@@ -269,6 +272,9 @@ class BillPrinterConfigViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     val current = billPrinterConfigDao.getById(configId) ?: return@withContext
                     val updated = current.copy(
+                        connectionType = connectionType,
+                        printerIp = if (connectionType == "network") printerIp else null,
+                        printerPort = if (connectionType == "network") printerPort else 0,
                         paperWidth = paperWidth,
                         fontSize = fontSize,
                         lineSpacing = lineSpacing,

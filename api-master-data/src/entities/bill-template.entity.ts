@@ -132,6 +132,9 @@ export class BillTemplate {
   @Column({ name: 'show_order_note', default: true })
   showOrderNote: boolean; // Hiển thị ghi chú đơn hàng
 
+  @Column({ name: 'item_display_layout', type: 'varchar', length: 50, default: 'standard' })
+  itemDisplayLayout: string; // standard, compact, detailed, two_line, price_right, with_index, grouped, grid_2_col, minimal, dotted, boxed, table
+
   // ============ PRICE CONFIG ============
   @Column({ name: 'show_subtotal', default: true })
   showSubtotal: boolean;

@@ -644,6 +644,7 @@ class SyncRepository @Inject constructor(
                 showItemCode = dto.showItemCode,
                 showItemNote = dto.showItemNote,
                 showOrderNote = dto.showOrderNote,
+                itemDisplayLayout = dto.itemDisplayLayout ?: "standard",
                 showUnitPrice = dto.showUnitPrice,
                 showQuantity = dto.showQuantity,
                 // Price config
