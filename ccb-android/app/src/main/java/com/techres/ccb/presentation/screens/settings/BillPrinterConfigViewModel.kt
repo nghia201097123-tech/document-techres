@@ -262,6 +262,7 @@ class BillPrinterConfigViewModel @Inject constructor(
         fontSize: String,
         lineSpacing: Float,
         numberOfCopies: Int,
+        printPreview: Boolean,
         cutPaper: Boolean,
         openCashDrawer: Boolean,
         beepAfterPrint: Boolean
@@ -279,6 +280,7 @@ class BillPrinterConfigViewModel @Inject constructor(
                         fontSize = fontSize,
                         lineSpacing = lineSpacing,
                         numberOfCopies = numberOfCopies,
+                        printPreview = printPreview,
                         cutPaper = cutPaper,
                         openCashDrawer = openCashDrawer,
                         beepAfterPrint = beepAfterPrint,

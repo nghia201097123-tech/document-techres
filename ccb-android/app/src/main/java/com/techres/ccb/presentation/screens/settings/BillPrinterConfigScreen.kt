@@ -138,12 +138,12 @@ fun BillPrinterConfigScreen(
         BillPrinterAllSettingsDialog(
             config = uiState.selectedConfig!!,
             onDismiss = { viewModel.hideAllSettingsDialog() },
-            onSave = { connectionType, printerIp, printerPort, paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint ->
+            onSave = { connectionType, printerIp, printerPort, paperWidth, fontSize, lineSpacing, numberOfCopies, printPreview, cutPaper, openCashDrawer, beepAfterPrint ->
                 viewModel.updateAllSettings(
                     uiState.selectedConfig!!.id,
                     connectionType, printerIp, printerPort,
                     paperWidth, fontSize, lineSpacing, numberOfCopies,
-                    cutPaper, openCashDrawer, beepAfterPrint
+                    printPreview, cutPaper, openCashDrawer, beepAfterPrint
                 )
             }
         )
@@ -1181,7 +1181,7 @@ private fun PrintSettingsDialog(
 private fun BillPrinterAllSettingsDialog(
     config: BillPrinterConfigEntity,
     onDismiss: () -> Unit,
-    onSave: (connectionType: String, printerIp: String?, printerPort: Int, paperWidth: Int, fontSize: String, lineSpacing: Float, numberOfCopies: Int, cutPaper: Boolean, openCashDrawer: Boolean, beepAfterPrint: Boolean) -> Unit
+    onSave: (connectionType: String, printerIp: String?, printerPort: Int, paperWidth: Int, fontSize: String, lineSpacing: Float, numberOfCopies: Int, printPreview: Boolean, cutPaper: Boolean, openCashDrawer: Boolean, beepAfterPrint: Boolean) -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
 
@@ -1193,6 +1193,7 @@ private fun BillPrinterAllSettingsDialog(
     var fontSize by remember { mutableStateOf(config.fontSize) }
     var lineSpacing by remember { mutableStateOf(config.lineSpacing) }
     var numberOfCopies by remember { mutableStateOf(config.numberOfCopies) }
+    var printPreview by remember { mutableStateOf(config.printPreview) }
     var cutPaper by remember { mutableStateOf(config.cutPaper) }
     var openCashDrawer by remember { mutableStateOf(config.openCashDrawer) }
     var beepAfterPrint by remember { mutableStateOf(config.beepAfterPrint) }
@@ -1478,6 +1479,35 @@ private fun BillPrinterAllSettingsDialog(
                 // Toggle Settings Section
                 Text("Cài đặt bổ sung", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
 
+                // Print Preview Toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { printPreview = !printPreview }
+                        .padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Preview,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (printPreview) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Xem trước khi in", fontWeight = FontWeight.Medium)
+                        Text("Hiển thị bản xem trước trước khi in", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Switch(
+                        checked = printPreview,
+                        onCheckedChange = { printPreview = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryColor
+                        )
+                    )
+                }
+
                 // Cut Paper Toggle
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1581,7 +1611,7 @@ private fun BillPrinterAllSettingsDialog(
                     }
                     Button(
                         onClick = {
-                            onSave(connectionType, printerIp.ifBlank { null }, printerPort.toIntOrNull() ?: 9100, paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, openCashDrawer, beepAfterPrint)
+                            onSave(connectionType, printerIp.ifBlank { null }, printerPort.toIntOrNull() ?: 9100, paperWidth, fontSize, lineSpacing, numberOfCopies, printPreview, cutPaper, openCashDrawer, beepAfterPrint)
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
