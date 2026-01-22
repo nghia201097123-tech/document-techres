@@ -51,9 +51,15 @@ export class WebhookService {
         counterAccountName: data.counterAccountName,
       };
 
-      this.logger.log(`✅ Payment SUCCESS: orderCode=${data.orderCode}, amount=${data.amount}`);
+      this.logger.log(`════════════════════════════════════════════════════════════`);
+      this.logger.log(`✅ [WEBHOOK] Payment SUCCESS received from PayOS`);
+      this.logger.log(`   📦 OrderCode: ${data.orderCode}`);
+      this.logger.log(`   💰 Amount: ${data.amount.toLocaleString('vi-VN')} VND`);
+      this.logger.log(`   🏦 From: ${data.counterAccountName || 'N/A'} - ${data.counterAccountBankName || 'N/A'}`);
+      this.logger.log(`════════════════════════════════════════════════════════════`);
 
       // Emit Socket.IO event to notify POS app
+      this.logger.log(`📡 [WEBHOOK -> SOCKET-SERVICE] Calling HTTP to emit socket event...`);
       await this.socketClient.emitPaymentSuccess(paymentResult);
 
       return { success: true };

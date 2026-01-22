@@ -15,17 +15,27 @@ export class EventsController {
   @ApiOperation({ summary: 'Emit payment success event' })
   @ApiResponse({ status: 200, description: 'Event emitted successfully' })
   emitPaymentSuccess(@Body() dto: PaymentEventDto) {
-    this.logger.log(`📥 Received payment success event for orderCode: ${dto.orderCode}`);
+    this.logger.log(`════════════════════════════════════════════════════════════`);
+    this.logger.log(`📥 [SOCKET-SERVICE] Received HTTP request from webhook-service`);
+    this.logger.log(`   📦 OrderCode: ${dto.orderCode}`);
+    this.logger.log(`   💰 Amount: ${dto.amount}`);
+    this.logger.log(`   🔄 Status: PAID`);
+    this.logger.log(`════════════════════════════════════════════════════════════`);
 
     this.socketService.emitPaymentSuccess({
       ...dto,
       status: PaymentStatus.PAID,
     });
 
+    const stats = this.socketService.getStats();
+    this.logger.log(`📡 [SOCKET.IO] Emitting payment:success to ${stats.connectedClients} connected clients`);
+    this.logger.log(`✅ [SOCKET-SERVICE] Event emitted successfully!`);
+
     return {
       success: true,
       message: 'Payment success event emitted',
       orderCode: dto.orderCode,
+      connectedClients: stats.connectedClients,
     };
   }
 

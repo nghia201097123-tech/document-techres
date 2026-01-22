@@ -25,9 +25,12 @@ export class SocketClientService {
 
   async emitPaymentSuccess(paymentResult: PaymentResult): Promise<void> {
     try {
-      this.logger.log(`📤 Sending payment success to socket-service for orderCode: ${paymentResult.orderCode}`);
+      this.logger.log(`────────────────────────────────────────────────────────────`);
+      this.logger.log(`📡 [HTTP REQUEST] POST ${this.socketServiceUrl}/events/payment/success`);
+      this.logger.log(`   📦 OrderCode: ${paymentResult.orderCode}`);
+      this.logger.log(`   💰 Amount: ${paymentResult.amount}`);
 
-      await this.httpClient.post('/events/payment/success', {
+      const response = await this.httpClient.post('/events/payment/success', {
         orderCode: paymentResult.orderCode,
         status: paymentResult.status,
         amount: paymentResult.amount,
@@ -38,9 +41,15 @@ export class SocketClientService {
         counterAccountName: paymentResult.counterAccountName,
       });
 
-      this.logger.log(`✅ Payment success event sent for orderCode: ${paymentResult.orderCode}`);
+      this.logger.log(`✅ [HTTP RESPONSE] Socket-service responded successfully!`);
+      this.logger.log(`   📨 Response: ${JSON.stringify(response.data)}`);
+      this.logger.log(`────────────────────────────────────────────────────────────`);
     } catch (error) {
-      this.logger.error(`❌ Failed to send payment success event: ${error.message}`);
+      this.logger.error(`────────────────────────────────────────────────────────────`);
+      this.logger.error(`❌ [HTTP ERROR] Failed to call socket-service!`);
+      this.logger.error(`   🔗 URL: ${this.socketServiceUrl}/events/payment/success`);
+      this.logger.error(`   ⚠️ Error: ${error.message}`);
+      this.logger.error(`────────────────────────────────────────────────────────────`);
       throw error;
     }
   }
