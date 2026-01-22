@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import PayOS = require('@payos/node');
+import axios from 'axios';
 import { BankAccount } from '../../database/entities';
 import {
   CreatePaymentDto,
@@ -32,6 +33,7 @@ export class PayosService {
   private readonly logger = new Logger(PayosService.name);
   private readonly paymentSessions = new Map<number, PaymentSession>();
   private readonly payosInstances = new Map<string, PayOS>();
+  private readonly webhookServiceUrl: string;
 
   constructor(
     @InjectRepository(BankAccount)
@@ -39,6 +41,7 @@ export class PayosService {
     private configService: ConfigService,
     private socketGateway: SocketGateway,
   ) {
+    this.webhookServiceUrl = this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
     this.startCleanupJob();
   }
 
@@ -111,6 +114,39 @@ export class PayosService {
     };
   }
 
+  /**
+   * Register PayOS config with webhook-service for multi-tenant support
+   * This allows webhook-service to verify signatures without DB connection
+   */
+  private async registerPayOSConfigWithWebhookService(
+    orderCode: number,
+    checksumKey: string,
+    branchId: string,
+    brandId?: string,
+  ): Promise<void> {
+    try {
+      await axios.post(`${this.webhookServiceUrl}/config/payos/register`, {
+        orderCode,
+        checksumKey,
+        branchId,
+        brandId,
+        ttlMinutes: 60, // Config expires after 60 minutes
+      }, {
+        timeout: 5000,
+      });
+
+      this.logger.log(
+        `Registered PayOS config with webhook-service: orderCode=${orderCode}, branchId=${branchId}`,
+      );
+    } catch (error) {
+      // Log but don't fail - webhook-service might use fallback .env key
+      this.logger.warn(
+        `Failed to register PayOS config with webhook-service: ${error.message}. ` +
+        `Webhook verification may fall back to .env PAYOS_CHECKSUM_KEY`,
+      );
+    }
+  }
+
   async createPayment(dto: CreatePaymentDto): Promise<CreatePaymentResponseDto> {
     const { payos, bankAccount } = await this.getPayOSInstance(dto.branchId);
 
@@ -146,6 +182,15 @@ export class PayosService {
 
       this.logger.log(
         `Created payment: orderCode=${dto.orderCode}, amount=${dto.amount}, branch=${dto.branchId}`,
+      );
+
+      // Register PayOS config with webhook-service for multi-tenant webhook verification
+      // This is async but non-blocking - payment creation shouldn't fail if this fails
+      this.registerPayOSConfigWithWebhookService(
+        dto.orderCode,
+        bankAccount.payosChecksumKey,
+        dto.branchId,
+        bankAccount.brandId,
       );
 
       // PayOS returns QR code as EMVCo data string, not image URL
