@@ -41,9 +41,10 @@ import {
 import {
   billTemplateService,
   BillTemplate,
+  BillPrinterConfig,
   BillTemplateType,
   PrinterConnectionType,
-  CreateBillTemplateDto,
+  BillTemplateWithPrinterForm,
   BILL_TEMPLATE_TYPE_LABELS,
   BILL_TEMPLATE_TYPE_DESCRIPTIONS,
   PRINTER_CONNECTION_TYPE_LABELS,
@@ -52,6 +53,7 @@ import {
   DATE_FORMAT_OPTIONS,
   QR_CODE_TYPE_LABELS,
   DEFAULT_BILL_TEMPLATE,
+  DEFAULT_PRINTER_CONFIG,
 } from "@/services/bill-template-service";
 
 type DialogMode = "create" | "edit" | null;
@@ -68,12 +70,16 @@ export default function BillTemplatePage() {
   const [savingTemplate, setSavingTemplate] = React.useState(false);
   const [previewTemplate, setPreviewTemplate] = React.useState<BillTemplate | null>(null);
 
-  // Form states
-  const [templateForm, setTemplateForm] = React.useState<CreateBillTemplateDto>({
+  // Associated printer config (when editing)
+  const [editingPrinterConfig, setEditingPrinterConfig] = React.useState<BillPrinterConfig | null>(null);
+
+  // Form states (combined template + printer for UI)
+  const [templateForm, setTemplateForm] = React.useState<BillTemplateWithPrinterForm>({
     name: "",
     storeName: "",
     templateType: BillTemplateType.CLASSIC,
     ...DEFAULT_BILL_TEMPLATE,
+    ...DEFAULT_PRINTER_CONFIG,
   });
 
   // Use React 18 useDeferredValue for smooth preview rendering (like TicketPreview)
@@ -105,9 +111,14 @@ export default function BillTemplatePage() {
   };
 
   // Template handlers
-  const openTemplateDialog = (mode: DialogMode, template?: BillTemplate) => {
+  const openTemplateDialog = async (mode: DialogMode, template?: BillTemplate) => {
     if (mode === "edit" && template) {
       setEditingTemplate(template);
+
+      // Load associated printer config
+      const printerConfig = await billTemplateService.getPrinterConfigByTemplateId(template.id);
+      setEditingPrinterConfig(printerConfig);
+
       setTemplateForm({
         name: template.name,
         templateType: template.templateType,
@@ -134,7 +145,7 @@ export default function BillTemplatePage() {
         // Items
         showItemCode: template.showItemCode,
         showItemNote: template.showItemNote,
-        showOrderNote: template.showOrderNote ?? true, // Ghi chú tổng bill
+        showOrderNote: template.showOrderNote ?? true,
         showUnitPrice: template.showUnitPrice,
         showQuantity: template.showQuantity,
         showSubtotal: template.showSubtotal,
@@ -184,25 +195,27 @@ export default function BillTemplatePage() {
         beepAfterPrint: template.beepAfterPrint,
         numberOfCopies: template.numberOfCopies,
         sortOrder: template.sortOrder,
-        // Printer config
-        connectionType: (template as any).connectionType || PrinterConnectionType.NETWORK,
-        printerIp: (template as any).printerIp || "",
-        printerPort: (template as any).printerPort || 9100,
-        printerMac: (template as any).printerMac || "",
-        printerUsbPath: (template as any).printerUsbPath || "",
-        autoPrintOnPayment: (template as any).autoPrintOnPayment ?? true,
-        printPreview: (template as any).printPreview ?? false,
-        retryCount: (template as any).retryCount || 3,
-        retryDelayMs: (template as any).retryDelayMs || 1000,
-        connectionTimeoutMs: (template as any).connectionTimeoutMs || 5000,
+        // Printer config (from associated printer config or defaults)
+        connectionType: printerConfig?.connectionType || PrinterConnectionType.NETWORK,
+        printerIp: printerConfig?.printerIp || "",
+        printerPort: printerConfig?.printerPort || 9100,
+        printerMac: printerConfig?.printerMac || "",
+        printerUsbPath: printerConfig?.printerUsbPath || "",
+        autoPrintOnPayment: printerConfig?.autoPrintOnPayment ?? true,
+        printPreview: printerConfig?.printPreview ?? false,
+        retryCount: printerConfig?.retryCount || 3,
+        retryDelayMs: printerConfig?.retryDelayMs || 1000,
+        connectionTimeoutMs: printerConfig?.connectionTimeoutMs || 5000,
       });
     } else {
       setEditingTemplate(null);
+      setEditingPrinterConfig(null);
       setTemplateForm({
         name: "",
         storeName: "",
         templateType: BillTemplateType.CLASSIC,
         ...DEFAULT_BILL_TEMPLATE,
+        ...DEFAULT_PRINTER_CONFIG,
       });
     }
     setFormTab("header");
@@ -215,13 +228,96 @@ export default function BillTemplatePage() {
     }
     setSavingTemplate(true);
     try {
+      // Extract template data (without printer fields)
+      const {
+        connectionType,
+        printerIp,
+        printerPort,
+        printerMac,
+        printerUsbPath,
+        autoPrintOnPayment,
+        printPreview,
+        retryCount,
+        retryDelayMs,
+        connectionTimeoutMs,
+        ...templateData
+      } = templateForm;
+
+      let savedTemplate: BillTemplate;
+
       if (templateDialog === "create") {
-        const newTemplate = await billTemplateService.createTemplate(filterBrandId, templateForm);
-        setTemplates((prev) => [...prev, newTemplate]);
+        savedTemplate = await billTemplateService.createTemplate(filterBrandId, templateData);
+        setTemplates((prev) => [...prev, savedTemplate]);
+
+        // Create associated printer config
+        if (printerIp || connectionType !== PrinterConnectionType.NETWORK) {
+          await billTemplateService.createPrinterConfig(filterBrandId, {
+            name: `Máy in - ${templateForm.name}`,
+            templateId: savedTemplate.id,
+            connectionType: connectionType || PrinterConnectionType.NETWORK,
+            printerIp,
+            printerPort,
+            printerMac,
+            printerUsbPath,
+            autoPrintOnPayment,
+            printPreview,
+            retryCount,
+            retryDelayMs,
+            connectionTimeoutMs,
+            paperWidth: templateForm.paperWidth,
+            numberOfCopies: templateForm.numberOfCopies,
+            cutPaper: templateForm.cutPaper,
+            openCashDrawer: templateForm.openCashDrawer,
+            beepAfterPrint: templateForm.beepAfterPrint,
+          });
+        }
+
         toast({ title: "Thành công", description: "Đã thêm mẫu bill mới" });
       } else if (editingTemplate) {
-        const updated = await billTemplateService.updateTemplate(editingTemplate.id, templateForm);
-        setTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        savedTemplate = await billTemplateService.updateTemplate(editingTemplate.id, templateData);
+        setTemplates((prev) => prev.map((t) => (t.id === savedTemplate.id ? savedTemplate : t)));
+
+        // Update or create printer config
+        if (editingPrinterConfig) {
+          await billTemplateService.updatePrinterConfig(editingPrinterConfig.id, {
+            connectionType: connectionType || PrinterConnectionType.NETWORK,
+            printerIp,
+            printerPort,
+            printerMac,
+            printerUsbPath,
+            autoPrintOnPayment,
+            printPreview,
+            retryCount,
+            retryDelayMs,
+            connectionTimeoutMs,
+            paperWidth: templateForm.paperWidth,
+            numberOfCopies: templateForm.numberOfCopies,
+            cutPaper: templateForm.cutPaper,
+            openCashDrawer: templateForm.openCashDrawer,
+            beepAfterPrint: templateForm.beepAfterPrint,
+          });
+        } else if (printerIp || connectionType !== PrinterConnectionType.NETWORK) {
+          await billTemplateService.createPrinterConfig(filterBrandId, {
+            name: `Máy in - ${templateForm.name}`,
+            templateId: savedTemplate.id,
+            connectionType: connectionType || PrinterConnectionType.NETWORK,
+            printerIp,
+            printerPort,
+            printerMac,
+            printerUsbPath,
+            autoPrintOnPayment,
+            printPreview,
+            retryCount,
+            retryDelayMs,
+            connectionTimeoutMs,
+            paperWidth: templateForm.paperWidth,
+            numberOfCopies: templateForm.numberOfCopies,
+            cutPaper: templateForm.cutPaper,
+            openCashDrawer: templateForm.openCashDrawer,
+            beepAfterPrint: templateForm.beepAfterPrint,
+          });
+        }
+
         toast({ title: "Thành công", description: "Đã cập nhật mẫu bill" });
       }
       setTemplateDialog(null);

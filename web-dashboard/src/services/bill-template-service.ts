@@ -272,18 +272,6 @@ export interface CreateBillTemplateDto {
   beepAfterPrint?: boolean;
   numberOfCopies?: number;
 
-  // Printer config (embedded)
-  connectionType?: PrinterConnectionType;
-  printerIp?: string;
-  printerPort?: number;
-  printerMac?: string;
-  printerUsbPath?: string;
-  autoPrintOnPayment?: boolean;
-  printPreview?: boolean;
-  retryCount?: number;
-  retryDelayMs?: number;
-  connectionTimeoutMs?: number;
-
   sortOrder?: number;
 }
 
@@ -412,7 +400,32 @@ export const billTemplateService = {
     const response = await api.post(`/bill-printer-configs/${id}/test`);
     return response.data;
   },
+
+  getPrinterConfigByTemplateId: async (templateId: string): Promise<BillPrinterConfig | null> => {
+    try {
+      const response = await api.get(`/bill-printer-configs/by-template/${templateId}`);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
 };
+
+// ==================== COMBINED FORM TYPE ====================
+// For UI purposes - combines template and printer config fields
+export interface BillTemplateWithPrinterForm extends CreateBillTemplateDto {
+  // Printer config fields (for UI form state, not sent to template API)
+  connectionType?: PrinterConnectionType;
+  printerIp?: string;
+  printerPort?: number;
+  printerMac?: string;
+  printerUsbPath?: string;
+  autoPrintOnPayment?: boolean;
+  printPreview?: boolean;
+  retryCount?: number;
+  retryDelayMs?: number;
+  connectionTimeoutMs?: number;
+}
 
 // ==================== LABELS ====================
 
@@ -554,14 +567,6 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   openCashDrawer: false,
   beepAfterPrint: false,
   numberOfCopies: 1,
-  // Printer config defaults
-  connectionType: PrinterConnectionType.NETWORK,
-  printerPort: 9100,
-  autoPrintOnPayment: true,
-  printPreview: false,
-  retryCount: 3,
-  retryDelayMs: 1000,
-  connectionTimeoutMs: 5000,
 };
 
 export const DEFAULT_PRINTER_CONFIG: Partial<CreateBillPrinterConfigDto> = {
