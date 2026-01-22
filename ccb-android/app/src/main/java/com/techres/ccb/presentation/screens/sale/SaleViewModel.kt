@@ -3113,9 +3113,9 @@ class SaleViewModel @Inject constructor(
                             if (paymentBankAccount?.paymentPartner == "payos") {
                                 Log.d(TAG, "printTemporaryBill - Bank uses PayOS, creating payment...")
                                 payosQrCode = createPayOSPaymentForBill(
-                                    orderId = order.id,
+                                    orderId = currentOrder.id,
                                     amount = billData.totalAmount.toLong(),
-                                    orderNumber = order.orderNumber
+                                    orderNumber = currentOrder.orderNumber
                                 )
                             }
 
@@ -4629,6 +4629,7 @@ class SaleViewModel @Inject constructor(
             val orderCode = orderId.hashCode().toLong().let { if (it < 0) -it else it } % 9999999999L + 1
 
             val description = "TT $orderNumber"
+            val currentDeviceId = authRepository.getDeviceId() ?: UUID.randomUUID().toString()
 
             Log.d(TAG, "Creating PayOS payment for bill: orderId=$orderId, orderCode=$orderCode, amount=$amount")
 
@@ -4637,8 +4638,8 @@ class SaleViewModel @Inject constructor(
                 orderCode = orderCode,
                 amount = amount,
                 description = description,
-                branchId = currentBranchId,
-                deviceId = deviceId,
+                branchId = branchId,
+                deviceId = currentDeviceId,
                 tableName = null,
                 customerName = null
             )
