@@ -4348,19 +4348,33 @@ class SaleViewModel @Inject constructor(
         viewModelScope.launch {
             // Listen for payment success events
             paymentSocketManager.paymentSuccess.collect { event ->
-                Log.d(TAG, "Payment success received: orderCode=${event.orderCode}, amount=${event.amount}")
+                Log.d(TAG, "════════════════════════════════════════════════════════════")
+                Log.d(TAG, "💰 Payment success received!")
+                Log.d(TAG, "   📦 Event orderCode: ${event.orderCode}")
+                Log.d(TAG, "   💵 Amount: ${event.amount}")
 
                 // Check if this is for our current payment
                 val currentOrderCode = _uiState.value.payosOrderCode
+                val currentOrder = _uiState.value.currentOrder
+                val dailyOrderNumber = currentOrder?.dailyOrderNumber ?: 0
+
+                Log.d(TAG, "   🔍 Current payosOrderCode in UI: $currentOrderCode")
+                Log.d(TAG, "   📋 Current order dailyOrderNumber: $dailyOrderNumber")
+                Log.d(TAG, "   ✅ OrderCode match: ${currentOrderCode == event.orderCode}")
+                Log.d(TAG, "════════════════════════════════════════════════════════════")
+
+                // Always announce TTS on payment success (don't require orderCode match)
+                // This ensures the cashier always hears the notification
+                Log.d(TAG, "🔊 Triggering TTS announcement...")
+                paymentAnnouncementService.announcePaymentSuccess(event.amount, dailyOrderNumber.toLong())
+
+                // Only auto-complete bill if orderCode matches current session
                 if (currentOrderCode == event.orderCode) {
-                    // Get daily order number for TTS announcement (user-friendly number like 1, 2, 3...)
-                    val dailyOrderNumber = _uiState.value.currentOrder?.dailyOrderNumber ?: 0
-
-                    // Announce via TTS with daily order number
-                    paymentAnnouncementService.announcePaymentSuccess(event.amount, dailyOrderNumber.toLong())
-
-                    // Auto-complete the bill
+                    Log.d(TAG, "✅ OrderCode matches - auto-completing bill...")
                     autoCompleteBillAfterPayment(event.orderId, event.amount, event.transactionRef)
+                } else {
+                    Log.d(TAG, "⚠️ OrderCode mismatch - TTS played but bill not auto-completed")
+                    Log.d(TAG, "   Expected: $currentOrderCode, Received: ${event.orderCode}")
                 }
             }
         }

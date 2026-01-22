@@ -89,8 +89,17 @@ class PaymentAnnouncementService @Inject constructor(
      * Example: "Thanh toán thành công, đơn hàng số 5, số tiền 1 triệu 20 nghìn đồng"
      */
     fun announcePaymentSuccess(amount: Long, dailyOrderNumber: Long) {
+        Timber.d("════════════════════════════════════════════════════════════")
+        Timber.d("🔊 [TTS] announcePaymentSuccess called!")
+        Timber.d("   💵 Amount: $amount")
+        Timber.d("   📋 Daily Order Number: $dailyOrderNumber")
+        Timber.d("   🔧 TTS Initialized: $isInitialized")
+        Timber.d("   🎯 TTS Ready: ${_isReady.value}")
+        Timber.d("════════════════════════════════════════════════════════════")
+
         val amountText = formatAmountForSpeech(amount)
         val message = "Thanh toán thành công, đơn hàng số $dailyOrderNumber, số tiền $amountText"
+        Timber.d("🔊 [TTS] Message to speak: $message")
         speak(message)
     }
 
@@ -124,14 +133,23 @@ class PaymentAnnouncementService @Inject constructor(
      * Announce custom message
      */
     fun speak(message: String) {
+        Timber.d("────────────────────────────────────────────────────────────")
+        Timber.d("🔊 [TTS] speak() called with message: $message")
+        Timber.d("   🔧 isInitialized: $isInitialized")
+        Timber.d("   🎯 isReady: ${_isReady.value}")
+        Timber.d("   📢 isSpeaking: ${_isSpeaking.value}")
+
         if (!isInitialized) {
-            Timber.w("TTS not initialized, cannot speak: $message")
+            Timber.e("❌ [TTS] NOT INITIALIZED! Cannot speak: $message")
+            Timber.e("   ⚠️ TTS engine may not be ready yet or initialization failed")
             return
         }
 
         val utteranceId = UUID.randomUUID().toString()
-        tts?.speak(message, TextToSpeech.QUEUE_ADD, null, utteranceId)
-        Timber.d("TTS speaking: $message")
+        val result = tts?.speak(message, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        Timber.d("✅ [TTS] speak() result: $result (SUCCESS=0, ERROR=-1)")
+        Timber.d("   🔑 Utterance ID: $utteranceId")
+        Timber.d("────────────────────────────────────────────────────────────")
     }
 
     /**
