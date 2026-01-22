@@ -4,13 +4,19 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,6 +38,16 @@ class PaymentAnnouncementService @Inject constructor(
 
     private val vietnameseLocale = Locale("vi", "VN")
     private val currencyFormat = NumberFormat.getNumberInstance(vietnameseLocale)
+
+    // Queue for messages that arrive before TTS is initialized
+    private val pendingMessages = ConcurrentLinkedQueue<String>()
+
+    // Coroutine scope for async operations
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Maximum wait time for TTS initialization (in milliseconds)
+    private val maxInitWaitTime = 5000L
+    private val initCheckInterval = 100L
 
     init {
         initializeTts()
@@ -76,10 +92,30 @@ class PaymentAnnouncementService @Inject constructor(
 
                 isInitialized = true
                 _isReady.value = true
-                Timber.d("TTS initialized successfully")
+                Timber.d("✅ [TTS] Initialized successfully")
+
+                // Process any pending messages that arrived before initialization
+                processPendingMessages()
             } else {
-                Timber.e("TTS initialization failed with status: $status")
+                Timber.e("❌ [TTS] Initialization failed with status: $status")
                 _isReady.value = false
+            }
+        }
+    }
+
+    /**
+     * Process all messages that were queued before TTS was initialized
+     */
+    private fun processPendingMessages() {
+        val pendingCount = pendingMessages.size
+        if (pendingCount > 0) {
+            Timber.d("🔊 [TTS] Processing $pendingCount pending message(s)")
+            while (pendingMessages.isNotEmpty()) {
+                val message = pendingMessages.poll()
+                if (message != null) {
+                    Timber.d("🔊 [TTS] Playing queued message: $message")
+                    speakInternal(message)
+                }
             }
         }
     }
@@ -131,6 +167,7 @@ class PaymentAnnouncementService @Inject constructor(
 
     /**
      * Announce custom message
+     * If TTS is not yet initialized, the message will be queued and played once initialization completes
      */
     fun speak(message: String) {
         Timber.d("────────────────────────────────────────────────────────────")
@@ -139,17 +176,50 @@ class PaymentAnnouncementService @Inject constructor(
         Timber.d("   🎯 isReady: ${_isReady.value}")
         Timber.d("   📢 isSpeaking: ${_isSpeaking.value}")
 
-        if (!isInitialized) {
-            Timber.e("❌ [TTS] NOT INITIALIZED! Cannot speak: $message")
-            Timber.e("   ⚠️ TTS engine may not be ready yet or initialization failed")
-            return
+        if (isInitialized) {
+            speakInternal(message)
+        } else {
+            // Queue the message and wait for TTS to initialize
+            Timber.w("⏳ [TTS] Not initialized yet, queuing message: $message")
+            pendingMessages.offer(message)
+
+            // Start a coroutine to wait for initialization with timeout
+            scope.launch {
+                waitForInitializationAndSpeak()
+            }
+        }
+        Timber.d("────────────────────────────────────────────────────────────")
+    }
+
+    /**
+     * Wait for TTS initialization and process pending messages
+     */
+    private suspend fun waitForInitializationAndSpeak() {
+        var waitedTime = 0L
+        while (!isInitialized && waitedTime < maxInitWaitTime) {
+            delay(initCheckInterval)
+            waitedTime += initCheckInterval
         }
 
+        if (isInitialized) {
+            Timber.d("✅ [TTS] Initialization completed after ${waitedTime}ms, processing pending messages")
+            processPendingMessages()
+        } else {
+            Timber.e("❌ [TTS] Initialization timeout after ${maxInitWaitTime}ms")
+            Timber.e("   ⚠️ ${pendingMessages.size} message(s) could not be played")
+            // Clear pending messages to avoid memory buildup
+            pendingMessages.clear()
+        }
+    }
+
+    /**
+     * Internal method to actually speak a message (assumes TTS is initialized)
+     */
+    private fun speakInternal(message: String) {
         val utteranceId = UUID.randomUUID().toString()
         val result = tts?.speak(message, TextToSpeech.QUEUE_ADD, null, utteranceId)
-        Timber.d("✅ [TTS] speak() result: $result (SUCCESS=0, ERROR=-1)")
+        Timber.d("✅ [TTS] speakInternal() result: $result (SUCCESS=0, ERROR=-1)")
         Timber.d("   🔑 Utterance ID: $utteranceId")
-        Timber.d("────────────────────────────────────────────────────────────")
     }
 
     /**
@@ -164,11 +234,15 @@ class PaymentAnnouncementService @Inject constructor(
      * Release TTS resources
      */
     fun shutdown() {
+        // Clear pending messages
+        pendingMessages.clear()
+
         tts?.stop()
         tts?.shutdown()
         tts = null
         isInitialized = false
         _isReady.value = false
+        Timber.d("🔊 [TTS] Shutdown complete")
     }
 
     /**
