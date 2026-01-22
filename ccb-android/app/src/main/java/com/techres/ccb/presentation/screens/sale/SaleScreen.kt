@@ -3259,7 +3259,7 @@ fun ReprintMenuDialog(
 // ===== PRINT PREVIEW DIALOG =====
 
 /**
- * Dialog xem trước bill trước khi in
+ * Dialog xem trước bill trước khi in - hiển thị giống bill in thật
  */
 @Composable
 fun PrintPreviewDialog(
@@ -3271,15 +3271,25 @@ fun PrintPreviewDialog(
     val primaryColor = MaterialTheme.colorScheme.primary
     val formatter = NumberFormat.getNumberInstance(Locale("vi", "VN"))
 
+    // Receipt styling
+    val receiptBg = Color(0xFFFFFDF5) // Slightly warm white like receipt paper
+    val receiptTextColor = Color(0xFF1A1A1A)
+    val separatorChar = template?.separatorChar ?: "-"
+    val doubleSeparatorChar = template?.doubleSeparatorChar ?: "="
+
+    // Create separator lines
+    val singleLine = separatorChar.repeat(48)
+    val doubleLine = doubleSeparatorChar.repeat(48)
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.85f),
-            shape = RoundedCornerShape(16.dp),
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
             Column(
@@ -3290,7 +3300,7 @@ fun PrintPreviewDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(primaryColor)
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -3298,172 +3308,346 @@ fun PrintPreviewDialog(
                         "XEM TRƯỚC BILL",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                        fontSize = 16.sp
                     )
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Close, null, tint = Color.White)
                     }
                 }
 
-                // Bill Preview Content
-                Column(
+                // Receipt Preview - looks like actual thermal printer receipt
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
-                        .background(Color(0xFFFAFAFA), RoundedCornerShape(8.dp))
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                        .background(Color(0xFFE8E8E8)),
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    // Store name
-                    if (template?.showLogo == true && !template.storeName.isNullOrEmpty()) {
+                    // Receipt paper
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 320.dp) // 80mm paper width approximation
+                            .fillMaxHeight()
+                            .shadow(4.dp, RoundedCornerShape(2.dp))
+                            .background(receiptBg)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Store name (centered, bold)
+                        if (template?.showLogo == true && !template.storeName.isNullOrEmpty()) {
+                            Text(
+                                template.storeName.uppercase(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                textAlign = TextAlign.Center,
+                                color = receiptTextColor
+                            )
+                        }
+
+                        // Store address
+                        if (!template?.storeAddress.isNullOrEmpty()) {
+                            Text(
+                                template?.storeAddress ?: "",
+                                fontSize = 11.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                textAlign = TextAlign.Center,
+                                color = receiptTextColor
+                            )
+                        }
+
+                        // Phone
+                        if (!template?.storePhone.isNullOrEmpty()) {
+                            Text(
+                                "ĐT: ${template?.storePhone}",
+                                fontSize = 11.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Double separator
                         Text(
-                            template.storeName,
+                            doubleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
+                        )
+
+                        // Bill title (centered)
+                        Text(
+                            template?.billTitle ?: "HÓA ĐƠN BÁN HÀNG",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-
-                    // Store address
-                    if (!template?.storeAddress.isNullOrEmpty()) {
-                        Text(
-                            template?.storeAddress ?: "",
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             textAlign = TextAlign.Center,
-                            color = Color.Gray
+                            color = receiptTextColor
                         )
-                    }
 
-                    // Phone
-                    if (!template?.storePhone.isNullOrEmpty()) {
                         Text(
-                            "ĐT: ${template?.storePhone}",
-                            fontSize = 12.sp,
-                            color = Color.Gray
+                            doubleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
                         )
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    // Bill title
-                    Text(
-                        template?.billTitle ?: "HÓA ĐƠN THANH TOÁN",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Order info
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("Số HĐ:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        Text(billData.orderNumber, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
-                    if (billData.tableName != null) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("Bàn:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text(billData.tableName, fontSize = 12.sp)
+                        // Order info
+                        ReceiptRow("Số HĐ:", billData.orderNumber, receiptTextColor)
+                        if (billData.tableName != null) {
+                            ReceiptRow("Bàn:", billData.tableName, receiptTextColor)
                         }
-                    }
-                    if (billData.staffName != null) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("Thu ngân:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text(billData.staffName, fontSize = 12.sp)
+                        if (billData.staffName != null) {
+                            ReceiptRow("Thu ngân:", billData.staffName, receiptTextColor)
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Items header
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("Món", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("SL", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                        Text("Thành tiền", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Items
-                    billData.items.forEach { item ->
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                            Text(item.name, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text("${item.quantity}", fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                            Text("${formatter.format(item.totalPrice.toLong())}đ", fontSize = 12.sp, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                        if (billData.customerName != null) {
+                            ReceiptRow("Khách:", billData.customerName, receiptTextColor)
                         }
-                        // Toppings
-                        item.toppings.forEach { topping ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp, bottom = 2.dp)) {
-                                Text("+ ${topping.name}", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.weight(1f))
-                                Text("${formatter.format(topping.price.toLong())}đ", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+
+                        // Date time
+                        val dateFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("vi", "VN"))
+                        ReceiptRow("Ngày:", dateFormat.format(billData.orderDate), receiptTextColor)
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            singleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
+                        )
+
+                        // Items header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Món",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "SL",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor,
+                                modifier = Modifier.width(30.dp),
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                "T.Tiền",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor,
+                                modifier = Modifier.width(70.dp),
+                                textAlign = TextAlign.End
+                            )
+                        }
+
+                        Text(
+                            singleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
+                        )
+
+                        // Items
+                        billData.items.forEach { item ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    item.name,
+                                    fontSize = 11.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = receiptTextColor,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    "${item.quantity}",
+                                    fontSize = 11.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = receiptTextColor,
+                                    modifier = Modifier.width(30.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    "${formatter.format(item.totalPrice.toLong())}",
+                                    fontSize = 11.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = receiptTextColor,
+                                    modifier = Modifier.width(70.dp),
+                                    textAlign = TextAlign.End
+                                )
+                            }
+                            // Toppings
+                            item.toppings.forEach { topping ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "+ ${topping.name}",
+                                        fontSize = 10.sp,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        color = receiptTextColor.copy(alpha = 0.7f),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        "${formatter.format(topping.price.toLong())}",
+                                        fontSize = 10.sp,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        color = receiptTextColor.copy(alpha = 0.7f),
+                                        modifier = Modifier.width(70.dp),
+                                        textAlign = TextAlign.End
+                                    )
+                                }
+                            }
+                            // Item note
+                            if (!item.note.isNullOrEmpty()) {
+                                Text(
+                                    "  * ${item.note}",
+                                    fontSize = 10.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = receiptTextColor.copy(alpha = 0.6f),
+                                    fontStyle = FontStyle.Italic,
+                                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp)
+                                )
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Totals
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("Tạm tính:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        Text("${formatter.format(billData.subtotal.toLong())}đ", fontSize = 12.sp)
-                    }
-                    if (billData.discountAmount > 0) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("Giảm giá:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text("-${formatter.format(billData.discountAmount.toLong())}đ", fontSize = 12.sp, color = Color(0xFFE53935))
-                        }
-                    }
-                    if (billData.vatAmount > 0) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("VAT (${billData.vatRate.toInt()}%):", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text("${formatter.format(billData.vatAmount.toLong())}đ", fontSize = 12.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(thickness = 2.dp)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Grand total
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("TỔNG CỘNG:", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                        Text("${formatter.format(billData.totalAmount.toLong())}đ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = primaryColor)
-                    }
-
-                    // Payment info
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("Thanh toán:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        Text(billData.paymentMethod, fontSize = 12.sp)
-                    }
-                    if (billData.receivedAmount > 0) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("Tiền nhận:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text("${formatter.format(billData.receivedAmount.toLong())}đ", fontSize = 12.sp)
-                        }
-                    }
-                    if (billData.changeAmount > 0) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("Tiền thừa:", fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text("${formatter.format(billData.changeAmount.toLong())}đ", fontSize = 12.sp)
-                        }
-                    }
-
-                    // Thank you message
-                    if (!template?.thankYouMessage.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            template?.thankYouMessage ?: "",
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center,
-                            fontStyle = FontStyle.Italic
+                            singleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
                         )
+
+                        // Totals section
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ReceiptRow("Tạm tính:", "${formatter.format(billData.subtotal.toLong())}đ", receiptTextColor)
+
+                        if (billData.discountAmount > 0) {
+                            ReceiptRow("Giảm giá:", "-${formatter.format(billData.discountAmount.toLong())}đ", receiptTextColor)
+                        }
+
+                        if (billData.serviceFee > 0) {
+                            ReceiptRow("Phí dịch vụ:", "${formatter.format(billData.serviceFee.toLong())}đ", receiptTextColor)
+                        }
+
+                        if (billData.vatAmount > 0) {
+                            ReceiptRow("VAT (${billData.vatRate.toInt()}%):", "${formatter.format(billData.vatAmount.toLong())}đ", receiptTextColor)
+                        }
+
+                        Text(
+                            doubleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
+                        )
+
+                        // Grand total (larger, bold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "TỔNG CỘNG:",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor
+                            )
+                            Text(
+                                "${formatter.format(billData.totalAmount.toLong())}đ",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor
+                            )
+                        }
+
+                        Text(
+                            doubleLine,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = receiptTextColor,
+                            maxLines = 1
+                        )
+
+                        // Payment info
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ReceiptRow("Thanh toán:", billData.paymentMethod, receiptTextColor)
+                        if (billData.receivedAmount > 0) {
+                            ReceiptRow("Tiền nhận:", "${formatter.format(billData.receivedAmount.toLong())}đ", receiptTextColor)
+                        }
+                        if (billData.changeAmount > 0) {
+                            ReceiptRow("Tiền thừa:", "${formatter.format(billData.changeAmount.toLong())}đ", receiptTextColor)
+                        }
+
+                        // Thank you message
+                        if (!template?.thankYouMessage.isNullOrEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                template?.thankYouMessage ?: "",
+                                fontSize = 11.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                textAlign = TextAlign.Center,
+                                color = receiptTextColor
+                            )
+                        }
+
+                        // Comeback message
+                        if (!template?.comebackMessage.isNullOrEmpty()) {
+                            Text(
+                                template?.comebackMessage ?: "",
+                                fontSize = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                textAlign = TextAlign.Center,
+                                fontStyle = FontStyle.Italic,
+                                color = receiptTextColor.copy(alpha = 0.7f)
+                            )
+                        }
+
+                        // Footer
+                        if (!template?.footerText.isNullOrEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                singleLine,
+                                fontSize = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = receiptTextColor,
+                                maxLines = 1
+                            )
+                            Text(
+                                template?.footerText ?: "",
+                                fontSize = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                textAlign = TextAlign.Center,
+                                color = receiptTextColor.copy(alpha = 0.6f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
 
@@ -3471,7 +3655,7 @@ fun PrintPreviewDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
@@ -3494,6 +3678,30 @@ fun PrintPreviewDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * Helper composable for receipt row with label and value
+ */
+@Composable
+private fun ReceiptRow(label: String, value: String, textColor: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            color = textColor
+        )
+        Text(
+            value,
+            fontSize = 11.sp,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            color = textColor
+        )
     }
 }
 
