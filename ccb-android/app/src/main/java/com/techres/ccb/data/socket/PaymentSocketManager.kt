@@ -84,13 +84,15 @@ class PaymentSocketManager @Inject constructor() {
 
     /**
      * Connect to the Socket.IO server
-     * @param serverUrl The server URL (e.g., "http://192.168.1.62:4000")
+     * @param serverUrl The server URL (e.g., "http://192.168.1.62:3007")
      * @param branchId The branch ID to join
      * @param deviceId The device ID
      */
     fun connect(serverUrl: String, branchId: String, deviceId: String) {
         if (socket?.connected() == true && currentBranchId == branchId) {
-            Timber.d("Already connected to branch $branchId")
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("📡 [SOCKET] Already connected to branch $branchId")
+            Timber.d("════════════════════════════════════════════════════════════")
             return
         }
 
@@ -101,6 +103,13 @@ class PaymentSocketManager @Inject constructor() {
             currentBranchId = branchId
             currentDeviceId = deviceId
 
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("📡 [SOCKET] Connecting to Socket.IO server...")
+            Timber.d("   🔗 URL: $serverUrl")
+            Timber.d("   🏢 Branch: $branchId")
+            Timber.d("   📱 Device: $deviceId")
+            Timber.d("════════════════════════════════════════════════════════════")
+
             val options = IO.Options().apply {
                 transports = arrayOf("websocket", "polling")
                 reconnection = true
@@ -110,8 +119,8 @@ class PaymentSocketManager @Inject constructor() {
                 timeout = 20000
             }
 
-            // Connect to /payment namespace
-            socket = IO.socket("$serverUrl/payment", options).apply {
+            // Connect to socket-service (no namespace, root path)
+            socket = IO.socket(serverUrl, options).apply {
                 // Connection events
                 on(Socket.EVENT_CONNECT, onConnect)
                 on(Socket.EVENT_DISCONNECT, onDisconnect)
@@ -122,13 +131,31 @@ class PaymentSocketManager @Inject constructor() {
                 on("payment:cancelled", onPaymentCancelled)
                 on("payment:expired", onPaymentExpired)
 
+                // Connection success event from server
+                on("connection:success", onConnectionSuccess)
+
                 connect()
             }
 
-            Timber.d("Connecting to Socket.IO server: $serverUrl/payment")
         } catch (e: Exception) {
-            Timber.e(e, "Failed to connect to Socket.IO server")
+            Timber.e("════════════════════════════════════════════════════════════")
+            Timber.e("❌ [SOCKET] Failed to connect!")
+            Timber.e("   ⚠️ Error: ${e.message}")
+            Timber.e("════════════════════════════════════════════════════════════")
             _connectionState.value = SocketConnectionState.ERROR
+        }
+    }
+
+    private val onConnectionSuccess = Emitter.Listener { args ->
+        try {
+            val data = args.firstOrNull() as? JSONObject
+            val socketId = data?.optString("socketId") ?: "unknown"
+            Timber.d("────────────────────────────────────────────────────────────")
+            Timber.d("✅ [SOCKET] Connection confirmed by server!")
+            Timber.d("   🔑 Socket ID: $socketId")
+            Timber.d("────────────────────────────────────────────────────────────")
+        } catch (e: Exception) {
+            Timber.e(e, "Error parsing connection:success event")
         }
     }
 
@@ -153,7 +180,9 @@ class PaymentSocketManager @Inject constructor() {
     fun isConnected(): Boolean = socket?.connected() == true
 
     private val onConnect = Emitter.Listener {
-        Timber.d("Socket.IO connected")
+        Timber.d("════════════════════════════════════════════════════════════")
+        Timber.d("✅ [SOCKET] Connected to socket-service!")
+        Timber.d("════════════════════════════════════════════════════════════")
         _connectionState.value = SocketConnectionState.CONNECTED
 
         // Join branch room
@@ -166,17 +195,28 @@ class PaymentSocketManager @Inject constructor() {
 
     private val onDisconnect = Emitter.Listener { args ->
         val reason = args.getOrNull(0)?.toString() ?: "unknown"
-        Timber.d("Socket.IO disconnected: $reason")
+        Timber.d("════════════════════════════════════════════════════════════")
+        Timber.d("❌ [SOCKET] Disconnected from socket-service")
+        Timber.d("   📝 Reason: $reason")
+        Timber.d("════════════════════════════════════════════════════════════")
         _connectionState.value = SocketConnectionState.DISCONNECTED
     }
 
     private val onConnectError = Emitter.Listener { args ->
         val error = args.getOrNull(0)?.toString() ?: "unknown error"
-        Timber.e("Socket.IO connection error: $error")
+        Timber.e("════════════════════════════════════════════════════════════")
+        Timber.e("❌ [SOCKET] Connection error!")
+        Timber.e("   ⚠️ Error: $error")
+        Timber.e("════════════════════════════════════════════════════════════")
         _connectionState.value = SocketConnectionState.ERROR
     }
 
     private fun joinBranch(branchId: String, deviceId: String) {
+        Timber.d("────────────────────────────────────────────────────────────")
+        Timber.d("📡 [SOCKET] Joining branch room...")
+        Timber.d("   🏢 Branch: $branchId")
+        Timber.d("   📱 Device: $deviceId")
+
         val payload = JSONObject().apply {
             put("branchId", branchId)
             put("deviceId", deviceId)
@@ -186,9 +226,11 @@ class PaymentSocketManager @Inject constructor() {
         socket?.emit("join:branch", payload, io.socket.client.Ack { response ->
             val result = (response as? Array<*>)?.firstOrNull() as? JSONObject
             if (result?.optBoolean("success") == true) {
-                Timber.d("Joined branch room: $branchId")
+                Timber.d("✅ [SOCKET] Joined branch room successfully!")
+                Timber.d("────────────────────────────────────────────────────────────")
             } else {
-                Timber.w("Failed to join branch room: ${result?.optString("message")}")
+                Timber.w("⚠️ [SOCKET] Failed to join branch room: ${result?.optString("message")}")
+                Timber.d("────────────────────────────────────────────────────────────")
             }
         })
     }
@@ -196,6 +238,21 @@ class PaymentSocketManager @Inject constructor() {
     private val onPaymentSuccess = Emitter.Listener { args ->
         try {
             val data = args.firstOrNull() as? JSONObject ?: return@Listener
+
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("💰 [SOCKET] PAYMENT SUCCESS RECEIVED FROM SOCKET-SERVICE!")
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("   📦 OrderCode: ${data.optLong("orderCode")}")
+            Timber.d("   💵 Amount: ${data.optLong("amount")} VND")
+            Timber.d("   🔖 Transaction Ref: ${data.optString("transactionRef")}")
+            Timber.d("   🏦 Bank: ${data.optString("counterAccountBankName")}")
+            Timber.d("   👤 From: ${data.optString("counterAccountName")}")
+            Timber.d("   🔢 Account: ${data.optString("counterAccountNumber")}")
+            Timber.d("   ⏰ Time: ${data.optString("transactionDateTime")}")
+            Timber.d("────────────────────────────────────────────────────────────")
+            Timber.d("   📄 Raw Data: $data")
+            Timber.d("════════════════════════════════════════════════════════════")
+
             val event = PaymentSuccessEvent(
                 orderId = data.optString("orderId"),
                 orderCode = data.optLong("orderCode"),
@@ -207,49 +264,63 @@ class PaymentSocketManager @Inject constructor() {
                 counterAccountBankName = data.optString("counterAccountBankName").takeIf { it.isNotEmpty() }
             )
 
-            Timber.d("Payment success received: orderCode=${event.orderCode}, amount=${event.amount}")
-
             scope.launch {
                 _paymentSuccess.emit(event)
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error parsing payment:success event")
+            Timber.e("════════════════════════════════════════════════════════════")
+            Timber.e("❌ [SOCKET] Error parsing payment:success event!")
+            Timber.e("   ⚠️ Error: ${e.message}")
+            Timber.e("════════════════════════════════════════════════════════════")
         }
     }
 
     private val onPaymentCancelled = Emitter.Listener { args ->
         try {
             val data = args.firstOrNull() as? JSONObject ?: return@Listener
+
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("❌ [SOCKET] PAYMENT CANCELLED RECEIVED FROM SOCKET-SERVICE!")
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("   📦 OrderCode: ${data.optLong("orderCode")}")
+            Timber.d("   📝 Reason: ${data.optString("reason")}")
+            Timber.d("   📄 Raw Data: $data")
+            Timber.d("════════════════════════════════════════════════════════════")
+
             val event = PaymentCancelledEvent(
                 orderId = data.optString("orderId"),
                 orderCode = data.optLong("orderCode"),
                 reason = data.optString("reason").takeIf { it.isNotEmpty() }
             )
 
-            Timber.d("Payment cancelled received: orderCode=${event.orderCode}")
-
             scope.launch {
                 _paymentCancelled.emit(event)
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error parsing payment:cancelled event")
+            Timber.e("❌ [SOCKET] Error parsing payment:cancelled event: ${e.message}")
         }
     }
 
     private val onPaymentExpired = Emitter.Listener { args ->
         try {
             val data = args.firstOrNull() as? JSONObject ?: return@Listener
+
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("⏰ [SOCKET] PAYMENT EXPIRED RECEIVED FROM SOCKET-SERVICE!")
+            Timber.d("════════════════════════════════════════════════════════════")
+            Timber.d("   📦 OrderCode: ${data.optLong("orderCode")}")
+            Timber.d("   📄 Raw Data: $data")
+            Timber.d("════════════════════════════════════════════════════════════")
+
             val event = PaymentExpiredEvent(
                 orderCode = data.optLong("orderCode")
             )
-
-            Timber.d("Payment expired received: orderCode=${event.orderCode}")
 
             scope.launch {
                 _paymentExpired.emit(event)
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error parsing payment:expired event")
+            Timber.e("❌ [SOCKET] Error parsing payment:expired event: ${e.message}")
         }
     }
 }
