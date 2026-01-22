@@ -115,6 +115,13 @@ export class ProxyService {
   }
 
   determineService(path: string): { service: BackendService; adjustedPath: string } {
+    // Routes for PayOS payments (api-dashboard)
+    // /v1/payos/* or /payos/* -> api-dashboard /payos/*
+    if (path.startsWith('/v1/payos/') || path.startsWith('/payos/') || path === '/v1/payos' || path === '/payos') {
+      const payosPath = path.replace(/^\/v1\/payos/, '/payos');
+      return { service: BackendService.DASHBOARD, adjustedPath: payosPath };
+    }
+
     // Routes for OAuth authentication (api-oauth)
     // /auth/* -> api-oauth /api/v1/auth/*
     if (path.startsWith('/auth/') || path.startsWith('/api/auth/')) {
