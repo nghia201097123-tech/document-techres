@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional, ValidateNested } from 'class-validator';
+import { IsString, IsNumber, IsOptional, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class WebhookTransactionDto {
@@ -144,6 +144,7 @@ export class PayOSWebhookDto {
   desc: string;
 
   @ApiProperty({ description: 'Success status' })
+  @IsBoolean()
   success: boolean;
 
   @ApiProperty({ description: 'Webhook data' })
