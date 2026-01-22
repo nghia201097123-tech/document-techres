@@ -7,6 +7,7 @@ export enum BackendService {
   DASHBOARD = 'dashboard',
   OAUTH = 'oauth',
   MASTER_DATA = 'master-data',
+  WEBHOOK = 'webhook',
 }
 
 @Injectable()
@@ -15,12 +16,14 @@ export class ProxyService {
   private readonly apiDashboardClient: AxiosInstance;
   private readonly apiOAuthClient: AxiosInstance;
   private readonly apiMasterDataClient: AxiosInstance;
+  private readonly webhookServiceClient: AxiosInstance;
 
   constructor(private readonly configService: ConfigService) {
     const apiAdminUrl = this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
     const apiDashboardUrl = this.configService.get<string>('API_DASHBOARD_URL') || 'http://localhost:4002';
     const apiOAuthUrl = this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
     const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3004';
+    const webhookServiceUrl = this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
@@ -47,6 +50,11 @@ export class ProxyService {
       maxBodyLength: 10 * 1024 * 1024, // 10MB
       maxContentLength: 10 * 1024 * 1024, // 10MB
     });
+
+    this.webhookServiceClient = axios.create({
+      baseURL: webhookServiceUrl,
+      timeout: 30000, // 30 seconds for webhook processing
+    });
   }
 
   private getClient(service: BackendService): AxiosInstance {
@@ -57,6 +65,8 @@ export class ProxyService {
         return this.apiOAuthClient;
       case BackendService.MASTER_DATA:
         return this.apiMasterDataClient;
+      case BackendService.WEBHOOK:
+        return this.webhookServiceClient;
       default:
         return this.apiAdminClient;
     }
@@ -114,7 +124,18 @@ export class ProxyService {
     return this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
   }
 
+  getWebhookServiceUrl(): string {
+    return this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
+  }
+
   determineService(path: string): { service: BackendService; adjustedPath: string } {
+    // Routes for PayOS webhooks -> webhook-service
+    // /webhook/payos/* -> webhook-service /webhook/payos/*
+    if (path.startsWith('/webhook/payos') || path.startsWith('/payos/webhook')) {
+      const webhookPath = path.replace(/^\/payos\/webhook/, '/webhook/payos');
+      return { service: BackendService.WEBHOOK, adjustedPath: webhookPath };
+    }
+
     // Routes for PayOS payments (api-dashboard)
     // /v1/payos/* or /payos/* -> api-dashboard /payos/*
     // /pos/payos/* -> api-dashboard /payos/* (POS app PayOS requests)

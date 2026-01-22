@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  webhook-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: techres-webhook-service
+    ports:
+      - "3006:3006"
+    environment:
+      - PORT=3006
+      - PAYOS_CLIENT_ID=${PAYOS_CLIENT_ID}
+      - PAYOS_API_KEY=${PAYOS_API_KEY}
+      - PAYOS_CHECKSUM_KEY=${PAYOS_CHECKSUM_KEY}
+      - SOCKET_SERVER_URL=${SOCKET_SERVER_URL:-http://api-dashboard:3000}
+      - LOG_LEVEL=debug
+    networks:
+      - techres-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3006/webhook/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  techres-network:
+    external: true
