@@ -19,6 +19,11 @@ export enum ItemDisplayLayout {
   PRICE_RIGHT = 'price_right',     // Giá bên phải: Tên món căn trái, giá căn phải
   WITH_INDEX = 'with_index',       // Có số thứ tự: STT. Tên món - SL x Đơn giá
   GROUPED = 'grouped',             // Nhóm theo danh mục
+  GRID_2_COL = 'grid_2_col',       // Grid 2 cột
+  MINIMAL = 'minimal',             // Tối giản: chỉ tên và tổng tiền
+  DOTTED = 'dotted',               // Dấu chấm: Tên món.......Giá
+  BOXED = 'boxed',                 // Có viền: mỗi món trong 1 khung
+  TABLE = 'table',                 // Dạng bảng: có header cột
 }
 
 export enum PrinterConnectionType {
@@ -473,6 +478,11 @@ export const ITEM_DISPLAY_LAYOUT_LABELS: Record<ItemDisplayLayout, string> = {
   [ItemDisplayLayout.PRICE_RIGHT]: 'Giá bên phải',
   [ItemDisplayLayout.WITH_INDEX]: 'Có STT',
   [ItemDisplayLayout.GROUPED]: 'Nhóm danh mục',
+  [ItemDisplayLayout.GRID_2_COL]: 'Grid 2 cột',
+  [ItemDisplayLayout.MINIMAL]: 'Tối giản',
+  [ItemDisplayLayout.DOTTED]: 'Dấu chấm',
+  [ItemDisplayLayout.BOXED]: 'Có viền',
+  [ItemDisplayLayout.TABLE]: 'Dạng bảng',
 };
 
 export const ITEM_DISPLAY_LAYOUT_DESCRIPTIONS: Record<ItemDisplayLayout, string> = {
@@ -483,6 +493,11 @@ export const ITEM_DISPLAY_LAYOUT_DESCRIPTIONS: Record<ItemDisplayLayout, string>
   [ItemDisplayLayout.PRICE_RIGHT]: 'Tên căn trái, giá căn phải',
   [ItemDisplayLayout.WITH_INDEX]: '1. Tên món - SL x Đơn giá',
   [ItemDisplayLayout.GROUPED]: 'Nhóm món theo danh mục',
+  [ItemDisplayLayout.GRID_2_COL]: 'Hiển thị món theo dạng lưới 2 cột',
+  [ItemDisplayLayout.MINIMAL]: 'Chỉ hiển thị tên món và tổng tiền',
+  [ItemDisplayLayout.DOTTED]: 'Tên món.........Giá (kiểu menu)',
+  [ItemDisplayLayout.BOXED]: 'Mỗi món trong 1 khung viền',
+  [ItemDisplayLayout.TABLE]: 'Bảng với header: Món | SL | Giá',
 };
 
 // Preview examples for each layout
@@ -517,6 +532,30 @@ export const ITEM_DISPLAY_LAYOUT_EXAMPLES: Record<ItemDisplayLayout, string[]> =
     'Phở bò tái x2         90,000',
     '--- ĐỒ UỐNG ---',
     'Trà đá x2             10,000',
+  ],
+  [ItemDisplayLayout.GRID_2_COL]: [
+    '┌─────────┬─────────┐',
+    '│Phở x2   │Trà x2   │',
+    '│90,000   │10,000   │',
+    '└─────────┴─────────┘',
+  ],
+  [ItemDisplayLayout.MINIMAL]: [
+    'Phở bò tái         90,000',
+    'Trà đá             10,000',
+  ],
+  [ItemDisplayLayout.DOTTED]: [
+    'Phở bò tái x2.......90,000',
+    'Trà đá x2...........10,000',
+  ],
+  [ItemDisplayLayout.BOXED]: [
+    '╔═══════════════════╗',
+    '║ Phở bò tái  90,000║',
+    '╚═══════════════════╝',
+  ],
+  [ItemDisplayLayout.TABLE]: [
+    'Món        | SL | Giá',
+    '-----------|----|---------',
+    'Phở bò tái |  2 | 90,000',
   ],
 };
 

@@ -274,6 +274,95 @@ const ItemsSection = React.memo(function ItemsSection({
     );
   }
 
+  // GRID_2_COL layout: Grid 2 cột
+  if (activeLayout === ItemDisplayLayout.GRID_2_COL) {
+    return (
+      <div className="grid grid-cols-2 gap-1 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="border border-dashed p-1 rounded">
+            <p className="font-medium truncate">{item.name}</p>
+            <div className="flex justify-between text-muted-foreground">
+              {showQuantity && <span>x{item.qty}</span>}
+              <span className="font-medium text-foreground">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // MINIMAL layout: Tối giản
+  if (activeLayout === ItemDisplayLayout.MINIMAL) {
+    return (
+      <div className="space-y-0.5 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="flex justify-between">
+            <span>{item.name}</span>
+            <span>{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // DOTTED layout: Dấu chấm
+  if (activeLayout === ItemDisplayLayout.DOTTED) {
+    return (
+      <div className="space-y-0.5 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => {
+          const name = `${item.name} ${showQuantity ? `x${item.qty}` : ""}`;
+          const price = formatPrice(item.price * item.qty - (item.discount || 0));
+          const dots = ".".repeat(Math.max(2, 20 - name.length - price.length));
+          return (
+            <div key={idx} className="flex">
+              <span className="flex-1">{name}<span className="text-muted-foreground">{dots}</span></span>
+              <span>{price}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // BOXED layout: Có viền
+  if (activeLayout === ItemDisplayLayout.BOXED) {
+    return (
+      <div className="space-y-1 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="border-2 border-gray-300 rounded p-1.5">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">{item.name}</span>
+              <span className="font-bold">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+            </div>
+            {showQuantity && (
+              <p className="text-muted-foreground text-right">SL: {item.qty}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // TABLE layout: Dạng bảng
+  if (activeLayout === ItemDisplayLayout.TABLE) {
+    return (
+      <div className="text-xs">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
+          <span>Món</span>
+          <span className="text-center w-8">SL</span>
+          <span className="text-right w-16">Giá</span>
+        </div>
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="grid grid-cols-[1fr_auto_auto] gap-1 py-0.5">
+            <span className="truncate">{item.name}</span>
+            <span className="text-center w-8">{item.qty}</span>
+            <span className="text-right w-16">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   // Fallback to standard
   return null;
 });
