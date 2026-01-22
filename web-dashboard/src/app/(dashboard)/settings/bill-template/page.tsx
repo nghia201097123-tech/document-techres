@@ -44,10 +44,14 @@ import {
   BillPrinterConfig,
   BillTemplateType,
   PrinterConnectionType,
+  ItemDisplayLayout,
   BillTemplateWithPrinterForm,
   BILL_TEMPLATE_TYPE_LABELS,
   BILL_TEMPLATE_TYPE_DESCRIPTIONS,
   PRINTER_CONNECTION_TYPE_LABELS,
+  ITEM_DISPLAY_LAYOUT_LABELS,
+  ITEM_DISPLAY_LAYOUT_DESCRIPTIONS,
+  ITEM_DISPLAY_LAYOUT_EXAMPLES,
   PAPER_WIDTH_OPTIONS,
   FONT_SIZE_OPTIONS,
   DATE_FORMAT_OPTIONS,
@@ -153,6 +157,7 @@ export default function BillTemplatePage() {
         checkInLabel: template.checkInLabel || "Giờ vào",
         checkOutLabel: template.checkOutLabel || "Giờ ra",
         // Items
+        itemDisplayLayout: template.itemDisplayLayout || ItemDisplayLayout.STANDARD,
         showItemCode: template.showItemCode,
         showItemNote: template.showItemNote,
         showOrderNote: template.showOrderNote ?? true,
@@ -668,6 +673,45 @@ export default function BillTemplatePage() {
 
                 {/* Content Config */}
                 <TabsContent value="content" className="space-y-4">
+                  {/* Item Display Layout Selection */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Kiểu hiển thị danh sách món</Label>
+                    <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                      {Object.values(ItemDisplayLayout).map((layout) => (
+                        <div
+                          key={layout}
+                          className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all hover:border-primary/50 ${
+                            templateForm.itemDisplayLayout === layout
+                              ? "border-primary bg-primary/5"
+                              : "border-muted"
+                          }`}
+                          onClick={() => setTemplateForm({ ...templateForm, itemDisplayLayout: layout })}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`h-3 w-3 rounded-full border-2 ${
+                              templateForm.itemDisplayLayout === layout
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground"
+                            }`} />
+                            <span className="font-medium text-sm">{ITEM_DISPLAY_LAYOUT_LABELS[layout]}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {ITEM_DISPLAY_LAYOUT_DESCRIPTIONS[layout]}
+                          </p>
+                          <div className="bg-muted/50 rounded p-2 font-mono text-xs leading-relaxed">
+                            {ITEM_DISPLAY_LAYOUT_EXAMPLES[layout].map((line, i) => (
+                              <div key={i} className="whitespace-pre">{line}</div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <Label className="text-sm font-medium text-muted-foreground mb-3 block">Thông tin hiển thị</Label>
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="flex items-center gap-2">
                       <Switch

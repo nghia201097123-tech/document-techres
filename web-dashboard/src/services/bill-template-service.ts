@@ -10,6 +10,17 @@ export enum BillTemplateType {
   PREMIUM = 'premium',
 }
 
+// Kiểu hiển thị danh sách món ăn
+export enum ItemDisplayLayout {
+  STANDARD = 'standard',           // Chuẩn: Tên món - SL x Đơn giá = Thành tiền
+  COMPACT = 'compact',             // Thu gọn: Tên món x SL = Thành tiền (1 dòng)
+  DETAILED = 'detailed',           // Chi tiết: Mã + Tên + Ghi chú + Đơn giá + SL + Thành tiền
+  TWO_LINE = 'two_line',           // 2 dòng: Dòng 1: Tên món, Dòng 2: SL x Đơn giá = Thành tiền
+  PRICE_RIGHT = 'price_right',     // Giá bên phải: Tên món căn trái, giá căn phải
+  WITH_INDEX = 'with_index',       // Có số thứ tự: STT. Tên món - SL x Đơn giá
+  GROUPED = 'grouped',             // Nhóm theo danh mục
+}
+
 export enum PrinterConnectionType {
   NETWORK = 'network',
   BLUETOOTH = 'bluetooth',
@@ -56,6 +67,7 @@ export interface BillTemplate {
   checkOutLabel?: string;
 
   // Items config
+  itemDisplayLayout: ItemDisplayLayout;
   showItemCode: boolean;
   showItemNote: boolean;
   showOrderNote: boolean;
@@ -206,6 +218,7 @@ export interface CreateBillTemplateDto {
   checkOutLabel?: string;
 
   // Items
+  itemDisplayLayout?: ItemDisplayLayout;
   showItemCode?: boolean;
   showItemNote?: boolean;
   showOrderNote?: boolean;
@@ -452,6 +465,61 @@ export const PRINTER_CONNECTION_TYPE_LABELS: Record<PrinterConnectionType, strin
   [PrinterConnectionType.SUNMI]: 'Sunmi Built-in',
 };
 
+export const ITEM_DISPLAY_LAYOUT_LABELS: Record<ItemDisplayLayout, string> = {
+  [ItemDisplayLayout.STANDARD]: 'Chuẩn',
+  [ItemDisplayLayout.COMPACT]: 'Thu gọn',
+  [ItemDisplayLayout.DETAILED]: 'Chi tiết',
+  [ItemDisplayLayout.TWO_LINE]: '2 dòng',
+  [ItemDisplayLayout.PRICE_RIGHT]: 'Giá bên phải',
+  [ItemDisplayLayout.WITH_INDEX]: 'Có STT',
+  [ItemDisplayLayout.GROUPED]: 'Nhóm danh mục',
+};
+
+export const ITEM_DISPLAY_LAYOUT_DESCRIPTIONS: Record<ItemDisplayLayout, string> = {
+  [ItemDisplayLayout.STANDARD]: 'Tên món - SL x Đơn giá = Thành tiền',
+  [ItemDisplayLayout.COMPACT]: 'Tên món x SL = Thành tiền (tiết kiệm giấy)',
+  [ItemDisplayLayout.DETAILED]: 'Hiển thị đầy đủ: Mã, Tên, Ghi chú, Giá',
+  [ItemDisplayLayout.TWO_LINE]: 'Dòng 1: Tên, Dòng 2: Chi tiết giá',
+  [ItemDisplayLayout.PRICE_RIGHT]: 'Tên căn trái, giá căn phải',
+  [ItemDisplayLayout.WITH_INDEX]: '1. Tên món - SL x Đơn giá',
+  [ItemDisplayLayout.GROUPED]: 'Nhóm món theo danh mục',
+};
+
+// Preview examples for each layout
+export const ITEM_DISPLAY_LAYOUT_EXAMPLES: Record<ItemDisplayLayout, string[]> = {
+  [ItemDisplayLayout.STANDARD]: [
+    'Phở bò tái - 2 x 45,000 = 90,000',
+    'Trà đá        - 2 x  5,000 = 10,000',
+  ],
+  [ItemDisplayLayout.COMPACT]: [
+    'Phở bò tái x2           90,000',
+    'Trà đá x2               10,000',
+  ],
+  [ItemDisplayLayout.DETAILED]: [
+    'PH001 - Phở bò tái',
+    '  Ghi chú: Ít bánh',
+    '  2 x 45,000 = 90,000',
+  ],
+  [ItemDisplayLayout.TWO_LINE]: [
+    'Phở bò tái',
+    '    2 x 45,000 = 90,000',
+  ],
+  [ItemDisplayLayout.PRICE_RIGHT]: [
+    'Phở bò tái (x2)        90,000',
+    'Trà đá (x2)            10,000',
+  ],
+  [ItemDisplayLayout.WITH_INDEX]: [
+    '1. Phở bò tái - 2 x 45,000',
+    '2. Trà đá - 2 x 5,000',
+  ],
+  [ItemDisplayLayout.GROUPED]: [
+    '--- MÓN CHÍNH ---',
+    'Phở bò tái x2         90,000',
+    '--- ĐỒ UỐNG ---',
+    'Trà đá x2             10,000',
+  ],
+};
+
 export const QR_CODE_TYPE_LABELS: Record<string, string> = {
   order_id: 'Mã đơn hàng',
   payment: 'Thanh toán',
@@ -520,6 +588,7 @@ export const DEFAULT_BILL_TEMPLATE: Partial<CreateBillTemplateDto> = {
   checkInLabel: 'Giờ vào',
   checkOutLabel: 'Giờ ra',
   // Items
+  itemDisplayLayout: ItemDisplayLayout.STANDARD,
   showItemCode: false,
   showItemNote: true,
   showOrderNote: true,
