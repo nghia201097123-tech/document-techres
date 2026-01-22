@@ -5,8 +5,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -224,7 +222,8 @@ fun DashboardScreen(
                     currentDate = currentDate,
                     todayRevenue = uiState.todayRevenue,
                     totalOrders = uiState.todayOrderCount,
-                    pendingOrders = uiState.draftPosCount
+                    pendingOrders = uiState.draftPosCount,
+                    isOnline = uiState.isOnline
                 )
 
                 // Stats Cards
@@ -356,47 +355,7 @@ fun DashboardScreen(
             }
         }
         }
-
-        // Network offline warning banner
-        AnimatedVisibility(
-            visible = !uiState.isOnline,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-        ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE65100)
-                ),
-                shape = RoundedCornerShape(0.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudOff,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "⚠ OFFLINE - Đơn hàng sẽ được đồng bộ khi có mạng",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-        }
-    } // End of main Box
+    }
 
     // Order Detail Dialog
     if (showOrderDetailDialog && selectedOrder != null) {
@@ -774,6 +733,35 @@ private fun MobileDashboardContent(
                     }
                 },
                 actions = {
+                    // Offline indicator
+                    if (!uiState.isOnline) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFE65100)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "OFFLINE",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
                     // Revenue badge
                     Surface(
                         color = Color(0xFFE8F5E9),
@@ -1173,7 +1161,8 @@ private fun DashboardHeader(
     currentDate: String,
     todayRevenue: Long,
     totalOrders: Int,
-    pendingOrders: Int
+    pendingOrders: Int,
+    isOnline: Boolean = true
 ) {
     Surface(
         color = Color.White,
@@ -1186,19 +1175,53 @@ private fun DashboardHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Time & Date
-            Column {
-                Text(
-                    text = currentTime,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2)
-                )
-                Text(
-                    text = currentDate,
-                    fontSize = 14.sp,
-                    color = Color.Gray
-                )
+            // Left: Time & Date + Offline indicator
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column {
+                    Text(
+                        text = currentTime,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1976D2)
+                    )
+                    Text(
+                        text = currentDate,
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                // Offline indicator - hiển thị khi mất mạng
+                if (!isOnline) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE65100)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "OFFLINE",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
             }
 
             // Right: Stats
