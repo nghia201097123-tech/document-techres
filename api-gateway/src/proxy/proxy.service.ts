@@ -117,8 +117,15 @@ export class ProxyService {
   determineService(path: string): { service: BackendService; adjustedPath: string } {
     // Routes for PayOS payments (api-dashboard)
     // /v1/payos/* or /payos/* -> api-dashboard /payos/*
+    // /pos/payos/* -> api-dashboard /payos/* (POS app PayOS requests)
     if (path.startsWith('/v1/payos/') || path.startsWith('/payos/') || path === '/v1/payos' || path === '/payos') {
       const payosPath = path.replace(/^\/v1\/payos/, '/payos');
+      return { service: BackendService.DASHBOARD, adjustedPath: payosPath };
+    }
+
+    // POS app PayOS requests: /pos/payos/* -> api-dashboard /payos/*
+    if (path.startsWith('/pos/payos/') || path === '/pos/payos') {
+      const payosPath = path.replace(/^\/pos\/payos/, '/payos');
       return { service: BackendService.DASHBOARD, adjustedPath: payosPath };
     }
 
