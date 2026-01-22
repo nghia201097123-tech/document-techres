@@ -51,6 +51,7 @@ import com.techres.ccb.data.repository.TableRepository
 import com.techres.ccb.data.socket.PaymentAnnouncementService
 import com.techres.ccb.data.socket.PaymentSocketManager
 import com.techres.ccb.data.socket.SocketConnectionState
+import com.techres.ccb.data.sync.NetworkMonitor
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.printer.OrderPrintingService
 import com.techres.ccb.presentation.screens.table.TableViewModel
@@ -188,7 +189,9 @@ data class SaleUiState(
     val payosOrderCode: Long? = null,             // PayOS order code for tracking
     val isCreatingPayosPayment: Boolean = false,  // Loading state for creating payment
     val payosError: String? = null,               // PayOS error message
-    val socketConnectionState: SocketConnectionState = SocketConnectionState.DISCONNECTED
+    val socketConnectionState: SocketConnectionState = SocketConnectionState.DISCONNECTED,
+    // Network status
+    val isOnline: Boolean = true                  // Network connectivity status
 ) {
     // Computed properties
     // Subtotal = tổng tiền items đã order + items mới trong giỏ hàng
@@ -394,7 +397,8 @@ class SaleViewModel @Inject constructor(
     private val sharedPreferences: SharedPreferences,
     private val payOSRepository: PayOSRepository,
     private val paymentSocketManager: PaymentSocketManager,
-    private val paymentAnnouncementService: PaymentAnnouncementService
+    private val paymentAnnouncementService: PaymentAnnouncementService,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     companion object {
@@ -428,6 +432,19 @@ class SaleViewModel @Inject constructor(
         loadPagerGridSize()
         loadOrderType()
         setupPaymentSocketListeners()
+        startNetworkMonitoring()
+    }
+
+    /**
+     * Start monitoring network connectivity
+     */
+    private fun startNetworkMonitoring() {
+        networkMonitor.startMonitoring()
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { isOnline ->
+                _uiState.update { it.copy(isOnline = isOnline) }
+            }
+        }
     }
 
     private fun loadInitialData() {
