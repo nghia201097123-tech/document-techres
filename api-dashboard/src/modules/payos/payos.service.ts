@@ -148,10 +148,16 @@ export class PayosService {
         `Created payment: orderCode=${dto.orderCode}, amount=${dto.amount}, branch=${dto.branchId}`,
       );
 
+      // PayOS returns QR code as EMVCo data string, not image URL
+      // Convert to image URL using QR code generation service
+      const qrData = paymentRequest.qrCode;
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+
       return {
         success: true,
         paymentLinkId: paymentRequest.paymentLinkId,
-        qrCode: paymentRequest.qrCode,
+        qrCode: qrImageUrl,
+        qrData: qrData, // Keep original QR data for clients that can render locally
         checkoutUrl: paymentRequest.checkoutUrl,
         orderCode: dto.orderCode,
         amount: dto.amount,

@@ -45,8 +45,11 @@ export class CreatePaymentResponseDto {
   @ApiProperty({ description: 'PayOS payment link ID' })
   paymentLinkId: string;
 
-  @ApiProperty({ description: 'QR code URL for payment' })
+  @ApiProperty({ description: 'QR code image URL for payment' })
   qrCode: string;
+
+  @ApiProperty({ description: 'Raw QR code data (EMVCo format) for local rendering' })
+  qrData?: string;
 
   @ApiProperty({ description: 'Checkout URL' })
   checkoutUrl: string;
