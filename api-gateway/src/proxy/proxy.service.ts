@@ -8,6 +8,7 @@ export enum BackendService {
   OAUTH = 'oauth',
   MASTER_DATA = 'master-data',
   WEBHOOK = 'webhook',
+  SOCKET = 'socket',
 }
 
 @Injectable()
@@ -17,6 +18,7 @@ export class ProxyService {
   private readonly apiOAuthClient: AxiosInstance;
   private readonly apiMasterDataClient: AxiosInstance;
   private readonly webhookServiceClient: AxiosInstance;
+  private readonly socketServiceClient: AxiosInstance;
 
   constructor(private readonly configService: ConfigService) {
     const apiAdminUrl = this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
@@ -24,6 +26,7 @@ export class ProxyService {
     const apiOAuthUrl = this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
     const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3004';
     const webhookServiceUrl = this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
+    const socketServiceUrl = this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
@@ -55,6 +58,11 @@ export class ProxyService {
       baseURL: webhookServiceUrl,
       timeout: 30000, // 30 seconds for webhook processing
     });
+
+    this.socketServiceClient = axios.create({
+      baseURL: socketServiceUrl,
+      timeout: 30000, // 30 seconds for socket events
+    });
   }
 
   private getClient(service: BackendService): AxiosInstance {
@@ -67,6 +75,8 @@ export class ProxyService {
         return this.apiMasterDataClient;
       case BackendService.WEBHOOK:
         return this.webhookServiceClient;
+      case BackendService.SOCKET:
+        return this.socketServiceClient;
       default:
         return this.apiAdminClient;
     }
@@ -128,7 +138,18 @@ export class ProxyService {
     return this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
   }
 
+  getSocketServiceUrl(): string {
+    return this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
+  }
+
   determineService(path: string): { service: BackendService; adjustedPath: string } {
+    // Routes for Socket.IO events -> socket-service
+    // /socket/* -> socket-service /*
+    if (path.startsWith('/socket/')) {
+      const socketPath = path.replace(/^\/socket/, '');
+      return { service: BackendService.SOCKET, adjustedPath: socketPath };
+    }
+
     // Routes for PayOS webhooks -> webhook-service
     // /webhook/payos/* -> webhook-service /webhook/payos/*
     if (path.startsWith('/webhook/payos') || path.startsWith('/payos/webhook')) {

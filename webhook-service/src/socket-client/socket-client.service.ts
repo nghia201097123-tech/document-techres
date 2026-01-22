@@ -1,137 +1,100 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { io, Socket } from 'socket.io-client';
+import axios, { AxiosInstance } from 'axios';
 import { PaymentResult } from '../webhook/webhook.service';
 
 @Injectable()
-export class SocketClientService implements OnModuleInit, OnModuleDestroy {
+export class SocketClientService {
   private readonly logger = new Logger(SocketClientService.name);
-  private socket: Socket;
-  private isConnected = false;
-  private reconnectAttempts = 0;
-  private readonly maxReconnectAttempts = 10;
+  private readonly httpClient: AxiosInstance;
+  private readonly socketServiceUrl: string;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    this.socketServiceUrl = this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
 
-  onModuleInit() {
-    this.connect();
-  }
-
-  onModuleDestroy() {
-    this.disconnect();
-  }
-
-  private connect() {
-    const serverUrl = this.configService.get<string>('SOCKET_SERVER_URL') || 'http://localhost:3000';
-
-    this.logger.log(`Connecting to Socket.IO server: ${serverUrl}`);
-
-    this.socket = io(serverUrl, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      auth: {
-        service: 'webhook-service',
+    this.httpClient = axios.create({
+      baseURL: this.socketServiceUrl,
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
       },
     });
 
-    this.socket.on('connect', () => {
-      this.isConnected = true;
-      this.reconnectAttempts = 0;
-      this.logger.log(`✅ Connected to Socket.IO server: ${this.socket.id}`);
-
-      // Join webhook service room
-      this.socket.emit('join:service', { service: 'webhook' });
-    });
-
-    this.socket.on('disconnect', (reason) => {
-      this.isConnected = false;
-      this.logger.warn(`❌ Disconnected from Socket.IO server: ${reason}`);
-    });
-
-    this.socket.on('connect_error', (error) => {
-      this.reconnectAttempts++;
-      this.logger.error(`Socket.IO connection error (attempt ${this.reconnectAttempts}): ${error.message}`);
-    });
-
-    this.socket.on('error', (error) => {
-      this.logger.error(`Socket.IO error: ${error}`);
-    });
-  }
-
-  private disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.logger.log('Disconnected from Socket.IO server');
-    }
+    this.logger.log(`Socket service URL configured: ${this.socketServiceUrl}`);
   }
 
   async emitPaymentSuccess(paymentResult: PaymentResult): Promise<void> {
-    return this.emitPaymentEvent('payment:success', paymentResult);
+    try {
+      this.logger.log(`📤 Sending payment success to socket-service for orderCode: ${paymentResult.orderCode}`);
+
+      await this.httpClient.post('/events/payment/success', {
+        orderCode: paymentResult.orderCode,
+        status: paymentResult.status,
+        amount: paymentResult.amount,
+        transactionRef: paymentResult.transactionRef,
+        transactionDateTime: paymentResult.transactionDateTime,
+        counterAccountBankName: paymentResult.counterAccountBankName,
+        counterAccountNumber: paymentResult.counterAccountNumber,
+        counterAccountName: paymentResult.counterAccountName,
+      });
+
+      this.logger.log(`✅ Payment success event sent for orderCode: ${paymentResult.orderCode}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to send payment success event: ${error.message}`);
+      throw error;
+    }
   }
 
   async emitPaymentCancelled(paymentResult: PaymentResult): Promise<void> {
-    return this.emitPaymentEvent('payment:cancelled', paymentResult);
+    try {
+      this.logger.log(`📤 Sending payment cancelled to socket-service for orderCode: ${paymentResult.orderCode}`);
+
+      await this.httpClient.post('/events/payment/cancelled', {
+        orderCode: paymentResult.orderCode,
+        status: paymentResult.status,
+        amount: paymentResult.amount,
+        transactionRef: paymentResult.transactionRef,
+        transactionDateTime: paymentResult.transactionDateTime,
+      });
+
+      this.logger.log(`✅ Payment cancelled event sent for orderCode: ${paymentResult.orderCode}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to send payment cancelled event: ${error.message}`);
+      throw error;
+    }
   }
 
   async emitPaymentExpired(paymentResult: PaymentResult): Promise<void> {
-    return this.emitPaymentEvent('payment:expired', paymentResult);
-  }
+    try {
+      this.logger.log(`📤 Sending payment expired to socket-service for orderCode: ${paymentResult.orderCode}`);
 
-  private async emitPaymentEvent(event: string, paymentResult: PaymentResult): Promise<void> {
-    if (!this.isConnected) {
-      this.logger.warn(`Socket not connected, cannot emit ${event}`);
-      // Try to reconnect
-      this.socket?.connect();
-      // Wait a bit for connection
-      await this.waitForConnection(3000);
-    }
-
-    if (this.isConnected) {
-      this.logger.log(`Emitting ${event} for orderCode: ${paymentResult.orderCode}`);
-      this.socket.emit(event, paymentResult);
-
-      // Also emit to specific room based on orderCode
-      // The room naming convention follows the pattern: payment:{orderCode}
-      this.socket.emit('payment:update', {
-        room: `payment:${paymentResult.orderCode}`,
-        event,
-        data: paymentResult,
+      await this.httpClient.post('/events/payment/expired', {
+        orderCode: paymentResult.orderCode,
+        status: paymentResult.status,
+        amount: paymentResult.amount,
       });
-    } else {
-      this.logger.error(`Failed to emit ${event}: Socket not connected`);
-      throw new Error('Socket not connected');
+
+      this.logger.log(`✅ Payment expired event sent for orderCode: ${paymentResult.orderCode}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to send payment expired event: ${error.message}`);
+      throw error;
     }
   }
 
-  private waitForConnection(timeout: number): Promise<boolean> {
-    return new Promise((resolve) => {
-      if (this.isConnected) {
-        resolve(true);
-        return;
-      }
+  async getSocketServiceStatus(): Promise<{ healthy: boolean; connectedClients?: number }> {
+    try {
+      const [healthResponse, statsResponse] = await Promise.all([
+        this.httpClient.get('/health'),
+        this.httpClient.get('/events/stats'),
+      ]);
 
-      const checkInterval = setInterval(() => {
-        if (this.isConnected) {
-          clearInterval(checkInterval);
-          resolve(true);
-        }
-      }, 100);
-
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        resolve(this.isConnected);
-      }, timeout);
-    });
-  }
-
-  getConnectionStatus(): { connected: boolean; socketId: string | null } {
-    return {
-      connected: this.isConnected,
-      socketId: this.socket?.id || null,
-    };
+      return {
+        healthy: healthResponse.data.status === 'ok',
+        connectedClients: statsResponse.data.connectedClients,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Socket service health check failed: ${error.message}`);
+      return { healthy: false };
+    }
   }
 }
