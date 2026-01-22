@@ -110,6 +110,11 @@ const mockBankAccounts: BankAccount[] = [
     transferTemplate: "TT {order_code}",
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
+    // PayOS configuration
+    paymentPartner: "payos",
+    payosClientId: "309cd981-25b9-4139-91af-ebc55bf6256e",
+    payosApiKey: "85fc4cd5-6b4a-4402-ba4d-5ce8a915577b",
+    payosChecksumKey: "c028b7bba18cfe4e7dc5dfb5f4fe80a293776fb396eebb48025e5bcdca18aa9f",
   },
   {
     id: "2",
