@@ -659,6 +659,7 @@ fun SaleScreen(
             PrintPreviewDialog(
                 billData = pendingBillData,
                 template = uiState.pendingTemplate,
+                isPrinting = uiState.isPrintingBill,
                 onDismiss = { viewModel.dismissPrintPreview() },
                 onConfirmPrint = { viewModel.confirmPrintFromPreview() }
             )
@@ -3265,11 +3266,28 @@ fun ReprintMenuDialog(
 fun PrintPreviewDialog(
     billData: BillData,
     template: BillTemplateEntity?,
+    isPrinting: Boolean = false,
     onDismiss: () -> Unit,
     onConfirmPrint: () -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val formatter = NumberFormat.getNumberInstance(Locale("vi", "VN"))
+
+    // Payment method mapping to Vietnamese
+    fun getPaymentMethodVietnamese(method: String): String {
+        return when (method.lowercase()) {
+            "cash" -> "Tiền mặt"
+            "bank_transfer", "bank" -> "Chuyển khoản"
+            "card", "credit_card", "debit_card" -> "Thẻ"
+            "momo" -> "MoMo"
+            "zalopay" -> "ZaloPay"
+            "vnpay" -> "VNPay"
+            "payos" -> "PayOS"
+            "ewallet", "e_wallet" -> "Ví điện tử"
+            "mixed" -> "Nhiều hình thức"
+            else -> method
+        }
+    }
 
     // Receipt styling
     val receiptBg = Color(0xFFFFFDF5) // Slightly warm white like receipt paper
@@ -3596,7 +3614,7 @@ fun PrintPreviewDialog(
 
                         // Payment info
                         Spacer(modifier = Modifier.height(4.dp))
-                        ReceiptRow("Thanh toán:", billData.paymentMethod, receiptTextColor)
+                        ReceiptRow("Thanh toán:", getPaymentMethodVietnamese(billData.paymentMethod), receiptTextColor)
                         if (billData.receivedAmount > 0) {
                             ReceiptRow("Tiền nhận:", "${formatter.format(billData.receivedAmount.toLong())}đ", receiptTextColor)
                         }
@@ -3661,7 +3679,8 @@ fun PrintPreviewDialog(
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isPrinting
                     ) {
                         Text("HỦY")
                     }
@@ -3669,11 +3688,22 @@ fun PrintPreviewDialog(
                         onClick = onConfirmPrint,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                        enabled = !isPrinting
                     ) {
-                        Icon(Icons.Default.Print, null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("IN BILL")
+                        if (isPrinting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ĐANG IN...")
+                        } else {
+                            Icon(Icons.Default.Print, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("IN BILL")
+                        }
                     }
                 }
             }

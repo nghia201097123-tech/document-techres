@@ -200,7 +200,8 @@ data class SaleUiState(
     val pendingPrinterConfig: BillPrinterConfigEntity? = null,  // Config máy in đang chờ
     val pendingTemplate: BillTemplateEntity? = null,            // Template đang chờ
     val pendingBankAccount: BankAccountEntity? = null,          // Bank account cho QR
-    val pendingPayosQrCode: String? = null        // PayOS QR code đang chờ
+    val pendingPayosQrCode: String? = null,       // PayOS QR code đang chờ
+    val isPrintingBill: Boolean = false           // Đang in bill từ print preview
 ) {
     // Computed properties
     // Subtotal = tổng tiền items đã order + items mới trong giỏ hàng
@@ -4239,6 +4240,8 @@ class SaleViewModel @Inject constructor(
         val billData = state.pendingBillData ?: return
 
         viewModelScope.launch {
+            // Set loading state at the start
+            _uiState.update { it.copy(isPrintingBill = true) }
             try {
                 val result = withContext(Dispatchers.IO) {
                     HybridBillPrintService.printBill(
@@ -4270,6 +4273,8 @@ class SaleViewModel @Inject constructor(
                 Log.e(TAG, "confirmPrintFromPreview - Error: ${e.message}", e)
                 _uiState.update { it.copy(errorMessage = "Lỗi in bill: ${e.message}") }
             } finally {
+                // Clear loading state and dismiss dialog
+                _uiState.update { it.copy(isPrintingBill = false) }
                 dismissPrintPreview()
             }
         }
