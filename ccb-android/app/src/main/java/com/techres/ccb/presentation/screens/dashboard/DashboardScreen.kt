@@ -5,6 +5,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -95,7 +97,9 @@ fun DashboardScreen(
         viewModel.ensureDataLoaded()
     }
 
-    if (isCompactScreen) {
+    // Wrap everything in a Box for the network banner overlay
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isCompactScreen) {
         // Mobile Layout with Navigation Drawer
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -351,7 +355,48 @@ fun DashboardScreen(
                 }
             }
         }
-    }
+        }
+
+        // Network offline warning banner
+        AnimatedVisibility(
+            visible = !uiState.isOnline,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE65100)
+                ),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudOff,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "⚠ OFFLINE - Đơn hàng sẽ được đồng bộ khi có mạng",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+    } // End of main Box
 
     // Order Detail Dialog
     if (showOrderDetailDialog && selectedOrder != null) {

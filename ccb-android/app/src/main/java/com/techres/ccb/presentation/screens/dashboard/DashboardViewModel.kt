@@ -9,6 +9,7 @@ import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.OrderRepository
 import com.techres.ccb.data.repository.ShiftRepository
 import com.techres.ccb.data.repository.TableRepository
+import com.techres.ccb.data.sync.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -93,6 +94,9 @@ data class DashboardUiState(
     val searchQuery: String = "",
     val sortType: OrderSortType = OrderSortType.TIME_DESC,
 
+    // Network status
+    val isOnline: Boolean = true,
+
     // Error
     val error: String? = null
 )
@@ -103,7 +107,8 @@ class DashboardViewModel @Inject constructor(
     private val orderRepository: OrderRepository,
     private val shiftRepository: ShiftRepository,
     private val tableRepository: TableRepository,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     companion object {
@@ -121,6 +126,25 @@ class DashboardViewModel @Inject constructor(
     init {
         loadGridColumnsPreference()
         loadData()
+        startNetworkMonitoring()
+    }
+
+    /**
+     * Start monitoring network connectivity
+     */
+    private fun startNetworkMonitoring() {
+        networkMonitor.startMonitoring()
+
+        // Set initial value immediately
+        _uiState.update { it.copy(isOnline = networkMonitor.isCurrentlyOnline()) }
+
+        // Collect future changes
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { isOnline ->
+                Log.d(TAG, "Network status changed: isOnline=$isOnline")
+                _uiState.update { it.copy(isOnline = isOnline) }
+            }
+        }
     }
 
     private fun loadGridColumnsPreference() {

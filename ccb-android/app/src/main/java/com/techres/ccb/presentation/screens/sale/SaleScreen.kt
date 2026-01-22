@@ -250,41 +250,42 @@ fun SaleScreen(
             }
         }
 
-        // Network offline warning banner
+        // Network offline warning banner - hiển thị ở đầu màn hình
         AnimatedVisibility(
             visible = !uiState.isOnline,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .align(Alignment.TopCenter)
                 .fillMaxWidth()
+                .zIndex(100f) // Đảm bảo hiển thị trên các thành phần khác
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFFF9800)
+                    containerColor = Color(0xFFE65100) // Màu cam đậm hơn để dễ thấy
                 ),
-                shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                shape = RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.WifiOff,
+                        imageVector = Icons.Default.CloudOff,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Không có kết nối mạng - Đơn hàng sẽ được đồng bộ sau",
+                        text = "⚠ OFFLINE - Đơn hàng sẽ được đồng bộ khi có mạng",
                         color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 13.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
                     )
                 }
             }
