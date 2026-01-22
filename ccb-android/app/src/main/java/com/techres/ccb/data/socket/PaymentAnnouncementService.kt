@@ -86,11 +86,11 @@ class PaymentAnnouncementService @Inject constructor(
 
     /**
      * Announce payment success
-     * Example: "Đã nhận thanh toán 150 nghìn đồng cho đơn hàng số 123"
+     * Example: "Thanh toán thành công, đơn hàng số 5, số tiền 1 triệu 20 nghìn đồng"
      */
-    fun announcePaymentSuccess(amount: Long, orderCode: Long) {
+    fun announcePaymentSuccess(amount: Long, dailyOrderNumber: Long) {
         val amountText = formatAmountForSpeech(amount)
-        val message = "Đã nhận thanh toán $amountText cho đơn hàng số $orderCode"
+        val message = "Thanh toán thành công, đơn hàng số $dailyOrderNumber, số tiền $amountText"
         speak(message)
     }
 

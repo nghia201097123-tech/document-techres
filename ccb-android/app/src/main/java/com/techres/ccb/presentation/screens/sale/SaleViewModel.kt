@@ -4353,8 +4353,11 @@ class SaleViewModel @Inject constructor(
                 // Check if this is for our current payment
                 val currentOrderCode = _uiState.value.payosOrderCode
                 if (currentOrderCode == event.orderCode) {
-                    // Announce via TTS
-                    paymentAnnouncementService.announcePaymentSuccess(event.amount, event.orderCode)
+                    // Get daily order number for TTS announcement (user-friendly number like 1, 2, 3...)
+                    val dailyOrderNumber = _uiState.value.currentOrder?.dailyOrderNumber ?: 0
+
+                    // Announce via TTS with daily order number
+                    paymentAnnouncementService.announcePaymentSuccess(event.amount, dailyOrderNumber.toLong())
 
                     // Auto-complete the bill
                     autoCompleteBillAfterPayment(event.orderId, event.amount, event.transactionRef)
