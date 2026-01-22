@@ -43,6 +43,10 @@ import coil.compose.SubcomposeAsyncImageContent
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.domain.model.Payment
 import com.techres.ccb.domain.model.PaymentMethod
@@ -504,14 +508,21 @@ fun PaymentDialog(
                                                 }
                                             }
                                         } else if (payosQrCodeUrl != null) {
-                                            // PayOS QR Code image
-                                            val payosImageRequest = remember(payosQrCodeUrl) {
-                                                ImageRequest.Builder(context)
-                                                    .data(payosQrCodeUrl)
-                                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                                    .crossfade(true)
-                                                    .build()
+                                            // PayOS QR Code image - decode base64 directly for better compatibility
+                                            // Coil doesn't reliably handle data:image/png;base64,... URIs on all devices
+                                            val qrBitmap = remember(payosQrCodeUrl) {
+                                                try {
+                                                    if (payosQrCodeUrl.startsWith("data:image")) {
+                                                        // Extract base64 data from data URI
+                                                        val base64Data = payosQrCodeUrl.substringAfter("base64,")
+                                                        val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                                                        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                                                    } else {
+                                                        null // Not a base64 data URI, will use Coil fallback
+                                                    }
+                                                } catch (e: Exception) {
+                                                    null
+                                                }
                                             }
 
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -533,45 +544,65 @@ fun PaymentDialog(
                                                     shape = RoundedCornerShape(12.dp),
                                                     colors = CardDefaults.cardColors(containerColor = Color.White)
                                                 ) {
-                                                    SubcomposeAsyncImage(
-                                                        model = payosImageRequest,
-                                                        contentDescription = "PayOS QR Code",
-                                                        modifier = Modifier
-                                                            .size(160.dp)
-                                                            .padding(8.dp),
-                                                        loading = {
-                                                            Box(
-                                                                modifier = Modifier.fillMaxSize(),
-                                                                contentAlignment = Alignment.Center
-                                                            ) {
-                                                                CircularProgressIndicator(
-                                                                    modifier = Modifier.size(32.dp),
-                                                                    strokeWidth = 3.dp,
-                                                                    color = Color(0xFF1976D2)
-                                                                )
-                                                            }
-                                                        },
-                                                        error = {
-                                                            Box(
-                                                                modifier = Modifier.fillMaxSize(),
-                                                                contentAlignment = Alignment.Center
-                                                            ) {
-                                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                                    Icon(
-                                                                        Icons.Default.Warning,
-                                                                        contentDescription = null,
-                                                                        tint = Color.Red,
-                                                                        modifier = Modifier.size(24.dp)
-                                                                    )
-                                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                                    Text("Lỗi tải QR", fontSize = 10.sp, color = Color.Red)
-                                                                }
-                                                            }
-                                                        },
-                                                        success = {
-                                                            SubcomposeAsyncImageContent()
+                                                    if (qrBitmap != null) {
+                                                        // Direct bitmap display for base64 QR codes
+                                                        Image(
+                                                            bitmap = qrBitmap.asImageBitmap(),
+                                                            contentDescription = "PayOS QR Code",
+                                                            modifier = Modifier
+                                                                .size(160.dp)
+                                                                .padding(8.dp)
+                                                        )
+                                                    } else {
+                                                        // Fallback to Coil for regular URLs
+                                                        val payosImageRequest = remember(payosQrCodeUrl) {
+                                                            ImageRequest.Builder(context)
+                                                                .data(payosQrCodeUrl)
+                                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                                .crossfade(true)
+                                                                .build()
                                                         }
-                                                    )
+                                                        SubcomposeAsyncImage(
+                                                            model = payosImageRequest,
+                                                            contentDescription = "PayOS QR Code",
+                                                            modifier = Modifier
+                                                                .size(160.dp)
+                                                                .padding(8.dp),
+                                                            loading = {
+                                                                Box(
+                                                                    modifier = Modifier.fillMaxSize(),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    CircularProgressIndicator(
+                                                                        modifier = Modifier.size(32.dp),
+                                                                        strokeWidth = 3.dp,
+                                                                        color = Color(0xFF1976D2)
+                                                                    )
+                                                                }
+                                                            },
+                                                            error = {
+                                                                Box(
+                                                                    modifier = Modifier.fillMaxSize(),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                                        Icon(
+                                                                            Icons.Default.Warning,
+                                                                            contentDescription = null,
+                                                                            tint = Color.Red,
+                                                                            modifier = Modifier.size(24.dp)
+                                                                        )
+                                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                                        Text("Lỗi tải QR", fontSize = 10.sp, color = Color.Red)
+                                                                    }
+                                                                }
+                                                            },
+                                                            success = {
+                                                                SubcomposeAsyncImageContent()
+                                                            }
+                                                        )
+                                                    }
                                                 }
 
                                                 // Order code for reference
