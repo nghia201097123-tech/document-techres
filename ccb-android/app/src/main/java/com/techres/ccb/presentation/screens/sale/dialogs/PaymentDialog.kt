@@ -164,14 +164,12 @@ fun PaymentDialog(
     // Bank account for QR code payment
     bankAccount: BankAccountEntity? = null,
     orderNumber: String = "",
-    // PayOS payment options
-    isPayosPaymentMode: Boolean = false,
+    // PayOS payment options (auto-determined from bank account)
     payosQrCodeUrl: String? = null,
     payosOrderCode: Long? = null,
     isCreatingPayosPayment: Boolean = false,
     payosError: String? = null,
-    onEnablePayOS: () -> Unit = {},
-    onDisablePayOS: () -> Unit = {},
+    onRetryPayOS: () -> Unit = {},
     onDismiss: () -> Unit,
     onPaymentComplete: (List<Payment>) -> Unit
 ) {
@@ -419,37 +417,11 @@ fun PaymentDialog(
                                 if (selectedMethod == PaymentMethod.BANK_TRANSFER) {
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    // PayOS/VietQR mode toggle
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        FilterChip(
-                                            selected = !isPayosPaymentMode,
-                                            onClick = onDisablePayOS,
-                                            label = { Text("VietQR", fontSize = 11.sp) },
-                                            modifier = Modifier.height(28.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        FilterChip(
-                                            selected = isPayosPaymentMode,
-                                            onClick = onEnablePayOS,
-                                            label = { Text("PayOS", fontSize = 11.sp) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = Color(0xFF1976D2),
-                                                selectedLabelColor = Color.White
-                                            ),
-                                            modifier = Modifier.height(28.dp)
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // QR Code display - PayOS or VietQR
+                                    // QR Code display - Auto-determined from bank account's payment partner
                                     val context = LocalContext.current
+                                    val isPayosMode = bankAccount?.paymentPartner == "payos"
 
-                                    if (isPayosPaymentMode) {
+                                    if (isPayosMode) {
                                         // PayOS QR Code
                                         if (isCreatingPayosPayment) {
                                             // Loading state
@@ -501,7 +473,7 @@ fun PaymentDialog(
                                                             textAlign = TextAlign.Center
                                                         )
                                                         Spacer(modifier = Modifier.height(8.dp))
-                                                        TextButton(onClick = onEnablePayOS) {
+                                                        TextButton(onClick = onRetryPayOS) {
                                                             Text("Thử lại", fontSize = 12.sp)
                                                         }
                                                     }
@@ -639,8 +611,8 @@ fun PaymentDialog(
                                                 }
                                             }
                                         }
-                                    } else if (bankAccount != null && !isPayosPaymentMode) {
-                                        // VietQR mode (original)
+                                    } else if (bankAccount != null && !isPayosMode) {
+                                        // VietQR mode
                                         val transferContent = remember(bankAccount.id, orderNumber) {
                                             bankAccount.generateTransferContent(orderNumber)
                                         }
@@ -768,8 +740,8 @@ fun PaymentDialog(
                                             }
                                         }
                                     }
-                                } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null && !isPayosPaymentMode) {
-                                    // No bank account configured (only show for VietQR mode)
+                                } else if (selectedMethod == PaymentMethod.BANK_TRANSFER && bankAccount == null) {
+                                    // No bank account configured
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
@@ -782,7 +754,7 @@ fun PaymentDialog(
                                             Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF9800))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                "Chưa cấu hình tài khoản ngân hàng.\nVui lòng cấu hình trong web-dashboard hoặc sử dụng PayOS.",
+                                                "Chưa cấu hình tài khoản ngân hàng.\nVui lòng cấu hình trong web-dashboard.",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = Color(0xFFE65100)
                                             )

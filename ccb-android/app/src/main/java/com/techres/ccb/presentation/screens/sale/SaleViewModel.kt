@@ -188,7 +188,6 @@ data class SaleUiState(
     val payosOrderCode: Long? = null,             // PayOS order code for tracking
     val isCreatingPayosPayment: Boolean = false,  // Loading state for creating payment
     val payosError: String? = null,               // PayOS error message
-    val isPayosPaymentMode: Boolean = false,      // Using PayOS instead of VietQR
     val socketConnectionState: SocketConnectionState = SocketConnectionState.DISCONNECTED
 ) {
     // Computed properties
@@ -3166,10 +3165,10 @@ class SaleViewModel @Inject constructor(
             return
         }
 
-        // Check if we're in PayOS mode or VietQR mode
-        val isPayosMode = state.isPayosPaymentMode
-        val payosQrData = state.payosQrData  // EMVCo QR data for banking apps
+        // Check if we're in PayOS mode or VietQR mode (auto-determined from bank account)
         val bankAccount = state.bankAccount
+        val isPayosMode = bankAccount?.paymentPartner == "payos"
+        val payosQrData = state.payosQrData  // EMVCo QR data for banking apps
 
         // Validate based on mode
         if (isPayosMode) {
@@ -4131,6 +4130,14 @@ class SaleViewModel @Inject constructor(
                     pendingPaymentDialog = false // Clear pending flag when dialog is shown
                 )
             }
+
+            // Auto-create PayOS payment if bank account is PayOS type
+            viewModelScope.launch {
+                val bankAccount = bankAccountDao.getPrimaryBankAccount()
+                if (bankAccount?.paymentPartner == "payos") {
+                    createPayOSPayment()
+                }
+            }
         }
     }
 
@@ -4483,8 +4490,7 @@ class SaleViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isCreatingPayosPayment = true,
-                    payosError = null,
-                    isPayosPaymentMode = true
+                    payosError = null
                 )
             }
 
@@ -4591,26 +4597,9 @@ class SaleViewModel @Inject constructor(
                 payosPaymentLinkId = null,
                 payosOrderCode = null,
                 isCreatingPayosPayment = false,
-                payosError = null,
-                isPayosPaymentMode = false
+                payosError = null
             )
         }
-    }
-
-    /**
-     * Switch to PayOS payment mode
-     */
-    fun enablePayOSPaymentMode() {
-        _uiState.update { it.copy(isPayosPaymentMode = true) }
-        createPayOSPayment()
-    }
-
-    /**
-     * Switch to VietQR payment mode (existing bank transfer)
-     */
-    fun disablePayOSPaymentMode() {
-        cancelPayOSPayment()
-        _uiState.update { it.copy(isPayosPaymentMode = false) }
     }
 
     /**

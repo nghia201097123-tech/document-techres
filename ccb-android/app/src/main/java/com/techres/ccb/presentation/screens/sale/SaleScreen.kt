@@ -531,14 +531,12 @@ fun SaleScreen(
                 // Bank account for QR payment
                 bankAccount = uiState.bankAccount,
                 orderNumber = uiState.currentOrder?.orderNumber ?: "",
-                // PayOS payment options
-                isPayosPaymentMode = uiState.isPayosPaymentMode,
+                // PayOS payment options (auto-determined from bank account)
                 payosQrCodeUrl = uiState.payosQrCodeUrl,
                 payosOrderCode = uiState.payosOrderCode,
                 isCreatingPayosPayment = uiState.isCreatingPayosPayment,
                 payosError = uiState.payosError,
-                onEnablePayOS = { viewModel.enablePayOSPaymentMode() },
-                onDisablePayOS = { viewModel.disablePayOSPaymentMode() },
+                onRetryPayOS = { viewModel.createPayOSPayment() },
                 onDismiss = { viewModel.hidePaymentDialog() },
                 onPaymentComplete = { payments ->
                     viewModel.processPayment(payments)

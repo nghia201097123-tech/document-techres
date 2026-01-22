@@ -28,7 +28,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.PrinterProtocol
 import com.techres.ccb.data.local.entity.LabelSize
@@ -183,26 +182,6 @@ fun KitchenPrinterScreen(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                 textAlign = TextAlign.Center
                             )
-
-                            // Debug button - only show in DEBUG builds
-                            if (BuildConfig.DEBUG) {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(
-                                    onClick = { viewModel.insertDebugData() },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFF9800)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.BugReport,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Thêm dữ liệu debug")
-                                }
-                            }
                         }
                     }
                 }
