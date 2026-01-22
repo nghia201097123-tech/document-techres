@@ -111,7 +111,7 @@ object HybridBillPrintService {
             val capability = PrinterCapabilityDetector.detect(ip, printerConfig.printerPort)
 
             // Generate bill content với Hybrid builder
-            // Sử dụng paperWidth, fontSize, lineSpacing từ template (web-dashboard)
+            // Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user cài đặt trong app)
             val billContent = generateHybridBill(printerConfig, template, billData, capability, paymentBankAccount)
 
             // Retry logic
@@ -306,8 +306,8 @@ object HybridBillPrintService {
 
     /**
      * Generate bill content với Hybrid approach
-     * Sử dụng paperWidth, fontSize, lineSpacing từ template (web dashboard)
-     * Các config hiển thị (labels, show flags) cũng từ template
+     * Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user cài đặt trong app)
+     * Các config hiển thị (labels, show flags) từ template (web dashboard)
      */
     private fun generateHybridBill(
         printerConfig: BillPrinterConfigEntity,
@@ -319,10 +319,13 @@ object HybridBillPrintService {
         // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
         val useBitmapMode = !capability.supportVietnameseUtf8
 
-        // Sử dụng settings từ template (đồng bộ từ web-dashboard)
-        val paperWidth = template.paperWidth
-        val fontSize = template.fontSize
-        val lineSpacing = template.lineSpacing
+        // Sử dụng settings từ printerConfig (user đã cài đặt trong app)
+        // printerConfig chứa: paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, etc.
+        val paperWidth = printerConfig.paperWidth
+        val fontSize = printerConfig.fontSize
+        val lineSpacing = printerConfig.lineSpacing
+
+        Log.d(TAG, "Bill settings from printerConfig: paperWidth=${paperWidth}mm, fontSize=$fontSize, lineSpacing=$lineSpacing")
 
         // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
         return if (useSingleCanvasRendering && useBitmapMode) {
