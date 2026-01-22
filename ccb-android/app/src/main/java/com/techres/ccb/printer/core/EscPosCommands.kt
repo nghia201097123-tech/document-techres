@@ -257,17 +257,27 @@ object EscPosCommands {
 
     // ==================== QR CODE ====================
 
-    /** Print QR Code */
-    fun printQRCode(data: String, moduleSize: Int = 4, errorCorrection: Int = 48): ByteArray {
+    /**
+     * Print QR Code
+     *
+     * @param data The data to encode
+     * @param moduleSize Size of each module (1-16, default 6 for better thermal print readability)
+     * @param errorCorrection Error correction level:
+     *   - L=48 (7% recovery) - smallest QR, least reliable when printed
+     *   - M=49 (15% recovery)
+     *   - Q=50 (25% recovery)
+     *   - H=51 (30% recovery) - largest QR, BEST for thermal printing (default)
+     */
+    fun printQRCode(data: String, moduleSize: Int = 6, errorCorrection: Int = 51): ByteArray {
         val output = ByteArrayOutputStream()
 
         // QR Code model (Model 2)
         output.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00))
 
-        // QR Code module size
+        // QR Code module size (increased default for thermal printers)
         output.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize.toByte()))
 
-        // QR Code error correction level (L=48, M=49, Q=50, H=51)
+        // QR Code error correction level - H (51) for best thermal print reliability
         output.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, errorCorrection.toByte()))
 
         // Store QR Code data
@@ -656,7 +666,7 @@ class EscPosBuilder {
         return this
     }
 
-    fun qrCode(data: String, size: Int = 4): EscPosBuilder {
+    fun qrCode(data: String, size: Int = 6): EscPosBuilder {
         buffer.write(EscPosCommands.printQRCode(data, size))
         return this
     }

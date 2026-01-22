@@ -12,6 +12,7 @@ import android.util.Log
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.techres.ccb.printer.core.EscPosCommands
 import java.io.ByteArrayOutputStream
 
@@ -434,7 +435,10 @@ class SingleCanvasBillBuilder(
                 is Segment.QrCodeSegment -> {
                     // Render QR code - support both URL images and generated QR
                     try {
-                        val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300) // 60% of paper width
+                        // Increase minimum size for better scannability when printed
+                        // 80mm paper = 576px width, 58mm = 384px width
+                        // Min 280px ensures readable QR even on low DPI thermal printers
+                        val qrSize = (pixelWidth * 0.65).toInt().coerceIn(280, 380) // 65% of paper width
 
                         // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
                         val qrBitmap = if (segment.content.startsWith("https://qr.sepay.vn/") ||
@@ -673,12 +677,18 @@ class SingleCanvasBillBuilder(
      * @param content The content to encode in QR code
      * @param size The desired size of the QR code in pixels
      * @return Bitmap of the QR code, or null if generation fails
+     *
+     * OPTIMIZED FOR THERMAL PRINTING:
+     * - Error Correction Level H (30%) - highest, best for thermal print degradation
+     * - Margin 3 - adequate quiet zone for reliable scanning
+     * - ARGB_8888 bitmap format - highest quality for printing
      */
     private fun generateQrCodeBitmap(content: String, size: Int): Bitmap? {
         return try {
             val hints = mapOf(
                 EncodeHintType.CHARACTER_SET to "UTF-8",
-                EncodeHintType.MARGIN to 1 // Minimal margin
+                EncodeHintType.MARGIN to 3, // Adequate margin for thermal printing
+                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H // 30% error correction - best for thermal
             )
 
             val qrCodeWriter = QRCodeWriter()
@@ -686,7 +696,8 @@ class SingleCanvasBillBuilder(
 
             val width = bitMatrix.width
             val height = bitMatrix.height
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            // Use ARGB_8888 for highest quality printing
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
             for (x in 0 until width) {
                 for (y in 0 until height) {
@@ -694,7 +705,7 @@ class SingleCanvasBillBuilder(
                 }
             }
 
-            Log.d(TAG, "QR code bitmap generated: ${width}x${height}, content length: ${content.length}")
+            Log.d(TAG, "QR code bitmap generated: ${width}x${height}, content length: ${content.length}, error correction: H")
             bitmap
         } catch (e: Exception) {
             Log.e(TAG, "Failed to generate QR code bitmap: ${e.message}")
