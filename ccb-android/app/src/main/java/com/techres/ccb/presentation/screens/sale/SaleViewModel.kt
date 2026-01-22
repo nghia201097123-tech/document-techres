@@ -13,6 +13,8 @@ import com.techres.ccb.data.local.dao.ProductNoteDao
 import com.techres.ccb.data.local.dao.SeasonalPriceDao
 import com.techres.ccb.data.local.dao.SeasonalPriceProductDao
 import com.techres.ccb.data.local.entity.BankAccountEntity
+import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
+import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.local.entity.ComboItemEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
@@ -191,7 +193,14 @@ data class SaleUiState(
     val payosError: String? = null,               // PayOS error message
     val socketConnectionState: SocketConnectionState = SocketConnectionState.DISCONNECTED,
     // Network status
-    val isOnline: Boolean = true                  // Network connectivity status
+    val isOnline: Boolean = true,                 // Network connectivity status
+    // Print preview state
+    val showPrintPreviewDialog: Boolean = false,  // Hiển thị dialog xem trước khi in
+    val pendingBillData: BillData? = null,        // Dữ liệu bill đang chờ in
+    val pendingPrinterConfig: BillPrinterConfigEntity? = null,  // Config máy in đang chờ
+    val pendingTemplate: BillTemplateEntity? = null,            // Template đang chờ
+    val pendingBankAccount: BankAccountEntity? = null,          // Bank account cho QR
+    val pendingPayosQrCode: String? = null        // PayOS QR code đang chờ
 ) {
     // Computed properties
     // Subtotal = tổng tiền items đã order + items mới trong giỏ hàng
@@ -3518,17 +3527,33 @@ class SaleViewModel @Inject constructor(
                                     )
                                 }
 
-                                // Print bill using Hybrid approach (supports Vietnamese diacritics)
-                                val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount, payosQrCode)
-                                when (result) {
-                                    is PrinterResult.Success -> {
-                                        Log.d(TAG, "completeOrder - Bill printed successfully")
-                                        // Update last print time
-                                        billPrinterConfigDao.updateLastPrint(printerConfig.id, now)
+                                // Check if print preview is enabled
+                                if (printerConfig.printPreview) {
+                                    // Store pending print data and show preview dialog
+                                    Log.d(TAG, "completeOrder - Print preview enabled, showing dialog")
+                                    withContext(Dispatchers.Main) {
+                                        _uiState.update { it.copy(
+                                            showPrintPreviewDialog = true,
+                                            pendingBillData = billData,
+                                            pendingPrinterConfig = printerConfig,
+                                            pendingTemplate = template,
+                                            pendingBankAccount = paymentBankAccount,
+                                            pendingPayosQrCode = payosQrCode
+                                        ) }
                                     }
-                                    is PrinterResult.Error -> {
-                                        Log.e(TAG, "completeOrder - Bill print failed: ${result.message}")
-                                        billPrinterConfigDao.updateLastError(printerConfig.id, result.message)
+                                } else {
+                                    // Print bill directly using Hybrid approach (supports Vietnamese diacritics)
+                                    val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount, payosQrCode)
+                                    when (result) {
+                                        is PrinterResult.Success -> {
+                                            Log.d(TAG, "completeOrder - Bill printed successfully")
+                                            // Update last print time
+                                            billPrinterConfigDao.updateLastPrint(printerConfig.id, now)
+                                        }
+                                        is PrinterResult.Error -> {
+                                            Log.e(TAG, "completeOrder - Bill print failed: ${result.message}")
+                                            billPrinterConfigDao.updateLastError(printerConfig.id, result.message)
+                                        }
                                     }
                                 }
                             } else {
@@ -4200,6 +4225,68 @@ class SaleViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(errorMessage = null)
         }
+    }
+
+    // ===== PRINT PREVIEW =====
+
+    /**
+     * Xác nhận in bill từ dialog xem trước
+     */
+    fun confirmPrintFromPreview() {
+        val state = _uiState.value
+        val printerConfig = state.pendingPrinterConfig ?: return
+        val template = state.pendingTemplate ?: return
+        val billData = state.pendingBillData ?: return
+
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    HybridBillPrintService.printBill(
+                        printerConfig,
+                        template,
+                        billData,
+                        state.pendingBankAccount,
+                        state.pendingPayosQrCode
+                    )
+                }
+                when (result) {
+                    is PrinterResult.Success -> {
+                        Log.d(TAG, "confirmPrintFromPreview - Bill printed successfully")
+                        val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).format(java.util.Date())
+                        withContext(Dispatchers.IO) {
+                            billPrinterConfigDao.updateLastPrint(printerConfig.id, now)
+                        }
+                        _uiState.update { it.copy(successMessage = "In bill thành công") }
+                    }
+                    is PrinterResult.Error -> {
+                        Log.e(TAG, "confirmPrintFromPreview - Bill print failed: ${result.message}")
+                        withContext(Dispatchers.IO) {
+                            billPrinterConfigDao.updateLastError(printerConfig.id, result.message)
+                        }
+                        _uiState.update { it.copy(errorMessage = "Lỗi in bill: ${result.message}") }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "confirmPrintFromPreview - Error: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Lỗi in bill: ${e.message}") }
+            } finally {
+                dismissPrintPreview()
+            }
+        }
+    }
+
+    /**
+     * Đóng dialog xem trước và xóa dữ liệu pending
+     */
+    fun dismissPrintPreview() {
+        _uiState.update { it.copy(
+            showPrintPreviewDialog = false,
+            pendingBillData = null,
+            pendingPrinterConfig = null,
+            pendingTemplate = null,
+            pendingBankAccount = null,
+            pendingPayosQrCode = null
+        ) }
     }
 
     private fun generateOrderNumber(): String {

@@ -33,10 +33,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.local.entity.OrderEntity
 import com.techres.ccb.data.local.entity.OrderItemEntity
 import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.local.entity.SurchargeEntity
+import com.techres.ccb.data.printer.BillData
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -648,6 +650,16 @@ fun SaleScreen(
                 onDismiss = { viewModel.hideReprintMenu() },
                 onReprintLabels = { viewModel.reprintLabels(uiState.reprintItemId) },
                 onReprintKitchenTickets = { viewModel.reprintKitchenTickets(uiState.reprintItemId) }
+            )
+        }
+
+        // Print Preview Dialog (Xem trước khi in)
+        if (uiState.showPrintPreviewDialog && uiState.pendingBillData != null) {
+            PrintPreviewDialog(
+                billData = uiState.pendingBillData,
+                template = uiState.pendingTemplate,
+                onDismiss = { viewModel.dismissPrintPreview() },
+                onConfirmPrint = { viewModel.confirmPrintFromPreview() }
             )
         }
     }
@@ -3241,6 +3253,247 @@ fun ReprintMenuDialog(
             }
         }
     )
+}
+
+// ===== PRINT PREVIEW DIALOG =====
+
+/**
+ * Dialog xem trước bill trước khi in
+ */
+@Composable
+fun PrintPreviewDialog(
+    billData: BillData,
+    template: BillTemplateEntity?,
+    onDismiss: () -> Unit,
+    onConfirmPrint: () -> Unit
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val formatter = NumberFormat.getNumberInstance(Locale("vi", "VN"))
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(primaryColor)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "XEM TRƯỚC BILL",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, null, tint = Color.White)
+                    }
+                }
+
+                // Bill Preview Content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                        .background(Color(0xFFFAFAFA), RoundedCornerShape(8.dp))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Store name
+                    if (template?.showLogo == true && !template.storeName.isNullOrEmpty()) {
+                        Text(
+                            template.storeName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    // Store address
+                    if (!template?.storeAddress.isNullOrEmpty()) {
+                        Text(
+                            template?.storeAddress ?: "",
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                    }
+
+                    // Phone
+                    if (!template?.storePhone.isNullOrEmpty()) {
+                        Text(
+                            "ĐT: ${template?.storePhone}",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Bill title
+                    Text(
+                        template?.billTitle ?: "HÓA ĐƠN THANH TOÁN",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Order info
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Số HĐ:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text(billData.orderNumber, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                    if (billData.tableName != null) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("Bàn:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text(billData.tableName, fontSize = 12.sp)
+                        }
+                    }
+                    if (billData.staffName != null) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("Thu ngân:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text(billData.staffName, fontSize = 12.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Items header
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Món", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("SL", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+                        Text("Thành tiền", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Items
+                    billData.items.forEach { item ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                            Text(item.name, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text("${item.quantity}", fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+                            Text("${formatter.format(item.totalPrice.toLong())}đ", fontSize = 12.sp, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                        }
+                        // Toppings
+                        item.toppings.forEach { topping ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp, bottom = 2.dp)) {
+                                Text("+ ${topping.name}", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.weight(1f))
+                                Text("${formatter.format(topping.price.toLong())}đ", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Totals
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Tạm tính:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text("${formatter.format(billData.subtotal.toLong())}đ", fontSize = 12.sp)
+                    }
+                    if (billData.discountAmount > 0) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("Giảm giá:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text("-${formatter.format(billData.discountAmount.toLong())}đ", fontSize = 12.sp, color = Color(0xFFE53935))
+                        }
+                    }
+                    if (billData.vatAmount > 0) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("VAT (${billData.vatRate.toInt()}%):", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text("${formatter.format(billData.vatAmount.toLong())}đ", fontSize = 12.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(thickness = 2.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Grand total
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("TỔNG CỘNG:", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Text("${formatter.format(billData.totalAmount.toLong())}đ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = primaryColor)
+                    }
+
+                    // Payment info
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Thanh toán:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text(billData.paymentMethod, fontSize = 12.sp)
+                    }
+                    if (billData.receivedAmount > 0) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("Tiền nhận:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text("${formatter.format(billData.receivedAmount.toLong())}đ", fontSize = 12.sp)
+                        }
+                    }
+                    if (billData.changeAmount > 0) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("Tiền thừa:", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text("${formatter.format(billData.changeAmount.toLong())}đ", fontSize = 12.sp)
+                        }
+                    }
+
+                    // Thank you message
+                    if (!template?.thankYouMessage.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            template?.thankYouMessage ?: "",
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            fontStyle = FontStyle.Italic
+                        )
+                    }
+                }
+
+                // Footer buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("HỦY")
+                    }
+                    Button(
+                        onClick = onConfirmPrint,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    ) {
+                        Icon(Icons.Default.Print, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("IN BILL")
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ===== UTILITY FUNCTIONS =====
