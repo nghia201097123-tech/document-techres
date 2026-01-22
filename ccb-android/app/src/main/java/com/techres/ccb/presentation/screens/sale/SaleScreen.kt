@@ -654,9 +654,10 @@ fun SaleScreen(
         }
 
         // Print Preview Dialog (Xem trước khi in)
-        if (uiState.showPrintPreviewDialog && uiState.pendingBillData != null) {
+        val pendingBillData = uiState.pendingBillData
+        if (uiState.showPrintPreviewDialog && pendingBillData != null) {
             PrintPreviewDialog(
-                billData = uiState.pendingBillData,
+                billData = pendingBillData,
                 template = uiState.pendingTemplate,
                 onDismiss = { viewModel.dismissPrintPreview() },
                 onConfirmPrint = { viewModel.confirmPrintFromPreview() }
