@@ -17,7 +17,6 @@ import {
   Settings,
   Landmark,
   CreditCard,
-  Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +77,6 @@ const navItems: NavItem[] = [
     children: [
       { title: "Tài khoản ngân hàng", href: "/settings/bank-accounts" },
       { title: "Phương thức thanh toán", href: "/settings/payment-methods" },
-      { title: "Mẫu in", href: "/settings/print-templates" },
     ],
   },
 ];
