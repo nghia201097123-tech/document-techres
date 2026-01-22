@@ -490,8 +490,9 @@ class OrderHistoryViewModel @Inject constructor(
                     // Get primary bank account for payment QR (if enabled)
                     val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
 
-                    // Print
-                    val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount)
+                    // Print (không tạo PayOS payment cho reprint, dùng VietQR)
+                    // Nếu cần PayOS QR, user nên dùng payment dialog
+                    val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount, null)
                     val message = when (result) {
                         is PrinterResult.Success -> "In lại bill thành công!"
                         is PrinterResult.Error -> "Lỗi in: ${result.message}"

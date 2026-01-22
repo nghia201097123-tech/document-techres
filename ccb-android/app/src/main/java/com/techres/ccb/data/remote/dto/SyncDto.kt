@@ -895,6 +895,11 @@ data class BankAccountDto(
     @SerializedName("accountName") val accountName: String,     // Tên chủ tài khoản
     @SerializedName("transferTemplate") val transferTemplate: String?, // Template nội dung chuyển khoản
     @SerializedName("staticQrUrl") val staticQrUrl: String?,    // URL mã QR tĩnh (nếu có)
+    // PayOS Integration
+    @SerializedName("paymentPartner") val paymentPartner: String? = null,     // "payos" hoặc null
+    @SerializedName("payosClientId") val payosClientId: String? = null,
+    @SerializedName("payosApiKey") val payosApiKey: String? = null,
+    @SerializedName("payosChecksumKey") val payosChecksumKey: String? = null,
     @SerializedName("isPrimary") val isPrimary: Boolean = false,// Tài khoản chính?
     @SerializedName("isActive") val isActive: Boolean = true
 )

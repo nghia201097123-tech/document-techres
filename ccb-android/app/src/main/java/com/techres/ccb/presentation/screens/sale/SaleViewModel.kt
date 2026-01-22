@@ -3108,8 +3108,19 @@ class SaleViewModel @Inject constructor(
                             // Get primary bank account for payment QR (if enabled)
                             val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
 
+                            // Nếu bank account dùng PayOS, tạo PayOS payment trước để lấy QR code
+                            var payosQrCode: String? = null
+                            if (paymentBankAccount?.paymentPartner == "payos") {
+                                Log.d(TAG, "printTemporaryBill - Bank uses PayOS, creating payment...")
+                                payosQrCode = createPayOSPaymentForBill(
+                                    orderId = order.id,
+                                    amount = billData.totalAmount.toLong(),
+                                    orderNumber = order.orderNumber
+                                )
+                            }
+
                             // Print temporary bill
-                            val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount)
+                            val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount, payosQrCode)
                             when (result) {
                                 is PrinterResult.Success -> {
                                     Log.d(TAG, "printTemporaryBill - Success, printCount: $newPrintCount")
@@ -3474,8 +3485,19 @@ class SaleViewModel @Inject constructor(
                                 // Get primary bank account for payment QR (if enabled)
                                 val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
 
+                                // Nếu bank account dùng PayOS, tạo PayOS payment trước để lấy QR code
+                                var payosQrCode: String? = null
+                                if (paymentBankAccount?.paymentPartner == "payos") {
+                                    Log.d(TAG, "completeOrder - Bank uses PayOS, creating payment...")
+                                    payosQrCode = createPayOSPaymentForBill(
+                                        orderId = completedOrder.id,
+                                        amount = billData.totalAmount.toLong(),
+                                        orderNumber = completedOrder.orderNumber
+                                    )
+                                }
+
                                 // Print bill using Hybrid approach (supports Vietnamese diacritics)
-                                val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount)
+                                val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount, payosQrCode)
                                 when (result) {
                                     is PrinterResult.Success -> {
                                         Log.d(TAG, "completeOrder - Bill printed successfully")
@@ -4589,6 +4611,53 @@ class SaleViewModel @Inject constructor(
     fun disablePayOSPaymentMode() {
         cancelPayOSPayment()
         _uiState.update { it.copy(isPayosPaymentMode = false) }
+    }
+
+    /**
+     * Tạo PayOS payment cho bill và trả về QR code URL
+     * Hàm này chạy synchronously để dùng trong bill printing flow
+     *
+     * @return QR code URL nếu thành công, null nếu thất bại
+     */
+    private suspend fun createPayOSPaymentForBill(
+        orderId: String,
+        amount: Long,
+        orderNumber: String
+    ): String? {
+        return try {
+            // Generate order code from order ID (PayOS requires numeric order code)
+            val orderCode = orderId.hashCode().toLong().let { if (it < 0) -it else it } % 9999999999L + 1
+
+            val description = "TT $orderNumber"
+
+            Log.d(TAG, "Creating PayOS payment for bill: orderId=$orderId, orderCode=$orderCode, amount=$amount")
+
+            val result = payOSRepository.createPayment(
+                orderId = orderId,
+                orderCode = orderCode,
+                amount = amount,
+                description = description,
+                branchId = currentBranchId,
+                deviceId = deviceId,
+                tableName = null,
+                customerName = null
+            )
+
+            when (result) {
+                is PayOSResult.Success -> {
+                    val qrCode = result.data.qrCode
+                    Log.d(TAG, "PayOS payment created for bill: qrCode=${qrCode.take(50)}...")
+                    qrCode
+                }
+                is PayOSResult.Error -> {
+                    Log.e(TAG, "PayOS payment failed for bill: ${result.message}")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "PayOS payment error for bill", e)
+            null
+        }
     }
 
     /**

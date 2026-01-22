@@ -1085,6 +1085,11 @@ export class SyncService {
       accountName: ba.accountName,
       transferTemplate: ba.transferTemplate || null,
       staticQrUrl: ba.staticQrUrl || null,
+      // PayOS Integration
+      paymentPartner: ba.paymentPartner || null,
+      payosClientId: ba.payosClientId || null,
+      payosApiKey: ba.payosApiKey || null,
+      payosChecksumKey: ba.payosChecksumKey || null,
       isPrimary: ba.isPrimary,
       isActive: ba.isActive,
     };

@@ -1011,6 +1011,19 @@ export class BankAccountDto {
   @ApiProperty()
   staticQrUrl: string | null;
 
+  // PayOS Integration
+  @ApiProperty({ nullable: true, description: 'Payment partner: payos or null' })
+  paymentPartner: string | null;
+
+  @ApiProperty({ nullable: true })
+  payosClientId: string | null;
+
+  @ApiProperty({ nullable: true })
+  payosApiKey: string | null;
+
+  @ApiProperty({ nullable: true })
+  payosChecksumKey: string | null;
+
   @ApiProperty()
   isPrimary: boolean;
 

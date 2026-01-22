@@ -53,6 +53,23 @@ data class BankAccountEntity(
     @ColumnInfo(name = "static_qr_url")
     val staticQrUrl: String? = null,
 
+    // === PayOS Integration ===
+    // Đối tác thanh toán: "payos" hoặc null/empty
+    @ColumnInfo(name = "payment_partner")
+    val paymentPartner: String? = null,
+
+    // PayOS Client ID
+    @ColumnInfo(name = "payos_client_id")
+    val payosClientId: String? = null,
+
+    // PayOS API Key
+    @ColumnInfo(name = "payos_api_key")
+    val payosApiKey: String? = null,
+
+    // PayOS Checksum Key
+    @ColumnInfo(name = "payos_checksum_key")
+    val payosChecksumKey: String? = null,
+
     // Tài khoản chính?
     @ColumnInfo(name = "is_primary")
     val isPrimary: Boolean = false,

@@ -772,6 +772,11 @@ class SyncRepository @Inject constructor(
                 accountName = dto.accountName,
                 transferTemplate = dto.transferTemplate,
                 staticQrUrl = dto.staticQrUrl,
+                // PayOS Integration
+                paymentPartner = dto.paymentPartner,
+                payosClientId = dto.payosClientId,
+                payosApiKey = dto.payosApiKey,
+                payosChecksumKey = dto.payosChecksumKey,
                 isPrimary = dto.isPrimary,
                 isActive = dto.isActive,
                 syncStatus = "synced",

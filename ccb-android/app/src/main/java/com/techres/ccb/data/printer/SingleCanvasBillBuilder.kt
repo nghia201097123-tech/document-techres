@@ -435,10 +435,10 @@ class SingleCanvasBillBuilder(
                 is Segment.QrCodeSegment -> {
                     // Render QR code - support both URL images and generated QR
                     try {
-                        // Increase minimum size for better scannability when printed
-                        // 80mm paper = 576px width, 58mm = 384px width
-                        // Min 280px ensures readable QR even on low DPI thermal printers
-                        val qrSize = (pixelWidth * 0.65).toInt().coerceIn(280, 380) // 65% of paper width
+                        // QR size = 60% of paper width, capped between 150-300 pixels
+                        // 58mm: pixelWidth=384, qrSize=230px
+                        // 80mm: pixelWidth=576, qrSize=300px
+                        val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
 
                         // Kiểm tra nếu content là URL hình ảnh QR (sepay.vn, vietqr.io)
                         val qrBitmap = if (segment.content.startsWith("https://qr.sepay.vn/") ||
@@ -452,13 +452,16 @@ class SingleCanvasBillBuilder(
                         }
 
                         if (qrBitmap != null) {
-                            // Center align before printing
-                            output.write(EscPosCommands.ALIGN_CENTER)
-                            val qrData = EscPosCommands.printRasterBitmap(qrBitmap, qrBitmap.width)
-                            output.write(qrData)
-                            output.write(EscPosCommands.ALIGN_LEFT)
-                            Log.d(TAG, "Segment $index: QRCode as bitmap (${qrBitmap.width}x${qrBitmap.height})")
+                            // Tạo bitmap full-width với QR code căn giữa
+                            // ESC/POS ALIGN_CENTER không hoạt động với GS v 0 raster bitmap
+                            val centeredBitmap = centerQrBitmap(qrBitmap, pixelWidth)
                             qrBitmap.recycle()
+
+                            // In bitmap đã căn giữa (không scale vì đã đúng kích thước)
+                            val qrData = EscPosCommands.printRasterBitmap(centeredBitmap, 0)
+                            output.write(qrData)
+                            Log.d(TAG, "Segment $index: QRCode centered (qr=${qrSize}, canvas=${centeredBitmap.width}x${centeredBitmap.height})")
+                            centeredBitmap.recycle()
                         } else {
                             Log.e(TAG, "Segment $index: QRCode bitmap failed, trying ESC/POS command")
                             // Fallback to ESC/POS command
@@ -755,5 +758,39 @@ class SingleCanvasBillBuilder(
             Log.e(TAG, "Error downloading QR image: ${e.message}")
             null
         }
+    }
+
+    /**
+     * Tạo bitmap full-width với QR code căn giữa
+     * ESC/POS ALIGN_CENTER không hoạt động với GS v 0 raster bitmap
+     * nên phải căn giữa bằng cách thêm padding vào bitmap
+     *
+     * @param qrBitmap QR code bitmap (nhỏ hơn targetWidth)
+     * @param targetWidth Độ rộng của khổ giấy (pixels)
+     * @return Bitmap mới với QR code căn giữa trên nền trắng
+     */
+    private fun centerQrBitmap(qrBitmap: Bitmap, targetWidth: Int): Bitmap {
+        val qrWidth = qrBitmap.width
+        val qrHeight = qrBitmap.height
+
+        // Nếu QR đã bằng hoặc lớn hơn targetWidth, không cần căn giữa
+        if (qrWidth >= targetWidth) {
+            return qrBitmap.copy(Bitmap.Config.ARGB_8888, false)
+        }
+
+        // Tạo canvas với chiều rộng = targetWidth
+        val centeredBitmap = Bitmap.createBitmap(targetWidth, qrHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(centeredBitmap)
+
+        // Fill nền trắng
+        canvas.drawColor(Color.WHITE)
+
+        // Tính vị trí x để căn giữa QR
+        val leftPadding = (targetWidth - qrWidth) / 2f
+
+        // Vẽ QR code căn giữa
+        canvas.drawBitmap(qrBitmap, leftPadding, 0f, null)
+
+        return centeredBitmap
     }
 }

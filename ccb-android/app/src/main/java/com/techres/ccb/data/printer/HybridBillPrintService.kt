@@ -77,7 +77,8 @@ object HybridBillPrintService {
         printerConfig: BillPrinterConfigEntity,
         template: BillTemplateEntity,
         billData: BillData,
-        paymentBankAccount: BankAccountEntity? = null // Tài khoản ngân hàng cho QR thanh toán
+        paymentBankAccount: BankAccountEntity? = null, // Tài khoản ngân hàng cho QR thanh toán
+        payosQrCode: String? = null // PayOS QR code URL (khi dùng PayOS thay VietQR)
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
             var lastError: String? = null
@@ -86,7 +87,8 @@ object HybridBillPrintService {
             Log.d(TAG, "Connection type: ${printerConfig.connectionType}")
             Log.d(TAG, "Order: ${billData.displayNumber}, ${billData.items.size} items")
             if (paymentBankAccount != null) {
-                Log.d(TAG, "Payment QR bank: ${paymentBankAccount.bankName} - ${paymentBankAccount.accountNumber}")
+                val qrType = if (payosQrCode != null) "PayOS" else "VietQR"
+                Log.d(TAG, "Payment QR ($qrType): ${paymentBankAccount.bankName} - ${paymentBankAccount.accountNumber}")
             }
 
             // ========== MÁY IN LIỀN THÂN (SUNMI) ==========
@@ -100,7 +102,7 @@ object HybridBillPrintService {
                     Log.w(TAG, "⚠️ Sunmi adapter có thể gây giật khi in qua AIDL interface")
                 }
 
-                return@withContext printViaSunmi(printerConfig, template, billData, paymentBankAccount)
+                return@withContext printViaSunmi(printerConfig, template, billData, paymentBankAccount, payosQrCode)
             }
 
             // ========== MÁY IN RỜI (NETWORK) ==========
@@ -112,7 +114,7 @@ object HybridBillPrintService {
 
             // Generate bill content với Hybrid builder
             // Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user cài đặt trong app)
-            val billContent = generateHybridBill(printerConfig, template, billData, capability, paymentBankAccount)
+            val billContent = generateHybridBill(printerConfig, template, billData, capability, paymentBankAccount, payosQrCode)
 
             // Retry logic
             repeat(printerConfig.retryCount) { attempt ->
@@ -150,7 +152,8 @@ object HybridBillPrintService {
         config: BillPrinterConfigEntity,
         template: BillTemplateEntity,
         billData: BillData,
-        paymentBankAccount: BankAccountEntity? = null
+        paymentBankAccount: BankAccountEntity? = null,
+        payosQrCode: String? = null
     ): PrinterResult {
         val adapter = sunmiAdapter ?: return PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
 
@@ -168,7 +171,7 @@ object HybridBillPrintService {
                 supportVietnameseUtf8 = false, // Force bitmap mode
                 printerModel = adapter.getSunmiModel()
             )
-            val billContent = generateHybridBill(config, template, billData, capability, paymentBankAccount)
+            val billContent = generateHybridBill(config, template, billData, capability, paymentBankAccount, payosQrCode)
 
             Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes (SINGLE WRITE)")
 
@@ -314,7 +317,8 @@ object HybridBillPrintService {
         template: BillTemplateEntity,
         billData: BillData,
         capability: PrinterCapability,
-        paymentBankAccount: BankAccountEntity? = null
+        paymentBankAccount: BankAccountEntity? = null,
+        payosQrCode: String? = null
     ): ByteArray {
         // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
         val useBitmapMode = !capability.supportVietnameseUtf8
@@ -330,10 +334,10 @@ object HybridBillPrintService {
         // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
         return if (useSingleCanvasRendering && useBitmapMode) {
             Log.d(TAG, "Using SINGLE CANVAS RENDERING mode")
-            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData, paymentBankAccount)
+            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData, paymentBankAccount, payosQrCode)
         } else {
             Log.d(TAG, "Using LEGACY per-line rendering mode")
-            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode, paymentBankAccount)
+            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode, paymentBankAccount, payosQrCode)
         }
     }
 
@@ -353,7 +357,8 @@ object HybridBillPrintService {
         lineSpacing: Float,
         template: BillTemplateEntity,
         billData: BillData,
-        paymentBankAccount: BankAccountEntity? = null
+        paymentBankAccount: BankAccountEntity? = null,
+        payosQrCode: String? = null
     ): ByteArray {
         Log.d(TAG, "Generating bill with SINGLE CANVAS: ${billData.displayNumber}, ${billData.items.size} items")
 
@@ -653,7 +658,8 @@ object HybridBillPrintService {
             if (paymentBankAccount != null) {
                 // Có tài khoản ngân hàng - LUÔN in QR code thanh toán
                 separator()
-                lineCenter("THANH TOÁN CHUYỂN KHOẢN")
+                val isPayOS = payosQrCode != null && paymentBankAccount.paymentPartner == "payos"
+                lineCenter(if (isPayOS) "THANH TOÁN QR" else "THANH TOÁN CHUYỂN KHOẢN")
                 lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
                 lineCenter("STK: ${paymentBankAccount.accountNumber}")
                 lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
@@ -661,16 +667,24 @@ object HybridBillPrintService {
                 val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
                 lineCenter("Nội dung: $transferContent")
                 feed(1)
-                // Tạo VietQR content sử dụng SePayVN
-                val vietQrContent = generateVietQrContent(
-                    bankCode = paymentBankAccount.bankCode,
-                    accountNumber = paymentBankAccount.accountNumber,
-                    amount = billData.totalAmount.toLong(),
-                    description = transferContent,
-                    accountName = paymentBankAccount.accountName
-                )
-                Log.d(TAG, "SePayVN QR URL: $vietQrContent (length: ${vietQrContent.length})")
-                qrCode(vietQrContent, size = 4)
+
+                // Sử dụng PayOS QR nếu có, ngược lại dùng VietQR
+                val qrContent = if (isPayOS) {
+                    Log.d(TAG, "Using PayOS QR code (length: ${payosQrCode!!.length})")
+                    payosQrCode
+                } else {
+                    // Tạo VietQR content sử dụng SePayVN
+                    val vietQrContent = generateVietQrContent(
+                        bankCode = paymentBankAccount.bankCode,
+                        accountNumber = paymentBankAccount.accountNumber,
+                        amount = billData.totalAmount.toLong(),
+                        description = transferContent,
+                        accountName = paymentBankAccount.accountName
+                    )
+                    Log.d(TAG, "SePayVN QR URL: $vietQrContent (length: ${vietQrContent.length})")
+                    vietQrContent
+                }
+                qrCode(qrContent, size = 4)
             } else if (template.showQrCode) {
                 // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
@@ -736,7 +750,8 @@ object HybridBillPrintService {
         template: BillTemplateEntity,
         billData: BillData,
         useBitmapMode: Boolean,
-        paymentBankAccount: BankAccountEntity? = null
+        paymentBankAccount: BankAccountEntity? = null,
+        payosQrCode: String? = null
     ): ByteArray {
         // Minimal logging for performance (chi tiết logging đã được disable để in mượt hơn)
         Log.d(TAG, "Generating bill: ${billData.displayNumber}, ${billData.items.size} items, $paperWidth mm, bitmap=$useBitmapMode")
@@ -1075,7 +1090,8 @@ object HybridBillPrintService {
             if (paymentBankAccount != null) {
                 // Có tài khoản ngân hàng - LUÔN in QR code thanh toán
                 separator()
-                lineCenter("THANH TOÁN CHUYỂN KHOẢN", BitmapTextStyle(bold = true))
+                val isPayOS = payosQrCode != null && paymentBankAccount.paymentPartner == "payos"
+                lineCenter(if (isPayOS) "THANH TOÁN QR" else "THANH TOÁN CHUYỂN KHOẢN", BitmapTextStyle(bold = true))
                 lineCenter("Ngân hàng: ${paymentBankAccount.bankName}")
                 lineCenter("STK: ${paymentBankAccount.accountNumber}")
                 lineCenter("Chủ TK: ${paymentBankAccount.accountName}")
@@ -1083,15 +1099,23 @@ object HybridBillPrintService {
                 val transferContent = paymentBankAccount.generateTransferContent(billData.orderNumber)
                 lineCenter("Nội dung: $transferContent")
                 feed(1)
-                // Tạo VietQR content sử dụng SePayVN
-                val vietQrContent = generateVietQrContent(
-                    bankCode = paymentBankAccount.bankCode,
-                    accountNumber = paymentBankAccount.accountNumber,
-                    amount = billData.totalAmount.toLong(),
-                    description = transferContent,
-                    accountName = paymentBankAccount.accountName
-                )
-                qrCode(vietQrContent, size = 4)
+
+                // Sử dụng PayOS QR nếu có, ngược lại dùng VietQR
+                val qrContent = if (isPayOS) {
+                    Log.d(TAG, "Using PayOS QR code (length: ${payosQrCode!!.length})")
+                    payosQrCode
+                } else {
+                    // Tạo VietQR content sử dụng SePayVN
+                    val vietQrContent = generateVietQrContent(
+                        bankCode = paymentBankAccount.bankCode,
+                        accountNumber = paymentBankAccount.accountNumber,
+                        amount = billData.totalAmount.toLong(),
+                        description = transferContent,
+                        accountName = paymentBankAccount.accountName
+                    )
+                    vietQrContent
+                }
+                qrCode(qrContent, size = 4)
             } else if (template.showQrCode) {
                 // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
