@@ -60,6 +60,36 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/lib/utils";
 
+// ================== BILL PRINTER TYPES ==================
+type PrinterConnectionType = "network" | "usb" | "bluetooth";
+
+interface BillPrinterConfig {
+  id: string;
+  name: string;
+  connectionType: PrinterConnectionType;
+  ipAddress?: string;
+  port: number;
+  paperWidth: number;
+  copies: number;
+  autoCut: boolean;
+  isDefault: boolean;
+  isActive: boolean;
+}
+
+// Mock data for bill printer
+const defaultBillPrinter: BillPrinterConfig = {
+  id: "1",
+  name: "Máy in Bill",
+  connectionType: "network",
+  ipAddress: "192.168.1.100",
+  port: 9100,
+  paperWidth: 80,
+  copies: 1,
+  autoCut: true,
+  isDefault: true,
+  isActive: true,
+};
+
 // ================== BILL TEMPLATE TYPES ==================
 type BillTemplateType = "classic" | "modern" | "compact" | "detailed" | "premium";
 
@@ -252,6 +282,10 @@ const mockKitchens: Kitchen[] = [
 export default function PrintTemplatesPage() {
   const [activeTab, setActiveTab] = React.useState("kitchen");
 
+  // Bill printer state
+  const [billPrinter, setBillPrinter] = React.useState<BillPrinterConfig>(defaultBillPrinter);
+  const [isBillPrinterSaving, setIsBillPrinterSaving] = React.useState(false);
+
   // Bill templates state
   const [billTemplates, setBillTemplates] = React.useState<BillTemplate[]>(mockBillTemplates);
   const [billSearchQuery, setBillSearchQuery] = React.useState("");
@@ -311,6 +345,16 @@ export default function PrintTemplatesPage() {
   const filteredKitchens = kitchens.filter((k) =>
     k.name.toLowerCase().includes(kitchenSearchQuery.toLowerCase())
   );
+
+  // Bill printer handlers
+  const handleSaveBillPrinter = () => {
+    setIsBillPrinterSaving(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsBillPrinterSaving(false);
+      // Show success toast or notification here
+    }, 1000);
+  };
 
   // Bill template handlers
   const handleOpenBillCreate = () => {
@@ -519,46 +563,174 @@ export default function PrintTemplatesPage() {
         </TabsList>
 
         {/* ================== BILL TEMPLATES TAB ================== */}
-        <TabsContent value="bill" className="space-y-4">
-          {/* Stats */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tổng mẫu bill
-                </CardTitle>
-                <FileText className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{billTemplates.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Đang hoạt động
-                </CardTitle>
-                <Check className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-500">
-                  {billTemplates.filter((t) => t.isActive).length}
+        <TabsContent value="bill" className="space-y-6">
+          {/* ========== BILL PRINTER CONFIG ========== */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                  <Printer className="h-5 w-5 text-blue-500" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Mẫu mặc định
-                </CardTitle>
-                <Star className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-yellow-500">
-                  {billTemplates.find((t) => t.isDefault)?.name || "Chưa thiết lập"}
+                <div>
+                  <CardTitle className="text-lg">Cấu hình máy in Bill</CardTitle>
+                  <CardDescription>Thiết lập máy in để in hóa đơn thanh toán</CardDescription>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="billPrinterName">Tên máy in</Label>
+                  <Input
+                    id="billPrinterName"
+                    value={billPrinter.name}
+                    onChange={(e) => setBillPrinter((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="VD: Máy in Bill"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="billPrinterConnection">Kết nối</Label>
+                  <Select
+                    value={billPrinter.connectionType}
+                    onValueChange={(v: PrinterConnectionType) => setBillPrinter((prev) => ({ ...prev, connectionType: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="network">Mạng (Network)</SelectItem>
+                      <SelectItem value="usb">USB</SelectItem>
+                      <SelectItem value="bluetooth">Bluetooth</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {billPrinter.connectionType === "network" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="billPrinterIp">Địa chỉ IP</Label>
+                      <Input
+                        id="billPrinterIp"
+                        value={billPrinter.ipAddress || ""}
+                        onChange={(e) => setBillPrinter((prev) => ({ ...prev, ipAddress: e.target.value }))}
+                        placeholder="VD: 192.168.1.100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="billPrinterPort">Port</Label>
+                      <Input
+                        id="billPrinterPort"
+                        type="number"
+                        value={billPrinter.port}
+                        onChange={(e) => setBillPrinter((prev) => ({ ...prev, port: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="billPrinterPaperWidth">Khổ giấy</Label>
+                  <Select
+                    value={String(billPrinter.paperWidth)}
+                    onValueChange={(v) => setBillPrinter((prev) => ({ ...prev, paperWidth: Number(v) }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="58">58mm</SelectItem>
+                      <SelectItem value="80">80mm</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="billPrinterCopies">Số bản in</Label>
+                  <Input
+                    id="billPrinterCopies"
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={billPrinter.copies}
+                    onChange={(e) => setBillPrinter((prev) => ({ ...prev, copies: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-6 pt-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="billPrinterAutoCut"
+                    checked={billPrinter.autoCut}
+                    onCheckedChange={(checked) => setBillPrinter((prev) => ({ ...prev, autoCut: checked }))}
+                  />
+                  <Label htmlFor="billPrinterAutoCut">Tự động cắt giấy</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="billPrinterActive"
+                    checked={billPrinter.isActive}
+                    onCheckedChange={(checked) => setBillPrinter((prev) => ({ ...prev, isActive: checked }))}
+                  />
+                  <Label htmlFor="billPrinterActive">Kích hoạt</Label>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button onClick={handleSaveBillPrinter} disabled={isBillPrinterSaving}>
+                  {isBillPrinterSaving ? "Đang lưu..." : "Lưu cấu hình"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ========== BILL TEMPLATES ========== */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+                <Receipt className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Mẫu in Bill</h3>
+                <p className="text-sm text-muted-foreground">Quản lý các mẫu hóa đơn</p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Tổng mẫu bill
+                  </CardTitle>
+                  <FileText className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{billTemplates.length}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Đang hoạt động
+                  </CardTitle>
+                  <Check className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-500">
+                    {billTemplates.filter((t) => t.isActive).length}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Mẫu mặc định
+                  </CardTitle>
+                  <Star className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-500">
+                    {billTemplates.find((t) => t.isDefault)?.name || "Chưa thiết lập"}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Bill Templates Table */}
