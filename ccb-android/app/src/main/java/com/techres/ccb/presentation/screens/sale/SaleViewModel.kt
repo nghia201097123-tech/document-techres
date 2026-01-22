@@ -440,8 +440,14 @@ class SaleViewModel @Inject constructor(
      */
     private fun startNetworkMonitoring() {
         networkMonitor.startMonitoring()
+
+        // Set initial value immediately
+        _uiState.update { it.copy(isOnline = networkMonitor.isCurrentlyOnline()) }
+
+        // Then collect future changes
         viewModelScope.launch {
             networkMonitor.isOnline.collect { isOnline ->
+                Log.d(TAG, "Network status changed: isOnline=$isOnline")
                 _uiState.update { it.copy(isOnline = isOnline) }
             }
         }
