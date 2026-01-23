@@ -471,81 +471,8 @@ object HybridBillPrintService {
 
             separator()
 
-            // ============ ITEMS ============
-            billData.items.forEach { item ->
-                val toppingTotal = item.variants.sumOf { it.priceAdjustment } +
-                        item.toppings.sumOf { it.price * it.quantity }
-                val basePrice = if (toppingTotal > 0 && item.originalPrice > 0) {
-                    (item.originalPrice - toppingTotal).coerceAtLeast(0.0)
-                } else {
-                    item.originalPrice
-                }
-
-                val quantityPart = if (template.showQuantity) "x${item.quantity}" else ""
-                val pricePart = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
-
-                if (quantityPart.isNotEmpty() && pricePart.isNotEmpty()) {
-                    lineKeyValue(item.name, "$quantityPart  $pricePart", BitmapTextStyle(bold = true))
-                } else if (quantityPart.isNotEmpty()) {
-                    lineKeyValue(item.name, quantityPart, BitmapTextStyle(bold = true))
-                } else if (pricePart.isNotEmpty()) {
-                    lineKeyValue(item.name, pricePart, BitmapTextStyle(bold = true))
-                } else {
-                    lineBold(item.name)
-                }
-
-                if (template.showUnitPrice && basePrice > 0 && toppingTotal > 0) {
-                    line("   ${formatCurrency(basePrice)}")
-                }
-
-                if (item.variants.isNotEmpty()) {
-                    item.variants.forEach { variant ->
-                        if (template.showUnitPrice && variant.priceAdjustment != 0.0) {
-                            val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
-                            lineKeyValue("   ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
-                        } else {
-                            line("   ${variant.name}")
-                        }
-                    }
-                }
-
-                if (item.toppings.isNotEmpty()) {
-                    item.toppings.forEach { topping ->
-                        val toppingPrice = topping.price * topping.quantity
-                        if (template.showUnitPrice && toppingPrice > 0) {
-                            if (topping.quantity > 1) {
-                                lineKeyValue("   + ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
-                            } else {
-                                lineKeyValue("   + ${topping.name}", "+${formatCurrency(toppingPrice)}")
-                            }
-                        } else {
-                            if (topping.quantity > 1) {
-                                line("   + ${topping.name} x${topping.quantity}")
-                            } else {
-                                line("   + ${topping.name}")
-                            }
-                        }
-                    }
-                }
-
-                if (template.showItemCode && item.code != null) {
-                    line("   Mã: ${item.code}")
-                }
-
-                if (template.showItemNote && item.note != null) {
-                    lineItalic("   Ghi chú: ${item.note}")
-                }
-
-                val hasItemDiscount = item.discountAmount > 0
-                if (hasItemDiscount && template.showItemDiscount) {
-                    val discountLabel = if (item.discountType == "percent" && item.discountPercent > 0) {
-                        "   → Giảm ${item.discountPercent.toInt()}%:"
-                    } else {
-                        "   → Giảm:"
-                    }
-                    lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
-                }
-            }
+            // ============ ITEMS (theo itemDisplayLayout) ============
+            renderItemsByLayout(template, billData)
 
             separator()
 
@@ -884,90 +811,8 @@ object HybridBillPrintService {
 
             separator()
 
-            // ============ ITEMS (format giống phiếu bếp - hiển thị giá tổng trên dòng đầu) ============
-            billData.items.forEach { item ->
-                // Tính topping total để biết giá gốc
-                val toppingTotal = item.variants.sumOf { it.priceAdjustment } +
-                                   item.toppings.sumOf { it.price * it.quantity }
-                val basePrice = if (toppingTotal > 0 && item.originalPrice > 0) {
-                    (item.originalPrice - toppingTotal).coerceAtLeast(0.0)
-                } else {
-                    item.originalPrice
-                }
-
-                // 1. Dòng đầu: Tên món + Số lượng + Giá TỔNG (giống phiếu bếp)
-                val quantityPart = if (template.showQuantity) "x${item.quantity}" else ""
-                val pricePart = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
-
-                if (quantityPart.isNotEmpty() && pricePart.isNotEmpty()) {
-                    lineKeyValue(item.name, "$quantityPart  $pricePart", BitmapTextStyle(bold = true))
-                } else if (quantityPart.isNotEmpty()) {
-                    lineKeyValue(item.name, quantityPart, BitmapTextStyle(bold = true))
-                } else if (pricePart.isNotEmpty()) {
-                    lineKeyValue(item.name, pricePart, BitmapTextStyle(bold = true))
-                } else {
-                    lineBold(item.name)
-                }
-
-                // 2. Giá gốc bên trái (nếu có topping/variant có giá và showUnitPrice)
-                if (template.showUnitPrice && basePrice > 0 && toppingTotal > 0) {
-                    line("   ${formatCurrency(basePrice)}")
-                }
-
-                // 3. Variants - chỉ indent, không dùng bullet (chỉ toppings mới có "+")
-                if (item.variants.isNotEmpty()) {
-                    item.variants.forEach { variant ->
-                        if (template.showUnitPrice && variant.priceAdjustment != 0.0) {
-                            val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
-                            lineKeyValue("   ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
-                        } else {
-                            line("   ${variant.name}")
-                        }
-                    }
-                }
-
-                // 4. Toppings - dùng "+" prefix
-                if (item.toppings.isNotEmpty()) {
-                    item.toppings.forEach { topping ->
-                        val toppingPrice = topping.price * topping.quantity
-                        if (template.showUnitPrice && toppingPrice > 0) {
-                            if (topping.quantity > 1) {
-                                lineKeyValue("   + ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
-                            } else {
-                                lineKeyValue("   + ${topping.name}", "+${formatCurrency(toppingPrice)}")
-                            }
-                        } else {
-                            if (topping.quantity > 1) {
-                                line("   + ${topping.name} x${topping.quantity}")
-                            } else {
-                                line("   + ${topping.name}")
-                            }
-                        }
-                    }
-                }
-
-                // 5. Item code (optional)
-                if (template.showItemCode && item.code != null) {
-                    line("   Mã: ${item.code}")
-                }
-
-                // 6. Item note (optional) - in nghiêng để nổi bật
-                if (template.showItemNote && item.note != null) {
-                    lineItalic("   Ghi chú: ${item.note}")
-                }
-
-                // 7. Giảm giá trên món (nếu có)
-                val hasItemDiscount = item.discountAmount > 0
-                if (hasItemDiscount && template.showItemDiscount) {
-                    val discountLabel = if (item.discountType == "percent" && item.discountPercent > 0) {
-                        "   → Giảm ${item.discountPercent.toInt()}%:"
-                    } else {
-                        "   → Giảm:"
-                    }
-                    lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
-                }
-                // Bỏ dòng "Thành tiền" vì đã hiển thị giá tổng trên dòng đầu (giống phiếu bếp)
-            }
+            // ============ ITEMS (theo itemDisplayLayout) ============
+            renderItemsByLayout(template, billData)
 
             separator()
 
@@ -1533,5 +1378,249 @@ object HybridBillPrintService {
         }
 
         return PrinterResult.Error("Lỗi in: $lastError")
+    }
+
+    // ============ ITEM LAYOUT RENDERING HELPERS ============
+
+    /**
+     * Render items theo layout type được chọn
+     * Hỗ trợ các layout:
+     * - standard: Tên món + xSL + Giá (mặc định)
+     * - table: Bảng Món | SL | Giá
+     * - table_stt: Bảng STT | Món | SL | Giá
+     * - table_qty_first: Bảng SL | Món | Giá
+     * - table_full: Bảng STT | Món | SL | Đơn giá | Thành tiền
+     */
+    private fun SingleCanvasBillBuilder.renderItemsByLayout(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        when (template.itemDisplayLayout) {
+            "table" -> renderItemsAsTable(template, billData)
+            "table_stt" -> renderItemsAsTableWithSTT(template, billData)
+            "table_qty_first" -> renderItemsAsTableQtyFirst(template, billData)
+            "table_full" -> renderItemsAsTableFull(template, billData)
+            else -> renderItemsStandard(template, billData) // standard và các layout khác
+        }
+    }
+
+    /**
+     * Layout: STANDARD (mặc định)
+     * Format: Tên món     xSL  Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsStandard(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val toppingTotal = item.variants.sumOf { it.priceAdjustment } +
+                    item.toppings.sumOf { it.price * it.quantity }
+            val basePrice = if (toppingTotal > 0 && item.originalPrice > 0) {
+                (item.originalPrice - toppingTotal).coerceAtLeast(0.0)
+            } else {
+                item.originalPrice
+            }
+
+            val quantityPart = if (template.showQuantity) "x${item.quantity}" else ""
+            val pricePart = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            if (quantityPart.isNotEmpty() && pricePart.isNotEmpty()) {
+                lineKeyValue(item.name, "$quantityPart  $pricePart", BitmapTextStyle(bold = true))
+            } else if (quantityPart.isNotEmpty()) {
+                lineKeyValue(item.name, quantityPart, BitmapTextStyle(bold = true))
+            } else if (pricePart.isNotEmpty()) {
+                lineKeyValue(item.name, pricePart, BitmapTextStyle(bold = true))
+            } else {
+                lineBold(item.name)
+            }
+
+            // Giá gốc nếu có topping
+            if (template.showUnitPrice && basePrice > 0 && toppingTotal > 0) {
+                line("   ${formatCurrency(basePrice)}")
+            }
+
+            // Variants
+            renderItemVariants(template, item)
+
+            // Toppings
+            renderItemToppings(template, item)
+
+            // Item code, note, discount
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: TABLE
+     * Format: Món        | SL | Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsAsTable(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        // Header
+        lineKeyValue("Món", "SL   Giá", BitmapTextStyle(bold = true))
+        line("${"-".repeat(20)}|${"-".repeat(12)}")
+
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            lineKeyValue(item.name, "$qty   $price")
+
+            // Variants, Toppings, Extras
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: TABLE_STT
+     * Format: STT | Món        | SL | Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsAsTableWithSTT(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        // Header
+        line("STT | Món              | SL | Giá", BitmapTextStyle(bold = true))
+        line("${"-".repeat(4)}|${"-".repeat(18)}|${"-".repeat(4)}|${"-".repeat(10)}")
+
+        billData.items.forEachIndexed { index, item ->
+            val stt = "${index + 1}".padStart(3)
+            val qty = if (template.showQuantity) "${item.quantity}".padStart(2) else "  "
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            val nameShort = if (item.name.length > 16) item.name.take(15) + "." else item.name.padEnd(16)
+            line("$stt | $nameShort | $qty | $price")
+
+            // Variants, Toppings, Extras (indented)
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: TABLE_QTY_FIRST
+     * Format: SL | Món        | Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsAsTableQtyFirst(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        // Header
+        line("SL | Món              | Giá", BitmapTextStyle(bold = true))
+        line("${"-".repeat(3)}|${"-".repeat(18)}|${"-".repeat(12)}")
+
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) "${item.quantity}".padStart(2) else "  "
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            val nameShort = if (item.name.length > 16) item.name.take(15) + "." else item.name.padEnd(16)
+            line("$qty | $nameShort | $price")
+
+            // Variants, Toppings, Extras
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: TABLE_FULL
+     * Format: STT | Món | SL | Đ.Giá | T.Tiền
+     */
+    private fun SingleCanvasBillBuilder.renderItemsAsTableFull(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        // Header
+        line("STT|Món         |SL|Đ.Giá  |T.Tiền", BitmapTextStyle(bold = true))
+        line("${"-".repeat(3)}|${"-".repeat(12)}|${"-".repeat(2)}|${"-".repeat(7)}|${"-".repeat(7)}")
+
+        billData.items.forEachIndexed { index, item ->
+            val stt = "${index + 1}".padStart(2)
+            val qty = if (template.showQuantity) "${item.quantity}".padStart(2) else "  "
+            val unitPrice = formatCurrency(item.originalPrice / item.quantity.coerceAtLeast(1)).take(7)
+            val totalPrice = formatCurrency(item.totalPrice).take(7)
+            val nameShort = if (item.name.length > 10) item.name.take(9) + "." else item.name.padEnd(10)
+            line("$stt|$nameShort|$qty|$unitPrice|$totalPrice")
+
+            // Variants, Toppings, Extras
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Helper: Render item variants
+     */
+    private fun SingleCanvasBillBuilder.renderItemVariants(
+        template: BillTemplateEntity,
+        item: BillItem
+    ) {
+        if (item.variants.isNotEmpty()) {
+            item.variants.forEach { variant ->
+                if (template.showUnitPrice && variant.priceAdjustment != 0.0) {
+                    val adjustSign = if (variant.priceAdjustment > 0) "+" else ""
+                    lineKeyValue("   ${variant.name}", "${adjustSign}${formatCurrency(variant.priceAdjustment)}")
+                } else {
+                    line("   ${variant.name}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Helper: Render item toppings
+     */
+    private fun SingleCanvasBillBuilder.renderItemToppings(
+        template: BillTemplateEntity,
+        item: BillItem
+    ) {
+        if (item.toppings.isNotEmpty()) {
+            item.toppings.forEach { topping ->
+                val toppingPrice = topping.price * topping.quantity
+                if (template.showUnitPrice && toppingPrice > 0) {
+                    if (topping.quantity > 1) {
+                        lineKeyValue("   + ${topping.name} x${topping.quantity}", "+${formatCurrency(toppingPrice)}")
+                    } else {
+                        lineKeyValue("   + ${topping.name}", "+${formatCurrency(toppingPrice)}")
+                    }
+                } else {
+                    if (topping.quantity > 1) {
+                        line("   + ${topping.name} x${topping.quantity}")
+                    } else {
+                        line("   + ${topping.name}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Helper: Render item extras (code, note, discount)
+     */
+    private fun SingleCanvasBillBuilder.renderItemExtras(
+        template: BillTemplateEntity,
+        item: BillItem
+    ) {
+        if (template.showItemCode && item.code != null) {
+            line("   Mã: ${item.code}")
+        }
+
+        if (template.showItemNote && item.note != null) {
+            lineItalic("   Ghi chú: ${item.note}")
+        }
+
+        val hasItemDiscount = item.discountAmount > 0
+        if (hasItemDiscount && template.showItemDiscount) {
+            val discountLabel = if (item.discountType == "percent" && item.discountPercent > 0) {
+                "   → Giảm ${item.discountPercent.toInt()}%:"
+            } else {
+                "   → Giảm:"
+            }
+            lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
+        }
     }
 }
