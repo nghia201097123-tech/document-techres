@@ -14,10 +14,10 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  // Global prefix
-  app.setGlobalPrefix('api', {
-    exclude: ['health'],
-  });
+  // No global prefix - gateway is a transparent proxy
+  // Routes are determined by the path prefix:
+  // /api/tenant/* -> api-dashboard
+  // /api/* -> api-admin (default)
 
   // Swagger setup
   const config = new DocumentBuilder()
@@ -30,12 +30,12 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('docs', app, document);
 
   const port = process.env.SERVICE_PORT ?? 4000;
   await app.listen(port);
 
   console.log(`🚀 API Gateway is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
+  console.log(`📚 Swagger docs: http://localhost:${port}/docs`);
 }
 bootstrap();
