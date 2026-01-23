@@ -24,6 +24,12 @@ export class BillPrinterConfigsController {
     return this.service.findByBranch(req.user.tenantId, branchId);
   }
 
+  @Get('by-template/:templateId')
+  @ApiOperation({ summary: 'Lấy danh sách cấu hình máy in đang sử dụng mẫu bill' })
+  findByTemplate(@Request() req, @Param('templateId') templateId: string) {
+    return this.service.findByTemplate(req.user.tenantId, templateId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin cấu hình máy in' })
   findOne(@Request() req, @Param('id') id: string) {

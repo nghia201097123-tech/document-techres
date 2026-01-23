@@ -31,6 +31,14 @@ export class BillPrinterConfigsService {
     });
   }
 
+  async findByTemplate(tenantId: string, templateId: string) {
+    return this.repository.find({
+      where: { tenantId, templateId },
+      relations: ['branch', 'template'],
+      order: { isActive: 'DESC', isDefault: 'DESC', sortOrder: 'ASC', name: 'ASC' },
+    });
+  }
+
   async findOne(tenantId: string, id: string) {
     const config = await this.repository.findOne({
       where: { tenantId, id },
