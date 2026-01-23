@@ -198,14 +198,10 @@ object HybridBillPrintService {
             Log.d(TAG, "Sunmi using BinderProxy: $isBinderProxy")
 
             if (isBinderProxy) {
-                // ========== ESC/POS BITMAP PRINTING (cho BinderProxy) ==========
-                // Convert bitmap -> ESC/POS format -> sendRAWData
-                Log.d(TAG, "Using ESC/POS BITMAP printing for Sunmi (BinderProxy mode)")
-
-                // DEBUG: Test if printText works via AIDL
-                Log.d(TAG, "DEBUG: Testing printText via AIDL...")
-                val textTestResult = adapter.printTextTest("=== TEST SUNMI AIDL ===\nIf you see this, AIDL printText works!\n")
-                Log.d(TAG, "DEBUG: printTextTest result: $textTestResult")
+                // ========== NATIVE BITMAP PRINTING (cho BinderProxy) ==========
+                // Sử dụng Sunmi native printBitmap/printBitmapCustom thay vì ESC/POS
+                // vì sendRAWData không hỗ trợ ESC/POS format trên Sunmi T1
+                Log.d(TAG, "Using NATIVE BITMAP printing for Sunmi (BinderProxy mode)")
 
                 // Generate bill bitmaps trực tiếp
                 val bitmaps = generateSunmiBillBitmaps(effectiveConfig, template, billData, paymentBankAccount, payosQrCode)
@@ -213,7 +209,7 @@ object HybridBillPrintService {
 
                 // In từng bản
                 repeat(template.numberOfCopies) { copyIndex ->
-                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies} (ESC/POS bitmap)...")
+                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies} (native bitmap)...")
 
                     // In từng bitmap
                     bitmaps.forEachIndexed { bitmapIndex, bitmap ->
@@ -803,10 +799,7 @@ object HybridBillPrintService {
     ): PrinterResult {
         var lastError: String? = null
 
-        // Convert bitmap to ESC/POS raster format (GS v 0)
-        Log.d(TAG, "Converting bitmap ${bitmapIndex + 1}/$totalBitmaps to ESC/POS raster format (${bitmap.width}x${bitmap.height})")
-        val rasterData = EscPosCommands.printRasterBitmap(bitmap, 0)
-        Log.d(TAG, "ESC/POS raster data size: ${rasterData.size} bytes")
+        Log.d(TAG, "Printing bitmap ${bitmapIndex + 1}/$totalBitmaps via native printBitmap (${bitmap.width}x${bitmap.height})")
 
         repeat(retryCount) { attempt ->
             // Kiểm tra status trước mỗi lần retry (trừ lần đầu)
@@ -817,85 +810,37 @@ object HybridBillPrintService {
                 }
             }
 
-            Log.d(TAG, "Sunmi ESC/POS raster print attempt ${attempt + 1}/$retryCount for bitmap ${bitmapIndex + 1}/$totalBitmaps")
+            Log.d(TAG, "Sunmi native printBitmap attempt ${attempt + 1}/$retryCount for bitmap ${bitmapIndex + 1}/$totalBitmaps")
 
-            // Step 1: Init printer (chỉ cho bitmap đầu tiên của mỗi attempt)
-            if (bitmapIndex == 0) {
-                Log.d(TAG, "Initializing printer...")
-                adapter.initPrinter()
-            }
+            // Sử dụng native printBitmap method của Sunmi
+            // Method này sẽ tự động convert bitmap sang grayscale và gọi printBitmapCustom
+            val printResult = adapter.printBitmap(bitmap)
 
-            // Step 2: Gửi data qua writeRawOnly (KHÔNG init/commit mỗi chunk)
-            // Chunk size 4KB để tránh tràn buffer
-            val chunkSize = 4096
-            var success = true
-            var chunkError: String? = null
+            when (printResult) {
+                is com.techres.ccb.printer.core.PrinterResult.Success -> {
+                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed successfully via native printBitmap (${bitmap.width}x${bitmap.height})")
 
-            if (rasterData.size <= chunkSize) {
-                // Data nhỏ, gửi 1 lần
-                Log.d(TAG, "Sending ${rasterData.size} bytes in single write")
-                val printResult = adapter.writeRawOnly(rasterData)
-                when (printResult) {
-                    is com.techres.ccb.printer.core.PrinterResult.Error -> {
-                        success = false
-                        chunkError = printResult.message
-                    }
-                    else -> { /* success */ }
+                    // Đợi máy in xử lý bitmap
+                    val processingTime = calculateBitmapProcessingTime(bitmap)
+                    Log.d(TAG, "Waiting ${processingTime}ms for bitmap processing...")
+                    delay(processingTime)
+
+                    return PrinterResult.Success("OK")
                 }
-            } else {
-                // Data lớn, chia thành chunks
-                Log.d(TAG, "Data size ${rasterData.size} > $chunkSize, sending in chunks...")
-                var offset = 0
-                var chunkIndex = 0
-                while (offset < rasterData.size && success) {
-                    val remaining = rasterData.size - offset
-                    val currentChunkSize = minOf(chunkSize, remaining)
-                    val chunk = rasterData.copyOfRange(offset, offset + currentChunkSize)
-
-                    Log.d(TAG, "Sending chunk ${chunkIndex + 1} (${chunk.size} bytes, offset $offset)")
-                    val chunkResult = adapter.writeRawOnly(chunk)
-
-                    when (chunkResult) {
-                        is com.techres.ccb.printer.core.PrinterResult.Error -> {
-                            success = false
-                            chunkError = chunkResult.message
-                        }
-                        else -> {
-                            offset += currentChunkSize
-                            chunkIndex++
-                            // Delay nhỏ giữa các chunk để printer xử lý
-                            if (offset < rasterData.size) {
-                                delay(20)
-                            }
-                        }
-                    }
+                is com.techres.ccb.printer.core.PrinterResult.PartialSuccess -> {
+                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed with partial success")
+                    val processingTime = calculateBitmapProcessingTime(bitmap)
+                    delay(processingTime)
+                    return PrinterResult.Success("OK")
                 }
-                Log.d(TAG, "Sent $chunkIndex chunks total")
-            }
+                is com.techres.ccb.printer.core.PrinterResult.Error -> {
+                    lastError = printResult.message
+                    Log.w(TAG, "Native printBitmap attempt ${attempt + 1} failed: ${printResult.message}")
 
-            // Step 3: Commit buffer SAU KHI gửi xong tất cả data (chỉ cho bitmap cuối)
-            if (success && bitmapIndex == totalBitmaps - 1) {
-                Log.d(TAG, "All bitmaps sent, committing buffer...")
-                adapter.feedLines(3)
-                adapter.commitBuffer()
-            }
-
-            if (success) {
-                Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed successfully via ESC/POS raster (${bitmap.width}x${bitmap.height})")
-
-                // Đợi máy in xử lý bitmap
-                val processingTime = calculateBitmapProcessingTime(bitmap)
-                Log.d(TAG, "Waiting ${processingTime}ms for bitmap processing...")
-                delay(processingTime)
-
-                return PrinterResult.Success("OK")
-            } else {
-                lastError = chunkError
-                Log.w(TAG, "ESC/POS raster print attempt ${attempt + 1} failed: $chunkError")
-
-                if (attempt < retryCount - 1) {
-                    Log.d(TAG, "Waiting ${retryDelayMs}ms before retry...")
-                    delay(retryDelayMs.toLong())
+                    if (attempt < retryCount - 1) {
+                        Log.d(TAG, "Waiting ${retryDelayMs}ms before retry...")
+                        delay(retryDelayMs.toLong())
+                    }
                 }
             }
         }

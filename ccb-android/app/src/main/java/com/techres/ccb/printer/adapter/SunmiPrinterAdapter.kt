@@ -1001,21 +1001,24 @@ class SunmiPrinterAdapter @Inject constructor(
         // First, initialize printer
         initPrinterViaTransact(binder)
 
-        // Try multiple transaction codes for printBitmap
-        // Position 16 in IWoyouService.aidl (jiuiv5)
-        val possibleTransactionCodes = listOf(
-            TransactionCodes.TRANSACTION_printBitmap,       // Standard position (16)
-            TransactionCodes.TRANSACTION_printBitmapCustom, // Custom position (17)
-            TransactionCodes.TRANSACTION_printBitmap2,      // Extended version (30)
-            IBinder.FIRST_CALL_TRANSACTION + 15,            // Alternative
-            IBinder.FIRST_CALL_TRANSACTION + 18             // Alternative
+        // Convert to grayscale for better thermal printing compatibility
+        val grayscaleBitmap = convertToGrayscale(bitmap)
+        Timber.d("$TAG: Converted bitmap to grayscale: ${grayscaleBitmap.width}x${grayscaleBitmap.height}")
+
+        // Try printBitmapCustom with type=1 (binary mode) first - better for thermal printers
+        // Then fall back to regular printBitmap
+        val transactionAttempts = listOf(
+            Pair(TransactionCodes.TRANSACTION_printBitmapCustom, 1), // type=1 binary mode
+            Pair(TransactionCodes.TRANSACTION_printBitmapCustom, 0), // type=0 grayscale mode
+            Pair(TransactionCodes.TRANSACTION_printBitmap, -1),      // regular printBitmap (no type)
         )
 
         var lastError: Exception? = null
 
-        for (transactionCode in possibleTransactionCodes) {
+        for ((transactionCode, bitmapType) in transactionAttempts) {
             try {
-                Timber.d("$TAG: Trying printBitmap transact with code $transactionCode")
+                val isCustom = bitmapType >= 0
+                Timber.d("$TAG: Trying ${if (isCustom) "printBitmapCustom(type=$bitmapType)" else "printBitmap"} transact($transactionCode)")
 
                 val dataParcel = Parcel.obtain()
                 val replyParcel = Parcel.obtain()
@@ -1024,7 +1027,13 @@ class SunmiPrinterAdapter @Inject constructor(
                     dataParcel.writeInterfaceToken(descriptor)
                     // AIDL format: write "not null" flag (1) before Parcelable object
                     dataParcel.writeInt(1) // bitmap is not null
-                    bitmap.writeToParcel(dataParcel, 0)
+                    grayscaleBitmap.writeToParcel(dataParcel, 0)
+
+                    if (isCustom) {
+                        // printBitmapCustom has additional type parameter
+                        dataParcel.writeInt(bitmapType)
+                    }
+
                     // Write null for callback (ICallback)
                     dataParcel.writeStrongBinder(null)
 
@@ -1037,6 +1046,11 @@ class SunmiPrinterAdapter @Inject constructor(
                         // Add line wrap and commit buffer to actually execute printing
                         lineWrapViaTransact(binder, 3)
                         commitPrinterBufferViaTransact(binder)
+
+                        // Recycle grayscale bitmap if it's a new one
+                        if (grayscaleBitmap != bitmap) {
+                            grayscaleBitmap.recycle()
+                        }
 
                         return PrinterResult.Success
                     } else {
@@ -1058,7 +1072,32 @@ class SunmiPrinterAdapter @Inject constructor(
             }
         }
 
+        // Recycle grayscale bitmap if it's a new one
+        if (grayscaleBitmap != bitmap) {
+            grayscaleBitmap.recycle()
+        }
+
         return PrinterResult.Error("printBitmap transact failed: ${lastError?.message ?: "unknown error"}")
+    }
+
+    /**
+     * Convert bitmap to grayscale for better thermal printer compatibility
+     */
+    private fun convertToGrayscale(src: Bitmap): Bitmap {
+        val width = src.width
+        val height = src.height
+
+        val grayscale = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(grayscale)
+
+        val paint = android.graphics.Paint()
+        val colorMatrix = android.graphics.ColorMatrix()
+        colorMatrix.setSaturation(0f) // Convert to grayscale
+        paint.colorFilter = android.graphics.ColorMatrixColorFilter(colorMatrix)
+
+        canvas.drawBitmap(src, 0f, 0f, paint)
+
+        return grayscale
     }
 
     /**
