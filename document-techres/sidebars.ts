@@ -52,6 +52,18 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Tích hợp Food Platform',
+      items: [
+        'food-platform/overview',
+        'food-platform/account-linking',
+        'food-platform/order-polling',
+        'food-platform/order-sync',
+        'food-platform/ccb-display',
+        'food-platform/auto-confirm-print',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Hệ thống in ấn',
       items: [
         'printing/overview',
