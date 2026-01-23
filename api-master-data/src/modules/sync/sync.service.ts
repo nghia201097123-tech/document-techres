@@ -351,11 +351,11 @@ export class SyncService {
           where: { tenantId, isActive: true },
           order: { sortOrder: 'ASC' },
         }) : Promise.resolve([]),
-        // Bill templates for this branch
-        this.billTemplateRepository.find({
-          where: { branchId, isActive: true },
+        // Bill templates for this brand (templates are at brand level, shared across branches)
+        brandId ? this.billTemplateRepository.find({
+          where: { brandId, isActive: true },
           order: { sortOrder: 'ASC' },
-        }),
+        }) : Promise.resolve([]),
         // Bill printer configs for this branch
         this.billPrinterConfigRepository.find({
           where: { branchId, isActive: true },

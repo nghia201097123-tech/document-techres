@@ -8,7 +8,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { Branch } from './branch.entity';
+import { Brand } from './brand.entity';
 
 export enum BillTemplateType {
   CLASSIC = 'classic',
@@ -19,7 +19,7 @@ export enum BillTemplateType {
 }
 
 @Entity('bill_templates')
-@Index(['tenantId', 'branchId'])
+@Index(['tenantId', 'brandId'])
 export class BillTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -28,12 +28,12 @@ export class BillTemplate {
   @Index()
   tenantId: string;
 
-  @Column({ name: 'branch_id' })
-  branchId: string;
+  @Column({ name: 'brand_id' })
+  brandId: string;
 
-  @ManyToOne(() => Branch)
-  @JoinColumn({ name: 'branch_id' })
-  branch: Branch;
+  @ManyToOne(() => Brand)
+  @JoinColumn({ name: 'brand_id' })
+  brand: Brand;
 
   @Column({ length: 100 })
   name: string;

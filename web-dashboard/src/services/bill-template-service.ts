@@ -41,8 +41,8 @@ export enum PrinterConnectionType {
 export interface BillTemplate {
   id: string;
   tenantId: string;
-  branchId: string;
-  branch?: {
+  brandId: string;
+  brand?: {
     id: string;
     name: string;
   };
@@ -196,7 +196,7 @@ export interface BillPrinterConfig {
 // ==================== DTOs ====================
 
 export interface CreateBillTemplateDto {
-  branchId?: string;
+  brandId: string;
   name: string;
   templateType: BillTemplateType;
   description?: string;
@@ -302,42 +302,10 @@ export interface UpdateBillTemplateDto extends Partial<CreateBillTemplateDto> {
 }
 
 /**
- * DTO gộp để cập nhật cả template và printer config cùng lúc
+ * DTO cho Printer Config - Xây dựng ở cấp chi nhánh (Branch)
  */
-export interface UpdateBillTemplateWithPrinterDto extends UpdateBillTemplateDto {
-  // Printer config fields
-  printerConfigId?: string;
-  connectionType?: PrinterConnectionType;
-  printerIp?: string;
-  printerPort?: number;
-  printerMac?: string;
-  printerUsbPath?: string;
-  autoPrintOnPayment?: boolean;
-  printPreview?: boolean;
-  retryCount?: number;
-  retryDelayMs?: number;
-  connectionTimeoutMs?: number;
-}
-
-/**
- * DTO gộp để tạo mới template và printer config cùng lúc
- */
-export interface CreateBillTemplateWithPrinterDto extends CreateBillTemplateDto {
-  // Printer config fields
-  connectionType?: PrinterConnectionType;
-  printerIp?: string;
-  printerPort?: number;
-  printerMac?: string;
-  printerUsbPath?: string;
-  autoPrintOnPayment?: boolean;
-  printPreview?: boolean;
-  retryCount?: number;
-  retryDelayMs?: number;
-  connectionTimeoutMs?: number;
-}
-
 export interface CreateBillPrinterConfigDto {
-  branchId?: string;
+  branchId: string;  // Bắt buộc - Máy in thuộc về chi nhánh
   name: string;
   description?: string;
 
@@ -372,14 +340,22 @@ export interface UpdateBillPrinterConfigDto extends Partial<CreateBillPrinterCon
 // ==================== SERVICE ====================
 
 export const billTemplateService = {
-  // Bill Templates
-  getAllTemplates: async (brandId: string): Promise<BillTemplate[]> => {
-    const response = await api.get(`/bill-templates?brandId=${brandId}`);
+  // ==================== BILL TEMPLATES (Brand Level) ====================
+
+  /**
+   * Lấy tất cả templates
+   */
+  getAllTemplates: async (): Promise<BillTemplate[]> => {
+    const response = await api.get(`/bill-templates`);
     return response.data;
   },
 
-  getTemplatesByBranch: async (branchId: string): Promise<BillTemplate[]> => {
-    const response = await api.get(`/bill-templates/branch/${branchId}`);
+  /**
+   * Lấy templates theo thương hiệu (brand)
+   * Mẫu in bill được xây dựng ở cấp thương hiệu
+   */
+  getTemplatesByBrand: async (brandId: string): Promise<BillTemplate[]> => {
+    const response = await api.get(`/bill-templates/brand/${brandId}`);
     return response.data;
   },
 
@@ -388,29 +364,16 @@ export const billTemplateService = {
     return response.data;
   },
 
-  createTemplate: async (brandId: string, data: CreateBillTemplateDto): Promise<BillTemplate> => {
-    const response = await api.post(`/bill-templates?brandId=${brandId}`, data);
-    return response.data;
-  },
-
   /**
-   * Tạo mới template và printer config cùng lúc (endpoint mới)
+   * Tạo template mới cho thương hiệu
    */
-  createTemplateWithPrinter: async (brandId: string, data: CreateBillTemplateWithPrinterDto): Promise<BillTemplate> => {
-    const response = await api.post(`/bill-templates/with-printer?brandId=${brandId}`, data);
+  createTemplate: async (data: CreateBillTemplateDto): Promise<BillTemplate> => {
+    const response = await api.post(`/bill-templates`, data);
     return response.data;
   },
 
   updateTemplate: async (id: string, data: UpdateBillTemplateDto): Promise<BillTemplate> => {
     const response = await api.put(`/bill-templates/${id}`, data);
-    return response.data;
-  },
-
-  /**
-   * Cập nhật template và printer config cùng lúc (endpoint mới)
-   */
-  updateTemplateWithPrinter: async (id: string, data: UpdateBillTemplateWithPrinterDto): Promise<BillTemplate> => {
-    const response = await api.put(`/bill-templates/${id}/with-printer`, data);
     return response.data;
   },
 
@@ -427,6 +390,8 @@ export const billTemplateService = {
   deleteTemplate: async (id: string): Promise<void> => {
     await api.delete(`/bill-templates/${id}`);
   },
+
+  // ==================== PRINTER CONFIGS (Branch Level) ====================
 
   // Bill Printer Configs
   getAllPrinterConfigs: async (brandId: string): Promise<BillPrinterConfig[]> => {

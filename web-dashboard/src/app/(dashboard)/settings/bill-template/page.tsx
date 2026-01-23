@@ -114,7 +114,8 @@ export default function BillTemplatePage() {
     if (!filterBrandId) return;
     setLoadingTemplates(true);
     try {
-      const data = await billTemplateService.getAllTemplates(filterBrandId);
+      // Templates được quản lý ở cấp thương hiệu (brand)
+      const data = await billTemplateService.getTemplatesByBrand(filterBrandId);
       setTemplates(data);
     } catch (error) {
       console.error("Error loading templates:", error);
@@ -242,15 +243,10 @@ export default function BillTemplatePage() {
       return;
     }
 
-    // Check if we have branches available
-    if (branches.length === 0) {
-      toast({ title: "Lỗi", description: "Không tìm thấy chi nhánh nào cho thương hiệu này", variant: "destructive" });
-      return;
-    }
-
     setSavingTemplate(true);
     try {
-      // Extract template data (without printer fields)
+      // Template chỉ cần thông tin template, không cần printer config
+      // Printer config sẽ được cấu hình riêng ở cấp chi nhánh
       const {
         connectionType,
         printerIp,
@@ -265,55 +261,23 @@ export default function BillTemplatePage() {
         ...templateData
       } = templateForm;
 
-      // Use the first branch for branchId (required by backend)
-      const defaultBranchId = branches[0].id;
-      const templateDataWithBranch = {
+      // Template thuộc về thương hiệu (brand), không phải chi nhánh (branch)
+      const templateDataWithBrand = {
         ...templateData,
-        branchId: defaultBranchId,
+        brandId: filterBrandId,
       };
 
       let savedTemplate: BillTemplate;
 
       if (templateDialog === "create") {
-        // Sử dụng endpoint gộp để tạo template và printer config cùng lúc
-        const createData = {
-          ...templateDataWithBranch,
-          // Printer config fields
-          connectionType: connectionType || PrinterConnectionType.NETWORK,
-          printerIp,
-          printerPort,
-          printerMac,
-          printerUsbPath,
-          autoPrintOnPayment,
-          printPreview,
-          retryCount,
-          retryDelayMs,
-          connectionTimeoutMs,
-        };
-        savedTemplate = await billTemplateService.createTemplateWithPrinter(filterBrandId, createData);
+        // Tạo template mới cho thương hiệu
+        savedTemplate = await billTemplateService.createTemplate(templateDataWithBrand);
         setTemplates((prev) => [...prev, savedTemplate]);
-
         toast({ title: "Thành công", description: "Đã thêm mẫu bill mới" });
       } else if (editingTemplate) {
-        // Sử dụng endpoint mới để cập nhật template và printer config cùng lúc
-        const updateData = {
-          ...templateData,
-          // Printer config fields
-          printerConfigId: editingPrinterConfig?.id,
-          connectionType: connectionType || PrinterConnectionType.NETWORK,
-          printerIp,
-          printerPort,
-          printerMac,
-          printerUsbPath,
-          autoPrintOnPayment,
-          printPreview,
-          retryCount,
-          retryDelayMs,
-          connectionTimeoutMs,
-        };
-        savedTemplate = await billTemplateService.updateTemplateWithPrinter(editingTemplate.id, updateData);
+        // Cập nhật template
+        savedTemplate = await billTemplateService.updateTemplate(editingTemplate.id, templateData);
         setTemplates((prev) => prev.map((t) => (t.id === savedTemplate.id ? savedTemplate : t)));
-
         toast({ title: "Thành công", description: "Đã cập nhật mẫu bill" });
       }
       setTemplateDialog(null);

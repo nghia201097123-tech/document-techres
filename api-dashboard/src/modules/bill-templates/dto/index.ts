@@ -3,10 +3,10 @@ import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum, IsUUID, IsNotEmpty }
 import { BillTemplateType } from '../../../database/entities/bill-template.entity';
 
 export class CreateBillTemplateDto {
-  @ApiProperty({ description: 'ID chi nhánh' })
-  @IsUUID('4', { message: 'branchId phải là UUID hợp lệ' })
-  @IsNotEmpty({ message: 'branchId không được để trống' })
-  branchId: string;
+  @ApiProperty({ description: 'ID thương hiệu' })
+  @IsUUID('4', { message: 'brandId phải là UUID hợp lệ' })
+  @IsNotEmpty({ message: 'brandId không được để trống' })
+  brandId: string;
 
   @ApiProperty({ description: 'Tên mẫu bill' })
   @IsString()
@@ -384,7 +384,7 @@ export class CreateBillTemplateDto {
 
 /**
  * UpdateBillTemplateDto - Sử dụng PartialType để tất cả fields từ CreateBillTemplateDto trở thành optional
- * Điều này fix lỗi "branchId must be a string" khi cập nhật bill template
+ * Điều này cho phép cập nhật từng field riêng lẻ mà không cần gửi toàn bộ
  */
 export class UpdateBillTemplateDto extends PartialType(CreateBillTemplateDto) {
   @ApiPropertyOptional()
@@ -396,133 +396,4 @@ export class UpdateBillTemplateDto extends PartialType(CreateBillTemplateDto) {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
-}
-
-/**
- * UpdateBillTemplateWithPrinterDto - DTO gộp để cập nhật cả template và printer config cùng lúc
- * Sử dụng cho UI đã gộp chung template và printer config vào 1 màn hình
- */
-export class UpdateBillTemplateWithPrinterDto extends PartialType(CreateBillTemplateDto) {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  isDefault?: boolean;
-
-  // ============ PRINTER CONFIG FIELDS ============
-  @ApiPropertyOptional({ description: 'ID printer config (nếu có)' })
-  @IsOptional()
-  @IsString()
-  printerConfigId?: string;
-
-  @ApiPropertyOptional({ description: 'Loại kết nối: network, bluetooth, usb, sunmi' })
-  @IsOptional()
-  @IsString()
-  connectionType?: string;
-
-  @ApiPropertyOptional({ description: 'Địa chỉ IP máy in' })
-  @IsOptional()
-  @IsString()
-  printerIp?: string;
-
-  @ApiPropertyOptional({ description: 'Port máy in' })
-  @IsOptional()
-  @IsNumber()
-  printerPort?: number;
-
-  @ApiPropertyOptional({ description: 'MAC address (Bluetooth)' })
-  @IsOptional()
-  @IsString()
-  printerMac?: string;
-
-  @ApiPropertyOptional({ description: 'USB path' })
-  @IsOptional()
-  @IsString()
-  printerUsbPath?: string;
-
-  @ApiPropertyOptional({ description: 'Tự động in khi thanh toán' })
-  @IsOptional()
-  @IsBoolean()
-  autoPrintOnPayment?: boolean;
-
-  @ApiPropertyOptional({ description: 'Xem trước khi in' })
-  @IsOptional()
-  @IsBoolean()
-  printPreview?: boolean;
-
-  @ApiPropertyOptional({ description: 'Số lần thử lại' })
-  @IsOptional()
-  @IsNumber()
-  retryCount?: number;
-
-  @ApiPropertyOptional({ description: 'Delay giữa các lần thử (ms)' })
-  @IsOptional()
-  @IsNumber()
-  retryDelayMs?: number;
-
-  @ApiPropertyOptional({ description: 'Timeout kết nối (ms)' })
-  @IsOptional()
-  @IsNumber()
-  connectionTimeoutMs?: number;
-}
-
-/**
- * CreateBillTemplateWithPrinterDto - DTO gộp để tạo mới template và printer config cùng lúc
- * Tất cả fields từ CreateBillTemplateDto + printer config fields
- */
-export class CreateBillTemplateWithPrinterDto extends CreateBillTemplateDto {
-  // ============ PRINTER CONFIG FIELDS ============
-  @ApiPropertyOptional({ description: 'Loại kết nối: network, bluetooth, usb, sunmi' })
-  @IsOptional()
-  @IsString()
-  connectionType?: string;
-
-  @ApiPropertyOptional({ description: 'Địa chỉ IP máy in' })
-  @IsOptional()
-  @IsString()
-  printerIp?: string;
-
-  @ApiPropertyOptional({ description: 'Port máy in' })
-  @IsOptional()
-  @IsNumber()
-  printerPort?: number;
-
-  @ApiPropertyOptional({ description: 'MAC address (Bluetooth)' })
-  @IsOptional()
-  @IsString()
-  printerMac?: string;
-
-  @ApiPropertyOptional({ description: 'USB path' })
-  @IsOptional()
-  @IsString()
-  printerUsbPath?: string;
-
-  @ApiPropertyOptional({ description: 'Tự động in khi thanh toán' })
-  @IsOptional()
-  @IsBoolean()
-  autoPrintOnPayment?: boolean;
-
-  @ApiPropertyOptional({ description: 'Xem trước khi in' })
-  @IsOptional()
-  @IsBoolean()
-  printPreview?: boolean;
-
-  @ApiPropertyOptional({ description: 'Số lần thử lại' })
-  @IsOptional()
-  @IsNumber()
-  retryCount?: number;
-
-  @ApiPropertyOptional({ description: 'Delay giữa các lần thử (ms)' })
-  @IsOptional()
-  @IsNumber()
-  retryDelayMs?: number;
-
-  @ApiPropertyOptional({ description: 'Timeout kết nối (ms)' })
-  @IsOptional()
-  @IsNumber()
-  connectionTimeoutMs?: number;
 }
