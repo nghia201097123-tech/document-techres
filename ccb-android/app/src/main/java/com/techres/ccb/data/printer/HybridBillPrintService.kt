@@ -1921,22 +1921,18 @@ object HybridBillPrintService {
     /**
      * Layout: DOTTED - Dấu chấm nối
      * Format: Tên món........xSL.......Giá
-     * Uses lineWidth for proper dot filling
+     * Sử dụng lineKeyValueDotted để fill chính xác theo pixel width
      */
     private fun SingleCanvasBillBuilder.renderItemsDotted(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        val totalWidth = lineWidth  // Dynamic based on paper width
-
         billData.items.forEach { item ->
             val qty = if (template.showQuantity) "x${item.quantity}" else ""
             val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
             val rightPart = "$qty $price".trim()
-            // Create dotted line: key + dots + value (use lineWidth instead of hardcoded 40)
-            val maxDots = totalWidth - item.name.length - rightPart.length
-            val dots = if (maxDots > 2) ".".repeat(maxDots) else " "
-            line("${item.name}$dots$rightPart", BitmapTextStyle(bold = true))
+            // Sử dụng lineKeyValueDotted để fill chính xác theo pixel width
+            lineKeyValueDotted(item.name, rightPart, BitmapTextStyle(bold = true))
 
             renderItemVariants(template, item)
             renderItemToppings(template, item)
@@ -2471,6 +2467,7 @@ object HybridBillPrintService {
 
     /**
      * Layout: DOTTED - Dấu chấm nối
+     * Sử dụng lineKeyValueDotted để pixel-accurate dot filling hiển thị hết khổ giấy
      */
     private fun HybridBillBuilder.renderItemsDotted(
         template: BillTemplateEntity,
@@ -2480,10 +2477,8 @@ object HybridBillPrintService {
             val qty = if (template.showQuantity) "x${item.quantity}" else ""
             val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
             val rightPart = "$qty $price".trim()
-            // Create dotted line: key + dots + value
-            val maxDots = lineWidth - item.name.length - rightPart.length
-            val dots = if (maxDots > 2) ".".repeat(maxDots) else " "
-            line("${item.name}$dots$rightPart", BitmapTextStyle(bold = true))
+            // Sử dụng lineKeyValueDotted với pixel-accurate dot filling
+            lineKeyValueDotted(item.name, rightPart, BitmapTextStyle(bold = true))
 
             renderItemVariants(template, item)
             renderItemToppings(template, item)

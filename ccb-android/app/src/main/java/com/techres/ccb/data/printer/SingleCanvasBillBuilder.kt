@@ -93,12 +93,13 @@ class SingleCanvasBillBuilder(
             val value: String,
             val fontSize: Float,
             val bold: Boolean = false,
-            val lineSpacing: Float = 0.4f
+            val lineSpacing: Float = 0.4f,
+            val fillChar: Char = ' ' // Ký tự fill giữa key và value (space hoặc dot)
         ) : PrintElement() {
             override fun measureHeight(pixelWidth: Int): Int {
                 if (key.isBlank() && value.isBlank()) return 0
                 val paint = createTextPaint(fontSize, bold, false)
-                val fullText = buildKeyValueText(key, value, paint, pixelWidth)
+                val fullText = buildKeyValueText(key, value, paint, pixelWidth, fillChar)
                 val layout = createStaticLayout(fullText, paint, pixelWidth, Layout.Alignment.ALIGN_NORMAL, lineSpacing)
                 return layout.height + calculatePadding(layout.height, lineSpacing)
             }
@@ -183,17 +184,18 @@ class SingleCanvasBillBuilder(
                         (contentHeight * 0.05f).toInt().coerceAtLeast(1) // top padding
             }
 
-            fun buildKeyValueText(key: String, value: String, paint: TextPaint, paperWidth: Int): String {
+            fun buildKeyValueText(key: String, value: String, paint: TextPaint, paperWidth: Int, fillChar: Char = ' '): String {
                 val valueWidth = paint.measureText(value)
-                val spaceCharWidth = paint.measureText(" ")
+                val fillCharWidth = paint.measureText(fillChar.toString())
                 val keyWidth = paint.measureText(key)
-                val minSpaceWidth = spaceCharWidth * 2
-                val maxFirstLineKeyWidth = paperWidth - valueWidth - minSpaceWidth
+                val minFillWidth = fillCharWidth * 2
+                val maxFirstLineKeyWidth = paperWidth - valueWidth - minFillWidth
 
                 return if (keyWidth <= maxFirstLineKeyWidth) {
-                    val spaceWidth = paperWidth - keyWidth - valueWidth
-                    val spaces = " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1))
-                    "$key$spaces$value"
+                    val fillWidth = paperWidth - keyWidth - valueWidth
+                    val fillCount = (fillWidth / fillCharWidth).toInt().coerceAtLeast(1)
+                    val fill = fillChar.toString().repeat(fillCount)
+                    "$key$fill$value"
                 } else {
                     // Key too long - needs wrapping
                     var firstLineEndIndex = key.length
@@ -208,9 +210,10 @@ class SingleCanvasBillBuilder(
                     val firstLinePart = key.substring(0, firstLineEndIndex).trimEnd()
                     val remainingPart = key.substring(firstLineEndIndex).trimStart()
                     val firstLineKeyWidth = paint.measureText(firstLinePart)
-                    val spaceWidth = paperWidth - firstLineKeyWidth - valueWidth
-                    val spaces = " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1))
-                    val firstLine = "$firstLinePart$spaces$value"
+                    val fillWidth = paperWidth - firstLineKeyWidth - valueWidth
+                    val fillCount = (fillWidth / fillCharWidth).toInt().coerceAtLeast(1)
+                    val fill = fillChar.toString().repeat(fillCount)
+                    val firstLine = "$firstLinePart$fill$value"
 
                     if (remainingPart.isNotEmpty()) "$firstLine\n$remainingPart" else firstLine
                 }
@@ -308,7 +311,7 @@ class SingleCanvasBillBuilder(
     /**
      * In key-value
      */
-    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): SingleCanvasBillBuilder {
+    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle(), dotFill: Boolean = false): SingleCanvasBillBuilder {
         if (key.isBlank() && value.isBlank()) return this
         val fontSize = if (style.bold) totalFontSize else baseFontSize
         elements.add(PrintElement.KeyValue(
@@ -316,7 +319,8 @@ class SingleCanvasBillBuilder(
             value = value,
             fontSize = fontSize,
             bold = style.bold,
-            lineSpacing = lineSpacing
+            lineSpacing = lineSpacing,
+            fillChar = if (dotFill) '.' else ' '
         ))
         return this
     }
@@ -326,6 +330,14 @@ class SingleCanvasBillBuilder(
      */
     fun lineKeyValueBold(key: String, value: String): SingleCanvasBillBuilder {
         return lineKeyValue(key, value, BitmapTextStyle(bold = true))
+    }
+
+    /**
+     * In key-value với dấu chấm nối (dotted)
+     * Ví dụ: Tên món...........Giá
+     */
+    fun lineKeyValueDotted(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): SingleCanvasBillBuilder {
+        return lineKeyValue(key, value, style, dotFill = true)
     }
 
     /**
@@ -675,7 +687,7 @@ class SingleCanvasBillBuilder(
         if (element.key.isBlank() && element.value.isBlank()) return
 
         val paint = PrintElement.createTextPaint(element.fontSize, element.bold, false)
-        val fullText = PrintElement.buildKeyValueText(element.key, element.value, paint, pixelWidth)
+        val fullText = PrintElement.buildKeyValueText(element.key, element.value, paint, pixelWidth, element.fillChar)
         val layout = PrintElement.createStaticLayout(fullText, paint, pixelWidth, Layout.Alignment.ALIGN_NORMAL, element.lineSpacing)
 
         val topPadding = (layout.height * 0.05f).coerceAtLeast(1f)

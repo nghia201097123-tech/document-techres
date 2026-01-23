@@ -444,12 +444,14 @@ object BitmapTextRenderer {
     /**
      * Render key-value line (ví dụ: "Tên món dài...     x1  230.000đ")
      * Nếu key quá dài: xuống dòng, value luôn canh phải trên dòng đầu
+     * @param fillChar Ký tự fill giữa key và value (mặc định ' ', dùng '.' cho dotted style)
      */
     fun renderKeyValue(
         key: String,
         value: String,
         paperWidth: Int = PAPER_WIDTH_80MM,
-        style: BitmapTextStyle = BitmapTextStyle()
+        style: BitmapTextStyle = BitmapTextStyle(),
+        fillChar: Char = ' '
     ): Bitmap {
         val textPaint = TextPaint().apply {
             color = Color.BLACK
@@ -461,18 +463,19 @@ object BitmapTextRenderer {
         }
 
         val valueWidth = textPaint.measureText(value)
-        val spaceCharWidth = textPaint.measureText(" ")
+        val fillCharWidth = textPaint.measureText(fillChar.toString())
         val keyWidth = textPaint.measureText(key)
 
-        // Cần ít nhất 2 khoảng trắng giữa key và value
-        val minSpaceWidth = spaceCharWidth * 2
-        val maxFirstLineKeyWidth = paperWidth - valueWidth - minSpaceWidth
+        // Cần ít nhất 2 fill characters giữa key và value
+        val minFillWidth = fillCharWidth * 2
+        val maxFirstLineKeyWidth = paperWidth - valueWidth - minFillWidth
 
         // Nếu key vừa trên 1 dòng
         if (keyWidth <= maxFirstLineKeyWidth) {
-            val spaceWidth = paperWidth - keyWidth - valueWidth
-            val spaces = " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1))
-            return renderText("$key$spaces$value", style, paperWidth)
+            val fillWidth = paperWidth - keyWidth - valueWidth
+            val fillCount = (fillWidth / fillCharWidth).toInt().coerceAtLeast(1)
+            val fill = fillChar.toString().repeat(fillCount)
+            return renderText("$key$fill$value", style, paperWidth)
         }
 
         // Key quá dài - cần xuống dòng
@@ -493,11 +496,12 @@ object BitmapTextRenderer {
 
         // Tính khoảng trống cho dòng đầu
         val firstLineKeyWidth = textPaint.measureText(firstLinePart)
-        val spaceWidth = paperWidth - firstLineKeyWidth - valueWidth
-        val spaces = " ".repeat((spaceWidth / spaceCharWidth).toInt().coerceAtLeast(1))
+        val fillWidth = paperWidth - firstLineKeyWidth - valueWidth
+        val fillCount = (fillWidth / fillCharWidth).toInt().coerceAtLeast(1)
+        val fill = fillChar.toString().repeat(fillCount)
 
-        // Dòng đầu: key (phần đầu) + spaces + value (canh phải)
-        val firstLine = "$firstLinePart$spaces$value"
+        // Dòng đầu: key (phần đầu) + fill + value (canh phải)
+        val firstLine = "$firstLinePart$fill$value"
 
         // Dòng còn lại: phần key chưa in (wrap tự động bởi StaticLayout)
         val fullText = if (remainingPart.isNotEmpty()) {
@@ -708,8 +712,9 @@ class HybridBillBuilder(
 
     /**
      * In key-value (ví dụ: "Tổng tiền:" và "100,000đ")
+     * @param fillChar Ký tự fill giữa key và value (mặc định ' ', dùng '.' cho dotted style)
      */
-    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+    fun lineKeyValue(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle(), fillChar: Char = ' '): HybridBillBuilder {
         // Bỏ qua nếu cả key và value đều blank
         if (key.isBlank() && value.isBlank()) {
             return this
@@ -720,7 +725,7 @@ class HybridBillBuilder(
         val actualStyle = BitmapTextStyle(fontSize = fontSize, bold = style.bold, lineSpacingMultiplier = lineSpacing)
 
         if (useBitmapMode) {
-            val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle)
+            val bitmap = BitmapTextRenderer.renderKeyValue(key, value, pixelWidth, actualStyle, fillChar)
 
             // Bỏ qua bitmap quá nhỏ
             if (bitmap.height <= 2) {
@@ -736,9 +741,9 @@ class HybridBillBuilder(
             buffer.write(imageData)
             bitmap.recycle()
         } else {
-            val spaces = lineWidth - key.length - value.length
-            val line = if (spaces > 0) {
-                key + " ".repeat(spaces) + value
+            val fillCount = lineWidth - key.length - value.length
+            val line = if (fillCount > 0) {
+                key + fillChar.toString().repeat(fillCount) + value
             } else {
                 "$key $value"
             }
@@ -746,6 +751,14 @@ class HybridBillBuilder(
             buffer.write(EscPosCommands.LF)
         }
         return this
+    }
+
+    /**
+     * In key-value với dấu chấm nối (dotted style)
+     * Sử dụng pixel-accurate dot filling để hiển thị hết khổ giấy
+     */
+    fun lineKeyValueDotted(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
+        return lineKeyValue(key, value, style, '.')
     }
 
     /**
