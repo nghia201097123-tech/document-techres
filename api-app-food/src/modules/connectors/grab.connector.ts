@@ -13,47 +13,92 @@ import {
 
 /**
  * GrabFood Platform Connector
+ * Uses Grab Merchant Experience (MEX) API for authentication
  */
 @Injectable()
 export class GrabConnector extends BasePlatformConnector {
   readonly platform = FoodPlatformType.GRAB;
 
   constructor(configService: ConfigService) {
-    const baseUrl = configService.get<string>('platform.grab.baseUrl') || 'https://api.grab.com/merchant/v2';
+    // Use MEX API base URL
+    const baseUrl = configService.get<string>('platform.grab.baseUrl') || 'https://api.grab.com/mex-app';
     super(configService, baseUrl);
   }
 
   /**
-   * Login with username/password
+   * Login with username/password via Grab MEX API
+   * Endpoint: POST /troy/user-profile/v1/login
    */
   async login(credentials: LoginCredentials): Promise<LoginResult> {
     try {
-      const clientId = this.configService.get<string>('platform.grab.clientId');
-      const clientSecret = this.configService.get<string>('platform.grab.clientSecret');
+      const response = await this.httpClient.post(
+        '/troy/user-profile/v1/login',
+        {
+          login_source: 'TROY_APP_MAIN_USERNAME_PASSWORD',
+          session_data: {
+            mobile_session_data: {
+              device_model: 'iPhone 13',
+              device_id: '',
+              device_brand: '',
+            },
+          },
+          without_force_logout: false,
+          password: credentials.password,
+          username: credentials.username,
+        },
+        {
+          headers: {
+            'user-agent': 'Grab Merchant/4.126.0 (ios 16.7.10; Build 102734851)',
+            'mex-country': 'VN',
+            'x-currency': 'VND',
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
-      const response = await this.httpClient.post('/auth/login', {
-        username: credentials.username,
-        password: credentials.password,
-        client_id: clientId,
-        client_secret: clientSecret,
-      });
+      const responseData = response.data;
 
-      const data = response.data;
+      // Check if login was successful
+      if (responseData?.data?.success && responseData?.data?.data?.jwt) {
+        const loginData = responseData.data.data;
+        const userProfile = loginData.user_profile;
 
-      return {
-        success: true,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresIn: data.expires_in,
-        merchantId: data.merchant_id,
-        merchantName: data.merchant_name,
-      };
-    } catch (error) {
-      this.logger.error('GrabFood login failed', error);
+        return {
+          success: true,
+          accessToken: loginData.jwt,
+          refreshToken: loginData.jwt, // Grab MEX uses JWT as both access and refresh
+          expiresIn: 540000000, // JWT has long expiry (~17 years based on sample)
+          merchantId: userProfile?.grab_food_entity_id || userProfile?.parent_entity_id,
+          merchantName: userProfile?.first_name
+            ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim()
+            : userProfile?.username,
+          // Additional user profile data
+          grabId: userProfile?.grab_id,
+          userProfileId: loginData.user_profile_id,
+          merchantGrabId: loginData.merchant_grab_id,
+          country: loginData.country,
+          cityId: loginData.city_id,
+        };
+      }
+
+      // Login failed
       return {
         success: false,
-        error: 'Đăng nhập thất bại',
+        error: responseData?.data?.message || 'Đăng nhập thất bại',
         errorCode: 'INVALID_CREDENTIALS',
+      };
+    } catch (error: any) {
+      this.logger.error('GrabFood login failed', error?.response?.data || error?.message);
+
+      // Extract error message from response if available
+      const errorMessage = error?.response?.data?.data?.message
+        || error?.response?.data?.error?.message
+        || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.';
+
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: error?.response?.data?.error?.code || 'INVALID_CREDENTIALS',
       };
     }
   }

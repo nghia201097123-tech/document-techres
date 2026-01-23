@@ -22,6 +22,12 @@ export interface LoginResult {
   merchantName?: string;
   error?: string;
   errorCode?: string;
+  // Grab MEX specific fields
+  grabId?: string;
+  userProfileId?: string;
+  merchantGrabId?: string;
+  country?: string;
+  cityId?: number;
 }
 
 /**
