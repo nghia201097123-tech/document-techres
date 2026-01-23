@@ -110,11 +110,43 @@ const PrintOptions = React.memo(function PrintOptions({
   );
 });
 
-// Sample items for preview
+// Sample items for preview with variants/toppings
 const PREVIEW_ITEMS = [
-  { code: "PHO-001", name: "Pho bo tai nam", qty: 1, price: 45000, note: "It hanh, them gia", category: "Mon chinh" },
-  { code: "CF-002", name: "Ca phe sua da", qty: 3, price: 20000, discount: 6000, category: "Do uong" },
-  { code: "BM-003", name: "Banh mi thit", qty: 2, price: 25000, category: "Mon chinh" },
+  {
+    code: "OLM-001",
+    name: "O long macchiata",
+    qty: 1,
+    price: 54000,
+    note: "It duong",
+    category: "Do uong",
+    variants: [
+      { name: "NHIEU", price: 0 },
+      { name: "Size L", price: 10000 },
+    ],
+    finalPrice: 64000, // price + variants
+  },
+  {
+    code: "LTM-002",
+    name: "Luc tra macchiata",
+    qty: 3,
+    price: 50000,
+    discount: 36000, // 20% discount
+    discountPercent: 20,
+    category: "Do uong",
+    variants: [
+      { name: "NHIEU", price: 0 },
+      { name: "Size L", price: 10000 },
+    ],
+    finalPrice: 144000, // (50000 + 10000) * 3 - 36000
+  },
+  {
+    code: "TRA-003",
+    name: "Tra da",
+    qty: 2,
+    price: 5000,
+    category: "Do uong",
+    finalPrice: 10000,
+  },
 ];
 
 // Memoized Items Section with different layouts
@@ -138,46 +170,81 @@ const ItemsSection = React.memo(function ItemsSection({
   // Format price helper
   const formatPrice = (n: number) => n.toLocaleString("vi-VN");
 
-  // STANDARD layout: Tên món - SL x Đơn giá = Thành tiền
+  // Helper to render variants
+  const renderVariants = (item: typeof PREVIEW_ITEMS[0]) => {
+    if (!item.variants || item.variants.length === 0) return null;
+    return (
+      <div className="text-xs pl-2 space-y-0.5">
+        {item.variants.map((v, i) => (
+          <div key={i} className="flex justify-between">
+            <span>• {v.name}</span>
+            {v.price > 0 && <span className="text-orange-600">+{formatPrice(v.price)}</span>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // STANDARD layout: Tên món - SL x Đơn giá = Thành tiền (với variants)
   if (activeLayout === ItemDisplayLayout.STANDARD) {
     return (
-      <div className="space-y-2 text-xs">
+      <div className="space-y-3 text-xs">
         {PREVIEW_ITEMS.map((item, idx) => (
           <div key={idx}>
             <div className="flex justify-between items-start">
               <span className="flex-1 font-medium">{item.name}</span>
               {showQuantity && <span className="text-xs bg-gray-200 px-1 rounded mx-1">x{item.qty}</span>}
-              {showUnitPrice && <span>{formatPrice(item.price * item.qty)}</span>}
             </div>
-            {showItemCode && <p className="text-xs text-muted-foreground">Ma: {item.code}</p>}
-            {showItemNote && item.note && <p className="text-xs text-muted-foreground italic">{item.note}</p>}
+            {showUnitPrice && (
+              <p className="text-xs text-muted-foreground pl-2">Gia goc: {formatPrice(item.price)}</p>
+            )}
+            {/* Variants/Toppings */}
+            {renderVariants(item)}
+            {showItemCode && <p className="text-xs text-muted-foreground pl-2">Ma: {item.code}</p>}
+            {showItemNote && item.note && <p className="text-xs text-blue-600 italic pl-2">Ghi chu: {item.note}</p>}
+            {/* Item Discount */}
             {showItemDiscount && item.discount && (
-              <div className="flex justify-between text-xs text-green-600">
-                <span>Giam gia</span>
+              <div className="flex justify-between text-xs text-green-600 pl-2">
+                <span>→ Giam {item.discountPercent || 0}%:</span>
                 <span>-{formatPrice(item.discount)}</span>
               </div>
             )}
+            {/* Final price */}
+            <div className="flex justify-between text-xs font-medium border-t border-dotted mt-1 pt-1">
+              <span className="pl-2">Thanh tien{item.qty > 1 ? ` (${item.qty} x ${formatPrice((item.finalPrice + (item.discount || 0)) / item.qty)})` : ""}:</span>
+              <span>{formatPrice(item.finalPrice)}</span>
+            </div>
           </div>
         ))}
       </div>
     );
   }
 
-  // COMPACT layout: Tên món x SL = Thành tiền (1 dòng)
+  // COMPACT layout: Tên món x SL = Thành tiền (1 dòng, với variants gộp)
   if (activeLayout === ItemDisplayLayout.COMPACT) {
     return (
       <div className="space-y-1 text-xs">
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="flex justify-between">
-            <span>{item.name} {showQuantity && `x${item.qty}`}</span>
-            <span>{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
-          </div>
-        ))}
+        {PREVIEW_ITEMS.map((item, idx) => {
+          const variantNames = item.variants?.filter(v => v.price > 0).map(v => v.name).join(", ") || "";
+          return (
+            <div key={idx}>
+              <div className="flex justify-between">
+                <span>{item.name} {variantNames && `(${variantNames})`} {showQuantity && `x${item.qty}`}</span>
+                <span>{formatPrice(item.finalPrice)}</span>
+              </div>
+              {showItemDiscount && item.discount && (
+                <div className="flex justify-end text-green-600 text-xs">
+                  <span>(-{formatPrice(item.discount)})</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  // DETAILED layout: Mã + Tên + Ghi chú + Đơn giá + SL + Thành tiền
+  // DETAILED layout: Mã + Tên + Ghi chú + Variants + Đơn giá + SL + Thành tiền
   if (activeLayout === ItemDisplayLayout.DETAILED) {
     return (
       <div className="space-y-3 text-xs">
@@ -185,16 +252,56 @@ const ItemsSection = React.memo(function ItemsSection({
           <div key={idx} className="border-b border-dashed pb-2 last:border-0">
             <div className="flex justify-between font-medium">
               <span>{item.code} - {item.name}</span>
+              {showQuantity && <span className="bg-gray-200 px-1 rounded">x{item.qty}</span>}
             </div>
-            {item.note && <p className="text-muted-foreground italic">Ghi chu: {item.note}</p>}
-            <div className="flex justify-between mt-1">
-              <span>{item.qty} x {formatPrice(item.price)}</span>
-              <span className="font-medium">{formatPrice(item.price * item.qty)}</span>
-            </div>
-            {item.discount && (
-              <div className="flex justify-between text-green-600">
-                <span>Giam gia</span>
+            {showUnitPrice && (
+              <p className="text-muted-foreground pl-2">Gia goc: {formatPrice(item.price)}</p>
+            )}
+            {/* Variants */}
+            {renderVariants(item)}
+            {item.note && <p className="text-blue-600 italic pl-2">Ghi chu: {item.note}</p>}
+            {/* Item Discount */}
+            {showItemDiscount && item.discount && (
+              <div className="flex justify-between text-green-600 pl-2">
+                <span>→ Giam {item.discountPercent || 0}%:</span>
                 <span>-{formatPrice(item.discount)}</span>
+              </div>
+            )}
+            {/* Final price */}
+            <div className="flex justify-between font-medium border-t border-dotted mt-1 pt-1">
+              <span className="pl-2">Thanh tien:</span>
+              <span>{formatPrice(item.finalPrice)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // TWO_LINE layout: Dòng 1: Tên, Dòng 2: Chi tiết giá (với variants)
+  if (activeLayout === ItemDisplayLayout.TWO_LINE) {
+    return (
+      <div className="space-y-3 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx}>
+            <div className="flex justify-between items-start">
+              <p className="font-medium">{item.name}</p>
+              {showQuantity && <span className="bg-gray-200 px-1 rounded">x{item.qty}</span>}
+            </div>
+            {/* Variants inline */}
+            {item.variants && item.variants.length > 0 && (
+              <p className="text-xs text-muted-foreground pl-2">
+                {item.variants.map(v => v.name + (v.price > 0 ? ` +${formatPrice(v.price)}` : "")).join(", ")}
+              </p>
+            )}
+            {/* Price line */}
+            <div className="flex justify-between pl-4 text-muted-foreground">
+              {showUnitPrice && <span>{item.qty} x {formatPrice((item.finalPrice + (item.discount || 0)) / item.qty)}</span>}
+              <span className="text-foreground font-medium">{formatPrice(item.finalPrice)}</span>
+            </div>
+            {showItemDiscount && item.discount && (
+              <div className="flex justify-end text-green-600 text-xs">
+                <span>(da giam {formatPrice(item.discount)})</span>
               </div>
             )}
           </div>
@@ -203,52 +310,56 @@ const ItemsSection = React.memo(function ItemsSection({
     );
   }
 
-  // TWO_LINE layout: Dòng 1: Tên, Dòng 2: Chi tiết giá
-  if (activeLayout === ItemDisplayLayout.TWO_LINE) {
-    return (
-      <div className="space-y-2 text-xs">
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx}>
-            <p className="font-medium">{item.name}</p>
-            <div className="flex justify-between pl-4 text-muted-foreground">
-              <span>{item.qty} x {formatPrice(item.price)}</span>
-              <span className="text-foreground">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // PRICE_RIGHT layout: Tên căn trái, giá căn phải
+  // PRICE_RIGHT layout: Tên căn trái, giá căn phải (với variants inline)
   if (activeLayout === ItemDisplayLayout.PRICE_RIGHT) {
     return (
-      <div className="space-y-1 text-xs">
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="flex justify-between">
-            <span className="flex-1">{item.name} {showQuantity && `(x${item.qty})`}</span>
-            <span className="text-right tabular-nums">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
-          </div>
-        ))}
+      <div className="space-y-2 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => {
+          const variantText = item.variants?.filter(v => v.price > 0).map(v => v.name).join(", ") || "";
+          return (
+            <div key={idx}>
+              <div className="flex justify-between">
+                <span className="flex-1">{item.name} {variantText && `(${variantText})`} {showQuantity && `x${item.qty}`}</span>
+                <span className="text-right tabular-nums font-medium">{formatPrice(item.finalPrice)}</span>
+              </div>
+              {showItemDiscount && item.discount && (
+                <div className="flex justify-end text-green-600 text-xs">
+                  <span>(-{formatPrice(item.discount)})</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  // WITH_INDEX layout: STT. Tên món - SL x Đơn giá
+  // WITH_INDEX layout: STT. Tên món - SL x Đơn giá (với variants)
   if (activeLayout === ItemDisplayLayout.WITH_INDEX) {
     return (
-      <div className="space-y-1 text-xs">
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="flex justify-between">
-            <span>{idx + 1}. {item.name}</span>
-            <span>{item.qty} x {formatPrice(item.price)}</span>
-          </div>
-        ))}
+      <div className="space-y-2 text-xs">
+        {PREVIEW_ITEMS.map((item, idx) => {
+          const variantText = item.variants?.filter(v => v.price > 0).map(v => v.name).join(", ") || "";
+          const unitPrice = (item.finalPrice + (item.discount || 0)) / item.qty;
+          return (
+            <div key={idx}>
+              <div className="flex justify-between">
+                <span>{idx + 1}. {item.name} {variantText && `(${variantText})`}</span>
+                <span>{item.qty} x {formatPrice(unitPrice)}</span>
+              </div>
+              {showItemDiscount && item.discount && (
+                <div className="flex justify-end text-green-600 text-xs pl-4">
+                  <span>Giam: -{formatPrice(item.discount)} → {formatPrice(item.finalPrice)}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  // GROUPED layout: Nhóm theo danh mục
+  // GROUPED layout: Nhóm theo danh mục (với variants)
   if (activeLayout === ItemDisplayLayout.GROUPED) {
     // Group items by category
     const grouped: Record<string, typeof PREVIEW_ITEMS> = {};
@@ -262,60 +373,78 @@ const ItemsSection = React.memo(function ItemsSection({
         {Object.entries(grouped).map(([category, items]) => (
           <div key={category}>
             <p className="text-center font-medium text-muted-foreground">--- {category.toUpperCase()} ---</p>
-            {items.map((item, idx) => (
-              <div key={idx} className="flex justify-between">
-                <span>{item.name} {showQuantity && `x${item.qty}`}</span>
-                <span>{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
-              </div>
-            ))}
+            {items.map((item, idx) => {
+              const variantText = item.variants?.filter(v => v.price > 0).map(v => v.name).join(", ") || "";
+              return (
+                <div key={idx}>
+                  <div className="flex justify-between">
+                    <span>{item.name} {variantText && `(${variantText})`} {showQuantity && `x${item.qty}`}</span>
+                    <span>{formatPrice(item.finalPrice)}</span>
+                  </div>
+                  {showItemDiscount && item.discount && (
+                    <div className="flex justify-end text-green-600 text-xs">
+                      <span>(-{formatPrice(item.discount)})</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
     );
   }
 
-  // GRID_2_COL layout: Grid 2 cột
+  // GRID_2_COL layout: Grid 2 cột (với variants)
   if (activeLayout === ItemDisplayLayout.GRID_2_COL) {
     return (
       <div className="grid grid-cols-2 gap-1 text-xs">
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="border border-dashed p-1 rounded">
-            <p className="font-medium truncate">{item.name}</p>
-            <div className="flex justify-between text-muted-foreground">
-              {showQuantity && <span>x{item.qty}</span>}
-              <span className="font-medium text-foreground">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+        {PREVIEW_ITEMS.map((item, idx) => {
+          const variantText = item.variants?.filter(v => v.price > 0).map(v => v.name).join(", ") || "";
+          return (
+            <div key={idx} className="border border-dashed p-1 rounded">
+              <p className="font-medium truncate">{item.name}</p>
+              {variantText && <p className="text-xs text-muted-foreground truncate">{variantText}</p>}
+              <div className="flex justify-between text-muted-foreground">
+                {showQuantity && <span>x{item.qty}</span>}
+                <span className="font-medium text-foreground">{formatPrice(item.finalPrice)}</span>
+              </div>
+              {showItemDiscount && item.discount && (
+                <p className="text-green-600 text-right text-xs">(-{formatPrice(item.discount)})</p>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
 
-  // MINIMAL layout: Tối giản
+  // MINIMAL layout: Tối giản (chỉ tên và giá cuối)
   if (activeLayout === ItemDisplayLayout.MINIMAL) {
     return (
       <div className="space-y-0.5 text-xs">
         {PREVIEW_ITEMS.map((item, idx) => (
           <div key={idx} className="flex justify-between">
-            <span>{item.name}</span>
-            <span>{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+            <span>{item.name} {showQuantity && `x${item.qty}`}</span>
+            <span>{formatPrice(item.finalPrice)}</span>
           </div>
         ))}
       </div>
     );
   }
 
-  // DOTTED layout: Dấu chấm
+  // DOTTED layout: Dấu chấm (với variants inline)
   if (activeLayout === ItemDisplayLayout.DOTTED) {
     return (
       <div className="space-y-0.5 text-xs">
         {PREVIEW_ITEMS.map((item, idx) => {
-          const name = `${item.name} ${showQuantity ? `x${item.qty}` : ""}`;
-          const price = formatPrice(item.price * item.qty - (item.discount || 0));
-          const dots = ".".repeat(Math.max(2, 20 - name.length - price.length));
+          const variantText = item.variants?.filter(v => v.price > 0).map(v => v.name).join(",") || "";
+          const name = `${item.name}${variantText ? ` (${variantText})` : ""} ${showQuantity ? `x${item.qty}` : ""}`;
+          const price = formatPrice(item.finalPrice);
+          const dots = ".".repeat(Math.max(2, 24 - name.length - price.length));
           return (
             <div key={idx} className="flex">
-              <span className="flex-1">{name}<span className="text-muted-foreground">{dots}</span></span>
+              <span className="flex-1 truncate">{name}<span className="text-muted-foreground">{dots}</span></span>
               <span>{price}</span>
             </div>
           );
@@ -324,7 +453,7 @@ const ItemsSection = React.memo(function ItemsSection({
     );
   }
 
-  // BOXED layout: Có viền
+  // BOXED layout: Có viền (với variants)
   if (activeLayout === ItemDisplayLayout.BOXED) {
     return (
       <div className="space-y-1 text-xs">
@@ -332,10 +461,50 @@ const ItemsSection = React.memo(function ItemsSection({
           <div key={idx} className="border-2 border-gray-300 rounded p-1.5">
             <div className="flex justify-between items-center">
               <span className="font-medium">{item.name}</span>
-              <span className="font-bold">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+              <span className="font-bold">{formatPrice(item.finalPrice)}</span>
             </div>
-            {showQuantity && (
-              <p className="text-muted-foreground text-right">SL: {item.qty}</p>
+            {/* Variants */}
+            {item.variants && item.variants.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {item.variants.map(v => v.name + (v.price > 0 ? ` +${formatPrice(v.price)}` : "")).join(", ")}
+              </p>
+            )}
+            <div className="flex justify-between text-muted-foreground">
+              {showQuantity && <span>SL: {item.qty}</span>}
+              {showItemDiscount && item.discount && (
+                <span className="text-green-600">-{formatPrice(item.discount)}</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // TABLE layout: Dạng bảng (với variants dòng phụ)
+  if (activeLayout === ItemDisplayLayout.TABLE) {
+    return (
+      <div className="text-xs">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
+          <span>Mon</span>
+          <span className="text-center w-8">SL</span>
+          <span className="text-right w-16">Gia</span>
+        </div>
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="py-0.5 border-b border-dotted last:border-0">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-1">
+              <span className="truncate">{item.name}</span>
+              <span className="text-center w-8">{item.qty}</span>
+              <span className="text-right w-16">{formatPrice(item.finalPrice)}</span>
+            </div>
+            {/* Variants row */}
+            {item.variants && item.variants.length > 0 && (
+              <div className="text-muted-foreground pl-2">
+                {item.variants.map(v => v.name + (v.price > 0 ? ` +${formatPrice(v.price)}` : "")).join(", ")}
+              </div>
+            )}
+            {showItemDiscount && item.discount && (
+              <div className="text-green-600 text-right">-{formatPrice(item.discount)}</div>
             )}
           </div>
         ))}
@@ -343,88 +512,104 @@ const ItemsSection = React.memo(function ItemsSection({
     );
   }
 
-  // TABLE layout: Dạng bảng
-  if (activeLayout === ItemDisplayLayout.TABLE) {
-    return (
-      <div className="text-xs">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
-          <span>Món</span>
-          <span className="text-center w-8">SL</span>
-          <span className="text-right w-16">Giá</span>
-        </div>
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="grid grid-cols-[1fr_auto_auto] gap-1 py-0.5">
-            <span className="truncate">{item.name}</span>
-            <span className="text-center w-8">{item.qty}</span>
-            <span className="text-right w-16">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // TABLE_STT layout: Bảng có STT
+  // TABLE_STT layout: Bảng có STT (với variants)
   if (activeLayout === ItemDisplayLayout.TABLE_STT) {
     return (
       <div className="text-xs">
         <div className="grid grid-cols-[auto_1fr_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
           <span className="w-6 text-center">STT</span>
-          <span>Món</span>
+          <span>Mon</span>
           <span className="text-center w-8">SL</span>
-          <span className="text-right w-16">Giá</span>
+          <span className="text-right w-16">Gia</span>
         </div>
         {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="grid grid-cols-[auto_1fr_auto_auto] gap-1 py-0.5">
-            <span className="w-6 text-center">{idx + 1}</span>
-            <span className="truncate">{item.name}</span>
-            <span className="text-center w-8">{item.qty}</span>
-            <span className="text-right w-16">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          <div key={idx} className="py-0.5 border-b border-dotted last:border-0">
+            <div className="grid grid-cols-[auto_1fr_auto_auto] gap-1">
+              <span className="w-6 text-center">{idx + 1}</span>
+              <span className="truncate">{item.name}</span>
+              <span className="text-center w-8">{item.qty}</span>
+              <span className="text-right w-16">{formatPrice(item.finalPrice)}</span>
+            </div>
+            {/* Variants row */}
+            {item.variants && item.variants.length > 0 && (
+              <div className="text-muted-foreground pl-8">
+                {item.variants.map(v => v.name + (v.price > 0 ? ` +${formatPrice(v.price)}` : "")).join(", ")}
+              </div>
+            )}
+            {showItemDiscount && item.discount && (
+              <div className="text-green-600 text-right">-{formatPrice(item.discount)}</div>
+            )}
           </div>
         ))}
       </div>
     );
   }
 
-  // TABLE_QTY_FIRST layout: Bảng SL trước
+  // TABLE_QTY_FIRST layout: Bảng SL trước (với variants)
   if (activeLayout === ItemDisplayLayout.TABLE_QTY_FIRST) {
     return (
       <div className="text-xs">
         <div className="grid grid-cols-[auto_1fr_auto] gap-1 font-medium border-b pb-1 mb-1">
           <span className="text-center w-8">SL</span>
-          <span>Món</span>
-          <span className="text-right w-16">Giá</span>
+          <span>Mon</span>
+          <span className="text-right w-16">Gia</span>
         </div>
         {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="grid grid-cols-[auto_1fr_auto] gap-1 py-0.5">
-            <span className="text-center w-8">{item.qty}</span>
-            <span className="truncate">{item.name}</span>
-            <span className="text-right w-16">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          <div key={idx} className="py-0.5 border-b border-dotted last:border-0">
+            <div className="grid grid-cols-[auto_1fr_auto] gap-1">
+              <span className="text-center w-8">{item.qty}</span>
+              <span className="truncate">{item.name}</span>
+              <span className="text-right w-16">{formatPrice(item.finalPrice)}</span>
+            </div>
+            {/* Variants row */}
+            {item.variants && item.variants.length > 0 && (
+              <div className="text-muted-foreground pl-10">
+                {item.variants.map(v => v.name + (v.price > 0 ? ` +${formatPrice(v.price)}` : "")).join(", ")}
+              </div>
+            )}
+            {showItemDiscount && item.discount && (
+              <div className="text-green-600 text-right">-{formatPrice(item.discount)}</div>
+            )}
           </div>
         ))}
       </div>
     );
   }
 
-  // TABLE_FULL layout: Bảng đầy đủ
+  // TABLE_FULL layout: Bảng đầy đủ (với variants)
   if (activeLayout === ItemDisplayLayout.TABLE_FULL) {
     return (
       <div className="text-xs">
         <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
           <span className="w-6 text-center">STT</span>
-          <span>Món</span>
+          <span>Mon</span>
           <span className="text-center w-6">SL</span>
-          <span className="text-right w-14">Đ.Giá</span>
-          <span className="text-right w-14">T.Tiền</span>
+          <span className="text-right w-14">D.Gia</span>
+          <span className="text-right w-14">T.Tien</span>
         </div>
-        {PREVIEW_ITEMS.map((item, idx) => (
-          <div key={idx} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-1 py-0.5">
-            <span className="w-6 text-center">{idx + 1}</span>
-            <span className="truncate">{item.name}</span>
-            <span className="text-center w-6">{item.qty}</span>
-            <span className="text-right w-14">{formatPrice(item.price)}</span>
-            <span className="text-right w-14">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
-          </div>
-        ))}
+        {PREVIEW_ITEMS.map((item, idx) => {
+          const unitPrice = (item.finalPrice + (item.discount || 0)) / item.qty;
+          return (
+            <div key={idx} className="py-0.5 border-b border-dotted last:border-0">
+              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-1">
+                <span className="w-6 text-center">{idx + 1}</span>
+                <span className="truncate">{item.name}</span>
+                <span className="text-center w-6">{item.qty}</span>
+                <span className="text-right w-14">{formatPrice(unitPrice)}</span>
+                <span className="text-right w-14">{formatPrice(item.finalPrice)}</span>
+              </div>
+              {/* Variants row */}
+              {item.variants && item.variants.length > 0 && (
+                <div className="text-muted-foreground pl-8">
+                  {item.variants.map(v => v.name + (v.price > 0 ? ` +${formatPrice(v.price)}` : "")).join(", ")}
+                </div>
+              )}
+              {showItemDiscount && item.discount && (
+                <div className="text-green-600 text-right">-{formatPrice(item.discount)}</div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -626,18 +811,19 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         </p>
 
         {/* Subtotal & Discounts - Price/VAT section with stable style */}
+        {/* Data: OLM 64k + LTM 144k (da giam 36k) + Tra da 10k = 218k */}
         <div className="space-y-1 text-xs" style={SECTION_STYLE}>
           {activeTemplate.showSubtotal && (
             <div className="flex justify-between">
-              <span>Tam tinh:</span>
-              <span>149,000</span>
+              <span>Tam tinh (3 mon):</span>
+              <span>254,000</span>
             </div>
           )}
 
           {activeTemplate.showTotalItemDiscount && (
             <div className="flex justify-between text-green-600">
               <span>{activeTemplate.itemDiscountLabel || "Giam gia mon"}:</span>
-              <span>-6,000</span>
+              <span>-36,000</span>
             </div>
           )}
 
@@ -646,7 +832,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
               <span>
                 {activeTemplate.billDiscountLabel || "Giam gia hoa don"}{activeTemplate.showDiscountPercent && " (10%)"}:
               </span>
-              <span>-14,300</span>
+              <span>-21,800</span>
             </div>
           )}
 
@@ -667,14 +853,14 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
           {activeTemplate.showTotalDiscount && (
             <div className="flex justify-between text-green-600 font-medium">
               <span>{activeTemplate.totalDiscountLabel || "Tong giam gia"}:</span>
-              <span>-90,300</span>
+              <span>-127,800</span>
             </div>
           )}
 
           {activeTemplate.showServiceFee && (
             <div className="flex justify-between">
               <span>Phi dich vu (5%):</span>
-              <span>7,450</span>
+              <span>6,310</span>
             </div>
           )}
 
@@ -684,19 +870,19 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
               {activeTemplate.showPriceBeforeVat && (
                 <div className="flex justify-between">
                   <span>{activeTemplate.priceBeforeVatLabel || "Gia truoc thue"}:</span>
-                  <span>66,150</span>
+                  <span>120,463</span>
                 </div>
               )}
               {activeTemplate.showVat && (
                 <div className="flex justify-between">
                   <span>{activeTemplate.vatLabel || "VAT"} (10%):</span>
-                  <span>6,615</span>
+                  <span>12,046</span>
                 </div>
               )}
               {activeTemplate.showPriceAfterVat && (
                 <div className="flex justify-between">
                   <span>{activeTemplate.priceAfterVatLabel || "Gia sau thue"}:</span>
-                  <span>72,765</span>
+                  <span>132,509</span>
                 </div>
               )}
             </>
@@ -705,7 +891,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
           {!activeTemplate.showVatDetails && activeTemplate.showVat && (
             <div className="flex justify-between">
               <span>{activeTemplate.vatLabel || "VAT"} (10%):</span>
-              <span>6,615</span>
+              <span>12,046</span>
             </div>
           )}
         </div>
@@ -719,7 +905,7 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
         <div style={SECTION_STYLE}>
           <div className="flex justify-between font-bold text-lg">
             <span>TONG TIEN:</span>
-            <span>72,765</span>
+            <span>132,500d</span>
           </div>
 
           {/* Payment Info */}
@@ -733,14 +919,14 @@ export const BillPreviewPanel = React.memo(function BillPreviewPanel({ template,
           {activeTemplate.showReceivedAmount && (
             <div className="flex justify-between text-xs">
               <span>Tien nhan:</span>
-              <span>100,000</span>
+              <span>200,000</span>
             </div>
           )}
 
           {activeTemplate.showChangeAmount && (
             <div className="flex justify-between text-xs">
               <span>Tien tra lai:</span>
-              <span>27,235</span>
+              <span>67,500</span>
             </div>
           )}
         </div>
