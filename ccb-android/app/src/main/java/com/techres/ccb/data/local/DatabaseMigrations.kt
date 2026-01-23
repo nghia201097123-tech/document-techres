@@ -918,6 +918,193 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 24 to 25
+     * Adds bank_accounts table for bank transfer payment QR codes
+     */
+    val MIGRATION_24_25 = object : Migration(24, 25) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 24 to 25...")
+
+            // Create bank_accounts table
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS bank_accounts (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    branch_id TEXT NOT NULL,
+                    bank_name TEXT NOT NULL,
+                    bank_code TEXT,
+                    account_number TEXT NOT NULL,
+                    account_holder TEXT NOT NULL,
+                    qr_template TEXT NOT NULL DEFAULT 'vietqr',
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    sync_status TEXT NOT NULL DEFAULT 'synced',
+                    synced_at TEXT
+                )
+            """.trimIndent())
+
+            // Create indices
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_bank_accounts_branch_id ON bank_accounts(branch_id)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_bank_accounts_is_active ON bank_accounts(is_active)")
+
+            Log.d(TAG, "Migration 24 to 25 complete - Created bank_accounts table")
+        }
+    }
+
+    /**
+     * Migration from version 25 to 26
+     * Renames branch_id to brand_id in bill_templates table
+     * Bill templates are now built at brand level (shared across branches)
+     */
+    val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 25 to 26...")
+            Log.d(TAG, "Renaming branch_id to brand_id in bill_templates (templates are now at brand level)")
+
+            // SQLite doesn't support ALTER TABLE RENAME COLUMN directly
+            // We need to recreate the table with the new schema
+
+            // 1. Create new table with brand_id
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS bill_templates_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    brand_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    template_type TEXT NOT NULL DEFAULT 'classic',
+                    description TEXT,
+                    show_logo INTEGER NOT NULL DEFAULT 1,
+                    logo_url TEXT,
+                    store_name TEXT NOT NULL,
+                    store_address TEXT,
+                    store_phone TEXT,
+                    tax_code TEXT,
+                    header_text TEXT,
+                    bill_title TEXT NOT NULL DEFAULT 'HÓA ĐƠN BÁN HÀNG',
+                    show_order_number INTEGER NOT NULL DEFAULT 1,
+                    show_table_name INTEGER NOT NULL DEFAULT 1,
+                    show_staff_name INTEGER NOT NULL DEFAULT 1,
+                    show_customer_name INTEGER NOT NULL DEFAULT 1,
+                    show_date_time INTEGER NOT NULL DEFAULT 1,
+                    date_format TEXT NOT NULL DEFAULT 'dd/MM/yyyy HH:mm',
+                    show_check_in_time INTEGER NOT NULL DEFAULT 0,
+                    show_check_out_time INTEGER NOT NULL DEFAULT 0,
+                    check_in_label TEXT NOT NULL DEFAULT 'Giờ vào',
+                    check_out_label TEXT NOT NULL DEFAULT 'Giờ ra',
+                    show_item_code INTEGER NOT NULL DEFAULT 0,
+                    show_item_note INTEGER NOT NULL DEFAULT 1,
+                    show_order_note INTEGER NOT NULL DEFAULT 1,
+                    item_display_layout TEXT NOT NULL DEFAULT 'standard',
+                    show_unit_price INTEGER NOT NULL DEFAULT 1,
+                    show_quantity INTEGER NOT NULL DEFAULT 1,
+                    show_subtotal INTEGER NOT NULL DEFAULT 1,
+                    show_item_discount INTEGER NOT NULL DEFAULT 1,
+                    show_total_item_discount INTEGER NOT NULL DEFAULT 1,
+                    item_discount_label TEXT NOT NULL DEFAULT 'Giảm giá món',
+                    show_bill_discount INTEGER NOT NULL DEFAULT 1,
+                    bill_discount_label TEXT NOT NULL DEFAULT 'Giảm giá hóa đơn',
+                    show_coupon_discount INTEGER NOT NULL DEFAULT 1,
+                    coupon_discount_label TEXT NOT NULL DEFAULT 'Mã giảm giá',
+                    show_voucher_discount INTEGER NOT NULL DEFAULT 1,
+                    voucher_discount_label TEXT NOT NULL DEFAULT 'Voucher',
+                    show_total_discount INTEGER NOT NULL DEFAULT 1,
+                    total_discount_label TEXT NOT NULL DEFAULT 'Tổng giảm giá',
+                    show_discount INTEGER NOT NULL DEFAULT 1,
+                    show_discount_percent INTEGER NOT NULL DEFAULT 1,
+                    show_service_fee INTEGER NOT NULL DEFAULT 1,
+                    show_vat INTEGER NOT NULL DEFAULT 1,
+                    show_vat_details INTEGER NOT NULL DEFAULT 1,
+                    show_price_before_vat INTEGER NOT NULL DEFAULT 1,
+                    show_price_after_vat INTEGER NOT NULL DEFAULT 1,
+                    vat_label TEXT NOT NULL DEFAULT 'VAT',
+                    price_before_vat_label TEXT NOT NULL DEFAULT 'Giá trước thuế',
+                    price_after_vat_label TEXT NOT NULL DEFAULT 'Giá sau thuế',
+                    show_payment_method INTEGER NOT NULL DEFAULT 1,
+                    show_received_amount INTEGER NOT NULL DEFAULT 1,
+                    show_change_amount INTEGER NOT NULL DEFAULT 1,
+                    show_qr_code INTEGER NOT NULL DEFAULT 0,
+                    qr_code_type TEXT NOT NULL DEFAULT 'order_id',
+                    qr_code_content TEXT,
+                    show_barcode INTEGER NOT NULL DEFAULT 0,
+                    thank_you_message TEXT NOT NULL DEFAULT 'Cảm ơn quý khách!',
+                    comeback_message TEXT NOT NULL DEFAULT 'Hẹn gặp lại!',
+                    footer_text TEXT,
+                    show_wifi_info INTEGER NOT NULL DEFAULT 0,
+                    wifi_name TEXT,
+                    wifi_password TEXT,
+                    paper_width INTEGER NOT NULL DEFAULT 80,
+                    font_size TEXT NOT NULL DEFAULT 'normal',
+                    line_spacing REAL NOT NULL DEFAULT 0.7,
+                    separator_char TEXT NOT NULL DEFAULT '-',
+                    double_separator_char TEXT NOT NULL DEFAULT '=',
+                    cut_paper INTEGER NOT NULL DEFAULT 1,
+                    open_cash_drawer INTEGER NOT NULL DEFAULT 0,
+                    beep_after_print INTEGER NOT NULL DEFAULT 0,
+                    number_of_copies INTEGER NOT NULL DEFAULT 1,
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    sync_status TEXT NOT NULL DEFAULT 'synced',
+                    synced_at TEXT
+                )
+            """.trimIndent())
+
+            // 2. Copy data from old table, renaming branch_id to brand_id
+            try {
+                db.execSQL("""
+                    INSERT INTO bill_templates_new (
+                        id, brand_id, name, template_type, description,
+                        show_logo, logo_url, store_name, store_address, store_phone, tax_code, header_text,
+                        bill_title, show_order_number, show_table_name, show_staff_name, show_customer_name, show_date_time, date_format,
+                        show_check_in_time, show_check_out_time, check_in_label, check_out_label,
+                        show_item_code, show_item_note, show_unit_price, show_quantity,
+                        show_subtotal, show_discount, show_discount_percent, show_service_fee, show_vat, show_vat_details,
+                        show_price_before_vat, show_price_after_vat, vat_label, price_before_vat_label, price_after_vat_label,
+                        show_payment_method, show_received_amount, show_change_amount,
+                        show_qr_code, qr_code_type, qr_code_content, show_barcode,
+                        thank_you_message, comeback_message, footer_text, show_wifi_info, wifi_name, wifi_password,
+                        paper_width, font_size, separator_char, double_separator_char, cut_paper, open_cash_drawer, beep_after_print, number_of_copies,
+                        is_default, is_active, sort_order, created_at, updated_at, sync_status, synced_at
+                    )
+                    SELECT
+                        id, branch_id, name, template_type, description,
+                        show_logo, logo_url, store_name, store_address, store_phone, tax_code, header_text,
+                        bill_title, show_order_number, show_table_name, show_staff_name, show_customer_name, show_date_time, date_format,
+                        COALESCE(show_check_in_time, 0), COALESCE(show_check_out_time, 0), COALESCE(check_in_label, 'Giờ vào'), COALESCE(check_out_label, 'Giờ ra'),
+                        show_item_code, show_item_note, show_unit_price, show_quantity,
+                        show_subtotal, show_discount, show_discount_percent, show_service_fee, show_vat, show_vat_details,
+                        show_price_before_vat, show_price_after_vat, vat_label, price_before_vat_label, price_after_vat_label,
+                        show_payment_method, show_received_amount, show_change_amount,
+                        show_qr_code, qr_code_type, qr_code_content, show_barcode,
+                        thank_you_message, comeback_message, footer_text, show_wifi_info, wifi_name, wifi_password,
+                        paper_width, font_size, separator_char, double_separator_char, cut_paper, open_cash_drawer, beep_after_print, number_of_copies,
+                        is_default, is_active, sort_order, created_at, updated_at, sync_status, synced_at
+                    FROM bill_templates
+                """.trimIndent())
+                Log.d(TAG, "Copied data from bill_templates to bill_templates_new")
+            } catch (e: Exception) {
+                Log.d(TAG, "bill_templates may be empty or have different schema: ${e.message}")
+            }
+
+            // 3. Drop old table
+            db.execSQL("DROP TABLE IF EXISTS bill_templates")
+
+            // 4. Rename new table to original name
+            db.execSQL("ALTER TABLE bill_templates_new RENAME TO bill_templates")
+
+            // 5. Recreate indices with new column name
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_bill_templates_brand_id ON bill_templates(brand_id)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_bill_templates_is_active ON bill_templates(is_active)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_bill_templates_is_default ON bill_templates(is_default)")
+
+            Log.d(TAG, "Migration 25 to 26 complete - Renamed branch_id to brand_id in bill_templates")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -935,6 +1122,8 @@ object DatabaseMigrations {
         MIGRATION_20_21,
         MIGRATION_21_22,
         MIGRATION_22_23,
-        MIGRATION_23_24
+        MIGRATION_23_24,
+        MIGRATION_24_25,
+        MIGRATION_25_26
     )
 }

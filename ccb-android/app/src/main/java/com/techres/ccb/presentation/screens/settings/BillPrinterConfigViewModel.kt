@@ -155,6 +155,7 @@ class BillPrinterConfigViewModel @Inject constructor(
 
     private fun loadData() {
         branchId = authRepository.getBranchId() ?: ""
+        val brandId = authRepository.getBrandId() ?: ""
         if (branchId.isEmpty()) {
             _uiState.update { it.copy(isLoading = false, errorMessage = "Không tìm thấy chi nhánh") }
             return
@@ -163,6 +164,7 @@ class BillPrinterConfigViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
 
         // Load printer configs (Flow will keep collecting and updating UI)
+        // Printer configs are at branch level
         viewModelScope.launch {
             try {
                 billPrinterConfigDao.getAllByBranch(branchId).collect { configs ->
@@ -174,10 +176,10 @@ class BillPrinterConfigViewModel @Inject constructor(
             }
         }
 
-        // Also load templates
+        // Also load templates (templates are at brand level, shared across branches)
         viewModelScope.launch {
             try {
-                billTemplateDao.getAllByBranch(branchId).collect { templates ->
+                billTemplateDao.getAllByBrand(brandId).collect { templates ->
                     _uiState.update { it.copy(templates = templates) }
                 }
             } catch (e: Exception) {
@@ -470,11 +472,12 @@ class BillPrinterConfigViewModel @Inject constructor(
             _uiState.update { it.copy(testingPrinterId = config.id) }
             try {
                 val result = withContext(Dispatchers.IO) {
-                    // Get template for test print
+                    // Get template for test print (templates are at brand level)
+                    val brandId = authRepository.getBrandId() ?: ""
                     val template = if (config.templateId != null) {
                         billTemplateDao.getById(config.templateId)
                     } else {
-                        billTemplateDao.getDefaultByBranch(branchId)
+                        billTemplateDao.getDefaultByBrand(brandId)
                     }
 
                     if (template == null) {

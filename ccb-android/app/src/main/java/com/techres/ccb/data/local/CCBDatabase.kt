@@ -45,7 +45,7 @@ import com.techres.ccb.data.local.entity.*
         // Bank accounts (tài khoản ngân hàng)
         BankAccountEntity::class
     ],
-    version = 25,
+    version = 26,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {

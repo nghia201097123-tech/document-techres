@@ -91,6 +91,8 @@ class SyncRepository @Inject constructor(
                 ?: return Result.failure(Exception("No access token"))
             val branchId = authRepository.getBranchId()
                 ?: return Result.failure(Exception("No branch ID"))
+            val brandId = authRepository.getBrandId()
+                ?: return Result.failure(Exception("No brand ID"))
 
             // Step: Fetching data
             onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.IN_PROGRESS))
@@ -100,7 +102,7 @@ class SyncRepository @Inject constructor(
                 val syncResponse = response.body()!!
                 if (syncResponse.success && syncResponse.data != null) {
                     onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.COMPLETED))
-                    saveSyncDataWithProgress(branchId, syncResponse.data, syncResponse.syncTime, onProgress)
+                    saveSyncDataWithProgress(branchId, brandId, syncResponse.data, syncResponse.syncTime, onProgress)
                     Result.success(Unit)
                 } else {
                     onProgress?.invoke(SyncStepProgress(SyncStep.FETCHING, SyncStepStatus.ERROR))
@@ -117,6 +119,7 @@ class SyncRepository @Inject constructor(
 
     private suspend fun saveSyncDataWithProgress(
         branchId: String,
+        brandId: String,
         syncData: FullSyncData,
         syncTime: String,
         onProgress: ((SyncStepProgress) -> Unit)?
@@ -610,12 +613,12 @@ class SyncRepository @Inject constructor(
         productNoteDao.syncProductNoteAssignments(branchId, productNoteAssignmentsList)
         onProgress?.invoke(SyncStepProgress(SyncStep.PRODUCT_NOTES, SyncStepStatus.COMPLETED, productNotesList.size))
 
-        // Sync bill templates
+        // Sync bill templates (at brand level - shared across branches)
         onProgress?.invoke(SyncStepProgress(SyncStep.BILL_TEMPLATES, SyncStepStatus.IN_PROGRESS))
         val billTemplatesList = syncData.billTemplates?.map { dto ->
             BillTemplateEntity(
                 id = dto.id,
-                branchId = branchId,
+                brandId = brandId,
                 name = dto.name,
                 templateType = dto.templateType,
                 description = dto.description,
@@ -707,10 +710,10 @@ class SyncRepository @Inject constructor(
             )
         } ?: emptyList()
 
-        billTemplateDao.deleteByBranch(branchId)
+        billTemplateDao.deleteByBrand(brandId)
         if (billTemplatesList.isNotEmpty()) {
             billTemplateDao.insertAll(billTemplatesList)
-            Log.d("SyncRepository", "Saved ${billTemplatesList.size} bill templates to database")
+            Log.d("SyncRepository", "Saved ${billTemplatesList.size} bill templates to database for brandId=$brandId")
         }
         onProgress?.invoke(SyncStepProgress(SyncStep.BILL_TEMPLATES, SyncStepStatus.COMPLETED, billTemplatesList.size))
 

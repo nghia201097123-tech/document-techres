@@ -3096,6 +3096,8 @@ class SaleViewModel @Inject constructor(
 
                 withContext(Dispatchers.IO) {
                     // Get printer and template (only active ones)
+                    // Printer configs are at branch level, templates are at brand level
+                    val brandId = authRepository.getBrandId() ?: ""
                     var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
                         val activePrinters = billPrinterConfigDao.getActiveByBranchSync(branchId)
@@ -3106,10 +3108,10 @@ class SaleViewModel @Inject constructor(
                         var template = if (printerConfig.templateId != null) {
                             billTemplateDao.getById(printerConfig.templateId)
                         } else {
-                            billTemplateDao.getDefaultByBranch(branchId)
+                            billTemplateDao.getDefaultByBrand(brandId)
                         }
                         if (template == null || !template.isActive) {
-                            val activeTemplates = billTemplateDao.getAllByBranchSync(branchId)
+                            val activeTemplates = billTemplateDao.getAllByBrandSync(brandId)
                             template = activeTemplates.firstOrNull()
                         }
 
@@ -3491,15 +3493,17 @@ class SaleViewModel @Inject constructor(
                         Log.d(TAG, "completeOrder - printerConfig: ${printerConfig?.id}, isActive: ${printerConfig?.isActive}, ip: ${printerConfig?.printerIp}")
 
                         if (printerConfig != null && printerConfig.isActive) {
-                            // Get template (from printer config or default for branch)
+                            // Get template (from printer config or default for brand)
+                            // Templates are at brand level, printer configs are at branch level
+                            val brandId = authRepository.getBrandId() ?: ""
                             var template = if (printerConfig.templateId != null) {
                                 billTemplateDao.getById(printerConfig.templateId)
                             } else {
-                                billTemplateDao.getDefaultByBranch(branchId)
+                                billTemplateDao.getDefaultByBrand(brandId)
                             }
-                            // Fallback: get first active template for this branch
+                            // Fallback: get first active template for this brand
                             if (template == null || !template.isActive) {
-                                val activeTemplates = billTemplateDao.getAllByBranchSync(branchId)
+                                val activeTemplates = billTemplateDao.getAllByBrandSync(brandId)
                                 template = activeTemplates.firstOrNull()
                                 Log.d(TAG, "completeOrder - No default template, using first active: ${template?.id}")
                             }

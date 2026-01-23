@@ -466,14 +466,15 @@ class OrderHistoryViewModel @Inject constructor(
                         return@withContext
                     }
 
-                    // Get bill template
+                    // Get bill template (templates are at brand level)
+                    val brandId = authRepository.getBrandId() ?: ""
                     var template = if (printerConfig.templateId != null) {
                         billTemplateDao.getById(printerConfig.templateId)
                     } else {
-                        billTemplateDao.getDefaultByBranch(branchId)
+                        billTemplateDao.getDefaultByBrand(brandId)
                     }
                     if (template == null || !template.isActive) {
-                        val activeTemplates = billTemplateDao.getAllByBranchSync(branchId)
+                        val activeTemplates = billTemplateDao.getAllByBrandSync(brandId)
                         template = activeTemplates.firstOrNull()
                     }
 

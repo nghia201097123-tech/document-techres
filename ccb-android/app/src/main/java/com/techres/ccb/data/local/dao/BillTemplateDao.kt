@@ -7,11 +7,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface BillTemplateDao {
 
-    @Query("SELECT * FROM bill_templates WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
-    fun getAllByBranch(branchId: String): Flow<List<BillTemplateEntity>>
+    /**
+     * Bill templates are at BRAND level, shared across all branches of a brand
+     */
+    @Query("SELECT * FROM bill_templates WHERE brand_id = :brandId AND is_active = 1 ORDER BY sort_order ASC")
+    fun getAllByBrand(brandId: String): Flow<List<BillTemplateEntity>>
 
-    @Query("SELECT * FROM bill_templates WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
-    suspend fun getAllByBranchSync(branchId: String): List<BillTemplateEntity>
+    @Query("SELECT * FROM bill_templates WHERE brand_id = :brandId AND is_active = 1 ORDER BY sort_order ASC")
+    suspend fun getAllByBrandSync(brandId: String): List<BillTemplateEntity>
 
     @Query("SELECT * FROM bill_templates WHERE id = :id")
     suspend fun getById(id: String): BillTemplateEntity?
@@ -19,14 +22,14 @@ interface BillTemplateDao {
     @Query("SELECT * FROM bill_templates WHERE id = :id")
     fun getByIdFlow(id: String): Flow<BillTemplateEntity?>
 
-    @Query("SELECT * FROM bill_templates WHERE branch_id = :branchId AND is_default = 1 LIMIT 1")
-    suspend fun getDefaultByBranch(branchId: String): BillTemplateEntity?
+    @Query("SELECT * FROM bill_templates WHERE brand_id = :brandId AND is_default = 1 LIMIT 1")
+    suspend fun getDefaultByBrand(brandId: String): BillTemplateEntity?
 
-    @Query("SELECT * FROM bill_templates WHERE branch_id = :branchId AND is_default = 1 LIMIT 1")
-    fun getDefaultByBranchFlow(branchId: String): Flow<BillTemplateEntity?>
+    @Query("SELECT * FROM bill_templates WHERE brand_id = :brandId AND is_default = 1 LIMIT 1")
+    fun getDefaultByBrandFlow(brandId: String): Flow<BillTemplateEntity?>
 
-    @Query("SELECT * FROM bill_templates WHERE branch_id = :branchId AND template_type = :templateType AND is_active = 1 ORDER BY sort_order ASC")
-    suspend fun getByTemplateType(branchId: String, templateType: String): List<BillTemplateEntity>
+    @Query("SELECT * FROM bill_templates WHERE brand_id = :brandId AND template_type = :templateType AND is_active = 1 ORDER BY sort_order ASC")
+    suspend fun getByTemplateType(brandId: String, templateType: String): List<BillTemplateEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(template: BillTemplateEntity)
@@ -43,24 +46,24 @@ interface BillTemplateDao {
     @Query("DELETE FROM bill_templates WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    @Query("DELETE FROM bill_templates WHERE branch_id = :branchId")
-    suspend fun deleteByBranch(branchId: String)
+    @Query("DELETE FROM bill_templates WHERE brand_id = :brandId")
+    suspend fun deleteByBrand(brandId: String)
 
-    @Query("UPDATE bill_templates SET is_default = 0 WHERE branch_id = :branchId")
-    suspend fun clearDefaultByBranch(branchId: String)
+    @Query("UPDATE bill_templates SET is_default = 0 WHERE brand_id = :brandId")
+    suspend fun clearDefaultByBrand(brandId: String)
 
     @Query("UPDATE bill_templates SET is_default = 1 WHERE id = :id")
     suspend fun setDefault(id: String)
 
     @Transaction
-    suspend fun setAsDefault(branchId: String, templateId: String) {
-        clearDefaultByBranch(branchId)
+    suspend fun setAsDefault(brandId: String, templateId: String) {
+        clearDefaultByBrand(brandId)
         setDefault(templateId)
     }
 
-    @Query("SELECT COUNT(*) FROM bill_templates WHERE branch_id = :branchId")
-    suspend fun getCount(branchId: String): Int
+    @Query("SELECT COUNT(*) FROM bill_templates WHERE brand_id = :brandId")
+    suspend fun getCount(brandId: String): Int
 
-    @Query("SELECT COUNT(*) FROM bill_templates WHERE branch_id = :branchId AND is_active = 1")
-    suspend fun getActiveCount(branchId: String): Int
+    @Query("SELECT COUNT(*) FROM bill_templates WHERE brand_id = :brandId AND is_active = 1")
+    suspend fun getActiveCount(brandId: String): Int
 }

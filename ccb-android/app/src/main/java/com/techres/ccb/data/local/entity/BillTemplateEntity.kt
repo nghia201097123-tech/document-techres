@@ -8,6 +8,9 @@ import androidx.room.PrimaryKey
 /**
  * Bill Template Entity - Mẫu hóa đơn
  *
+ * Mẫu bill được xây dựng ở cấp THƯƠNG HIỆU (Brand), dùng chung cho tất cả chi nhánh.
+ * Máy in bill (BillPrinterConfigEntity) ở cấp CHI NHÁNH sẽ chọn mẫu để sử dụng.
+ *
  * Các mẫu bill có thể cấu hình từ web-dashboard:
  * - classic: Mẫu truyền thống
  * - modern: Mẫu hiện đại, tối giản
@@ -18,7 +21,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "bill_templates",
     indices = [
-        Index(value = ["branch_id"]),
+        Index(value = ["brand_id"]),
         Index(value = ["is_active"]),
         Index(value = ["is_default"])
     ]
@@ -28,8 +31,8 @@ data class BillTemplateEntity(
     @ColumnInfo(name = "id")
     val id: String,
 
-    @ColumnInfo(name = "branch_id")
-    val branchId: String,
+    @ColumnInfo(name = "brand_id")
+    val brandId: String,
 
     @ColumnInfo(name = "name")
     val name: String,
