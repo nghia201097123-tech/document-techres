@@ -1573,6 +1573,20 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('food_platform_accounts updated to allow multiple ports per platform');
       }
 
+      // 49. Normalize tenantId to uppercase in food_platform_accounts
+      // This ensures data created by api-admin matches web-dashboard user's tenantId
+      const tenantIdCheck = await queryRunner.query(`
+        SELECT COUNT(*) as count FROM food_platform_accounts WHERE tenant_id != UPPER(tenant_id)
+      `);
+
+      if (parseInt(tenantIdCheck[0].count) > 0) {
+        this.logger.log('Normalizing tenantId to uppercase in food_platform_accounts...');
+        await queryRunner.query(`
+          UPDATE food_platform_accounts SET tenant_id = UPPER(tenant_id)
+        `);
+        this.logger.log(`Updated ${tenantIdCheck[0].count} records to uppercase tenantId`);
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

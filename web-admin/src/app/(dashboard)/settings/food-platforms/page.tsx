@@ -280,14 +280,12 @@ export default function FoodPlatformsPage() {
     account,
     platformName,
     color,
-    showShopNumber,
   }: {
     account: FoodPlatformAccount;
     platformName: string;
     color: string;
-    showShopNumber: boolean;
+    showShopNumber?: boolean;
   }) => {
-    const displayName = showShopNumber ? `${platformName} #${account.shopNumber}` : platformName;
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -295,12 +293,11 @@ export default function FoodPlatformsPage() {
             variant="outline"
             size="sm"
             className={cn(
-              "gap-2",
+              "h-7 gap-1 px-2",
               account.isActive ? "border-green-500 bg-green-50" : "border-gray-300 bg-gray-50"
             )}
           >
-            <div className={cn("w-2 h-2 rounded-full", color)} />
-            {displayName}
+            {platformName}
             {account.isActive ? (
               <CheckCircle2 className="h-3 w-3 text-green-500" />
             ) : (
@@ -346,32 +343,32 @@ export default function FoodPlatformsPage() {
     const hasAccounts = platformAccounts.length > 0;
 
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1 p-1 rounded-md bg-muted/30">
+        {/* Platform label */}
+        <span className="text-xs text-muted-foreground px-1 min-w-[60px]">
+          <span className={cn("inline-block w-2 h-2 rounded-full mr-1", color)} />
+          {platformName}:
+        </span>
         {/* Show existing accounts */}
         {platformAccounts.map((account) => (
           <AccountButton
             key={account.id}
             account={account}
-            platformName={platformName}
+            platformName={`#${account.shopNumber}`}
             color={color}
-            showShopNumber={platformAccounts.length > 1}
+            showShopNumber={false}
           />
         ))}
         {/* Add new button */}
         <Button
           variant="outline"
           size="sm"
-          className={cn(
-            "gap-2 border-dashed",
-            hasAccounts && "px-2"
-          )}
+          className="h-7 px-2 border-dashed"
           onClick={() => handleCreatePlatform(branch, platform)}
           disabled={saving}
           title={`Thêm ${platformName}`}
         >
-          {!hasAccounts && <div className={cn("w-2 h-2 rounded-full", color, "opacity-50")} />}
-          {!hasAccounts && platformName}
-          <Plus className="h-3 w-3 text-muted-foreground" />
+          <Plus className="h-3 w-3" />
         </Button>
       </div>
     );
@@ -484,21 +481,35 @@ export default function FoodPlatformsPage() {
                 return (
                   <div
                     key={branch.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                    className="p-4 border rounded-lg hover:bg-muted/50"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Store className="h-5 w-5 text-primary" />
+                    {/* Branch Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                          <Store className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{branch.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {branch.code} • {branchAccounts.length} cổng
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{branch.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {branch.code} • {branchAccounts.length} cổng
-                        </p>
-                      </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleCreateAllPlatforms(branch)}
+                        disabled={saving}
+                        title="Thêm 3 cổng mới (Grab, BeFood, Shopee)"
+                      >
+                        <Zap className="mr-1 h-3 w-3" />
+                        +3 cổng
+                      </Button>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    {/* Platforms Grid */}
+                    <div className="flex flex-wrap gap-2">
                       {ALL_PLATFORMS.map((p) => (
                         <PlatformButtons
                           key={p.type}
@@ -508,17 +519,6 @@ export default function FoodPlatformsPage() {
                           color={p.color}
                         />
                       ))}
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="ml-2"
-                        onClick={() => handleCreateAllPlatforms(branch)}
-                        disabled={saving}
-                        title="Thêm 3 cổng mới (Grab, BeFood, Shopee)"
-                      >
-                        <Zap className="mr-1 h-3 w-3" />
-                        +3 cổng
-                      </Button>
                     </div>
                   </div>
                 );
