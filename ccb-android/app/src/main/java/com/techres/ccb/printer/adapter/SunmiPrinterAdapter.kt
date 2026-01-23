@@ -105,6 +105,9 @@ class SunmiPrinterAdapter @Inject constructor(
         const val TRANSACTION_cutPaper = IBinder.FIRST_CALL_TRANSACTION + 26
         const val TRANSACTION_sendRAWData = IBinder.FIRST_CALL_TRANSACTION + 27
         const val TRANSACTION_openDrawer = IBinder.FIRST_CALL_TRANSACTION + 28
+        const val TRANSACTION_commitPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 29
+        const val TRANSACTION_enterPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 30
+        const val TRANSACTION_exitPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 31
     }
 
     override fun isConnected(): Boolean = printerService != null && _connectionState.value == ConnectionState.Connected
@@ -551,14 +554,15 @@ class SunmiPrinterAdapter @Inject constructor(
     private fun sendRawDataViaTransact(binder: IBinder, data: ByteArray): PrinterResult {
         val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
 
+        // Step 1: Initialize printer first
+        Timber.d("$TAG: Initializing printer before sendRAWData")
+        initPrinterViaTransact(binder)
+
         // Try multiple transaction codes for sendRAWData
         // Different Sunmi firmware versions may use different codes
         val possibleTransactionCodes = listOf(
-            TransactionCodes.TRANSACTION_sendRAWData,  // Standard position
+            TransactionCodes.TRANSACTION_sendRAWData,  // Standard position (27)
             IBinder.FIRST_CALL_TRANSACTION + 26,       // Alternative position
-            IBinder.FIRST_CALL_TRANSACTION + 28,       // Alternative position
-            IBinder.FIRST_CALL_TRANSACTION + 30,       // Alternative position
-            IBinder.FIRST_CALL_TRANSACTION + 32,       // Alternative position
             IBinder.FIRST_CALL_TRANSACTION + 24,       // Alternative position
             IBinder.FIRST_CALL_TRANSACTION + 25        // Alternative position
         )
@@ -583,6 +587,11 @@ class SunmiPrinterAdapter @Inject constructor(
                     if (success) {
                         replyParcel.readException()
                         Timber.d("$TAG: transact($transactionCode) succeeded")
+
+                        // Step 2: Feed paper and commit buffer to actually execute printing
+                        lineWrapViaTransact(binder, 3)
+                        commitPrinterBufferViaTransact(binder)
+
                         return PrinterResult.Success
                     } else {
                         Timber.d("$TAG: transact($transactionCode) returned false")
@@ -839,8 +848,9 @@ class SunmiPrinterAdapter @Inject constructor(
                         replyParcel.readException()
                         Timber.d("$TAG: printBitmap transact($transactionCode) succeeded")
 
-                        // Add line wrap after printing
+                        // Add line wrap and commit buffer to actually execute printing
                         lineWrapViaTransact(binder, 3)
+                        commitPrinterBufferViaTransact(binder)
 
                         return PrinterResult.Success
                     } else {
@@ -920,6 +930,46 @@ class SunmiPrinterAdapter @Inject constructor(
         } catch (e: Exception) {
             Timber.w(e, "$TAG: lineWrap transact failed")
         }
+    }
+
+    /**
+     * Commit printer buffer via AIDL transact - Actually execute buffered print commands
+     */
+    private fun commitPrinterBufferViaTransact(binder: IBinder) {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        // Try multiple possible transaction codes for commitPrinterBuffer
+        val possibleCodes = listOf(
+            TransactionCodes.TRANSACTION_commitPrinterBuffer,
+            TransactionCodes.TRANSACTION_exitPrinterBuffer,
+            IBinder.FIRST_CALL_TRANSACTION + 32,
+            IBinder.FIRST_CALL_TRANSACTION + 33
+        )
+
+        for (code in possibleCodes) {
+            try {
+                val dataParcel = Parcel.obtain()
+                val replyParcel = Parcel.obtain()
+
+                try {
+                    dataParcel.writeInterfaceToken(descriptor)
+                    dataParcel.writeStrongBinder(null) // callback
+
+                    val success = binder.transact(code, dataParcel, replyParcel, 0)
+                    if (success) {
+                        replyParcel.readException()
+                        Timber.d("$TAG: commitPrinterBuffer transact($code) succeeded")
+                        return
+                    }
+                } finally {
+                    dataParcel.recycle()
+                    replyParcel.recycle()
+                }
+            } catch (e: Exception) {
+                Timber.d("$TAG: commitPrinterBuffer transact($code) failed: ${e.message}")
+            }
+        }
+        Timber.w("$TAG: commitPrinterBuffer - all transaction codes failed")
     }
 
     /**
