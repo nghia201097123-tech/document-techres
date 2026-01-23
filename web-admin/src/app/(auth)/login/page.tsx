@@ -43,6 +43,28 @@ export default function LoginPage() {
     try {
       const response = await authService.login(formData);
       login(response.user, response.token);
+
+      // Wait for Zustand to persist to localStorage before redirecting
+      // This prevents race condition where API calls happen before token is persisted
+      await new Promise<void>((resolve) => {
+        const checkPersisted = () => {
+          const stored = localStorage.getItem("auth-storage");
+          if (stored) {
+            try {
+              const { state } = JSON.parse(stored);
+              if (state?.token === response.token) {
+                resolve();
+                return;
+              }
+            } catch {
+              // JSON parse failed, keep waiting
+            }
+          }
+          setTimeout(checkPersisted, 10);
+        };
+        checkPersisted();
+      });
+
       router.push("/companies");
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };

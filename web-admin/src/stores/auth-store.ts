@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AdminUser } from "@/types";
+import { setInMemoryToken } from "@/services/api";
 
 interface AuthState {
   user: AdminUser | null;
@@ -25,22 +26,31 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) =>
         set({ user, isAuthenticated: !!user }),
 
-      setToken: (token) =>
-        set({ token }),
+      setToken: (token) => {
+        // Also set in-memory token for API calls before localStorage is hydrated
+        setInMemoryToken(token);
+        set({ token });
+      },
 
-      login: (user, token) =>
+      login: (user, token) => {
+        // Also set in-memory token for API calls before localStorage is hydrated
+        setInMemoryToken(token);
         set({
           user,
           token,
           isAuthenticated: true,
-        }),
+        });
+      },
 
-      logout: () =>
+      logout: () => {
+        // Clear in-memory token
+        setInMemoryToken(null);
         set({
           user: null,
           token: null,
           isAuthenticated: false,
-        }),
+        });
+      },
 
       setHydrated: (isHydrated) =>
         set({ isHydrated }),
@@ -53,6 +63,10 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
+        // Restore in-memory token from persisted state
+        if (state?.token) {
+          setInMemoryToken(state.token);
+        }
         state?.setHydrated(true);
       },
     }
