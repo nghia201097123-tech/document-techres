@@ -202,6 +202,11 @@ object HybridBillPrintService {
                 // Convert bitmap -> ESC/POS format -> sendRAWData
                 Log.d(TAG, "Using ESC/POS BITMAP printing for Sunmi (BinderProxy mode)")
 
+                // DEBUG: Test if printText works via AIDL
+                Log.d(TAG, "DEBUG: Testing printText via AIDL...")
+                val textTestResult = adapter.printTextTest("=== TEST SUNMI AIDL ===\nIf you see this, AIDL printText works!\n")
+                Log.d(TAG, "DEBUG: printTextTest result: $textTestResult")
+
                 // Generate bill bitmaps trực tiếp
                 val bitmaps = generateSunmiBillBitmaps(effectiveConfig, template, billData, paymentBankAccount, payosQrCode)
                 Log.d(TAG, "Generated ${bitmaps.size} bitmaps for Sunmi")

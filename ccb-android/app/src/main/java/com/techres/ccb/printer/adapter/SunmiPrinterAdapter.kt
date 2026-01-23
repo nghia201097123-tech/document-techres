@@ -684,6 +684,55 @@ class SunmiPrinterAdapter @Inject constructor(
     }
 
     /**
+     * TEST: Print simple text via AIDL transact to verify printing works
+     * This bypasses ESC/POS and uses Sunmi's native printText method
+     */
+    suspend fun printTextTest(text: String): PrinterResult = withContext(Dispatchers.IO) {
+        val service = printerService
+        if (service !is BinderProxyWrapper) {
+            return@withContext PrinterResult.Error("Not using BinderProxy")
+        }
+
+        val binder = service.binder
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        try {
+            // Init printer
+            initPrinterViaTransact(binder)
+
+            // Print text using printText transaction
+            val dataParcel = Parcel.obtain()
+            val replyParcel = Parcel.obtain()
+
+            try {
+                dataParcel.writeInterfaceToken(descriptor)
+                dataParcel.writeString(text)
+                dataParcel.writeStrongBinder(null) // callback
+
+                val success = binder.transact(TransactionCodes.TRANSACTION_printText, dataParcel, replyParcel, 0)
+                if (success) {
+                    replyParcel.readException()
+                    Timber.d("$TAG: printText transact succeeded")
+
+                    // Line wrap and commit
+                    lineWrapViaTransact(binder, 3)
+                    commitPrinterBufferViaTransact(binder)
+
+                    return@withContext PrinterResult.Success
+                }
+            } finally {
+                dataParcel.recycle()
+                replyParcel.recycle()
+            }
+
+            PrinterResult.Error("printText transact failed")
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: printTextTest failed")
+            PrinterResult.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    /**
      * Send raw data via AIDL transact() mechanism for BinderProxy
      * This is used when we can't get a proper service interface
      */
