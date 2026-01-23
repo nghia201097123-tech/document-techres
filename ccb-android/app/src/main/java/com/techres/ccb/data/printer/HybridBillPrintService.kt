@@ -242,6 +242,17 @@ object HybridBillPrintService {
                     }
                 }
 
+                // Feed paper và cắt giấy nếu config cho phép
+                if (config.cutPaper) {
+                    Log.d(TAG, "Cutting paper as per config...")
+                    adapter.feedLines(3) // Đẩy giấy trước khi cắt
+                    adapter.cutPaper()
+                } else {
+                    // Chỉ đẩy giấy ra để dễ xé
+                    Log.d(TAG, "No auto-cut, feeding paper...")
+                    adapter.feedLines(5)
+                }
+
                 // Recycle bitmaps
                 bitmaps.forEach { it.recycle() }
 
