@@ -512,6 +512,127 @@ class SingleCanvasBillBuilder(
     }
 
     /**
+     * Build bill thành danh sách Bitmap (cho Sunmi native printing)
+     *
+     * Trả về list các bitmap theo thứ tự cần in:
+     * - Text batches được render thành bitmap
+     * - QR code được render thành bitmap riêng
+     *
+     * @return List<Bitmap> - Danh sách các bitmap cần in (caller phải recycle sau khi dùng)
+     */
+    fun buildBitmaps(): List<Bitmap> {
+        val startTime = System.currentTimeMillis()
+        Log.d(TAG, "=== START BUILD BITMAPS (Single Canvas) ===")
+        Log.d(TAG, "Total elements: ${elements.size}")
+
+        val bitmaps = mutableListOf<Bitmap>()
+
+        // Group elements into segments (text-batch between special elements)
+        val segments = groupElementsIntoSegments()
+        Log.d(TAG, "Grouped into ${segments.size} segments")
+
+        // Render each segment
+        segments.forEachIndexed { index, segment ->
+            when (segment) {
+                is Segment.TextBatch -> {
+                    if (segment.elements.isNotEmpty()) {
+                        val bitmap = renderTextBatchToBitmap(segment.elements)
+                        if (bitmap != null) {
+                            bitmaps.add(bitmap)
+                            Log.d(TAG, "Segment $index: TextBatch bitmap ${bitmap.width}x${bitmap.height}")
+                        }
+                    }
+                }
+                is Segment.QrCodeSegment -> {
+                    if (segment.content.isNotBlank()) {
+                        val qrBitmap = renderQrSegmentToBitmap(segment)
+                        if (qrBitmap != null) {
+                            bitmaps.add(qrBitmap)
+                            Log.d(TAG, "Segment $index: QRCode bitmap ${qrBitmap.width}x${qrBitmap.height}")
+                        }
+                    }
+                }
+                is Segment.BarcodeSegment -> {
+                    // Barcode không hỗ trợ bitmap mode, skip
+                    Log.d(TAG, "Segment $index: Barcode skipped in bitmap mode")
+                }
+            }
+        }
+
+        val elapsed = System.currentTimeMillis() - startTime
+        Log.d(TAG, "=== BUILD BITMAPS COMPLETE ===")
+        Log.d(TAG, "Total bitmaps: ${bitmaps.size}, Time: ${elapsed}ms")
+
+        return bitmaps
+    }
+
+    /**
+     * Render text batch thành Bitmap
+     */
+    private fun renderTextBatchToBitmap(batch: List<PrintElement>): Bitmap? {
+        if (batch.isEmpty()) return null
+
+        // Measure total height
+        var totalHeight = 0
+        val elementHeights = batch.map { element ->
+            val height = element.measureHeight(pixelWidth)
+            totalHeight += height
+            height
+        }
+
+        if (totalHeight <= 0) return null
+
+        // Create canvas
+        val bitmap = Bitmap.createBitmap(pixelWidth, totalHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+
+        // Render each element
+        var currentY = 0f
+        batch.forEachIndexed { index, element ->
+            val height = elementHeights[index]
+            if (height > 0) {
+                renderElementOnCanvas(canvas, element, currentY)
+                currentY += height
+            }
+        }
+
+        return bitmap
+    }
+
+    /**
+     * Render QR segment thành Bitmap full-width với QR căn giữa
+     */
+    private fun renderQrSegmentToBitmap(segment: Segment.QrCodeSegment): Bitmap? {
+        val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
+
+        // Check if URL or content
+        val isQrImageUrl = segment.content.startsWith("https://qr.sepay.vn/") ||
+                          segment.content.startsWith("https://img.vietqr.io/") ||
+                          segment.content.startsWith("https://api.payos.vn/") ||
+                          segment.content.startsWith("https://pay.payos.vn/")
+
+        var qrBitmap: Bitmap? = null
+
+        if (isQrImageUrl) {
+            qrBitmap = downloadQrImageFromUrl(segment.content, qrSize)
+            if (qrBitmap == null) {
+                qrBitmap = generateQrCodeBitmap(segment.content, qrSize)
+            }
+        } else {
+            qrBitmap = generateQrCodeBitmap(segment.content, qrSize)
+        }
+
+        if (qrBitmap != null) {
+            val centeredBitmap = centerQrBitmap(qrBitmap, pixelWidth)
+            qrBitmap.recycle()
+            return centeredBitmap
+        }
+
+        return null
+    }
+
+    /**
      * Build thành byte array
      *
      * QUY TRÌNH SINGLE CANVAS RENDERING:

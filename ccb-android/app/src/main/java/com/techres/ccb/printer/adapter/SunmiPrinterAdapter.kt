@@ -89,16 +89,22 @@ class SunmiPrinterAdapter @Inject constructor(
 
     // AIDL transaction codes for IWoyouService (based on Sunmi AIDL definition order)
     // These are calculated as IBinder.FIRST_CALL_TRANSACTION + method_index
+    // Note: Transaction codes may vary between Sunmi firmware versions
     private object TransactionCodes {
-        // Common transaction codes based on Sunmi IWoyouService.aidl
-        // Note: These may vary between Sunmi firmware versions
-        const val TRANSACTION_sendRAWData = IBinder.FIRST_CALL_TRANSACTION + 27
         const val TRANSACTION_printerInit = IBinder.FIRST_CALL_TRANSACTION + 0
+        const val TRANSACTION_printerSelfChecking = IBinder.FIRST_CALL_TRANSACTION + 1
+        const val TRANSACTION_getPrinterSerialNo = IBinder.FIRST_CALL_TRANSACTION + 2
+        const val TRANSACTION_getPrinterVersion = IBinder.FIRST_CALL_TRANSACTION + 3
+        const val TRANSACTION_getPrinterModal = IBinder.FIRST_CALL_TRANSACTION + 4
+        const val TRANSACTION_updatePrinterState = IBinder.FIRST_CALL_TRANSACTION + 5
+        const val TRANSACTION_setAlignment = IBinder.FIRST_CALL_TRANSACTION + 14
         const val TRANSACTION_printOriginalText = IBinder.FIRST_CALL_TRANSACTION + 17
+        const val TRANSACTION_printBitmap = IBinder.FIRST_CALL_TRANSACTION + 20
+        const val TRANSACTION_printBitmapCustom = IBinder.FIRST_CALL_TRANSACTION + 21
         const val TRANSACTION_lineWrap = IBinder.FIRST_CALL_TRANSACTION + 25
         const val TRANSACTION_cutPaper = IBinder.FIRST_CALL_TRANSACTION + 26
+        const val TRANSACTION_sendRAWData = IBinder.FIRST_CALL_TRANSACTION + 27
         const val TRANSACTION_openDrawer = IBinder.FIRST_CALL_TRANSACTION + 28
-        const val TRANSACTION_updatePrinterState = IBinder.FIRST_CALL_TRANSACTION + 5
     }
 
     override fun isConnected(): Boolean = printerService != null && _connectionState.value == ConnectionState.Connected
@@ -749,18 +755,178 @@ class SunmiPrinterAdapter @Inject constructor(
     }
 
     /**
-     * In hình ảnh
+     * In hình ảnh - Hỗ trợ cả reflection và AIDL transact cho BinderProxy
      */
     suspend fun printBitmap(bitmap: Bitmap): PrinterResult = withContext(Dispatchers.IO) {
         if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
 
         try {
-            val method = printerService?.javaClass?.getMethod("printBitmap", Bitmap::class.java, Any::class.java)
-            method?.invoke(printerService, bitmap, null)
-            return@withContext PrinterResult.Success
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+
+            // Check if we're using BinderProxyWrapper (remote service via AIDL)
+            if (service is BinderProxyWrapper) {
+                Timber.d("$TAG: Using AIDL transact() for printBitmap")
+                return@withContext printBitmapViaTransact(service.binder, bitmap)
+            }
+
+            // Try reflection for local service
+            val method = service.javaClass.methods.find {
+                it.name == "printBitmap" && it.parameterTypes.isNotEmpty() &&
+                it.parameterTypes[0] == Bitmap::class.java
+            }
+
+            if (method != null) {
+                when (method.parameterTypes.size) {
+                    1 -> method.invoke(service, bitmap)
+                    2 -> method.invoke(service, bitmap, null)
+                    else -> method.invoke(service, bitmap, null)
+                }
+                return@withContext PrinterResult.Success
+            }
+
+            // Fallback to AIDL transact if reflection fails
+            val binder = rawBinder
+            if (binder != null) {
+                Timber.d("$TAG: Reflection failed, falling back to AIDL transact for printBitmap")
+                return@withContext printBitmapViaTransact(binder, bitmap)
+            }
+
+            return@withContext PrinterResult.Error("Cannot find printBitmap method")
         } catch (e: Exception) {
+            Timber.e(e, "$TAG: printBitmap failed")
             return@withContext PrinterResult.Error(e.message ?: "Print bitmap failed")
         }
+    }
+
+    /**
+     * Print bitmap via AIDL transact() for BinderProxy
+     * Sunmi printBitmap(Bitmap bitmap, ICallback callback)
+     */
+    private fun printBitmapViaTransact(binder: IBinder, bitmap: Bitmap): PrinterResult {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        // First, initialize printer
+        initPrinterViaTransact(binder)
+
+        // Try multiple transaction codes for printBitmap
+        val possibleTransactionCodes = listOf(
+            TransactionCodes.TRANSACTION_printBitmap,     // Standard position (20)
+            TransactionCodes.TRANSACTION_printBitmapCustom, // Custom position (21)
+            IBinder.FIRST_CALL_TRANSACTION + 19,          // Alternative
+            IBinder.FIRST_CALL_TRANSACTION + 22,          // Alternative
+            IBinder.FIRST_CALL_TRANSACTION + 23           // Alternative
+        )
+
+        var lastError: Exception? = null
+
+        for (transactionCode in possibleTransactionCodes) {
+            try {
+                Timber.d("$TAG: Trying printBitmap transact with code $transactionCode")
+
+                val dataParcel = Parcel.obtain()
+                val replyParcel = Parcel.obtain()
+
+                try {
+                    dataParcel.writeInterfaceToken(descriptor)
+                    // Write bitmap to parcel
+                    bitmap.writeToParcel(dataParcel, 0)
+                    // Write null for callback (ICallback)
+                    dataParcel.writeStrongBinder(null)
+
+                    val success = binder.transact(transactionCode, dataParcel, replyParcel, 0)
+
+                    if (success) {
+                        replyParcel.readException()
+                        Timber.d("$TAG: printBitmap transact($transactionCode) succeeded")
+
+                        // Add line wrap after printing
+                        lineWrapViaTransact(binder, 3)
+
+                        return PrinterResult.Success
+                    } else {
+                        Timber.d("$TAG: printBitmap transact($transactionCode) returned false")
+                    }
+                } finally {
+                    dataParcel.recycle()
+                    replyParcel.recycle()
+                }
+            } catch (e: SecurityException) {
+                Timber.d("$TAG: printBitmap transact($transactionCode) security exception: ${e.message}")
+                lastError = e
+            } catch (e: RemoteException) {
+                Timber.d("$TAG: printBitmap transact($transactionCode) remote exception: ${e.message}")
+                lastError = e
+            } catch (e: Exception) {
+                Timber.d("$TAG: printBitmap transact($transactionCode) failed: ${e.message}")
+                lastError = e
+            }
+        }
+
+        return PrinterResult.Error("printBitmap transact failed: ${lastError?.message ?: "unknown error"}")
+    }
+
+    /**
+     * Initialize printer via AIDL transact
+     */
+    private fun initPrinterViaTransact(binder: IBinder) {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        try {
+            val dataParcel = Parcel.obtain()
+            val replyParcel = Parcel.obtain()
+
+            try {
+                dataParcel.writeInterfaceToken(descriptor)
+                dataParcel.writeStrongBinder(null) // callback
+
+                val success = binder.transact(TransactionCodes.TRANSACTION_printerInit, dataParcel, replyParcel, 0)
+                if (success) {
+                    replyParcel.readException()
+                    Timber.d("$TAG: printerInit transact succeeded")
+                }
+            } finally {
+                dataParcel.recycle()
+                replyParcel.recycle()
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "$TAG: printerInit transact failed, continuing anyway")
+        }
+    }
+
+    /**
+     * Line wrap via AIDL transact
+     */
+    private fun lineWrapViaTransact(binder: IBinder, lines: Int) {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        try {
+            val dataParcel = Parcel.obtain()
+            val replyParcel = Parcel.obtain()
+
+            try {
+                dataParcel.writeInterfaceToken(descriptor)
+                dataParcel.writeInt(lines)
+                dataParcel.writeStrongBinder(null) // callback
+
+                val success = binder.transact(TransactionCodes.TRANSACTION_lineWrap, dataParcel, replyParcel, 0)
+                if (success) {
+                    replyParcel.readException()
+                    Timber.d("$TAG: lineWrap transact succeeded")
+                }
+            } finally {
+                dataParcel.recycle()
+                replyParcel.recycle()
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "$TAG: lineWrap transact failed")
+        }
+    }
+
+    /**
+     * Check if using BinderProxy (remote AIDL service)
+     */
+    fun isUsingBinderProxy(): Boolean {
+        return printerService is BinderProxyWrapper
     }
 
     /**

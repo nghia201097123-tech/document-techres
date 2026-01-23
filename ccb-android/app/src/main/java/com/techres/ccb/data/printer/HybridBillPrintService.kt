@@ -1,5 +1,6 @@
 package com.techres.ccb.data.printer
 
+import android.graphics.Bitmap
 import android.util.Log
 import com.techres.ccb.data.local.entity.BankAccountEntity
 import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
@@ -183,14 +184,6 @@ object HybridBillPrintService {
             Log.d(TAG, "Sunmi paper width: ${sunmiPaperWidth}mm (effective: ${effectivePaperWidth}mm)")
 
             // ========== BƯỚC 4: GENERATE BILL CONTENT ==========
-            // Sử dụng BITMAP mode để đảm bảo tiếng Việt hiển thị đúng trên mọi thiết bị Sunmi
-            val capability = PrinterCapability(
-                printerIp = "sunmi_inner",
-                printerPort = 0,
-                supportVietnameseUtf8 = false, // Force bitmap mode cho Sunmi
-                printerModel = adapter.getSunmiModel()
-            )
-
             // Tạo config với paper width từ Sunmi (nếu detect được)
             val effectiveConfig = if (sunmiPaperWidth > 0 && sunmiPaperWidth != config.paperWidth) {
                 config.copy(paperWidth = sunmiPaperWidth)
@@ -198,29 +191,87 @@ object HybridBillPrintService {
                 config
             }
 
-            val billContent = generateHybridBill(effectiveConfig, template, billData, capability, paymentBankAccount, payosQrCode)
-            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes")
+            // Kiểm tra nếu sử dụng BinderProxy, dùng native bitmap printing
+            val isBinderProxy = adapter.isUsingBinderProxy()
+            Log.d(TAG, "Sunmi using BinderProxy: $isBinderProxy")
 
-            // ========== BƯỚC 5: IN TỪNG BẢN VỚI RETRY ==========
-            repeat(template.numberOfCopies) { copyIndex ->
-                Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies}...")
+            if (isBinderProxy) {
+                // ========== NATIVE BITMAP PRINTING (cho BinderProxy) ==========
+                Log.d(TAG, "Using NATIVE BITMAP printing for Sunmi")
 
-                val printResult = printSunmiCopyWithRetry(
-                    adapter = adapter,
-                    content = billContent,
-                    copyIndex = copyIndex,
-                    totalCopies = template.numberOfCopies,
-                    retryCount = config.retryCount,
-                    retryDelayMs = config.retryDelayMs
-                )
+                // Generate bill bitmaps trực tiếp
+                val bitmaps = generateSunmiBillBitmaps(effectiveConfig, template, billData, paymentBankAccount, payosQrCode)
+                Log.d(TAG, "Generated ${bitmaps.size} bitmaps for Sunmi")
 
-                if (printResult is PrinterResult.Error) {
-                    return printResult
+                // In từng bản
+                repeat(template.numberOfCopies) { copyIndex ->
+                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies} (native bitmap)...")
+
+                    // In từng bitmap
+                    bitmaps.forEachIndexed { bitmapIndex, bitmap ->
+                        val printResult = printSunmiBitmapWithRetry(
+                            adapter = adapter,
+                            bitmap = bitmap,
+                            bitmapIndex = bitmapIndex,
+                            totalBitmaps = bitmaps.size,
+                            retryCount = config.retryCount,
+                            retryDelayMs = config.retryDelayMs
+                        )
+
+                        if (printResult is PrinterResult.Error) {
+                            // Recycle all bitmaps before returning
+                            bitmaps.forEach { it.recycle() }
+                            return printResult
+                        }
+                    }
+
+                    // Feed paper sau mỗi bản
+                    adapter.feedPaper(3)
+
+                    // Delay giữa các bản
+                    if (copyIndex < template.numberOfCopies - 1) {
+                        delay(500)
+                    }
                 }
 
-                // Delay giữa các bản (không delay sau bản cuối)
-                if (copyIndex < template.numberOfCopies - 1) {
-                    delay(300)
+                // Recycle bitmaps
+                bitmaps.forEach { it.recycle() }
+
+            } else {
+                // ========== ESC/POS PRINTING (cho local service) ==========
+                Log.d(TAG, "Using ESC/POS printing for Sunmi")
+
+                val capability = PrinterCapability(
+                    printerIp = "sunmi_inner",
+                    printerPort = 0,
+                    supportVietnameseUtf8 = false, // Force bitmap mode cho Sunmi
+                    printerModel = adapter.getSunmiModel()
+                )
+
+                val billContent = generateHybridBill(effectiveConfig, template, billData, capability, paymentBankAccount, payosQrCode)
+                Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes")
+
+                // In từng bản với retry
+                repeat(template.numberOfCopies) { copyIndex ->
+                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies}...")
+
+                    val printResult = printSunmiCopyWithRetry(
+                        adapter = adapter,
+                        content = billContent,
+                        copyIndex = copyIndex,
+                        totalCopies = template.numberOfCopies,
+                        retryCount = config.retryCount,
+                        retryDelayMs = config.retryDelayMs
+                    )
+
+                    if (printResult is PrinterResult.Error) {
+                        return printResult
+                    }
+
+                    // Delay giữa các bản (không delay sau bản cuối)
+                    if (copyIndex < template.numberOfCopies - 1) {
+                        delay(300)
+                    }
                 }
             }
 
@@ -398,154 +449,40 @@ object HybridBillPrintService {
     }
 
     /**
-     * In bill qua Network (TCP/IP)
-     *
-     * SINGLE WRITE (giống phiếu bếp - đã proven hoạt động tốt):
-     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
-     * - tcpNoDelay = true: Gửi ngay, không đợi Nagle buffer
-     * - Delay sau khi gửi để máy in xử lý
-     *
-     * Mỗi bản copy được in trong kết nối riêng để đảm bảo ổn định
+     * Generate bitmaps cho Sunmi native printing
+     * Sử dụng SingleCanvasBillBuilder.buildBitmaps() để tạo list bitmap
      */
-    private suspend fun printViaNetwork(
+    private fun generateSunmiBillBitmaps(
         config: BillPrinterConfigEntity,
         template: BillTemplateEntity,
-        billContent: ByteArray
-    ): PrinterResult {
-        val ip = config.printerIp ?: return PrinterResult.Error("Chưa cấu hình IP máy in")
-
-        // In từng bản trong kết nối riêng - sử dụng numberOfCopies từ template (web-dashboard)
-        repeat(template.numberOfCopies) { copyIndex ->
-            val result = printSingleCopy(ip, config.printerPort, config.connectionTimeoutMs, billContent)
-            if (result is PrinterResult.Error) {
-                return result
-            }
-            // Delay giữa các bản
-            if (copyIndex < template.numberOfCopies - 1) {
-                delay(300)
-            }
-        }
-
-        return PrinterResult.Success("In bill thành công!")
-    }
-
-    /**
-     * In 1 bản bill qua Network
-     *
-     * SINGLE WRITE (giống phiếu bếp - đã proven hoạt động tốt):
-     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
-     * - tcpNoDelay = true để gửi ngay, không buffer
-     * - Delay sau khi gửi xong để máy in xử lý
-     *
-     * Flow: connect → single write → flush → delay → close
-     */
-    private suspend fun printSingleCopy(
-        ip: String,
-        port: Int,
-        timeoutMs: Int,
-        content: ByteArray
-    ): PrinterResult {
-        var socket: Socket? = null
-        var outputStream: OutputStream? = null
-
-        Log.d(TAG, "=== START PRINT BILL (NETWORK - SINGLE WRITE) ===")
-        Log.d(TAG, "Target: $ip:$port")
-        Log.d(TAG, "Content size: ${content.size} bytes")
-
-        return try {
-            Log.d(TAG, "Creating socket...")
-            socket = Socket().apply {
-                reuseAddress = true
-                keepAlive = true
-                // tcpNoDelay = true: Gửi ngay, không đợi Nagle buffer (giống phiếu bếp)
-                tcpNoDelay = true
-                setSoLinger(true, 2)
-            }
-
-            Log.d(TAG, "Connecting to $ip:$port...")
-            socket.connect(InetSocketAddress(ip, port), timeoutMs)
-            Log.d(TAG, "Connected successfully!")
-
-            outputStream = socket.getOutputStream()
-            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
-
-            // SINGLE WRITE: Gửi toàn bộ data trong 1 lần (giống phiếu bếp)
-            outputStream.write(content)
-            Log.d(TAG, "Write completed, flushing...")
-            outputStream.flush()
-            Log.d(TAG, "Flush completed!")
-
-            // Đợi máy in xử lý xong bitmap data
-            // Bill có nhiều content hơn phiếu bếp nên cần thời gian lâu hơn
-            Log.d(TAG, "Waiting 800ms for printer to process...")
-            delay(800)
-
-            Log.d(TAG, "=== PRINT BILL SUCCESS (SINGLE WRITE) ===")
-            PrinterResult.Success("OK")
-        } catch (e: Exception) {
-            Log.e(TAG, "=== PRINT BILL FAILED ===")
-            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
-            Log.e(TAG, "Error message: ${e.message}")
-            PrinterResult.Error("Lỗi in: ${e.message}")
-        } finally {
-            try {
-                Log.d(TAG, "Closing connection...")
-                outputStream?.flush()
-                socket?.shutdownOutput()
-                outputStream?.close()
-                socket?.close()
-                Log.d(TAG, "Connection closed")
-            } catch (e: Exception) {
-                Log.e(TAG, "Close error: ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * Generate bill content với Hybrid approach
-     * Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user cài đặt trong app)
-     * Các config hiển thị (labels, show flags) từ template (web dashboard)
-     */
-    private fun generateHybridBill(
-        printerConfig: BillPrinterConfigEntity,
-        template: BillTemplateEntity,
         billData: BillData,
-        capability: PrinterCapability,
         paymentBankAccount: BankAccountEntity? = null,
         payosQrCode: String? = null
-    ): ByteArray {
-        // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
-        val useBitmapMode = !capability.supportVietnameseUtf8
+    ): List<Bitmap> {
+        Log.d(TAG, "Generating Sunmi bill bitmaps: ${billData.displayNumber}, ${billData.items.size} items")
 
-        // Sử dụng settings từ printerConfig (user đã cài đặt trong app)
-        // printerConfig chứa: paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, etc.
-        val paperWidth = printerConfig.paperWidth
-        val fontSize = printerConfig.fontSize
-        val lineSpacing = printerConfig.lineSpacing
+        // Sử dụng shared method để build nội dung bill vào builder
+        val builder = buildBillContentToBuilder(
+            config.paperWidth,
+            config.fontSize,
+            config.lineSpacing,
+            template,
+            billData,
+            paymentBankAccount,
+            payosQrCode
+        )
 
-        Log.d(TAG, "Bill settings from printerConfig: paperWidth=${paperWidth}mm, fontSize=$fontSize, lineSpacing=$lineSpacing")
+        // Không cần cut/beep/openCashDrawer cho bitmap mode - sẽ xử lý riêng
 
-        // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
-        return if (useSingleCanvasRendering && useBitmapMode) {
-            Log.d(TAG, "Using SINGLE CANVAS RENDERING mode")
-            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData, paymentBankAccount, payosQrCode)
-        } else {
-            Log.d(TAG, "Using LEGACY per-line rendering mode")
-            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode, paymentBankAccount, payosQrCode)
-        }
+        // Build to bitmaps (không bao gồm ESC/POS commands)
+        return builder.buildBitmaps()
     }
 
     /**
-     * Generate bill sử dụng Single Canvas Rendering
-     *
-     * SINGLE CANVAS RENDERING:
-     * - Render toàn bộ bill trên 1 canvas/bitmap duy nhất
-     * - Giảm GC pressure (chỉ tạo 1 bitmap lớn thay vì nhiều bitmap nhỏ)
-     * - In mượt hơn (gửi 1 khối data liên tục)
-     * - Line spacing chính xác và đồng nhất
-     * - Tránh jitter do timing giữa các bitmap renders
+     * Build nội dung bill vào SingleCanvasBillBuilder
+     * Shared method được sử dụng bởi cả generateBillWithSingleCanvas và generateSunmiBillBitmaps
      */
-    private fun generateBillWithSingleCanvas(
+    private fun buildBillContentToBuilder(
         paperWidth: Int,
         fontSize: String,
         lineSpacing: Float,
@@ -553,9 +490,7 @@ object HybridBillPrintService {
         billData: BillData,
         paymentBankAccount: BankAccountEntity? = null,
         payosQrCode: String? = null
-    ): ByteArray {
-        Log.d(TAG, "Generating bill with SINGLE CANVAS: ${billData.displayNumber}, ${billData.items.size} items")
-
+    ): SingleCanvasBillBuilder {
         // Chuyển đổi fontSize từ string sang fontScale float
         val fontScale = when (fontSize) {
             "extra_small" -> 0.7f
@@ -774,10 +709,7 @@ object HybridBillPrintService {
             }
 
             // ============ QR CODE ============
-            // Nếu có paymentBankAccount -> luôn in QR thanh toán (cho cả bill tạm và bill chính thức)
-            // Ngược lại -> in QR theo cài đặt template
             if (paymentBankAccount != null) {
-                // Có tài khoản ngân hàng - LUÔN in QR code thanh toán
                 separator()
                 val isPayOS = payosQrCode != null && paymentBankAccount.paymentPartner == "payos"
                 lineCenter(if (isPayOS) "THANH TOÁN QR" else "THANH TOÁN CHUYỂN KHOẢN")
@@ -789,12 +721,10 @@ object HybridBillPrintService {
                 lineCenter("Nội dung: $transferContent")
                 feed(1)
 
-                // Sử dụng PayOS QR nếu có, ngược lại dùng VietQR
                 val qrContent = if (isPayOS) {
                     Log.d(TAG, "Using PayOS QR code (length: ${payosQrCode!!.length})")
                     payosQrCode
                 } else {
-                    // Tạo VietQR content sử dụng SePayVN
                     val vietQrContent = generateVietQrContent(
                         bankCode = paymentBankAccount.bankCode,
                         accountNumber = paymentBankAccount.accountNumber,
@@ -807,17 +737,11 @@ object HybridBillPrintService {
                 }
                 qrCode(qrContent, size = 4)
             } else if (template.showQrCode) {
-                // Không có bank account - in QR theo cài đặt template
                 when (template.qrCodeType) {
                     "order_id" -> qrCode(billData.orderNumber)
                     "custom" -> qrCode(template.qrCodeContent ?: billData.orderNumber)
                     else -> qrCode(billData.orderNumber)
                 }
-            }
-
-            // ============ BARCODE ============
-            if (template.showBarcode) {
-                barcode(billData.orderNumber)
             }
 
             // ============ WIFI INFO ============
@@ -838,8 +762,257 @@ object HybridBillPrintService {
                 template.footerText?.let { lineCenter(it) }
             }
 
+            // Feed giấy để nội dung bill không bị cắt
+            feed(3)
+        }
+
+        return builder
+    }
+
+    /**
+     * In 1 bitmap qua Sunmi với retry logic (cho native bitmap printing)
+     */
+    private suspend fun printSunmiBitmapWithRetry(
+        adapter: SunmiPrinterAdapter,
+        bitmap: Bitmap,
+        bitmapIndex: Int,
+        totalBitmaps: Int,
+        retryCount: Int,
+        retryDelayMs: Int
+    ): PrinterResult {
+        var lastError: String? = null
+
+        repeat(retryCount) { attempt ->
+            // Kiểm tra status trước mỗi lần retry (trừ lần đầu)
+            if (attempt > 0) {
+                val statusCheck = checkSunmiPrinterStatus(adapter)
+                if (statusCheck is PrinterResult.Error) {
+                    return statusCheck
+                }
+            }
+
+            Log.d(TAG, "Sunmi printBitmap attempt ${attempt + 1}/$retryCount for bitmap ${bitmapIndex + 1}/$totalBitmaps")
+
+            // In bitmap qua native API
+            val printResult = adapter.printBitmap(bitmap)
+
+            when (printResult) {
+                is com.techres.ccb.printer.core.PrinterResult.Success -> {
+                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed successfully (${bitmap.width}x${bitmap.height})")
+
+                    // Đợi máy in xử lý bitmap
+                    val processingTime = calculateBitmapProcessingTime(bitmap)
+                    Log.d(TAG, "Waiting ${processingTime}ms for bitmap processing...")
+                    delay(processingTime)
+
+                    return PrinterResult.Success("OK")
+                }
+                is com.techres.ccb.printer.core.PrinterResult.PartialSuccess -> {
+                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed with partial success")
+                    val processingTime = calculateBitmapProcessingTime(bitmap)
+                    delay(processingTime)
+                    return PrinterResult.Success("OK")
+                }
+                is com.techres.ccb.printer.core.PrinterResult.Error -> {
+                    lastError = printResult.message
+                    Log.w(TAG, "PrintBitmap attempt ${attempt + 1} failed: ${printResult.message}")
+
+                    if (attempt < retryCount - 1) {
+                        Log.d(TAG, "Waiting ${retryDelayMs}ms before retry...")
+                        delay(retryDelayMs.toLong())
+                    }
+                }
+            }
+        }
+
+        return PrinterResult.Error("Lỗi in bitmap ${bitmapIndex + 1}/$totalBitmaps sau $retryCount lần thử: $lastError")
+    }
+
+    /**
+     * Tính toán thời gian đợi máy in xử lý bitmap dựa trên kích thước
+     */
+    private fun calculateBitmapProcessingTime(bitmap: Bitmap): Long {
+        val pixelCount = bitmap.width * bitmap.height
+        return when {
+            pixelCount < 100_000 -> 300L     // Bitmap nhỏ: 300ms
+            pixelCount < 300_000 -> 500L     // Bitmap trung bình: 500ms
+            pixelCount < 500_000 -> 800L     // Bitmap lớn: 800ms
+            else -> 1000L                     // Bitmap rất lớn: 1s
+        }
+    }
+
+    /**
+     * In bill qua Network (TCP/IP)
+     *
+     * SINGLE WRITE (giống phiếu bếp - đã proven hoạt động tốt):
+     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
+     * - tcpNoDelay = true: Gửi ngay, không đợi Nagle buffer
+     * - Delay sau khi gửi để máy in xử lý
+     *
+     * Mỗi bản copy được in trong kết nối riêng để đảm bảo ổn định
+     */
+    private suspend fun printViaNetwork(
+        config: BillPrinterConfigEntity,
+        template: BillTemplateEntity,
+        billContent: ByteArray
+    ): PrinterResult {
+        val ip = config.printerIp ?: return PrinterResult.Error("Chưa cấu hình IP máy in")
+
+        // In từng bản trong kết nối riêng - sử dụng numberOfCopies từ template (web-dashboard)
+        repeat(template.numberOfCopies) { copyIndex ->
+            val result = printSingleCopy(ip, config.printerPort, config.connectionTimeoutMs, billContent)
+            if (result is PrinterResult.Error) {
+                return result
+            }
+            // Delay giữa các bản
+            if (copyIndex < template.numberOfCopies - 1) {
+                delay(300)
+            }
+        }
+
+        return PrinterResult.Success("In bill thành công!")
+    }
+
+    /**
+     * In 1 bản bill qua Network
+     *
+     * SINGLE WRITE (giống phiếu bếp - đã proven hoạt động tốt):
+     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
+     * - tcpNoDelay = true để gửi ngay, không buffer
+     * - Delay sau khi gửi xong để máy in xử lý
+     *
+     * Flow: connect → single write → flush → delay → close
+     */
+    private suspend fun printSingleCopy(
+        ip: String,
+        port: Int,
+        timeoutMs: Int,
+        content: ByteArray
+    ): PrinterResult {
+        var socket: Socket? = null
+        var outputStream: OutputStream? = null
+
+        Log.d(TAG, "=== START PRINT BILL (NETWORK - SINGLE WRITE) ===")
+        Log.d(TAG, "Target: $ip:$port")
+        Log.d(TAG, "Content size: ${content.size} bytes")
+
+        return try {
+            Log.d(TAG, "Creating socket...")
+            socket = Socket().apply {
+                reuseAddress = true
+                keepAlive = true
+                // tcpNoDelay = true: Gửi ngay, không đợi Nagle buffer (giống phiếu bếp)
+                tcpNoDelay = true
+                setSoLinger(true, 2)
+            }
+
+            Log.d(TAG, "Connecting to $ip:$port...")
+            socket.connect(InetSocketAddress(ip, port), timeoutMs)
+            Log.d(TAG, "Connected successfully!")
+
+            outputStream = socket.getOutputStream()
+            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
+
+            // SINGLE WRITE: Gửi toàn bộ data trong 1 lần (giống phiếu bếp)
+            outputStream.write(content)
+            Log.d(TAG, "Write completed, flushing...")
+            outputStream.flush()
+            Log.d(TAG, "Flush completed!")
+
+            // Đợi máy in xử lý xong bitmap data
+            // Bill có nhiều content hơn phiếu bếp nên cần thời gian lâu hơn
+            Log.d(TAG, "Waiting 800ms for printer to process...")
+            delay(800)
+
+            Log.d(TAG, "=== PRINT BILL SUCCESS (SINGLE WRITE) ===")
+            PrinterResult.Success("OK")
+        } catch (e: Exception) {
+            Log.e(TAG, "=== PRINT BILL FAILED ===")
+            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Error message: ${e.message}")
+            PrinterResult.Error("Lỗi in: ${e.message}")
+        } finally {
+            try {
+                Log.d(TAG, "Closing connection...")
+                outputStream?.flush()
+                socket?.shutdownOutput()
+                outputStream?.close()
+                socket?.close()
+                Log.d(TAG, "Connection closed")
+            } catch (e: Exception) {
+                Log.e(TAG, "Close error: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Generate bill content với Hybrid approach
+     * Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user cài đặt trong app)
+     * Các config hiển thị (labels, show flags) từ template (web dashboard)
+     */
+    private fun generateHybridBill(
+        printerConfig: BillPrinterConfigEntity,
+        template: BillTemplateEntity,
+        billData: BillData,
+        capability: PrinterCapability,
+        paymentBankAccount: BankAccountEntity? = null,
+        payosQrCode: String? = null
+    ): ByteArray {
+        // Luôn dùng bitmap mode để đảm bảo tiếng Việt hiển thị đúng
+        val useBitmapMode = !capability.supportVietnameseUtf8
+
+        // Sử dụng settings từ printerConfig (user đã cài đặt trong app)
+        // printerConfig chứa: paperWidth, fontSize, lineSpacing, numberOfCopies, cutPaper, etc.
+        val paperWidth = printerConfig.paperWidth
+        val fontSize = printerConfig.fontSize
+        val lineSpacing = printerConfig.lineSpacing
+
+        Log.d(TAG, "Bill settings from printerConfig: paperWidth=${paperWidth}mm, fontSize=$fontSize, lineSpacing=$lineSpacing")
+
+        // Sử dụng Single Canvas Rendering nếu được bật (mặc định ON)
+        return if (useSingleCanvasRendering && useBitmapMode) {
+            Log.d(TAG, "Using SINGLE CANVAS RENDERING mode")
+            generateBillWithSingleCanvas(paperWidth, fontSize, lineSpacing, template, billData, paymentBankAccount, payosQrCode)
+        } else {
+            Log.d(TAG, "Using LEGACY per-line rendering mode")
+            generateBillFromConfig(paperWidth, fontSize, lineSpacing, template, billData, useBitmapMode, paymentBankAccount, payosQrCode)
+        }
+    }
+
+    /**
+     * Generate bill sử dụng Single Canvas Rendering
+     *
+     * SINGLE CANVAS RENDERING:
+     * - Render toàn bộ bill trên 1 canvas/bitmap duy nhất
+     * - Giảm GC pressure (chỉ tạo 1 bitmap lớn thay vì nhiều bitmap nhỏ)
+     * - In mượt hơn (gửi 1 khối data liên tục)
+     * - Line spacing chính xác và đồng nhất
+     * - Tránh jitter do timing giữa các bitmap renders
+     */
+    private fun generateBillWithSingleCanvas(
+        paperWidth: Int,
+        fontSize: String,
+        lineSpacing: Float,
+        template: BillTemplateEntity,
+        billData: BillData,
+        paymentBankAccount: BankAccountEntity? = null,
+        payosQrCode: String? = null
+    ): ByteArray {
+        Log.d(TAG, "Generating bill with SINGLE CANVAS: ${billData.displayNumber}, ${billData.items.size} items")
+
+        // Sử dụng shared method để build nội dung bill vào builder
+        val builder = buildBillContentToBuilder(
+            paperWidth, fontSize, lineSpacing, template, billData, paymentBankAccount, payosQrCode
+        )
+
+        // Thêm barcode nếu cần (chỉ cho ESC/POS, không hỗ trợ trong bitmap mode)
+        builder.apply {
+            if (template.showBarcode) {
+                barcode(billData.orderNumber)
+            }
+
             // ============ PRINTER ACTIONS ============
-            feed(5)
+            feed(2) // Thêm feed để nội dung không bị cắt
             if (template.cutPaper) {
                 cut()
             }
