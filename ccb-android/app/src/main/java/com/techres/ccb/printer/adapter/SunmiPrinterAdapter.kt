@@ -837,7 +837,8 @@ class SunmiPrinterAdapter @Inject constructor(
 
                 try {
                     dataParcel.writeInterfaceToken(descriptor)
-                    // Write bitmap to parcel
+                    // AIDL format: write "not null" flag (1) before Parcelable object
+                    dataParcel.writeInt(1) // bitmap is not null
                     bitmap.writeToParcel(dataParcel, 0)
                     // Write null for callback (ICallback)
                     dataParcel.writeStrongBinder(null)
