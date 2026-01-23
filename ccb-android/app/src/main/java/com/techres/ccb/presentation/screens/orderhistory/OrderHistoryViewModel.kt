@@ -456,7 +456,7 @@ class OrderHistoryViewModel @Inject constructor(
                     var printerConfig = printerConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
                         // Fallback to first active printer
-                        val activePrinters = printerConfigDao.getAllByBranchSync(branchId)
+                        val activePrinters = printerConfigDao.getActiveByBranchSync(branchId)
                         printerConfig = activePrinters.firstOrNull()
                     }
                     if (printerConfig == null) {

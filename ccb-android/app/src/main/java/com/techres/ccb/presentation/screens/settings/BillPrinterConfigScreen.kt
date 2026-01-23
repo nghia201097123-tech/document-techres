@@ -221,7 +221,6 @@ fun BillPrinterConfigScreen(
                         isTesting = uiState.testingPrinterId == config.id,
                         onEditClick = { viewModel.showEditDialog(config) },
                         onTestClick = { viewModel.testPrinterConnection(config) },
-                        onSetDefaultClick = { viewModel.setDefault(config.id) },
                         onTemplateClick = { viewModel.showTemplateSelector(config) },
                         onAllSettingsClick = { viewModel.showAllSettingsDialog(config) },
                         onToggleAutoPrint = { viewModel.toggleAutoPrint(config) },
@@ -281,7 +280,6 @@ private fun PrinterConfigCard(
     isTesting: Boolean,
     onEditClick: () -> Unit,
     onTestClick: () -> Unit,
-    onSetDefaultClick: () -> Unit,
     onTemplateClick: () -> Unit,
     onAllSettingsClick: () -> Unit,
     onToggleAutoPrint: () -> Unit,
@@ -338,36 +336,15 @@ private fun PrinterConfigCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = config.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = if (config.isActive)
-                                MaterialTheme.colorScheme.onSurface
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                        if (config.isDefault) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = if (config.isActive)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    Color.Gray
-                            ) {
-                                Text(
-                                    "Mặc định",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    fontSize = 10.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = config.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = if (config.isActive)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
                     config.description?.let {
                         Text(
                             text = it,
@@ -643,7 +620,7 @@ private fun PrinterConfigCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Actions - Row 1: Test In + Mặc định
+            // Actions - Row with Test In and Cài đặt buttons
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -665,32 +642,18 @@ private fun PrinterConfigCard(
                     Text(if (isTesting) "Đang in..." else "Test In")
                 }
 
-                // Set default button
-                if (!config.isDefault) {
-                    OutlinedButton(
-                        onClick = onSetDefaultClick,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Mặc định")
-                    }
+                // Cài đặt button
+                Button(
+                    onClick = onAllSettingsClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = primaryColor
+                    )
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Cài đặt")
                 }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Actions - Row 2: Cài đặt button (full width)
-            Button(
-                onClick = onAllSettingsClick,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = primaryColor
-                )
-            ) {
-                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Cài đặt")
             }
         }
     }

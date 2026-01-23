@@ -7,11 +7,19 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface BillPrinterConfigDao {
 
-    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
+    // Get ALL printers (for UI - show both enabled and disabled)
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId ORDER BY sort_order ASC")
     fun getAllByBranch(branchId: String): Flow<List<BillPrinterConfigEntity>>
 
-    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId ORDER BY sort_order ASC")
     suspend fun getAllByBranchSync(branchId: String): List<BillPrinterConfigEntity>
+
+    // Get only ACTIVE printers (for printing)
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
+    fun getActiveByBranch(branchId: String): Flow<List<BillPrinterConfigEntity>>
+
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC")
+    suspend fun getActiveByBranchSync(branchId: String): List<BillPrinterConfigEntity>
 
     @Query("SELECT * FROM bill_printer_configs WHERE id = :id")
     suspend fun getById(id: String): BillPrinterConfigEntity?

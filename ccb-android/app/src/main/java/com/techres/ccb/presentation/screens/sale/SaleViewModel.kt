@@ -3095,10 +3095,10 @@ class SaleViewModel @Inject constructor(
                 _uiState.update { it.copy(tempBillPrintCount = newPrintCount) }
 
                 withContext(Dispatchers.IO) {
-                    // Get printer and template
+                    // Get printer and template (only active ones)
                     var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
-                        val activePrinters = billPrinterConfigDao.getAllByBranchSync(branchId)
+                        val activePrinters = billPrinterConfigDao.getActiveByBranchSync(branchId)
                         printerConfig = activePrinters.firstOrNull()
                     }
 
@@ -3221,10 +3221,10 @@ class SaleViewModel @Inject constructor(
 
             try {
                 withContext(Dispatchers.IO) {
-                    // Get printer config
+                    // Get printer config (only active ones)
                     var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
-                        val activePrinters = billPrinterConfigDao.getAllByBranchSync(branchId)
+                        val activePrinters = billPrinterConfigDao.getActiveByBranchSync(branchId)
                         printerConfig = activePrinters.firstOrNull()
                     }
 
@@ -3474,7 +3474,7 @@ class SaleViewModel @Inject constructor(
                         var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                         if (printerConfig == null) {
                             // Fallback: get first active printer for this branch
-                            val activePrinters = billPrinterConfigDao.getAllByBranchSync(branchId)
+                            val activePrinters = billPrinterConfigDao.getActiveByBranchSync(branchId)
                             printerConfig = activePrinters.firstOrNull()
                             Log.d(TAG, "completeOrder - No default printer, using first active: ${printerConfig?.id}")
                         }
