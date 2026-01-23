@@ -44,6 +44,7 @@ import {
   BillPrinterConfig,
   BillTemplateType,
   ItemDisplayLayout,
+  PrinterConnectionType,
   BillTemplateWithPrinterForm,
   BILL_TEMPLATE_TYPE_LABELS,
   BILL_TEMPLATE_TYPE_DESCRIPTIONS,
