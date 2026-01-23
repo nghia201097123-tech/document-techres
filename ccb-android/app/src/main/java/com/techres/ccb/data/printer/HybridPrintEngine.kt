@@ -160,6 +160,22 @@ data class BitmapTextStyle(
     val lineSpacingMultiplier: Float = 0.4f // Giảm xuống 0.4 để khoảng cách giữa các dòng nhỏ nhất
 )
 
+// ==================== TABLE COLUMN STRUCTURES ====================
+
+/**
+ * Một cột trong table row với chiều rộng theo tỷ lệ phần trăm
+ */
+data class TableColumn(
+    val text: String,
+    val widthPercent: Float, // Phần trăm chiều rộng (0-100)
+    val align: ColumnAlign = ColumnAlign.LEFT
+)
+
+/**
+ * Căn lề cho cột trong table
+ */
+enum class ColumnAlign { LEFT, CENTER, RIGHT }
+
 /**
  * Bitmap Text Renderer - Chuyển text tiếng Việt thành hình ảnh
  */
@@ -512,6 +528,121 @@ object BitmapTextRenderer {
 
         return renderText(fullText, style, paperWidth)
     }
+
+    /**
+     * Render table row với các cột có chiều rộng theo tỷ lệ phần trăm
+     * Sử dụng pixel-based rendering để fill chính xác theo khổ giấy
+     */
+    fun renderTableRow(
+        columns: List<TableColumn>,
+        paperWidth: Int = PAPER_WIDTH_80MM,
+        style: BitmapTextStyle = BitmapTextStyle(),
+        separator: String = ""
+    ): Bitmap {
+        if (columns.isEmpty()) {
+            return Bitmap.createBitmap(paperWidth, 1, Bitmap.Config.RGB_565).apply {
+                eraseColor(Color.WHITE)
+            }
+        }
+
+        val textPaint = TextPaint().apply {
+            color = Color.BLACK
+            textSize = style.fontSize
+            isAntiAlias = false
+            isSubpixelText = false
+            hinting = android.graphics.Paint.HINTING_ON
+            typeface = if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+
+        val sepWidth = if (separator.isNotEmpty()) textPaint.measureText(separator) else 0f
+        val totalSepWidth = sepWidth * (columns.size - 1).coerceAtLeast(0)
+        val availableWidth = paperWidth - totalSepWidth
+
+        // Measure max height of all columns
+        var maxHeight = 0
+        columns.forEach { col ->
+            val colWidth = (availableWidth * col.widthPercent / 100f).toInt().coerceAtLeast(1)
+            val text = truncateTextToFit(col.text, textPaint, colWidth)
+            val alignment = when (col.align) {
+                ColumnAlign.CENTER -> Layout.Alignment.ALIGN_CENTER
+                ColumnAlign.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+                else -> Layout.Alignment.ALIGN_NORMAL
+            }
+            val layout = StaticLayout.Builder
+                .obtain(text, 0, text.length, textPaint, colWidth)
+                .setAlignment(alignment)
+                .setLineSpacing(0f, 1.02f)
+                .setIncludePad(false)
+                .build()
+            maxHeight = maxOf(maxHeight, layout.height)
+        }
+
+        // Add padding for Vietnamese diacritics
+        val topPadding = (maxHeight * 0.05f).toInt().coerceAtLeast(1)
+        val bottomPadding = (maxHeight * style.lineSpacingMultiplier * 0.3f).toInt().coerceAtLeast(1)
+        val totalHeight = maxHeight + topPadding + bottomPadding
+
+        // Create bitmap
+        val bitmap = Bitmap.createBitmap(paperWidth, totalHeight.coerceAtLeast(1), Bitmap.Config.RGB_565)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+
+        // Render each column at correct X position
+        var currentX = 0f
+        columns.forEachIndexed { index, col ->
+            val colWidth = (availableWidth * col.widthPercent / 100f).toInt().coerceAtLeast(1)
+            val text = truncateTextToFit(col.text, textPaint, colWidth)
+            val alignment = when (col.align) {
+                ColumnAlign.CENTER -> Layout.Alignment.ALIGN_CENTER
+                ColumnAlign.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+                else -> Layout.Alignment.ALIGN_NORMAL
+            }
+            val layout = StaticLayout.Builder
+                .obtain(text, 0, text.length, textPaint, colWidth)
+                .setAlignment(alignment)
+                .setLineSpacing(0f, 1.02f)
+                .setIncludePad(false)
+                .build()
+
+            canvas.save()
+            canvas.translate(currentX, topPadding.toFloat())
+            layout.draw(canvas)
+            canvas.restore()
+
+            currentX += colWidth
+
+            // Draw separator if not last column
+            if (index < columns.size - 1 && separator.isNotEmpty()) {
+                canvas.drawText(separator, currentX, topPadding + textPaint.textSize, textPaint)
+                currentX += sepWidth
+            }
+        }
+
+        return bitmap
+    }
+
+    /**
+     * Truncate text to fit within maxWidth pixels
+     */
+    private fun truncateTextToFit(text: String, paint: TextPaint, maxWidth: Int): String {
+        if (maxWidth <= 0) return ""
+        val textWidth = paint.measureText(text)
+        if (textWidth <= maxWidth) return text
+
+        // Need to truncate
+        var endIndex = text.length
+        val ellipsis = "."
+        val ellipsisWidth = paint.measureText(ellipsis)
+
+        while (endIndex > 0) {
+            val truncated = text.substring(0, endIndex) + ellipsis
+            if (paint.measureText(truncated) <= maxWidth) {
+                return truncated
+            }
+            endIndex--
+        }
+        return ellipsis
+    }
 }
 
 // ==================== HYBRID BILL BUILDER ====================
@@ -759,6 +890,71 @@ class HybridBillBuilder(
      */
     fun lineKeyValueDotted(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): HybridBillBuilder {
         return lineKeyValue(key, value, style, '.')
+    }
+
+    /**
+     * In table row với các cột có chiều rộng theo tỷ lệ phần trăm
+     * Sử dụng pixel-based rendering để fill chính xác theo khổ giấy
+     *
+     * @param columns Danh sách các cột (text, widthPercent, align)
+     * @param style Style cho text
+     * @param separator Ký tự ngăn cách giữa các cột (mặc định "")
+     */
+    fun lineTable(
+        columns: List<TableColumn>,
+        style: BitmapTextStyle = BitmapTextStyle(),
+        separator: String = ""
+    ): HybridBillBuilder {
+        if (columns.isEmpty()) return this
+
+        val fontSize = if (style.bold) totalFontSize else baseFontSize
+        val actualStyle = BitmapTextStyle(fontSize = fontSize, bold = style.bold, lineSpacingMultiplier = lineSpacing)
+
+        if (useBitmapMode) {
+            val bitmap = BitmapTextRenderer.renderTableRow(columns, pixelWidth, actualStyle, separator)
+
+            if (bitmap.height <= 2) {
+                bitmap.recycle()
+                return this
+            }
+
+            val imageData = if (useRasterBitmap) {
+                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            } else {
+                EscPosCommands.printBitmap(bitmap, 0)
+            }
+            buffer.write(imageData)
+            bitmap.recycle()
+        } else {
+            // Fallback: text mode - use character-based approximation
+            val totalPercent = columns.sumOf { it.widthPercent.toDouble() }.toFloat()
+            val line = buildString {
+                columns.forEachIndexed { index, col ->
+                    val colCharWidth = ((col.widthPercent / totalPercent) * lineWidth).toInt().coerceAtLeast(1)
+                    val text = if (col.text.length > colCharWidth) {
+                        col.text.take(colCharWidth - 1) + "."
+                    } else {
+                        when (col.align) {
+                            ColumnAlign.RIGHT -> col.text.padStart(colCharWidth)
+                            ColumnAlign.CENTER -> col.text.padStart((colCharWidth + col.text.length) / 2).padEnd(colCharWidth)
+                            else -> col.text.padEnd(colCharWidth)
+                        }
+                    }
+                    append(text)
+                    if (index < columns.size - 1) append(separator)
+                }
+            }
+            buffer.write(line.toByteArray(Charsets.UTF_8))
+            buffer.write(EscPosCommands.LF)
+        }
+        return this
+    }
+
+    /**
+     * Helper để tạo TableColumn nhanh
+     */
+    fun tableColumn(text: String, widthPercent: Float, align: ColumnAlign = ColumnAlign.LEFT): TableColumn {
+        return TableColumn(text, widthPercent, align)
     }
 
     /**

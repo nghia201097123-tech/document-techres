@@ -1474,32 +1474,35 @@ object HybridBillPrintService {
     /**
      * Layout: TABLE
      * Format: Món        | SL | Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun SingleCanvasBillBuilder.renderItemsAsTable(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        // lineWidth = 32 (58mm) or 48 (80mm) or more
-        val totalWidth = lineWidth
-        val qtyWidth = 3  // "SL" column
-        val priceWidth = if (totalWidth >= 48) 12 else 8  // Price column
-        val separatorWidth = 2  // " | "
-        val nameWidth = (totalWidth - qtyWidth - priceWidth - separatorWidth * 2).coerceAtLeast(10)
+        // Column widths in percentage (total = 100%)
+        val namePercent = 62f
+        val qtyPercent = 10f
+        val pricePercent = 28f
 
-        // Header
-        val headerName = "Món".padEnd(nameWidth)
-        val headerQty = "SL".padStart(qtyWidth)
-        val headerPrice = "Giá".padStart(priceWidth)
-        line("$headerName|$headerQty|$headerPrice", BitmapTextStyle(bold = true))
-        line("${"-".repeat(nameWidth)}|${"-".repeat(qtyWidth)}|${"-".repeat(priceWidth)}")
+        // Header row
+        lineTable(listOf(
+            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
+            tableColumn("Giá", pricePercent, PrintElement.ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
+        separator()
 
+        // Data rows
         billData.items.forEach { item ->
-            val qty = if (template.showQuantity) "${item.quantity}".padStart(qtyWidth) else " ".repeat(qtyWidth)
-            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).padStart(priceWidth) else " ".repeat(priceWidth)
-            val nameShort = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name.padEnd(nameWidth)
-            line("$nameShort|$qty|$price")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            lineTable(listOf(
+                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
+                tableColumn(price, pricePercent, PrintElement.ColumnAlign.RIGHT)
+            ))
 
             // Variants, Toppings, Extras
             renderItemVariants(template, item)
@@ -1511,34 +1514,38 @@ object HybridBillPrintService {
     /**
      * Layout: TABLE_STT
      * Format: STT | Món        | SL | Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun SingleCanvasBillBuilder.renderItemsAsTableWithSTT(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val sttWidth = 3   // "STT" column
-        val qtyWidth = 3   // "SL" column
-        val priceWidth = if (totalWidth >= 48) 12 else 8  // Price column
-        val separatorWidth = 3  // " | "
-        val nameWidth = (totalWidth - sttWidth - qtyWidth - priceWidth - separatorWidth * 3).coerceAtLeast(8)
+        // Column widths in percentage (total = 100%)
+        val sttPercent = 10f
+        val namePercent = 52f
+        val qtyPercent = 10f
+        val pricePercent = 28f
 
-        // Header
-        val headerStt = "STT".padEnd(sttWidth)
-        val headerName = "Món".padEnd(nameWidth)
-        val headerQty = "SL".padStart(qtyWidth)
-        val headerPrice = "Giá".padStart(priceWidth)
-        line("$headerStt|$headerName|$headerQty|$headerPrice", BitmapTextStyle(bold = true))
-        line("${"-".repeat(sttWidth)}|${"-".repeat(nameWidth)}|${"-".repeat(qtyWidth)}|${"-".repeat(priceWidth)}")
+        // Header row
+        lineTable(listOf(
+            tableColumn("STT", sttPercent, PrintElement.ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
+            tableColumn("Giá", pricePercent, PrintElement.ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
+        separator()
 
+        // Data rows
         billData.items.forEachIndexed { index, item ->
-            val stt = "${index + 1}".padStart(sttWidth)
-            val qty = if (template.showQuantity) "${item.quantity}".padStart(qtyWidth) else " ".repeat(qtyWidth)
-            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).padStart(priceWidth) else " ".repeat(priceWidth)
-            val nameShort = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name.padEnd(nameWidth)
-            line("$stt|$nameShort|$qty|$price")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            lineTable(listOf(
+                tableColumn("${index + 1}", sttPercent, PrintElement.ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
+                tableColumn(price, pricePercent, PrintElement.ColumnAlign.RIGHT)
+            ))
 
             // Variants, Toppings, Extras (indented)
             renderItemVariants(template, item)
@@ -1550,31 +1557,35 @@ object HybridBillPrintService {
     /**
      * Layout: TABLE_QTY_FIRST
      * Format: SL | Món        | Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun SingleCanvasBillBuilder.renderItemsAsTableQtyFirst(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val qtyWidth = 3   // "SL" column
-        val priceWidth = if (totalWidth >= 48) 12 else 8  // Price column
-        val separatorWidth = 2  // " | "
-        val nameWidth = (totalWidth - qtyWidth - priceWidth - separatorWidth * 2).coerceAtLeast(10)
+        // Column widths in percentage (total = 100%)
+        val qtyPercent = 10f
+        val namePercent = 62f
+        val pricePercent = 28f
 
-        // Header
-        val headerQty = "SL".padStart(qtyWidth)
-        val headerName = "Món".padEnd(nameWidth)
-        val headerPrice = "Giá".padStart(priceWidth)
-        line("$headerQty|$headerName|$headerPrice", BitmapTextStyle(bold = true))
-        line("${"-".repeat(qtyWidth)}|${"-".repeat(nameWidth)}|${"-".repeat(priceWidth)}")
+        // Header row
+        lineTable(listOf(
+            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
+            tableColumn("Giá", pricePercent, PrintElement.ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
+        separator()
 
+        // Data rows
         billData.items.forEach { item ->
-            val qty = if (template.showQuantity) "${item.quantity}".padStart(qtyWidth) else " ".repeat(qtyWidth)
-            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).padStart(priceWidth) else " ".repeat(priceWidth)
-            val nameShort = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name.padEnd(nameWidth)
-            line("$qty|$nameShort|$price")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            lineTable(listOf(
+                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
+                tableColumn(price, pricePercent, PrintElement.ColumnAlign.RIGHT)
+            ))
 
             // Variants, Toppings, Extras
             renderItemVariants(template, item)
@@ -1586,37 +1597,42 @@ object HybridBillPrintService {
     /**
      * Layout: TABLE_FULL
      * Format: STT | Món | SL | Đ.Giá | T.Tiền
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun SingleCanvasBillBuilder.renderItemsAsTableFull(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val sttWidth = 3    // "STT" column
-        val qtyWidth = 2    // "SL" column
-        val unitPriceWidth = if (totalWidth >= 48) 9 else 7   // "Đ.Giá" column
-        val totalPriceWidth = if (totalWidth >= 48) 10 else 7  // "T.Tiền" column
-        val separatorCount = 4  // Number of "|" separators
-        val nameWidth = (totalWidth - sttWidth - qtyWidth - unitPriceWidth - totalPriceWidth - separatorCount).coerceAtLeast(6)
+        // Column widths in percentage (total = 100%)
+        val sttPercent = 8f
+        val namePercent = 34f
+        val qtyPercent = 8f
+        val unitPricePercent = 25f
+        val totalPricePercent = 25f
 
-        // Header
-        val headerStt = "STT".padEnd(sttWidth)
-        val headerName = "Món".padEnd(nameWidth)
-        val headerQty = "SL".padStart(qtyWidth)
-        val headerUnitPrice = "Đ.Giá".padStart(unitPriceWidth)
-        val headerTotalPrice = "T.Tiền".padStart(totalPriceWidth)
-        line("$headerStt|$headerName|$headerQty|$headerUnitPrice|$headerTotalPrice", BitmapTextStyle(bold = true))
-        line("${"-".repeat(sttWidth)}|${"-".repeat(nameWidth)}|${"-".repeat(qtyWidth)}|${"-".repeat(unitPriceWidth)}|${"-".repeat(totalPriceWidth)}")
+        // Header row
+        lineTable(listOf(
+            tableColumn("STT", sttPercent, PrintElement.ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
+            tableColumn("Đ.Giá", unitPricePercent, PrintElement.ColumnAlign.RIGHT),
+            tableColumn("T.Tiền", totalPricePercent, PrintElement.ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
+        separator()
 
+        // Data rows
         billData.items.forEachIndexed { index, item ->
-            val stt = "${index + 1}".padStart(sttWidth)
-            val qty = if (template.showQuantity) "${item.quantity}".padStart(qtyWidth) else " ".repeat(qtyWidth)
-            val unitPrice = formatCurrency(item.originalPrice / item.quantity.coerceAtLeast(1)).takeLast(unitPriceWidth).padStart(unitPriceWidth)
-            val totalPrice = formatCurrency(item.totalPrice).takeLast(totalPriceWidth).padStart(totalPriceWidth)
-            val nameShort = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name.padEnd(nameWidth)
-            line("$stt|$nameShort|$qty|$unitPrice|$totalPrice")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val unitPrice = formatCurrency(item.originalPrice / item.quantity.coerceAtLeast(1))
+            val totalPrice = formatCurrency(item.totalPrice)
+
+            lineTable(listOf(
+                tableColumn("${index + 1}", sttPercent, PrintElement.ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
+                tableColumn(unitPrice, unitPricePercent, PrintElement.ColumnAlign.RIGHT),
+                tableColumn(totalPrice, totalPricePercent, PrintElement.ColumnAlign.RIGHT)
+            ))
 
             // Variants, Toppings, Extras
             renderItemVariants(template, item)
@@ -1858,40 +1874,49 @@ object HybridBillPrintService {
     /**
      * Layout: GRID_2_COL - 2 cột (cho món ngắn tên)
      * Format: Món1 xSL Giá | Món2 xSL Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun SingleCanvasBillBuilder.renderItemsGrid2Col(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column width for each item (half of total minus separator)
-        val totalWidth = lineWidth
-        val separatorWidth = 3  // " | "
-        val colWidth = (totalWidth - separatorWidth) / 2
-        // Calculate name width within each column (leaving space for qty and price)
-        val priceWidth = if (totalWidth >= 48) 9 else 7
-        val qtyWidth = 3
-        val nameWidth = (colWidth - priceWidth - qtyWidth - 2).coerceAtLeast(6)
+        // Each column takes 48% (leaving 4% for separator in the middle)
+        val colPercent = 48f
+        val sepPercent = 4f
 
-        // Process items in pairs
+        // Within each column: name 55%, qty 15%, price 30%
+        val nameInColPercent = 55f
+        val qtyInColPercent = 15f
+        val priceInColPercent = 30f
+
+        // Format item text for grid display
+        fun formatItemText(item: BillItem): String {
+            val qty = if (template.showQuantity) " x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) " ${formatCurrency(item.totalPrice)}" else ""
+            return "${item.name}$qty$price"
+        }
+
+        // Process items in pairs using lineTable
         val items = billData.items
         var i = 0
         while (i < items.size) {
             val item1 = items[i]
             val item2 = if (i + 1 < items.size) items[i + 1] else null
 
-            val formatItem = { item: BillItem ->
-                val name = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name.padEnd(nameWidth)
-                val qty = if (template.showQuantity) "x${item.quantity}".padStart(qtyWidth) else " ".repeat(qtyWidth)
-                val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).takeLast(priceWidth).padStart(priceWidth) else " ".repeat(priceWidth)
-                "$name $qty $price"
-            }
-
             if (item2 != null) {
-                line("${formatItem(item1)} | ${formatItem(item2)}")
+                // Two items in one row
+                lineTable(listOf(
+                    tableColumn(formatItemText(item1), colPercent, PrintElement.ColumnAlign.LEFT),
+                    tableColumn("|", sepPercent, PrintElement.ColumnAlign.CENTER),
+                    tableColumn(formatItemText(item2), colPercent, PrintElement.ColumnAlign.LEFT)
+                ))
                 i += 2
             } else {
-                line(formatItem(item1))
+                // Single item takes half the width
+                lineTable(listOf(
+                    tableColumn(formatItemText(item1), colPercent, PrintElement.ColumnAlign.LEFT),
+                    tableColumn("", sepPercent + colPercent, PrintElement.ColumnAlign.LEFT)
+                ))
                 i += 1
             }
         }
@@ -2046,33 +2071,35 @@ object HybridBillPrintService {
 
     /**
      * Layout: TABLE - Bảng đơn giản: Món | SL | Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun HybridBillBuilder.renderItemsAsTable(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val qtyWidth = 3
-        val priceWidth = if (totalWidth >= 48) 12 else 8
-        val nameWidth = (totalWidth - qtyWidth - priceWidth - 2).coerceAtLeast(10)
+        // Column widths in percentage (total = 100%)
+        val namePercent = 62f
+        val qtyPercent = 10f
+        val pricePercent = 28f
 
         // Header row
-        val header = buildString {
-            append("Món".padEnd(nameWidth))
-            append("SL".padStart(qtyWidth))
-            append("Giá".padStart(priceWidth))
-        }
-        lineBold(header)
+        lineTable(listOf(
+            tableColumn("Món", namePercent, ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, ColumnAlign.CENTER),
+            tableColumn("Giá", pricePercent, ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
         separator()
 
-        // Item rows
+        // Data rows
         billData.items.forEach { item ->
-            val itemName = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name
-            val qty = item.quantity.toString().padStart(qtyWidth)
-            val price = formatCurrency(item.totalPrice).padStart(priceWidth)
-            line("${itemName.padEnd(nameWidth)}$qty$price")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            lineTable(listOf(
+                tableColumn(item.name, namePercent, ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, ColumnAlign.CENTER),
+                tableColumn(price, pricePercent, ColumnAlign.RIGHT)
+            ))
 
             renderItemVariants(template, item)
             renderItemToppings(template, item)
@@ -2082,36 +2109,38 @@ object HybridBillPrintService {
 
     /**
      * Layout: TABLE_STT - Bảng có STT: STT | Món | SL | Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun HybridBillBuilder.renderItemsAsTableWithSTT(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val sttWidth = 4
-        val qtyWidth = 3
-        val priceWidth = if (totalWidth >= 48) 12 else 8
-        val nameWidth = (totalWidth - sttWidth - qtyWidth - priceWidth - 2).coerceAtLeast(8)
+        // Column widths in percentage (total = 100%)
+        val sttPercent = 10f
+        val namePercent = 52f
+        val qtyPercent = 10f
+        val pricePercent = 28f
 
         // Header row
-        val header = buildString {
-            append("STT".padEnd(sttWidth))
-            append("Món".padEnd(nameWidth))
-            append("SL".padStart(qtyWidth))
-            append("Giá".padStart(priceWidth))
-        }
-        lineBold(header)
+        lineTable(listOf(
+            tableColumn("STT", sttPercent, ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, ColumnAlign.CENTER),
+            tableColumn("Giá", pricePercent, ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
         separator()
 
-        // Item rows
+        // Data rows
         billData.items.forEachIndexed { index, item ->
-            val stt = (index + 1).toString().padEnd(sttWidth)
-            val itemName = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name
-            val qty = item.quantity.toString().padStart(qtyWidth)
-            val price = formatCurrency(item.totalPrice).padStart(priceWidth)
-            line("$stt${itemName.padEnd(nameWidth)}$qty$price")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            lineTable(listOf(
+                tableColumn("${index + 1}", sttPercent, ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, ColumnAlign.CENTER),
+                tableColumn(price, pricePercent, ColumnAlign.RIGHT)
+            ))
 
             renderItemVariants(template, item)
             renderItemToppings(template, item)
@@ -2121,33 +2150,35 @@ object HybridBillPrintService {
 
     /**
      * Layout: TABLE_QTY_FIRST - Bảng SL đầu: SL | Món | Giá
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun HybridBillBuilder.renderItemsAsTableQtyFirst(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val qtyWidth = 4
-        val priceWidth = if (totalWidth >= 48) 12 else 8
-        val nameWidth = (totalWidth - qtyWidth - priceWidth - 2).coerceAtLeast(10)
+        // Column widths in percentage (total = 100%)
+        val qtyPercent = 10f
+        val namePercent = 62f
+        val pricePercent = 28f
 
         // Header row
-        val header = buildString {
-            append("SL".padEnd(qtyWidth))
-            append("Món".padEnd(nameWidth))
-            append("Giá".padStart(priceWidth))
-        }
-        lineBold(header)
+        lineTable(listOf(
+            tableColumn("SL", qtyPercent, ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, ColumnAlign.LEFT),
+            tableColumn("Giá", pricePercent, ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
         separator()
 
-        // Item rows
+        // Data rows
         billData.items.forEach { item ->
-            val qty = item.quantity.toString().padEnd(qtyWidth)
-            val itemName = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name
-            val price = formatCurrency(item.totalPrice).padStart(priceWidth)
-            line("$qty${itemName.padEnd(nameWidth)}$price")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            lineTable(listOf(
+                tableColumn(qty, qtyPercent, ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, ColumnAlign.LEFT),
+                tableColumn(price, pricePercent, ColumnAlign.RIGHT)
+            ))
 
             renderItemVariants(template, item)
             renderItemToppings(template, item)
@@ -2157,39 +2188,42 @@ object HybridBillPrintService {
 
     /**
      * Layout: TABLE_FULL - Bảng đầy đủ: STT | Món | SL | Đơn giá | Thành tiền
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun HybridBillBuilder.renderItemsAsTableFull(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column widths based on lineWidth
-        val totalWidth = lineWidth
-        val sttWidth = 3
-        val qtyWidth = 3
-        val unitPriceWidth = if (totalWidth >= 48) 10 else 8
-        val totalPriceWidth = if (totalWidth >= 48) 10 else 8
-        val nameWidth = (totalWidth - sttWidth - qtyWidth - unitPriceWidth - totalPriceWidth - 2).coerceAtLeast(6)
+        // Column widths in percentage (total = 100%)
+        val sttPercent = 8f
+        val namePercent = 34f
+        val qtyPercent = 8f
+        val unitPricePercent = 25f
+        val totalPricePercent = 25f
 
         // Header row
-        val header = buildString {
-            append("STT".padEnd(sttWidth))
-            append("Món".padEnd(nameWidth))
-            append("SL".padStart(qtyWidth))
-            append("ĐG".padStart(unitPriceWidth))
-            append("TT".padStart(totalPriceWidth))
-        }
-        lineBold(header)
+        lineTable(listOf(
+            tableColumn("STT", sttPercent, ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, ColumnAlign.CENTER),
+            tableColumn("Đ.Giá", unitPricePercent, ColumnAlign.RIGHT),
+            tableColumn("T.Tiền", totalPricePercent, ColumnAlign.RIGHT)
+        ), BitmapTextStyle(bold = true))
         separator()
 
-        // Item rows
+        // Data rows
         billData.items.forEachIndexed { index, item ->
-            val stt = (index + 1).toString().padEnd(sttWidth)
-            val itemName = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name
-            val qty = item.quantity.toString().padStart(qtyWidth)
-            val unitPrice = formatCurrency(item.originalPrice).takeLast(unitPriceWidth).padStart(unitPriceWidth)
-            val total = formatCurrency(item.totalPrice).takeLast(totalPriceWidth).padStart(totalPriceWidth)
-            line("$stt${itemName.padEnd(nameWidth)}$qty$unitPrice$total")
+            val qty = if (template.showQuantity) "${item.quantity}" else ""
+            val unitPrice = formatCurrency(item.originalPrice / item.quantity.coerceAtLeast(1))
+            val totalPrice = formatCurrency(item.totalPrice)
+
+            lineTable(listOf(
+                tableColumn("${index + 1}", sttPercent, ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, ColumnAlign.CENTER),
+                tableColumn(unitPrice, unitPricePercent, ColumnAlign.RIGHT),
+                tableColumn(totalPrice, totalPricePercent, ColumnAlign.RIGHT)
+            ))
 
             renderItemVariants(template, item)
             renderItemToppings(template, item)
@@ -2409,38 +2443,44 @@ object HybridBillPrintService {
 
     /**
      * Layout: GRID_2_COL - 2 cột
-     * Column widths adapt to paper width
+     * Sử dụng lineTable với pixel-based column widths để fill chính xác theo khổ giấy
      */
     private fun HybridBillBuilder.renderItemsGrid2Col(
         template: BillTemplateEntity,
         billData: BillData
     ) {
-        // Calculate column width for each item (half of total minus separator)
-        val totalWidth = lineWidth
-        val separatorWidth = 3  // " | "
-        val colWidth = (totalWidth - separatorWidth) / 2
-        val priceWidth = if (totalWidth >= 48) 9 else 7
-        val qtyWidth = 3
-        val nameWidth = (colWidth - priceWidth - qtyWidth - 2).coerceAtLeast(6)
+        // Each column takes 48% (leaving 4% for separator in the middle)
+        val colPercent = 48f
+        val sepPercent = 4f
 
+        // Format item text for grid display
+        fun formatItemText(item: BillItem): String {
+            val qty = if (template.showQuantity) " x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) " ${formatCurrency(item.totalPrice)}" else ""
+            return "${item.name}$qty$price"
+        }
+
+        // Process items in pairs using lineTable
         val items = billData.items
         var i = 0
         while (i < items.size) {
             val item1 = items[i]
             val item2 = if (i + 1 < items.size) items[i + 1] else null
 
-            val formatItem = { item: BillItem ->
-                val name = if (item.name.length > nameWidth) item.name.take(nameWidth - 1) + "." else item.name.padEnd(nameWidth)
-                val qty = if (template.showQuantity) "x${item.quantity}".padStart(qtyWidth) else " ".repeat(qtyWidth)
-                val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).takeLast(priceWidth).padStart(priceWidth) else " ".repeat(priceWidth)
-                "$name $qty $price"
-            }
-
             if (item2 != null) {
-                line("${formatItem(item1)} | ${formatItem(item2)}")
+                // Two items in one row
+                lineTable(listOf(
+                    tableColumn(formatItemText(item1), colPercent, ColumnAlign.LEFT),
+                    tableColumn("|", sepPercent, ColumnAlign.CENTER),
+                    tableColumn(formatItemText(item2), colPercent, ColumnAlign.LEFT)
+                ))
                 i += 2
             } else {
-                line(formatItem(item1))
+                // Single item takes half the width
+                lineTable(listOf(
+                    tableColumn(formatItemText(item1), colPercent, ColumnAlign.LEFT),
+                    tableColumn("", sepPercent + colPercent, ColumnAlign.LEFT)
+                ))
                 i += 1
             }
         }

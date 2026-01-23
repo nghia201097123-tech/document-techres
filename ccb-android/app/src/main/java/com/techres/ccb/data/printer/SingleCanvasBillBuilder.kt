@@ -137,6 +137,71 @@ class SingleCanvasBillBuilder(
             override fun measureHeight(pixelWidth: Int): Int = 0 // Handled separately
         }
 
+        /**
+         * Table row với các cột có chiều rộng theo tỷ lệ phần trăm
+         * Dùng pixel-based rendering để fill chính xác theo khổ giấy
+         */
+        data class TableRow(
+            val columns: List<TableColumn>,
+            val fontSize: Float,
+            val bold: Boolean = false,
+            val lineSpacing: Float = 0.4f,
+            val separator: String = " " // Ký tự ngăn cách giữa các cột
+        ) : PrintElement() {
+            override fun measureHeight(pixelWidth: Int): Int {
+                if (columns.isEmpty()) return 0
+                val paint = createTextPaint(fontSize, bold, false)
+                // Measure max height among all columns
+                var maxHeight = 0
+                val sepWidth = paint.measureText(separator)
+                val totalSepWidth = sepWidth * (columns.size - 1).coerceAtLeast(0)
+                val availableWidth = pixelWidth - totalSepWidth
+
+                columns.forEach { col ->
+                    val colWidth = (availableWidth * col.widthPercent / 100f).toInt()
+                    val text = truncateTextToFit(col.text, paint, colWidth)
+                    val layout = createStaticLayout(text, paint, colWidth.coerceAtLeast(1),
+                        when (col.align) {
+                            ColumnAlign.CENTER -> Layout.Alignment.ALIGN_CENTER
+                            ColumnAlign.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+                            else -> Layout.Alignment.ALIGN_NORMAL
+                        }, lineSpacing)
+                    maxHeight = maxOf(maxHeight, layout.height)
+                }
+                return maxHeight + calculatePadding(maxHeight, lineSpacing)
+            }
+
+            companion object {
+                fun truncateTextToFit(text: String, paint: TextPaint, maxWidth: Int): String {
+                    if (maxWidth <= 0) return ""
+                    val textWidth = paint.measureText(text)
+                    if (textWidth <= maxWidth) return text
+
+                    // Need to truncate
+                    var endIndex = text.length
+                    val ellipsis = "."
+                    val ellipsisWidth = paint.measureText(ellipsis)
+
+                    while (endIndex > 0) {
+                        val truncated = text.substring(0, endIndex) + ellipsis
+                        if (paint.measureText(truncated) <= maxWidth) {
+                            return truncated
+                        }
+                        endIndex--
+                    }
+                    return ellipsis
+                }
+            }
+        }
+
+        data class TableColumn(
+            val text: String,
+            val widthPercent: Float, // Phần trăm chiều rộng (0-100)
+            val align: ColumnAlign = ColumnAlign.LEFT
+        )
+
+        enum class ColumnAlign { LEFT, CENTER, RIGHT }
+
         companion object {
             fun createTextPaint(fontSize: Float, bold: Boolean, italic: Boolean): TextPaint {
                 return TextPaint().apply {
@@ -338,6 +403,38 @@ class SingleCanvasBillBuilder(
      */
     fun lineKeyValueDotted(key: String, value: String, style: BitmapTextStyle = BitmapTextStyle()): SingleCanvasBillBuilder {
         return lineKeyValue(key, value, style, dotFill = true)
+    }
+
+    /**
+     * In table row với các cột có chiều rộng theo tỷ lệ phần trăm
+     * Sử dụng pixel-based rendering để fill chính xác theo khổ giấy
+     *
+     * @param columns Danh sách các cột (text, widthPercent, align)
+     * @param style Style cho text
+     * @param separator Ký tự ngăn cách giữa các cột (mặc định " ")
+     */
+    fun lineTable(
+        columns: List<PrintElement.TableColumn>,
+        style: BitmapTextStyle = BitmapTextStyle(),
+        separator: String = " "
+    ): SingleCanvasBillBuilder {
+        if (columns.isEmpty()) return this
+        val fontSize = if (style.bold) totalFontSize else baseFontSize
+        elements.add(PrintElement.TableRow(
+            columns = columns,
+            fontSize = fontSize,
+            bold = style.bold,
+            lineSpacing = lineSpacing,
+            separator = separator
+        ))
+        return this
+    }
+
+    /**
+     * Helper để tạo TableColumn nhanh
+     */
+    fun tableColumn(text: String, widthPercent: Float, align: PrintElement.ColumnAlign = PrintElement.ColumnAlign.LEFT): PrintElement.TableColumn {
+        return PrintElement.TableColumn(text, widthPercent, align)
     }
 
     /**
@@ -657,6 +754,7 @@ class SingleCanvasBillBuilder(
         when (element) {
             is PrintElement.Text -> renderTextOnCanvas(canvas, element, startY)
             is PrintElement.KeyValue -> renderKeyValueOnCanvas(canvas, element, startY)
+            is PrintElement.TableRow -> renderTableRowOnCanvas(canvas, element, startY)
             is PrintElement.Separator -> renderSeparatorOnCanvas(canvas, element, startY)
             is PrintElement.Feed -> { /* Feed rendered as blank space - no drawing needed, height already reserved */ }
             else -> { /* QR, Barcode handled separately via special ESC/POS commands */ }
@@ -696,6 +794,61 @@ class SingleCanvasBillBuilder(
         canvas.translate(0f, startY + topPadding)
         layout.draw(canvas)
         canvas.restore()
+    }
+
+    /**
+     * Render table row với pixel-based column widths
+     * Mỗi cột được vẽ tại vị trí X chính xác dựa trên widthPercent
+     */
+    private fun renderTableRowOnCanvas(canvas: Canvas, element: PrintElement.TableRow, startY: Float) {
+        if (element.columns.isEmpty()) return
+
+        val paint = PrintElement.createTextPaint(element.fontSize, element.bold, false)
+        val sepWidth = paint.measureText(element.separator)
+        val totalSepWidth = sepWidth * (element.columns.size - 1).coerceAtLeast(0)
+        val availableWidth = pixelWidth - totalSepWidth
+
+        // Calculate row height (max of all columns)
+        var maxHeight = 0
+        element.columns.forEach { col ->
+            val colWidth = (availableWidth * col.widthPercent / 100f).toInt().coerceAtLeast(1)
+            val text = PrintElement.TableRow.truncateTextToFit(col.text, paint, colWidth)
+            val alignment = when (col.align) {
+                PrintElement.ColumnAlign.CENTER -> Layout.Alignment.ALIGN_CENTER
+                PrintElement.ColumnAlign.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+                else -> Layout.Alignment.ALIGN_NORMAL
+            }
+            val layout = PrintElement.createStaticLayout(text, paint, colWidth, alignment, element.lineSpacing)
+            maxHeight = maxOf(maxHeight, layout.height)
+        }
+
+        val topPadding = (maxHeight * 0.05f).coerceAtLeast(1f)
+
+        // Render each column at correct X position
+        var currentX = 0f
+        element.columns.forEachIndexed { index, col ->
+            val colWidth = (availableWidth * col.widthPercent / 100f).toInt().coerceAtLeast(1)
+            val text = PrintElement.TableRow.truncateTextToFit(col.text, paint, colWidth)
+            val alignment = when (col.align) {
+                PrintElement.ColumnAlign.CENTER -> Layout.Alignment.ALIGN_CENTER
+                PrintElement.ColumnAlign.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+                else -> Layout.Alignment.ALIGN_NORMAL
+            }
+            val layout = PrintElement.createStaticLayout(text, paint, colWidth, alignment, element.lineSpacing)
+
+            canvas.save()
+            canvas.translate(currentX, startY + topPadding)
+            layout.draw(canvas)
+            canvas.restore()
+
+            currentX += colWidth
+
+            // Draw separator if not last column
+            if (index < element.columns.size - 1 && element.separator.isNotEmpty()) {
+                canvas.drawText(element.separator, currentX, startY + topPadding + paint.textSize, paint)
+                currentX += sepWidth
+            }
+        }
     }
 
     private fun renderSeparatorOnCanvas(canvas: Canvas, element: PrintElement.Separator, startY: Float) {
