@@ -55,6 +55,7 @@ const sidebars: SidebarsConfig = {
       label: 'Tích hợp Food Platform',
       items: [
         'food-platform/overview',
+        'food-platform/app-responsibilities',
         'food-platform/account-linking',
         'food-platform/store-mapping',
         'food-platform/product-mapping',

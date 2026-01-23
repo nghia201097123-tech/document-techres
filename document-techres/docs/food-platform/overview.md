@@ -22,6 +22,30 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
 | **BeFood** | Username/Password | Planned |
 | **GoFood** | TBD | Future |
 
+## Phân chia nhiệm vụ các App
+
+| App | Nhiệm vụ chính |
+|-----|---------------|
+| **Web Admin** | Tạo cổng liên kết (ports), cấu hình API credentials cho từng platform |
+| **Web Dashboard** | Liên kết tài khoản, gán chi nhánh ↔ cửa hàng, gán món ăn, bật/tắt cổng |
+| **CCB** | Liên kết tài khoản, poll đơn 5s, auto xác nhận, in bill, hoàn tất đơn, lưu hóa đơn local |
+
+```
+┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+│    WEB-ADMIN      │  │   WEB-DASHBOARD   │  │       CCB         │
+│   (Quản trị)      │  │   (Chi nhánh)     │  │    (Tại quán)     │
+├───────────────────┤  ├───────────────────┤  ├───────────────────┤
+│ • Tạo cổng liên   │  │ • Liên kết tài    │  │ • Poll đơn hàng   │
+│   kết (ports)     │  │   khoản merchant  │  │   mỗi 5 giây      │
+│ • Cấu hình API    │  │ • Gán chi nhánh   │  │ • Auto xác nhận   │
+│                   │  │   ↔ cửa hàng      │  │ • In bill giao    │
+│                   │  │ • Gán món ăn      │  │ • Hoàn tất đơn    │
+│                   │  │ • Bật/tắt cổng    │  │ • Lưu hóa đơn     │
+└───────────────────┘  └───────────────────┘  └───────────────────┘
+```
+
+**Chi tiết**: [Phân chia nhiệm vụ các App](./app-responsibilities.md)
+
 ## Khái niệm quan trọng
 
 ### Mapping giữa Merchant và TechRes
@@ -406,10 +430,11 @@ Frontend:
 
 ## Tiếp theo
 
-1. [Liên kết tài khoản](./account-linking.md) - Chi tiết flow đăng nhập
-2. [Mapping cửa hàng](./store-mapping.md) - Mapping store ↔ branch
-3. [Mapping sản phẩm](./product-mapping.md) - Mapping món ăn (Future)
-4. [Polling đơn hàng](./order-polling.md) - Cơ chế polling 5s với store filter
-5. [Sync và lưu dữ liệu](./order-sync.md) - Logic so sánh và lưu DB
-6. [Hiển thị trên CCB](./ccb-display.md) - UI và UX trên CCB
-7. [Auto-confirm và in bill](./auto-confirm-print.md) - Tự động hóa
+1. [Phân chia nhiệm vụ các App](./app-responsibilities.md) - Web Admin, Web Dashboard, CCB
+2. [Liên kết tài khoản](./account-linking.md) - Chi tiết flow đăng nhập
+3. [Mapping cửa hàng](./store-mapping.md) - Mapping store ↔ branch
+4. [Mapping sản phẩm](./product-mapping.md) - Mapping món ăn (Future)
+5. [Polling đơn hàng](./order-polling.md) - Cơ chế polling 5s với store filter
+6. [Sync và lưu dữ liệu](./order-sync.md) - Logic so sánh và lưu DB
+7. [Hiển thị trên CCB](./ccb-display.md) - UI và UX trên CCB
+8. [Auto-confirm và in bill](./auto-confirm-print.md) - Tự động hóa
