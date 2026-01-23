@@ -87,6 +87,7 @@ const menuItems: MenuItem[] = [
     children: [
       { title: "Quản lý bếp", href: "/kitchen", icon: ChefHat },
       { title: "Mẫu in Bill", href: "/settings/bill-template", icon: FileText },
+      { title: "Máy in Bill", href: "/settings/bill-printer", icon: Printer },
     ],
   },
   {

@@ -173,6 +173,8 @@ export interface BillPrinterConfig {
 
   // Print config
   paperWidth: number;
+  fontSize?: string;
+  lineSpacing?: number;
   autoPrintOnPayment: boolean;
   printPreview: boolean;
   numberOfCopies: number;
@@ -318,6 +320,8 @@ export interface CreateBillPrinterConfigDto {
   templateId?: string;
 
   paperWidth?: number;
+  fontSize?: string;
+  lineSpacing?: number;
   autoPrintOnPayment?: boolean;
   printPreview?: boolean;
   numberOfCopies?: number;
@@ -409,8 +413,8 @@ export const billTemplateService = {
     return response.data;
   },
 
-  createPrinterConfig: async (brandId: string, data: CreateBillPrinterConfigDto): Promise<BillPrinterConfig> => {
-    const response = await api.post(`/bill-printer-configs?brandId=${brandId}`, data);
+  createPrinterConfig: async (data: CreateBillPrinterConfigDto): Promise<BillPrinterConfig> => {
+    const response = await api.post(`/bill-printer-configs`, data);
     return response.data;
   },
 

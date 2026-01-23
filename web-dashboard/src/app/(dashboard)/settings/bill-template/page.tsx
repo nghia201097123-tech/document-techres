@@ -43,12 +43,10 @@ import {
   BillTemplate,
   BillPrinterConfig,
   BillTemplateType,
-  PrinterConnectionType,
   ItemDisplayLayout,
   BillTemplateWithPrinterForm,
   BILL_TEMPLATE_TYPE_LABELS,
   BILL_TEMPLATE_TYPE_DESCRIPTIONS,
-  PRINTER_CONNECTION_TYPE_LABELS,
   ITEM_DISPLAY_LAYOUT_LABELS,
   ITEM_DISPLAY_LAYOUT_DESCRIPTIONS,
   ITEM_DISPLAY_LAYOUT_EXAMPLES,
@@ -327,8 +325,8 @@ export default function BillTemplatePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Mẫu Bill & Máy in</h1>
-          <p className="text-muted-foreground">Quản lý mẫu hóa đơn và cấu hình máy in bill</p>
+          <h1 className="text-2xl font-bold">Mẫu in Bill</h1>
+          <p className="text-muted-foreground">Quản lý mẫu hóa đơn cho thương hiệu</p>
         </div>
         <BrandFilter
           selectedBrandId={filterBrandId}
@@ -343,8 +341,8 @@ export default function BillTemplatePage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Mẫu Bill & Máy in</CardTitle>
-              <CardDescription>Quản lý mẫu hóa đơn (bao gồm cấu hình máy in) cho thương hiệu</CardDescription>
+              <CardTitle>Mẫu in Bill</CardTitle>
+              <CardDescription>Quản lý mẫu hóa đơn cho thương hiệu. Cấu hình máy in được quản lý riêng ở mục "Máy in Bill"</CardDescription>
             </div>
             <Button onClick={() => openTemplateDialog("create")} disabled={!filterBrandId}>
               <Plus className="mr-2 h-4 w-4" />
@@ -509,14 +507,13 @@ export default function BillTemplatePage() {
               </div>
 
               <Tabs value={formTab} onValueChange={setFormTab}>
-                <TabsList className="grid w-full grid-cols-7">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="header">Header</TabsTrigger>
                   <TabsTrigger value="content">Nội dung</TabsTrigger>
                   <TabsTrigger value="price">Giá & VAT</TabsTrigger>
                   <TabsTrigger value="payment">Thanh toán</TabsTrigger>
                   <TabsTrigger value="footer">Footer</TabsTrigger>
                   <TabsTrigger value="style">Kiểu in</TabsTrigger>
-                  <TabsTrigger value="printer">Máy in</TabsTrigger>
                 </TabsList>
 
                 {/* Header Config */}
@@ -1234,137 +1231,6 @@ export default function BillTemplatePage() {
                   </div>
                 </TabsContent>
 
-                {/* Printer Config */}
-                <TabsContent value="printer" className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Loại kết nối</Label>
-                      <Select
-                        value={templateForm.connectionType || PrinterConnectionType.NETWORK}
-                        onValueChange={(value: PrinterConnectionType) =>
-                          setTemplateForm({ ...templateForm, connectionType: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(PRINTER_CONNECTION_TYPE_LABELS).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Network connection */}
-                  {(templateForm.connectionType === PrinterConnectionType.NETWORK || !templateForm.connectionType) && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Địa chỉ IP</Label>
-                        <Input
-                          value={templateForm.printerIp || ""}
-                          onChange={(e) => setTemplateForm({ ...templateForm, printerIp: e.target.value })}
-                          placeholder="192.168.1.100"
-                          className="font-mono"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Port</Label>
-                        <Input
-                          type="number"
-                          value={templateForm.printerPort || 9100}
-                          onChange={(e) => setTemplateForm({ ...templateForm, printerPort: Number(e.target.value) })}
-                          placeholder="9100"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bluetooth connection */}
-                  {templateForm.connectionType === PrinterConnectionType.BLUETOOTH && (
-                    <div className="space-y-2">
-                      <Label>MAC Address</Label>
-                      <Input
-                        value={templateForm.printerMac || ""}
-                        onChange={(e) => setTemplateForm({ ...templateForm, printerMac: e.target.value })}
-                        placeholder="00:11:22:33:44:55"
-                        className="font-mono"
-                      />
-                    </div>
-                  )}
-
-                  {/* USB connection */}
-                  {templateForm.connectionType === PrinterConnectionType.USB && (
-                    <div className="space-y-2">
-                      <Label>USB Path</Label>
-                      <Input
-                        value={templateForm.printerUsbPath || ""}
-                        onChange={(e) => setTemplateForm({ ...templateForm, printerUsbPath: e.target.value })}
-                        placeholder="/dev/usb/lp0"
-                        className="font-mono"
-                      />
-                    </div>
-                  )}
-
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3">Tùy chọn in tự động</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={templateForm.autoPrintOnPayment || false}
-                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, autoPrintOnPayment: checked })}
-                        />
-                        <Label>Tự động in khi thanh toán</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={templateForm.printPreview || false}
-                          onCheckedChange={(checked) => setTemplateForm({ ...templateForm, printPreview: checked })}
-                        />
-                        <Label>Xem trước khi in</Label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3">Cấu hình kết nối</h4>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label>Số lần thử lại</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={templateForm.retryCount || 3}
-                          onChange={(e) => setTemplateForm({ ...templateForm, retryCount: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Delay giữa lần thử (ms)</Label>
-                        <Input
-                          type="number"
-                          min={100}
-                          max={10000}
-                          value={templateForm.retryDelayMs || 1000}
-                          onChange={(e) => setTemplateForm({ ...templateForm, retryDelayMs: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Timeout kết nối (ms)</Label>
-                        <Input
-                          type="number"
-                          min={1000}
-                          max={30000}
-                          value={templateForm.connectionTimeoutMs || 5000}
-                          onChange={(e) => setTemplateForm({ ...templateForm, connectionTimeoutMs: Number(e.target.value) })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
               </Tabs>
               </div>
             </div>
