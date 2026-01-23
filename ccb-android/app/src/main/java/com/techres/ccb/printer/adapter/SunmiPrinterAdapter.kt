@@ -772,8 +772,7 @@ class SunmiPrinterAdapter @Inject constructor(
                         replyParcel.readException()
                         Timber.d("$TAG: transact($transactionCode) succeeded")
 
-                        // Step 2: Feed paper and commit buffer to actually execute printing
-                        lineWrapViaTransact(binder, 3)
+                        // Chỉ commit buffer, không cần lineWrap (tránh đẩy giấy thừa)
                         commitPrinterBufferViaTransact(binder)
 
                         return PrinterResult.Success
@@ -1285,6 +1284,13 @@ class SunmiPrinterAdapter @Inject constructor(
 
         try {
             val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+
+            // Nếu dùng BinderProxy, dùng AIDL transact
+            if (service is BinderProxyWrapper) {
+                Timber.d("$TAG: Using AIDL transact for cutPaper")
+                return@withContext cutPaperViaTransact(service.binder)
+            }
+
             val methods = service.javaClass.methods
 
             // Tìm method cutPaper với callback
@@ -1304,6 +1310,38 @@ class SunmiPrinterAdapter @Inject constructor(
         } catch (e: Exception) {
             return@withContext PrinterResult.Error(e.message ?: "Cut paper failed")
         }
+    }
+
+    /**
+     * Cut paper via AIDL transact for BinderProxy
+     */
+    private fun cutPaperViaTransact(binder: IBinder): PrinterResult {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        try {
+            val dataParcel = Parcel.obtain()
+            val replyParcel = Parcel.obtain()
+
+            try {
+                dataParcel.writeInterfaceToken(descriptor)
+                dataParcel.writeStrongBinder(null) // callback
+
+                val success = binder.transact(TransactionCodes.TRANSACTION_cutPaper, dataParcel, replyParcel, 0)
+
+                if (success) {
+                    replyParcel.readException()
+                    Timber.d("$TAG: cutPaper transact succeeded")
+                    return PrinterResult.Success
+                }
+            } finally {
+                dataParcel.recycle()
+                replyParcel.recycle()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: cutPaperViaTransact failed")
+        }
+
+        return PrinterResult.Error("cutPaper transact failed")
     }
 
     /**
