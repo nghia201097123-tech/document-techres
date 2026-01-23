@@ -672,8 +672,8 @@ class SingleCanvasBillBuilder(
 
         for (element in elements) {
             when (element) {
-                // Text, KeyValue, Separator, Feed đều gom vào TextBatch
-                is PrintElement.Text, is PrintElement.KeyValue, is PrintElement.Separator, is PrintElement.Feed -> {
+                // Text, KeyValue, TableRow, Separator, Feed đều gom vào TextBatch
+                is PrintElement.Text, is PrintElement.KeyValue, is PrintElement.TableRow, is PrintElement.Separator, is PrintElement.Feed -> {
                     currentBatch.add(element)
                 }
                 is PrintElement.QrCode -> {

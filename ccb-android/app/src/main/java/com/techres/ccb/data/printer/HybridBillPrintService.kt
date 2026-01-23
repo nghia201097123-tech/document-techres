@@ -1487,9 +1487,9 @@ object HybridBillPrintService {
 
         // Header row
         lineTable(listOf(
-            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
-            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
-            tableColumn("Giá", pricePercent, PrintElement.ColumnAlign.RIGHT)
+            tableColumn("Món", namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+            tableColumn("Giá", pricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
         ), BitmapTextStyle(bold = true))
         separator()
 
@@ -1499,9 +1499,9 @@ object HybridBillPrintService {
             val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
 
             lineTable(listOf(
-                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
-                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
-                tableColumn(price, pricePercent, PrintElement.ColumnAlign.RIGHT)
+                tableColumn(item.name, namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                tableColumn(price, pricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
             ))
 
             // Variants, Toppings, Extras
@@ -1528,10 +1528,10 @@ object HybridBillPrintService {
 
         // Header row
         lineTable(listOf(
-            tableColumn("STT", sttPercent, PrintElement.ColumnAlign.CENTER),
-            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
-            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
-            tableColumn("Giá", pricePercent, PrintElement.ColumnAlign.RIGHT)
+            tableColumn("STT", sttPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+            tableColumn("Giá", pricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
         ), BitmapTextStyle(bold = true))
         separator()
 
@@ -1541,10 +1541,10 @@ object HybridBillPrintService {
             val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
 
             lineTable(listOf(
-                tableColumn("${index + 1}", sttPercent, PrintElement.ColumnAlign.CENTER),
-                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
-                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
-                tableColumn(price, pricePercent, PrintElement.ColumnAlign.RIGHT)
+                tableColumn("${index + 1}", sttPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                tableColumn(price, pricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
             ))
 
             // Variants, Toppings, Extras (indented)
@@ -1570,9 +1570,9 @@ object HybridBillPrintService {
 
         // Header row
         lineTable(listOf(
-            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
-            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
-            tableColumn("Giá", pricePercent, PrintElement.ColumnAlign.RIGHT)
+            tableColumn("SL", qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+            tableColumn("Giá", pricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
         ), BitmapTextStyle(bold = true))
         separator()
 
@@ -1582,9 +1582,9 @@ object HybridBillPrintService {
             val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
 
             lineTable(listOf(
-                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
-                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
-                tableColumn(price, pricePercent, PrintElement.ColumnAlign.RIGHT)
+                tableColumn(qty, qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+                tableColumn(price, pricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
             ))
 
             // Variants, Toppings, Extras
@@ -1612,11 +1612,11 @@ object HybridBillPrintService {
 
         // Header row
         lineTable(listOf(
-            tableColumn("STT", sttPercent, PrintElement.ColumnAlign.CENTER),
-            tableColumn("Món", namePercent, PrintElement.ColumnAlign.LEFT),
-            tableColumn("SL", qtyPercent, PrintElement.ColumnAlign.CENTER),
-            tableColumn("Đ.Giá", unitPricePercent, PrintElement.ColumnAlign.RIGHT),
-            tableColumn("T.Tiền", totalPricePercent, PrintElement.ColumnAlign.RIGHT)
+            tableColumn("STT", sttPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+            tableColumn("Món", namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+            tableColumn("SL", qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+            tableColumn("Đ.Giá", unitPricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT),
+            tableColumn("T.Tiền", totalPricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
         ), BitmapTextStyle(bold = true))
         separator()
 
@@ -1627,11 +1627,11 @@ object HybridBillPrintService {
             val totalPrice = formatCurrency(item.totalPrice)
 
             lineTable(listOf(
-                tableColumn("${index + 1}", sttPercent, PrintElement.ColumnAlign.CENTER),
-                tableColumn(item.name, namePercent, PrintElement.ColumnAlign.LEFT),
-                tableColumn(qty, qtyPercent, PrintElement.ColumnAlign.CENTER),
-                tableColumn(unitPrice, unitPricePercent, PrintElement.ColumnAlign.RIGHT),
-                tableColumn(totalPrice, totalPricePercent, PrintElement.ColumnAlign.RIGHT)
+                tableColumn("${index + 1}", sttPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                tableColumn(item.name, namePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+                tableColumn(qty, qtyPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                tableColumn(unitPrice, unitPricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT),
+                tableColumn(totalPrice, totalPricePercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.RIGHT)
             ))
 
             // Variants, Toppings, Extras
@@ -1906,16 +1906,16 @@ object HybridBillPrintService {
             if (item2 != null) {
                 // Two items in one row
                 lineTable(listOf(
-                    tableColumn(formatItemText(item1), colPercent, PrintElement.ColumnAlign.LEFT),
-                    tableColumn("|", sepPercent, PrintElement.ColumnAlign.CENTER),
-                    tableColumn(formatItemText(item2), colPercent, PrintElement.ColumnAlign.LEFT)
+                    tableColumn(formatItemText(item1), colPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+                    tableColumn("|", sepPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.CENTER),
+                    tableColumn(formatItemText(item2), colPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT)
                 ))
                 i += 2
             } else {
                 // Single item takes half the width
                 lineTable(listOf(
-                    tableColumn(formatItemText(item1), colPercent, PrintElement.ColumnAlign.LEFT),
-                    tableColumn("", sepPercent + colPercent, PrintElement.ColumnAlign.LEFT)
+                    tableColumn(formatItemText(item1), colPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT),
+                    tableColumn("", sepPercent + colPercent, SingleCanvasBillBuilder.PrintElement.ColumnAlign.LEFT)
                 ))
                 i += 1
             }
