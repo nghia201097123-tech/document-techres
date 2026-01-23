@@ -64,24 +64,30 @@ export enum AuthType {
   PHONE_OTP = "phone_otp",
 }
 
+// API Response wrapper from backend
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
 // Food platform account from backend
 export interface FoodPlatformAccount {
   id: string;
   tenantId: string;
   branchId: string;
-  name: string;
+  displayName: string;
   platform: FoodPartnerType;
   authType: AuthType;
   status: ConnectionStatus;
   username?: string;
   phoneNumber?: string;
   externalMerchantId?: string;
-  externalStoreName?: string;
+  externalMerchantName?: string;
   pollIntervalSeconds: number;
   lastPollAt?: string;
   errorCount: number;
   lastError?: string;
-  sortOrder: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -155,7 +161,7 @@ function transformToConnectionView(account: FoodPlatformAccount, index: number):
         portId: account.id,
         partnerType: account.platform,
         shopNumber: index + 1,
-        username: account.username || account.phoneNumber || account.name,
+        username: account.username || account.phoneNumber || account.displayName,
         status: account.status,
         lastSyncAt: account.lastPollAt,
         errorMessage: account.lastError,
@@ -172,8 +178,9 @@ export const foodPartnerService = {
    * Get all available connection ports for a branch
    */
   async getAvailablePorts(branchId: string): Promise<PartnerConnectionPort[]> {
-    const response = await foodApi.get<FoodPlatformAccount[]>(`/accounts/branch/${branchId}`);
-    return response.data.map((account, index) => ({
+    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts/branch/${branchId}`);
+    const accounts = response.data.data || [];
+    return accounts.map((account, index) => ({
       id: account.id,
       partnerType: account.platform,
       shopNumber: index + 1,
@@ -188,15 +195,16 @@ export const foodPartnerService = {
    * Get all account connections for a branch
    */
   async getConnections(branchId: string): Promise<PartnerAccountConnection[]> {
-    const response = await foodApi.get<FoodPlatformAccount[]>(`/accounts/branch/${branchId}`);
-    return response.data
+    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts/branch/${branchId}`);
+    const accounts = response.data.data || [];
+    return accounts
       .filter((account) => account.status !== ConnectionStatus.PENDING || account.username)
       .map((account, index) => ({
         id: account.id,
         portId: account.id,
         partnerType: account.platform,
         shopNumber: index + 1,
-        username: account.username || account.phoneNumber || account.name,
+        username: account.username || account.phoneNumber || account.displayName,
         status: account.status,
         lastSyncAt: account.lastPollAt,
         errorMessage: account.lastError,
@@ -209,30 +217,31 @@ export const foodPartnerService = {
    * Get combined view of ports and connections
    */
   async getConnectionsView(branchId: string): Promise<PartnerConnectionView[]> {
-    const response = await foodApi.get<FoodPlatformAccount[]>(`/accounts/branch/${branchId}`);
-    return response.data.map(transformToConnectionView);
+    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts/branch/${branchId}`);
+    const accounts = response.data.data || [];
+    return accounts.map(transformToConnectionView);
   },
 
   /**
    * Link an account to a connection port (login)
    */
   async linkAccount(dto: LinkPartnerAccountDto): Promise<PartnerAccountConnection> {
-    const response = await foodApi.post(`/accounts/${dto.portId}/login`, {
+    const response = await foodApi.post<ApiResponse<any>>(`/accounts/${dto.portId}/login`, {
       username: dto.username,
       password: dto.password,
     });
-    return response.data;
+    return response.data.data;
   },
 
   /**
    * Update connection credentials
    */
   async updateConnection(connectionId: string, dto: UpdatePartnerConnectionDto): Promise<PartnerAccountConnection> {
-    const response = await foodApi.post(`/accounts/${connectionId}/login`, {
+    const response = await foodApi.post<ApiResponse<any>>(`/accounts/${connectionId}/login`, {
       username: dto.username,
       password: dto.password,
     });
-    return response.data;
+    return response.data.data;
   },
 
   /**
@@ -247,8 +256,8 @@ export const foodPartnerService = {
    */
   async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string }> {
     // For now, just get the account status
-    const response = await foodApi.get<FoodPlatformAccount>(`/accounts/${connectionId}`);
-    const account = response.data;
+    const response = await foodApi.get<ApiResponse<FoodPlatformAccount>>(`/accounts/${connectionId}`);
+    const account = response.data.data;
     return {
       status: account.status,
       message: account.status === ConnectionStatus.CONNECTED
