@@ -3141,14 +3141,21 @@ class SaleViewModel @Inject constructor(
                             val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
 
                             // Nếu bank account dùng PayOS, tạo PayOS payment trước để lấy QR code
-                            var payosQrCode: String? = null
-                            if (paymentBankAccount?.paymentPartner == "payos") {
+                            // Ưu tiên dùng lại QR đã tạo trước đó (tránh lỗi duplicate orderCode)
+                            var payosQrCode: String? = state.payosQrData
+                            if (paymentBankAccount?.paymentPartner == "payos" && payosQrCode == null) {
                                 Log.d(TAG, "printTemporaryBill - Bank uses PayOS, creating payment...")
                                 payosQrCode = createPayOSPaymentForBill(
                                     orderId = currentOrder.id,
                                     amount = billData.totalAmount.toLong(),
                                     orderNumber = currentOrder.orderNumber
                                 )
+                                // Lưu lại QR code để dùng cho bill thật
+                                if (payosQrCode != null) {
+                                    withContext(Dispatchers.Main) {
+                                        _uiState.update { it.copy(payosQrData = payosQrCode) }
+                                    }
+                                }
                             }
 
                             // Print temporary bill
@@ -3384,6 +3391,7 @@ class SaleViewModel @Inject constructor(
                 val surchargesForPrint = state.selectedSurcharges  // Danh sách phụ thu (để tính VAT)
                 val appliedDiscountsForPrint = state.appliedDiscounts  // Coupon/Voucher đã áp dụng
                 val tableNameForPrint = state.selectedTable?.name
+                val cachedPayosQrData = state.payosQrData  // PayOS QR data đã tạo từ bill tạm
 
                 withContext(Dispatchers.IO) {
                     // 1. Update order status to completed with correct discount, surcharge, VAT and total
@@ -3459,6 +3467,8 @@ class SaleViewModel @Inject constructor(
                         tempBillPrintCount = 0,
                         // Clear pager number
                         pagerNumber = null,
+                        // Clear PayOS QR data (đã lưu vào cachedPayosQrData)
+                        payosQrData = null,
                         successMessage = "Thanh toán thành công! #${String.format("%04d", currentOrder.dailyOrderNumber)}"
                     )
                 }
@@ -3517,15 +3527,18 @@ class SaleViewModel @Inject constructor(
                                 // Get primary bank account for payment QR (if enabled)
                                 val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
 
-                                // Nếu bank account dùng PayOS, tạo PayOS payment trước để lấy QR code
-                                var payosQrCode: String? = null
-                                if (paymentBankAccount?.paymentPartner == "payos") {
+                                // Nếu bank account dùng PayOS, ưu tiên dùng QR đã tạo từ bill tạm
+                                // (tránh lỗi duplicate orderCode khi tạo lại payment)
+                                var payosQrCode: String? = cachedPayosQrData
+                                if (paymentBankAccount?.paymentPartner == "payos" && payosQrCode == null) {
                                     Log.d(TAG, "completeOrder - Bank uses PayOS, creating payment...")
                                     payosQrCode = createPayOSPaymentForBill(
                                         orderId = completedOrder.id,
                                         amount = billData.totalAmount.toLong(),
                                         orderNumber = completedOrder.orderNumber
                                     )
+                                } else if (payosQrCode != null) {
+                                    Log.d(TAG, "completeOrder - Reusing cached PayOS QR from temporary bill")
                                 }
 
                                 // Check if print preview is enabled
