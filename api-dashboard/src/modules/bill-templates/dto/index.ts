@@ -397,3 +397,75 @@ export class UpdateBillTemplateDto extends PartialType(CreateBillTemplateDto) {
   @IsBoolean()
   isDefault?: boolean;
 }
+
+/**
+ * UpdateBillTemplateWithPrinterDto - DTO gộp để cập nhật cả template và printer config cùng lúc
+ * Sử dụng cho UI đã gộp chung template và printer config vào 1 màn hình
+ */
+export class UpdateBillTemplateWithPrinterDto extends PartialType(CreateBillTemplateDto) {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+
+  // ============ PRINTER CONFIG FIELDS ============
+  @ApiPropertyOptional({ description: 'ID printer config (nếu có)' })
+  @IsOptional()
+  @IsString()
+  printerConfigId?: string;
+
+  @ApiPropertyOptional({ description: 'Loại kết nối: network, bluetooth, usb, sunmi' })
+  @IsOptional()
+  @IsString()
+  connectionType?: string;
+
+  @ApiPropertyOptional({ description: 'Địa chỉ IP máy in' })
+  @IsOptional()
+  @IsString()
+  printerIp?: string;
+
+  @ApiPropertyOptional({ description: 'Port máy in' })
+  @IsOptional()
+  @IsNumber()
+  printerPort?: number;
+
+  @ApiPropertyOptional({ description: 'MAC address (Bluetooth)' })
+  @IsOptional()
+  @IsString()
+  printerMac?: string;
+
+  @ApiPropertyOptional({ description: 'USB path' })
+  @IsOptional()
+  @IsString()
+  printerUsbPath?: string;
+
+  @ApiPropertyOptional({ description: 'Tự động in khi thanh toán' })
+  @IsOptional()
+  @IsBoolean()
+  autoPrintOnPayment?: boolean;
+
+  @ApiPropertyOptional({ description: 'Xem trước khi in' })
+  @IsOptional()
+  @IsBoolean()
+  printPreview?: boolean;
+
+  @ApiPropertyOptional({ description: 'Số lần thử lại' })
+  @IsOptional()
+  @IsNumber()
+  retryCount?: number;
+
+  @ApiPropertyOptional({ description: 'Delay giữa các lần thử (ms)' })
+  @IsOptional()
+  @IsNumber()
+  retryDelayMs?: number;
+
+  @ApiPropertyOptional({ description: 'Timeout kết nối (ms)' })
+  @IsOptional()
+  @IsNumber()
+  connectionTimeoutMs?: number;
+}

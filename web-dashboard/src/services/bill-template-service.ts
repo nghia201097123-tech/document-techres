@@ -301,6 +301,24 @@ export interface UpdateBillTemplateDto extends Partial<CreateBillTemplateDto> {
   isDefault?: boolean;
 }
 
+/**
+ * DTO gộp để cập nhật cả template và printer config cùng lúc
+ */
+export interface UpdateBillTemplateWithPrinterDto extends UpdateBillTemplateDto {
+  // Printer config fields
+  printerConfigId?: string;
+  connectionType?: PrinterConnectionType;
+  printerIp?: string;
+  printerPort?: number;
+  printerMac?: string;
+  printerUsbPath?: string;
+  autoPrintOnPayment?: boolean;
+  printPreview?: boolean;
+  retryCount?: number;
+  retryDelayMs?: number;
+  connectionTimeoutMs?: number;
+}
+
 export interface CreateBillPrinterConfigDto {
   branchId?: string;
   name: string;
@@ -360,6 +378,14 @@ export const billTemplateService = {
 
   updateTemplate: async (id: string, data: UpdateBillTemplateDto): Promise<BillTemplate> => {
     const response = await api.put(`/bill-templates/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Cập nhật template và printer config cùng lúc (endpoint mới)
+   */
+  updateTemplateWithPrinter: async (id: string, data: UpdateBillTemplateWithPrinterDto): Promise<BillTemplate> => {
+    const response = await api.put(`/bill-templates/${id}/with-printer`, data);
     return response.data;
   },
 

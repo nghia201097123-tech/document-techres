@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuard
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { BillTemplatesService } from './bill-templates.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateBillTemplateDto, UpdateBillTemplateDto } from './dto';
+import { CreateBillTemplateDto, UpdateBillTemplateDto, UpdateBillTemplateWithPrinterDto } from './dto';
 
 @ApiTags('Bill Templates')
 @Controller('bill-templates')
@@ -43,6 +43,12 @@ export class BillTemplatesController {
   @ApiOperation({ summary: 'Cập nhật mẫu bill' })
   update(@Request() req, @Param('id') id: string, @Body() updateDto: UpdateBillTemplateDto) {
     return this.service.update(req.user.tenantId, id, updateDto);
+  }
+
+  @Put(':id/with-printer')
+  @ApiOperation({ summary: 'Cập nhật mẫu bill và cấu hình máy in cùng lúc' })
+  updateWithPrinter(@Request() req, @Param('id') id: string, @Body() updateDto: UpdateBillTemplateWithPrinterDto) {
+    return this.service.updateWithPrinter(req.user.tenantId, id, updateDto);
   }
 
   @Patch(':id/toggle')
