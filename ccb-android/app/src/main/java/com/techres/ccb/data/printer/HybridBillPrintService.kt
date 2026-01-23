@@ -142,11 +142,14 @@ object HybridBillPrintService {
     /**
      * In bill qua Sunmi Built-in Printer
      *
-     * SINGLE WRITE (giống phiếu bếp):
-     * - Gửi toàn bộ data trong 1 lệnh write duy nhất
-     * - Đợi máy in xử lý sau khi gửi xong
+     * Tính năng:
+     * - Retry logic với configurable retry count và delay
+     * - Kiểm tra trạng thái máy in trước khi in
+     * - Error handling chi tiết với thông báo lỗi rõ ràng
+     * - Tối ưu connection management
+     * - SINGLE WRITE để đảm bảo in mượt
      *
-     * Flow: connect → single write → delay → complete
+     * Flow: connect → check status → generate bill → retry loop (write + delay) → complete
      */
     private suspend fun printViaSunmi(
         config: BillPrinterConfigEntity,
@@ -157,49 +160,230 @@ object HybridBillPrintService {
     ): PrinterResult {
         val adapter = sunmiAdapter ?: return PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
 
+        Log.d(TAG, "=== START PRINT BILL (SUNMI) ===")
+        Log.d(TAG, "Model: ${adapter.getSunmiModel()}")
+        Log.d(TAG, "Copies: ${template.numberOfCopies}, Retry: ${config.retryCount}")
+
+        // ========== BƯỚC 1: KẾT NỐI ĐẾN MÁY IN ==========
+        val connectResult = connectToSunmiWithRetry(adapter, config.retryCount, config.retryDelayMs)
+        if (connectResult is PrinterResult.Error) {
+            return connectResult
+        }
+
         return try {
-            // Kết nối đến máy in Sunmi
-            val connectResult = adapter.connect()
-            if (connectResult is com.techres.ccb.printer.core.PrinterResult.Error) {
-                return PrinterResult.Error("Không thể kết nối máy in Sunmi: ${connectResult.message}")
+            // ========== BƯỚC 2: KIỂM TRA TRẠNG THÁI MÁY IN ==========
+            val statusCheck = checkSunmiPrinterStatus(adapter)
+            if (statusCheck is PrinterResult.Error) {
+                return statusCheck
             }
 
-            // Generate bill content với cùng settings như kitchen ticket
+            // ========== BƯỚC 3: LẤY THÔNG TIN MÁY IN ==========
+            val sunmiPaperWidth = adapter.getPaperWidth()
+            val effectivePaperWidth = if (sunmiPaperWidth > 0) sunmiPaperWidth else config.paperWidth
+            Log.d(TAG, "Sunmi paper width: ${sunmiPaperWidth}mm (effective: ${effectivePaperWidth}mm)")
+
+            // ========== BƯỚC 4: GENERATE BILL CONTENT ==========
+            // Sử dụng BITMAP mode để đảm bảo tiếng Việt hiển thị đúng trên mọi thiết bị Sunmi
             val capability = PrinterCapability(
                 printerIp = "sunmi_inner",
                 printerPort = 0,
-                supportVietnameseUtf8 = false, // Force bitmap mode
+                supportVietnameseUtf8 = false, // Force bitmap mode cho Sunmi
                 printerModel = adapter.getSunmiModel()
             )
-            val billContent = generateHybridBill(config, template, billData, capability, paymentBankAccount, payosQrCode)
 
-            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes (SINGLE WRITE)")
+            // Tạo config với paper width từ Sunmi (nếu detect được)
+            val effectiveConfig = if (sunmiPaperWidth > 0 && sunmiPaperWidth != config.paperWidth) {
+                config.copy(paperWidth = sunmiPaperWidth)
+            } else {
+                config
+            }
 
-            // In từng bản riêng biệt - sử dụng numberOfCopies từ template (web-dashboard)
+            val billContent = generateHybridBill(effectiveConfig, template, billData, capability, paymentBankAccount, payosQrCode)
+            Log.d(TAG, "Sunmi bill content size: ${billContent.size} bytes")
+
+            // ========== BƯỚC 5: IN TỪNG BẢN VỚI RETRY ==========
             repeat(template.numberOfCopies) { copyIndex ->
-                // SINGLE WRITE: Gửi toàn bộ data trong 1 lần (giống phiếu bếp)
-                val writeResult = adapter.write(billContent)
-                if (writeResult is com.techres.ccb.printer.core.PrinterResult.Error) {
-                    Log.w(TAG, "Copy ${copyIndex + 1} failed: ${writeResult.message}")
-                    return PrinterResult.Error("Lỗi gửi dữ liệu in: ${writeResult.message}")
+                Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies}...")
+
+                val printResult = printSunmiCopyWithRetry(
+                    adapter = adapter,
+                    content = billContent,
+                    copyIndex = copyIndex,
+                    totalCopies = template.numberOfCopies,
+                    retryCount = config.retryCount,
+                    retryDelayMs = config.retryDelayMs
+                )
+
+                if (printResult is PrinterResult.Error) {
+                    return printResult
                 }
 
-                Log.d(TAG, "Sunmi print copy ${copyIndex + 1}/${template.numberOfCopies}: ${billContent.size} bytes sent")
-
-                // Đợi máy in xử lý xong
-                delay(800)
-
-                // Delay giữa các bản
+                // Delay giữa các bản (không delay sau bản cuối)
                 if (copyIndex < template.numberOfCopies - 1) {
                     delay(300)
                 }
             }
 
-            Log.d(TAG, "Sunmi print successful (SINGLE WRITE): ${template.numberOfCopies} copies")
+            Log.d(TAG, "=== SUNMI PRINT SUCCESS ===")
+            Log.d(TAG, "Printed ${template.numberOfCopies} copies successfully")
             PrinterResult.Success("In bill thành công!")
+
         } catch (e: Exception) {
-            Log.e(TAG, "Sunmi print error: ${e.message}", e)
+            Log.e(TAG, "=== SUNMI PRINT FAILED ===")
+            Log.e(TAG, "Error: ${e.message}", e)
             PrinterResult.Error("Lỗi in Sunmi: ${e.message}")
+        }
+    }
+
+    /**
+     * Kết nối đến máy in Sunmi với retry logic
+     */
+    private suspend fun connectToSunmiWithRetry(
+        adapter: SunmiPrinterAdapter,
+        retryCount: Int,
+        retryDelayMs: Int
+    ): PrinterResult {
+        var lastError: String? = null
+
+        repeat(retryCount) { attempt ->
+            Log.d(TAG, "Sunmi connect attempt ${attempt + 1}/$retryCount")
+
+            val connectResult = adapter.connect()
+            when (connectResult) {
+                is com.techres.ccb.printer.core.PrinterResult.Success -> {
+                    Log.d(TAG, "Sunmi connected successfully")
+                    return PrinterResult.Success("Connected")
+                }
+                is com.techres.ccb.printer.core.PrinterResult.Error -> {
+                    lastError = connectResult.message
+                    Log.w(TAG, "Connect attempt ${attempt + 1} failed: ${connectResult.message}")
+
+                    if (attempt < retryCount - 1) {
+                        Log.d(TAG, "Waiting ${retryDelayMs}ms before retry...")
+                        delay(retryDelayMs.toLong())
+                    }
+                }
+            }
+        }
+
+        return PrinterResult.Error("Không thể kết nối máy in Sunmi sau $retryCount lần thử: $lastError")
+    }
+
+    /**
+     * Kiểm tra trạng thái máy in Sunmi trước khi in
+     * Trả về lỗi chi tiết nếu máy in có vấn đề
+     */
+    private suspend fun checkSunmiPrinterStatus(adapter: SunmiPrinterAdapter): PrinterResult {
+        return try {
+            val status = adapter.getStatus()
+            Log.d(TAG, "Sunmi status: online=${status.isOnline}, error=${status.hasError}, paper=${status.hasPaper}")
+
+            when {
+                !status.isOnline -> {
+                    PrinterResult.Error("Máy in Sunmi không sẵn sàng. Vui lòng kiểm tra máy in.")
+                }
+                !status.hasPaper -> {
+                    PrinterResult.Error("Máy in hết giấy. Vui lòng thêm giấy và thử lại.")
+                }
+                status.coverOpen -> {
+                    PrinterResult.Error("Nắp máy in đang mở. Vui lòng đóng nắp và thử lại.")
+                }
+                status.hasError && status.errorMessage != null -> {
+                    val errorMsg = mapSunmiErrorMessage(status.errorMessage!!)
+                    PrinterResult.Error("Lỗi máy in: $errorMsg")
+                }
+                else -> {
+                    Log.d(TAG, "Sunmi printer status OK")
+                    PrinterResult.Success("OK")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to check Sunmi status: ${e.message}")
+            // Không fail nếu không check được status, tiếp tục in
+            PrinterResult.Success("Status check skipped")
+        }
+    }
+
+    /**
+     * Map Sunmi error message sang tiếng Việt
+     */
+    private fun mapSunmiErrorMessage(errorMessage: String): String {
+        return when {
+            errorMessage.contains("Out of paper", ignoreCase = true) -> "Hết giấy"
+            errorMessage.contains("Overheated", ignoreCase = true) -> "Máy in quá nóng, vui lòng đợi nguội"
+            errorMessage.contains("Cover open", ignoreCase = true) -> "Nắp máy in đang mở"
+            errorMessage.contains("Paper cutter", ignoreCase = true) -> "Lỗi dao cắt giấy"
+            errorMessage.contains("No printer", ignoreCase = true) -> "Không tìm thấy máy in"
+            errorMessage.contains("Abnormal", ignoreCase = true) -> "Lỗi giao tiếp máy in"
+            errorMessage.contains("Preparing", ignoreCase = true) -> "Máy in đang khởi động"
+            else -> errorMessage
+        }
+    }
+
+    /**
+     * In 1 bản bill qua Sunmi với retry logic
+     */
+    private suspend fun printSunmiCopyWithRetry(
+        adapter: SunmiPrinterAdapter,
+        content: ByteArray,
+        copyIndex: Int,
+        totalCopies: Int,
+        retryCount: Int,
+        retryDelayMs: Int
+    ): PrinterResult {
+        var lastError: String? = null
+
+        repeat(retryCount) { attempt ->
+            // Kiểm tra status trước mỗi lần retry (trừ lần đầu)
+            if (attempt > 0) {
+                val statusCheck = checkSunmiPrinterStatus(adapter)
+                if (statusCheck is PrinterResult.Error) {
+                    return statusCheck
+                }
+            }
+
+            Log.d(TAG, "Sunmi write attempt ${attempt + 1}/$retryCount for copy ${copyIndex + 1}/$totalCopies")
+
+            // SINGLE WRITE: Gửi toàn bộ data trong 1 lần
+            val writeResult = adapter.write(content)
+
+            when (writeResult) {
+                is com.techres.ccb.printer.core.PrinterResult.Success -> {
+                    Log.d(TAG, "Copy ${copyIndex + 1} sent: ${content.size} bytes")
+
+                    // Đợi máy in xử lý xong bitmap data
+                    // Thời gian đợi tỷ lệ với kích thước data
+                    val processingTime = calculateProcessingTime(content.size)
+                    Log.d(TAG, "Waiting ${processingTime}ms for printer to process...")
+                    delay(processingTime)
+
+                    return PrinterResult.Success("OK")
+                }
+                is com.techres.ccb.printer.core.PrinterResult.Error -> {
+                    lastError = writeResult.message
+                    Log.w(TAG, "Write attempt ${attempt + 1} failed: ${writeResult.message}")
+
+                    if (attempt < retryCount - 1) {
+                        Log.d(TAG, "Waiting ${retryDelayMs}ms before retry...")
+                        delay(retryDelayMs.toLong())
+                    }
+                }
+            }
+        }
+
+        return PrinterResult.Error("Lỗi in bản ${copyIndex + 1}/$totalCopies sau $retryCount lần thử: $lastError")
+    }
+
+    /**
+     * Tính toán thời gian đợi máy in xử lý dựa trên kích thước data
+     * Bill lớn cần nhiều thời gian hơn
+     */
+    private fun calculateProcessingTime(contentSize: Int): Long {
+        return when {
+            contentSize < 10_000 -> 500L      // Bill nhỏ: 500ms
+            contentSize < 30_000 -> 800L      // Bill trung bình: 800ms
+            contentSize < 50_000 -> 1200L     // Bill lớn: 1.2s
+            else -> 1500L                      // Bill rất lớn: 1.5s
         }
     }
 
