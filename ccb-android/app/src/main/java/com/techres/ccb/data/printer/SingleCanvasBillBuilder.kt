@@ -356,6 +356,11 @@ class SingleCanvasBillBuilder(
      * In QR Code
      */
     fun qrCode(content: String, size: Int = 6): SingleCanvasBillBuilder {
+        // Validate content - skip if empty or blank
+        if (content.isBlank()) {
+            Log.w(TAG, "QR code skipped: empty content")
+            return this
+        }
         elements.add(PrintElement.QrCode(content, size))
         return this
     }
@@ -435,51 +440,69 @@ class SingleCanvasBillBuilder(
                 is Segment.QrCodeSegment -> {
                     // Render QR code - support both URL images and generated QR
                     try {
-                        // QR size = 60% of paper width, capped between 150-300 pixels
-                        // 58mm: pixelWidth=384, qrSize=230px
-                        // 80mm: pixelWidth=576, qrSize=300px
-                        val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
-
-                        // Kiểm tra nếu content là URL hình ảnh QR
-                        // Hỗ trợ: sepay.vn, vietqr.io, payos.vn
-                        val isQrImageUrl = segment.content.startsWith("https://qr.sepay.vn/") ||
-                                          segment.content.startsWith("https://img.vietqr.io/") ||
-                                          segment.content.startsWith("https://api.payos.vn/") ||
-                                          segment.content.startsWith("https://pay.payos.vn/")
-
-                        val qrBitmap = if (isQrImageUrl) {
-                            // Tải hình ảnh QR từ URL (có logo ngân hàng)
-                            Log.d(TAG, "Segment $index: Downloading QR image from URL")
-                            downloadQrImageFromUrl(segment.content, qrSize)
+                        // Skip empty content
+                        if (segment.content.isBlank()) {
+                            Log.w(TAG, "Segment $index: QRCode skipped (empty content)")
                         } else {
-                            // Generate QR code bằng ZXing (EMVCo data hoặc nội dung text)
-                            generateQrCodeBitmap(segment.content, qrSize)
+                            // QR size = 60% of paper width, capped between 150-300 pixels
+                            // 58mm: pixelWidth=384, qrSize=230px
+                            // 80mm: pixelWidth=576, qrSize=300px
+                            val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
+
+                            // Kiểm tra nếu content là URL hình ảnh QR
+                            // Hỗ trợ: sepay.vn, vietqr.io, payos.vn
+                            val isQrImageUrl = segment.content.startsWith("https://qr.sepay.vn/") ||
+                                              segment.content.startsWith("https://img.vietqr.io/") ||
+                                              segment.content.startsWith("https://api.payos.vn/") ||
+                                              segment.content.startsWith("https://pay.payos.vn/")
+
+                            var qrBitmap: Bitmap? = null
+
+                            if (isQrImageUrl) {
+                                // Tải hình ảnh QR từ URL (có logo ngân hàng)
+                                Log.d(TAG, "Segment $index: Downloading QR image from URL")
+                                qrBitmap = downloadQrImageFromUrl(segment.content, qrSize)
+
+                                // Nếu download thất bại, fallback tạo QR từ URL content
+                                // (sẽ tạo QR code chứa URL, user scan sẽ mở URL)
+                                if (qrBitmap == null) {
+                                    Log.w(TAG, "Segment $index: URL download failed, generating QR from URL content")
+                                    qrBitmap = generateQrCodeBitmap(segment.content, qrSize)
+                                }
+                            } else {
+                                // Generate QR code bằng ZXing (EMVCo data hoặc nội dung text)
+                                qrBitmap = generateQrCodeBitmap(segment.content, qrSize)
+                            }
+
+                            if (qrBitmap != null) {
+                                // Tạo bitmap full-width với QR code căn giữa
+                                // ESC/POS ALIGN_CENTER không hoạt động với GS v 0 raster bitmap
+                                val centeredBitmap = centerQrBitmap(qrBitmap, pixelWidth)
+                                qrBitmap.recycle()
+
+                                // In bitmap đã căn giữa (không scale vì đã đúng kích thước)
+                                val qrData = EscPosCommands.printRasterBitmap(centeredBitmap, 0)
+                                output.write(qrData)
+                                Log.d(TAG, "Segment $index: QRCode centered (qr=${qrSize}, canvas=${centeredBitmap.width}x${centeredBitmap.height})")
+                                centeredBitmap.recycle()
+                            } else {
+                                // Last resort: ESC/POS command (nhiều máy in không hỗ trợ)
+                                Log.e(TAG, "Segment $index: All QR methods failed, trying ESC/POS command as last resort")
+                                output.write(EscPosCommands.ALIGN_CENTER)
+                                output.write(EscPosCommands.printQRCode(segment.content, segment.size))
+                                output.write(EscPosCommands.ALIGN_LEFT)
+                            }
                         }
-
-                        if (qrBitmap != null) {
-                            // Tạo bitmap full-width với QR code căn giữa
-                            // ESC/POS ALIGN_CENTER không hoạt động với GS v 0 raster bitmap
-                            val centeredBitmap = centerQrBitmap(qrBitmap, pixelWidth)
-                            qrBitmap.recycle()
-
-                            // In bitmap đã căn giữa (không scale vì đã đúng kích thước)
-                            val qrData = EscPosCommands.printRasterBitmap(centeredBitmap, 0)
-                            output.write(qrData)
-                            Log.d(TAG, "Segment $index: QRCode centered (qr=${qrSize}, canvas=${centeredBitmap.width}x${centeredBitmap.height})")
-                            centeredBitmap.recycle()
-                        } else {
-                            Log.e(TAG, "Segment $index: QRCode bitmap failed, trying ESC/POS command")
-                            // Fallback to ESC/POS command
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Segment $index: QRCode error: ${e.message}")
+                        // Try ESC/POS as absolute last resort
+                        try {
                             output.write(EscPosCommands.ALIGN_CENTER)
                             output.write(EscPosCommands.printQRCode(segment.content, segment.size))
                             output.write(EscPosCommands.ALIGN_LEFT)
+                        } catch (e2: Exception) {
+                            Log.e(TAG, "Segment $index: ESC/POS QR also failed: ${e2.message}")
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Segment $index: QRCode error: ${e.message}, trying ESC/POS command")
-                        // Fallback to ESC/POS command
-                        output.write(EscPosCommands.ALIGN_CENTER)
-                        output.write(EscPosCommands.printQRCode(segment.content, segment.size))
-                        output.write(EscPosCommands.ALIGN_LEFT)
                     }
                 }
                 is Segment.BarcodeSegment -> {
@@ -724,45 +747,63 @@ class SingleCanvasBillBuilder(
     /**
      * Tải hình ảnh QR từ URL (sepay.vn, vietqr.io)
      * Hình ảnh đã có logo ngân hàng và VietQR branding
+     * Có retry logic với 3 lần thử, timeout 8 giây
      */
     private fun downloadQrImageFromUrl(url: String, targetSize: Int): Bitmap? {
-        return try {
-            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            connection.doInput = true
-            connection.connect()
+        val maxRetries = 3
+        val connectTimeout = 8000 // Tăng từ 5s lên 8s
+        val readTimeout = 10000   // Tăng từ 5s lên 10s
 
-            if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
-                val inputStream = connection.inputStream
-                val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                inputStream.close()
-                connection.disconnect()
+        for (attempt in 1..maxRetries) {
+            try {
+                Log.d(TAG, "Downloading QR image (attempt $attempt/$maxRetries): $url")
+                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = connectTimeout
+                connection.readTimeout = readTimeout
+                connection.doInput = true
+                connection.setRequestProperty("User-Agent", "CCB-Android-POS")
+                connection.connect()
 
-                if (originalBitmap != null) {
-                    // Scale bitmap to target size while maintaining aspect ratio
-                    val scale = targetSize.toFloat() / originalBitmap.width.coerceAtLeast(originalBitmap.height)
-                    val newWidth = (originalBitmap.width * scale).toInt()
-                    val newHeight = (originalBitmap.height * scale).toInt()
-                    val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
-                    if (scaledBitmap != originalBitmap) {
-                        originalBitmap.recycle()
+                if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                    val inputStream = connection.inputStream
+                    val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                    inputStream.close()
+                    connection.disconnect()
+
+                    if (originalBitmap != null) {
+                        // Scale bitmap to target size while maintaining aspect ratio
+                        val scale = targetSize.toFloat() / originalBitmap.width.coerceAtLeast(originalBitmap.height)
+                        val newWidth = (originalBitmap.width * scale).toInt()
+                        val newHeight = (originalBitmap.height * scale).toInt()
+                        val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+                        if (scaledBitmap != originalBitmap) {
+                            originalBitmap.recycle()
+                        }
+                        Log.d(TAG, "Downloaded QR image successfully: ${scaledBitmap.width}x${scaledBitmap.height}")
+                        return scaledBitmap
+                    } else {
+                        Log.e(TAG, "Failed to decode QR image from URL (attempt $attempt)")
                     }
-                    Log.d(TAG, "Downloaded QR image: ${scaledBitmap.width}x${scaledBitmap.height}")
-                    scaledBitmap
                 } else {
-                    Log.e(TAG, "Failed to decode QR image from URL")
-                    null
+                    Log.e(TAG, "HTTP error ${connection.responseCode} (attempt $attempt)")
+                    connection.disconnect()
                 }
-            } else {
-                Log.e(TAG, "Failed to download QR image: HTTP ${connection.responseCode}")
-                connection.disconnect()
-                null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error downloading QR image (attempt $attempt): ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error downloading QR image: ${e.message}")
-            null
+
+            // Wait before retry (exponential backoff)
+            if (attempt < maxRetries) {
+                try {
+                    Thread.sleep((attempt * 500).toLong())
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
         }
+
+        Log.e(TAG, "Failed to download QR image after $maxRetries attempts")
+        return null
     }
 
     /**
