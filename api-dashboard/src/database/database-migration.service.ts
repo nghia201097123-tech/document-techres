@@ -1397,6 +1397,25 @@ export class DatabaseMigrationService implements OnModuleInit {
         }
       }
 
+      // 45. Add item_display_layout column to bill_templates table
+      if (hasBillTemplatesTable[0].exists) {
+        const hasItemDisplayLayout = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_templates' AND column_name = 'item_display_layout'
+          );
+        `);
+
+        if (!hasItemDisplayLayout[0].exists) {
+          this.logger.log('Adding item_display_layout column to bill_templates table...');
+          await queryRunner.query(`
+            ALTER TABLE bill_templates
+            ADD COLUMN IF NOT EXISTS item_display_layout VARCHAR(50) DEFAULT 'standard'
+          `);
+          this.logger.log('item_display_layout column added to bill_templates table');
+        }
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

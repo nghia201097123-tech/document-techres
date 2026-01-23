@@ -140,6 +140,11 @@ export class CreateBillTemplateDto {
   @IsBoolean()
   showQuantity?: boolean;
 
+  @ApiPropertyOptional({ description: 'Kiểu hiển thị danh sách món: standard, compact, detailed, two_line, price_right, with_index, grouped, grid_2_col, minimal, dotted, boxed, table, table_stt, table_qty_first, table_full' })
+  @IsOptional()
+  @IsString()
+  itemDisplayLayout?: string;
+
   // Price
   @ApiPropertyOptional()
   @IsOptional()

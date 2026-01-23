@@ -122,6 +122,9 @@ export class BillTemplate {
   @Column({ name: 'show_quantity', default: true })
   showQuantity: boolean;
 
+  @Column({ name: 'item_display_layout', type: 'varchar', length: 50, default: 'standard' })
+  itemDisplayLayout: string; // standard, compact, detailed, two_line, price_right, with_index, grouped, grid_2_col, minimal, dotted, boxed, table, table_stt, table_qty_first, table_full
+
   // ============ PRICE CONFIG ============
   @Column({ name: 'show_subtotal', default: true })
   showSubtotal: boolean;
