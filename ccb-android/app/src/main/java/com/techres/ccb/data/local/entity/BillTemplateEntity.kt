@@ -108,7 +108,7 @@ data class BillTemplateEntity(
     val showOrderNote: Boolean = true, // Hiển thị ghi chú tổng bill
 
     @ColumnInfo(name = "item_display_layout")
-    val itemDisplayLayout: String = "standard", // standard, compact, detailed, two_line, price_right, with_index, grouped, grid_2_col, minimal, dotted, boxed, table
+    val itemDisplayLayout: String = "standard", // standard, compact, detailed, two_line, price_right, with_index, grouped, grid_2_col, minimal, dotted, boxed, table, table_stt, table_qty_first, table_full
 
     @ColumnInfo(name = "show_unit_price")
     val showUnitPrice: Boolean = true,

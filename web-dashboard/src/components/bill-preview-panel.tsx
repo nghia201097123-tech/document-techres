@@ -363,6 +363,72 @@ const ItemsSection = React.memo(function ItemsSection({
     );
   }
 
+  // TABLE_STT layout: Bảng có STT
+  if (activeLayout === ItemDisplayLayout.TABLE_STT) {
+    return (
+      <div className="text-xs">
+        <div className="grid grid-cols-[auto_1fr_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
+          <span className="w-6 text-center">STT</span>
+          <span>Món</span>
+          <span className="text-center w-8">SL</span>
+          <span className="text-right w-16">Giá</span>
+        </div>
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="grid grid-cols-[auto_1fr_auto_auto] gap-1 py-0.5">
+            <span className="w-6 text-center">{idx + 1}</span>
+            <span className="truncate">{item.name}</span>
+            <span className="text-center w-8">{item.qty}</span>
+            <span className="text-right w-16">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // TABLE_QTY_FIRST layout: Bảng SL trước
+  if (activeLayout === ItemDisplayLayout.TABLE_QTY_FIRST) {
+    return (
+      <div className="text-xs">
+        <div className="grid grid-cols-[auto_1fr_auto] gap-1 font-medium border-b pb-1 mb-1">
+          <span className="text-center w-8">SL</span>
+          <span>Món</span>
+          <span className="text-right w-16">Giá</span>
+        </div>
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="grid grid-cols-[auto_1fr_auto] gap-1 py-0.5">
+            <span className="text-center w-8">{item.qty}</span>
+            <span className="truncate">{item.name}</span>
+            <span className="text-right w-16">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // TABLE_FULL layout: Bảng đầy đủ
+  if (activeLayout === ItemDisplayLayout.TABLE_FULL) {
+    return (
+      <div className="text-xs">
+        <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-1 font-medium border-b pb-1 mb-1">
+          <span className="w-6 text-center">STT</span>
+          <span>Món</span>
+          <span className="text-center w-6">SL</span>
+          <span className="text-right w-14">Đ.Giá</span>
+          <span className="text-right w-14">T.Tiền</span>
+        </div>
+        {PREVIEW_ITEMS.map((item, idx) => (
+          <div key={idx} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-1 py-0.5">
+            <span className="w-6 text-center">{idx + 1}</span>
+            <span className="truncate">{item.name}</span>
+            <span className="text-center w-6">{item.qty}</span>
+            <span className="text-right w-14">{formatPrice(item.price)}</span>
+            <span className="text-right w-14">{formatPrice(item.price * item.qty - (item.discount || 0))}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   // Fallback to standard
   return null;
 });

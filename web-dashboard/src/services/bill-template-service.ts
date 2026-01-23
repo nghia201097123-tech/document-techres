@@ -24,6 +24,9 @@ export enum ItemDisplayLayout {
   DOTTED = 'dotted',               // Dấu chấm: Tên món.......Giá
   BOXED = 'boxed',                 // Có viền: mỗi món trong 1 khung
   TABLE = 'table',                 // Dạng bảng: có header cột
+  TABLE_STT = 'table_stt',         // Bảng có STT: STT | Món | SL | Giá
+  TABLE_QTY_FIRST = 'table_qty_first', // Bảng SL đầu: SL | Món | Giá
+  TABLE_FULL = 'table_full',       // Bảng đầy đủ: STT | Món | SL | Đơn giá | T.Tiền
 }
 
 export enum PrinterConnectionType {
@@ -483,6 +486,9 @@ export const ITEM_DISPLAY_LAYOUT_LABELS: Record<ItemDisplayLayout, string> = {
   [ItemDisplayLayout.DOTTED]: 'Dấu chấm',
   [ItemDisplayLayout.BOXED]: 'Có viền',
   [ItemDisplayLayout.TABLE]: 'Dạng bảng',
+  [ItemDisplayLayout.TABLE_STT]: 'Bảng có STT',
+  [ItemDisplayLayout.TABLE_QTY_FIRST]: 'Bảng SL đầu',
+  [ItemDisplayLayout.TABLE_FULL]: 'Bảng đầy đủ',
 };
 
 export const ITEM_DISPLAY_LAYOUT_DESCRIPTIONS: Record<ItemDisplayLayout, string> = {
@@ -498,6 +504,9 @@ export const ITEM_DISPLAY_LAYOUT_DESCRIPTIONS: Record<ItemDisplayLayout, string>
   [ItemDisplayLayout.DOTTED]: 'Tên món.........Giá (kiểu menu)',
   [ItemDisplayLayout.BOXED]: 'Mỗi món trong 1 khung viền',
   [ItemDisplayLayout.TABLE]: 'Bảng với header: Món | SL | Giá',
+  [ItemDisplayLayout.TABLE_STT]: 'Bảng có STT trước tên món',
+  [ItemDisplayLayout.TABLE_QTY_FIRST]: 'Bảng có SL trước tên món',
+  [ItemDisplayLayout.TABLE_FULL]: 'Bảng đầy đủ: STT, Món, SL, Đơn giá, Thành tiền',
 };
 
 // Preview examples for each layout
@@ -556,6 +565,21 @@ export const ITEM_DISPLAY_LAYOUT_EXAMPLES: Record<ItemDisplayLayout, string[]> =
     'Món        | SL | Giá',
     '-----------|----|---------',
     'Phở bò tái |  2 | 90,000',
+  ],
+  [ItemDisplayLayout.TABLE_STT]: [
+    'STT | Món        | SL | Giá',
+    '----|------------|----|---------',
+    '  1 | Phở bò tái |  2 | 90,000',
+  ],
+  [ItemDisplayLayout.TABLE_QTY_FIRST]: [
+    'SL | Món        | Giá',
+    '---|------------|---------',
+    ' 2 | Phở bò tái | 90,000',
+  ],
+  [ItemDisplayLayout.TABLE_FULL]: [
+    'STT | Món     | SL | Đ.Giá  | T.Tiền',
+    '----|---------|----| -------|-------',
+    '  1 | Phở tái |  2 | 45,000 | 90,000',
   ],
 };
 
