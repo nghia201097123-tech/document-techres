@@ -556,6 +556,10 @@ class SingleCanvasBillBuilder(
                     // Barcode không hỗ trợ bitmap mode, skip
                     Log.d(TAG, "Segment $index: Barcode skipped in bitmap mode")
                 }
+                is Segment.FeedSegment -> {
+                    // Feed segment không cần render bitmap riêng
+                    Log.d(TAG, "Segment $index: Feed skipped in bitmap mode")
+                }
             }
         }
 
