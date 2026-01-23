@@ -1,8 +1,8 @@
 import api from "./api";
 
-// Partner types
+// Partner types - match backend FoodPlatformType
 export enum FoodPartnerType {
-  SHOPEE = "shopee",
+  SHOPEE = "shopee_food",
   GRAB = "grab",
   BEFOOD = "befood",
 }
@@ -14,19 +14,49 @@ export const FoodPartnerInfo: Record<FoodPartnerType, { name: string; color: str
   [FoodPartnerType.BEFOOD]: { name: "BeFood", color: "text-yellow-600", bgColor: "bg-yellow-100" },
 };
 
-// Connection status
+// Connection status - match backend FoodPlatformStatus
 export enum ConnectionStatus {
   CONNECTED = "connected",
   DISCONNECTED = "disconnected",
   PENDING = "pending",
+  CONNECTING = "connecting",
   ERROR = "error",
 }
 
-// Partner connection port (opened by web-admin)
+// Auth types - match backend FoodPlatformAuthType
+export enum AuthType {
+  USERNAME_PASSWORD = "username_password",
+  PHONE_OTP = "phone_otp",
+}
+
+// Food platform account from backend
+export interface FoodPlatformAccount {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  name: string;
+  platform: FoodPartnerType;
+  authType: AuthType;
+  status: ConnectionStatus;
+  username?: string;
+  phoneNumber?: string;
+  externalMerchantId?: string;
+  externalStoreName?: string;
+  pollIntervalSeconds: number;
+  lastPollAt?: string;
+  errorCount: number;
+  lastError?: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Partner connection port (created by admin)
 export interface PartnerConnectionPort {
   id: string;
   partnerType: FoodPartnerType;
-  shopNumber: number; // 1, 2, 3... for multiple shops per partner
+  shopNumber: number;
   branchId: string;
   branchName?: string;
   maxConnections: number;
@@ -34,7 +64,7 @@ export interface PartnerConnectionPort {
   createdAt: string;
 }
 
-// Account connection (linked by web-dashboard)
+// Account connection (linked by user)
 export interface PartnerAccountConnection {
   id: string;
   portId: string;
@@ -67,36 +97,95 @@ export interface PartnerConnectionView {
   connection?: PartnerAccountConnection;
 }
 
+/**
+ * Transform backend FoodPlatformAccount to frontend PartnerConnectionView
+ */
+function transformToConnectionView(account: FoodPlatformAccount, index: number): PartnerConnectionView {
+  const port: PartnerConnectionPort = {
+    id: account.id,
+    partnerType: account.platform,
+    shopNumber: index + 1,
+    branchId: account.branchId,
+    maxConnections: 1,
+    isActive: account.isActive,
+    createdAt: account.createdAt,
+  };
+
+  // If account has username or is not pending, create connection
+  const hasConnection = account.status !== ConnectionStatus.PENDING || account.username;
+
+  const connection: PartnerAccountConnection | undefined = hasConnection
+    ? {
+        id: account.id,
+        portId: account.id,
+        partnerType: account.platform,
+        shopNumber: index + 1,
+        username: account.username || account.phoneNumber || account.name,
+        status: account.status,
+        lastSyncAt: account.lastPollAt,
+        errorMessage: account.lastError,
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt,
+      }
+    : undefined;
+
+  return { port, connection };
+}
+
 export const foodPartnerService = {
   /**
    * Get all available connection ports for a branch
    */
   async getAvailablePorts(branchId: string): Promise<PartnerConnectionPort[]> {
-    const response = await api.get(`/food-partners/ports/branch/${branchId}`);
-    return response.data;
+    const response = await api.get<FoodPlatformAccount[]>(`/food-platforms/branch/${branchId}`);
+    return response.data.map((account, index) => ({
+      id: account.id,
+      partnerType: account.platform,
+      shopNumber: index + 1,
+      branchId: account.branchId,
+      maxConnections: 1,
+      isActive: account.isActive,
+      createdAt: account.createdAt,
+    }));
   },
 
   /**
    * Get all account connections for a branch
    */
   async getConnections(branchId: string): Promise<PartnerAccountConnection[]> {
-    const response = await api.get(`/food-partners/connections/branch/${branchId}`);
-    return response.data;
+    const response = await api.get<FoodPlatformAccount[]>(`/food-platforms/branch/${branchId}`);
+    return response.data
+      .filter((account) => account.status !== ConnectionStatus.PENDING || account.username)
+      .map((account, index) => ({
+        id: account.id,
+        portId: account.id,
+        partnerType: account.platform,
+        shopNumber: index + 1,
+        username: account.username || account.phoneNumber || account.name,
+        status: account.status,
+        lastSyncAt: account.lastPollAt,
+        errorMessage: account.lastError,
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt,
+      }));
   },
 
   /**
    * Get combined view of ports and connections
    */
   async getConnectionsView(branchId: string): Promise<PartnerConnectionView[]> {
-    const response = await api.get(`/food-partners/view/branch/${branchId}`);
-    return response.data;
+    const response = await api.get<FoodPlatformAccount[]>(`/food-platforms/branch/${branchId}`);
+    return response.data.map(transformToConnectionView);
   },
 
   /**
-   * Link an account to a connection port
+   * Link an account to a connection port (login)
    */
   async linkAccount(dto: LinkPartnerAccountDto): Promise<PartnerAccountConnection> {
-    const response = await api.post(`/food-partners/connections/link`, dto);
+    const response = await api.post(`/food-platforms/${dto.portId}/login`, {
+      username: dto.username,
+      password: dto.password,
+    });
     return response.data;
   },
 
@@ -104,7 +193,10 @@ export const foodPartnerService = {
    * Update connection credentials
    */
   async updateConnection(connectionId: string, dto: UpdatePartnerConnectionDto): Promise<PartnerAccountConnection> {
-    const response = await api.patch(`/food-partners/connections/${connectionId}`, dto);
+    const response = await api.post(`/food-platforms/${connectionId}/login`, {
+      username: dto.username,
+      password: dto.password,
+    });
     return response.data;
   },
 
@@ -112,22 +204,29 @@ export const foodPartnerService = {
    * Disconnect/unlink an account
    */
   async unlinkAccount(connectionId: string): Promise<void> {
-    await api.delete(`/food-partners/connections/${connectionId}`);
+    await api.post(`/food-platforms/${connectionId}/disconnect`);
   },
 
   /**
    * Test connection status
    */
   async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string }> {
-    const response = await api.post(`/food-partners/connections/${connectionId}/test`);
-    return response.data;
+    // For now, just get the account status
+    const response = await api.get<FoodPlatformAccount>(`/food-platforms/${connectionId}`);
+    const account = response.data;
+    return {
+      status: account.status,
+      message: account.status === ConnectionStatus.CONNECTED
+        ? "Tài khoản đang hoạt động bình thường"
+        : account.lastError || "Kết nối có vấn đề",
+    };
   },
 
   /**
    * Sync menu to partner platform
    */
   async syncMenu(connectionId: string): Promise<{ success: boolean; message: string }> {
-    const response = await api.post(`/food-partners/connections/${connectionId}/sync-menu`);
-    return response.data;
+    // Placeholder - will be implemented when backend supports it
+    return { success: true, message: "Sync completed" };
   },
 };

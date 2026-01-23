@@ -51,18 +51,20 @@ import {
 
 // Status badge component
 const StatusBadge = ({ status }: { status: ConnectionStatus }) => {
-  const config = {
+  const config: Record<ConnectionStatus, { label: string; icon: typeof CheckCircle2; className: string }> = {
     [ConnectionStatus.CONNECTED]: { label: "Đã kết nối", icon: CheckCircle2, className: "bg-green-100 text-green-700 border-green-200" },
-    [ConnectionStatus.DISCONNECTED]: { label: "Chưa kết nối", icon: Link2Off, className: "bg-gray-100 text-gray-700 border-gray-200" },
-    [ConnectionStatus.PENDING]: { label: "Đang xử lý", icon: Clock, className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    [ConnectionStatus.DISCONNECTED]: { label: "Mất kết nối", icon: Link2Off, className: "bg-gray-100 text-gray-700 border-gray-200" },
+    [ConnectionStatus.PENDING]: { label: "Chờ kết nối", icon: Clock, className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    [ConnectionStatus.CONNECTING]: { label: "Đang kết nối", icon: Loader2, className: "bg-blue-100 text-blue-700 border-blue-200" },
     [ConnectionStatus.ERROR]: { label: "Lỗi kết nối", icon: XCircle, className: "bg-red-100 text-red-700 border-red-200" },
   };
 
-  const { label, icon: Icon, className } = config[status];
+  const statusConfig = config[status] || config[ConnectionStatus.PENDING];
+  const { label, icon: Icon, className } = statusConfig;
 
   return (
     <Badge variant="outline" className={cn("gap-1", className)}>
-      <Icon className="h-3 w-3" />
+      <Icon className={cn("h-3 w-3", status === ConnectionStatus.CONNECTING && "animate-spin")} />
       {label}
     </Badge>
   );
@@ -70,11 +72,18 @@ const StatusBadge = ({ status }: { status: ConnectionStatus }) => {
 
 // Partner logo/icon component
 const PartnerLogo = ({ type, size = "md" }: { type: FoodPartnerType; size?: "sm" | "md" | "lg" }) => {
-  const info = FoodPartnerInfo[type];
+  const info = FoodPartnerInfo[type] || { bgColor: "bg-gray-100", color: "text-gray-600" };
   const sizeClasses = {
     sm: "h-8 w-8 text-xs",
     md: "h-12 w-12 text-sm",
     lg: "h-16 w-16 text-base",
+  };
+
+  const getInitial = () => {
+    if (type === FoodPartnerType.SHOPEE) return "S";
+    if (type === FoodPartnerType.GRAB) return "G";
+    if (type === FoodPartnerType.BEFOOD) return "B";
+    return "?";
   };
 
   return (
@@ -84,9 +93,7 @@ const PartnerLogo = ({ type, size = "md" }: { type: FoodPartnerType; size?: "sm"
       info.color,
       sizeClasses[size]
     )}>
-      {type === FoodPartnerType.SHOPEE && "S"}
-      {type === FoodPartnerType.GRAB && "G"}
-      {type === FoodPartnerType.BEFOOD && "B"}
+      {getInitial()}
     </div>
   );
 };
