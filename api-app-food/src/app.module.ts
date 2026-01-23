@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 // Config
 import databaseConfig from './config/database.config';
 import platformConfig from './config/platform.config';
+import jwtConfig from './config/jwt.config';
 
 // Common
 import { CommonModule } from './common/common.module';
@@ -21,7 +22,7 @@ import { ConnectorsModule } from './modules/connectors/connectors.module';
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, platformConfig],
+      load: [databaseConfig, platformConfig, jwtConfig],
       envFilePath: ['.env.local', '.env'],
     }),
 
