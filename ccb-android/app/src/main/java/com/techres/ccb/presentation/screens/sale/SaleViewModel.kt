@@ -3527,24 +3527,13 @@ class SaleViewModel @Inject constructor(
                                 // Get primary bank account for payment QR (if enabled)
                                 val paymentBankAccount = bankAccountDao.getPrimaryBankAccount()
 
-                                // Nếu bank account dùng PayOS, ưu tiên dùng QR đã tạo từ bill tạm
-                                // (tránh lỗi duplicate orderCode khi tạo lại payment)
-                                var payosQrCode: String? = cachedPayosQrData
-                                if (paymentBankAccount?.paymentPartner == "payos" && payosQrCode == null) {
-                                    Log.d(TAG, "completeOrder - Bank uses PayOS, creating payment...")
-                                    payosQrCode = createPayOSPaymentForBill(
-                                        orderId = completedOrder.id,
-                                        amount = billData.totalAmount.toLong(),
-                                        orderNumber = completedOrder.orderNumber
-                                    )
-                                } else if (payosQrCode != null) {
-                                    Log.d(TAG, "completeOrder - Reusing cached PayOS QR from temporary bill")
-                                }
-
                                 // Check if print preview is enabled
                                 if (printerConfig.printPreview) {
-                                    // Store pending print data and show preview dialog
-                                    Log.d(TAG, "completeOrder - Print preview enabled, showing dialog")
+                                    // OPTIMIZATION: Hiển thị dialog ngay lập tức, load PayOS QR ở background
+                                    // Dialog preview không cần QR code, chỉ cần khi in thật
+                                    Log.d(TAG, "completeOrder - Print preview enabled, showing dialog immediately")
+
+                                    // Show dialog FIRST (without PayOS QR)
                                     withContext(Dispatchers.Main) {
                                         _uiState.update { it.copy(
                                             showPrintPreviewDialog = true,
@@ -3552,10 +3541,39 @@ class SaleViewModel @Inject constructor(
                                             pendingPrinterConfig = printerConfig,
                                             pendingTemplate = template,
                                             pendingBankAccount = paymentBankAccount,
-                                            pendingPayosQrCode = payosQrCode
+                                            pendingPayosQrCode = cachedPayosQrData // Use cached if available
                                         ) }
                                     }
+
+                                    // Load PayOS QR in background if needed (for when user confirms print)
+                                    if (paymentBankAccount?.paymentPartner == "payos" && cachedPayosQrData == null) {
+                                        Log.d(TAG, "completeOrder - Loading PayOS QR in background...")
+                                        val payosQrCode = createPayOSPaymentForBill(
+                                            orderId = completedOrder.id,
+                                            amount = billData.totalAmount.toLong(),
+                                            orderNumber = completedOrder.orderNumber
+                                        )
+                                        // Update pendingPayosQrCode when ready
+                                        if (payosQrCode != null) {
+                                            withContext(Dispatchers.Main) {
+                                                _uiState.update { it.copy(pendingPayosQrCode = payosQrCode) }
+                                            }
+                                        }
+                                    }
                                 } else {
+                                    // Direct print - need PayOS QR immediately
+                                    var payosQrCode: String? = cachedPayosQrData
+                                    if (paymentBankAccount?.paymentPartner == "payos" && payosQrCode == null) {
+                                        Log.d(TAG, "completeOrder - Bank uses PayOS, creating payment...")
+                                        payosQrCode = createPayOSPaymentForBill(
+                                            orderId = completedOrder.id,
+                                            amount = billData.totalAmount.toLong(),
+                                            orderNumber = completedOrder.orderNumber
+                                        )
+                                    } else if (payosQrCode != null) {
+                                        Log.d(TAG, "completeOrder - Reusing cached PayOS QR from temporary bill")
+                                    }
+
                                     // Print bill directly using Hybrid approach (supports Vietnamese diacritics)
                                     val result = HybridBillPrintService.printBill(printerConfig, template, billData, paymentBankAccount, payosQrCode)
                                     when (result) {
