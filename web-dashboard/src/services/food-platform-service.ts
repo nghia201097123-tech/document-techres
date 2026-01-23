@@ -1,4 +1,39 @@
-import api from "./api";
+import axios from "axios";
+
+// API App Food URL - connects directly to api-app-food service
+const API_APP_FOOD_URL =
+  process.env.NEXT_PUBLIC_API_APP_FOOD_URL || "http://localhost:3010/api";
+
+const foodApi = axios.create({
+  baseURL: API_APP_FOOD_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Request interceptor to add auth token and tenant ID
+foodApi.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const authStorage = localStorage.getItem("auth-storage");
+      if (authStorage) {
+        try {
+          const { state } = JSON.parse(authStorage);
+          if (state?.token) {
+            config.headers.Authorization = `Bearer ${state.token}`;
+          }
+          if (state?.tenantId) {
+            config.headers["X-Tenant-ID"] = state.tenantId;
+          }
+        } catch (e) {
+          console.error("Error parsing auth storage:", e);
+        }
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Platform types - khớp với backend enum
 export enum FoodPlatformType {
@@ -163,7 +198,7 @@ export const foodPlatformService = {
    */
   async getAll(brandId?: string): Promise<FoodPlatformAccount[]> {
     const params = brandId ? { brandId } : {};
-    const response = await api.get("/food-platforms", { params });
+    const response = await foodApi.get("/accounts", { params });
     return response.data;
   },
 
@@ -171,7 +206,7 @@ export const foodPlatformService = {
    * Lay danh sach cong theo chi nhanh
    */
   async getByBranch(branchId: string): Promise<FoodPlatformAccount[]> {
-    const response = await api.get(`/food-platforms/branch/${branchId}`);
+    const response = await foodApi.get(`/accounts/branch/${branchId}`);
     return response.data;
   },
 
@@ -179,7 +214,7 @@ export const foodPlatformService = {
    * Lay chi tiet cong
    */
   async getOne(id: string): Promise<FoodPlatformAccount> {
-    const response = await api.get(`/food-platforms/${id}`);
+    const response = await foodApi.get(`/accounts/${id}`);
     return response.data;
   },
 
@@ -187,7 +222,7 @@ export const foodPlatformService = {
    * Tao cong ket noi moi
    */
   async create(dto: CreateFoodPlatformDto): Promise<FoodPlatformAccount> {
-    const response = await api.post("/food-platforms", dto);
+    const response = await foodApi.post("/accounts", dto);
     return response.data;
   },
 
@@ -195,7 +230,7 @@ export const foodPlatformService = {
    * Cap nhat thong tin cong
    */
   async update(id: string, dto: UpdateFoodPlatformDto): Promise<FoodPlatformAccount> {
-    const response = await api.put(`/food-platforms/${id}`, dto);
+    const response = await foodApi.put(`/accounts/${id}`, dto);
     return response.data;
   },
 
@@ -203,14 +238,14 @@ export const foodPlatformService = {
    * Xoa cong ket noi
    */
   async delete(id: string): Promise<void> {
-    await api.delete(`/food-platforms/${id}`);
+    await foodApi.delete(`/accounts/${id}`);
   },
 
   /**
    * Bat/tat cong
    */
   async toggle(id: string): Promise<FoodPlatformAccount> {
-    const response = await api.patch(`/food-platforms/${id}/toggle`);
+    const response = await foodApi.patch(`/accounts/${id}/toggle`);
     return response.data;
   },
 
@@ -220,7 +255,7 @@ export const foodPlatformService = {
    * Dang nhap bang username/password (Grab, BeFood)
    */
   async login(id: string, dto: LoginUsernamePasswordDto): Promise<{ success: boolean; message: string }> {
-    const response = await api.post(`/food-platforms/${id}/login`, dto);
+    const response = await foodApi.post(`/accounts/${id}/login`, dto);
     return response.data;
   },
 
@@ -228,7 +263,7 @@ export const foodPlatformService = {
    * Yeu cau gui OTP (ShopeeFood)
    */
   async requestOtp(id: string, dto: RequestOtpDto): Promise<{ success: boolean; message: string; expiresAt: string }> {
-    const response = await api.post(`/food-platforms/${id}/request-otp`, dto);
+    const response = await foodApi.post(`/accounts/${id}/request-otp`, dto);
     return response.data;
   },
 
@@ -236,7 +271,7 @@ export const foodPlatformService = {
    * Xac thuc OTP (ShopeeFood)
    */
   async verifyOtp(id: string, dto: VerifyOtpDto): Promise<{ success: boolean; message: string; stores: ShopeeStore[] }> {
-    const response = await api.post(`/food-platforms/${id}/verify-otp`, dto);
+    const response = await foodApi.post(`/accounts/${id}/verify-otp`, dto);
     return response.data;
   },
 
@@ -244,7 +279,7 @@ export const foodPlatformService = {
    * Chon cua hang sau khi xac thuc OTP (ShopeeFood)
    */
   async selectStore(id: string, dto: SelectStoreDto): Promise<{ success: boolean; message: string; account: FoodPlatformAccount }> {
-    const response = await api.post(`/food-platforms/${id}/select-store`, dto);
+    const response = await foodApi.post(`/accounts/${id}/select-store`, dto);
     return response.data;
   },
 
@@ -252,7 +287,7 @@ export const foodPlatformService = {
    * Ngat ket noi
    */
   async disconnect(id: string): Promise<{ success: boolean; message: string }> {
-    const response = await api.post(`/food-platforms/${id}/disconnect`);
+    const response = await foodApi.post(`/accounts/${id}/disconnect`);
     return response.data;
   },
 
@@ -262,7 +297,7 @@ export const foodPlatformService = {
    * Lay danh sach cong cho CCB sync
    */
   async getForCCBSync(branchId: string): Promise<FoodPlatformAccount[]> {
-    const response = await api.get(`/food-platforms/sync/branch/${branchId}`);
+    const response = await foodApi.get(`/accounts/sync/branch/${branchId}`);
     return response.data;
   },
 };

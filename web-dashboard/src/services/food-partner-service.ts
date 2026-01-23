@@ -1,4 +1,39 @@
-import api from "./api";
+import axios from "axios";
+
+// API App Food URL - connects directly to api-app-food service
+const API_APP_FOOD_URL =
+  process.env.NEXT_PUBLIC_API_APP_FOOD_URL || "http://localhost:3010/api";
+
+const foodApi = axios.create({
+  baseURL: API_APP_FOOD_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Request interceptor to add auth token and tenant ID
+foodApi.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const authStorage = localStorage.getItem("auth-storage");
+      if (authStorage) {
+        try {
+          const { state } = JSON.parse(authStorage);
+          if (state?.token) {
+            config.headers.Authorization = `Bearer ${state.token}`;
+          }
+          if (state?.tenantId) {
+            config.headers["X-Tenant-ID"] = state.tenantId;
+          }
+        } catch (e) {
+          console.error("Error parsing auth storage:", e);
+        }
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Partner types - match backend FoodPlatformType
 export enum FoodPartnerType {
@@ -137,7 +172,7 @@ export const foodPartnerService = {
    * Get all available connection ports for a branch
    */
   async getAvailablePorts(branchId: string): Promise<PartnerConnectionPort[]> {
-    const response = await api.get<FoodPlatformAccount[]>(`/food-platforms/branch/${branchId}`);
+    const response = await foodApi.get<FoodPlatformAccount[]>(`/accounts/branch/${branchId}`);
     return response.data.map((account, index) => ({
       id: account.id,
       partnerType: account.platform,
@@ -153,7 +188,7 @@ export const foodPartnerService = {
    * Get all account connections for a branch
    */
   async getConnections(branchId: string): Promise<PartnerAccountConnection[]> {
-    const response = await api.get<FoodPlatformAccount[]>(`/food-platforms/branch/${branchId}`);
+    const response = await foodApi.get<FoodPlatformAccount[]>(`/accounts/branch/${branchId}`);
     return response.data
       .filter((account) => account.status !== ConnectionStatus.PENDING || account.username)
       .map((account, index) => ({
@@ -174,7 +209,7 @@ export const foodPartnerService = {
    * Get combined view of ports and connections
    */
   async getConnectionsView(branchId: string): Promise<PartnerConnectionView[]> {
-    const response = await api.get<FoodPlatformAccount[]>(`/food-platforms/branch/${branchId}`);
+    const response = await foodApi.get<FoodPlatformAccount[]>(`/accounts/branch/${branchId}`);
     return response.data.map(transformToConnectionView);
   },
 
@@ -182,7 +217,7 @@ export const foodPartnerService = {
    * Link an account to a connection port (login)
    */
   async linkAccount(dto: LinkPartnerAccountDto): Promise<PartnerAccountConnection> {
-    const response = await api.post(`/food-platforms/${dto.portId}/login`, {
+    const response = await foodApi.post(`/accounts/${dto.portId}/login`, {
       username: dto.username,
       password: dto.password,
     });
@@ -193,7 +228,7 @@ export const foodPartnerService = {
    * Update connection credentials
    */
   async updateConnection(connectionId: string, dto: UpdatePartnerConnectionDto): Promise<PartnerAccountConnection> {
-    const response = await api.post(`/food-platforms/${connectionId}/login`, {
+    const response = await foodApi.post(`/accounts/${connectionId}/login`, {
       username: dto.username,
       password: dto.password,
     });
@@ -204,7 +239,7 @@ export const foodPartnerService = {
    * Disconnect/unlink an account
    */
   async unlinkAccount(connectionId: string): Promise<void> {
-    await api.post(`/food-platforms/${connectionId}/disconnect`);
+    await foodApi.post(`/accounts/${connectionId}/disconnect`);
   },
 
   /**
@@ -212,7 +247,7 @@ export const foodPartnerService = {
    */
   async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string }> {
     // For now, just get the account status
-    const response = await api.get<FoodPlatformAccount>(`/food-platforms/${connectionId}`);
+    const response = await foodApi.get<FoodPlatformAccount>(`/accounts/${connectionId}`);
     const account = response.data;
     return {
       status: account.status,

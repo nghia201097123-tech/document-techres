@@ -41,4 +41,3 @@ export * from './einvoice-config.entity';
 export * from './transaction-voucher.entity';
 export * from './bill-template.entity';
 export * from './bill-printer-config.entity';
-export * from './food-platform-account.entity';

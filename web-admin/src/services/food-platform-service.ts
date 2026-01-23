@@ -1,4 +1,36 @@
-import api from "./api";
+import axios from "axios";
+
+// API App Food URL - connects directly to api-app-food service
+const API_APP_FOOD_URL =
+  process.env.NEXT_PUBLIC_API_APP_FOOD_URL || "http://localhost:3010/api";
+
+const foodApi = axios.create({
+  baseURL: API_APP_FOOD_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Request interceptor to add auth token
+foodApi.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const authStorage = localStorage.getItem("auth-storage");
+      if (authStorage) {
+        try {
+          const { state } = JSON.parse(authStorage);
+          if (state?.token) {
+            config.headers.Authorization = `Bearer ${state.token}`;
+          }
+        } catch (e) {
+          console.error("Error parsing auth storage:", e);
+        }
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Platform types - match backend enum
 export enum FoodPlatformType {
@@ -138,7 +170,7 @@ export const foodPlatformService = {
    */
   async getAll(tenantId?: string): Promise<FoodPlatformAccount[]> {
     const params = tenantId ? { tenantId } : {};
-    const response = await api.get<FoodPlatformAccount[]>("/food-platforms", {
+    const response = await foodApi.get<FoodPlatformAccount[]>("/accounts", {
       params,
     });
     return response.data;
@@ -148,8 +180,8 @@ export const foodPlatformService = {
    * Get food platform accounts by branch
    */
   async getByBranch(branchId: string): Promise<FoodPlatformAccount[]> {
-    const response = await api.get<FoodPlatformAccount[]>(
-      `/food-platforms/branch/${branchId}`
+    const response = await foodApi.get<FoodPlatformAccount[]>(
+      `/accounts/branch/${branchId}`
     );
     return response.data;
   },
@@ -158,8 +190,8 @@ export const foodPlatformService = {
    * Get food platform accounts by company
    */
   async getByCompany(companyCode: string): Promise<FoodPlatformAccount[]> {
-    const response = await api.get<FoodPlatformAccount[]>(
-      `/food-platforms/company/${companyCode}`
+    const response = await foodApi.get<FoodPlatformAccount[]>(
+      `/accounts/company/${companyCode}`
     );
     return response.data;
   },
@@ -168,7 +200,7 @@ export const foodPlatformService = {
    * Get food platform account by ID
    */
   async getById(id: string): Promise<FoodPlatformAccount> {
-    const response = await api.get<FoodPlatformAccount>(`/food-platforms/${id}`);
+    const response = await foodApi.get<FoodPlatformAccount>(`/accounts/${id}`);
     return response.data;
   },
 
@@ -176,7 +208,7 @@ export const foodPlatformService = {
    * Create food platform account
    */
   async create(data: CreateFoodPlatformDto): Promise<FoodPlatformAccount> {
-    const response = await api.post<FoodPlatformAccount>("/food-platforms", data);
+    const response = await foodApi.post<FoodPlatformAccount>("/accounts", data);
     return response.data;
   },
 
@@ -184,8 +216,8 @@ export const foodPlatformService = {
    * Create all platforms for a branch
    */
   async createAllForBranch(branchId: string): Promise<FoodPlatformAccount[]> {
-    const response = await api.post<FoodPlatformAccount[]>(
-      `/food-platforms/branch/${branchId}/all-platforms`
+    const response = await foodApi.post<FoodPlatformAccount[]>(
+      `/accounts/branch/${branchId}/all-platforms`
     );
     return response.data;
   },
@@ -197,8 +229,8 @@ export const foodPlatformService = {
     id: string,
     data: UpdateFoodPlatformDto
   ): Promise<FoodPlatformAccount> {
-    const response = await api.patch<FoodPlatformAccount>(
-      `/food-platforms/${id}`,
+    const response = await foodApi.patch<FoodPlatformAccount>(
+      `/accounts/${id}`,
       data
     );
     return response.data;
@@ -208,8 +240,8 @@ export const foodPlatformService = {
    * Toggle active status
    */
   async toggleActive(id: string): Promise<FoodPlatformAccount> {
-    const response = await api.patch<FoodPlatformAccount>(
-      `/food-platforms/${id}/toggle`
+    const response = await foodApi.patch<FoodPlatformAccount>(
+      `/accounts/${id}/toggle`
     );
     return response.data;
   },
@@ -218,6 +250,6 @@ export const foodPlatformService = {
    * Delete food platform account
    */
   async delete(id: string): Promise<void> {
-    await api.delete(`/food-platforms/${id}`);
+    await foodApi.delete(`/accounts/${id}`);
   },
 };
