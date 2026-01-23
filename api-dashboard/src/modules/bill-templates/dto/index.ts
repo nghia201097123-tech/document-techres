@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum, IsUUID, IsNotEmpty } from 'class-validator';
 import { BillTemplateType } from '../../../database/entities/bill-template.entity';
 
@@ -382,13 +382,11 @@ export class CreateBillTemplateDto {
   sortOrder?: number;
 }
 
-export class UpdateBillTemplateDto extends CreateBillTemplateDto {
-  // Override branchId to make it optional for updates
-  @ApiPropertyOptional({ description: 'ID chi nhánh (không cần khi cập nhật)' })
-  @IsOptional()
-  @IsUUID('4', { message: 'branchId phải là UUID hợp lệ' })
-  branchId?: string;
-
+/**
+ * UpdateBillTemplateDto - Sử dụng PartialType để tất cả fields từ CreateBillTemplateDto trở thành optional
+ * Điều này fix lỗi "branchId must be a string" khi cập nhật bill template
+ */
+export class UpdateBillTemplateDto extends PartialType(CreateBillTemplateDto) {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
