@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 25,
-    "identityHash": "9c54ae441652ecd272ef69a197fe6f3c",
+    "version": 26,
+    "identityHash": "834aca4dd7a8e4b1ba524747756771f1",
     "entities": [
       {
         "tableName": "brands",
@@ -3804,7 +3804,7 @@
       },
       {
         "tableName": "bill_templates",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `branch_id` TEXT NOT NULL, `name` TEXT NOT NULL, `template_type` TEXT NOT NULL, `description` TEXT, `show_logo` INTEGER NOT NULL, `logo_url` TEXT, `store_name` TEXT NOT NULL, `store_address` TEXT, `store_phone` TEXT, `tax_code` TEXT, `header_text` TEXT, `bill_title` TEXT NOT NULL, `show_order_number` INTEGER NOT NULL, `show_table_name` INTEGER NOT NULL, `show_staff_name` INTEGER NOT NULL, `show_customer_name` INTEGER NOT NULL, `show_date_time` INTEGER NOT NULL, `date_format` TEXT NOT NULL, `show_check_in_time` INTEGER NOT NULL, `show_check_out_time` INTEGER NOT NULL, `check_in_label` TEXT NOT NULL, `check_out_label` TEXT NOT NULL, `show_item_code` INTEGER NOT NULL, `show_item_note` INTEGER NOT NULL, `show_order_note` INTEGER NOT NULL, `item_display_layout` TEXT NOT NULL, `show_unit_price` INTEGER NOT NULL, `show_quantity` INTEGER NOT NULL, `show_subtotal` INTEGER NOT NULL, `show_item_discount` INTEGER NOT NULL, `show_total_item_discount` INTEGER NOT NULL, `item_discount_label` TEXT NOT NULL, `show_bill_discount` INTEGER NOT NULL, `bill_discount_label` TEXT NOT NULL, `show_coupon_discount` INTEGER NOT NULL, `coupon_discount_label` TEXT NOT NULL, `show_voucher_discount` INTEGER NOT NULL, `voucher_discount_label` TEXT NOT NULL, `show_total_discount` INTEGER NOT NULL, `total_discount_label` TEXT NOT NULL, `show_discount` INTEGER NOT NULL, `show_discount_percent` INTEGER NOT NULL, `show_service_fee` INTEGER NOT NULL, `show_vat` INTEGER NOT NULL, `show_vat_details` INTEGER NOT NULL, `show_price_before_vat` INTEGER NOT NULL, `show_price_after_vat` INTEGER NOT NULL, `vat_label` TEXT NOT NULL, `price_before_vat_label` TEXT NOT NULL, `price_after_vat_label` TEXT NOT NULL, `show_payment_method` INTEGER NOT NULL, `show_received_amount` INTEGER NOT NULL, `show_change_amount` INTEGER NOT NULL, `show_qr_code` INTEGER NOT NULL, `qr_code_type` TEXT NOT NULL, `qr_code_content` TEXT, `show_barcode` INTEGER NOT NULL, `thank_you_message` TEXT NOT NULL, `comeback_message` TEXT NOT NULL, `footer_text` TEXT, `show_wifi_info` INTEGER NOT NULL, `wifi_name` TEXT, `wifi_password` TEXT, `paper_width` INTEGER NOT NULL, `font_size` TEXT NOT NULL, `line_spacing` REAL NOT NULL, `separator_char` TEXT NOT NULL, `double_separator_char` TEXT NOT NULL, `cut_paper` INTEGER NOT NULL, `open_cash_drawer` INTEGER NOT NULL, `beep_after_print` INTEGER NOT NULL, `number_of_copies` INTEGER NOT NULL, `is_default` INTEGER NOT NULL, `is_active` INTEGER NOT NULL, `sort_order` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, `sync_status` TEXT NOT NULL, `synced_at` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `brand_id` TEXT NOT NULL, `name` TEXT NOT NULL, `template_type` TEXT NOT NULL, `description` TEXT, `show_logo` INTEGER NOT NULL, `logo_url` TEXT, `store_name` TEXT NOT NULL, `store_address` TEXT, `store_phone` TEXT, `tax_code` TEXT, `header_text` TEXT, `bill_title` TEXT NOT NULL, `show_order_number` INTEGER NOT NULL, `show_table_name` INTEGER NOT NULL, `show_staff_name` INTEGER NOT NULL, `show_customer_name` INTEGER NOT NULL, `show_date_time` INTEGER NOT NULL, `date_format` TEXT NOT NULL, `show_check_in_time` INTEGER NOT NULL, `show_check_out_time` INTEGER NOT NULL, `check_in_label` TEXT NOT NULL, `check_out_label` TEXT NOT NULL, `show_item_code` INTEGER NOT NULL, `show_item_note` INTEGER NOT NULL, `show_order_note` INTEGER NOT NULL, `item_display_layout` TEXT NOT NULL, `show_unit_price` INTEGER NOT NULL, `show_quantity` INTEGER NOT NULL, `show_subtotal` INTEGER NOT NULL, `show_item_discount` INTEGER NOT NULL, `show_total_item_discount` INTEGER NOT NULL, `item_discount_label` TEXT NOT NULL, `show_bill_discount` INTEGER NOT NULL, `bill_discount_label` TEXT NOT NULL, `show_coupon_discount` INTEGER NOT NULL, `coupon_discount_label` TEXT NOT NULL, `show_voucher_discount` INTEGER NOT NULL, `voucher_discount_label` TEXT NOT NULL, `show_total_discount` INTEGER NOT NULL, `total_discount_label` TEXT NOT NULL, `show_discount` INTEGER NOT NULL, `show_discount_percent` INTEGER NOT NULL, `show_service_fee` INTEGER NOT NULL, `show_vat` INTEGER NOT NULL, `show_vat_details` INTEGER NOT NULL, `show_price_before_vat` INTEGER NOT NULL, `show_price_after_vat` INTEGER NOT NULL, `vat_label` TEXT NOT NULL, `price_before_vat_label` TEXT NOT NULL, `price_after_vat_label` TEXT NOT NULL, `show_payment_method` INTEGER NOT NULL, `show_received_amount` INTEGER NOT NULL, `show_change_amount` INTEGER NOT NULL, `show_qr_code` INTEGER NOT NULL, `qr_code_type` TEXT NOT NULL, `qr_code_content` TEXT, `show_barcode` INTEGER NOT NULL, `thank_you_message` TEXT NOT NULL, `comeback_message` TEXT NOT NULL, `footer_text` TEXT, `show_wifi_info` INTEGER NOT NULL, `wifi_name` TEXT, `wifi_password` TEXT, `paper_width` INTEGER NOT NULL, `font_size` TEXT NOT NULL, `line_spacing` REAL NOT NULL, `separator_char` TEXT NOT NULL, `double_separator_char` TEXT NOT NULL, `cut_paper` INTEGER NOT NULL, `open_cash_drawer` INTEGER NOT NULL, `beep_after_print` INTEGER NOT NULL, `number_of_copies` INTEGER NOT NULL, `is_default` INTEGER NOT NULL, `is_active` INTEGER NOT NULL, `sort_order` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, `sync_status` TEXT NOT NULL, `synced_at` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -3813,8 +3813,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "branchId",
-            "columnName": "branch_id",
+            "fieldPath": "brandId",
+            "columnName": "brand_id",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -4295,13 +4295,13 @@
         },
         "indices": [
           {
-            "name": "index_bill_templates_branch_id",
+            "name": "index_bill_templates_brand_id",
             "unique": false,
             "columnNames": [
-              "branch_id"
+              "brand_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_bill_templates_branch_id` ON `${TABLE_NAME}` (`branch_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bill_templates_brand_id` ON `${TABLE_NAME}` (`brand_id`)"
           },
           {
             "name": "index_bill_templates_is_active",
@@ -4823,7 +4823,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9c54ae441652ecd272ef69a197fe6f3c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '834aca4dd7a8e4b1ba524747756771f1')"
     ]
   }
 }
