@@ -87,27 +87,51 @@ class SunmiPrinterAdapter @Inject constructor(
     private var rawBinder: IBinder? = null
     private var serviceDescriptor: String? = null
 
-    // AIDL transaction codes for IWoyouService (based on Sunmi AIDL definition order)
-    // These are calculated as IBinder.FIRST_CALL_TRANSACTION + method_index
-    // Note: Transaction codes may vary between Sunmi firmware versions
+    // AIDL transaction codes for IWoyouService (woyou.aidlservice.jiuiv5)
+    // Based on the actual AIDL method ordering for Sunmi T1/V1/V2 devices
+    // Transaction code = IBinder.FIRST_CALL_TRANSACTION + method_index
     private object TransactionCodes {
-        const val TRANSACTION_printerInit = IBinder.FIRST_CALL_TRANSACTION + 0
-        const val TRANSACTION_printerSelfChecking = IBinder.FIRST_CALL_TRANSACTION + 1
-        const val TRANSACTION_getPrinterSerialNo = IBinder.FIRST_CALL_TRANSACTION + 2
-        const val TRANSACTION_getPrinterVersion = IBinder.FIRST_CALL_TRANSACTION + 3
-        const val TRANSACTION_getPrinterModal = IBinder.FIRST_CALL_TRANSACTION + 4
-        const val TRANSACTION_updatePrinterState = IBinder.FIRST_CALL_TRANSACTION + 5
-        const val TRANSACTION_setAlignment = IBinder.FIRST_CALL_TRANSACTION + 14
-        const val TRANSACTION_printOriginalText = IBinder.FIRST_CALL_TRANSACTION + 17
-        const val TRANSACTION_printBitmap = IBinder.FIRST_CALL_TRANSACTION + 20
-        const val TRANSACTION_printBitmapCustom = IBinder.FIRST_CALL_TRANSACTION + 21
-        const val TRANSACTION_lineWrap = IBinder.FIRST_CALL_TRANSACTION + 25
-        const val TRANSACTION_cutPaper = IBinder.FIRST_CALL_TRANSACTION + 26
-        const val TRANSACTION_sendRAWData = IBinder.FIRST_CALL_TRANSACTION + 27
-        const val TRANSACTION_openDrawer = IBinder.FIRST_CALL_TRANSACTION + 28
-        const val TRANSACTION_commitPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 29
-        const val TRANSACTION_enterPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 30
-        const val TRANSACTION_exitPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 31
+        // Basic printer methods
+        const val TRANSACTION_printerInit = IBinder.FIRST_CALL_TRANSACTION + 0           // printerInit(ICallback)
+        const val TRANSACTION_printerSelfChecking = IBinder.FIRST_CALL_TRANSACTION + 1   // printerSelfChecking(ICallback)
+        const val TRANSACTION_getPrinterSerialNo = IBinder.FIRST_CALL_TRANSACTION + 2    // getPrinterSerialNo()
+        const val TRANSACTION_getPrinterVersion = IBinder.FIRST_CALL_TRANSACTION + 3     // getPrinterVersion()
+        const val TRANSACTION_getPrinterModal = IBinder.FIRST_CALL_TRANSACTION + 4       // getPrinterModal()
+        const val TRANSACTION_updatePrinterState = IBinder.FIRST_CALL_TRANSACTION + 5    // updatePrinterState()
+        const val TRANSACTION_getPrinterPaper = IBinder.FIRST_CALL_TRANSACTION + 6       // getPrinterPaper()
+
+        // Print methods
+        const val TRANSACTION_sendRAWData = IBinder.FIRST_CALL_TRANSACTION + 7           // sendRAWData(byte[], ICallback)
+        const val TRANSACTION_setFontName = IBinder.FIRST_CALL_TRANSACTION + 8           // setFontName(String, ICallback)
+        const val TRANSACTION_setFontSize = IBinder.FIRST_CALL_TRANSACTION + 9           // setFontSize(float, ICallback)
+        const val TRANSACTION_printText = IBinder.FIRST_CALL_TRANSACTION + 10            // printText(String, ICallback)
+        const val TRANSACTION_printTextWithFont = IBinder.FIRST_CALL_TRANSACTION + 11    // printTextWithFont(...)
+        const val TRANSACTION_setAlignment = IBinder.FIRST_CALL_TRANSACTION + 12         // setAlignment(int, ICallback)
+        const val TRANSACTION_printBarCode = IBinder.FIRST_CALL_TRANSACTION + 13         // printBarCode(...)
+        const val TRANSACTION_printQRCode = IBinder.FIRST_CALL_TRANSACTION + 14          // printQRCode(...)
+        const val TRANSACTION_printOriginalText = IBinder.FIRST_CALL_TRANSACTION + 15    // printOriginalText(String, ICallback)
+        const val TRANSACTION_printBitmap = IBinder.FIRST_CALL_TRANSACTION + 16          // printBitmap(Bitmap, ICallback)
+        const val TRANSACTION_printBitmapCustom = IBinder.FIRST_CALL_TRANSACTION + 17    // printBitmapCustom(Bitmap, int, ICallback)
+        const val TRANSACTION_printColumnsText = IBinder.FIRST_CALL_TRANSACTION + 18     // printColumnsText(...)
+        const val TRANSACTION_printColumnsString = IBinder.FIRST_CALL_TRANSACTION + 19   // printColumnsString(...)
+
+        // Paper control methods
+        const val TRANSACTION_lineWrap = IBinder.FIRST_CALL_TRANSACTION + 22             // lineWrap(int, ICallback)
+        const val TRANSACTION_feedPaper = IBinder.FIRST_CALL_TRANSACTION + 23            // feedPaper(int, ICallback)
+        const val TRANSACTION_cutPaper = IBinder.FIRST_CALL_TRANSACTION + 24             // cutPaper(ICallback)
+        const val TRANSACTION_getCutPaperTimes = IBinder.FIRST_CALL_TRANSACTION + 25     // getCutPaperTimes()
+        const val TRANSACTION_openDrawer = IBinder.FIRST_CALL_TRANSACTION + 26           // openDrawer(ICallback)
+
+        // Extended print methods
+        const val TRANSACTION_printText2 = IBinder.FIRST_CALL_TRANSACTION + 27           // printText2(...)
+        const val TRANSACTION_printBarCode2 = IBinder.FIRST_CALL_TRANSACTION + 28        // printBarCode2(...)
+        const val TRANSACTION_printQRCode2 = IBinder.FIRST_CALL_TRANSACTION + 29         // printQRCode2(...)
+        const val TRANSACTION_printBitmap2 = IBinder.FIRST_CALL_TRANSACTION + 30         // printBitmap2(...)
+
+        // Buffer control
+        const val TRANSACTION_enterPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 31   // enterPrinterBuffer(boolean)
+        const val TRANSACTION_exitPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 32    // exitPrinterBuffer(boolean)
+        const val TRANSACTION_commitPrinterBuffer = IBinder.FIRST_CALL_TRANSACTION + 33  // commitPrinterBuffer()
     }
 
     override fun isConnected(): Boolean = printerService != null && _connectionState.value == ConnectionState.Connected
@@ -559,12 +583,11 @@ class SunmiPrinterAdapter @Inject constructor(
         initPrinterViaTransact(binder)
 
         // Try multiple transaction codes for sendRAWData
-        // Different Sunmi firmware versions may use different codes
+        // Position 7 in IWoyouService.aidl (jiuiv5)
         val possibleTransactionCodes = listOf(
-            TransactionCodes.TRANSACTION_sendRAWData,  // Standard position (27)
-            IBinder.FIRST_CALL_TRANSACTION + 26,       // Alternative position
-            IBinder.FIRST_CALL_TRANSACTION + 24,       // Alternative position
-            IBinder.FIRST_CALL_TRANSACTION + 25        // Alternative position
+            TransactionCodes.TRANSACTION_sendRAWData,  // Standard position (7)
+            IBinder.FIRST_CALL_TRANSACTION + 8,        // Alternative
+            IBinder.FIRST_CALL_TRANSACTION + 6         // Alternative
         )
 
         var lastError: Exception? = null
@@ -818,12 +841,13 @@ class SunmiPrinterAdapter @Inject constructor(
         initPrinterViaTransact(binder)
 
         // Try multiple transaction codes for printBitmap
+        // Position 16 in IWoyouService.aidl (jiuiv5)
         val possibleTransactionCodes = listOf(
-            TransactionCodes.TRANSACTION_printBitmap,     // Standard position (20)
-            TransactionCodes.TRANSACTION_printBitmapCustom, // Custom position (21)
-            IBinder.FIRST_CALL_TRANSACTION + 19,          // Alternative
-            IBinder.FIRST_CALL_TRANSACTION + 22,          // Alternative
-            IBinder.FIRST_CALL_TRANSACTION + 23           // Alternative
+            TransactionCodes.TRANSACTION_printBitmap,       // Standard position (16)
+            TransactionCodes.TRANSACTION_printBitmapCustom, // Custom position (17)
+            TransactionCodes.TRANSACTION_printBitmap2,      // Extended version (30)
+            IBinder.FIRST_CALL_TRANSACTION + 15,            // Alternative
+            IBinder.FIRST_CALL_TRANSACTION + 18             // Alternative
         )
 
         var lastError: Exception? = null
@@ -940,11 +964,12 @@ class SunmiPrinterAdapter @Inject constructor(
         val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
 
         // Try multiple possible transaction codes for commitPrinterBuffer
+        // Position 33 in IWoyouService.aidl (jiuiv5)
         val possibleCodes = listOf(
-            TransactionCodes.TRANSACTION_commitPrinterBuffer,
-            TransactionCodes.TRANSACTION_exitPrinterBuffer,
-            IBinder.FIRST_CALL_TRANSACTION + 32,
-            IBinder.FIRST_CALL_TRANSACTION + 33
+            TransactionCodes.TRANSACTION_commitPrinterBuffer,  // Position 33
+            TransactionCodes.TRANSACTION_exitPrinterBuffer,    // Position 32
+            IBinder.FIRST_CALL_TRANSACTION + 34,               // Alternative
+            IBinder.FIRST_CALL_TRANSACTION + 35                // Alternative
         )
 
         for (code in possibleCodes) {
