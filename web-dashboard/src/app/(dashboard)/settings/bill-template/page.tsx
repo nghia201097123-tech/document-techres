@@ -275,31 +275,23 @@ export default function BillTemplatePage() {
       let savedTemplate: BillTemplate;
 
       if (templateDialog === "create") {
-        savedTemplate = await billTemplateService.createTemplate(filterBrandId, templateDataWithBranch);
+        // Sử dụng endpoint gộp để tạo template và printer config cùng lúc
+        const createData = {
+          ...templateDataWithBranch,
+          // Printer config fields
+          connectionType: connectionType || PrinterConnectionType.NETWORK,
+          printerIp,
+          printerPort,
+          printerMac,
+          printerUsbPath,
+          autoPrintOnPayment,
+          printPreview,
+          retryCount,
+          retryDelayMs,
+          connectionTimeoutMs,
+        };
+        savedTemplate = await billTemplateService.createTemplateWithPrinter(filterBrandId, createData);
         setTemplates((prev) => [...prev, savedTemplate]);
-
-        // Create associated printer config
-        if (printerIp || connectionType !== PrinterConnectionType.NETWORK) {
-          await billTemplateService.createPrinterConfig(filterBrandId, {
-            name: `Máy in - ${templateForm.name}`,
-            templateId: savedTemplate.id,
-            connectionType: connectionType || PrinterConnectionType.NETWORK,
-            printerIp,
-            printerPort,
-            printerMac,
-            printerUsbPath,
-            autoPrintOnPayment,
-            printPreview,
-            retryCount,
-            retryDelayMs,
-            connectionTimeoutMs,
-            paperWidth: templateForm.paperWidth,
-            numberOfCopies: templateForm.numberOfCopies,
-            cutPaper: templateForm.cutPaper,
-            openCashDrawer: templateForm.openCashDrawer,
-            beepAfterPrint: templateForm.beepAfterPrint,
-          });
-        }
 
         toast({ title: "Thành công", description: "Đã thêm mẫu bill mới" });
       } else if (editingTemplate) {

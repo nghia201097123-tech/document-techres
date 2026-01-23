@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { BillTemplate, BillPrinterConfig } from '../../database/entities';
-import { CreateBillTemplateDto, UpdateBillTemplateDto, UpdateBillTemplateWithPrinterDto } from './dto';
+import { CreateBillTemplateDto, UpdateBillTemplateDto, UpdateBillTemplateWithPrinterDto, CreateBillTemplateWithPrinterDto } from './dto';
 
 @Injectable()
 export class BillTemplatesService {
@@ -51,6 +51,67 @@ export class BillTemplatesService {
       isActive: true,
     });
     return this.repository.save(template);
+  }
+
+  /**
+   * Tạo mới template và printer config cùng lúc
+   * Dùng cho UI đã gộp chung template và printer config vào 1 màn hình
+   */
+  async createWithPrinter(tenantId: string, dto: CreateBillTemplateWithPrinterDto) {
+    // Tách printer config fields ra khỏi template fields
+    const {
+      connectionType,
+      printerIp,
+      printerPort,
+      printerMac,
+      printerUsbPath,
+      autoPrintOnPayment,
+      printPreview,
+      retryCount,
+      retryDelayMs,
+      connectionTimeoutMs,
+      ...templateData
+    } = dto;
+
+    // 1. Tạo template
+    const template = this.repository.create({
+      ...templateData,
+      tenantId,
+      isActive: true,
+    });
+    const savedTemplate = await this.repository.save(template);
+
+    // 2. Tạo printer config nếu có thông tin máy in
+    const hasPrinterInfo = printerIp || printerMac || printerUsbPath || connectionType;
+
+    if (hasPrinterInfo) {
+      const printerConfig = this.printerConfigRepository.create({
+        tenantId,
+        branchId: savedTemplate.branchId,
+        name: `Máy in - ${savedTemplate.name}`,
+        templateId: savedTemplate.id,
+        isActive: true,
+        connectionType: connectionType || 'network',
+        printerIp,
+        printerPort: printerPort || 9100,
+        printerMac,
+        printerUsbPath,
+        autoPrintOnPayment: autoPrintOnPayment ?? true,
+        printPreview: printPreview ?? false,
+        retryCount: retryCount ?? 3,
+        retryDelayMs: retryDelayMs ?? 1000,
+        connectionTimeoutMs: connectionTimeoutMs ?? 5000,
+        // Copy from template
+        paperWidth: templateData.paperWidth || 80,
+        numberOfCopies: templateData.numberOfCopies || 1,
+        cutPaper: templateData.cutPaper ?? true,
+        openCashDrawer: templateData.openCashDrawer ?? false,
+        beepAfterPrint: templateData.beepAfterPrint ?? false,
+      });
+      await this.printerConfigRepository.save(printerConfig);
+    }
+
+    return savedTemplate;
   }
 
   async update(tenantId: string, id: string, updateDto: UpdateBillTemplateDto) {
