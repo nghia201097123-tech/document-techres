@@ -7,6 +7,7 @@ import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.local.entity.BillTemplateType
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
+import com.techres.ccb.printer.core.EscPosCommands
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -191,13 +192,15 @@ object HybridBillPrintService {
                 config
             }
 
-            // Kiểm tra nếu sử dụng BinderProxy, dùng native bitmap printing
+            // Kiểm tra nếu sử dụng BinderProxy, dùng ESC/POS bitmap printing
+            // (Sunmi T1 không xử lý đúng native Parcelable Bitmap qua AIDL)
             val isBinderProxy = adapter.isUsingBinderProxy()
             Log.d(TAG, "Sunmi using BinderProxy: $isBinderProxy")
 
             if (isBinderProxy) {
-                // ========== NATIVE BITMAP PRINTING (cho BinderProxy) ==========
-                Log.d(TAG, "Using NATIVE BITMAP printing for Sunmi")
+                // ========== ESC/POS BITMAP PRINTING (cho BinderProxy) ==========
+                // Convert bitmap -> ESC/POS format -> sendRAWData
+                Log.d(TAG, "Using ESC/POS BITMAP printing for Sunmi (BinderProxy mode)")
 
                 // Generate bill bitmaps trực tiếp
                 val bitmaps = generateSunmiBillBitmaps(effectiveConfig, template, billData, paymentBankAccount, payosQrCode)
@@ -205,7 +208,7 @@ object HybridBillPrintService {
 
                 // In từng bản
                 repeat(template.numberOfCopies) { copyIndex ->
-                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies} (native bitmap)...")
+                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies} (ESC/POS bitmap)...")
 
                     // In từng bitmap
                     bitmaps.forEachIndexed { bitmapIndex, bitmap ->
@@ -770,7 +773,13 @@ object HybridBillPrintService {
     }
 
     /**
-     * In 1 bitmap qua Sunmi với retry logic (cho native bitmap printing)
+     * In 1 bitmap qua Sunmi với retry logic
+     *
+     * QUAN TRỌNG: Sử dụng ESC/POS format thay vì native printBitmap
+     * vì Sunmi T1's AIDL interface không xử lý đúng Parcelable Bitmap,
+     * dẫn đến in ra giấy trắng.
+     *
+     * Phương pháp: Convert bitmap -> ESC/POS format -> sendRAWData
      */
     private suspend fun printSunmiBitmapWithRetry(
         adapter: SunmiPrinterAdapter,
@@ -782,6 +791,11 @@ object HybridBillPrintService {
     ): PrinterResult {
         var lastError: String? = null
 
+        // Convert bitmap to ESC/POS format ONCE (không cần convert lại mỗi retry)
+        Log.d(TAG, "Converting bitmap ${bitmapIndex + 1}/$totalBitmaps to ESC/POS format (${bitmap.width}x${bitmap.height})")
+        val escPosData = EscPosCommands.printBitmap(bitmap, 0) // 0 = left align
+        Log.d(TAG, "ESC/POS data size: ${escPosData.size} bytes")
+
         repeat(retryCount) { attempt ->
             // Kiểm tra status trước mỗi lần retry (trừ lần đầu)
             if (attempt > 0) {
@@ -791,14 +805,14 @@ object HybridBillPrintService {
                 }
             }
 
-            Log.d(TAG, "Sunmi printBitmap attempt ${attempt + 1}/$retryCount for bitmap ${bitmapIndex + 1}/$totalBitmaps")
+            Log.d(TAG, "Sunmi ESC/POS print attempt ${attempt + 1}/$retryCount for bitmap ${bitmapIndex + 1}/$totalBitmaps")
 
-            // In bitmap qua native API
-            val printResult = adapter.printBitmap(bitmap)
+            // Gửi ESC/POS data qua sendRAWData (thay vì native printBitmap)
+            val printResult = adapter.write(escPosData)
 
             when (printResult) {
                 is com.techres.ccb.printer.core.PrinterResult.Success -> {
-                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed successfully (${bitmap.width}x${bitmap.height})")
+                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed successfully via ESC/POS (${bitmap.width}x${bitmap.height})")
 
                     // Đợi máy in xử lý bitmap
                     val processingTime = calculateBitmapProcessingTime(bitmap)
@@ -808,14 +822,14 @@ object HybridBillPrintService {
                     return PrinterResult.Success("OK")
                 }
                 is com.techres.ccb.printer.core.PrinterResult.PartialSuccess -> {
-                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed with partial success")
+                    Log.d(TAG, "Bitmap ${bitmapIndex + 1} printed with partial success via ESC/POS")
                     val processingTime = calculateBitmapProcessingTime(bitmap)
                     delay(processingTime)
                     return PrinterResult.Success("OK")
                 }
                 is com.techres.ccb.printer.core.PrinterResult.Error -> {
                     lastError = printResult.message
-                    Log.w(TAG, "PrintBitmap attempt ${attempt + 1} failed: ${printResult.message}")
+                    Log.w(TAG, "ESC/POS print attempt ${attempt + 1} failed: ${printResult.message}")
 
                     if (attempt < retryCount - 1) {
                         Log.d(TAG, "Waiting ${retryDelayMs}ms before retry...")
