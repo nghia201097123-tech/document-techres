@@ -82,6 +82,7 @@ enum class DebugTab(val title: String) {
 data class DebugUiState(
     val selectedTab: DebugTab = DebugTab.BRANDS,
     val branchId: String = "",
+    val brandId: String = "",
     val brands: List<BrandEntity> = emptyList(),
     val branches: List<BranchEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
@@ -137,7 +138,8 @@ class DatabaseDebugViewModel @Inject constructor(
 
     private fun loadBranchId() {
         val branchId = authRepository.getBranchId() ?: ""
-        _uiState.update { it.copy(branchId = branchId) }
+        val brandId = authRepository.getBrandId() ?: ""
+        _uiState.update { it.copy(branchId = branchId, brandId = brandId) }
     }
 
     fun selectTab(tab: DebugTab) {
@@ -343,15 +345,19 @@ class DatabaseDebugViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch {
-            try {
-                billTemplateDao.getAllByBranch(branchId)
-                    .catch { e -> Log.e(TAG, "Error loading bill templates", e) }
-                    .collect { billTemplates ->
-                        _uiState.update { it.copy(billTemplates = billTemplates) }
-                    }
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception loading bill templates", e)
+        // Bill templates are at brand level
+        val brandId = _uiState.value.brandId
+        if (brandId.isNotEmpty()) {
+            viewModelScope.launch {
+                try {
+                    billTemplateDao.getAllByBrand(brandId)
+                        .catch { e -> Log.e(TAG, "Error loading bill templates", e) }
+                        .collect { billTemplates ->
+                            _uiState.update { it.copy(billTemplates = billTemplates) }
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception loading bill templates", e)
+                }
             }
         }
 

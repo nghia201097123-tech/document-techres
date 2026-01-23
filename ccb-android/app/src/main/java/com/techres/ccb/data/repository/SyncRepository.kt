@@ -859,7 +859,11 @@ class SyncRepository @Inject constructor(
         seasonalPriceProductDao.deleteAllByBranch(branchId)
         couponDao.deleteAllByBranch(branchId)
         surchargeDao.deleteAllByBranch(branchId)
-        billTemplateDao.deleteByBranch(branchId)
+        // Bill templates are at brand level, get brandId from authRepository
+        val brandId = authRepository.getBrandId()
+        if (brandId != null) {
+            billTemplateDao.deleteByBrand(brandId)
+        }
         billPrinterConfigDao.deleteByBranch(branchId)
         bankAccountDao.deleteAllByBranch(branchId)
     }
