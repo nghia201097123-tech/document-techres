@@ -179,23 +179,28 @@ object HybridBillPrintService {
                 return statusCheck
             }
 
-            // ========== BƯỚC 3: LẤY THÔNG TIN MÁY IN ==========
-            val sunmiPaperWidth = adapter.getPaperWidth()
-            val effectivePaperWidth = if (sunmiPaperWidth > 0) sunmiPaperWidth else config.paperWidth
-            Log.d(TAG, "Sunmi paper width: ${sunmiPaperWidth}mm (effective: ${effectivePaperWidth}mm)")
-
-            // ========== BƯỚC 4: GENERATE BILL CONTENT ==========
-            // Tạo config với paper width từ Sunmi (nếu detect được)
-            val effectiveConfig = if (sunmiPaperWidth > 0 && sunmiPaperWidth != config.paperWidth) {
-                config.copy(paperWidth = sunmiPaperWidth)
-            } else {
-                config
-            }
-
-            // Kiểm tra nếu sử dụng BinderProxy, dùng ESC/POS bitmap printing
+            // ========== BƯỚC 3: KIỂM TRA LOẠI KẾT NỐI ==========
+            // Kiểm tra BinderProxy TRƯỚC khi quyết định paper width
             // (Sunmi T1 không xử lý đúng native Parcelable Bitmap qua AIDL)
             val isBinderProxy = adapter.isUsingBinderProxy()
             Log.d(TAG, "Sunmi using BinderProxy: $isBinderProxy")
+
+            // ========== BƯỚC 4: XÁC ĐỊNH PAPER WIDTH ==========
+            // Với BinderProxy (Sunmi T1): SỬ DỤNG USER CONFIG vì getPaperWidth() không đáng tin
+            // Với non-BinderProxy: Có thể tin tưởng Sunmi reported width
+            val sunmiPaperWidth = adapter.getPaperWidth()
+            val effectiveConfig = if (isBinderProxy) {
+                // BinderProxy mode: Luôn sử dụng user config
+                Log.d(TAG, "BinderProxy mode: Using user config paperWidth=${config.paperWidth}mm (Sunmi reported: ${sunmiPaperWidth}mm)")
+                config
+            } else if (sunmiPaperWidth > 0 && sunmiPaperWidth != config.paperWidth) {
+                // Non-BinderProxy: Có thể trust Sunmi's reported width
+                Log.d(TAG, "Non-BinderProxy: Using Sunmi detected paperWidth=${sunmiPaperWidth}mm (user config: ${config.paperWidth}mm)")
+                config.copy(paperWidth = sunmiPaperWidth)
+            } else {
+                Log.d(TAG, "Using user config paperWidth=${config.paperWidth}mm")
+                config
+            }
 
             if (isBinderProxy) {
                 // ========== NATIVE BITMAP PRINTING (cho BinderProxy) ==========
@@ -245,7 +250,8 @@ object HybridBillPrintService {
                 // Feed paper và cắt giấy nếu config cho phép
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper as per config...")
-                    adapter.feedLines(3) // Đẩy giấy trước khi cắt
+                    // Đẩy giấy nhiều hơn (6 dòng ~15mm) để footer không bị cắt
+                    adapter.feedLines(6)
                     adapter.cutPaper()
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
