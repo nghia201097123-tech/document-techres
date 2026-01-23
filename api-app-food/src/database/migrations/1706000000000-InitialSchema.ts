@@ -51,6 +51,7 @@ export class InitialSchema1706000000000 implements MigrationInterface {
       CREATE TABLE "food_platform_accounts" (
         "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "tenant_id" varchar(50) NOT NULL,
+        "branch_id" uuid,
         "port_id" uuid,
         "platform" "food_platform_type_enum" NOT NULL,
         "auth_type" "auth_type_enum" NOT NULL,
@@ -83,6 +84,10 @@ export class InitialSchema1706000000000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE INDEX "IDX_food_platform_accounts_tenant_platform" ON "food_platform_accounts" ("tenant_id", "platform")
+    `);
+
+    await queryRunner.query(`
+      CREATE INDEX "IDX_food_platform_accounts_branch" ON "food_platform_accounts" ("branch_id")
     `);
 
     await queryRunner.query(`
