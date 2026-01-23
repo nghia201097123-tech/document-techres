@@ -6,6 +6,10 @@ sidebar_position: 4
 
 Chi tiết về quy trình mapping cửa hàng bên Merchant với chi nhánh bên TechRes sau khi liên kết tài khoản.
 
+:::tip Quan trọng: Single API Architecture
+Tất cả API calls liên quan đến store mapping đều đi qua **API App Food** duy nhất. API App Food sẽ gọi đến Merchant APIs để lấy danh sách cửa hàng và lưu trữ mappings trong PostgreSQL.
+:::
+
 ## Tổng quan
 
 Sau khi liên kết tài khoản merchant thành công, hệ thống cần **mapping** giữa:
@@ -536,7 +540,7 @@ private async pollGrabOrdersForStore(
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  API-DASHBOARD                                                           │
+│  API APP FOOD                                                           │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  1. Query store mappings cho Branch ID: 1                        │    │
 │  │                                                                  │    │

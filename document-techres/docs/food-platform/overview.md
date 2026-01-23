@@ -77,6 +77,10 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
 
 ## Kiến trúc tổng quan
 
+:::tip Quan trọng: Single API Architecture
+Tất cả các tính năng liên quan đến Food Platform đều được xử lý bởi một **API backend duy nhất** - gọi là **API App Food**. Web Dashboard và CCB **100% gọi vào API App Food**, không gọi qua API khác hay microservice nào khác.
+:::
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    FOOD PLATFORMS                                        │
@@ -93,41 +97,69 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
                            │
                            ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                      API-DASHBOARD                                        │
+│                    API APP FOOD (Single Backend)                          │
+│  ══════════════════════════════════════════════════════════════════════  │
+│  │ Đây là API duy nhất xử lý TẤT CẢ các tính năng Food Platform         │
+│  │ Web Dashboard và CCB gọi 100% vào API này                            │
+│  ══════════════════════════════════════════════════════════════════════  │
+│                                                                          │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │                    Food Platform Service                            │  │
+│  │                    Food Platform Services                           │  │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │  │
 │  │  │   Account    │  │    Store     │  │      Order Sync          │  │  │
 │  │  │   Manager    │  │   Mapping    │  │      Service             │  │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────────┘  │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │  │
+│  │  │   Product    │  │   Platform   │  │      Auto Confirm        │  │  │
+│  │  │   Mapping    │  │   Connector  │  │      Service             │  │  │
 │  │  └──────────────┘  └──────────────┘  └──────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
 │  │                      PostgreSQL                                     │  │
+│  │  ├── food_platform_ports (cấu hình platform từ Admin)               │  │
 │  │  ├── food_platform_accounts (credentials, tokens)                   │  │
 │  │  ├── food_platform_store_mappings (store ↔ branch)                  │  │
+│  │  ├── food_platform_product_mappings (future)                        │  │
 │  │  └── food_orders (đơn hàng từ platforms)                            │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
                            │
                            │ REST API + WebSocket
-                           ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                           CCB (Android)                                   │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │                    Food Order Screen                                │  │
-│  │  ├── Hiển thị đơn hàng theo platform                                │  │
-│  │  ├── Filter theo trạng thái (Mới, Đang xử lý, Hoàn thành)           │  │
-│  │  ├── Auto-confirm khi có tài xế                                     │  │
-│  │  └── Auto-print bill                                                │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │                      SQLite (Local)                                 │  │
-│  │  └── food_orders (cache local)                                      │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────────────┘
+         ┌─────────────────┴─────────────────┐
+         │                                   │
+         ▼                                   ▼
+┌─────────────────────────────┐  ┌─────────────────────────────────────────┐
+│     WEB DASHBOARD           │  │              CCB (Android)               │
+│  ┌───────────────────────┐  │  │  ┌───────────────────────────────────┐  │
+│  │ Food Platform Module  │  │  │  │      Food Order Screen            │  │
+│  │                       │  │  │  │                                   │  │
+│  │ • Liên kết tài khoản  │  │  │  │ • Poll đơn hàng mỗi 5s            │  │
+│  │ • Store mapping       │  │  │  │ • Hiển thị đơn theo platform      │  │
+│  │ • Product mapping     │  │  │  │ • Auto-confirm khi có tài xế      │  │
+│  │ • Bật/tắt cổng        │  │  │  │ • Auto-print bill                 │  │
+│  │                       │  │  │  │ • Hoàn tất đơn & lưu local        │  │
+│  │ ▲                     │  │  │  │ ▲                                 │  │
+│  │ │ 100% call to        │  │  │  │ │ 100% call to                    │  │
+│  │ │ API App Food        │  │  │  │ │ API App Food                    │  │
+│  └───────────────────────┘  │  │  └───────────────────────────────────┘  │
+│                             │  │                                         │
+│                             │  │  ┌───────────────────────────────────┐  │
+│                             │  │  │         SQLite (Local)            │  │
+│                             │  │  │  └── invoices (hóa đơn local)     │  │
+│                             │  │  │  └── food_orders (cache)          │  │
+│                             │  │  └───────────────────────────────────┘  │
+└─────────────────────────────┘  └─────────────────────────────────────────┘
 ```
+
+### Nguyên tắc quan trọng
+
+| Quy tắc | Mô tả |
+|---------|-------|
+| **Single API** | Tất cả tính năng food platform xử lý bởi **API App Food** duy nhất |
+| **No Microservices** | Không có microservice khác tham gia vào luồng food platform |
+| **100% API Calls** | Web Dashboard và CCB chỉ gọi đến API App Food |
+| **Platform Connector** | API App Food đóng vai trò trung gian gọi đến Merchant APIs của GrabFood, ShopeeFood, BeFood |
 
 ## Business Flow tổng quan
 
@@ -140,13 +172,13 @@ User trên CCB/Dashboard
 Nhập thông tin đăng nhập (username/password hoặc OTP)
         │
         ▼
-API-Dashboard gọi Merchant API để authenticate
+Gọi API App Food → API App Food gọi Merchant API để authenticate
         │
         ▼
 Lưu token + credentials vào PostgreSQL
         │
         ▼
-Gọi API lấy danh sách cửa hàng của merchant
+Gọi API App Food → API App Food gọi Merchant API lấy danh sách cửa hàng
         │
         ▼
 Hiển thị UI mapping: Store (Platform) ↔ Branch (TechRes)
@@ -165,16 +197,16 @@ Account status = CONNECTED
 ### Flow 2: Polling đơn hàng (với Store Filter)
 
 ```
-CCB Chi nhánh A gọi API mỗi 5 giây
+CCB Chi nhánh A gọi API App Food mỗi 5 giây
         │
         ▼
-API-Dashboard query: "Chi nhánh A mapped với stores nào?"
+API App Food query: "Chi nhánh A mapped với stores nào?"
         │
         ▼
 Tìm thấy: Store GR-001 (Grab), Store SF-001 (Shopee)
         │
         ▼
-Polling song song đến từng store đã mapping
+API App Food polling song song đến Merchant APIs của từng store đã mapping
 (Chỉ lấy đơn của stores này, không lấy stores khác)
         │
         ▼
@@ -404,28 +436,48 @@ enum AccountStatus {
 ## Files tham khảo
 
 ```
-Backend:
-├── api-dashboard/src/modules/food-platforms/
-│   ├── food-platforms.controller.ts
-│   ├── food-platforms.service.ts
-│   └── dto/
+API App Food (Single Backend - NestJS):
+├── api-app-food/src/modules/
+│   ├── accounts/                        # Quản lý tài khoản merchant
+│   │   ├── accounts.controller.ts
+│   │   ├── accounts.service.ts
+│   │   └── dto/
+│   ├── stores/                          # Store mapping
+│   │   ├── stores.controller.ts
+│   │   ├── stores.service.ts
+│   │   └── dto/
+│   ├── orders/                          # Order polling & sync
+│   │   ├── orders.controller.ts
+│   │   ├── orders.service.ts
+│   │   └── dto/
+│   ├── products/                        # Product mapping (future)
+│   │   └── ...
+│   └── connectors/                      # Platform API connectors
+│       ├── grab.connector.ts
+│       ├── shopee.connector.ts
+│       └── befood.connector.ts
 │
-├── api-dashboard/src/database/entities/
-│   └── food-platform-account.entity.ts
+├── api-app-food/src/database/entities/
+│   ├── food-platform-account.entity.ts
+│   ├── food-platform-store-mapping.entity.ts
+│   ├── food-order.entity.ts
+│   └── ...
 │
 Mobile (CCB):
 ├── ccb-android/app/src/main/java/com/techres/ccb/
+│   ├── data/api/
+│   │   └── FoodPlatformApi.kt           # Gọi 100% đến API App Food
 │   ├── presentation/screens/foodorder/
 │   │   ├── FoodOrderScreen.kt
 │   │   └── FoodOrderViewModel.kt
 │   └── domain/model/
 │       └── FoodOrderModels.kt
 │
-Frontend:
+Frontend (Web Dashboard):
 ├── web-dashboard/src/app/(dashboard)/settings/food-platforms/
 │   └── page.tsx
 └── web-dashboard/src/services/
-    └── food-platform-service.ts
+    └── food-platform-service.ts          # Gọi 100% đến API App Food
 ```
 
 ## Tiếp theo

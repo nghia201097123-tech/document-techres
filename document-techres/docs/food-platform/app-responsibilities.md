@@ -6,6 +6,14 @@ sidebar_position: 2
 
 Mô tả chi tiết nhiệm vụ của từng ứng dụng trong hệ thống Food Platform Integration.
 
+:::tip Quan trọng: Single API Architecture
+Tất cả các tính năng liên quan đến Food Platform đều được xử lý bởi một **API backend duy nhất** - gọi là **API App Food**.
+
+- **Web Dashboard** gọi **100%** đến API App Food cho các tính năng food platform
+- **CCB** gọi **100%** đến API App Food cho các tính năng food platform
+- **Không có microservice khác** tham gia vào luồng xử lý food platform
+:::
+
 ## Tổng quan
 
 ```
@@ -226,7 +234,14 @@ CREATE TABLE food_platform_tenant_permissions (
 
 ### API Endpoints cho Web Dashboard
 
+:::info API App Food
+Tất cả các endpoints dưới đây đều thuộc **API App Food** (ví dụ: `https://api-food.techres.vn`).
+Web Dashboard gọi **100%** đến API này.
+:::
+
 ```typescript
+// Base URL: https://api-food.techres.vn/api
+
 // Liên kết tài khoản
 POST /api/food-platforms/accounts/login
 POST /api/food-platforms/accounts/request-otp
@@ -297,7 +312,12 @@ GET /api/branches/{branchId}/food-platform-status
 │  │  ┌───────────────────────────────────────────────────────────┐  │    │
 │  │  │ 🔄 Đang tải đơn hàng...                         [●] 5s    │  │    │
 │  │  │                                                            │  │    │
-│  │  │ GET /food-orders/poll?branchId=1&lastPollAt=xxx            │  │    │
+│  │  │ ═══════════════════════════════════════════════════════   │  │    │
+│  │  │ │ CCB gọi 100% đến API App Food                        │  │  │    │
+│  │  │ ═══════════════════════════════════════════════════════   │  │    │
+│  │  │                                                            │  │    │
+│  │  │ GET https://api-food.techres.vn/api/food-orders/poll       │  │    │
+│  │  │     ?branchId=1&lastPollAt=xxx                             │  │    │
 │  │  │                                                            │  │    │
 │  │  │ Response: { newOrders: 2, updatedOrders: 1 }               │  │    │
 │  │  └───────────────────────────────────────────────────────────┘  │    │
@@ -378,8 +398,11 @@ GET /api/branches/{branchId}/food-platform-status
 │  │                                                                  │    │
 │  │  if (settings.autoConfirmEnabled && order.status !== 'accepted')│    │
 │  │  {                                                               │    │
-│  │    // Call platform API                                          │    │
-│  │    POST /merchant/orders/{orderId}/accept                        │    │
+│  │    // CCB gọi API App Food để xác nhận đơn                       │    │
+│  │    POST https://api-food.techres.vn/api/orders/{orderId}/accept  │    │
+│  │                                                                  │    │
+│  │    // API App Food sẽ gọi tiếp đến Merchant API                  │    │
+│  │    // (GrabFood API, ShopeeFood API, BeFood API)                 │    │
 │  │                                                                  │    │
 │  │    // Update local status                                        │    │
 │  │    order.status = 'DELIVERING'                                   │    │
@@ -439,6 +462,34 @@ GET /api/branches/{branchId}/food-platform-status
 │  │  3. Sync: queue for cloud sync                                   │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
+```
+
+### API Endpoints cho CCB
+
+:::info API App Food
+Tất cả các endpoints dưới đây đều thuộc **API App Food** (ví dụ: `https://api-food.techres.vn`).
+CCB gọi **100%** đến API này cho các tính năng food platform.
+:::
+
+```typescript
+// Base URL: https://api-food.techres.vn/api
+
+// Liên kết tài khoản (nếu chưa có)
+POST /api/food-platforms/accounts/login
+POST /api/food-platforms/accounts/request-otp
+POST /api/food-platforms/accounts/verify-otp
+
+// Polling đơn hàng
+GET /api/food-orders/poll?branchId={branchId}&lastPollAt={timestamp}
+
+// Xử lý đơn hàng
+POST /api/food-orders/{orderId}/accept      // Xác nhận đơn
+POST /api/food-orders/{orderId}/ready       // Đánh dấu sẵn sàng
+POST /api/food-orders/{orderId}/complete    // Hoàn tất đơn
+POST /api/food-orders/{orderId}/cancel      // Hủy đơn
+
+// Lấy chi tiết đơn
+GET /api/food-orders/{orderId}
 ```
 
 ### CCB Local Invoice Storage
@@ -514,34 +565,68 @@ suspend fun saveFoodOrderAsInvoice(order: FoodOrder) {
 
 ## Tổng kết phân chia
 
-| App | Nhiệm vụ chính | Database |
-|-----|---------------|----------|
-| **Web Admin** | Cấu hình cổng liên kết, API credentials | `food_platform_ports` |
-| **Web Dashboard** | Liên kết tài khoản, mapping store/product, bật/tắt | `food_platform_accounts`, `store_mappings`, `product_mappings` |
-| **CCB** | Poll đơn, auto-confirm, in bill, hoàn tất, lưu hóa đơn | `food_orders` (cache), `invoices` (local) |
+| App | Nhiệm vụ chính | Gọi đến | Database |
+|-----|---------------|---------|----------|
+| **Web Admin** | Cấu hình cổng liên kết, API credentials | API Admin | `food_platform_ports` |
+| **Web Dashboard** | Liên kết tài khoản, mapping store/product, bật/tắt | **100% API App Food** | `food_platform_accounts`, `store_mappings`, `product_mappings` |
+| **CCB** | Poll đơn, auto-confirm, in bill, hoàn tất, lưu hóa đơn | **100% API App Food** | `food_orders` (cache), `invoices` (local) |
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                    DATA FLOW OVERVIEW                              │
-│                                                                    │
-│   WEB-ADMIN          WEB-DASHBOARD              CCB                │
-│      │                    │                      │                 │
-│      │ Create ports       │ Link accounts        │ Poll orders     │
-│      ▼                    ▼                      ▼                 │
-│  ┌───────┐           ┌───────┐              ┌───────┐              │
-│  │ Ports │──────────▶│Accounts│─────────────▶│Orders │              │
-│  └───────┘           │Mappings│              │Invoice│              │
-│                      └───────┘              └───────┘              │
-│                           │                      │                 │
-│                           └──────────────────────┘                 │
-│                                    │                               │
-│                                    ▼                               │
-│                            ┌────────────┐                          │
-│                            │ PostgreSQL │ (Cloud)                  │
-│                            │  + SQLite  │ (Local)                  │
-│                            └────────────┘                          │
-└───────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    DATA FLOW OVERVIEW (Single API Architecture)          │
+│                                                                          │
+│   WEB-ADMIN          WEB-DASHBOARD              CCB                      │
+│      │                    │                      │                       │
+│      │ Create ports       │ 100% API calls       │ 100% API calls        │
+│      ▼                    │                      │                       │
+│  ┌───────┐                │                      │                       │
+│  │ Ports │                │                      │                       │
+│  └───────┘                │                      │                       │
+│                           │                      │                       │
+│                           ▼                      ▼                       │
+│                  ┌──────────────────────────────────────┐                │
+│                  │          API APP FOOD                 │                │
+│                  │     (Single Backend Service)          │                │
+│                  │                                       │                │
+│                  │  • Account Management                 │                │
+│                  │  • Store Mapping                      │                │
+│                  │  • Product Mapping                    │                │
+│                  │  • Order Polling & Sync               │                │
+│                  │  • Auto Confirm                       │                │
+│                  │  • Platform Connectors                │                │
+│                  │    (Grab, Shopee, BeFood)             │                │
+│                  │                                       │                │
+│                  └───────────────┬──────────────────────┘                │
+│                                  │                                       │
+│                                  ▼                                       │
+│                  ┌──────────────────────────────────────┐                │
+│                  │            PostgreSQL                 │                │
+│                  │  ├── food_platform_ports              │                │
+│                  │  ├── food_platform_accounts           │                │
+│                  │  ├── food_platform_store_mappings     │                │
+│                  │  ├── food_platform_product_mappings   │                │
+│                  │  └── food_orders                      │                │
+│                  └──────────────────────────────────────┘                │
+│                                  │                                       │
+│                                  │ Sync                                  │
+│                                  ▼                                       │
+│                  ┌──────────────────────────────────────┐                │
+│                  │     CCB SQLite (Local Storage)        │                │
+│                  │  ├── food_orders (cache)              │                │
+│                  │  └── invoices (local)                 │                │
+│                  └──────────────────────────────────────┘                │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Nguyên tắc API Architecture
+
+| Quy tắc | Mô tả |
+|---------|-------|
+| **Single API** | API App Food là backend duy nhất xử lý tất cả tính năng food platform |
+| **No Microservices** | Không có microservice khác tham gia vào luồng food platform |
+| **100% API Calls** | Web Dashboard và CCB chỉ gọi đến API App Food, không gọi API khác |
+| **Platform Connector** | API App Food chịu trách nhiệm gọi đến Merchant APIs (GrabFood, ShopeeFood, BeFood) |
+| **Data Consistency** | Tất cả dữ liệu food platform được quản lý tập trung trong PostgreSQL của API App Food |
 
 ## Tiếp theo
 

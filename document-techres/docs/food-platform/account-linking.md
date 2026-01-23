@@ -6,6 +6,10 @@ sidebar_position: 3
 
 Chi tiết về quy trình liên kết tài khoản merchant từ các food platform vào hệ thống TechRes.
 
+:::tip Quan trọng: Single API Architecture
+Tất cả API calls từ Web Dashboard và CCB đều đi qua **API App Food** duy nhất. API App Food sẽ gọi tiếp đến Merchant APIs (GrabFood, ShopeeFood, BeFood) để xác thực và lấy dữ liệu.
+:::
+
 ## Tổng quan
 
 Quy trình liên kết tài khoản gồm **2 bước chính**:
@@ -60,7 +64,7 @@ Chi tiết về mapping cửa hàng: [Mapping cửa hàng](./store-mapping.md)
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Step 2: API-Dashboard xử lý                                             │
+│  Step 2: API App Food xử lý                                             │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  POST /food-platforms/{id}/login                                 │    │
 │  │  Body: { username, password }                                    │    │

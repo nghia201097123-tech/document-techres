@@ -6,9 +6,17 @@ sidebar_position: 6
 
 Chi tiết về cơ chế polling đơn hàng từ các food platform về hệ thống TechRes.
 
+:::tip Quan trọng: Single API Architecture
+CCB gọi **100%** đến **API App Food** duy nhất. API App Food sẽ:
+1. Xác định stores đã mapping với branch
+2. Gọi đến Merchant APIs (GrabFood, ShopeeFood, BeFood) để lấy đơn hàng
+3. Sync dữ liệu vào PostgreSQL
+4. Trả kết quả về cho CCB
+:::
+
 ## Tổng quan
 
-CCB (Cash Control Box) sẽ **chủ động gọi API** xuống `api-dashboard` mỗi **5 giây** (configurable) để lấy đơn hàng mới từ các food platform.
+CCB (Cash Control Box) sẽ **chủ động gọi API App Food** mỗi **5 giây** (configurable) để lấy đơn hàng mới từ các food platform.
 
 :::info Store Mapping là bắt buộc
 Backend chỉ poll đơn hàng từ các **store đã được mapping** với chi nhánh. Nếu chưa mapping, sẽ không lấy được đơn hàng.
@@ -32,7 +40,7 @@ Chi tiết: [Mapping cửa hàng](./store-mapping.md)
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        API-DASHBOARD                                     │
+│                        API APP FOOD                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  FoodOrderPollingService                                         │    │
 │  │                                                                  │    │
@@ -72,7 +80,7 @@ class FoodOrderRepository @Inject constructor(
 ### Step 2: API-Dashboard xử lý
 
 ```typescript
-// api-dashboard/src/modules/food-orders/food-orders.controller.ts
+// API App Food/src/modules/food-orders/food-orders.controller.ts
 @Get('poll')
 async pollOrders(
   @Query('branchId') branchId: number,
@@ -359,7 +367,7 @@ async pollFromBeFood(account: FoodPlatformAccount, since?: number): Promise<RawF
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  API-DASHBOARD receives poll request                                     │
+│  API APP FOOD receives poll request                                     │
 │  Branch ID: 1                                                            │
 │  Connected accounts: [Grab #1, Grab #2, Shopee #1, BeFood #1]           │
 └─────────────────────────────────────────────────────────────────────────┘
