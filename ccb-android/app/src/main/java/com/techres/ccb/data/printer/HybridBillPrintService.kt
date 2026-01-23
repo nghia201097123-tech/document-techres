@@ -207,9 +207,13 @@ object HybridBillPrintService {
                 val bitmaps = generateSunmiBillBitmaps(effectiveConfig, template, billData, paymentBankAccount, payosQrCode)
                 Log.d(TAG, "Generated ${bitmaps.size} bitmaps for Sunmi")
 
+                // Sử dụng numberOfCopies từ config (user settings) thay vì template
+                val numberOfCopies = config.numberOfCopies
+                Log.d(TAG, "Config numberOfCopies: $numberOfCopies, cutPaper: ${config.cutPaper}")
+
                 // In từng bản
-                repeat(template.numberOfCopies) { copyIndex ->
-                    Log.d(TAG, "Printing copy ${copyIndex + 1}/${template.numberOfCopies} (native bitmap)...")
+                repeat(numberOfCopies) { copyIndex ->
+                    Log.d(TAG, "Printing copy ${copyIndex + 1}/$numberOfCopies (native bitmap)...")
 
                     // In từng bitmap
                     bitmaps.forEachIndexed { bitmapIndex, bitmap ->
@@ -229,11 +233,11 @@ object HybridBillPrintService {
                         }
                     }
 
-                    // Không cần feedPaper ở đây vì printBitmapViaTransact đã có lineWrap(3) + commit
+                    // Không cần feedPaper ở đây vì printBitmapViaTransact đã có lineWrap + commit
                     // adapter.feedPaper(3) - REMOVED to avoid double paper feeding
 
                     // Delay giữa các bản
-                    if (copyIndex < template.numberOfCopies - 1) {
+                    if (copyIndex < numberOfCopies - 1) {
                         delay(500)
                     }
                 }

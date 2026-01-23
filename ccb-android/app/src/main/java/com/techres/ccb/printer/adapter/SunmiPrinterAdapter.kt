@@ -1043,8 +1043,7 @@ class SunmiPrinterAdapter @Inject constructor(
                         replyParcel.readException()
                         Timber.d("$TAG: printBitmap transact($transactionCode) succeeded")
 
-                        // Add line wrap and commit buffer to actually execute printing
-                        lineWrapViaTransact(binder, 3)
+                        // Commit buffer to execute printing (không cần lineWrap - gây đẩy giấy thừa)
                         commitPrinterBufferViaTransact(binder)
 
                         // Recycle grayscale bitmap if it's a new one
