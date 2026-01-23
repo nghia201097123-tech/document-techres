@@ -98,6 +98,9 @@ export abstract class BasePlatformConnector implements IPlatformConnector {
     data?: unknown,
     params?: Record<string, unknown>,
   ): Promise<T> {
+    if (!account.accessToken) {
+      throw new Error('Account has no access token');
+    }
     this.setAuthHeader(account.accessToken);
     const response = await this.httpClient.request<T>({
       method,

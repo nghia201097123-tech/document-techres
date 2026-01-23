@@ -84,27 +84,27 @@ export class FoodPlatformAccount {
 
   // OTP session
   @Column({ type: 'varchar', length: 100, nullable: true, name: 'otp_session_id' })
-  otpSessionId: string;
+  otpSessionId: string | null;
 
   @Column({ type: 'timestamp', nullable: true, name: 'otp_expires_at' })
-  otpExpiresAt: Date;
+  otpExpiresAt: Date | null;
 
   // Tokens
   @Column({ type: 'text', nullable: true, name: 'access_token' })
-  accessToken: string;
+  accessToken: string | null;
 
   @Column({ type: 'text', nullable: true, name: 'refresh_token' })
-  refreshToken: string;
+  refreshToken: string | null;
 
   @Column({ type: 'timestamp', nullable: true, name: 'token_expires_at' })
-  tokenExpiresAt: Date;
+  tokenExpiresAt: Date | null;
 
   // External merchant info (from platform)
   @Column({ type: 'varchar', length: 100, nullable: true, name: 'external_merchant_id' })
-  externalMerchantId: string;
+  externalMerchantId: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'external_merchant_name' })
-  externalMerchantName: string;
+  externalMerchantName: string | null;
 
   // Status
   @Column({
@@ -139,7 +139,7 @@ export class FoodPlatformAccount {
   errorCount: number;
 
   @Column({ type: 'text', nullable: true, name: 'last_error' })
-  lastError: string;
+  lastError: string | null;
 
   // Timestamps
   @CreateDateColumn({ name: 'created_at' })

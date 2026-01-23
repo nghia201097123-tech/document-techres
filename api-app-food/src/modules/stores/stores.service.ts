@@ -11,7 +11,7 @@ import {
   FoodPlatformAccount,
   FoodPlatformType,
 } from '../../database/entities';
-import { ConnectorFactory } from '../connectors/connectors.module';
+import { ConnectorFactory, MerchantStore } from '../connectors';
 import {
   CreateStoreMappingsDto,
   UpdateStoreMappingDto,
@@ -203,12 +203,12 @@ export class StoresService {
     const connector = this.connectorFactory.getConnector(account.platform);
     const stores = await connector.getStores(account);
 
-    const store = stores.find((s) => s.externalStoreId === mapping.externalStoreId);
+    const store = stores.find((s: MerchantStore) => s.externalStoreId === mapping.externalStoreId);
 
     if (store) {
       mapping.externalStoreName = store.name;
-      mapping.externalStoreAddress = store.address;
-      mapping.externalStorePhone = store.phone;
+      mapping.externalStoreAddress = store.address ?? null;
+      mapping.externalStorePhone = store.phone ?? null;
       mapping.isStoreActive = store.isActive;
       mapping.lastSyncedAt = new Date();
     }

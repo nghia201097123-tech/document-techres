@@ -19,7 +19,7 @@ export class ShopeeConnector extends BasePlatformConnector {
   readonly platform = FoodPlatformType.SHOPEE_FOOD;
 
   constructor(configService: ConfigService) {
-    const baseUrl = configService.get<string>('platform.shopeeFood.baseUrl');
+    const baseUrl = configService.get<string>('platform.shopeeFood.baseUrl') || 'https://api.shopeefood.vn/merchant/v4';
     super(configService, baseUrl);
   }
 

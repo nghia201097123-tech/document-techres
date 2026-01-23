@@ -19,7 +19,7 @@ export class GrabConnector extends BasePlatformConnector {
   readonly platform = FoodPlatformType.GRAB;
 
   constructor(configService: ConfigService) {
-    const baseUrl = configService.get<string>('platform.grab.baseUrl');
+    const baseUrl = configService.get<string>('platform.grab.baseUrl') || 'https://api.grab.com/merchant/v2';
     super(configService, baseUrl);
   }
 

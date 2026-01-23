@@ -162,13 +162,13 @@ export class OrdersService {
         if (hasChanges) {
           existingOrder.previousStatus = existingOrder.status;
           existingOrder.status = rawOrder.status as FoodOrderStatus;
-          existingOrder.driverName = rawOrder.driverName;
-          existingOrder.driverPhone = rawOrder.driverPhone;
-          existingOrder.driverLicensePlate = rawOrder.driverLicensePlate;
-          existingOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime;
+          existingOrder.driverName = rawOrder.driverName ?? null;
+          existingOrder.driverPhone = rawOrder.driverPhone ?? null;
+          existingOrder.driverLicensePlate = rawOrder.driverLicensePlate ?? null;
+          existingOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime ?? null;
           existingOrder.platformUpdatedAt = rawOrder.updatedAt;
           existingOrder.lastSyncAt = new Date();
-          existingOrder.rawData = rawOrder.rawData;
+          existingOrder.rawData = rawOrder.rawData ?? null;
 
           await this.orderRepo.save(existingOrder);
           updatedOrders.push(existingOrder);

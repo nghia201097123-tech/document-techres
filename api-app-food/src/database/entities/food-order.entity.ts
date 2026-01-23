@@ -124,16 +124,16 @@ export class FoodOrder {
 
   // Driver info
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'driver_name' })
-  driverName: string;
+  driverName: string | null;
 
   @Column({ type: 'varchar', length: 20, nullable: true, name: 'driver_phone' })
-  driverPhone: string;
+  driverPhone: string | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true, name: 'driver_license_plate' })
-  driverLicensePlate: string;
+  driverLicensePlate: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'estimated_delivery_time' })
-  estimatedDeliveryTime: string;
+  estimatedDeliveryTime: string | null;
 
   // Processing flags
   @Column({ type: 'boolean', default: false, name: 'is_auto_confirmed' })
@@ -197,5 +197,5 @@ export class FoodOrder {
 
   // Raw data from platform (for debugging)
   @Column({ type: 'jsonb', nullable: true, name: 'raw_data' })
-  rawData: Record<string, unknown>;
+  rawData: Record<string, unknown> | null;
 }
