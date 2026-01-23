@@ -383,6 +383,12 @@ export class CreateBillTemplateDto {
 }
 
 export class UpdateBillTemplateDto extends CreateBillTemplateDto {
+  // Override branchId to make it optional for updates
+  @ApiPropertyOptional({ description: 'ID chi nhánh (không cần khi cập nhật)' })
+  @IsOptional()
+  @IsUUID('4', { message: 'branchId phải là UUID hợp lệ' })
+  branchId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
