@@ -229,8 +229,8 @@ object HybridBillPrintService {
                         }
                     }
 
-                    // Feed paper sau mỗi bản
-                    adapter.feedPaper(3)
+                    // Không cần feedPaper ở đây vì printBitmapViaTransact đã có lineWrap(3) + commit
+                    // adapter.feedPaper(3) - REMOVED to avoid double paper feeding
 
                     // Delay giữa các bản
                     if (copyIndex < template.numberOfCopies - 1) {
