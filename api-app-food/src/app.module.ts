@@ -16,6 +16,7 @@ import { AccountsModule } from './modules/accounts/accounts.module';
 import { StoresModule } from './modules/stores/stores.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
+import { SyncModule } from './modules/sync/sync.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ConnectorsModule } from './modules/connectors/connectors.module';
     AccountsModule,
     StoresModule,
     OrdersModule,
+    SyncModule,
   ],
 })
 export class AppModule {}

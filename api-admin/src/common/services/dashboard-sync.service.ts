@@ -90,11 +90,16 @@ export interface SyncFoodPlatformDto {
 export class DashboardSyncService {
   private readonly logger = new Logger(DashboardSyncService.name);
   private readonly dashboardApiUrl: string;
+  private readonly appFoodApiUrl: string;
 
   constructor(private readonly configService: ConfigService) {
     this.dashboardApiUrl = this.configService.get<string>(
       'DASHBOARD_API_URL',
       'http://localhost:4002',
+    );
+    this.appFoodApiUrl = this.configService.get<string>(
+      'API_APP_FOOD_URL',
+      'http://localhost:3010',
     );
   }
 
@@ -245,13 +250,13 @@ export class DashboardSyncService {
   }
 
   /**
-   * Sync a food platform account to dashboard API
+   * Sync a food platform account to api-app-food
    */
   async syncFoodPlatform(foodPlatform: SyncFoodPlatformDto): Promise<boolean> {
     try {
-      this.logger.log(`Syncing food platform: ${foodPlatform.name} (${foodPlatform.id})`);
+      this.logger.log(`Syncing food platform to api-app-food: ${foodPlatform.name} (${foodPlatform.id})`);
 
-      const response = await fetch(`${this.dashboardApiUrl}/api/sync/food-platform`, {
+      const response = await fetch(`${this.appFoodApiUrl}/api/sync/account`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -260,15 +265,15 @@ export class DashboardSyncService {
       });
 
       if (response.ok) {
-        this.logger.log(`✅ Food platform synced successfully: ${foodPlatform.name}`);
+        this.logger.log(`✅ Food platform synced to api-app-food successfully: ${foodPlatform.name}`);
         return true;
       } else {
         const error = await response.text();
-        this.logger.error(`❌ Food platform sync failed: ${response.status} - ${error}`);
+        this.logger.error(`❌ Food platform sync to api-app-food failed: ${response.status} - ${error}`);
         return false;
       }
     } catch (error: any) {
-      this.logger.error(`❌ Food platform sync error: ${error.message}`);
+      this.logger.error(`❌ Food platform sync to api-app-food error: ${error.message}`);
       return false;
     }
   }
