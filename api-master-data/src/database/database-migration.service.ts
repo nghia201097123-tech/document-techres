@@ -294,6 +294,9 @@ export class DatabaseMigrationService implements OnModuleInit {
       // Add label size config columns to kitchens table
       await this.addKitchenLabelSizeColumns(queryRunner);
 
+      // Migrate bill_templates from branch_id to brand_id
+      await this.migrateBillTemplatesBranchToBrand(queryRunner);
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
@@ -422,7 +425,7 @@ export class DatabaseMigrationService implements OnModuleInit {
         CREATE TABLE bill_templates (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           tenant_id VARCHAR(50) NOT NULL,
-          branch_id UUID NOT NULL,
+          brand_id UUID NOT NULL,
           name VARCHAR(100) NOT NULL,
           template_type VARCHAR(50) DEFAULT 'classic',
           description TEXT,
@@ -491,10 +494,67 @@ export class DatabaseMigrationService implements OnModuleInit {
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX idx_bill_templates_tenant ON bill_templates(tenant_id);
-        CREATE INDEX idx_bill_templates_branch ON bill_templates(branch_id);
-        CREATE INDEX idx_bill_templates_tenant_branch ON bill_templates(tenant_id, branch_id);
+        CREATE INDEX idx_bill_templates_brand ON bill_templates(brand_id);
+        CREATE INDEX idx_bill_templates_tenant_brand ON bill_templates(tenant_id, brand_id);
       `);
       this.logger.log('bill_templates table created successfully');
+    }
+  }
+
+  /**
+   * Migrate bill_templates table from branch_id to brand_id
+   * Bill templates are now built at brand level (shared across branches)
+   * Each branch's printer config selects which template to use
+   */
+  private async migrateBillTemplatesBranchToBrand(queryRunner: any): Promise<void> {
+    const exists = await this.tableExists(queryRunner, 'bill_templates');
+    if (!exists) {
+      return; // Table doesn't exist yet
+    }
+
+    // Check if branch_id column exists
+    const hasBranchId = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'bill_templates' AND column_name = 'branch_id'
+      );
+    `);
+
+    // Check if brand_id column exists
+    const hasBrandId = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'bill_templates' AND column_name = 'brand_id'
+      );
+    `);
+
+    if (hasBranchId[0].exists && !hasBrandId[0].exists) {
+      this.logger.log('Migrating bill_templates from branch_id to brand_id...');
+
+      // Drop old foreign key constraint if exists
+      try {
+        await queryRunner.query(`ALTER TABLE bill_templates DROP CONSTRAINT IF EXISTS "FK_bill_templates_branch"`);
+        await queryRunner.query(`ALTER TABLE bill_templates DROP CONSTRAINT IF EXISTS "fk_bill_templates_branch"`);
+        await queryRunner.query(`ALTER TABLE bill_templates DROP CONSTRAINT IF EXISTS "bill_templates_branch_id_fkey"`);
+      } catch (e) {
+        this.logger.warn('Could not drop old FK constraint (may not exist):', e.message);
+      }
+
+      // Rename column
+      await queryRunner.query(`ALTER TABLE bill_templates RENAME COLUMN branch_id TO brand_id`);
+
+      // Drop old indexes and create new ones
+      try {
+        await queryRunner.query(`DROP INDEX IF EXISTS idx_bill_templates_branch`);
+        await queryRunner.query(`DROP INDEX IF EXISTS idx_bill_templates_tenant_branch`);
+      } catch (e) {
+        this.logger.warn('Could not drop old indexes (may not exist):', e.message);
+      }
+
+      await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_bill_templates_brand ON bill_templates(brand_id)`);
+      await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_bill_templates_tenant_brand ON bill_templates(tenant_id, brand_id)`);
+
+      this.logger.log('bill_templates migrated from branch_id to brand_id successfully');
     }
   }
 

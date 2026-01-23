@@ -1416,6 +1416,60 @@ export class DatabaseMigrationService implements OnModuleInit {
         }
       }
 
+      // 46. Rename branch_id to brand_id in bill_templates table (bill templates are at brand level, not branch level)
+      if (hasBillTemplatesTable[0].exists) {
+        const hasBranchIdColumn = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_templates' AND column_name = 'branch_id'
+          );
+        `);
+
+        const hasBrandIdColumn = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_name = 'bill_templates' AND column_name = 'brand_id'
+          );
+        `);
+
+        if (hasBranchIdColumn[0].exists && !hasBrandIdColumn[0].exists) {
+          this.logger.log('Renaming branch_id to brand_id in bill_templates table...');
+
+          // Drop old foreign key constraint if exists
+          await queryRunner.query(`
+            ALTER TABLE bill_templates DROP CONSTRAINT IF EXISTS "FK_bill_templates_branch"
+          `);
+          await queryRunner.query(`
+            ALTER TABLE bill_templates DROP CONSTRAINT IF EXISTS "fk_bill_templates_branch"
+          `);
+          await queryRunner.query(`
+            ALTER TABLE bill_templates DROP CONSTRAINT IF EXISTS "bill_templates_branch_id_fkey"
+          `);
+
+          // Rename the column
+          await queryRunner.query(`
+            ALTER TABLE bill_templates RENAME COLUMN branch_id TO brand_id
+          `);
+
+          // Add new foreign key constraint to brands table
+          await queryRunner.query(`
+            ALTER TABLE bill_templates
+            ADD CONSTRAINT "FK_bill_templates_brand"
+            FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+          `);
+
+          // Update index (drop old, create new)
+          await queryRunner.query(`
+            DROP INDEX IF EXISTS idx_bill_templates_tenant_branch
+          `);
+          await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_bill_templates_tenant_brand ON bill_templates(tenant_id, brand_id)
+          `);
+
+          this.logger.log('bill_templates: branch_id renamed to brand_id successfully');
+        }
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
