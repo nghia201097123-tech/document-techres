@@ -1,0 +1,349 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
+import { BasePlatformConnector } from './base.connector';
+import {
+  LoginCredentials,
+  LoginResult,
+  OtpRequestResult,
+  MerchantStore,
+  RawFoodOrder,
+  OrderActionResult,
+} from './interfaces/connector.interface';
+
+/**
+ * GrabFood Platform Connector
+ */
+@Injectable()
+export class GrabConnector extends BasePlatformConnector {
+  readonly platform = FoodPlatformType.GRAB;
+
+  constructor(configService: ConfigService) {
+    const baseUrl = configService.get<string>('platform.grab.baseUrl');
+    super(configService, baseUrl);
+  }
+
+  /**
+   * Login with username/password
+   */
+  async login(credentials: LoginCredentials): Promise<LoginResult> {
+    try {
+      const clientId = this.configService.get<string>('platform.grab.clientId');
+      const clientSecret = this.configService.get<string>('platform.grab.clientSecret');
+
+      const response = await this.httpClient.post('/auth/login', {
+        username: credentials.username,
+        password: credentials.password,
+        client_id: clientId,
+        client_secret: clientSecret,
+      });
+
+      const data = response.data;
+
+      return {
+        success: true,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
+        merchantId: data.merchant_id,
+        merchantName: data.merchant_name,
+      };
+    } catch (error) {
+      this.logger.error('GrabFood login failed', error);
+      return {
+        success: false,
+        error: 'Đăng nhập thất bại',
+        errorCode: 'INVALID_CREDENTIALS',
+      };
+    }
+  }
+
+  /**
+   * Request OTP (Grab uses username/password, not OTP)
+   */
+  async requestOtp(_phoneNumber: string): Promise<OtpRequestResult> {
+    return {
+      success: false,
+      error: 'GrabFood không hỗ trợ đăng nhập bằng OTP',
+    };
+  }
+
+  /**
+   * Verify OTP (not supported)
+   */
+  async verifyOtp(_sessionId: string, _otp: string): Promise<LoginResult> {
+    return {
+      success: false,
+      error: 'GrabFood không hỗ trợ đăng nhập bằng OTP',
+    };
+  }
+
+  /**
+   * Refresh access token
+   */
+  async refreshToken(refreshToken: string): Promise<LoginResult> {
+    try {
+      const clientId = this.configService.get<string>('platform.grab.clientId');
+      const clientSecret = this.configService.get<string>('platform.grab.clientSecret');
+
+      const response = await this.httpClient.post('/auth/refresh', {
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      });
+
+      const data = response.data;
+
+      return {
+        success: true,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token || refreshToken,
+        expiresIn: data.expires_in,
+      };
+    } catch (error) {
+      this.logger.error('GrabFood refresh token failed', error);
+      return {
+        success: false,
+        error: 'Refresh token thất bại',
+        errorCode: 'TOKEN_REFRESH_FAILED',
+      };
+    }
+  }
+
+  /**
+   * Get list of merchant stores
+   */
+  async getStores(account: FoodPlatformAccount): Promise<MerchantStore[]> {
+    try {
+      const response = await this.authenticatedRequest<{ stores: any[] }>(
+        account,
+        'get',
+        '/stores',
+      );
+
+      return response.stores.map((store) => ({
+        externalStoreId: store.storeID,
+        name: store.name,
+        address: store.address?.fullAddress,
+        phone: store.phone,
+        isActive: store.status === 'ACTIVE',
+      }));
+    } catch (error) {
+      this.logger.error('GrabFood get stores failed', error);
+      return [];
+    }
+  }
+
+  /**
+   * Poll orders from a specific store
+   */
+  async pollOrders(
+    account: FoodPlatformAccount,
+    storeId: string,
+    since?: Date,
+  ): Promise<RawFoodOrder[]> {
+    try {
+      const params: Record<string, unknown> = {
+        storeID: storeId,
+        status: 'NEW,ACCEPTED,PREPARING,READY_FOR_PICKUP,DRIVER_ASSIGNED,DRIVER_ARRIVED,PICKED_UP',
+        limit: 50,
+      };
+
+      if (since) {
+        params.updatedSince = since.toISOString();
+      }
+
+      const response = await this.authenticatedRequest<{ orders: any[] }>(
+        account,
+        'get',
+        '/orders',
+        undefined,
+        params,
+      );
+
+      return response.orders.map((order) => this.transformOrder(order));
+    } catch (error) {
+      this.logger.error('GrabFood poll orders failed', error);
+      return [];
+    }
+  }
+
+  /**
+   * Transform Grab order to standard format
+   */
+  private transformOrder(grabOrder: any): RawFoodOrder {
+    return {
+      externalOrderId: grabOrder.orderID,
+      orderCode: `#GR${grabOrder.shortOrderNumber || grabOrder.orderID.slice(-6)}`,
+      platform: FoodPlatformType.GRAB,
+      status: this.mapStatus(grabOrder.state),
+
+      customerName: grabOrder.receiver?.name || 'Khách hàng',
+      customerPhone: grabOrder.receiver?.phone || '',
+      customerAddress: grabOrder.receiver?.address?.fullAddress,
+      customerNote: grabOrder.specialInstruction,
+
+      items: (grabOrder.items || []).map((item: any) => ({
+        productName: item.name,
+        quantity: item.quantity,
+        unitPrice: item.price?.value || 0,
+        totalPrice: item.totalPrice?.value || 0,
+        note: item.specialInstruction,
+        options: item.modifiers?.map((m: any) => m.name).join(', '),
+        externalProductId: item.itemID,
+      })),
+
+      subtotal: grabOrder.price?.subtotal?.value || 0,
+      deliveryFee: grabOrder.price?.deliveryFee?.value || 0,
+      platformFee: grabOrder.price?.serviceFee?.value || 0,
+      discount: grabOrder.price?.discount?.value || 0,
+      totalAmount: grabOrder.price?.total?.value || 0,
+
+      isPaid: grabOrder.paymentType !== 'CASH',
+      paymentMethod: grabOrder.paymentType,
+
+      driverName: grabOrder.driver?.name,
+      driverPhone: grabOrder.driver?.phone,
+      driverLicensePlate: grabOrder.driver?.licensePlate,
+      estimatedDeliveryTime: grabOrder.estimatedPickupTime,
+
+      createdAt: new Date(grabOrder.createdAt),
+      updatedAt: new Date(grabOrder.updatedAt),
+
+      rawData: grabOrder,
+    };
+  }
+
+  /**
+   * Map Grab status to standard status
+   */
+  private mapStatus(grabState: string): string {
+    const statusMap: Record<string, string> = {
+      NEW: FoodOrderStatus.NEW,
+      ACCEPTED: FoodOrderStatus.ACCEPTED,
+      PREPARING: FoodOrderStatus.PREPARING,
+      READY_FOR_PICKUP: FoodOrderStatus.READY,
+      DRIVER_ASSIGNED: FoodOrderStatus.DELIVERING,
+      DRIVER_ARRIVED: FoodOrderStatus.DELIVERING,
+      PICKED_UP: FoodOrderStatus.DELIVERING,
+      DELIVERED: FoodOrderStatus.COMPLETED,
+      CANCELLED: FoodOrderStatus.CANCELLED,
+    };
+    return statusMap[grabState] || FoodOrderStatus.NEW;
+  }
+
+  /**
+   * Accept/Confirm an order
+   */
+  async acceptOrder(
+    account: FoodPlatformAccount,
+    orderId: string,
+  ): Promise<OrderActionResult> {
+    try {
+      await this.authenticatedRequest(
+        account,
+        'post',
+        `/orders/${orderId}/accept`,
+      );
+
+      return {
+        success: true,
+        orderId,
+        newStatus: FoodOrderStatus.ACCEPTED,
+      };
+    } catch (error) {
+      this.logger.error(`GrabFood accept order ${orderId} failed`, error);
+      return {
+        success: false,
+        orderId,
+        error: 'Xác nhận đơn hàng thất bại',
+      };
+    }
+  }
+
+  /**
+   * Mark order as ready for pickup
+   */
+  async markReady(
+    account: FoodPlatformAccount,
+    orderId: string,
+  ): Promise<OrderActionResult> {
+    try {
+      await this.authenticatedRequest(
+        account,
+        'post',
+        `/orders/${orderId}/ready`,
+      );
+
+      return {
+        success: true,
+        orderId,
+        newStatus: FoodOrderStatus.READY,
+      };
+    } catch (error) {
+      this.logger.error(`GrabFood mark ready ${orderId} failed`, error);
+      return {
+        success: false,
+        orderId,
+        error: 'Đánh dấu sẵn sàng thất bại',
+      };
+    }
+  }
+
+  /**
+   * Complete an order
+   */
+  async completeOrder(
+    account: FoodPlatformAccount,
+    orderId: string,
+  ): Promise<OrderActionResult> {
+    try {
+      await this.authenticatedRequest(
+        account,
+        'post',
+        `/orders/${orderId}/complete`,
+      );
+
+      return {
+        success: true,
+        orderId,
+        newStatus: FoodOrderStatus.COMPLETED,
+      };
+    } catch (error) {
+      this.logger.error(`GrabFood complete order ${orderId} failed`, error);
+      return {
+        success: false,
+        orderId,
+        error: 'Hoàn tất đơn hàng thất bại',
+      };
+    }
+  }
+
+  /**
+   * Cancel an order
+   */
+  async cancelOrder(
+    account: FoodPlatformAccount,
+    orderId: string,
+    reason: string,
+  ): Promise<OrderActionResult> {
+    try {
+      await this.authenticatedRequest(account, 'post', `/orders/${orderId}/cancel`, {
+        reason,
+      });
+
+      return {
+        success: true,
+        orderId,
+        newStatus: FoodOrderStatus.CANCELLED,
+      };
+    } catch (error) {
+      this.logger.error(`GrabFood cancel order ${orderId} failed`, error);
+      return {
+        success: false,
+        orderId,
+        error: 'Hủy đơn hàng thất bại',
+      };
+    }
+  }
+}
