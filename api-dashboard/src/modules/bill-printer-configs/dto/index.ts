@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
 import { PrinterConnectionType } from '../../../database/entities/bill-printer-config.entity';
 
@@ -112,7 +112,11 @@ export class CreateBillPrinterConfigDto {
   sortOrder?: number;
 }
 
-export class UpdateBillPrinterConfigDto extends CreateBillPrinterConfigDto {
+/**
+ * UpdateBillPrinterConfigDto - Sử dụng PartialType để tất cả fields trở thành optional
+ * Điều này fix lỗi "branchId must be a string" khi cập nhật printer config
+ */
+export class UpdateBillPrinterConfigDto extends PartialType(CreateBillPrinterConfigDto) {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
