@@ -27,8 +27,8 @@ export class ProxyController {
     }
 
     try {
-      // Extract path after /api prefix (without query string)
-      const fullPath = req.originalUrl.replace(/^\/api/, '');
+      // Extract path (keep /api prefix, remove query string)
+      const fullPath = req.originalUrl;
       const path = fullPath.split('?')[0]; // Remove query string from path
 
       // Determine which backend service to use based on path

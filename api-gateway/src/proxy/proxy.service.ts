@@ -144,66 +144,72 @@ export class ProxyService {
 
   determineService(path: string): { service: BackendService; adjustedPath: string } {
     // Routes for Socket.IO events -> socket-service
-    // /socket/* -> socket-service /*
-    if (path.startsWith('/socket/')) {
-      const socketPath = path.replace(/^\/socket/, '');
+    // /api/socket/* -> socket-service /*
+    if (path.startsWith('/api/socket/') || path.startsWith('/socket/')) {
+      const socketPath = path.replace(/^\/api\/socket/, '').replace(/^\/socket/, '');
       return { service: BackendService.SOCKET, adjustedPath: socketPath };
     }
 
     // Routes for PayOS webhooks -> webhook-service
-    // /webhook/payos/* -> webhook-service /webhook/payos/*
-    if (path.startsWith('/webhook/payos') || path.startsWith('/payos/webhook')) {
-      const webhookPath = path.replace(/^\/payos\/webhook/, '/webhook/payos');
+    // /api/webhook/payos/* -> webhook-service /webhook/payos/*
+    if (path.startsWith('/api/webhook/payos') || path.startsWith('/webhook/payos') || path.startsWith('/payos/webhook')) {
+      const webhookPath = path.replace(/^\/api/, '').replace(/^\/payos\/webhook/, '/webhook/payos');
       return { service: BackendService.WEBHOOK, adjustedPath: webhookPath };
     }
 
     // Routes for PayOS payments (api-dashboard)
-    // /v1/payos/* or /payos/* -> api-dashboard /payos/*
-    // /pos/payos/* -> api-dashboard /payos/* (POS app PayOS requests)
-    if (path.startsWith('/v1/payos/') || path.startsWith('/payos/') || path === '/v1/payos' || path === '/payos') {
-      const payosPath = path.replace(/^\/v1\/payos/, '/payos');
+    // /api/v1/payos/* or /api/payos/* -> api-dashboard /payos/*
+    if (path.startsWith('/api/v1/payos') || path.startsWith('/api/payos') || path.startsWith('/v1/payos') || path.startsWith('/payos')) {
+      const payosPath = path.replace(/^\/api\/v1\/payos/, '/payos').replace(/^\/api\/payos/, '/payos').replace(/^\/v1\/payos/, '/payos');
       return { service: BackendService.DASHBOARD, adjustedPath: payosPath };
     }
 
-    // POS app PayOS requests: /pos/payos/* -> api-dashboard /payos/*
-    if (path.startsWith('/pos/payos/') || path === '/pos/payos') {
-      const payosPath = path.replace(/^\/pos\/payos/, '/payos');
+    // POS app PayOS requests: /api/pos/payos/* -> api-dashboard /payos/*
+    if (path.startsWith('/api/pos/payos') || path.startsWith('/pos/payos')) {
+      const payosPath = path.replace(/^\/api\/pos\/payos/, '/payos').replace(/^\/pos\/payos/, '/payos');
       return { service: BackendService.DASHBOARD, adjustedPath: payosPath };
     }
 
     // Routes for OAuth authentication (api-oauth)
-    // /auth/* -> api-oauth /api/v1/auth/*
-    if (path.startsWith('/auth/') || path.startsWith('/api/auth/')) {
-      const authPath = path.replace(/^\/api\/auth/, '/auth').replace(/^\/auth/, '/api/v1/auth');
+    // /api/auth/* -> api-oauth /api/v1/auth/*
+    if (path.startsWith('/api/auth/') || path.startsWith('/auth/')) {
+      const authPath = path.replace(/^\/api\/auth/, '/api/v1/auth').replace(/^\/auth/, '/api/v1/auth');
       return { service: BackendService.OAUTH, adjustedPath: authPath };
     }
 
     // Routes for tenant dashboard (api-dashboard)
-    // /tenant/auth/* -> api-oauth (tenant authentication)
-    if (path.startsWith('/tenant/auth/') || path.startsWith('/api/tenant/auth/')) {
-      const authPath = path.replace(/^\/api\/tenant\/auth/, '/auth').replace(/^\/tenant\/auth/, '/api/v1/auth');
+    // /api/tenant/auth/* -> api-oauth (tenant authentication)
+    if (path.startsWith('/api/tenant/auth/') || path.startsWith('/tenant/auth/')) {
+      const authPath = path.replace(/^\/api\/tenant\/auth/, '/api/v1/auth').replace(/^\/tenant\/auth/, '/api/v1/auth');
       return { service: BackendService.OAUTH, adjustedPath: authPath };
     }
 
-    if (path.startsWith('/tenant/') || path.startsWith('/api/tenant/')) {
+    // /api/tenant/* -> api-dashboard /api/*
+    if (path.startsWith('/api/tenant/') || path.startsWith('/tenant/')) {
       const adjustedPath = path.replace(/^\/api\/tenant/, '/api').replace(/^\/tenant/, '/api');
       return { service: BackendService.DASHBOARD, adjustedPath };
     }
 
     // Routes for POS/CCB app (api-master-data)
-    // /pos/* -> api-master-data /api/v1/*
-    if (path.startsWith('/pos/') || path.startsWith('/api/pos/')) {
+    // /api/pos/* -> api-master-data /api/v1/*
+    if (path.startsWith('/api/pos/') || path.startsWith('/pos/')) {
       const adjustedPath = path.replace(/^\/api\/pos/, '/api/v1').replace(/^\/pos/, '/api/v1');
       return { service: BackendService.MASTER_DATA, adjustedPath };
     }
 
-    // Routes for admin (api-admin) - default
-    if (path.startsWith('/admin/') || path.startsWith('/api/admin/')) {
+    // Routes for admin (api-admin) - explicit /api/admin/* prefix
+    if (path.startsWith('/api/admin/') || path.startsWith('/admin/')) {
       const adjustedPath = path.replace(/^\/api\/admin/, '/api').replace(/^\/admin/, '/api');
       return { service: BackendService.ADMIN, adjustedPath };
     }
 
-    // Default to admin for backward compatibility
-    return { service: BackendService.ADMIN, adjustedPath: path };
+    // Default to admin for /api/* routes (api-admin has /api prefix)
+    // /api/companies -> api-admin /api/companies
+    if (path.startsWith('/api/')) {
+      return { service: BackendService.ADMIN, adjustedPath: path };
+    }
+
+    // Fallback: add /api prefix for backward compatibility
+    return { service: BackendService.ADMIN, adjustedPath: `/api${path}` };
   }
 }
