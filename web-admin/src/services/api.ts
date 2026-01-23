@@ -1,7 +1,8 @@
 import axios from "axios";
 
 // API Gateway URL - use environment variable for production deployment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api";
+// Default to api-gateway (port 4000) which routes to appropriate backend services
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 console.log("[API] Base URL:", API_BASE_URL);
 
