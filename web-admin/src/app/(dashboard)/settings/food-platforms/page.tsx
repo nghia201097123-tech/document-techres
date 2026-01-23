@@ -143,14 +143,9 @@ export default function FoodPlatformsPage() {
     return accounts.filter((acc) => acc.branchId === branchId);
   };
 
-  // Check if a platform exists for a branch
-  const hasPlatform = (branchId: string, platform: FoodPlatformType) => {
-    return accounts.some((acc) => acc.branchId === branchId && acc.platform === platform);
-  };
-
-  // Get account for a specific branch and platform
-  const getAccount = (branchId: string, platform: FoodPlatformType) => {
-    return accounts.find((acc) => acc.branchId === branchId && acc.platform === platform);
+  // Get all accounts for a specific branch and platform
+  const getAccountsForPlatform = (branchId: string, platform: FoodPlatformType) => {
+    return accounts.filter((acc) => acc.branchId === branchId && acc.platform === platform);
   };
 
   // Filter branches by search
@@ -280,8 +275,63 @@ export default function FoodPlatformsPage() {
     }
   };
 
-  // Platform button component
-  const PlatformButton = ({
+  // Single account button with dropdown menu
+  const AccountButton = ({
+    account,
+    platformName,
+    color,
+    showShopNumber,
+  }: {
+    account: FoodPlatformAccount;
+    platformName: string;
+    color: string;
+    showShopNumber: boolean;
+  }) => {
+    const displayName = showShopNumber ? `${platformName} #${account.shopNumber}` : platformName;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "gap-2",
+              account.isActive ? "border-green-500 bg-green-50" : "border-gray-300 bg-gray-50"
+            )}
+          >
+            <div className={cn("w-2 h-2 rounded-full", color)} />
+            {displayName}
+            {account.isActive ? (
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+            ) : (
+              <Circle className="h-3 w-3 text-gray-400" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={() => handleOpenEdit(account)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Chỉnh sửa
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleToggleActive(account)}>
+            <Power className="mr-2 h-4 w-4" />
+            {account.isActive ? "Tạm dừng" : "Kích hoạt"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => handleOpenDelete(account)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Xóa
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  // Platform buttons component - shows all accounts for a platform and add button
+  const PlatformButtons = ({
     branch,
     platform,
     platformName,
@@ -292,64 +342,38 @@ export default function FoodPlatformsPage() {
     platformName: string;
     color: string;
   }) => {
-    const account = getAccount(branch.id, platform);
-    const exists = !!account;
-
-    if (exists) {
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                "gap-2",
-                account.isActive ? "border-green-500 bg-green-50" : "border-gray-300 bg-gray-50"
-              )}
-            >
-              <div className={cn("w-2 h-2 rounded-full", color)} />
-              {platformName}
-              {account.isActive ? (
-                <CheckCircle2 className="h-3 w-3 text-green-500" />
-              ) : (
-                <Circle className="h-3 w-3 text-gray-400" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => handleOpenEdit(account)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Chỉnh sửa
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggleActive(account)}>
-              <Power className="mr-2 h-4 w-4" />
-              {account.isActive ? "Tạm dừng" : "Kích hoạt"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => handleOpenDelete(account)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Xóa
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
+    const platformAccounts = getAccountsForPlatform(branch.id, platform);
+    const hasAccounts = platformAccounts.length > 0;
 
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2 border-dashed"
-        onClick={() => handleCreatePlatform(branch, platform)}
-        disabled={saving}
-      >
-        <div className={cn("w-2 h-2 rounded-full", color, "opacity-50")} />
-        {platformName}
-        <Plus className="h-3 w-3 text-muted-foreground" />
-      </Button>
+      <div className="flex items-center gap-1">
+        {/* Show existing accounts */}
+        {platformAccounts.map((account) => (
+          <AccountButton
+            key={account.id}
+            account={account}
+            platformName={platformName}
+            color={color}
+            showShopNumber={platformAccounts.length > 1}
+          />
+        ))}
+        {/* Add new button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "gap-2 border-dashed",
+            hasAccounts && "px-2"
+          )}
+          onClick={() => handleCreatePlatform(branch, platform)}
+          disabled={saving}
+          title={`Thêm ${platformName}`}
+        >
+          {!hasAccounts && <div className={cn("w-2 h-2 rounded-full", color, "opacity-50")} />}
+          {!hasAccounts && platformName}
+          <Plus className="h-3 w-3 text-muted-foreground" />
+        </Button>
+      </div>
     );
   };
 
@@ -456,9 +480,6 @@ export default function FoodPlatformsPage() {
             <div className="space-y-4">
               {filteredBranches.map((branch) => {
                 const branchAccounts = getAccountsForBranch(branch.id);
-                const allPlatformsExist = ALL_PLATFORMS.every((p) =>
-                  hasPlatform(branch.id, p.type)
-                );
 
                 return (
                   <div
@@ -472,14 +493,14 @@ export default function FoodPlatformsPage() {
                       <div>
                         <p className="font-medium">{branch.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {branch.code} • {branchAccounts.length}/3 cổng
+                          {branch.code} • {branchAccounts.length} cổng
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {ALL_PLATFORMS.map((p) => (
-                        <PlatformButton
+                        <PlatformButtons
                           key={p.type}
                           branch={branch}
                           platform={p.type}
@@ -487,18 +508,17 @@ export default function FoodPlatformsPage() {
                           color={p.color}
                         />
                       ))}
-                      {!allPlatformsExist && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="ml-2"
-                          onClick={() => handleCreateAllPlatforms(branch)}
-                          disabled={saving}
-                        >
-                          <Zap className="mr-1 h-3 w-3" />
-                          Tạo tất cả
-                        </Button>
-                      )}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="ml-2"
+                        onClick={() => handleCreateAllPlatforms(branch)}
+                        disabled={saving}
+                        title="Thêm 3 cổng mới (Grab, BeFood, Shopee)"
+                      >
+                        <Zap className="mr-1 h-3 w-3" />
+                        +3 cổng
+                      </Button>
                     </div>
                   </div>
                 );

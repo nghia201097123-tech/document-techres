@@ -74,20 +74,15 @@ export class FoodPlatformsService {
    * Tạo cổng kết nối mới (chưa có thông tin đăng nhập)
    */
   async create(tenantId: string, dto: CreateFoodPlatformDto) {
-    // Check duplicate
-    const existing = await this.accountRepo.findOne({
+    // Tính shopNumber tiếp theo cho platform này trong branch
+    const existingCount = await this.accountRepo.count({
       where: {
         tenantId,
         branchId: dto.branchId,
         platform: dto.platform,
       },
     });
-
-    if (existing) {
-      throw new ConflictException(
-        `Chi nhánh này đã có kết nối với ${this.getPlatformLabel(dto.platform)}`,
-      );
-    }
+    const shopNumber = existingCount + 1;
 
     // Determine auth type based on platform
     const authType = this.getAuthType(dto.platform);
@@ -96,6 +91,7 @@ export class FoodPlatformsService {
       tenantId,
       ...dto,
       authType,
+      shopNumber,
       status: FoodPlatformStatus.PENDING,
     });
 

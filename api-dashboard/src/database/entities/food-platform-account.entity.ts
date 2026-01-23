@@ -41,7 +41,6 @@ export enum FoodPlatformStatus {
 @Entity('food_platform_accounts')
 @Index('idx_food_platform_tenant', ['tenantId'])
 @Index('idx_food_platform_branch', ['branchId'])
-@Index('idx_food_platform_unique', ['branchId', 'platform'], { unique: true })
 export class FoodPlatformAccount {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -164,6 +163,10 @@ export class FoodPlatformAccount {
   // Dữ liệu bổ sung từ platform (JSON)
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
+
+  // Số thứ tự cửa hàng trong cùng platform (cho phép nhiều cổng)
+  @Column({ name: 'shop_number', type: 'int', default: 1 })
+  shopNumber: number;
 
   // Thứ tự hiển thị
   @Column({ name: 'sort_order', type: 'int', default: 0 })

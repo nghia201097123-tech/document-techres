@@ -167,6 +167,10 @@ export class FoodPlatformAccount {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 
+  // Số thứ tự cửa hàng trong cùng platform (cho phép nhiều cổng)
+  @Column({ name: 'shop_number', type: 'int', default: 1 })
+  shopNumber: number;
+
   // Thứ tự hiển thị
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;

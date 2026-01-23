@@ -106,6 +106,7 @@ export interface FoodPlatformAccount {
   lastPollAt?: string;
   errorCount: number;
   lastError?: string;
+  shopNumber: number;
   sortOrder: number;
   isActive: boolean;
   createdAt: string;

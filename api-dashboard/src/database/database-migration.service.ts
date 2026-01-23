@@ -1543,6 +1543,36 @@ export class DatabaseMigrationService implements OnModuleInit {
         this.logger.log('Food platform accounts table created successfully');
       }
 
+      // 48. Update food_platform_accounts to allow multiple ports per platform per branch
+      const hasShopNumber = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns
+          WHERE table_name = 'food_platform_accounts' AND column_name = 'shop_number'
+        );
+      `);
+
+      if (!hasShopNumber[0].exists) {
+        this.logger.log('Updating food_platform_accounts to allow multiple ports...');
+
+        // Drop the unique index that prevents multiple ports
+        await queryRunner.query(`
+          DROP INDEX IF EXISTS idx_food_platform_unique
+        `);
+
+        // Add shop_number column
+        await queryRunner.query(`
+          ALTER TABLE food_platform_accounts
+          ADD COLUMN IF NOT EXISTS shop_number INTEGER DEFAULT 1
+        `);
+
+        // Create a non-unique index for performance
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS idx_food_platform_branch_platform ON food_platform_accounts(branch_id, platform)
+        `);
+
+        this.logger.log('food_platform_accounts updated to allow multiple ports per platform');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);

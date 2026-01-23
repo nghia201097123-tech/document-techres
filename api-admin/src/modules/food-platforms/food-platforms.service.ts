@@ -33,7 +33,7 @@ export class FoodPlatformsService {
       .addOrderBy('fp.createdAt', 'DESC');
 
     if (tenantId) {
-      query.where('fp.tenantId = :tenantId', { tenantId });
+      query.where('fp.tenantId = :tenantId', { tenantId: tenantId.toUpperCase() });
     }
 
     return query.getMany();
@@ -54,7 +54,7 @@ export class FoodPlatformsService {
    */
   async findByCompany(companyCode: string): Promise<FoodPlatformAccount[]> {
     return this.foodPlatformRepo.find({
-      where: { tenantId: companyCode },
+      where: { tenantId: companyCode.toUpperCase() },
       relations: ['branch'],
       order: { sortOrder: 'ASC', createdAt: 'DESC' },
     });
@@ -90,28 +90,24 @@ export class FoodPlatformsService {
       throw new NotFoundException(`Không tìm thấy chi nhánh với ID: ${dto.branchId}`);
     }
 
-    // Kiểm tra không trùng platform cho cùng branch
-    const existing = await this.foodPlatformRepo.findOne({
+    // Tính shopNumber tiếp theo cho platform này trong branch
+    const existingCount = await this.foodPlatformRepo.count({
       where: {
         branchId: dto.branchId,
         platform: dto.platform,
       },
     });
-
-    if (existing) {
-      throw new ConflictException(
-        `Chi nhánh này đã có cổng kết nối ${this.getPlatformName(dto.platform)}`,
-      );
-    }
+    const shopNumber = existingCount + 1;
 
     // Xác định auth type dựa trên platform
     const authType = dto.authType || this.getDefaultAuthType(dto.platform);
 
-    // Tạo cổng kết nối
+    // Tạo cổng kết nối (tenantId uppercase để khớp với api-dashboard)
     const account = this.foodPlatformRepo.create({
       ...dto,
-      tenantId: branch.brand.company.code,
+      tenantId: branch.brand.company.code.toUpperCase(),
       authType,
+      shopNumber,
     });
 
     return this.foodPlatformRepo.save(account);
@@ -147,6 +143,7 @@ export class FoodPlatformsService {
 
   /**
    * Tạo cổng kết nối cho tất cả platforms cho một branch
+   * Mỗi platform sẽ được tạo 1 cổng mới (shop #1, #2, ...)
    */
   async createAllPlatformsForBranch(branchId: string): Promise<FoodPlatformAccount[]> {
     const branch = await this.branchRepo.findOne({
@@ -162,22 +159,22 @@ export class FoodPlatformsService {
     const results: FoodPlatformAccount[] = [];
 
     for (const platform of platforms) {
-      // Kiểm tra đã tồn tại chưa
-      const existing = await this.foodPlatformRepo.findOne({
+      // Tính shopNumber tiếp theo
+      const existingCount = await this.foodPlatformRepo.count({
         where: { branchId, platform },
       });
+      const shopNumber = existingCount + 1;
 
-      if (!existing) {
-        const account = this.foodPlatformRepo.create({
-          branchId,
-          tenantId: branch.brand.company.code,
-          name: `${this.getPlatformName(platform)} - ${branch.name}`,
-          platform,
-          authType: this.getDefaultAuthType(platform),
-        });
+      const account = this.foodPlatformRepo.create({
+        branchId,
+        tenantId: branch.brand.company.code.toUpperCase(),
+        name: `${this.getPlatformName(platform)} #${shopNumber} - ${branch.name}`,
+        platform,
+        authType: this.getDefaultAuthType(platform),
+        shopNumber,
+      });
 
-        results.push(await this.foodPlatformRepo.save(account));
-      }
+      results.push(await this.foodPlatformRepo.save(account));
     }
 
     return results;
