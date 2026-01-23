@@ -66,7 +66,7 @@ export class BillPrinterConfig {
   @Column({ name: 'template_id', nullable: true })
   templateId: string;
 
-  @ManyToOne(() => BillTemplate, { nullable: true })
+  @ManyToOne(() => BillTemplate, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'template_id' })
   template: BillTemplate;
 

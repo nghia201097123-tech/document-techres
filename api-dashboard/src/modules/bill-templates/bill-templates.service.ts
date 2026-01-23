@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BillTemplate } from '../../database/entities';
+import { BillTemplate, BillPrinterConfig } from '../../database/entities';
 import { CreateBillTemplateDto, UpdateBillTemplateDto } from './dto';
 
 @Injectable()
@@ -9,6 +9,8 @@ export class BillTemplatesService {
   constructor(
     @InjectRepository(BillTemplate)
     private readonly repository: Repository<BillTemplate>,
+    @InjectRepository(BillPrinterConfig)
+    private readonly printerConfigRepository: Repository<BillPrinterConfig>,
   ) {}
 
   /**
@@ -85,7 +87,31 @@ export class BillTemplatesService {
 
   async delete(tenantId: string, id: string) {
     const template = await this.findOne(tenantId, id);
+
+    // Kiểm tra nếu là mẫu mặc định
+    if (template.isDefault) {
+      throw new BadRequestException(
+        'Không thể xóa mẫu bill mặc định. Vui lòng đặt mẫu khác làm mặc định trước khi xóa.'
+      );
+    }
+
+    // Kiểm tra nếu đang được sử dụng bởi printer config
+    const usedByConfigs = await this.printerConfigRepository.count({
+      where: { tenantId, templateId: id },
+    });
+
+    if (usedByConfigs > 0) {
+      // Tự động cập nhật các printer config để không còn reference đến template này
+      await this.printerConfigRepository.update(
+        { tenantId, templateId: id },
+        { templateId: null }
+      );
+    }
+
     await this.repository.remove(template);
-    return { message: 'Đã xóa mẫu bill' };
+    return {
+      message: 'Đã xóa mẫu bill',
+      updatedConfigs: usedByConfigs > 0 ? usedByConfigs : undefined
+    };
   }
 }
