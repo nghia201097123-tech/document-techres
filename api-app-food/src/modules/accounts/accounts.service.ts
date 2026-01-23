@@ -92,7 +92,7 @@ export class AccountsService {
 
     if (!result.success) {
       account.status = AccountStatus.ERROR;
-      account.lastError = result.error;
+      account.lastError = result.error ?? null;
       account.errorCount += 1;
       await this.accountRepo.save(account);
 
@@ -100,13 +100,13 @@ export class AccountsService {
     }
 
     // Update account with tokens
-    account.accessToken = result.accessToken;
-    account.refreshToken = result.refreshToken;
+    account.accessToken = result.accessToken ?? null;
+    account.refreshToken = result.refreshToken ?? null;
     account.tokenExpiresAt = result.expiresIn
       ? new Date(Date.now() + result.expiresIn * 1000)
       : null;
-    account.externalMerchantId = result.merchantId;
-    account.externalMerchantName = result.merchantName;
+    account.externalMerchantId = result.merchantId ?? null;
+    account.externalMerchantName = result.merchantName ?? null;
     account.status = AccountStatus.CONNECTED;
     account.isActive = true;
     account.errorCount = 0;
@@ -138,7 +138,7 @@ export class AccountsService {
     }
 
     // Save OTP session
-    account.otpSessionId = result.sessionId;
+    account.otpSessionId = result.sessionId ?? null;
     account.otpExpiresAt = new Date(Date.now() + (result.expiresIn || 300) * 1000);
     await this.accountRepo.save(account);
 
@@ -173,15 +173,15 @@ export class AccountsService {
 
     if (!result.success) {
       account.errorCount += 1;
-      account.lastError = result.error;
+      account.lastError = result.error ?? null;
       await this.accountRepo.save(account);
 
       throw new BadRequestException(result.error || 'Mã OTP không chính xác');
     }
 
     // Update tokens
-    account.accessToken = result.accessToken;
-    account.refreshToken = result.refreshToken;
+    account.accessToken = result.accessToken ?? null;
+    account.refreshToken = result.refreshToken ?? null;
     account.tokenExpiresAt = result.expiresIn
       ? new Date(Date.now() + result.expiresIn * 1000)
       : null;
@@ -281,8 +281,8 @@ export class AccountsService {
       const result = await connector.refreshToken(account.refreshToken);
 
       if (result.success) {
-        account.accessToken = result.accessToken;
-        account.refreshToken = result.refreshToken || account.refreshToken;
+        account.accessToken = result.accessToken ?? null;
+        account.refreshToken = result.refreshToken ?? account.refreshToken;
         account.tokenExpiresAt = result.expiresIn
           ? new Date(Date.now() + result.expiresIn * 1000)
           : null;
@@ -292,7 +292,7 @@ export class AccountsService {
       } else {
         account.status = AccountStatus.DISCONNECTED;
         account.isActive = false;
-        account.lastError = result.error;
+        account.lastError = result.error ?? null;
         account.errorCount += 1;
         await this.accountRepo.save(account);
         return false;

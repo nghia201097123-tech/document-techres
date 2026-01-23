@@ -46,10 +46,10 @@ export class FoodPlatformStoreMapping {
   externalStoreName: string; // Tên cửa hàng trên platform
 
   @Column({ type: 'text', nullable: true, name: 'external_store_address' })
-  externalStoreAddress: string;
+  externalStoreAddress: string | null;
 
   @Column({ type: 'varchar', length: 20, nullable: true, name: 'external_store_phone' })
-  externalStorePhone: string;
+  externalStorePhone: string | null;
 
   @Column({ type: 'boolean', default: true, name: 'is_store_active' })
   isStoreActive: boolean; // Trạng thái trên platform

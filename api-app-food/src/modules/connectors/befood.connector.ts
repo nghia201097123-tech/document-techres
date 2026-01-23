@@ -19,7 +19,7 @@ export class BeFoodConnector extends BasePlatformConnector {
   readonly platform = FoodPlatformType.BEFOOD;
 
   constructor(configService: ConfigService) {
-    const baseUrl = configService.get<string>('platform.befood.baseUrl');
+    const baseUrl = configService.get<string>('platform.befood.baseUrl') || 'https://api.befood.vn/merchant';
     super(configService, baseUrl);
   }
 
