@@ -3766,7 +3766,8 @@ class SaleViewModel @Inject constructor(
                 note = userNote,
                 variants = variants,  // Variants with • prefix (size, ice level, etc.)
                 toppings = toppings,  // Toppings with + prefix (add-ons)
-                vatRate = item.vatRate // VAT rate của món này
+                vatRate = item.vatRate, // VAT rate của món này
+                categoryName = item.categoryName // Tên danh mục (dùng cho grouped layout)
             )
         }
 

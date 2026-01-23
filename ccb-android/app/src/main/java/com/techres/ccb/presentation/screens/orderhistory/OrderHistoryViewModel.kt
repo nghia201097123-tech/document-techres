@@ -584,7 +584,8 @@ class OrderHistoryViewModel @Inject constructor(
                 note = userNote,
                 variants = variants,
                 toppings = emptyList(),
-                vatRate = item.vatRate
+                vatRate = item.vatRate,
+                categoryName = item.categoryName // Tên danh mục (dùng cho grouped layout)
             )
         }
 

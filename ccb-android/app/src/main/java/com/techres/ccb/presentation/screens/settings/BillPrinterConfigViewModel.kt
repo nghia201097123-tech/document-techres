@@ -499,7 +499,8 @@ class BillPrinterConfigViewModel @Inject constructor(
                                     unitPrice = 50000.0,
                                     totalPrice = 100000.0,
                                     note = null,
-                                    toppings = emptyList()
+                                    toppings = emptyList(),
+                                    categoryName = "Đồ uống"
                                 ),
                                 com.techres.ccb.data.printer.BillItem(
                                     code = "TEST02",
@@ -510,7 +511,8 @@ class BillPrinterConfigViewModel @Inject constructor(
                                     note = "Ghi chú test",
                                     toppings = listOf(
                                         com.techres.ccb.data.printer.BillTopping("Topping A", 5000.0)
-                                    )
+                                    ),
+                                    categoryName = "Đồ ăn"
                                 )
                             ),
                             subtotal = 140000.0,
