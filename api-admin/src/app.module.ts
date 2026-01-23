@@ -21,6 +21,7 @@ import {
   Staff,
   Province,
   Ward,
+  FoodPlatformAccount,
 } from './database/entities';
 
 // Modules
@@ -34,6 +35,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { TransactionCategoriesModule } from './modules/transaction-categories/transaction-categories.module';
+import { FoodPlatformsModule } from './modules/food-platforms/food-platforms.module';
 
 @Module({
   imports: [
@@ -66,6 +68,7 @@ import { TransactionCategoriesModule } from './modules/transaction-categories/tr
           Staff,
           Province,
           Ward,
+          FoodPlatformAccount,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',
@@ -87,6 +90,7 @@ import { TransactionCategoriesModule } from './modules/transaction-categories/tr
     AdminUsersModule,
     LocationsModule,
     TransactionCategoriesModule,
+    FoodPlatformsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
