@@ -635,7 +635,8 @@ data class BillItem(
     val note: String? = null,
     val variants: List<BillVariant> = emptyList(),
     val toppings: List<BillTopping> = emptyList(),
-    val vatRate: Double = 8.0
+    val vatRate: Double = 8.0,
+    val categoryName: String? = null // Tên danh mục (dùng cho grouped layout)
 )
 
 data class BillVariant(

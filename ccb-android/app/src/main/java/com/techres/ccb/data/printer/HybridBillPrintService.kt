@@ -1384,8 +1384,18 @@ object HybridBillPrintService {
 
     /**
      * Render items theo layout type được chọn
-     * Hỗ trợ các layout:
+     * Hỗ trợ 15 layouts:
      * - standard: Tên món + xSL + Giá (mặc định)
+     * - compact: Tên món xSL Giá (thu gọn, không indent)
+     * - detailed: Chi tiết với đơn giá và thành tiền riêng
+     * - two_line: Dòng 1: Tên món, Dòng 2: SL x Đơn giá = Thành tiền
+     * - price_right: Tên món bên trái, giá căn phải
+     * - with_index: Có số thứ tự: 1. Tên món xSL Giá
+     * - grouped: Nhóm theo category (nếu có)
+     * - grid_2_col: 2 cột (món ngắn)
+     * - minimal: Chỉ tên và số lượng
+     * - dotted: Dấu chấm nối tên và giá
+     * - boxed: Có viền box cho mỗi món
      * - table: Bảng Món | SL | Giá
      * - table_stt: Bảng STT | Món | SL | Giá
      * - table_qty_first: Bảng SL | Món | Giá
@@ -1395,12 +1405,23 @@ object HybridBillPrintService {
         template: BillTemplateEntity,
         billData: BillData
     ) {
+        Log.d(TAG, "Rendering items with layout: ${template.itemDisplayLayout}")
         when (template.itemDisplayLayout) {
+            "compact" -> renderItemsCompact(template, billData)
+            "detailed" -> renderItemsDetailed(template, billData)
+            "two_line" -> renderItemsTwoLine(template, billData)
+            "price_right" -> renderItemsPriceRight(template, billData)
+            "with_index" -> renderItemsWithIndex(template, billData)
+            "grouped" -> renderItemsGrouped(template, billData)
+            "grid_2_col" -> renderItemsGrid2Col(template, billData)
+            "minimal" -> renderItemsMinimal(template, billData)
+            "dotted" -> renderItemsDotted(template, billData)
+            "boxed" -> renderItemsBoxed(template, billData)
             "table" -> renderItemsAsTable(template, billData)
             "table_stt" -> renderItemsAsTableWithSTT(template, billData)
             "table_qty_first" -> renderItemsAsTableQtyFirst(template, billData)
             "table_full" -> renderItemsAsTableFull(template, billData)
-            else -> renderItemsStandard(template, billData) // standard và các layout khác
+            else -> renderItemsStandard(template, billData) // standard
         }
     }
 
@@ -1625,23 +1646,300 @@ object HybridBillPrintService {
     }
 
     // ============================================================================
+    // ADDITIONAL LAYOUT IMPLEMENTATIONS FOR SingleCanvasBillBuilder
+    // ============================================================================
+
+    /**
+     * Layout: COMPACT - Thu gọn, không indent
+     * Format: Tên món xSL Giá (tất cả trên 1 dòng)
+     */
+    private fun SingleCanvasBillBuilder.renderItemsCompact(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val parts = mutableListOf<String>()
+            parts.add(item.name)
+            if (template.showQuantity) parts.add("x${item.quantity}")
+            if (template.showUnitPrice) parts.add(formatCurrency(item.totalPrice))
+            line(parts.joinToString(" "))
+
+            // Ghi chú ngắn gọn
+            if (template.showItemNote && item.note != null) {
+                line("  ${item.note}")
+            }
+        }
+    }
+
+    /**
+     * Layout: DETAILED - Chi tiết với đơn giá và thành tiền
+     * Format:
+     *   Tên món
+     *   Đơn giá: xxx  x SL = Thành tiền
+     */
+    private fun SingleCanvasBillBuilder.renderItemsDetailed(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            lineBold(item.name)
+
+            val unitPrice = item.originalPrice / item.quantity.coerceAtLeast(1)
+            if (template.showUnitPrice && template.showQuantity) {
+                line("   ${formatCurrency(unitPrice)} x ${item.quantity} = ${formatCurrency(item.totalPrice)}")
+            } else if (template.showUnitPrice) {
+                lineKeyValue("   Thành tiền:", formatCurrency(item.totalPrice))
+            }
+
+            // Variants
+            renderItemVariants(template, item)
+            // Toppings
+            renderItemToppings(template, item)
+            // Extras
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: TWO_LINE - 2 dòng
+     * Dòng 1: Tên món
+     * Dòng 2: SL x Đơn giá = Thành tiền (căn phải)
+     */
+    private fun SingleCanvasBillBuilder.renderItemsTwoLine(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            lineBold(item.name)
+
+            val unitPrice = item.originalPrice / item.quantity.coerceAtLeast(1)
+            val priceLine = if (template.showQuantity && template.showUnitPrice) {
+                "${item.quantity} x ${formatCurrency(unitPrice)} = ${formatCurrency(item.totalPrice)}"
+            } else if (template.showUnitPrice) {
+                formatCurrency(item.totalPrice)
+            } else if (template.showQuantity) {
+                "SL: ${item.quantity}"
+            } else ""
+
+            if (priceLine.isNotEmpty()) {
+                lineRight(priceLine)
+            }
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: PRICE_RIGHT - Giá căn phải
+     * Format: Tên món...................Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsPriceRight(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) " x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            lineKeyValue("${item.name}$qty", price, BitmapTextStyle(bold = true))
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: WITH_INDEX - Có số thứ tự
+     * Format: 1. Tên món xSL Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsWithIndex(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEachIndexed { index, item ->
+            val qty = if (template.showQuantity) "x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            val rightPart = listOf(qty, price).filter { it.isNotEmpty() }.joinToString("  ")
+            lineKeyValue("${index + 1}. ${item.name}", rightPart, BitmapTextStyle(bold = true))
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: GROUPED - Nhóm theo category
+     * Format:
+     *   [Category 1]
+     *   - Món 1 xSL Giá
+     *   - Món 2 xSL Giá
+     *   [Category 2]
+     *   ...
+     */
+    private fun SingleCanvasBillBuilder.renderItemsGrouped(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        // Group items by category
+        val groupedItems = billData.items.groupBy { it.categoryName ?: "Khác" }
+
+        groupedItems.forEach { (category, items) ->
+            // Category header
+            lineBold("[$category]")
+
+            items.forEach { item ->
+                val qty = if (template.showQuantity) "x${item.quantity}" else ""
+                val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+                val rightPart = listOf(qty, price).filter { it.isNotEmpty() }.joinToString("  ")
+                lineKeyValue("  ${item.name}", rightPart)
+
+                renderItemVariants(template, item)
+                renderItemToppings(template, item)
+                renderItemExtras(template, item)
+            }
+        }
+    }
+
+    /**
+     * Layout: GRID_2_COL - 2 cột (cho món ngắn tên)
+     * Format: Món1 xSL Giá | Món2 xSL Giá
+     * Note: Thermal printer width limited, may not work well for long names
+     */
+    private fun SingleCanvasBillBuilder.renderItemsGrid2Col(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        // Process items in pairs
+        val items = billData.items
+        var i = 0
+        while (i < items.size) {
+            val item1 = items[i]
+            val item2 = if (i + 1 < items.size) items[i + 1] else null
+
+            val formatItem = { item: BillItem ->
+                val name = item.name.take(12)
+                val qty = if (template.showQuantity) "x${item.quantity}" else ""
+                val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).take(8) else ""
+                "$name $qty $price"
+            }
+
+            if (item2 != null) {
+                line("${formatItem(item1)} | ${formatItem(item2)}")
+                i += 2
+            } else {
+                line(formatItem(item1))
+                i += 1
+            }
+        }
+
+        // Show extras for all items (simplified for grid layout)
+        billData.items.forEach { item ->
+            if (template.showItemNote && item.note != null) {
+                line("  * ${item.name}: ${item.note}")
+            }
+        }
+    }
+
+    /**
+     * Layout: MINIMAL - Tối giản, chỉ tên và số lượng
+     * Format: Tên món (SL)
+     */
+    private fun SingleCanvasBillBuilder.renderItemsMinimal(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) " (${item.quantity})" else ""
+            line("${item.name}$qty")
+        }
+    }
+
+    /**
+     * Layout: DOTTED - Dấu chấm nối
+     * Format: Tên món........xSL.......Giá
+     */
+    private fun SingleCanvasBillBuilder.renderItemsDotted(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) "x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            val rightPart = "$qty $price".trim()
+            // Create dotted line: key + dots + value
+            val maxDots = 40 - item.name.length - rightPart.length
+            val dots = if (maxDots > 2) ".".repeat(maxDots) else " "
+            line("${item.name}$dots$rightPart", BitmapTextStyle(bold = true))
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: BOXED - Có viền box
+     * Format:
+     *   ┌─────────────────────────┐
+     *   │ Tên món      xSL   Giá │
+     *   └─────────────────────────┘
+     */
+    private fun SingleCanvasBillBuilder.renderItemsBoxed(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) "x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            // Top border
+            separator()
+
+            // Item content
+            lineKeyValue(item.name, "$qty  $price", BitmapTextStyle(bold = true))
+
+            // Variants & Toppings
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+
+            // Bottom border
+            separator()
+        }
+    }
+
+    // ============================================================================
     // EXTENSION FUNCTIONS FOR HybridBillBuilder (for generateBillFromConfig)
     // ============================================================================
 
     /**
      * Render items theo itemDisplayLayout từ template
-     * Hỗ trợ các layout: standard, table, table_stt, table_qty_first, table_full
+     * Hỗ trợ 15 layouts (giống SingleCanvasBillBuilder)
      */
     private fun HybridBillBuilder.renderItemsByLayout(
         template: BillTemplateEntity,
         billData: BillData
     ) {
+        Log.d(TAG, "HybridBillBuilder rendering items with layout: ${template.itemDisplayLayout}")
         when (template.itemDisplayLayout) {
+            "compact" -> renderItemsCompact(template, billData)
+            "detailed" -> renderItemsDetailed(template, billData)
+            "two_line" -> renderItemsTwoLine(template, billData)
+            "price_right" -> renderItemsPriceRight(template, billData)
+            "with_index" -> renderItemsWithIndex(template, billData)
+            "grouped" -> renderItemsGrouped(template, billData)
+            "grid_2_col" -> renderItemsGrid2Col(template, billData)
+            "minimal" -> renderItemsMinimal(template, billData)
+            "dotted" -> renderItemsDotted(template, billData)
+            "boxed" -> renderItemsBoxed(template, billData)
             "table" -> renderItemsAsTable(template, billData)
             "table_stt" -> renderItemsAsTableWithSTT(template, billData)
             "table_qty_first" -> renderItemsAsTableQtyFirst(template, billData)
             "table_full" -> renderItemsAsTableFull(template, billData)
-            else -> renderItemsStandard(template, billData) // standard và các layout khác
+            else -> renderItemsStandard(template, billData) // standard
         }
     }
 
@@ -1877,6 +2175,235 @@ object HybridBillPrintService {
                 "   → Giảm:"
             }
             lineKeyValue(discountLabel, "-${formatCurrency(item.discountAmount)}")
+        }
+    }
+
+    // ============================================================================
+    // ADDITIONAL LAYOUT IMPLEMENTATIONS FOR HybridBillBuilder
+    // ============================================================================
+
+    /**
+     * Layout: COMPACT - Thu gọn, không indent
+     */
+    private fun HybridBillBuilder.renderItemsCompact(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val parts = mutableListOf<String>()
+            parts.add(item.name)
+            if (template.showQuantity) parts.add("x${item.quantity}")
+            if (template.showUnitPrice) parts.add(formatCurrency(item.totalPrice))
+            line(parts.joinToString(" "))
+
+            if (template.showItemNote && item.note != null) {
+                line("  ${item.note}")
+            }
+        }
+    }
+
+    /**
+     * Layout: DETAILED - Chi tiết với đơn giá và thành tiền
+     */
+    private fun HybridBillBuilder.renderItemsDetailed(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            lineBold(item.name)
+
+            val unitPrice = item.originalPrice / item.quantity.coerceAtLeast(1)
+            if (template.showUnitPrice && template.showQuantity) {
+                line("   ${formatCurrency(unitPrice)} x ${item.quantity} = ${formatCurrency(item.totalPrice)}")
+            } else if (template.showUnitPrice) {
+                lineKeyValue("   Thành tiền:", formatCurrency(item.totalPrice))
+            }
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: TWO_LINE - 2 dòng
+     */
+    private fun HybridBillBuilder.renderItemsTwoLine(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            lineBold(item.name)
+
+            val unitPrice = item.originalPrice / item.quantity.coerceAtLeast(1)
+            val priceLine = if (template.showQuantity && template.showUnitPrice) {
+                "${item.quantity} x ${formatCurrency(unitPrice)} = ${formatCurrency(item.totalPrice)}"
+            } else if (template.showUnitPrice) {
+                formatCurrency(item.totalPrice)
+            } else if (template.showQuantity) {
+                "SL: ${item.quantity}"
+            } else ""
+
+            if (priceLine.isNotEmpty()) {
+                lineRight(priceLine)
+            }
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: PRICE_RIGHT - Giá căn phải
+     */
+    private fun HybridBillBuilder.renderItemsPriceRight(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) " x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            lineKeyValue("${item.name}$qty", price, BitmapTextStyle(bold = true))
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: WITH_INDEX - Có số thứ tự
+     */
+    private fun HybridBillBuilder.renderItemsWithIndex(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEachIndexed { index, item ->
+            val qty = if (template.showQuantity) "x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            val rightPart = listOf(qty, price).filter { it.isNotEmpty() }.joinToString("  ")
+            lineKeyValue("${index + 1}. ${item.name}", rightPart, BitmapTextStyle(bold = true))
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: GROUPED - Nhóm theo category
+     */
+    private fun HybridBillBuilder.renderItemsGrouped(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        val groupedItems = billData.items.groupBy { it.categoryName ?: "Khác" }
+
+        groupedItems.forEach { (category, items) ->
+            lineBold("[$category]")
+
+            items.forEach { item ->
+                val qty = if (template.showQuantity) "x${item.quantity}" else ""
+                val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+                val rightPart = listOf(qty, price).filter { it.isNotEmpty() }.joinToString("  ")
+                lineKeyValue("  ${item.name}", rightPart)
+
+                renderItemVariants(template, item)
+                renderItemToppings(template, item)
+                renderItemExtras(template, item)
+            }
+        }
+    }
+
+    /**
+     * Layout: GRID_2_COL - 2 cột
+     */
+    private fun HybridBillBuilder.renderItemsGrid2Col(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        val items = billData.items
+        var i = 0
+        while (i < items.size) {
+            val item1 = items[i]
+            val item2 = if (i + 1 < items.size) items[i + 1] else null
+
+            val formatItem = { item: BillItem ->
+                val name = item.name.take(12)
+                val qty = if (template.showQuantity) "x${item.quantity}" else ""
+                val price = if (template.showUnitPrice) formatCurrency(item.totalPrice).take(8) else ""
+                "$name $qty $price"
+            }
+
+            if (item2 != null) {
+                line("${formatItem(item1)} | ${formatItem(item2)}")
+                i += 2
+            } else {
+                line(formatItem(item1))
+                i += 1
+            }
+        }
+
+        billData.items.forEach { item ->
+            if (template.showItemNote && item.note != null) {
+                line("  * ${item.name}: ${item.note}")
+            }
+        }
+    }
+
+    /**
+     * Layout: MINIMAL - Tối giản
+     */
+    private fun HybridBillBuilder.renderItemsMinimal(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) " (${item.quantity})" else ""
+            line("${item.name}$qty")
+        }
+    }
+
+    /**
+     * Layout: DOTTED - Dấu chấm nối
+     */
+    private fun HybridBillBuilder.renderItemsDotted(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) "x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+            val rightPart = "$qty $price".trim()
+            // Create dotted line: key + dots + value
+            val maxDots = lineWidth - item.name.length - rightPart.length
+            val dots = if (maxDots > 2) ".".repeat(maxDots) else " "
+            line("${item.name}$dots$rightPart", BitmapTextStyle(bold = true))
+
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+        }
+    }
+
+    /**
+     * Layout: BOXED - Có viền box
+     */
+    private fun HybridBillBuilder.renderItemsBoxed(
+        template: BillTemplateEntity,
+        billData: BillData
+    ) {
+        billData.items.forEach { item ->
+            val qty = if (template.showQuantity) "x${item.quantity}" else ""
+            val price = if (template.showUnitPrice) formatCurrency(item.totalPrice) else ""
+
+            separator()
+            lineKeyValue(item.name, "$qty  $price", BitmapTextStyle(bold = true))
+            renderItemVariants(template, item)
+            renderItemToppings(template, item)
+            renderItemExtras(template, item)
+            separator()
         }
     }
 }
