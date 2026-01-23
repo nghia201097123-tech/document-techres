@@ -572,6 +572,118 @@ class SunmiPrinterAdapter @Inject constructor(
     }
 
     /**
+     * Initialize printer - gọi 1 lần trước khi bắt đầu gửi data
+     * Dùng cho chunked printing để tránh reset buffer mỗi chunk
+     */
+    suspend fun initPrinter(): PrinterResult = withContext(Dispatchers.IO) {
+        val service = printerService
+        if (service is BinderProxyWrapper) {
+            initPrinterViaTransact(service.binder)
+            return@withContext PrinterResult.Success
+        }
+        // For local service, no need to init
+        PrinterResult.Success
+    }
+
+    /**
+     * Write raw data WITHOUT init and commit
+     * Dùng cho chunked printing - gửi nhiều chunks liên tiếp
+     * Phải gọi initPrinter() trước và commitBuffer() sau
+     */
+    suspend fun writeRawOnly(data: ByteArray): PrinterResult = withContext(Dispatchers.IO) {
+        if (!isConnected()) {
+            return@withContext PrinterResult.Error("Not connected")
+        }
+
+        try {
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+
+            if (service is BinderProxyWrapper) {
+                Timber.d("$TAG: writeRawOnly via AIDL transact()")
+                return@withContext sendRawDataOnlyViaTransact(service.binder, data)
+            }
+
+            // For local service, use regular write
+            return@withContext write(data)
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: writeRawOnly failed")
+            return@withContext PrinterResult.Error(e.message ?: "Write failed")
+        }
+    }
+
+    /**
+     * Commit printer buffer - gọi 1 lần sau khi gửi xong tất cả data
+     * Dùng cho chunked printing
+     */
+    suspend fun commitBuffer(): PrinterResult = withContext(Dispatchers.IO) {
+        val service = printerService
+        if (service is BinderProxyWrapper) {
+            commitPrinterBufferViaTransact(service.binder)
+            return@withContext PrinterResult.Success
+        }
+        // For local service, no need to commit
+        PrinterResult.Success
+    }
+
+    /**
+     * Feed paper by number of lines
+     * Dùng để đẩy giấy sau khi in xong
+     */
+    suspend fun feedLines(lines: Int): PrinterResult = withContext(Dispatchers.IO) {
+        val service = printerService
+        if (service is BinderProxyWrapper) {
+            lineWrapViaTransact(service.binder, lines)
+            return@withContext PrinterResult.Success
+        }
+        // For local service, use feedPaper
+        feedPaper(lines)
+    }
+
+    /**
+     * Send raw data via AIDL transact() WITHOUT init and commit
+     * Dùng cho chunked printing
+     */
+    private fun sendRawDataOnlyViaTransact(binder: IBinder, data: ByteArray): PrinterResult {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        val possibleTransactionCodes = listOf(
+            TransactionCodes.TRANSACTION_sendRAWData,  // Standard position (7)
+            IBinder.FIRST_CALL_TRANSACTION + 8,        // Alternative
+            IBinder.FIRST_CALL_TRANSACTION + 6         // Alternative
+        )
+
+        var lastError: Exception? = null
+
+        for (transactionCode in possibleTransactionCodes) {
+            try {
+                val dataParcel = Parcel.obtain()
+                val replyParcel = Parcel.obtain()
+
+                try {
+                    dataParcel.writeInterfaceToken(descriptor)
+                    dataParcel.writeByteArray(data)
+                    dataParcel.writeStrongBinder(null) // callback
+
+                    val success = binder.transact(transactionCode, dataParcel, replyParcel, 0)
+
+                    if (success) {
+                        replyParcel.readException()
+                        Timber.d("$TAG: sendRawDataOnly transact($transactionCode) succeeded, ${data.size} bytes")
+                        return PrinterResult.Success
+                    }
+                } finally {
+                    dataParcel.recycle()
+                    replyParcel.recycle()
+                }
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+
+        return PrinterResult.Error("sendRawDataOnly failed: ${lastError?.message ?: "unknown error"}")
+    }
+
+    /**
      * Send raw data via AIDL transact() mechanism for BinderProxy
      * This is used when we can't get a proper service interface
      */

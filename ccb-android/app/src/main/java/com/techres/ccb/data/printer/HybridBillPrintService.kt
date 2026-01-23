@@ -782,6 +782,11 @@ object HybridBillPrintService {
      * Phương pháp: Convert bitmap -> ESC/POS raster format -> sendRAWData
      * Sử dụng GS v 0 (raster bit image) thay vì ESC * (bit image mode)
      * vì GS v 0 tương thích tốt hơn với Sunmi built-in printer.
+     *
+     * CRITICAL: Sử dụng writeRawOnly() để gửi data liên tục không bị reset buffer.
+     * - initPrinter() chỉ gọi 1 lần đầu
+     * - writeRawOnly() gửi data KHÔNG init/commit
+     * - commitBuffer() gọi 1 lần cuối
      */
     private suspend fun printSunmiBitmapWithRetry(
         adapter: SunmiPrinterAdapter,
@@ -793,26 +798,10 @@ object HybridBillPrintService {
     ): PrinterResult {
         var lastError: String? = null
 
-        // Build ESC/POS data với init command
+        // Convert bitmap to ESC/POS raster format (GS v 0)
         Log.d(TAG, "Converting bitmap ${bitmapIndex + 1}/$totalBitmaps to ESC/POS raster format (${bitmap.width}x${bitmap.height})")
-
-        val output = java.io.ByteArrayOutputStream()
-
-        // 1. Init printer trước khi in (chỉ cho bitmap đầu tiên)
-        if (bitmapIndex == 0) {
-            output.write(EscPosCommands.INIT)
-            Log.d(TAG, "Added ESC @ init command")
-        }
-
-        // 2. Convert bitmap to raster format (GS v 0 - tương thích tốt hơn với Sunmi)
         val rasterData = EscPosCommands.printRasterBitmap(bitmap, 0)
-        output.write(rasterData)
-
-        // 3. Add line feed sau bitmap
-        output.write(EscPosCommands.LF)
-
-        val escPosData = output.toByteArray()
-        Log.d(TAG, "ESC/POS raster data size: ${escPosData.size} bytes")
+        Log.d(TAG, "ESC/POS raster data size: ${rasterData.size} bytes")
 
         repeat(retryCount) { attempt ->
             // Kiểm tra status trước mỗi lần retry (trừ lần đầu)
@@ -825,15 +814,22 @@ object HybridBillPrintService {
 
             Log.d(TAG, "Sunmi ESC/POS raster print attempt ${attempt + 1}/$retryCount for bitmap ${bitmapIndex + 1}/$totalBitmaps")
 
-            // Gửi ESC/POS data qua sendRAWData
-            // Chia nhỏ data nếu quá lớn (Sunmi buffer limit ~4KB)
+            // Step 1: Init printer (chỉ cho bitmap đầu tiên của mỗi attempt)
+            if (bitmapIndex == 0) {
+                Log.d(TAG, "Initializing printer...")
+                adapter.initPrinter()
+            }
+
+            // Step 2: Gửi data qua writeRawOnly (KHÔNG init/commit mỗi chunk)
+            // Chunk size 4KB để tránh tràn buffer
             val chunkSize = 4096
             var success = true
             var chunkError: String? = null
 
-            if (escPosData.size <= chunkSize) {
+            if (rasterData.size <= chunkSize) {
                 // Data nhỏ, gửi 1 lần
-                val printResult = adapter.write(escPosData)
+                Log.d(TAG, "Sending ${rasterData.size} bytes in single write")
+                val printResult = adapter.writeRawOnly(rasterData)
                 when (printResult) {
                     is com.techres.ccb.printer.core.PrinterResult.Error -> {
                         success = false
@@ -843,16 +839,16 @@ object HybridBillPrintService {
                 }
             } else {
                 // Data lớn, chia thành chunks
-                Log.d(TAG, "Data size ${escPosData.size} > $chunkSize, sending in chunks...")
+                Log.d(TAG, "Data size ${rasterData.size} > $chunkSize, sending in chunks...")
                 var offset = 0
                 var chunkIndex = 0
-                while (offset < escPosData.size && success) {
-                    val remaining = escPosData.size - offset
+                while (offset < rasterData.size && success) {
+                    val remaining = rasterData.size - offset
                     val currentChunkSize = minOf(chunkSize, remaining)
-                    val chunk = escPosData.copyOfRange(offset, offset + currentChunkSize)
+                    val chunk = rasterData.copyOfRange(offset, offset + currentChunkSize)
 
                     Log.d(TAG, "Sending chunk ${chunkIndex + 1} (${chunk.size} bytes, offset $offset)")
-                    val chunkResult = adapter.write(chunk)
+                    val chunkResult = adapter.writeRawOnly(chunk)
 
                     when (chunkResult) {
                         is com.techres.ccb.printer.core.PrinterResult.Error -> {
@@ -863,13 +859,20 @@ object HybridBillPrintService {
                             offset += currentChunkSize
                             chunkIndex++
                             // Delay nhỏ giữa các chunk để printer xử lý
-                            if (offset < escPosData.size) {
-                                delay(50)
+                            if (offset < rasterData.size) {
+                                delay(20)
                             }
                         }
                     }
                 }
                 Log.d(TAG, "Sent $chunkIndex chunks total")
+            }
+
+            // Step 3: Commit buffer SAU KHI gửi xong tất cả data (chỉ cho bitmap cuối)
+            if (success && bitmapIndex == totalBitmaps - 1) {
+                Log.d(TAG, "All bitmaps sent, committing buffer...")
+                adapter.feedLines(3)
+                adapter.commitBuffer()
             }
 
             if (success) {
