@@ -8,7 +8,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('SERVICE_PORT', 3005);
+  const port = configService.get<number>('SERVICE_PORT', 3006);
   const apiPrefix = configService.get<string>('API_PREFIX', 'api');
 
   // Global prefix
