@@ -1470,6 +1470,79 @@ export class DatabaseMigrationService implements OnModuleInit {
         }
       }
 
+      // 47. Create food_platform_accounts table for food delivery platform integrations
+      this.logger.log('Creating food platform enums...');
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE food_platform_type AS ENUM ('grab', 'befood', 'shopee_food');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE food_platform_auth_type AS ENUM ('username_password', 'phone_otp');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      await queryRunner.query(`
+        DO $$ BEGIN
+          CREATE TYPE food_platform_status AS ENUM ('pending', 'connecting', 'connected', 'disconnected', 'error');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      const foodPlatformAccountsExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'food_platform_accounts'
+        );
+      `);
+
+      if (!foodPlatformAccountsExists[0].exists) {
+        this.logger.log('Creating food_platform_accounts table...');
+        await queryRunner.query(`
+          CREATE TABLE food_platform_accounts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id VARCHAR(50) NOT NULL,
+            branch_id UUID NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            platform food_platform_type NOT NULL,
+            auth_type food_platform_auth_type DEFAULT 'username_password',
+            status food_platform_status DEFAULT 'pending',
+            username VARCHAR(100),
+            password TEXT,
+            phone_number VARCHAR(20),
+            external_merchant_id VARCHAR(100),
+            external_store_name VARCHAR(255),
+            access_token TEXT,
+            refresh_token TEXT,
+            token_expires_at TIMESTAMP,
+            poll_interval_seconds INTEGER DEFAULT 30,
+            next_poll_at TIMESTAMP,
+            last_poll_at TIMESTAMP,
+            error_count INTEGER DEFAULT 0,
+            last_error TEXT,
+            last_error_at TIMESTAMP,
+            otp_session_id VARCHAR(100),
+            otp_expires_at TIMESTAMP,
+            metadata JSONB,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX idx_food_platform_tenant ON food_platform_accounts(tenant_id);
+          CREATE INDEX idx_food_platform_branch ON food_platform_accounts(branch_id);
+          CREATE UNIQUE INDEX idx_food_platform_unique ON food_platform_accounts(branch_id, platform);
+        `);
+        this.logger.log('Food platform accounts table created successfully');
+      }
+
       this.logger.log('Database migration completed successfully');
     } catch (error) {
       this.logger.error('Database migration failed:', error.message);
