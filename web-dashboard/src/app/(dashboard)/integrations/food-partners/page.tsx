@@ -46,6 +46,8 @@ import {
   FoodPartnerInfo,
   ConnectionStatus,
   type PartnerConnectionView,
+  type PartnerConnectionPort,
+  type PartnerAccountConnection,
   foodPartnerService,
 } from "@/services/food-partner-service";
 
