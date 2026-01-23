@@ -45,79 +45,9 @@ import {
   FoodPartnerType,
   FoodPartnerInfo,
   ConnectionStatus,
-  type PartnerConnectionPort,
-  type PartnerAccountConnection,
   type PartnerConnectionView,
+  foodPartnerService,
 } from "@/services/food-partner-service";
-
-// Mock data for UI development
-const mockPorts: PartnerConnectionPort[] = [
-  {
-    id: "port-1",
-    partnerType: FoodPartnerType.SHOPEE,
-    shopNumber: 1,
-    branchId: "branch-1",
-    branchName: "Chi nhánh Quận 1",
-    maxConnections: 1,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "port-2",
-    partnerType: FoodPartnerType.GRAB,
-    shopNumber: 1,
-    branchId: "branch-1",
-    branchName: "Chi nhánh Quận 1",
-    maxConnections: 1,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "port-3",
-    partnerType: FoodPartnerType.GRAB,
-    shopNumber: 2,
-    branchId: "branch-1",
-    branchName: "Chi nhánh Quận 1",
-    maxConnections: 1,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "port-4",
-    partnerType: FoodPartnerType.BEFOOD,
-    shopNumber: 1,
-    branchId: "branch-1",
-    branchName: "Chi nhánh Quận 1",
-    maxConnections: 1,
-    isActive: true,
-    createdAt: "2024-01-01T00:00:00Z",
-  },
-];
-
-const mockConnections: PartnerAccountConnection[] = [
-  {
-    id: "conn-1",
-    portId: "port-1",
-    partnerType: FoodPartnerType.SHOPEE,
-    shopNumber: 1,
-    username: "shop_techres_q1",
-    status: ConnectionStatus.CONNECTED,
-    lastSyncAt: "2024-01-15T10:30:00Z",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "conn-2",
-    portId: "port-2",
-    partnerType: FoodPartnerType.GRAB,
-    shopNumber: 1,
-    username: "grab_techres_1",
-    status: ConnectionStatus.ERROR,
-    errorMessage: "Token hết hạn, vui lòng đăng nhập lại",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-10T08:00:00Z",
-  },
-];
 
 // Status badge component
 const StatusBadge = ({ status }: { status: ConnectionStatus }) => {
@@ -192,18 +122,12 @@ export default function FoodPartnersPage() {
   }, [filterBranchId]);
 
   const loadData = async () => {
+    if (!filterBranchId || filterBranchId === "all") return;
+
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const data = await foodPartnerService.getConnectionsView(filterBranchId);
-
-      // Mock data for now
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const views: PartnerConnectionView[] = mockPorts.map(port => ({
-        port,
-        connection: mockConnections.find(c => c.portId === port.id),
-      }));
-      setConnectionViews(views);
+      const data = await foodPartnerService.getConnectionsView(filterBranchId);
+      setConnectionViews(data);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -247,10 +171,7 @@ export default function FoodPartnersPage() {
 
     setSaving(true);
     try {
-      // TODO: Replace with actual API call
-      // await foodPartnerService.linkAccount({ portId: selectedPort.id, username, password });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await foodPartnerService.linkAccount({ portId: selectedPort.id, username, password });
 
       toast({
         title: "Thành công",
@@ -276,10 +197,10 @@ export default function FoodPartnersPage() {
 
     setSaving(true);
     try {
-      // TODO: Replace with actual API call
-      // await foodPartnerService.updateConnection(selectedConnection.id, { username, password: password || undefined });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await foodPartnerService.updateConnection(selectedConnection.id, {
+        username,
+        password: password || undefined
+      });
 
       toast({
         title: "Thành công",
@@ -305,10 +226,7 @@ export default function FoodPartnersPage() {
 
     setSaving(true);
     try {
-      // TODO: Replace with actual API call
-      // await foodPartnerService.unlinkAccount(selectedConnection.id);
-
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await foodPartnerService.unlinkAccount(selectedConnection.id);
 
       toast({
         title: "Thành công",
@@ -333,15 +251,23 @@ export default function FoodPartnersPage() {
   const handleTestConnection = async (connectionId: string) => {
     setTestingConnection(connectionId);
     try {
-      // TODO: Replace with actual API call
-      // const result = await foodPartnerService.testConnection(connectionId);
+      const result = await foodPartnerService.testConnection(connectionId);
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (result.status === ConnectionStatus.CONNECTED) {
+        toast({
+          title: "Kết nối thành công",
+          description: result.message || "Tài khoản đang hoạt động bình thường",
+        });
+      } else {
+        toast({
+          title: "Lỗi kết nối",
+          description: result.message || "Không thể kết nối đến đối tác",
+          variant: "destructive",
+        });
+      }
 
-      toast({
-        title: "Kết nối thành công",
-        description: "Tài khoản đang hoạt động bình thường",
-      });
+      // Reload data to update status
+      loadData();
     } catch (error: any) {
       toast({
         title: "Lỗi kết nối",
