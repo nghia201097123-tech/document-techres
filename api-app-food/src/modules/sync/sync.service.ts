@@ -40,6 +40,7 @@ export class SyncService {
       if (existing) {
         // Update existing account
         existing.tenantId = dto.tenantId;
+        existing.branchId = dto.branchId;
         existing.displayName = dto.name;
         existing.platform = this.mapPlatform(dto.platform);
         existing.authType = this.mapAuthType(dto.authType);
@@ -74,6 +75,7 @@ export class SyncService {
         const account = this.accountRepo.create({
           id: dto.id, // Use same ID from api-admin
           tenantId: dto.tenantId,
+          branchId: dto.branchId,
           displayName: dto.name,
           platform: this.mapPlatform(dto.platform),
           authType: this.mapAuthType(dto.authType),

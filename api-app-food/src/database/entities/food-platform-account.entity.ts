@@ -46,6 +46,7 @@ export enum FoodPlatformType {
  */
 @Entity('food_platform_accounts')
 @Index(['tenantId', 'platform'])
+@Index(['branchId'])
 @Index(['status'])
 @Index(['nextPollAt'])
 export class FoodPlatformAccount {
@@ -54,6 +55,9 @@ export class FoodPlatformAccount {
 
   @Column({ type: 'varchar', length: 50, name: 'tenant_id' })
   tenantId: string;
+
+  @Column({ type: 'uuid', nullable: true, name: 'branch_id' })
+  branchId: string;
 
   // Platform info
   @Column({

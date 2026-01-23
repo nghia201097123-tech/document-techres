@@ -72,6 +72,16 @@ export class AccountsService {
   }
 
   /**
+   * Get accounts by branch
+   */
+  async getAccountsByBranch(branchId: string): Promise<FoodPlatformAccount[]> {
+    return this.accountRepo.find({
+      where: { branchId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
    * Login with username/password
    */
   async login(accountId: string, dto: LoginDto): Promise<FoodPlatformAccount> {

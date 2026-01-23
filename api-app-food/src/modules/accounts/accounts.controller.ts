@@ -23,7 +23,7 @@ import {
 } from './dto/login.dto';
 
 @ApiTags('accounts')
-@Controller('food-platforms/accounts')
+@Controller('accounts')
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
@@ -47,6 +47,18 @@ export class AccountsController {
   @ApiResponse({ status: 200, description: 'Thành công' })
   async getAccounts(@Query('tenantId') tenantId: string) {
     const accounts = await this.accountsService.getAccountsByTenant(tenantId);
+    return ApiResponseDto.success(accounts);
+  }
+
+  /**
+   * Get accounts by branch
+   */
+  @Get('branch/:branchId')
+  @ApiOperation({ summary: 'Lấy danh sách tài khoản theo chi nhánh' })
+  @ApiParam({ name: 'branchId', description: 'Branch ID' })
+  @ApiResponse({ status: 200, description: 'Thành công' })
+  async getAccountsByBranch(@Param('branchId') branchId: string) {
+    const accounts = await this.accountsService.getAccountsByBranch(branchId);
     return ApiResponseDto.success(accounts);
   }
 
