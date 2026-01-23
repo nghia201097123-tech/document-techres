@@ -334,3 +334,88 @@ export class SyncCompanyDataDto {
   @Type(() => SyncBranchDto)
   additionalBranches?: SyncBranchDto[];
 }
+
+export class SyncFoodPlatformDto {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  tenantId: string;
+
+  @ApiProperty()
+  @IsUUID()
+  branchId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  platform: string; // 'grab' | 'befood' | 'shopee_food'
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  authType?: string; // 'username_password' | 'phone_otp'
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  status?: string; // 'pending' | 'connecting' | 'connected' | 'disconnected' | 'error'
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  externalMerchantId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  externalStoreName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  pollIntervalSeconds?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  shopNumber?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isDeleted?: boolean; // Flag để xóa record
+}
+
+export class SyncFoodPlatformBatchDto {
+  @ApiProperty({ type: [SyncFoodPlatformDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncFoodPlatformDto)
+  foodPlatforms: SyncFoodPlatformDto[];
+}

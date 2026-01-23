@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
-import { SyncCompanyDataDto, SyncCompanyDto, SyncBrandDto, SyncBranchDto, SyncStaffDto, SyncTransactionCategoryDto } from './dto/sync.dto';
+import { SyncCompanyDataDto, SyncCompanyDto, SyncBrandDto, SyncBranchDto, SyncStaffDto, SyncTransactionCategoryDto, SyncFoodPlatformDto } from './dto/sync.dto';
 
 @ApiTags('Sync')
 @Controller('sync')
@@ -62,5 +62,14 @@ export class SyncController {
   async syncTransactionCategory(@Body() dto: SyncTransactionCategoryDto) {
     this.logger.log(`Received sync request for transaction category: ${dto.name}`);
     return this.syncService.syncSingleTransactionCategory(dto);
+  }
+
+  @Post('food-platform')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sync single food platform account from api-admin' })
+  @ApiResponse({ status: 200, description: 'Food platform synced successfully' })
+  async syncFoodPlatform(@Body() dto: SyncFoodPlatformDto) {
+    this.logger.log(`Received sync request for food platform: ${dto.name} (${dto.id})`);
+    return this.syncService.syncFoodPlatform(dto);
   }
 }

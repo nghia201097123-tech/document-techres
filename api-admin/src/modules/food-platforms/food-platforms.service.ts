@@ -12,6 +12,7 @@ import {
 } from '../../database/entities/food-platform-account.entity';
 import { Branch } from '../../database/entities/branch.entity';
 import { CreateFoodPlatformDto, UpdateFoodPlatformDto } from './dto';
+import { DashboardSyncService } from '../../common/services/dashboard-sync.service';
 
 @Injectable()
 export class FoodPlatformsService {
@@ -20,6 +21,7 @@ export class FoodPlatformsService {
     private readonly foodPlatformRepo: Repository<FoodPlatformAccount>,
     @InjectRepository(Branch)
     private readonly branchRepo: Repository<Branch>,
+    private readonly dashboardSyncService: DashboardSyncService,
   ) {}
 
   /**
@@ -110,7 +112,12 @@ export class FoodPlatformsService {
       shopNumber,
     });
 
-    return this.foodPlatformRepo.save(account);
+    const savedAccount = await this.foodPlatformRepo.save(account);
+
+    // Sync to dashboard
+    this.syncToDashboard(savedAccount);
+
+    return savedAccount;
   }
 
   /**
@@ -121,7 +128,12 @@ export class FoodPlatformsService {
 
     Object.assign(account, dto);
 
-    return this.foodPlatformRepo.save(account);
+    const savedAccount = await this.foodPlatformRepo.save(account);
+
+    // Sync to dashboard
+    this.syncToDashboard(savedAccount);
+
+    return savedAccount;
   }
 
   /**
@@ -129,6 +141,17 @@ export class FoodPlatformsService {
    */
   async remove(id: string): Promise<void> {
     const account = await this.findOne(id);
+
+    // Sync delete to dashboard
+    this.dashboardSyncService.syncFoodPlatform({
+      id: account.id,
+      tenantId: account.tenantId,
+      branchId: account.branchId,
+      name: account.name,
+      platform: account.platform,
+      isDeleted: true,
+    });
+
     await this.foodPlatformRepo.remove(account);
   }
 
@@ -138,7 +161,12 @@ export class FoodPlatformsService {
   async toggleActive(id: string): Promise<FoodPlatformAccount> {
     const account = await this.findOne(id);
     account.isActive = !account.isActive;
-    return this.foodPlatformRepo.save(account);
+    const savedAccount = await this.foodPlatformRepo.save(account);
+
+    // Sync to dashboard
+    this.syncToDashboard(savedAccount);
+
+    return savedAccount;
   }
 
   /**
@@ -174,7 +202,12 @@ export class FoodPlatformsService {
         shopNumber,
       });
 
-      results.push(await this.foodPlatformRepo.save(account));
+      const savedAccount = await this.foodPlatformRepo.save(account);
+
+      // Sync to dashboard
+      this.syncToDashboard(savedAccount);
+
+      results.push(savedAccount);
     }
 
     return results;
@@ -200,5 +233,29 @@ export class FoodPlatformsService {
       return FoodPlatformAuthType.PHONE_OTP;
     }
     return FoodPlatformAuthType.USERNAME_PASSWORD;
+  }
+
+  /**
+   * Sync food platform to dashboard (async, non-blocking)
+   */
+  private syncToDashboard(account: FoodPlatformAccount): void {
+    // Fire and forget - sync không block main operation
+    this.dashboardSyncService.syncFoodPlatform({
+      id: account.id,
+      tenantId: account.tenantId,
+      branchId: account.branchId,
+      name: account.name,
+      platform: account.platform,
+      authType: account.authType,
+      status: account.status,
+      username: account.username,
+      phoneNumber: account.phoneNumber,
+      externalMerchantId: account.externalMerchantId,
+      externalStoreName: account.externalStoreName,
+      pollIntervalSeconds: account.pollIntervalSeconds,
+      shopNumber: account.shopNumber,
+      sortOrder: account.sortOrder,
+      isActive: account.isActive,
+    });
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Company, Brand, Branch, Department, Staff, TransactionCategory } from '../../database/entities';
+import { Company, Brand, Branch, Department, Staff, TransactionCategory, FoodPlatformAccount } from '../../database/entities';
 import { StaffRole } from '../../database/entities/enums';
 import {
   SyncCompanyDataDto,
@@ -11,6 +11,7 @@ import {
   SyncDepartmentDto,
   SyncStaffDto,
   SyncTransactionCategoryDto,
+  SyncFoodPlatformDto,
 } from './dto/sync.dto';
 
 @Injectable()
@@ -30,6 +31,8 @@ export class SyncService {
     private readonly staffRepository: Repository<Staff>,
     @InjectRepository(TransactionCategory)
     private readonly transactionCategoryRepository: Repository<TransactionCategory>,
+    @InjectRepository(FoodPlatformAccount)
+    private readonly foodPlatformRepository: Repository<FoodPlatformAccount>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -453,6 +456,63 @@ export class SyncService {
         isSystem: dto.isSystem ?? false,
         isActive: dto.isActive ?? true,
       });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Sync a single food platform account from api-admin
+   */
+  async syncFoodPlatform(dto: SyncFoodPlatformDto): Promise<{ success: boolean }> {
+    // Handle delete
+    if (dto.isDeleted) {
+      await this.foodPlatformRepository.delete({ id: dto.id });
+      this.logger.log(`✅ Food platform deleted: ${dto.id}`);
+      return { success: true };
+    }
+
+    const existing = await this.foodPlatformRepository.findOne({
+      where: { id: dto.id },
+    });
+
+    if (existing) {
+      await this.foodPlatformRepository.update(dto.id, {
+        tenantId: dto.tenantId,
+        branchId: dto.branchId,
+        name: dto.name,
+        platform: dto.platform as any,
+        authType: dto.authType as any,
+        status: dto.status as any,
+        username: dto.username,
+        phoneNumber: dto.phoneNumber,
+        externalMerchantId: dto.externalMerchantId,
+        externalStoreName: dto.externalStoreName,
+        pollIntervalSeconds: dto.pollIntervalSeconds ?? 30,
+        shopNumber: dto.shopNumber ?? 1,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      });
+      this.logger.log(`✅ Food platform updated: ${dto.name}`);
+    } else {
+      await this.foodPlatformRepository.insert({
+        id: dto.id,
+        tenantId: dto.tenantId,
+        branchId: dto.branchId,
+        name: dto.name,
+        platform: dto.platform as any,
+        authType: dto.authType as any,
+        status: dto.status as any,
+        username: dto.username,
+        phoneNumber: dto.phoneNumber,
+        externalMerchantId: dto.externalMerchantId,
+        externalStoreName: dto.externalStoreName,
+        pollIntervalSeconds: dto.pollIntervalSeconds ?? 30,
+        shopNumber: dto.shopNumber ?? 1,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      });
+      this.logger.log(`✅ Food platform created: ${dto.name}`);
     }
 
     return { success: true };

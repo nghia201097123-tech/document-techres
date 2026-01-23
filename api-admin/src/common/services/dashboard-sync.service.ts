@@ -67,6 +67,25 @@ export interface SyncStaffDto {
   isActive: boolean;
 }
 
+export interface SyncFoodPlatformDto {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  name: string;
+  platform: string;
+  authType?: string;
+  status?: string;
+  username?: string;
+  phoneNumber?: string;
+  externalMerchantId?: string;
+  externalStoreName?: string;
+  pollIntervalSeconds?: number;
+  shopNumber?: number;
+  sortOrder?: number;
+  isActive?: boolean;
+  isDeleted?: boolean;
+}
+
 @Injectable()
 export class DashboardSyncService {
   private readonly logger = new Logger(DashboardSyncService.name);
@@ -221,6 +240,35 @@ export class DashboardSyncService {
       }
     } catch (error: any) {
       this.logger.error(`❌ Staff sync error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Sync a food platform account to dashboard API
+   */
+  async syncFoodPlatform(foodPlatform: SyncFoodPlatformDto): Promise<boolean> {
+    try {
+      this.logger.log(`Syncing food platform: ${foodPlatform.name} (${foodPlatform.id})`);
+
+      const response = await fetch(`${this.dashboardApiUrl}/api/sync/food-platform`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(foodPlatform),
+      });
+
+      if (response.ok) {
+        this.logger.log(`✅ Food platform synced successfully: ${foodPlatform.name}`);
+        return true;
+      } else {
+        const error = await response.text();
+        this.logger.error(`❌ Food platform sync failed: ${response.status} - ${error}`);
+        return false;
+      }
+    } catch (error: any) {
+      this.logger.error(`❌ Food platform sync error: ${error.message}`);
       return false;
     }
   }
