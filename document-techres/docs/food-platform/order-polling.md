@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 5
 ---
 
 # Polling đơn hàng (Order Polling)
@@ -10,17 +10,23 @@ Chi tiết về cơ chế polling đơn hàng từ các food platform về hệ 
 
 CCB (Cash Control Box) sẽ **chủ động gọi API** xuống `api-dashboard` mỗi **5 giây** (configurable) để lấy đơn hàng mới từ các food platform.
 
+:::info Store Mapping là bắt buộc
+Backend chỉ poll đơn hàng từ các **store đã được mapping** với chi nhánh. Nếu chưa mapping, sẽ không lấy được đơn hàng.
+
+Chi tiết: [Mapping cửa hàng](./store-mapping.md)
+:::
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           CCB (Android)                                  │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  PollingService                                                  │    │
 │  │  ├── Interval: 5 giây (configurable: 5-60s)                      │    │
-│  │  ├── Chỉ chạy khi có ít nhất 1 account CONNECTED                 │    │
+│  │  ├── Chỉ chạy khi có ít nhất 1 store mapping active              │    │
 │  │  └── Pause khi app ở background                                  │    │
 │  └──────────────────────────────┬──────────────────────────────────┘    │
 │                                 │                                        │
-│                        GET /food-orders/poll                             │
+│                        GET /food-orders/poll?branchId=1                  │
 │                                 │                                        │
 └─────────────────────────────────┼────────────────────────────────────────┘
                                   │
@@ -31,8 +37,9 @@ CCB (Cash Control Box) sẽ **chủ động gọi API** xuống `api-dashboard` 
 │  │  FoodOrderPollingService                                         │    │
 │  │                                                                  │    │
 │  │  1. Xác định branch từ request                                   │    │
-│  │  2. Lấy tất cả CONNECTED accounts của branch                     │    │
-│  │  3. Polling song song đến từng platform                          │    │
+│  │  2. Query store_mappings: "Branch này mapped với stores nào?"    │    │
+│  │  3. Polling song song đến TỪNG STORE đã mapping                  │    │
+│  │     (Chỉ lấy đơn của stores này, không lấy stores khác)          │    │
 │  │  4. So sánh và lưu vào DB                                        │    │
 │  │  5. Trả về newOrders + updatedOrders                             │    │
 │  └──────────────────────────────────────────────────────────────────┘    │
@@ -75,27 +82,32 @@ async pollOrders(
 }
 ```
 
-### Step 3: Xác định accounts cần poll
+### Step 3: Xác định STORES cần poll (qua Store Mapping)
 
 ```typescript
 // food-orders.service.ts
 async pollOrders(branchId: number, lastPollAt?: number) {
-  // 1. Lấy tất cả accounts CONNECTED của branch
-  const accounts = await this.foodPlatformAccountRepo.find({
+  // 1. Query store mappings cho branch này
+  // "Chi nhánh này được mapping với những stores nào?"
+  const storeMappings = await this.storeMappingRepo.find({
     where: {
       branchId,
-      status: 'connected',
       isActive: true,
     },
+    relations: ['account'], // Join với food_platform_accounts
   });
 
-  if (accounts.length === 0) {
-    return { newOrders: [], updatedOrders: [], message: 'No connected accounts' };
+  if (storeMappings.length === 0) {
+    return {
+      newOrders: [],
+      updatedOrders: [],
+      message: 'Chưa có cửa hàng nào được mapping với chi nhánh này',
+    };
   }
 
-  // 2. Polling song song
+  // 2. Polling song song từng STORE (không phải từng account)
   const results = await Promise.allSettled(
-    accounts.map(account => this.pollFromPlatform(account, lastPollAt))
+    storeMappings.map(mapping => this.pollFromStore(mapping, lastPollAt))
   );
 
   // 3. Aggregate results
@@ -107,6 +119,47 @@ async pollOrders(branchId: number, lastPollAt?: number) {
   const { newOrders, updatedOrders } = await this.syncOrdersToDb(allOrders, branchId);
 
   return { newOrders, updatedOrders };
+}
+
+/**
+ * Poll orders từ một STORE cụ thể (qua store mapping)
+ */
+private async pollFromStore(
+  mapping: FoodPlatformStoreMapping,
+  lastPollAt?: number
+): Promise<RawFoodOrder[]> {
+  const account = mapping.account;
+
+  // Verify account is still connected
+  if (account.status !== 'connected' || !account.isActive) {
+    return [];
+  }
+
+  // Refresh token nếu cần
+  await this.refreshTokenIfNeeded(account);
+
+  // Gọi API platform với STORE_ID filter
+  // Chỉ lấy đơn của store này, không lấy đơn của stores khác
+  switch (account.platform) {
+    case 'grab':
+      return this.pollGrabOrdersForStore(
+        account,
+        mapping.externalStoreId,  // Filter by store ID
+        lastPollAt
+      );
+    case 'shopee_food':
+      return this.pollShopeeOrdersForStore(
+        account,
+        mapping.externalStoreId,
+        lastPollAt
+      );
+    case 'befood':
+      return this.pollBeFoodOrdersForStore(
+        account,
+        mapping.externalStoreId,
+        lastPollAt
+      );
+  }
 }
 ```
 

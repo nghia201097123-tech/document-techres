@@ -8,19 +8,39 @@ Chi tiết về quy trình liên kết tài khoản merchant từ các food plat
 
 ## Tổng quan
 
-Mỗi chi nhánh có thể liên kết **nhiều tài khoản** từ **nhiều platform** khác nhau:
+Quy trình liên kết tài khoản gồm **2 bước chính**:
+1. **Đăng nhập** vào tài khoản merchant trên platform (Grab/Shopee/BeFood)
+2. **Mapping** cửa hàng trên platform với chi nhánh TechRes
 
 ```
-Chi nhánh A
-├── GrabFood Account #1 (Cửa hàng chính)
-├── GrabFood Account #2 (Cửa hàng phụ)
-├── ShopeeFood Account #1
-└── BeFood Account #1
-
-Chi nhánh B
-├── GrabFood Account #1
-└── ShopeeFood Account #1
+┌─────────────────────────────────────────────────────────────────────────┐
+│  QUY TRÌNH LIÊN KẾT TÀI KHOẢN                                            │
+│                                                                          │
+│  Step 1: Đăng nhập                                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  Nhập username/password hoặc OTP                                 │    │
+│  │  → Xác thực với Platform API                                     │    │
+│  │  → Lưu token vào DB                                              │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                          │                                               │
+│                          ▼                                               │
+│  Step 2: Mapping cửa hàng                                                │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  Lấy danh sách cửa hàng của merchant                             │    │
+│  │  → Mapping mỗi cửa hàng với 1 chi nhánh TechRes                  │    │
+│  │  → Lưu vào food_platform_store_mappings                          │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                          │                                               │
+│                          ▼                                               │
+│  ✓ Hoàn thành → Có thể bắt đầu nhận đơn hàng                            │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
+
+:::info Lưu ý quan trọng
+Một tài khoản merchant có thể quản lý **nhiều cửa hàng**. Sau khi login, hệ thống sẽ lấy danh sách cửa hàng và cho phép mapping với các chi nhánh TechRes tương ứng.
+:::
+
+Chi tiết về mapping cửa hàng: [Mapping cửa hàng](./store-mapping.md)
 
 ## Các loại Authentication
 

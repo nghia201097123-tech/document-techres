@@ -22,6 +22,35 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
 | **BeFood** | Username/Password | Planned |
 | **GoFood** | TBD | Future |
 
+## Khái niệm quan trọng
+
+### Mapping giữa Merchant và TechRes
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    MERCHANT (Food Platform)        TECHRES               │
+│                                                                          │
+│  Merchant Account                                 TechRes Tenant         │
+│  (Đăng nhập GrabFood)                            (Công ty ABC)           │
+│                                                                          │
+│  ├── Store A (Quận 1)        ←── mapping ──→     Branch 1 (CN Quận 1)   │
+│  ├── Store B (Quận 3)        ←── mapping ──→     Branch 2 (CN Quận 3)   │
+│  └── Store C (Thủ Đức)       ←── mapping ──→     Branch 3 (CN Thủ Đức)  │
+│                                                                          │
+│  Menu Items (Platform)                           Menu Items (TechRes)    │
+│  ├── M001: Cà phê sữa        ←── mapping ──→     SP001: Cà phê sữa      │
+│  ├── M002: Bánh mì           ←── mapping ──→     SP002: Bánh mì         │
+│  └── ...                                         ...                     │
+│                                                                          │
+│  (Product mapping sẽ phát triển sau để xuất định lượng)                  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Tại sao cần mapping?**
+- Một tài khoản merchant quản lý **nhiều cửa hàng** trên platform
+- Một tenant TechRes có **nhiều chi nhánh**
+- CCB của chi nhánh A chỉ được lấy đơn của store đã map với chi nhánh A
+
 ## Kiến trúc tổng quan
 
 ```
@@ -29,7 +58,7 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
 │                    FOOD PLATFORMS                                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                       │
 │  │  GrabFood   │  │ ShopeeFood  │  │   BeFood    │                       │
-│  │  Merchant   │  │  Merchant   │  │  Merchant   │                       │
+│  │  (Stores)   │  │  (Stores)   │  │  (Stores)   │                       │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                       │
 │         │                │                │                              │
 │         └────────────────┼────────────────┘                              │
@@ -44,14 +73,15 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
 │  ┌────────────────────────────────────────────────────────────────────┐  │
 │  │                    Food Platform Service                            │  │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │  │
-│  │  │   Account    │  │   Polling    │  │      Order Sync          │  │  │
-│  │  │   Manager    │  │   Service    │  │      Service             │  │  │
+│  │  │   Account    │  │    Store     │  │      Order Sync          │  │  │
+│  │  │   Manager    │  │   Mapping    │  │      Service             │  │  │
 │  │  └──────────────┘  └──────────────┘  └──────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
 │  │                      PostgreSQL                                     │  │
 │  │  ├── food_platform_accounts (credentials, tokens)                   │  │
+│  │  ├── food_platform_store_mappings (store ↔ branch)                  │  │
 │  │  └── food_orders (đơn hàng từ platforms)                            │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -77,7 +107,7 @@ Hệ thống tích hợp các nền tảng giao đồ ăn (GrabFood, ShopeeFood,
 
 ## Business Flow tổng quan
 
-### Flow 1: Liên kết tài khoản
+### Flow 1: Liên kết tài khoản + Mapping cửa hàng
 
 ```
 User trên CCB/Dashboard
@@ -92,21 +122,36 @@ API-Dashboard gọi Merchant API để authenticate
 Lưu token + credentials vào PostgreSQL
         │
         ▼
+Gọi API lấy danh sách cửa hàng của merchant
+        │
+        ▼
+Hiển thị UI mapping: Store (Platform) ↔ Branch (TechRes)
+        │
+        ▼
+Lưu store mappings vào food_platform_store_mappings
+        │
+        ▼
 Account status = CONNECTED
 ```
 
-**Chi tiết**: [Liên kết tài khoản](./account-linking.md)
+**Chi tiết**:
+- [Liên kết tài khoản](./account-linking.md)
+- [Mapping cửa hàng](./store-mapping.md)
 
-### Flow 2: Polling đơn hàng
+### Flow 2: Polling đơn hàng (với Store Filter)
 
 ```
-CCB gọi API mỗi 5 giây (configurable)
+CCB Chi nhánh A gọi API mỗi 5 giây
         │
         ▼
-API-Dashboard xác định các accounts đã liên kết của branch
+API-Dashboard query: "Chi nhánh A mapped với stores nào?"
         │
         ▼
-Polling song song đến từng platform (Grab, Shopee, BeFood)
+Tìm thấy: Store GR-001 (Grab), Store SF-001 (Shopee)
+        │
+        ▼
+Polling song song đến từng store đã mapping
+(Chỉ lấy đơn của stores này, không lấy stores khác)
         │
         ▼
 So sánh với DB để xác định đơn mới / đơn cập nhật
@@ -115,7 +160,7 @@ So sánh với DB để xác định đơn mới / đơn cập nhật
 Lưu vào PostgreSQL
         │
         ▼
-Trả kết quả về CCB
+Trả kết quả về CCB Chi nhánh A
 ```
 
 **Chi tiết**: [Polling đơn hàng](./order-polling.md)
@@ -181,7 +226,6 @@ Kiểm tra cấu hình auto_confirm_enabled
 interface FoodPlatformAccount {
   id: string;                    // UUID
   tenantId: string;              // Multi-tenant support
-  branchId: number;              // Chi nhánh
   platform: FoodPlatformType;    // GRAB | SHOPEE_FOOD | BEFOOD
 
   // Authentication
@@ -195,20 +239,38 @@ interface FoodPlatformAccount {
   refreshToken?: string;
   tokenExpiresAt?: Date;
 
-  // Store info
-  externalMerchantId?: string;   // ID trên platform
-  externalStoreName?: string;    // Tên cửa hàng
-
   // Status
   status: AccountStatus;         // PENDING | CONNECTING | CONNECTED | ERROR
   isActive: boolean;
 
   // Polling config
   pollIntervalSeconds: number;   // Default: 30
-  lastPollAt?: Date;
-  nextPollAt?: Date;
   errorCount: number;
   lastError?: string;
+}
+```
+
+### FoodPlatformStoreMapping
+
+```typescript
+interface FoodPlatformStoreMapping {
+  id: string;                      // UUID
+  accountId: string;               // FK to FoodPlatformAccount
+  tenantId: string;
+
+  // Merchant store info (from platform)
+  externalStoreId: string;         // Store ID trên platform (GR-001)
+  externalStoreName: string;       // "Cà phê TechRes Quận 1"
+  externalStoreAddress?: string;
+  isStoreActive: boolean;          // Trạng thái trên platform
+
+  // TechRes branch mapping
+  branchId: number;                // FK to branches
+  branchName?: string;             // Cache tên chi nhánh
+
+  // Status
+  isActive: boolean;               // Bật/tắt mapping
+  lastSyncedAt?: Date;             // Lần cuối sync store info
 }
 ```
 
@@ -306,11 +368,14 @@ enum AccountStatus {
 | Login APIs (structure) | ✅ Done | - |
 | CCB FoodOrderScreen UI | ✅ Done | - |
 | **Merchant API Integration** | ⚠️ TODO | High |
-| **Polling Service** | ⚠️ TODO | High |
+| **Store Mapping Logic** | ⚠️ TODO | High |
+| **food_platform_store_mappings Table** | ⚠️ TODO | High |
+| **Polling Service (with Store Filter)** | ⚠️ TODO | High |
 | **Order Sync Logic** | ⚠️ TODO | High |
 | **food_orders Table** | ⚠️ TODO | High |
 | **Auto-confirm Logic** | ⚠️ TODO | Medium |
 | **Auto-print Bill** | ⚠️ TODO | Medium |
+| **Product Mapping** | 📋 Future | Low |
 
 ## Files tham khảo
 
@@ -342,7 +407,9 @@ Frontend:
 ## Tiếp theo
 
 1. [Liên kết tài khoản](./account-linking.md) - Chi tiết flow đăng nhập
-2. [Polling đơn hàng](./order-polling.md) - Cơ chế polling 5s
-3. [Sync và lưu dữ liệu](./order-sync.md) - Logic so sánh và lưu DB
-4. [Hiển thị trên CCB](./ccb-display.md) - UI và UX trên CCB
-5. [Auto-confirm và in bill](./auto-confirm-print.md) - Tự động hóa
+2. [Mapping cửa hàng](./store-mapping.md) - Mapping store ↔ branch
+3. [Mapping sản phẩm](./product-mapping.md) - Mapping món ăn (Future)
+4. [Polling đơn hàng](./order-polling.md) - Cơ chế polling 5s với store filter
+5. [Sync và lưu dữ liệu](./order-sync.md) - Logic so sánh và lưu DB
+6. [Hiển thị trên CCB](./ccb-display.md) - UI và UX trên CCB
+7. [Auto-confirm và in bill](./auto-confirm-print.md) - Tự động hóa

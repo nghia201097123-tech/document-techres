@@ -56,6 +56,8 @@ const sidebars: SidebarsConfig = {
       items: [
         'food-platform/overview',
         'food-platform/account-linking',
+        'food-platform/store-mapping',
+        'food-platform/product-mapping',
         'food-platform/order-polling',
         'food-platform/order-sync',
         'food-platform/ccb-display',
