@@ -254,6 +254,10 @@ object HybridBillPrintService {
                     Log.d(TAG, "Sunmi connected successfully")
                     return PrinterResult.Success("Connected")
                 }
+                is com.techres.ccb.printer.core.PrinterResult.PartialSuccess -> {
+                    Log.d(TAG, "Sunmi connected with partial success")
+                    return PrinterResult.Success("Connected")
+                }
                 is com.techres.ccb.printer.core.PrinterResult.Error -> {
                     lastError = connectResult.message
                     Log.w(TAG, "Connect attempt ${attempt + 1} failed: ${connectResult.message}")
@@ -357,6 +361,12 @@ object HybridBillPrintService {
                     Log.d(TAG, "Waiting ${processingTime}ms for printer to process...")
                     delay(processingTime)
 
+                    return PrinterResult.Success("OK")
+                }
+                is com.techres.ccb.printer.core.PrinterResult.PartialSuccess -> {
+                    Log.d(TAG, "Copy ${copyIndex + 1} sent with partial success: ${content.size} bytes")
+                    val processingTime = calculateProcessingTime(content.size)
+                    delay(processingTime)
                     return PrinterResult.Success("OK")
                 }
                 is com.techres.ccb.printer.core.PrinterResult.Error -> {
