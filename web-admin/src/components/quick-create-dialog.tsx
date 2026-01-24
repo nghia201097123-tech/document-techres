@@ -55,7 +55,7 @@ export function QuickCreateDialog({ open, onOpenChange, onSuccess }: QuickCreate
   const [createdResult, setCreatedResult] = React.useState<WizardResponse | null>(null);
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
   const { toast } = useToast();
-  const checkAliasTimeoutRef = React.useRef<NodeJS.Timeout>();
+  const checkAliasTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Auto-generate alias when company name changes
   const handleCompanyNameChange = (name: string) => {
