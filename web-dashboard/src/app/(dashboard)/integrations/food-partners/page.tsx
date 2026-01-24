@@ -597,7 +597,7 @@ export default function FoodPartnersPage() {
     try {
       const result = await foodPartnerService.testConnection(connectionId);
 
-      if (result.status === ConnectionStatus.CONNECTED) {
+      if (result.success || result.status === ConnectionStatus.CONNECTED) {
         toast({
           title: "Kết nối thành công",
           description: result.message || "Tài khoản đang hoạt động bình thường",
@@ -612,6 +612,7 @@ export default function FoodPartnersPage() {
 
       // Reload data to update status
       loadData();
+      loadBranchLinkData();
     } catch (error: any) {
       toast({
         title: "Lỗi kết nối",

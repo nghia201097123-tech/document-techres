@@ -474,6 +474,60 @@ export class AccountsService {
   }
 
   /**
+   * Test connection by calling platform API
+   * Auto-reconnect if token expired (401)
+   */
+  async testConnection(accountId: string): Promise<{
+    success: boolean;
+    status: AccountStatus;
+    message: string;
+  }> {
+    this.logger.log(`[testConnection] Testing connection for account ${accountId}`);
+    const account = await this.getAccountById(accountId);
+
+    // If account is not connected, try to reconnect first
+    if (account.status === AccountStatus.DISCONNECTED) {
+      this.logger.log(`[testConnection] Account is DISCONNECTED, attempting to reconnect...`);
+      try {
+        const reconnectedAccount = await this.reconnect(accountId);
+        return {
+          success: true,
+          status: reconnectedAccount.status,
+          message: 'Kết nối lại thành công',
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          status: AccountStatus.DISCONNECTED,
+          message: error?.message || 'Không thể kết nối lại. Vui lòng đăng nhập lại.',
+        };
+      }
+    }
+
+    // Try to call getStores to test the connection (this has auto-reconnect logic)
+    try {
+      this.logger.log(`[testConnection] Calling getStores to test connection...`);
+      await this.getStores(accountId);
+
+      // If we get here, connection is working
+      const updatedAccount = await this.getAccountById(accountId);
+      return {
+        success: true,
+        status: updatedAccount.status,
+        message: 'Kết nối đang hoạt động bình thường',
+      };
+    } catch (error: any) {
+      // getStores failed, return the error
+      const failedAccount = await this.getAccountById(accountId);
+      return {
+        success: false,
+        status: failedAccount.status,
+        message: error?.message || failedAccount.lastError || 'Kết nối có vấn đề',
+      };
+    }
+  }
+
+  /**
    * Update account branch assignment
    */
   async updateBranch(

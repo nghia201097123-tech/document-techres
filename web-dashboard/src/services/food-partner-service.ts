@@ -304,18 +304,11 @@ export const foodPartnerService = {
   },
 
   /**
-   * Test connection status
+   * Test connection by calling platform API (with auto-reconnect)
    */
-  async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string }> {
-    // For now, just get the account status
-    const response = await foodApi.get<ApiResponse<FoodPlatformAccount>>(`/accounts/${connectionId}`);
-    const account = response.data.data;
-    return {
-      status: account.status,
-      message: account.status === ConnectionStatus.CONNECTED
-        ? "Tài khoản đang hoạt động bình thường"
-        : account.lastError || "Kết nối có vấn đề",
-    };
+  async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string; success?: boolean }> {
+    const response = await foodApi.post<ApiResponse<{ success: boolean; status: ConnectionStatus; message: string }>>(`/accounts/${connectionId}/test`);
+    return response.data.data;
   },
 
   /**

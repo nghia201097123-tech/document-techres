@@ -204,6 +204,19 @@ export class AccountsController {
   }
 
   /**
+   * Test connection by calling platform API
+   */
+  @Post(':id/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kiểm tra kết nối bằng cách gọi API platform' })
+  @ApiParam({ name: 'id', description: 'Account ID' })
+  @ApiResponse({ status: 200, description: 'Kiểm tra thành công' })
+  async testConnection(@Param('id') id: string) {
+    const result = await this.accountsService.testConnection(id);
+    return ApiResponseDto.success(result, result.message);
+  }
+
+  /**
    * Update account branch assignment
    */
   @Patch(':id/branch')
