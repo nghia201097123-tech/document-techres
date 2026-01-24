@@ -168,7 +168,20 @@ class BillPrinterConfigViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 billPrinterConfigDao.getAllByBranch(branchId).collect { configs ->
-                    _uiState.update { it.copy(printerConfigs = configs, isLoading = false) }
+                    // Sắp xếp: Sunmi printer (tự động phát hiện) luôn ở trên đầu
+                    val sortedConfigs = configs.sortedWith(
+                        compareBy<BillPrinterConfigEntity> {
+                            // Sunmi printer lên đầu (connectionType = "sunmi")
+                            if (it.connectionType == "sunmi") 0 else 1
+                        }.thenBy {
+                            // Sau đó theo sortOrder
+                            it.sortOrder
+                        }.thenBy {
+                            // Cuối cùng theo tên
+                            it.name
+                        }
+                    )
+                    _uiState.update { it.copy(printerConfigs = sortedConfigs, isLoading = false) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading data: ${e.message}", e)

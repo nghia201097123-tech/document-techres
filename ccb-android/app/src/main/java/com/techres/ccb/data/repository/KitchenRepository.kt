@@ -26,6 +26,13 @@ class KitchenRepository @Inject constructor(
         kitchenDao.syncKitchens(branchId, kitchens)
     }
 
+    /**
+     * Insert a single kitchen (e.g., auto-detected Sunmi printer kitchen)
+     */
+    suspend fun insert(kitchen: KitchenEntity) {
+        kitchenDao.insert(kitchen)
+    }
+
     suspend fun updatePrinterConfig(
         kitchenId: String,
         ip: String?,
