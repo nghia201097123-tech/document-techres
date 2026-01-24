@@ -17,6 +17,7 @@ import {
   Building2,
   ArrowRightLeft,
   Store,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,6 +129,11 @@ export default function FoodPartnersPage() {
   const [externalStores, setExternalStores] = React.useState<Record<string, ExternalStore[]>>({});
   const [loadingStores, setLoadingStores] = React.useState<string | null>(null);
   const [expandedAccount, setExpandedAccount] = React.useState<string | null>(null);
+
+  // Branch linking dialog states
+  const [branchLinkDialogOpen, setBranchLinkDialogOpen] = React.useState(false);
+  const [selectedAccountForLink, setSelectedAccountForLink] = React.useState<string | null>(null);
+  const [selectedStoreForLink, setSelectedStoreForLink] = React.useState<ExternalStore | null>(null);
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -263,6 +269,23 @@ export default function FoodPartnersPage() {
         handleFetchStores(accountId);
       }
     }
+  };
+
+  // Open branch link dialog
+  const openBranchLinkDialog = (accountId: string, store: ExternalStore) => {
+    setSelectedAccountForLink(accountId);
+    setSelectedStoreForLink(store);
+    setBranchLinkDialogOpen(true);
+  };
+
+  // Handle branch link from dialog
+  const handleBranchLink = async (branchId: string) => {
+    if (!selectedAccountForLink) return;
+
+    await handleUpdateAccountBranch(selectedAccountForLink, branchId);
+    setBranchLinkDialogOpen(false);
+    setSelectedAccountForLink(null);
+    setSelectedStoreForLink(null);
   };
 
   // Open link dialog
@@ -901,25 +924,15 @@ export default function FoodPartnersPage() {
                                           </div>
                                         </div>
                                         <div className="ml-4">
-                                          <Select
-                                            onValueChange={(value) => {
-                                              // For now, just update the account's branch
-                                              // In future, this could create a store mapping
-                                              handleUpdateAccountBranch(account.id, value);
-                                            }}
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                            onClick={() => openBranchLinkDialog(account.id, store)}
                                           >
-                                            <SelectTrigger className="w-[180px]">
-                                              <ArrowRightLeft className="h-4 w-4 mr-1" />
-                                              <SelectValue placeholder="Liên kết chi nhánh" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {branches.map((branch) => (
-                                                <SelectItem key={branch.id} value={branch.id}>
-                                                  {branch.name}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
+                                            <Plus className="h-4 w-4 mr-1" />
+                                            Liên kết
+                                          </Button>
                                         </div>
                                       </div>
                                     </div>
@@ -1085,6 +1098,56 @@ export default function FoodPartnersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Branch Link Dialog */}
+      <Dialog open={branchLinkDialogOpen} onOpenChange={setBranchLinkDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-green-600" />
+              Liên kết chi nhánh
+            </DialogTitle>
+            <DialogDescription>
+              {selectedStoreForLink && (
+                <>
+                  Chọn chi nhánh để liên kết với cửa hàng <strong>{selectedStoreForLink.name}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedStoreForLink && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+                <div className="font-medium mb-1">{selectedStoreForLink.name}</div>
+                <div className="text-muted-foreground text-xs">ID: {selectedStoreForLink.externalStoreId}</div>
+                {selectedStoreForLink.address && (
+                  <div className="text-muted-foreground text-xs mt-1">{selectedStoreForLink.address}</div>
+                )}
+              </div>
+            )}
+            <Label className="mb-2 block">Chọn chi nhánh</Label>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {branches.map((branch) => (
+                <Button
+                  key={branch.id}
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 px-4"
+                  onClick={() => handleBranchLink(branch.id)}
+                  disabled={updatingAccount !== null}
+                >
+                  <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{branch.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBranchLinkDialogOpen(false)}>
+              Hủy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
