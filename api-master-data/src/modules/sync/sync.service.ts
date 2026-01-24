@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
 import { Category, Product, BranchProduct, Area, Table, Staff, Device, Brand, Branch, StaffBranch, SeasonalPrice, SeasonalPriceProduct, Coupon, ToppingGroup, ToppingGroupItem, ProductToppingGroup, ProductNote, ProductNoteAssignment, ComboItem, Kitchen, ProductKitchen, BillTemplate, BillPrinterConfig, Surcharge, BankAccount } from '../../entities';
 import {
   FullSyncResponseDto,
@@ -22,11 +25,16 @@ import {
   BillPrinterConfigDto,
   SurchargeDto,
   BankAccountDto,
+  FoodPlatformSyncDto,
 } from './dto/sync.dto';
 
 @Injectable()
 export class SyncService {
+  private readonly foodApiUrl: string;
+
   constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
     @InjectRepository(Product)
@@ -77,7 +85,10 @@ export class SyncService {
     private surchargeRepository: Repository<Surcharge>,
     @InjectRepository(BankAccount)
     private bankAccountRepository: Repository<BankAccount>,
-  ) {}
+  ) {
+    // Get food API URL from config or use default
+    this.foodApiUrl = this.configService.get<string>('FOOD_API_URL') || 'http://localhost:3003';
+  }
 
   /**
    * Sync brands and branches based on staff's permissions
@@ -521,6 +532,9 @@ export class SyncService {
 
       const syncTime = new Date().toISOString();
 
+      // Fetch food platform data from api-app-food
+      const foodPlatformData = await this.fetchFoodPlatformData(branchId);
+
       return {
         success: true,
         data: {
@@ -539,6 +553,7 @@ export class SyncService {
           billPrinterConfigs: billPrinterConfigs.map(bpc => this.mapBillPrinterConfig(bpc)),
           surcharges: surcharges.map(s => this.mapSurcharge(s)),
           bankAccounts: bankAccounts.map(ba => this.mapBankAccount(ba)),
+          foodPlatform: foodPlatformData,
         },
         syncTime,
         message: null,
@@ -1094,5 +1109,39 @@ export class SyncService {
       isPrimary: ba.isPrimary,
       isActive: ba.isActive,
     };
+  }
+
+  /**
+   * Fetch food platform data from api-app-food service
+   * Returns accounts, store mappings, and item mappings for a specific branch
+   */
+  private async fetchFoodPlatformData(branchId: string): Promise<FoodPlatformSyncDto | null> {
+    try {
+      console.log(`[SyncService.fetchFoodPlatformData] Fetching from ${this.foodApiUrl}/api/public/sync/food-platform/${branchId}`);
+
+      const response = await firstValueFrom(
+        this.httpService.get(`${this.foodApiUrl}/api/public/sync/food-platform/${branchId}`, {
+          timeout: 10000, // 10 second timeout
+        })
+      );
+
+      if (response.data?.status === 200 && response.data?.data) {
+        const data = response.data.data;
+        console.log(`[SyncService.fetchFoodPlatformData] Found ${data.accounts?.length || 0} accounts, ${data.itemMappings?.length || 0} item mappings`);
+
+        return {
+          accounts: data.accounts || [],
+          itemMappings: data.itemMappings || [],
+          syncedAt: data.syncedAt || new Date().toISOString(),
+        };
+      }
+
+      console.log(`[SyncService.fetchFoodPlatformData] No food platform data found for branch ${branchId}`);
+      return null;
+    } catch (error) {
+      // Don't fail the sync if food platform API is unavailable
+      console.error(`[SyncService.fetchFoodPlatformData] Error fetching food platform data:`, error.message);
+      return null;
+    }
   }
 }

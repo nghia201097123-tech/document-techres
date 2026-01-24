@@ -988,6 +988,105 @@ export class BillPrinterConfigDto {
   updatedAt: string;
 }
 
+// ============ Food Platform Account DTOs ============
+
+export class FoodPlatformStoreMappingDto {
+  @ApiProperty({ description: 'ID mapping' })
+  id: string;
+
+  @ApiProperty({ description: 'External store ID on platform' })
+  externalStoreId: string;
+
+  @ApiProperty({ description: 'External store name' })
+  externalStoreName: string;
+
+  @ApiProperty({ description: 'External store address', nullable: true })
+  externalStoreAddress: string | null;
+
+  @ApiProperty({ description: 'TechRes branch ID' })
+  branchId: number;
+
+  @ApiProperty({ description: 'TechRes branch name' })
+  branchName: string;
+
+  @ApiProperty()
+  isActive: boolean;
+}
+
+export class FoodPlatformAccountInfoDto {
+  @ApiProperty({ description: 'Account ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Tenant ID' })
+  tenantId: string;
+
+  @ApiProperty({ description: 'Platform: grab, shopee, etc.' })
+  platform: string;
+
+  @ApiProperty({ description: 'Display name' })
+  displayName: string;
+
+  @ApiProperty({ description: 'Account status: pending, otp_required, connected, disconnected' })
+  status: string;
+
+  @ApiProperty({ description: 'External merchant ID', nullable: true })
+  externalMerchantId: string | null;
+
+  @ApiProperty({ description: 'External merchant name', nullable: true })
+  externalMerchantName: string | null;
+
+  @ApiProperty()
+  isActive: boolean;
+}
+
+export class FoodPlatformAccountDto {
+  @ApiProperty({ type: FoodPlatformAccountInfoDto })
+  account: FoodPlatformAccountInfoDto;
+
+  @ApiProperty({ type: [FoodPlatformStoreMappingDto] })
+  storeMappings: FoodPlatformStoreMappingDto[];
+}
+
+export class FoodPlatformItemMappingDto {
+  @ApiProperty({ description: 'Mapping ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Account ID' })
+  accountId: string;
+
+  @ApiProperty({ description: 'External item ID in our DB' })
+  externalItemId: string;
+
+  @ApiProperty({ description: 'Platform item ID from GrabFood/Shopee' })
+  externalPlatformItemId: string;
+
+  @ApiProperty({ description: 'External item name' })
+  externalItemName: string;
+
+  @ApiProperty({ description: 'TechRes brand ID (UUID string)' })
+  techresBrandId: string;
+
+  @ApiProperty({ description: 'TechRes item ID (UUID string)' })
+  techresItemId: string;
+
+  @ApiProperty({ description: 'TechRes item name' })
+  techresItemName: string;
+
+  @ApiProperty({ description: 'Mapping type: item, combo, modifier' })
+  mappingType: string;
+}
+
+export class FoodPlatformSyncDto {
+  @ApiProperty({ type: [FoodPlatformAccountDto], description: 'Food platform accounts with store mappings' })
+  accounts: FoodPlatformAccountDto[];
+
+  @ApiProperty({ type: [FoodPlatformItemMappingDto], description: 'Item mappings between platforms and TechRes' })
+  itemMappings: FoodPlatformItemMappingDto[];
+
+  @ApiProperty({ description: 'Sync timestamp' })
+  syncedAt: string;
+}
+
 // Bank Account DTO for sync
 export class BankAccountDto {
   @ApiProperty()
@@ -1079,6 +1178,9 @@ export class FullSyncDataDto {
 
   @ApiProperty({ type: [BankAccountDto], description: 'Danh sách tài khoản ngân hàng thanh toán' })
   bankAccounts: BankAccountDto[];
+
+  @ApiProperty({ type: FoodPlatformSyncDto, description: 'Food platform accounts and item mappings', nullable: true })
+  foodPlatform: FoodPlatformSyncDto | null;
 }
 
 export class FullSyncResponseDto {
