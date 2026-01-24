@@ -35,9 +35,24 @@ import com.techres.ccb.data.local.entity.KitchenPrintMode
 import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.printer.KitchenTicketPrintService
+import com.techres.ccb.data.printer.KitchenTicketPrintService.Companion.SUNMI_PRINTER_IP
 import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.presentation.components.PosTopAppBar
 import java.util.Date
+
+/**
+ * Kitchen printer connection type
+ */
+private enum class KitchenPrinterType(val displayName: String) {
+    TCP_IP("Máy in TCP/IP (Mạng)"),
+    SUNMI("Máy in Sunmi tích hợp");
+
+    companion object {
+        fun fromPrinterIp(printerIp: String?): KitchenPrinterType {
+            return if (printerIp == SUNMI_PRINTER_IP) SUNMI else TCP_IP
+        }
+    }
+}
 
 /**
  * Get icon for kitchen based on type
@@ -472,9 +487,19 @@ private fun KitchenPrinterCard(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     if (kitchen.printerIp != null) {
+                        val isSunmiPrinter = kitchen.printerIp == SUNMI_PRINTER_IP
+
                         PrinterInfoRow("Tên máy in", kitchen.printerName ?: "Chưa đặt tên")
-                        PrinterInfoRow("Địa chỉ IP", kitchen.printerIp!!)
-                        PrinterInfoRow("Cổng", kitchen.printerPort.toString())
+
+                        if (isSunmiPrinter) {
+                            // Display Sunmi printer info
+                            PrinterInfoRow("Loại kết nối", "Máy in Sunmi tích hợp")
+                        } else {
+                            // Display TCP/IP printer info
+                            PrinterInfoRow("Địa chỉ IP", kitchen.printerIp!!)
+                            PrinterInfoRow("Cổng", kitchen.printerPort.toString())
+                        }
+
                         PrinterInfoRow("Protocol", kitchen.getPrinterProtocolEnum().displayName)
                         PrinterInfoRow("Chế độ in", when (kitchen.getPrintModeEnum()) {
                             KitchenPrintMode.TICKET -> "Phiếu bếp"
@@ -589,8 +614,10 @@ private fun PrinterConfigDialog(
     val color = getKitchenColor(kitchen.kitchenType)
 
     var printerName by remember { mutableStateOf(kitchen.printerName ?: "") }
-    var printerIp by remember { mutableStateOf(kitchen.printerIp ?: "") }
+    var selectedPrinterType by remember { mutableStateOf(KitchenPrinterType.fromPrinterIp(kitchen.printerIp)) }
+    var printerIp by remember { mutableStateOf(if (kitchen.printerIp == SUNMI_PRINTER_IP) "" else (kitchen.printerIp ?: "")) }
     var printerPort by remember { mutableStateOf(kitchen.printerPort.toString()) }
+    var printerTypeExpanded by remember { mutableStateOf(false) }
     var selectedProtocol by remember { mutableStateOf(kitchen.getPrinterProtocolEnum()) }
     var selectedLabelSize by remember { mutableStateOf(kitchen.getLabelSize()) }
     var printDensity by remember { mutableStateOf(kitchen.printDensity) }
@@ -695,33 +722,144 @@ private fun PrinterConfigDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // IP Address and Port in a row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Printer Type Selection (TCP/IP or Sunmi)
+                Text(
+                    text = "Loại kết nối máy in",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = printerTypeExpanded,
+                    onExpandedChange = { printerTypeExpanded = !printerTypeExpanded }
                 ) {
                     OutlinedTextField(
-                        value = printerIp,
-                        onValueChange = { printerIp = it },
-                        label = { Text("IP Address") },
-                        placeholder = { Text("192.168.1.100") },
-                        modifier = Modifier.weight(2f),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp)
+                        value = selectedPrinterType.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = printerTypeExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = color,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
                     )
-                    OutlinedTextField(
-                        value = printerPort,
-                        onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
-                        label = { Text("Port") },
-                        placeholder = { Text("9100") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    ExposedDropdownMenu(
+                        expanded = printerTypeExpanded,
+                        onDismissRequest = { printerTypeExpanded = false }
+                    ) {
+                        KitchenPrinterType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = type.displayName,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = when (type) {
+                                                KitchenPrinterType.TCP_IP -> "Kết nối qua địa chỉ IP (mạng LAN/WiFi)"
+                                                KitchenPrinterType.SUNMI -> "Máy in tích hợp sẵn trên thiết bị Sunmi"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedPrinterType = type
+                                    printerTypeExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (type) {
+                                            KitchenPrinterType.TCP_IP -> Icons.Default.Wifi
+                                            KitchenPrinterType.SUNMI -> Icons.Default.PhoneAndroid
+                                        },
+                                        contentDescription = null,
+                                        tint = if (selectedPrinterType == type) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Show Sunmi printer info when selected
+                if (selectedPrinterType == KitchenPrinterType.SUNMI) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE8F5E9)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Máy in Sunmi tích hợp",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF2E7D32)
+                                )
+                                Text(
+                                    text = "Sử dụng máy in có sẵn trên thiết bị Sunmi T1/T2/V2",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF388E3C)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // IP Address and Port in a row - only show for TCP/IP
+                if (selectedPrinterType == KitchenPrinterType.TCP_IP) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = printerIp,
+                            onValueChange = { printerIp = it },
+                            label = { Text("IP Address") },
+                            placeholder = { Text("192.168.1.100") },
+                            modifier = Modifier.weight(2f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = printerPort,
+                            onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
+                            label = { Text("Port") },
+                            placeholder = { Text("9100") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1490,8 +1628,13 @@ private fun PrinterConfigDialog(
 
                     Button(
                         onClick = {
+                            // Use "sunmi" as IP when Sunmi printer is selected
+                            val effectivePrinterIp = when (selectedPrinterType) {
+                                KitchenPrinterType.SUNMI -> SUNMI_PRINTER_IP
+                                KitchenPrinterType.TCP_IP -> printerIp
+                            }
                             onSave(
-                                printerIp,
+                                effectivePrinterIp,
                                 printerPort.toIntOrNull() ?: 9100,
                                 printerName,
                                 selectedProtocol,
