@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
 import { BasePlatformConnector } from './base.connector';
 import {
@@ -243,19 +244,22 @@ export class GrabConnector extends BasePlatformConnector {
 
   /**
    * Get menu from GrabFood
-   * Endpoint: GET /food/merchant/v2/menu
+   * Endpoint: GET https://api.grab.com/food/merchant/v2/menu
+   * Note: Menu API uses different domain (api.grab.com/food) than MEX API (api.grab.com/mex-app)
    */
   async getMenu(account: FoodPlatformAccount): Promise<any> {
     try {
-      this.logger.debug('[GrabConnector] Fetching menu...');
+      this.logger.debug('[GrabConnector] Fetching menu from api.grab.com/food...');
 
-      const response = await this.httpClient.get(
-        '/food/merchant/v2/menu',
+      // Menu API uses different base URL and Authorization header
+      const response = await axios.get(
+        'https://api.grab.com/food/merchant/v2/menu',
         {
           headers: {
-            'x-mts-ssid': account.accessToken,
+            'Authorization': account.accessToken,
             'x-user-type': 'user-profile',
           },
+          timeout: 30000,
         },
       );
 
