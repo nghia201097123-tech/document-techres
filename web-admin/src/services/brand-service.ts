@@ -36,12 +36,12 @@ interface UpdateBrandData extends Partial<CreateBrandData> {
 }
 
 // Helper to clean data - remove empty strings for optional fields
-function cleanBrandData<T extends Record<string, unknown>>(data: T): T {
+function cleanBrandData<T extends object>(data: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(data).filter(
       ([, value]) => value !== undefined && value !== ""
     )
-  ) as T;
+  ) as Partial<T>;
 }
 
 export const brandService = {
