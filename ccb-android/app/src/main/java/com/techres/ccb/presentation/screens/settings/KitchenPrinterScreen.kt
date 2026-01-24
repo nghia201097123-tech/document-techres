@@ -35,7 +35,7 @@ import com.techres.ccb.data.local.entity.KitchenPrintMode
 import com.techres.ccb.data.printer.PrinterService
 import com.techres.ccb.data.printer.PrinterResult
 import com.techres.ccb.data.printer.KitchenTicketPrintService
-import com.techres.ccb.data.printer.KitchenTicketPrintService.Companion.SUNMI_PRINTER_IP
+import com.techres.ccb.data.printer.KitchenTicketPrintService.SUNMI_PRINTER_IP
 import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.presentation.components.PosTopAppBar
 import java.util.Date
