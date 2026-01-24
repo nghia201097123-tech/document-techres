@@ -1132,7 +1132,7 @@ class HybridBillBuilder(
         try {
             // QR size = 60% of paper width, capped between 150-300 pixels
             val qrSize = (pixelWidth * 0.6).toInt().coerceIn(150, 300)
-            Log.d(TAG, "QR code: paperWidth-based pixelWidth=$pixelWidth, qrSize=$qrSize")
+            Log.d(TAG, "QR code: paperWidth-based pixelWidth=$pixelWidth, qrSize=$qrSize, collectBitmapsMode=$collectBitmapsMode")
 
             // Kiểm tra nếu content là URL hình ảnh QR
             // Hỗ trợ: sepay.vn, vietqr.io, payos.vn
@@ -1166,25 +1166,35 @@ class HybridBillBuilder(
                 val centeredBitmap = centerQrBitmap(qrBitmap, pixelWidth)
                 qrBitmap.recycle()
 
-                // In bitmap đã căn giữa (không scale vì đã đúng kích thước)
-                buffer.write(EscPosCommands.printRasterBitmap(centeredBitmap, 0))
-                Log.d(TAG, "QR code printed centered: qr=${qrSize}x${qrSize}, canvas=${centeredBitmap.width}x${centeredBitmap.height}")
-                centeredBitmap.recycle()
+                if (collectBitmapsMode) {
+                    // Bitmap mode cho Sunmi: Thêm vào collectedBitmaps
+                    collectedBitmaps.add(centeredBitmap)
+                    Log.d(TAG, "QR code added to collectedBitmaps: ${centeredBitmap.width}x${centeredBitmap.height}")
+                } else {
+                    // ESC/POS mode cho TCP/IP: In bitmap đã căn giữa
+                    buffer.write(EscPosCommands.printRasterBitmap(centeredBitmap, 0))
+                    Log.d(TAG, "QR code printed centered: qr=${qrSize}x${qrSize}, canvas=${centeredBitmap.width}x${centeredBitmap.height}")
+                    centeredBitmap.recycle()
+                }
             } else {
                 // Last resort: ESC/POS QR command (nhiều máy in không hỗ trợ)
                 Log.e(TAG, "All QR methods failed, trying ESC/POS command as last resort")
-                buffer.write(EscPosCommands.ALIGN_CENTER)
-                buffer.write(EscPosCommands.printQRCode(content, size))
-                buffer.write(EscPosCommands.ALIGN_LEFT)
+                if (!collectBitmapsMode) {
+                    buffer.write(EscPosCommands.ALIGN_CENTER)
+                    buffer.write(EscPosCommands.printQRCode(content, size))
+                    buffer.write(EscPosCommands.ALIGN_LEFT)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "QR code error: ${e.message}")
-            try {
-                buffer.write(EscPosCommands.ALIGN_CENTER)
-                buffer.write(EscPosCommands.printQRCode(content, size))
-                buffer.write(EscPosCommands.ALIGN_LEFT)
-            } catch (e2: Exception) {
-                Log.e(TAG, "ESC/POS QR also failed: ${e2.message}")
+            if (!collectBitmapsMode) {
+                try {
+                    buffer.write(EscPosCommands.ALIGN_CENTER)
+                    buffer.write(EscPosCommands.printQRCode(content, size))
+                    buffer.write(EscPosCommands.ALIGN_LEFT)
+                } catch (e2: Exception) {
+                    Log.e(TAG, "ESC/POS QR also failed: ${e2.message}")
+                }
             }
         }
         return this
@@ -1327,7 +1337,7 @@ class HybridBillBuilder(
      *
      * LƯU Ý: Method này dành cho máy in TCP/IP (WiFi/LAN)
      * - Máy in TCP/IP có dao cắt ngay tại đầu in, không cần feed nhiều
-     * - Chỉ cần feed tối thiểu để đảm bảo footer không bị cắt
+     * - Chỉ dùng cutWithFeed với feed tối thiểu để tránh khoảng trắng lớn ở cuối
      *
      * Đối với Sunmi T1:
      * - Sunmi T1 có khoảng cách lớn giữa đầu in và dao cắt (~20-25mm)
@@ -1338,10 +1348,9 @@ class HybridBillBuilder(
         if (useBitmapMode) {
             buffer.write(EscPosCommands.LINE_SPACING_DEFAULT)
         }
-        // Feed 3 dòng (~8mm) - đủ cho TCP/IP printers
-        buffer.write(EscPosCommands.feedLines(3))
-        // Sử dụng cutWithFeed(1) - cắt với feed tối thiểu
-        buffer.write(EscPosCommands.cutWithFeed(1))
+        // Chỉ dùng cutWithFeed(2) - cắt với feed tối thiểu (~5mm)
+        // Không cần feedLines() thêm vì đã có cutWithFeed
+        buffer.write(EscPosCommands.cutWithFeed(2))
         return this
     }
 
@@ -1384,9 +1393,9 @@ class HybridBillBuilder(
 
         Log.d(TAG, "buildBitmaps(): Collected ${collectedBitmaps.size} bitmaps")
 
-        // Thêm blank bitmap ở cuối để footer không bị cắt
-        // Khoảng cách đầu in - dao cắt trên Sunmi T1 khoảng 20-25mm (~100 pixels)
-        val feedHeightPixels = 100 // ~25mm extra margin
+        // Thêm blank bitmap nhỏ ở cuối để đảm bảo nội dung không bị cắt
+        // Giảm từ 100px xuống 24px (~6mm) vì Sunmi T1 sẽ tự động feed thêm khi cắt
+        val feedHeightPixels = 24 // ~6mm margin
         if (feedHeightPixels > 0 && collectedBitmaps.isNotEmpty()) {
             val feedBitmap = Bitmap.createBitmap(pixelWidth, feedHeightPixels, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(feedBitmap)

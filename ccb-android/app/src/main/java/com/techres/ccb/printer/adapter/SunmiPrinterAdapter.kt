@@ -1117,12 +1117,15 @@ class SunmiPrinterAdapter @Inject constructor(
     /**
      * Print bitmap via AIDL transact() for BinderProxy
      * Sunmi printBitmap(Bitmap bitmap, ICallback callback)
+     *
+     * LƯU Ý: Không gọi initPrinterViaTransact ở đây vì:
+     * 1. Có thể gây ra khoảng trắng ở đầu mỗi bitmap
+     * 2. Printer đã được init khi connect
      */
     private fun printBitmapViaTransact(binder: IBinder, bitmap: Bitmap): PrinterResult {
         val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
 
-        // First, initialize printer
-        initPrinterViaTransact(binder)
+        // Không cần initPrinterViaTransact - đã init khi connect, tránh khoảng trắng đầu trang
 
         // Convert to grayscale for better thermal printing compatibility
         val grayscaleBitmap = convertToGrayscale(bitmap)
