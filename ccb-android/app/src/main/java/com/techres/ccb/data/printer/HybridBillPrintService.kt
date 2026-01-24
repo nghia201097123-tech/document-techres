@@ -247,44 +247,21 @@ object HybridBillPrintService {
                     }
                 }
 
-                // QUAN TRỌNG: Đợi máy in xử lý xong tất cả data trước khi feed/cut
-                // Nếu không đợi, lệnh cut có thể đến trước khi footer được in xong
-                // dẫn đến footer bị cắt và in qua bill sau
-                Log.d(TAG, "Waiting for printer to finish processing all data before feed/cut...")
-
-                // Bước 1: Commit buffer để đảm bảo tất cả data đã gửi
-                adapter.commitBuffer()
-
-                // Bước 2: Đợi máy in xử lý xong buffer (polling printer state)
-                // Đây là bước QUAN TRỌNG để tránh footer bị cắt và in sang bill kế tiếp
-                val isIdle = adapter.waitForPrinterIdle(timeoutMs = 5000, pollIntervalMs = 150)
-                if (!isIdle) {
-                    Log.w(TAG, "Printer did not become idle within timeout, adding extra delay")
-                    delay(1000) // Fallback delay nếu polling timeout
-                }
-
-                // Bước 3: Thêm delay cố định để đảm bảo an toàn (máy in có thể báo idle sớm)
-                delay(300)
-
                 // Feed paper và cắt giấy nếu config cho phép
+                // LƯU Ý: Không cần đợi waitForPrinterIdle ở đây vì:
+                // 1. printBitmap đã có commitBuffer() bên trong
+                // 2. Sunmi printer tự queue các lệnh theo thứ tự
+                // 3. Việc đợi idle gây chậm 5-7 giây không cần thiết
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper as per config...")
-                    // Đẩy giấy nhiều hơn (12 dòng ~30mm) để footer không bị cắt bởi dao
-                    adapter.feedLines(12)
-
-                    // Đợi feed hoàn tất
-                    delay(200)
-                    adapter.commitBuffer()
-
-                    // Đợi máy in xử lý xong lệnh feed trước khi cắt
-                    adapter.waitForPrinterIdle(timeoutMs = 2000, pollIntervalMs = 100)
-                    delay(100)
-
+                    // Đẩy giấy 6 dòng (~15mm) - vừa đủ để dao cắt đúng vị trí
+                    // Sunmi T1/V2 có khoảng cách đầu in - dao cắt khoảng 12-15mm
+                    adapter.feedLines(6)
                     adapter.cutPaper()
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
                     Log.d(TAG, "No auto-cut, feeding paper...")
-                    adapter.feedLines(10)
+                    adapter.feedLines(5)
                 }
 
                 // Recycle bitmaps
@@ -937,14 +914,16 @@ object HybridBillPrintService {
 
     /**
      * Tính toán thời gian đợi máy in xử lý bitmap dựa trên kích thước
+     * LƯU Ý: Giảm delay tối thiểu vì Sunmi tự queue lệnh theo thứ tự,
+     * không cần đợi lâu giữa các bitmap
      */
     private fun calculateBitmapProcessingTime(bitmap: Bitmap): Long {
         val pixelCount = bitmap.width * bitmap.height
         return when {
-            pixelCount < 100_000 -> 300L     // Bitmap nhỏ: 300ms
-            pixelCount < 300_000 -> 500L     // Bitmap trung bình: 500ms
-            pixelCount < 500_000 -> 800L     // Bitmap lớn: 800ms
-            else -> 1000L                     // Bitmap rất lớn: 1s
+            pixelCount < 100_000 -> 50L      // Bitmap nhỏ: 50ms
+            pixelCount < 300_000 -> 100L     // Bitmap trung bình: 100ms
+            pixelCount < 500_000 -> 150L     // Bitmap lớn: 150ms
+            else -> 200L                      // Bitmap rất lớn: 200ms
         }
     }
 
