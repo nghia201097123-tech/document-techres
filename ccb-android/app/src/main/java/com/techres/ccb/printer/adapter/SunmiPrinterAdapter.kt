@@ -918,6 +918,104 @@ class SunmiPrinterAdapter @Inject constructor(
         }
     }
 
+    /**
+     * Đợi máy in xử lý xong buffer và trở về trạng thái idle
+     *
+     * QUAN TRỌNG: Gọi hàm này TRƯỚC khi cắt giấy để đảm bảo:
+     * 1. Tất cả bitmap/text đã được in xong
+     * 2. Buffer đã được flush hoàn toàn
+     * 3. Tránh tình trạng footer bị cắt và in sang bill kế tiếp
+     *
+     * @param timeoutMs Thời gian tối đa đợi (mặc định 5 giây)
+     * @param pollIntervalMs Khoảng cách giữa các lần kiểm tra (mặc định 150ms)
+     * @return true nếu máy in đã idle, false nếu timeout
+     */
+    suspend fun waitForPrinterIdle(
+        timeoutMs: Long = 5000,
+        pollIntervalMs: Long = 150
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!isConnected()) {
+            Timber.w("$TAG: waitForPrinterIdle - not connected")
+            return@withContext false
+        }
+
+        val startTime = System.currentTimeMillis()
+        var lastState = -1
+
+        Timber.d("$TAG: waitForPrinterIdle started (timeout=${timeoutMs}ms)")
+
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            try {
+                // Gọi updatePrinterState để lấy trạng thái hiện tại
+                val service = printerService
+                val state = if (service is BinderProxyWrapper) {
+                    // BinderProxy: sử dụng transact
+                    getPrinterStateViaTransact(service.binder)
+                } else {
+                    // Local service: sử dụng reflection
+                    val method = service?.javaClass?.getMethod("updatePrinterState")
+                    method?.invoke(service) as? Int ?: -1
+                }
+
+                if (state != lastState) {
+                    Timber.d("$TAG: Printer state changed: $lastState -> $state")
+                    lastState = state
+                }
+
+                // State 1 = Normal/Idle - máy in đã sẵn sàng
+                if (state == 1) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    Timber.d("$TAG: Printer is idle after ${elapsed}ms")
+                    return@withContext true
+                }
+
+                // State 2 = Preparing (đang in) - tiếp tục đợi
+                // Các state khác có thể là lỗi, nhưng vẫn tiếp tục đợi trong timeout
+
+                kotlinx.coroutines.delay(pollIntervalMs)
+            } catch (e: Exception) {
+                Timber.w(e, "$TAG: Error checking printer state")
+                kotlinx.coroutines.delay(pollIntervalMs)
+            }
+        }
+
+        val elapsed = System.currentTimeMillis() - startTime
+        Timber.w("$TAG: waitForPrinterIdle timeout after ${elapsed}ms (last state: $lastState)")
+        return@withContext false
+    }
+
+    /**
+     * Get printer state via AIDL transact for BinderProxy
+     * Returns: 1=Normal, 2=Preparing, 3=Abnormal, 4=OutOfPaper, etc.
+     */
+    private fun getPrinterStateViaTransact(binder: IBinder): Int {
+        val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
+
+        try {
+            val dataParcel = Parcel.obtain()
+            val replyParcel = Parcel.obtain()
+
+            try {
+                dataParcel.writeInterfaceToken(descriptor)
+
+                // updatePrinterState is typically FIRST_CALL_TRANSACTION + 1
+                val success = binder.transact(IBinder.FIRST_CALL_TRANSACTION + 1, dataParcel, replyParcel, 0)
+
+                if (success) {
+                    replyParcel.readException()
+                    return replyParcel.readInt()
+                }
+            } finally {
+                dataParcel.recycle()
+                replyParcel.recycle()
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "$TAG: getPrinterStateViaTransact failed")
+        }
+
+        return -1 // Unknown state
+    }
+
     // ==================== SUNMI SPECIFIC METHODS ====================
 
     /**

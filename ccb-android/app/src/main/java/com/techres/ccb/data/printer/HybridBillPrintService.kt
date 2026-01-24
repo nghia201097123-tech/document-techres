@@ -255,24 +255,30 @@ object HybridBillPrintService {
                 // Bước 1: Commit buffer để đảm bảo tất cả data đã gửi
                 adapter.commitBuffer()
 
-                // Bước 2: Đợi đủ thời gian để máy in xử lý xong data
-                // Thời gian này phụ thuộc vào tốc độ in và kích thước bill
-                delay(800) // Tăng từ 500ms lên 800ms để đảm bảo an toàn hơn
+                // Bước 2: Đợi máy in xử lý xong buffer (polling printer state)
+                // Đây là bước QUAN TRỌNG để tránh footer bị cắt và in sang bill kế tiếp
+                val isIdle = adapter.waitForPrinterIdle(timeoutMs = 5000, pollIntervalMs = 150)
+                if (!isIdle) {
+                    Log.w(TAG, "Printer did not become idle within timeout, adding extra delay")
+                    delay(1000) // Fallback delay nếu polling timeout
+                }
+
+                // Bước 3: Thêm delay cố định để đảm bảo an toàn (máy in có thể báo idle sớm)
+                delay(300)
 
                 // Feed paper và cắt giấy nếu config cho phép
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper as per config...")
                     // Đẩy giấy nhiều hơn (12 dòng ~30mm) để footer không bị cắt bởi dao
-                    // Tăng từ 8 lên 12 để đảm bảo các dòng footer cuối cùng được in rõ
-                    // và có khoảng cách an toàn trước lưỡi dao
                     adapter.feedLines(12)
 
-                    // Đợi thêm để feed hoàn tất trước khi cắt
-                    delay(300)
-
-                    // Commit một lần nữa để đảm bảo feed đã được thực thi
-                    adapter.commitBuffer()
+                    // Đợi feed hoàn tất
                     delay(200)
+                    adapter.commitBuffer()
+
+                    // Đợi máy in xử lý xong lệnh feed trước khi cắt
+                    adapter.waitForPrinterIdle(timeoutMs = 2000, pollIntervalMs = 100)
+                    delay(100)
 
                     adapter.cutPaper()
                 } else {
