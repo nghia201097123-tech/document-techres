@@ -253,13 +253,13 @@ export class GrabConnector extends BasePlatformConnector {
         '/food/merchant/v2/menu',
         {
           headers: {
-            'Authorization': account.accessToken,
+            'x-mts-ssid': account.accessToken,
             'x-user-type': 'user-profile',
           },
         },
       );
 
-      const menuData = response.data;
+      const menuData = response.data?.data || response.data;
       this.logger.debug(`[GrabConnector] Got menu with ${menuData?.categories?.length || 0} categories`);
 
       return {
