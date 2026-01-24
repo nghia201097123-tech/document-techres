@@ -11,6 +11,7 @@ import android.util.Log
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.LabelSize
 import com.techres.ccb.data.local.entity.PrinterProtocol
+import com.techres.ccb.printer.adapter.UsbPrinterAdapter
 import com.techres.ccb.printer.core.EscPosCommands
 import com.techres.ccb.printer.core.TsplCommands
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,17 @@ object LabelPrintService {
     // DPI for most thermal printers
     private const val DPI = 203
     private const val DOTS_PER_MM = 8 // 203 DPI ≈ 8 dots/mm
+
+    // USB adapter - phải được khởi tạo từ Application
+    private var usbAdapter: UsbPrinterAdapter? = null
+
+    /**
+     * Khởi tạo USB Adapter (gọi từ Application)
+     */
+    fun initUsbAdapter(adapter: UsbPrinterAdapter) {
+        usbAdapter = adapter
+        Log.d(TAG, "USB adapter initialized")
+    }
 
     /**
      * Regex để match tất cả các ký tự whitespace Unicode và zero-width characters
@@ -119,75 +131,178 @@ object LabelPrintService {
         labelData: LabelData
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
-            val ip = kitchen.printerIp
-                ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in cho ${kitchen.name}")
+            Log.d(TAG, "=== PRINT LABELS ===")
+            Log.d(TAG, "Connection type: ${kitchen.connectionType}")
 
-            val protocol = kitchen.getPrinterProtocolEnum()
-            Log.d(TAG, "Printing with protocol: $protocol")
+            // Route to USB or Network based on connectionType
+            when (kitchen.connectionType) {
+                "usb" -> printLabelsViaUsb(kitchen, labelData)
+                else -> printLabelsViaNetwork(kitchen, labelData)
+            }
+        }
+    }
 
-            var lastError: String? = null
+    /**
+     * In tem qua USB
+     */
+    private suspend fun printLabelsViaUsb(
+        kitchen: KitchenEntity,
+        labelData: LabelData
+    ): PrinterResult {
+        val adapter = usbAdapter
+            ?: return PrinterResult.Error("USB adapter chưa được khởi tạo")
 
-            // Split label nếu có quá nhiều topping
-            val maxToppings = kitchen.getEffectiveMaxToppings()
-            val labelParts = splitLabelIfNeeded(labelData, kitchen.getLabelSize(), maxToppings)
-            Log.d(TAG, "Label split into ${labelParts.size} parts")
+        val protocol = kitchen.getPrinterProtocolEnum()
+        Log.d(TAG, "Printing via USB with protocol: $protocol")
 
-            // In nhiều tem nếu quantity > 1
-            for (i in 1..labelData.quantity) {
-                // In tất cả các parts của label
-                for ((partIndex, labelPart) in labelParts.withIndex()) {
-                    val currentLabel = labelPart.copy(
-                        labelIndex = i,
-                        totalLabels = labelData.quantity,
-                        partIndex = partIndex + 1,
-                        totalParts = labelParts.size
-                    )
+        var lastError: String? = null
 
-                    val labelContent = when (protocol) {
-                        PrinterProtocol.TSPL -> generateTsplLabel(kitchen, currentLabel)
-                        PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
+        // Split label nếu có quá nhiều topping
+        val maxToppings = kitchen.getEffectiveMaxToppings()
+        val labelParts = splitLabelIfNeeded(labelData, kitchen.getLabelSize(), maxToppings)
+        Log.d(TAG, "Label split into ${labelParts.size} parts")
+
+        return try {
+            // Tìm USB printer
+            val connectedPrinters = adapter.getConnectedPrinters()
+            if (connectedPrinters.isEmpty()) {
+                val debugInfo = adapter.getUsbDebugInfo()
+                return PrinterResult.Error("Không tìm thấy máy in USB.\n\n$debugInfo")
+            }
+
+            val usbPath = kitchen.printerUsbPath
+            val targetPrinter = if (!usbPath.isNullOrBlank()) {
+                connectedPrinters.find { it.address == usbPath || it.id == usbPath }
+                    ?: connectedPrinters.firstOrNull()
+            } else {
+                connectedPrinters.firstOrNull()
+            } ?: return PrinterResult.Error("Không tìm thấy máy in USB phù hợp")
+
+            Log.d(TAG, "Using USB printer: ${targetPrinter.name}")
+
+            adapter.registerReceiver()
+            val connectResult = adapter.connect(targetPrinter)
+            if (connectResult is PrinterResult.Error) {
+                return connectResult
+            }
+
+            try {
+                // In nhiều tem nếu quantity > 1
+                for (i in 1..labelData.quantity) {
+                    for ((partIndex, labelPart) in labelParts.withIndex()) {
+                        val currentLabel = labelPart.copy(
+                            labelIndex = i,
+                            totalLabels = labelData.quantity,
+                            partIndex = partIndex + 1,
+                            totalParts = labelParts.size
+                        )
+
+                        val labelContent = when (protocol) {
+                            PrinterProtocol.TSPL -> generateTsplLabel(kitchen, currentLabel)
+                            PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
+                        }
+
+                        val writeResult = adapter.write(labelContent)
+                        if (writeResult is PrinterResult.Error) {
+                            lastError = writeResult.message
+                            Log.e(TAG, "USB write failed: ${writeResult.message}")
+                        }
+
+                        if (partIndex < labelParts.size - 1) delay(200)
                     }
+                    if (i < labelData.quantity) delay(300)
+                }
 
-                    // Retry logic - use run block to properly break on success
-                    var success = false
-                    run retryLoop@{
-                        repeat(3) { attempt ->
-                            val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
-                            when (result) {
-                                is PrinterResult.Success -> {
-                                    success = true
-                                    return@retryLoop // Break out of retry loop on success
-                                }
-                                is PrinterResult.Error -> {
-                                    lastError = result.message
-                                    Log.w(TAG, "Label $i part ${partIndex + 1} attempt ${attempt + 1} failed: ${result.message}")
-                                    if (attempt < 2) delay(1000)
-                                }
+                adapter.disconnect()
+                val totalLabels = labelData.quantity * labelParts.size
+                PrinterResult.Success("Đã in $totalLabels tem qua USB")
+
+            } catch (e: Exception) {
+                adapter.disconnect()
+                throw e
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "USB label printing error: ${e.message}", e)
+            PrinterResult.Error("Lỗi in tem USB: ${e.message}")
+        }
+    }
+
+    /**
+     * In tem qua Network (TCP/IP)
+     */
+    private suspend fun printLabelsViaNetwork(
+        kitchen: KitchenEntity,
+        labelData: LabelData
+    ): PrinterResult {
+        val ip = kitchen.printerIp
+            ?: return PrinterResult.Error("Chưa cấu hình IP máy in cho ${kitchen.name}")
+
+        val protocol = kitchen.getPrinterProtocolEnum()
+        Log.d(TAG, "Printing via Network with protocol: $protocol")
+
+        var lastError: String? = null
+
+        // Split label nếu có quá nhiều topping
+        val maxToppings = kitchen.getEffectiveMaxToppings()
+        val labelParts = splitLabelIfNeeded(labelData, kitchen.getLabelSize(), maxToppings)
+        Log.d(TAG, "Label split into ${labelParts.size} parts")
+
+        // In nhiều tem nếu quantity > 1
+        for (i in 1..labelData.quantity) {
+            // In tất cả các parts của label
+            for ((partIndex, labelPart) in labelParts.withIndex()) {
+                val currentLabel = labelPart.copy(
+                    labelIndex = i,
+                    totalLabels = labelData.quantity,
+                    partIndex = partIndex + 1,
+                    totalParts = labelParts.size
+                )
+
+                val labelContent = when (protocol) {
+                    PrinterProtocol.TSPL -> generateTsplLabel(kitchen, currentLabel)
+                    PrinterProtocol.ESCPOS -> generateEscPosLabel(kitchen, currentLabel)
+                }
+
+                // Retry logic - use run block to properly break on success
+                var success = false
+                run retryLoop@{
+                    repeat(3) { attempt ->
+                        val result = printViaNetwork(ip, kitchen.printerPort, labelContent)
+                        when (result) {
+                            is PrinterResult.Success -> {
+                                success = true
+                                return@retryLoop // Break out of retry loop on success
+                            }
+                            is PrinterResult.Error -> {
+                                lastError = result.message
+                                Log.w(TAG, "Label $i part ${partIndex + 1} attempt ${attempt + 1} failed: ${result.message}")
+                                if (attempt < 2) delay(1000)
                             }
                         }
                     }
-
-                    if (!success) {
-                        return@withContext PrinterResult.Error(
-                            lastError ?: "In tem thất bại cho ${labelData.itemName}"
-                        )
-                    }
-
-                    // Delay giữa các parts
-                    if (partIndex < labelParts.size - 1) {
-                        delay(300)
-                    }
                 }
 
-                // Delay giữa các tem (quantity)
-                if (i < labelData.quantity) {
-                    delay(500)
+                if (!success) {
+                    return PrinterResult.Error(
+                        lastError ?: "In tem thất bại cho ${labelData.itemName}"
+                    )
+                }
+
+                // Delay giữa các parts
+                if (partIndex < labelParts.size - 1) {
+                    delay(300)
                 }
             }
 
-            val totalLabels = labelData.quantity * labelParts.size
-            PrinterResult.Success("Đã in $totalLabels tem cho ${labelData.itemName}")
+            // Delay giữa các tem (quantity)
+            if (i < labelData.quantity) {
+                delay(500)
+            }
         }
+
+        val totalLabels = labelData.quantity * labelParts.size
+        return PrinterResult.Success("Đã in $totalLabels tem cho ${labelData.itemName}")
     }
 
     /**

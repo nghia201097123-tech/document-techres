@@ -7,6 +7,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.KitchenTicketPrintService
+import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import com.techres.ccb.printer.adapter.UsbPrinterAdapter
 import dagger.hilt.EntryPoint
@@ -82,7 +83,9 @@ class CCBApplication : Application(), ImageLoaderFactory {
             // Initialize USB adapter
             val usbAdapter = entryPoint.usbPrinterAdapter()
             HybridBillPrintService.initUsbAdapter(usbAdapter)
-            Timber.d("USB adapter initialized on app startup")
+            KitchenTicketPrintService.initUsbAdapter(usbAdapter)
+            LabelPrintService.initUsbAdapter(usbAdapter)
+            Timber.d("USB adapter initialized on app startup (Bill + Kitchen + Label)")
 
         } catch (e: Exception) {
             Timber.e(e, "Failed to initialize printer adapters on startup")

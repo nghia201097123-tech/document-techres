@@ -3,6 +3,7 @@ package com.techres.ccb.data.printer
 import android.util.Log
 import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
+import com.techres.ccb.printer.adapter.UsbPrinterAdapter
 import com.techres.ccb.printer.core.EscPosCommands
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -33,12 +34,23 @@ object KitchenTicketPrintService {
     // Sunmi adapter - phải được khởi tạo từ Application
     private var sunmiAdapter: SunmiPrinterAdapter? = null
 
+    // USB adapter - phải được khởi tạo từ Application
+    private var usbAdapter: UsbPrinterAdapter? = null
+
     /**
      * Khởi tạo Sunmi Adapter (gọi từ Application)
      */
     fun initSunmiAdapter(adapter: SunmiPrinterAdapter) {
         sunmiAdapter = adapter
         Log.d(TAG, "Sunmi adapter initialized: ${adapter.getSunmiModel()}")
+    }
+
+    /**
+     * Khởi tạo USB Adapter (gọi từ Application)
+     */
+    fun initUsbAdapter(adapter: UsbPrinterAdapter) {
+        usbAdapter = adapter
+        Log.d(TAG, "USB adapter initialized")
     }
 
     /**
@@ -127,20 +139,27 @@ object KitchenTicketPrintService {
         ticketData: KitchenTicketData
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
-            val printerIp = kitchen.printerIp
-                ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in cho ${kitchen.name}")
-
             Log.d(TAG, "=== PRINT TICKET ===")
             Log.d(TAG, "Kitchen: ${kitchen.name}")
-            Log.d(TAG, "Printer IP: $printerIp")
+            Log.d(TAG, "Connection type: ${kitchen.connectionType}")
 
-            // ========== PHÂN LUỒNG: SUNMI vs TCP/IP ==========
-            return@withContext if (printerIp == SUNMI_PRINTER_IP) {
-                Log.d(TAG, ">>> Routing to SUNMI printer <<<")
-                printTicketViaSunmi(kitchen, ticketData)
-            } else {
-                Log.d(TAG, ">>> Routing to TCP/IP printer: $printerIp:${kitchen.printerPort} <<<")
-                printTicketViaNetwork(kitchen, ticketData)
+            // ========== PHÂN LUỒNG: SUNMI vs USB vs TCP/IP ==========
+            return@withContext when (kitchen.connectionType) {
+                "sunmi" -> {
+                    Log.d(TAG, ">>> Routing to SUNMI printer <<<")
+                    printTicketViaSunmi(kitchen, ticketData)
+                }
+                "usb" -> {
+                    Log.d(TAG, ">>> Routing to USB printer <<<")
+                    printTicketViaUsb(kitchen, ticketData)
+                }
+                else -> {
+                    // Network (default)
+                    val printerIp = kitchen.printerIp
+                        ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in cho ${kitchen.name}")
+                    Log.d(TAG, ">>> Routing to TCP/IP printer: $printerIp:${kitchen.printerPort} <<<")
+                    printTicketViaNetwork(kitchen, ticketData)
+                }
             }
         }
     }
@@ -270,6 +289,97 @@ object KitchenTicketPrintService {
         } catch (e: Exception) {
             Log.e(TAG, "Sunmi single ticket error: ${e.message}", e)
             PrinterResult.Error("Lỗi: ${e.message}")
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // USB PRINTING - HOÀN TOÀN RIÊNG BIỆT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * In phiếu bếp qua USB
+     *
+     * Flow tương tự TCP/IP nhưng dùng USB connection:
+     * 1. Generate ESC/POS content
+     * 2. Kết nối USB printer
+     * 3. Gửi data qua USB
+     */
+    private suspend fun printTicketViaUsb(
+        kitchen: KitchenEntity,
+        ticketData: KitchenTicketData
+    ): PrinterResult {
+        val adapter = usbAdapter
+            ?: return PrinterResult.Error("USB adapter chưa được khởi tạo")
+
+        val printSeparately = kitchen.ticketPrintItemsSeparately
+        val copies = kitchen.ticketCopies.coerceIn(1, 5)
+
+        Log.d(TAG, "=== START PRINT TICKET (USB) ===")
+        Log.d(TAG, "  printSeparately: $printSeparately")
+        Log.d(TAG, "  cutAfterPrint: ${kitchen.ticketCutAfterPrint}")
+        Log.d(TAG, "  copies: $copies")
+
+        return try {
+            // Tìm USB printer
+            val connectedPrinters = adapter.getConnectedPrinters()
+            Log.d(TAG, "Found ${connectedPrinters.size} USB printers")
+
+            if (connectedPrinters.isEmpty()) {
+                val debugInfo = adapter.getUsbDebugInfo()
+                Log.e(TAG, "No USB printers found!")
+                return PrinterResult.Error("Không tìm thấy máy in USB.\n\n$debugInfo")
+            }
+
+            // Tìm printer theo usbPath hoặc dùng cái đầu tiên
+            val usbPath = kitchen.printerUsbPath
+            val targetPrinter = if (!usbPath.isNullOrBlank()) {
+                connectedPrinters.find { it.address == usbPath || it.id == usbPath }
+                    ?: connectedPrinters.firstOrNull()
+            } else {
+                connectedPrinters.firstOrNull()
+            } ?: return PrinterResult.Error("Không tìm thấy máy in USB phù hợp")
+
+            Log.d(TAG, "Using USB printer: ${targetPrinter.name} (${targetPrinter.address})")
+
+            // Đăng ký receiver và kết nối
+            adapter.registerReceiver()
+            val connectResult = adapter.connect(targetPrinter)
+            if (connectResult is PrinterResult.Error) {
+                return connectResult
+            }
+
+            try {
+                // Generate và in content
+                if (printSeparately && ticketData.items.size > 1) {
+                    // In từng món riêng biệt
+                    ticketData.items.forEach { item ->
+                        val singleItemTicket = ticketData.copy(items = listOf(item))
+                        repeat(copies) {
+                            val content = generateTicketContent(kitchen, singleItemTicket)
+                            adapter.write(content)
+                            delay(200)
+                        }
+                    }
+                } else {
+                    // In tất cả món trên 1 phiếu
+                    repeat(copies) {
+                        val content = generateTicketContent(kitchen, ticketData)
+                        adapter.write(content)
+                        delay(200)
+                    }
+                }
+
+                adapter.disconnect()
+                PrinterResult.Success("In phiếu thành công qua USB")
+
+            } catch (e: Exception) {
+                adapter.disconnect()
+                throw e
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "USB printing error: ${e.message}", e)
+            PrinterResult.Error("Lỗi in USB: ${e.message}")
         }
     }
 

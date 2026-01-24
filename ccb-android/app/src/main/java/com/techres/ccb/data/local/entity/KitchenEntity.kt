@@ -193,6 +193,12 @@ data class KitchenEntity(
     @ColumnInfo(name = "is_printer_connected")
     val isPrinterConnected: Boolean = false,
 
+    @ColumnInfo(name = "connection_type")
+    val connectionType: String = "network", // "sunmi", "network", "usb"
+
+    @ColumnInfo(name = "printer_usb_path")
+    val printerUsbPath: String? = null, // USB device path for USB printers
+
     // ========== PRINTER PROTOCOL ==========
     @ColumnInfo(name = "printer_protocol")
     val printerProtocol: String = PrinterProtocol.ESCPOS.name, // ESCPOS or TSPL

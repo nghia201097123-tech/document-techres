@@ -1105,6 +1105,35 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 26 to 27
+     * Adds connection_type and printer_usb_path columns to kitchens table
+     * to support USB printing for kitchen tickets and labels
+     */
+    val MIGRATION_26_27 = object : Migration(26, 27) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 26 to 27...")
+            Log.d(TAG, "Adding connection_type and printer_usb_path columns to kitchens table for USB printing")
+
+            // Add connection_type column with default "network"
+            db.execSQL("""
+                ALTER TABLE kitchens ADD COLUMN connection_type TEXT NOT NULL DEFAULT 'network'
+            """.trimIndent())
+
+            // Add printer_usb_path column
+            db.execSQL("""
+                ALTER TABLE kitchens ADD COLUMN printer_usb_path TEXT DEFAULT NULL
+            """.trimIndent())
+
+            // Update existing records: if printerIp = "sunmi", set connectionType = "sunmi"
+            db.execSQL("""
+                UPDATE kitchens SET connection_type = 'sunmi' WHERE printer_ip = 'sunmi'
+            """.trimIndent())
+
+            Log.d(TAG, "Migration 26 to 27 complete - Added USB support columns to kitchens")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -1124,6 +1153,7 @@ object DatabaseMigrations {
         MIGRATION_22_23,
         MIGRATION_23_24,
         MIGRATION_24_25,
-        MIGRATION_25_26
+        MIGRATION_25_26,
+        MIGRATION_26_27
     )
 }
