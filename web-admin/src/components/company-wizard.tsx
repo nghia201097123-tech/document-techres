@@ -55,7 +55,7 @@ const initialWizardData: CreateCompanyWizardData = {
     phone: "",
     representative: ""
   },
-  brand: { name: "", description: "", businessModel: "full_system" },
+  brand: { name: "", description: "", businessModel: "full_system", provinceCode: "", wardCode: "", addressDetail: "" },
   branch: {
     name: "",
     addressDetail: "",

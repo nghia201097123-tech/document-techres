@@ -57,6 +57,9 @@ interface WizardBrandData {
   name: string;
   description?: string;
   businessModel?: "order_only" | "ccb_only" | "full_system";
+  addressDetail?: string; // Địa chỉ chi tiết (số nhà, đường)
+  provinceCode?: string; // Mã tỉnh/thành
+  wardCode?: string; // Mã phường/xã
 }
 
 interface WizardBranchData {
