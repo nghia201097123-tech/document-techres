@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { PublicModule } from './modules/public/public.module';
 
 @Module({
   imports: [
@@ -9,6 +10,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
       envFilePath: '.env',
     }),
     UploadsModule,
+    PublicModule,
   ],
 })
 export class AppModule {}

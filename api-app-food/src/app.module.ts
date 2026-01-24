@@ -17,6 +17,7 @@ import { StoresModule } from './modules/stores/stores.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { PublicModule } from './modules/public/public.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SyncModule } from './modules/sync/sync.module';
     StoresModule,
     OrdersModule,
     SyncModule,
+    PublicModule,
   ],
 })
 export class AppModule {}

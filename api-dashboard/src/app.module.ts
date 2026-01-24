@@ -75,6 +75,7 @@ import {
   BillPrinterConfig,
 } from "./database/entities";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { PublicModule } from "./modules/public/public.module";
 
 @Module({
   imports: [
@@ -167,6 +168,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     BillPrinterConfigsModule,
     SocketModule,
     PayosModule,
+    PublicModule,
   ],
   providers: [DatabaseMigrationService],
 })

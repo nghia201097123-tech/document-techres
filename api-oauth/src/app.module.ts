@@ -4,6 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 
 import configuration from "./config/configuration";
 import { AuthModule } from "./modules/auth/auth.module";
+import { PublicModule } from "./modules/public/public.module";
 import {
   User,
   RefreshToken,
@@ -39,6 +40,7 @@ import {
 
     // Feature Modules
     AuthModule,
+    PublicModule,
   ],
 })
 export class AppModule {}

@@ -36,6 +36,7 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { TransactionCategoriesModule } from './modules/transaction-categories/transaction-categories.module';
 import { FoodPlatformsModule } from './modules/food-platforms/food-platforms.module';
+import { PublicModule } from './modules/public/public.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { FoodPlatformsModule } from './modules/food-platforms/food-platforms.mod
     LocationsModule,
     TransactionCategoriesModule,
     FoodPlatformsModule,
+    PublicModule,
   ],
   controllers: [AppController],
   providers: [AppService],
