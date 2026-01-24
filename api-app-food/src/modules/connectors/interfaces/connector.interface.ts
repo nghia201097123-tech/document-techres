@@ -48,6 +48,7 @@ export interface MerchantStore {
   name: string;
   address?: string;
   phone?: string;
+  email?: string;
   isActive: boolean;
 }
 

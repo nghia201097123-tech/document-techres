@@ -51,6 +51,9 @@ export class FoodPlatformStoreMapping {
   @Column({ type: 'varchar', length: 20, nullable: true, name: 'external_store_phone' })
   externalStorePhone: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'external_store_email' })
+  externalStoreEmail: string | null;
+
   @Column({ type: 'boolean', default: true, name: 'is_store_active' })
   isStoreActive: boolean; // Trạng thái trên platform
 

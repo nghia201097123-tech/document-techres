@@ -34,6 +34,11 @@ export class StoreMappingItemDto {
   @IsOptional()
   externalStorePhone?: string;
 
+  @ApiPropertyOptional({ example: 'store@example.com' })
+  @IsString()
+  @IsOptional()
+  externalStoreEmail?: string;
+
   @ApiProperty({ example: 1 })
   @IsInt()
   branchId: number;

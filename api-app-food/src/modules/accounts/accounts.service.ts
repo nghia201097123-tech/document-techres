@@ -342,6 +342,7 @@ export class AccountsService {
       name: store.name,
       address: store.address,
       phone: store.phone,
+      email: store.email,
       isActive: store.isActive,
     }));
   }

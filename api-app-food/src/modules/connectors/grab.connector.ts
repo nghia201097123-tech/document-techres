@@ -170,23 +170,54 @@ export class GrabConnector extends BasePlatformConnector {
   }
 
   /**
-   * Get list of merchant stores
+   * Get list of merchant stores using unified-profile API
+   * Endpoint: GET /troy/user-profile/v1/unified-profile
    */
   async getStores(account: FoodPlatformAccount): Promise<MerchantStore[]> {
     try {
-      const response = await this.authenticatedRequest<{ stores: any[] }>(
-        account,
-        'get',
-        '/stores',
+      const response = await this.httpClient.get(
+        '/troy/user-profile/v1/unified-profile',
+        {
+          params: { isBalanceNeeded: false },
+          headers: {
+            'x-mts-ssid': account.accessToken,
+            'x-user-type': 'user-profile',
+          },
+        },
       );
 
-      return response.stores.map((store) => ({
-        externalStoreId: store.storeID,
-        name: store.name,
-        address: store.address?.fullAddress,
-        phone: store.phone,
-        isActive: store.status === 'ACTIVE',
-      }));
+      const responseData = response.data;
+      const stores: MerchantStore[] = [];
+
+      // Extract store info from grab_food_store_profile
+      const storeProfile = responseData?.data?.grab_food_store_profile?.storeProfile;
+      if (storeProfile) {
+        stores.push({
+          externalStoreId: storeProfile.storeID,
+          name: storeProfile.storeName,
+          address: storeProfile.storeLocation?.address,
+          phone: storeProfile.storePIC?.outletPhone,
+          email: storeProfile.storePIC?.outletEmail,
+          isActive: storeProfile.status === 'ACTIVE',
+        });
+      }
+
+      // Also check grab_food_profile.merchant for additional store info
+      const merchant = responseData?.data?.grab_food_profile?.merchant;
+      if (merchant && !stores.find(s => s.externalStoreId === merchant.ID)) {
+        stores.push({
+          externalStoreId: merchant.ID,
+          name: merchant.name,
+          address: merchant.address,
+          phone: merchant.mobileNumber || merchant.contractNumber,
+          email: merchant.email,
+          isActive: merchant.status === 'ACTIVE',
+        });
+      }
+
+      this.logger.debug('GrabFood get stores result:', JSON.stringify(stores));
+
+      return stores;
     } catch (error) {
       this.logger.error('GrabFood get stores failed', error);
       return [];

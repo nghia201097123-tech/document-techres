@@ -121,6 +121,7 @@ export class StoresService {
         externalStoreName: item.externalStoreName,
         externalStoreAddress: item.externalStoreAddress,
         externalStorePhone: item.externalStorePhone,
+        externalStoreEmail: item.externalStoreEmail,
         branchId: item.branchId,
         branchName: item.branchName,
         isActive: true,
@@ -209,6 +210,7 @@ export class StoresService {
       mapping.externalStoreName = store.name;
       mapping.externalStoreAddress = store.address ?? null;
       mapping.externalStorePhone = store.phone ?? null;
+      mapping.externalStoreEmail = store.email ?? null;
       mapping.isStoreActive = store.isActive;
       mapping.lastSyncedAt = new Date();
     }
