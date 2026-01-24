@@ -5,7 +5,13 @@ import android.os.Build
 import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import com.techres.ccb.data.printer.HybridBillPrintService
+import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.components.SingletonComponent
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.TlsVersion
@@ -22,6 +28,17 @@ import javax.net.ssl.X509TrustManager
 
 @HiltAndroidApp
 class CCBApplication : Application(), ImageLoaderFactory {
+
+    /**
+     * EntryPoint để access Hilt-managed SunmiPrinterAdapter từ Application
+     * Cần thiết vì Application không thể inject trực tiếp như Activity/ViewModel
+     */
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface PrinterEntryPoint {
+        fun sunmiPrinterAdapter(): SunmiPrinterAdapter
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -34,6 +51,32 @@ class CCBApplication : Application(), ImageLoaderFactory {
         }
 
         Timber.d("CCB Application started")
+
+        // Khởi tạo Sunmi adapter ngay khi app start để tránh lỗi "adapter chưa được khởi tạo"
+        // khi user in bill trước khi vào Settings
+        initializeSunmiAdapter()
+    }
+
+    /**
+     * Khởi tạo Sunmi printer adapter ngay khi app khởi động
+     * Đảm bảo HybridBillPrintService.sunmiAdapter luôn sẵn sàng
+     */
+    private fun initializeSunmiAdapter() {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                this,
+                PrinterEntryPoint::class.java
+            )
+            val sunmiAdapter = entryPoint.sunmiPrinterAdapter()
+
+            // initSunmiAdapter đã được gọi trong PrinterModule.provideSunmiPrinterAdapter()
+            // nhưng gọi lại ở đây để chắc chắn (idempotent operation)
+            HybridBillPrintService.initSunmiAdapter(sunmiAdapter)
+
+            Timber.d("Sunmi adapter initialized on app startup")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initialize Sunmi adapter on startup")
+        }
     }
 
     /**
