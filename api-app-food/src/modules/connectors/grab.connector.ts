@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
 import { BasePlatformConnector } from './base.connector';
@@ -218,8 +218,16 @@ export class GrabConnector extends BasePlatformConnector {
       this.logger.debug('GrabFood get stores result:', JSON.stringify(stores));
 
       return stores;
-    } catch (error) {
-      this.logger.error('GrabFood get stores failed', error);
+    } catch (error: any) {
+      this.logger.error('GrabFood get stores failed');
+      this.logger.error(error);
+
+      // Throw UnauthorizedException for 401 errors so frontend can catch and retry
+      if (error?.response?.status === 401) {
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
+      // For other errors, return empty array
       return [];
     }
   }
