@@ -58,9 +58,16 @@ export class GrabConnector extends BasePlatformConnector {
 
       const responseData = response.data;
 
-      // Check if login was successful
-      if (responseData?.data?.success && responseData?.data?.data?.jwt) {
-        const loginData = responseData.data.data;
+      this.logger.debug('GrabFood login response:', JSON.stringify(responseData));
+
+      // Check if login was successful - handle both direct response and wrapped response
+      // Direct response format: { success: true, data: { jwt: '...' } }
+      // Wrapped response format: { data: { success: true, data: { jwt: '...' } } }
+      const isDirectResponse = responseData?.success !== undefined;
+      const successCheck = isDirectResponse ? responseData?.success : responseData?.data?.success;
+      const loginData = isDirectResponse ? responseData?.data : responseData?.data?.data;
+
+      if (successCheck && loginData?.jwt) {
         const userProfile = loginData.user_profile;
 
         return {
@@ -81,24 +88,31 @@ export class GrabConnector extends BasePlatformConnector {
         };
       }
 
-      // Login failed
+      // Login failed - extract error message from response
+      const errorMsg = isDirectResponse
+        ? (responseData?.message || responseData?.error?.message)
+        : (responseData?.data?.message || responseData?.data?.error?.message);
+
       return {
         success: false,
-        error: responseData?.data?.message || 'Đăng nhập thất bại',
+        error: errorMsg || 'Đăng nhập thất bại',
         errorCode: 'INVALID_CREDENTIALS',
       };
     } catch (error: any) {
       this.logger.error('GrabFood login failed', error?.response?.data || error?.message);
 
-      // Extract error message from response if available
-      const errorMessage = error?.response?.data?.data?.message
-        || error?.response?.data?.error?.message
+      // Extract error message from response if available - handle multiple formats
+      const errData = error?.response?.data;
+      const errorMessage = errData?.message
+        || errData?.data?.message
+        || errData?.error?.message
+        || errData?.data?.error?.message
         || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.';
 
       return {
         success: false,
         error: errorMessage,
-        errorCode: error?.response?.data?.error?.code || 'INVALID_CREDENTIALS',
+        errorCode: errData?.error?.code || errData?.code || 'INVALID_CREDENTIALS',
       };
     }
   }
