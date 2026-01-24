@@ -86,6 +86,7 @@ export default function BillTemplatePage() {
 
   // Form states (combined template + printer for UI)
   const [templateForm, setTemplateForm] = React.useState<BillTemplateWithPrinterForm>({
+    brandId: "",
     name: "",
     storeName: "",
     templateType: BillTemplateType.CLASSIC,
