@@ -135,6 +135,10 @@ export default function FoodPartnersPage() {
   const [selectedAccountForLink, setSelectedAccountForLink] = React.useState<string | null>(null);
   const [selectedStoreForLink, setSelectedStoreForLink] = React.useState<ExternalStore | null>(null);
 
+  // Add new link dialog states
+  const [addNewLinkDialogOpen, setAddNewLinkDialogOpen] = React.useState(false);
+  const [selectedPlatformForAdd, setSelectedPlatformForAdd] = React.useState<FoodPartnerType | null>(null);
+
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -286,6 +290,21 @@ export default function FoodPartnersPage() {
     setBranchLinkDialogOpen(false);
     setSelectedAccountForLink(null);
     setSelectedStoreForLink(null);
+  };
+
+  // Open add new link dialog for a platform
+  const openAddNewLinkDialog = (platform: FoodPartnerType) => {
+    setSelectedPlatformForAdd(platform);
+    setAddNewLinkDialogOpen(true);
+  };
+
+  // Handle selecting an account to link from add new dialog
+  const handleSelectAccountToLink = (accountId: string) => {
+    setAddNewLinkDialogOpen(false);
+    // Expand the account to show its stores
+    toggleExpandAccount(accountId);
+    // Set this account for linking
+    setSelectedAccountForLink(accountId);
   };
 
   // Open link dialog
@@ -456,8 +475,8 @@ export default function FoodPartnersPage() {
     return { total, connected, errors, notLinked };
   }, [connectionViews]);
 
-  // Group accounts by platform for branch link tab
-  const groupedAccountsByPlatform = React.useMemo(() => {
+  // Group LINKED accounts by platform for branch link tab (only show accounts with branchId)
+  const linkedAccountsByPlatform = React.useMemo(() => {
     const groups: Record<FoodPartnerType, FoodPlatformAccount[]> = {
       [FoodPartnerType.SHOPEE]: [],
       [FoodPartnerType.GRAB]: [],
@@ -465,12 +484,36 @@ export default function FoodPartnersPage() {
     };
 
     allAccounts.forEach(account => {
-      if (groups[account.platform]) {
+      // Only include accounts that are linked to a branch
+      if (groups[account.platform] && account.branchId) {
         groups[account.platform].push(account);
       }
     });
 
     return groups;
+  }, [allAccounts]);
+
+  // Get UNLINKED accounts (connected but no branchId) for the "Add New" dialog
+  const unlinkedAccountsByPlatform = React.useMemo(() => {
+    const groups: Record<FoodPartnerType, FoodPlatformAccount[]> = {
+      [FoodPartnerType.SHOPEE]: [],
+      [FoodPartnerType.GRAB]: [],
+      [FoodPartnerType.BEFOOD]: [],
+    };
+
+    allAccounts.forEach(account => {
+      // Include accounts that are connected but not linked to a branch
+      if (groups[account.platform] && !account.branchId && account.status === ConnectionStatus.CONNECTED) {
+        groups[account.platform].push(account);
+      }
+    });
+
+    return groups;
+  }, [allAccounts]);
+
+  // Total linked count
+  const totalLinkedStores = React.useMemo(() => {
+    return allAccounts.filter(a => a.branchId).length;
   }, [allAccounts]);
 
   // Get branch name by id
@@ -736,25 +779,12 @@ export default function FoodPartnersPage() {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
-                        <Store className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold">{allAccounts.length}</p>
-                        <p className="text-xs text-muted-foreground">Tổng số tài khoản</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-green-100 text-green-800">
                         <Building2 className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{allAccounts.filter(a => a.branchId).length}</p>
-                        <p className="text-xs text-muted-foreground">Đã gán chi nhánh</p>
+                        <p className="text-2xl font-bold">{totalLinkedStores}</p>
+                        <p className="text-xs text-muted-foreground">Cửa hàng đã liên kết</p>
                       </div>
                     </div>
                   </CardContent>
@@ -762,112 +792,156 @@ export default function FoodPartnersPage() {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-yellow-100 text-yellow-800">
+                      <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
+                        <Store className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allAccounts.filter(a => a.status === ConnectionStatus.CONNECTED && !a.branchId).length}</p>
+                        <p className="text-xs text-muted-foreground">Tài khoản có thể liên kết</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-gray-100 text-gray-800">
                         <AlertCircle className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{allAccounts.filter(a => !a.branchId).length}</p>
-                        <p className="text-xs text-muted-foreground">Chưa gán chi nhánh</p>
+                        <p className="text-2xl font-bold">{branches.length}</p>
+                        <p className="text-xs text-muted-foreground">Chi nhánh trong hệ thống</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Partner Sections for branch link */}
-              {Object.entries(groupedAccountsByPlatform).map(([partnerType, accounts]) => {
-                if (accounts.length === 0) return null;
-                const partner = FoodPartnerInfo[partnerType as FoodPartnerType];
+              {/* Partner Sections for branch link - show all platforms */}
+              {Object.values(FoodPartnerType).map((partnerType) => {
+                const partner = FoodPartnerInfo[partnerType];
+                const linkedAccounts = linkedAccountsByPlatform[partnerType] || [];
+                const unlinkedAccounts = unlinkedAccountsByPlatform[partnerType] || [];
+                const hasUnlinkedAccounts = unlinkedAccounts.length > 0;
 
                 return (
                   <Card key={partnerType}>
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <PartnerLogo type={partnerType as FoodPartnerType} />
-                        <div>
-                          <CardTitle>{partner.name}</CardTitle>
-                          <CardDescription>{accounts.length} tài khoản</CardDescription>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <PartnerLogo type={partnerType} />
+                          <div>
+                            <CardTitle>{partner.name}</CardTitle>
+                            <CardDescription>
+                              {linkedAccounts.length > 0
+                                ? `${linkedAccounts.length} cửa hàng đã liên kết`
+                                : "Chưa có liên kết nào"}
+                            </CardDescription>
+                          </div>
                         </div>
+                        {hasUnlinkedAccounts && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                            onClick={() => openAddNewLinkDialog(partnerType)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Thêm liên kết
+                          </Button>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-4">
-                        {accounts.map((account) => (
-                          <div key={account.id} className="space-y-3">
-                            {/* Account Header */}
-                            <div
-                              className={cn(
-                                "flex items-center justify-between p-4 rounded-lg border",
-                                !account.branchId && "border-dashed border-yellow-300 bg-yellow-50",
-                                account.status === ConnectionStatus.CONNECTED && "border-green-200 bg-green-50"
-                              )}
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className="min-w-[200px]">
-                                  <p className="font-medium">{account.username || account.displayName}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <StatusBadge status={account.status} />
-                                  </div>
-                                </div>
-                                <div className="h-10 w-px bg-border" />
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-muted-foreground">Chi nhánh:</span>
-                                  <span className={cn("font-medium", !account.branchId && "text-yellow-600")}>
-                                    {getBranchName(account.branchId)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {account.status === ConnectionStatus.CONNECTED && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => toggleExpandAccount(account.id)}
-                                    disabled={loadingStores === account.id}
-                                  >
-                                    {loadingStores === account.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                    ) : (
-                                      <Store className="h-4 w-4 mr-1" />
-                                    )}
-                                    {expandedAccount === account.id ? "Ẩn cửa hàng" : "Xem cửa hàng"}
-                                  </Button>
+                      {linkedAccounts.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Store className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm">Chưa có cửa hàng nào được liên kết với chi nhánh</p>
+                          {hasUnlinkedAccounts && (
+                            <p className="text-xs mt-1">
+                              Bấm <strong>"Thêm liên kết"</strong> để bắt đầu liên kết cửa hàng
+                            </p>
+                          )}
+                          {!hasUnlinkedAccounts && (
+                            <p className="text-xs mt-1 text-yellow-600">
+                              Chưa có tài khoản {partner.name} nào đã kết nối. Vui lòng kết nối tài khoản trước.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {linkedAccounts.map((account) => (
+                            <div key={account.id} className="space-y-3">
+                              {/* Account Header - shows linked store */}
+                              <div
+                                className={cn(
+                                  "flex items-center justify-between p-4 rounded-lg border",
+                                  account.status === ConnectionStatus.CONNECTED && "border-green-200 bg-green-50",
+                                  account.status === ConnectionStatus.ERROR && "border-red-200 bg-red-50"
                                 )}
-                              </div>
-                            </div>
-
-                            {/* External Stores List */}
-                            {expandedAccount === account.id && externalStores[account.id] && (
-                              <div className="ml-4 pl-4 border-l-2 border-green-200 space-y-3">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <Store className="h-4 w-4" />
-                                  <span>Danh sách cửa hàng từ {partner.name} ({externalStores[account.id].length} cửa hàng)</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleFetchStores(account.id)}
-                                    disabled={loadingStores === account.id}
-                                  >
-                                    <RefreshCw className={cn("h-3 w-3", loadingStores === account.id && "animate-spin")} />
-                                  </Button>
-                                </div>
-                                {externalStores[account.id].length === 0 ? (
-                                  <div className="text-sm text-muted-foreground p-4 bg-gray-50 rounded-lg text-center">
-                                    Không có cửa hàng nào
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="min-w-[200px]">
+                                    <p className="font-medium">{account.externalMerchantName || account.username || account.displayName}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <StatusBadge status={account.status} />
+                                    </div>
                                   </div>
-                                ) : (
-                                  externalStores[account.id].map((store, storeIndex) => (
-                                    <div
-                                      key={store.externalStoreId}
-                                      className="p-4 bg-white border rounded-lg shadow-sm"
+                                  <div className="h-10 w-px bg-border" />
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Building2 className="h-4 w-4 text-green-600" />
+                                    <span className="text-muted-foreground">Chi nhánh:</span>
+                                    <span className="font-medium text-green-700">
+                                      {getBranchName(account.branchId)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {account.status === ConnectionStatus.CONNECTED && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => toggleExpandAccount(account.id)}
+                                      disabled={loadingStores === account.id}
                                     >
-                                      <div className="flex items-start justify-between">
-                                        <div className="space-y-2 flex-1">
+                                      {loadingStores === account.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                      ) : (
+                                        <Store className="h-4 w-4 mr-1" />
+                                      )}
+                                      {expandedAccount === account.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* External Stores List */}
+                              {expandedAccount === account.id && externalStores[account.id] && (
+                                <div className="ml-4 pl-4 border-l-2 border-green-200 space-y-3">
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Store className="h-4 w-4" />
+                                    <span>Thông tin cửa hàng từ {partner.name}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleFetchStores(account.id)}
+                                      disabled={loadingStores === account.id}
+                                    >
+                                      <RefreshCw className={cn("h-3 w-3", loadingStores === account.id && "animate-spin")} />
+                                    </Button>
+                                  </div>
+                                  {externalStores[account.id].length === 0 ? (
+                                    <div className="text-sm text-muted-foreground p-4 bg-gray-50 rounded-lg text-center">
+                                      Không có thông tin cửa hàng
+                                    </div>
+                                  ) : (
+                                    externalStores[account.id].map((store, storeIndex) => (
+                                      <div
+                                        key={store.externalStoreId}
+                                        className="p-4 bg-white border rounded-lg shadow-sm"
+                                      >
+                                        <div className="space-y-2">
                                           <div className="flex items-center gap-2">
-                                            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                                              #{storeIndex + 1}
-                                            </span>
                                             <h4 className="font-semibold text-base">{store.name}</h4>
                                             <Badge variant={store.isActive ? "default" : "secondary"} className="text-xs">
                                               {store.isActive ? "Đang hoạt động" : "Tạm ngưng"}
@@ -900,26 +974,15 @@ export default function FoodPartnersPage() {
                                             )}
                                           </div>
                                         </div>
-                                        <div className="ml-4">
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                                            onClick={() => openBranchLinkDialog(account.id, store)}
-                                          >
-                                            <Plus className="h-4 w-4 mr-1" />
-                                            Liên kết
-                                          </Button>
-                                        </div>
                                       </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -1121,6 +1184,61 @@ export default function FoodPartnersPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setBranchLinkDialogOpen(false)}>
               Hủy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Link Dialog - shows available unlinked accounts */}
+      <Dialog open={addNewLinkDialogOpen} onOpenChange={setAddNewLinkDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedPlatformForAdd && <PartnerLogo type={selectedPlatformForAdd} size="sm" />}
+              Thêm liên kết mới
+            </DialogTitle>
+            <DialogDescription>
+              Chọn tài khoản {selectedPlatformForAdd && FoodPartnerInfo[selectedPlatformForAdd].name} để liên kết với chi nhánh
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="mb-3 block">Tài khoản có thể liên kết</Label>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {selectedPlatformForAdd && unlinkedAccountsByPlatform[selectedPlatformForAdd]?.length > 0 ? (
+                unlinkedAccountsByPlatform[selectedPlatformForAdd].map((account) => (
+                  <div
+                    key={account.id}
+                    className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handleSelectAccountToLink(account.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{account.externalMerchantName || account.username || account.displayName}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <StatusBadge status={account.status} />
+                          {account.externalMerchantId && (
+                            <span className="text-xs text-muted-foreground">
+                              ID: {account.externalMerchantId}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Store className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Không có tài khoản nào có thể liên kết</p>
+                  <p className="text-xs mt-1">Vui lòng kết nối tài khoản mới từ tab "Kết nối tài khoản"</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddNewLinkDialogOpen(false)}>
+              Đóng
             </Button>
           </DialogFooter>
         </DialogContent>
