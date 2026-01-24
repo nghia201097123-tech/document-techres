@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -380,9 +381,10 @@ export class AccountsService {
 
   /**
    * Get stores from platform
+   * Auto-reconnect if token expired (401)
    */
   async getStores(accountId: string): Promise<any[]> {
-    const account = await this.getAccountById(accountId);
+    let account = await this.getAccountById(accountId);
 
     if (account.status !== AccountStatus.CONNECTED) {
       throw new BadRequestException('Tài khoản chưa kết nối');
@@ -391,8 +393,41 @@ export class AccountsService {
     await this.refreshTokenIfNeeded(account);
 
     const connector = this.connectorFactory.getConnector(account.platform);
-    const stores = await connector.getStores(account);
 
+    try {
+      const stores = await connector.getStores(account);
+      return this.mapStores(stores);
+    } catch (error) {
+      // Check if it's a 401 Unauthorized error
+      if (error instanceof UnauthorizedException) {
+        this.logger.log(`Token expired for account ${accountId}, attempting to reconnect...`);
+
+        try {
+          // Auto-reconnect using stored credentials
+          account = await this.reconnect(accountId);
+
+          this.logger.log(`Reconnected successfully, retrying getStores...`);
+
+          // Retry getting stores with new token
+          const stores = await connector.getStores(account);
+          return this.mapStores(stores);
+        } catch (reconnectError) {
+          this.logger.error(`Failed to reconnect account ${accountId}`, reconnectError);
+          throw new BadRequestException(
+            'Token hết hạn và không thể kết nối lại. Vui lòng đăng nhập lại.',
+          );
+        }
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
+  }
+
+  /**
+   * Map stores to response format
+   */
+  private mapStores(stores: any[]): any[] {
     return stores.map((store) => ({
       externalStoreId: store.externalStoreId,
       name: store.name,
