@@ -22,6 +22,8 @@ import {
   ChevronDown,
   ChevronRight,
   ImageIcon,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +74,7 @@ import {
   foodPartnerService,
 } from "@/services/food-partner-service";
 import { Branch, branchService } from "@/services/branch-service";
+import { Product, productService } from "@/services/product-service";
 
 // Status badge component
 const StatusBadge = ({ status }: { status: ConnectionStatus }) => {
@@ -175,6 +178,14 @@ export default function FoodPartnersPage() {
   const [itemMappings, setItemMappings] = React.useState<ItemMapping[]>([]);
   const [menuSyncStatus, setMenuSyncStatus] = React.useState<MenuSyncStatus | null>(null);
   const [loadingSyncedItems, setLoadingSyncedItems] = React.useState(false);
+
+  // Item mapping dialog states
+  const [itemMappingDialogOpen, setItemMappingDialogOpen] = React.useState(false);
+  const [selectedItemForMapping, setSelectedItemForMapping] = React.useState<SyncedExternalItem | null>(null);
+  const [techresProducts, setTechresProducts] = React.useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = React.useState(false);
+  const [productSearchQuery, setProductSearchQuery] = React.useState("");
+  const [savingItemMapping, setSavingItemMapping] = React.useState(false);
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -358,6 +369,101 @@ export default function FoodPartnersPage() {
   const getItemMapping = (itemId: string): ItemMapping | undefined => {
     return itemMappings.find(m => m.externalItemId === itemId);
   };
+
+  // Load TechRes products for mapping
+  const loadTechresProducts = async (brandId?: string) => {
+    setLoadingProducts(true);
+    try {
+      const products = await productService.getAll(brandId || filterBrandId !== "all" ? filterBrandId : undefined);
+      setTechresProducts(products.filter(p => p.isActive));
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách món ăn TechRes",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // Open item mapping dialog
+  const openItemMappingDialog = async (item: SyncedExternalItem) => {
+    setSelectedItemForMapping(item);
+    setProductSearchQuery("");
+    setItemMappingDialogOpen(true);
+    await loadTechresProducts();
+  };
+
+  // Handle create item mapping
+  const handleCreateItemMapping = async (techresProduct: Product) => {
+    if (!selectedAccountForMenu || !selectedItemForMapping) return;
+
+    setSavingItemMapping(true);
+    try {
+      await foodPartnerService.createItemMapping(selectedAccountForMenu.id, {
+        externalItemId: selectedItemForMapping.id,
+        techresBrandId: parseInt(techresProduct.brandId || filterBrandId),
+        techresItemId: parseInt(techresProduct.id),
+        techresItemName: techresProduct.name,
+      });
+
+      toast({
+        title: "Thành công",
+        description: `Đã liên kết "${selectedItemForMapping.externalItemName}" với "${techresProduct.name}"`,
+      });
+
+      // Close dialog and reload data
+      setItemMappingDialogOpen(false);
+      setSelectedItemForMapping(null);
+
+      // Reload synced items and mappings
+      await loadSyncedItems(selectedAccountForMenu);
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tạo liên kết",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingItemMapping(false);
+    }
+  };
+
+  // Handle delete item mapping
+  const handleDeleteItemMapping = async (item: SyncedExternalItem) => {
+    const mapping = getItemMapping(item.id);
+    if (!mapping || !selectedAccountForMenu) return;
+
+    try {
+      await foodPartnerService.deleteItemMapping(mapping.id);
+      toast({
+        title: "Thành công",
+        description: `Đã hủy liên kết "${item.externalItemName}"`,
+      });
+
+      // Reload data
+      await loadSyncedItems(selectedAccountForMenu);
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể hủy liên kết",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Filtered products by search query
+  const filteredProducts = React.useMemo(() => {
+    if (!productSearchQuery.trim()) return techresProducts;
+
+    const query = productSearchQuery.toLowerCase();
+    return techresProducts.filter(p =>
+      p.name.toLowerCase().includes(query) ||
+      p.code?.toLowerCase().includes(query) ||
+      p.categoryName?.toLowerCase().includes(query)
+    );
+  }, [techresProducts, productSearchQuery]);
 
   // Update account branch
   const handleUpdateAccountBranch = async (accountId: string, branchId: string) => {
@@ -1523,6 +1629,41 @@ export default function FoodPartnersPage() {
                                           </Badge>
                                         )}
                                       </div>
+
+                                      {/* Action buttons */}
+                                      <div className="mt-3 flex items-center gap-2">
+                                        {item.isMapped && mapping ? (
+                                          <>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-7 text-xs"
+                                              onClick={() => openItemMappingDialog(item)}
+                                            >
+                                              <ArrowRightLeft className="h-3 w-3 mr-1" />
+                                              Đổi liên kết
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                              onClick={() => handleDeleteItemMapping(item)}
+                                            >
+                                              <X className="h-3 w-3 mr-1" />
+                                              Hủy liên kết
+                                            </Button>
+                                          </>
+                                        ) : (
+                                          <Button
+                                            size="sm"
+                                            className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                                            onClick={() => openItemMappingDialog(item)}
+                                          >
+                                            <Link2 className="h-3 w-3 mr-1" />
+                                            Liên kết món ăn
+                                          </Button>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -1944,6 +2085,153 @@ export default function FoodPartnersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Item Mapping Dialog - Select TechRes product to link with GrabFood item */}
+      <Dialog open={itemMappingDialogOpen} onOpenChange={setItemMappingDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-blue-600" />
+              Liên kết món ăn TechRes
+            </DialogTitle>
+            <DialogDescription>
+              Chọn món ăn từ thương hiệu TechRes để liên kết với món ăn từ {selectedAccountForMenu && FoodPartnerInfo[selectedAccountForMenu.platform].name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {/* Selected GrabFood item */}
+            {selectedItemForMapping && (
+              <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="flex items-start gap-3">
+                  {selectedItemForMapping.imageUrl ? (
+                    <img
+                      src={selectedItemForMapping.imageUrl}
+                      alt={selectedItemForMapping.externalItemName}
+                      className="w-16 h-16 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-orange-100 flex items-center justify-center">
+                      <ImageIcon className="h-6 w-6 text-orange-400" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-xs text-orange-600 font-medium mb-1">
+                      Món ăn {selectedAccountForMenu && FoodPartnerInfo[selectedAccountForMenu.platform].name}:
+                    </p>
+                    <h4 className="font-semibold text-orange-900">{selectedItemForMapping.externalItemName}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm font-medium text-green-600">
+                        {selectedItemForMapping.priceDisplay || `${selectedItemForMapping.priceInMin.toLocaleString()}đ`}
+                      </span>
+                      <code className="text-xs bg-orange-100 px-1.5 py-0.5 rounded text-orange-700">
+                        {selectedItemForMapping.externalItemId}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Search input */}
+            <div className="mb-4">
+              <Label className="text-sm font-medium mb-2 block">Chọn món ăn TechRes để liên kết:</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm theo tên, mã món ăn, danh mục..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+                {productSearchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => setProductSearchQuery("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Product list */}
+            <div className="flex-1 overflow-y-auto border rounded-lg">
+              {loadingProducts ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Đang tải danh sách món ăn...</span>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <UtensilsCrossed className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">
+                    {productSearchQuery
+                      ? `Không tìm thấy món ăn nào với từ khóa "${productSearchQuery}"`
+                      : "Không có món ăn nào trong thương hiệu này"}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filteredProducts.map((product) => (
+                    <button
+                      key={product.id}
+                      className="w-full flex items-start gap-3 p-3 hover:bg-blue-50 transition-colors text-left"
+                      onClick={() => handleCreateItemMapping(product)}
+                      disabled={savingItemMapping}
+                    >
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <UtensilsCrossed className="h-5 w-5 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h5 className="font-medium text-sm line-clamp-1">{product.name}</h5>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm font-semibold text-green-600">
+                            {product.price.toLocaleString()}đ
+                          </span>
+                          {product.categoryName && (
+                            <Badge variant="secondary" className="text-xs">
+                              {product.categoryName}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                            {product.code}
+                          </code>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {savingItemMapping ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                        ) : (
+                          <Link2 className="h-5 w-5 text-blue-600" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setItemMappingDialogOpen(false)}>
               Đóng
             </Button>
           </DialogFooter>
