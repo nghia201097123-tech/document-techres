@@ -248,29 +248,33 @@ object HybridBillPrintService {
                 }
 
                 // Feed paper và cắt giấy nếu config cho phép
-                // FIX: Sử dụng feedAndCutPaper() - gửi feed+cut trong 1 buffer ESC/POS duy nhất
-                // Giống cách TCP/IP hoạt động - tránh timing issue giữa các AIDL calls riêng biệt
+                // FIX: Bitmap đã có blank space ở cuối (~200 pixels = ~50mm)
+                // Chỉ cần đợi in xong rồi gọi native cutPaper()
                 if (config.cutPaper) {
-                    Log.d(TAG, "Cutting paper as per config (using atomic ESC/POS command)...")
+                    Log.d(TAG, "Cutting paper as per config...")
 
-                    // Bước 1: Đợi printer xử lý xong buffer in (bitmap)
+                    // Bước 1: Đợi printer xử lý xong buffer in (bitmap đã có blank space ở cuối)
                     Log.d(TAG, "Step 1: Waiting for printer to finish printing...")
-                    adapter.waitForPrinterIdle(timeoutMs = 8000)
+                    adapter.waitForPrinterIdle(timeoutMs = 10000)
 
-                    // Bước 2: Delay cố định để đảm bảo in xong vật lý
-                    // waitForPrinterIdle() chỉ báo printer đã nhận data, không phải đã in xong
-                    Log.d(TAG, "Step 2: Fixed delay (1500ms) for physical printing to complete...")
-                    delay(1500)
+                    // Bước 2: Delay cố định để đảm bảo in xong VẬT LÝ
+                    // waitForPrinterIdle() báo printer đã nhận data, không phải đã in xong giấy
+                    // Bitmap cuối có ~200 pixels blank = ~50mm giấy trắng
+                    // Cần đợi đủ lâu để giấy trắng này được đẩy ra hoàn toàn
+                    Log.d(TAG, "Step 2: Fixed delay (2000ms) for physical printing to complete...")
+                    delay(2000)
 
-                    // Bước 3: Gửi feed+cut trong MỘT lệnh ESC/POS duy nhất
-                    // feedAndCutPaper() build buffer: [reset line spacing] + [feed n lines] + [cut with feed]
-                    // Gửi qua sendRAWData trong 1 atomic operation - giống TCP/IP
-                    // 20 dòng = ~50mm (đủ margin cho Sunmi T1 có khoảng cách đầu in-dao ~25mm)
-                    Log.d(TAG, "Step 3: Sending atomic feed+cut command (20 lines + cut)...")
-                    val cutResult = adapter.feedAndCutPaper(feedLines = 20, partial = true)
-                    Log.d(TAG, "Feed and cut result: $cutResult")
+                    // Bước 3: Feed thêm một chút qua native AIDL để chắc chắn
+                    Log.d(TAG, "Step 3: Extra feed via native AIDL (5 lines)...")
+                    adapter.feedLines(5)
+                    adapter.commitBuffer()
+                    delay(500)
 
-                    // Bước 4: Đợi cắt xong để tránh ảnh hưởng bill kế tiếp
+                    // Bước 4: Cắt giấy qua native AIDL
+                    Log.d(TAG, "Step 4: Cutting paper via native AIDL...")
+                    adapter.cutPaper()
+
+                    // Bước 5: Đợi cắt xong
                     adapter.waitForPrinterIdle(timeoutMs = 2000)
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé

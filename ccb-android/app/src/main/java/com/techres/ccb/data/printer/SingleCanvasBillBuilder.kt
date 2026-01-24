@@ -524,6 +524,9 @@ class SingleCanvasBillBuilder(
      * - Text batches được render thành bitmap
      * - QR code được render thành bitmap riêng
      *
+     * FIX: Thêm blank space ở cuối bitmap cuối cùng để footer không bị cắt
+     * Sunmi T1 có khoảng cách đầu in - dao cắt khoảng 20-25mm (~80-100 pixels)
+     *
      * @return List<Bitmap> - Danh sách các bitmap cần in (caller phải recycle sau khi dùng)
      */
     fun buildBitmaps(): List<Bitmap> {
@@ -536,6 +539,9 @@ class SingleCanvasBillBuilder(
         // Group elements into segments (text-batch between special elements)
         val segments = groupElementsIntoSegments()
         Log.d(TAG, "Grouped into ${segments.size} segments")
+
+        // Track feed lines to add to last bitmap
+        var pendingFeedLines = 0
 
         // Render each segment
         segments.forEachIndexed { index, segment ->
@@ -563,10 +569,27 @@ class SingleCanvasBillBuilder(
                     Log.d(TAG, "Segment $index: Barcode skipped in bitmap mode")
                 }
                 is Segment.FeedSegment -> {
-                    // Feed segment không cần render bitmap riêng
-                    Log.d(TAG, "Segment $index: Feed skipped in bitmap mode")
+                    // Tích lũy feed lines để thêm vào cuối
+                    pendingFeedLines += segment.lines
+                    Log.d(TAG, "Segment $index: Feed ${segment.lines} lines accumulated (total: $pendingFeedLines)")
                 }
             }
+        }
+
+        // FIX: Thêm blank bitmap ở cuối để footer không bị cắt
+        // Khoảng cách đầu in - dao cắt trên Sunmi T1 khoảng 20-25mm
+        // 1 line ~= 8 pixels, cần ít nhất 25mm = ~100 pixels = 12-15 lines
+        // Tổng: pendingFeedLines + extra margin (20 lines) = đủ an toàn
+        val extraMarginLines = 20 // ~50mm margin để chắc chắn
+        val totalFeedLines = pendingFeedLines + extraMarginLines
+        val feedHeightPixels = totalFeedLines * 8 // ~8 pixels per line
+
+        if (feedHeightPixels > 0) {
+            val feedBitmap = Bitmap.createBitmap(pixelWidth, feedHeightPixels, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(feedBitmap)
+            canvas.drawColor(Color.WHITE) // Blank white space
+            bitmaps.add(feedBitmap)
+            Log.d(TAG, "Added feed bitmap: ${pixelWidth}x${feedHeightPixels} pixels ($totalFeedLines lines)")
         }
 
         val elapsed = System.currentTimeMillis() - startTime
