@@ -2,6 +2,7 @@ package com.techres.ccb.data.printer
 
 import android.util.Log
 import com.techres.ccb.data.local.entity.KitchenEntity
+import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import com.techres.ccb.printer.core.EscPosCommands
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -16,12 +17,29 @@ import java.util.*
 /**
  * Kitchen Ticket Print Service - In phiếu bếp
  *
- * In danh sách các món cần chuẩn bị cho 1 bếp cụ thể
+ * Hỗ trợ 2 loại máy in (TÁCH RIÊNG HOÀN TOÀN):
+ * 1. MÁY IN SUNMI TÍCH HỢP (printerIp = "sunmi"): Sử dụng SunmiPrinterAdapter
+ * 2. MÁY IN TCP/IP (printerIp = IP thực): Sử dụng Socket connection
+ *
  * Phiếu chứa: Tên bếp, Bàn, Mã đơn, Danh sách món, Ghi chú
  */
 object KitchenTicketPrintService {
     private const val TAG = "KitchenTicketPrint"
     private val priceFormatter = DecimalFormat("#,###")
+
+    // Convention: printerIp = "sunmi" means use built-in Sunmi printer
+    const val SUNMI_PRINTER_IP = "sunmi"
+
+    // Sunmi adapter - phải được khởi tạo từ Application
+    private var sunmiAdapter: SunmiPrinterAdapter? = null
+
+    /**
+     * Khởi tạo Sunmi Adapter (gọi từ Application)
+     */
+    fun initSunmiAdapter(adapter: SunmiPrinterAdapter) {
+        sunmiAdapter = adapter
+        Log.d(TAG, "Sunmi adapter initialized: ${adapter.getSunmiModel()}")
+    }
 
     /**
      * Regex để match tất cả các ký tự whitespace Unicode và zero-width characters
@@ -93,86 +111,228 @@ object KitchenTicketPrintService {
     }
 
     /**
-     * In phiếu bếp
+     * In phiếu bếp - ĐIỂM VÀO CHÍNH
+     *
+     * Tự động chọn phương thức in dựa trên printerIp:
+     * - printerIp = "sunmi" → In qua máy in Sunmi tích hợp
+     * - printerIp = IP thực → In qua TCP/IP
+     *
      * Hỗ trợ:
      * - ticketPrintItemsSeparately: In từng món riêng biệt
      * - ticketCutAfterPrint: Cắt giấy sau khi in
      * - ticketCopies: Số bản in
-     *
-     * TỐI ƯU: Gộp tất cả nội dung (items × copies) vào 1 byte array
-     * và gửi trong 1 connection duy nhất để tránh giật khi in
      */
     suspend fun printTicket(
         kitchen: KitchenEntity,
         ticketData: KitchenTicketData
     ): PrinterResult {
         return withContext(Dispatchers.IO) {
-            val ip = kitchen.printerIp
+            val printerIp = kitchen.printerIp
                 ?: return@withContext PrinterResult.Error("Chưa cấu hình IP máy in cho ${kitchen.name}")
 
-            val printSeparately = kitchen.ticketPrintItemsSeparately
-            val copies = kitchen.ticketCopies.coerceIn(1, 5)
+            Log.d(TAG, "=== PRINT TICKET ===")
+            Log.d(TAG, "Kitchen: ${kitchen.name}")
+            Log.d(TAG, "Printer IP: $printerIp")
 
-            Log.d(TAG, "=== Print ticket config ===")
-            Log.d(TAG, "  printSeparately: $printSeparately")
-            Log.d(TAG, "  cutAfterPrint: ${kitchen.ticketCutAfterPrint}")
-            Log.d(TAG, "  copies: $copies")
+            // ========== PHÂN LUỒNG: SUNMI vs TCP/IP ==========
+            return@withContext if (printerIp == SUNMI_PRINTER_IP) {
+                Log.d(TAG, ">>> Routing to SUNMI printer <<<")
+                printTicketViaSunmi(kitchen, ticketData)
+            } else {
+                Log.d(TAG, ">>> Routing to TCP/IP printer: $printerIp:${kitchen.printerPort} <<<")
+                printTicketViaNetwork(kitchen, ticketData)
+            }
+        }
+    }
 
-            // ========== BATCHED CONTENT GENERATION ==========
-            // Gộp tất cả nội dung vào 1 byte array để gửi trong 1 connection
-            // Tránh jerky behavior do mở/đóng nhiều connection
-            val batchedContent = java.io.ByteArrayOutputStream()
-            var totalTickets = 0
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SUNMI PRINTING - HOÀN TOÀN RIÊNG BIỆT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * In phiếu bếp qua máy in Sunmi tích hợp
+     *
+     * Flow riêng biệt, KHÔNG dùng chung code với TCP/IP:
+     * 1. Kết nối Sunmi adapter
+     * 2. Generate bitmap content
+     * 3. In qua AIDL interface
+     * 4. Cắt giấy nếu cần
+     */
+    private suspend fun printTicketViaSunmi(
+        kitchen: KitchenEntity,
+        ticketData: KitchenTicketData
+    ): PrinterResult {
+        val adapter = sunmiAdapter
+            ?: return PrinterResult.Error("Sunmi adapter chưa được khởi tạo")
+
+        Log.d(TAG, "=== START PRINT TICKET (SUNMI) ===")
+        Log.d(TAG, "Model: ${adapter.getSunmiModel()}")
+
+        val printSeparately = kitchen.ticketPrintItemsSeparately
+        val copies = kitchen.ticketCopies.coerceIn(1, 5)
+
+        Log.d(TAG, "  printSeparately: $printSeparately")
+        Log.d(TAG, "  cutAfterPrint: ${kitchen.ticketCutAfterPrint}")
+        Log.d(TAG, "  copies: $copies")
+
+        return try {
+            // Kết nối Sunmi printer
+            val connectResult = adapter.connect()
+            if (connectResult is PrinterResult.Error) {
+                return connectResult
+            }
+
+            // Generate và in content
+            var totalPrinted = 0
 
             if (printSeparately && ticketData.items.size > 1) {
-                // In từng món riêng biệt - gộp tất cả items × copies
-                Log.d(TAG, "Batching ${ticketData.items.size} items × $copies copies")
+                // In từng món riêng biệt
                 ticketData.items.forEach { item ->
                     val singleItemTicket = ticketData.copy(items = listOf(item))
-                    val ticketContent = generateTicketContent(kitchen, singleItemTicket)
-
-                    // Ghi copies lần cho mỗi item
                     repeat(copies) {
-                        batchedContent.write(ticketContent)
-                        totalTickets++
+                        val result = printSingleTicketSunmi(adapter, kitchen, singleItemTicket)
+                        if (result is PrinterResult.Success) totalPrinted++
                     }
                 }
             } else {
-                // In tất cả món trên 1 phiếu - gộp copies lần
-                val ticketContent = generateTicketContent(kitchen, ticketData)
-                Log.d(TAG, "Batching 1 ticket × $copies copies")
+                // In tất cả món trên 1 phiếu
+                repeat(copies) {
+                    val result = printSingleTicketSunmi(adapter, kitchen, ticketData)
+                    if (result is PrinterResult.Success) totalPrinted++
+                }
+            }
 
+            Log.d(TAG, "=== SUNMI PRINT COMPLETE: $totalPrinted tickets ===")
+            if (totalPrinted > 0) {
+                PrinterResult.Success("Đã in $totalPrinted phiếu bếp (Sunmi)")
+            } else {
+                PrinterResult.Error("Không in được phiếu nào")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Sunmi print error: ${e.message}", e)
+            PrinterResult.Error("Lỗi in Sunmi: ${e.message}")
+        }
+    }
+
+    /**
+     * In 1 phiếu qua Sunmi (nội bộ)
+     */
+    private suspend fun printSingleTicketSunmi(
+        adapter: SunmiPrinterAdapter,
+        kitchen: KitchenEntity,
+        ticketData: KitchenTicketData
+    ): PrinterResult {
+        return try {
+            // Generate ESC/POS content
+            val content = generateTicketContent(kitchen, ticketData)
+
+            // Gửi qua Sunmi
+            val writeResult = adapter.write(content)
+            if (writeResult is PrinterResult.Error) {
+                return writeResult
+            }
+
+            // Commit buffer
+            adapter.commitBuffer()
+
+            // Cắt giấy nếu cần
+            if (kitchen.ticketCutAfterPrint) {
+                adapter.cutPaperWithFallback()
+            }
+
+            // Delay nhỏ giữa các bản
+            delay(200)
+
+            PrinterResult.Success("OK")
+        } catch (e: Exception) {
+            Log.e(TAG, "Sunmi single ticket error: ${e.message}", e)
+            PrinterResult.Error("Lỗi: ${e.message}")
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TCP/IP PRINTING - HOÀN TOÀN RIÊNG BIỆT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * In phiếu bếp qua TCP/IP (máy in rời)
+     *
+     * Flow riêng biệt, KHÔNG dùng chung code với Sunmi:
+     * 1. Generate ESC/POS content
+     * 2. Batch tất cả copies vào 1 byte array
+     * 3. Gửi qua Socket trong 1 connection duy nhất
+     *
+     * TỐI ƯU: Gộp tất cả nội dung để tránh giật khi in
+     */
+    private suspend fun printTicketViaNetwork(
+        kitchen: KitchenEntity,
+        ticketData: KitchenTicketData
+    ): PrinterResult {
+        val ip = kitchen.printerIp ?: return PrinterResult.Error("Chưa có IP máy in")
+
+        Log.d(TAG, "=== START PRINT TICKET (TCP/IP) ===")
+        Log.d(TAG, "Target: $ip:${kitchen.printerPort}")
+
+        val printSeparately = kitchen.ticketPrintItemsSeparately
+        val copies = kitchen.ticketCopies.coerceIn(1, 5)
+
+        Log.d(TAG, "  printSeparately: $printSeparately")
+        Log.d(TAG, "  cutAfterPrint: ${kitchen.ticketCutAfterPrint}")
+        Log.d(TAG, "  copies: $copies")
+
+        // ========== BATCHED CONTENT GENERATION ==========
+        // Gộp tất cả nội dung vào 1 byte array để gửi trong 1 connection
+        // Tránh jerky behavior do mở/đóng nhiều connection
+        val batchedContent = java.io.ByteArrayOutputStream()
+        var totalTickets = 0
+
+        if (printSeparately && ticketData.items.size > 1) {
+            // In từng món riêng biệt - gộp tất cả items × copies
+            Log.d(TAG, "Batching ${ticketData.items.size} items × $copies copies")
+            ticketData.items.forEach { item ->
+                val singleItemTicket = ticketData.copy(items = listOf(item))
+                val ticketContent = generateTicketContent(kitchen, singleItemTicket)
+
+                // Ghi copies lần cho mỗi item
                 repeat(copies) {
                     batchedContent.write(ticketContent)
                     totalTickets++
                 }
             }
+        } else {
+            // In tất cả món trên 1 phiếu - gộp copies lần
+            val ticketContent = generateTicketContent(kitchen, ticketData)
+            Log.d(TAG, "Batching 1 ticket × $copies copies")
 
-            val allContent = batchedContent.toByteArray()
-            Log.d(TAG, "Total batched content: ${allContent.size} bytes ($totalTickets tickets)")
+            repeat(copies) {
+                batchedContent.write(ticketContent)
+                totalTickets++
+            }
+        }
 
-            // ========== SINGLE CONNECTION PRINT ==========
-            // Gửi tất cả trong 1 connection duy nhất
-            val result = printWithRetry(ip, kitchen.printerPort, allContent)
+        val allContent = batchedContent.toByteArray()
+        Log.d(TAG, "Total batched content: ${allContent.size} bytes ($totalTickets tickets)")
 
-            when (result) {
-                is PrinterResult.Success -> {
-                    Log.d(TAG, "=== PRINT SUCCESS: $totalTickets tickets ===")
-                    PrinterResult.Success("Đã in $totalTickets phiếu bếp")
-                }
-                is PrinterResult.Error -> {
-                    Log.e(TAG, "=== PRINT FAILED: ${result.message} ===")
-                    result
-                }
+        // ========== SINGLE CONNECTION PRINT ==========
+        val result = printWithRetryNetwork(ip, kitchen.printerPort, allContent)
+
+        return when (result) {
+            is PrinterResult.Success -> {
+                Log.d(TAG, "=== TCP/IP PRINT SUCCESS: $totalTickets tickets ===")
+                PrinterResult.Success("Đã in $totalTickets phiếu bếp")
+            }
+            is PrinterResult.Error -> {
+                Log.e(TAG, "=== TCP/IP PRINT FAILED: ${result.message} ===")
+                result
             }
         }
     }
 
     /**
-     * In với retry logic
+     * In với retry logic cho TCP/IP
      * Sử dụng exponential backoff để tránh flood máy in
      */
-    private suspend fun printWithRetry(
+    private suspend fun printWithRetryNetwork(
         ip: String,
         port: Int,
         content: ByteArray,
@@ -180,8 +340,8 @@ object KitchenTicketPrintService {
     ): PrinterResult {
         var lastError: String? = null
         repeat(maxRetries) { attempt ->
-            Log.d(TAG, "Print attempt ${attempt + 1}/$maxRetries...")
-            val result = printViaNetwork(ip, port, content)
+            Log.d(TAG, "TCP/IP Print attempt ${attempt + 1}/$maxRetries...")
+            val result = sendToNetworkPrinter(ip, port, content)
             when (result) {
                 is PrinterResult.Success -> {
                     Log.d(TAG, "Attempt ${attempt + 1} succeeded!")
@@ -200,6 +360,64 @@ object KitchenTicketPrintService {
             }
         }
         return PrinterResult.Error(lastError ?: "In thất bại sau $maxRetries lần thử")
+    }
+
+    /**
+     * Gửi data đến máy in TCP/IP (nội bộ)
+     * SINGLE WRITE để tránh giật
+     */
+    private suspend fun sendToNetworkPrinter(
+        ip: String,
+        port: Int,
+        content: ByteArray
+    ): PrinterResult {
+        var socket: Socket? = null
+        var outputStream: OutputStream? = null
+
+        Log.d(TAG, "=== TCP/IP SEND ===")
+        Log.d(TAG, "Target: $ip:$port")
+        Log.d(TAG, "Content size: ${content.size} bytes")
+
+        return try {
+            socket = Socket().apply {
+                reuseAddress = true
+                keepAlive = true
+                tcpNoDelay = true
+                setSoLinger(true, 2)
+            }
+
+            socket.connect(InetSocketAddress(ip, port), 5000)
+            Log.d(TAG, "Connected!")
+
+            outputStream = socket.getOutputStream()
+
+            // SINGLE WRITE: Gửi toàn bộ batched content trong 1 lần
+            outputStream.write(content)
+            outputStream.flush()
+            Log.d(TAG, "Write completed!")
+
+            // Đợi máy in xử lý - thời gian tỷ lệ với kích thước content
+            val baseDelay = 500L
+            val sizeDelay = (content.size / 10240) * 100L
+            val totalDelay = (baseDelay + sizeDelay).coerceIn(500L, 2000L)
+            Log.d(TAG, "Waiting ${totalDelay}ms for printer...")
+            delay(totalDelay)
+
+            Log.d(TAG, "=== TCP/IP SEND SUCCESS ===")
+            PrinterResult.Success("OK")
+        } catch (e: Exception) {
+            Log.e(TAG, "TCP/IP error: ${e.message}", e)
+            PrinterResult.Error("Lỗi kết nối: ${e.message}")
+        } finally {
+            try {
+                outputStream?.flush()
+                socket?.shutdownOutput()
+                outputStream?.close()
+                socket?.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "Close error: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -523,70 +741,4 @@ object KitchenTicketPrintService {
         return content
     }
 
-    /**
-     * In qua mạng TCP/IP
-     */
-    private suspend fun printViaNetwork(
-        ip: String,
-        port: Int,
-        content: ByteArray
-    ): PrinterResult {
-        var socket: Socket? = null
-        var outputStream: OutputStream? = null
-
-        Log.d(TAG, "=== START PRINT TICKET ===")
-        Log.d(TAG, "Target: $ip:$port")
-        Log.d(TAG, "Content size: ${content.size} bytes")
-
-        return try {
-            Log.d(TAG, "Creating socket...")
-            socket = Socket().apply {
-                reuseAddress = true
-                keepAlive = true
-                tcpNoDelay = true
-                setSoLinger(true, 2)
-            }
-
-            Log.d(TAG, "Connecting to $ip:$port...")
-            socket.connect(InetSocketAddress(ip, port), 5000)
-            Log.d(TAG, "Connected successfully!")
-
-            outputStream = socket.getOutputStream()
-            Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
-
-            // SINGLE WRITE: Gửi toàn bộ batched content trong 1 lần
-            outputStream.write(content)
-            Log.d(TAG, "Write completed, flushing...")
-            outputStream.flush()
-            Log.d(TAG, "Flush completed!")
-
-            // Đợi máy in xử lý - thời gian tỷ lệ với kích thước content
-            // Base: 500ms, thêm 100ms cho mỗi 10KB content
-            val baseDelay = 500L
-            val sizeDelay = (content.size / 10240) * 100L
-            val totalDelay = (baseDelay + sizeDelay).coerceIn(500L, 2000L)
-            Log.d(TAG, "Waiting ${totalDelay}ms for printer to process ${content.size} bytes...")
-            delay(totalDelay)
-
-            Log.d(TAG, "=== PRINT TICKET SUCCESS (SINGLE WRITE, BATCHED) ===")
-            PrinterResult.Success("In phiếu bếp thành công!")
-        } catch (e: Exception) {
-            Log.e(TAG, "=== PRINT TICKET FAILED ===")
-            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
-            Log.e(TAG, "Error message: ${e.message}")
-            Log.e(TAG, "Stack trace:", e)
-            PrinterResult.Error("Lỗi in: ${e.message}")
-        } finally {
-            try {
-                Log.d(TAG, "Closing connection...")
-                outputStream?.flush()
-                socket?.shutdownOutput()
-                outputStream?.close()
-                socket?.close()
-                Log.d(TAG, "Connection closed")
-            } catch (e: Exception) {
-                Log.e(TAG, "Close error: ${e.message}")
-            }
-        }
-    }
 }

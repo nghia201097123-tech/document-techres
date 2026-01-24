@@ -6,6 +6,7 @@ import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.techres.ccb.data.printer.HybridBillPrintService
+import com.techres.ccb.data.printer.KitchenTicketPrintService
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -72,8 +73,9 @@ class CCBApplication : Application(), ImageLoaderFactory {
             // initSunmiAdapter đã được gọi trong PrinterModule.provideSunmiPrinterAdapter()
             // nhưng gọi lại ở đây để chắc chắn (idempotent operation)
             HybridBillPrintService.initSunmiAdapter(sunmiAdapter)
+            KitchenTicketPrintService.initSunmiAdapter(sunmiAdapter)
 
-            Timber.d("Sunmi adapter initialized on app startup")
+            Timber.d("Sunmi adapter initialized on app startup (Bill + Kitchen)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to initialize Sunmi adapter on startup")
         }
