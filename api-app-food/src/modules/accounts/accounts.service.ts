@@ -12,7 +12,6 @@ import {
   AccountStatus,
   FoodPlatformType,
 } from '../../database/entities';
-import { EncryptionService } from '../../common/services/encryption.service';
 import { ConnectorFactory } from '../connectors/connector.factory';
 import {
   CreateAccountDto,
@@ -30,7 +29,6 @@ export class AccountsService {
   constructor(
     @InjectRepository(FoodPlatformAccount)
     private readonly accountRepo: Repository<FoodPlatformAccount>,
-    private readonly encryptionService: EncryptionService,
     private readonly connectorFactory: ConnectorFactory,
   ) {}
 
@@ -95,7 +93,7 @@ export class AccountsService {
     // Update status to connecting
     account.status = AccountStatus.CONNECTING;
     account.username = dto.username;
-    account.password = this.encryptionService.encrypt(dto.password);
+    account.password = dto.password;
     await this.accountRepo.save(account);
 
     // Get connector and login
@@ -275,8 +273,8 @@ export class AccountsService {
       );
     }
 
-    // Decrypt stored password
-    const password = this.encryptionService.decrypt(account.password);
+    // Use stored password directly (plain text)
+    const password = account.password;
 
     // Update status to connecting
     account.status = AccountStatus.CONNECTING;
