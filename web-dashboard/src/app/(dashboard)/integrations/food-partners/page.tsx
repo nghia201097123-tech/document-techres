@@ -403,8 +403,8 @@ export default function FoodPartnersPage() {
     try {
       await foodPartnerService.createItemMapping(selectedAccountForMenu.id, {
         externalItemId: selectedItemForMapping.id,
-        techresBrandId: parseInt(techresProduct.brandId || filterBrandId),
-        techresItemId: parseInt(techresProduct.id),
+        techresBrandId: techresProduct.brandId || filterBrandId,
+        techresItemId: techresProduct.id,
         techresItemName: techresProduct.name,
       });
 

@@ -283,12 +283,12 @@ export interface ItemMapping {
   externalItemId: string;
   externalPlatformItemId: string;
   externalItemName: string;
-  techresBrandId: number;
+  techresBrandId: string;
   techresBrandName?: string;
-  techresItemId: number;
+  techresItemId: string;
   techresItemName?: string;
   mappingType: ItemMappingType;
-  comboItems?: { itemId: number; quantity: number; itemName?: string }[];
+  comboItems?: { itemId: string; quantity: number; itemName?: string }[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -298,12 +298,12 @@ export interface ItemMapping {
 // DTO for creating item mapping
 export interface CreateItemMappingDto {
   externalItemId: string; // UUID of SyncedExternalItem
-  techresBrandId: number;
+  techresBrandId: string; // UUID string of TechRes brand
   techresBrandName?: string;
-  techresItemId: number;
+  techresItemId: string; // UUID string of TechRes item/product
   techresItemName?: string;
   mappingType?: ItemMappingType;
-  comboItems?: { itemId: number; quantity: number; itemName?: string }[];
+  comboItems?: { itemId: string; quantity: number; itemName?: string }[];
 }
 
 // Menu sync result

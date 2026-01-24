@@ -19,12 +19,12 @@ import { AccountsService } from '../accounts/accounts.service';
  */
 export interface CreateItemMappingDto {
   externalItemId: string; // UUID of FoodPlatformExternalItem
-  techresBrandId: number;
+  techresBrandId: string; // UUID string of TechRes brand
   techresBrandName?: string;
-  techresItemId: number;
+  techresItemId: string; // UUID string of TechRes item/product
   techresItemName?: string;
   mappingType?: ItemMappingType;
-  comboItems?: { itemId: number; quantity: number; itemName?: string }[];
+  comboItems?: { itemId: string; quantity: number; itemName?: string }[];
 }
 
 /**

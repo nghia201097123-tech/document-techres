@@ -61,14 +61,14 @@ export class FoodPlatformItemMapping {
   externalItemName: string;
 
   // TechRes item mapping (brand level)
-  @Column({ type: 'int', name: 'techres_brand_id' })
-  techresBrandId: number; // FK to TechRes brands
+  @Column({ type: 'varchar', length: 100, name: 'techres_brand_id' })
+  techresBrandId: string; // FK to TechRes brands (UUID string)
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'techres_brand_name' })
   techresBrandName: string | null; // Cache brand name
 
-  @Column({ type: 'int', name: 'techres_item_id' })
-  techresItemId: number; // FK to TechRes items
+  @Column({ type: 'varchar', length: 100, name: 'techres_item_id' })
+  techresItemId: string; // FK to TechRes items (UUID string)
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'techres_item_name' })
   techresItemName: string | null; // Cache item name
@@ -84,7 +84,7 @@ export class FoodPlatformItemMapping {
 
   // Combo mapping (if mapping_type = combo)
   @Column({ type: 'jsonb', nullable: true, name: 'combo_items' })
-  comboItems: { itemId: number; quantity: number; itemName?: string }[] | null;
+  comboItems: { itemId: string; quantity: number; itemName?: string }[] | null;
 
   // Status
   @Column({ type: 'boolean', default: true, name: 'is_active' })
