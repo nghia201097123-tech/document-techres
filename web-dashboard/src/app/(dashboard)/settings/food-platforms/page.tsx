@@ -86,7 +86,7 @@ const DEFAULT_FORM: PlatformForm = {
 export default function FoodPlatformsPage() {
   const { toast } = useToast();
   const dispatch = useAppDispatch();
-  const { brandId: filterBrandId } = useGlobalFilters();
+  const { brandId: filterBrandId, setBrandId: setFilterBrandId } = useGlobalFilters();
 
   // Branch selection
   const [selectedBranchId, setSelectedBranchId] = React.useState<string>("");
@@ -348,7 +348,7 @@ export default function FoodPlatformsPage() {
               ))}
             </SelectContent>
           </Select>
-          <BrandFilter />
+          <BrandFilter selectedBrandId={filterBrandId} onBrandChange={setFilterBrandId} />
         </div>
       </div>
 
