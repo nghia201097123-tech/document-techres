@@ -483,21 +483,23 @@ class SingleCanvasBillBuilder(
     }
 
     /**
-     * Cắt giấy
-     * QUAN TRỌNG: Phải feed giấy trước khi cắt để footer không bị dao cắt luôn
-     * Khi dùng bitmap mode, khoảng trống trong bitmap không đủ - cần lệnh feed thật
+     * Cắt giấy (cho TCP/IP printers)
      *
-     * FIX cho Sunmi T1: Sử dụng lệnh cutWithFeed() (GS V 66 n) - lệnh atomic
-     * Feed n dòng RỒI MỚI cắt trong 1 operation - không có timing issue
+     * LƯU Ý: Method này dành cho máy in TCP/IP (WiFi/LAN)
+     * - Máy in TCP/IP có dao cắt ngay tại đầu in, không cần feed nhiều
+     * - Chỉ cần feed tối thiểu (3 dòng) để đảm bảo footer không bị cắt
+     *
+     * Đối với Sunmi T1:
+     * - Sunmi T1 có khoảng cách lớn giữa đầu in và dao cắt (~20-25mm)
+     * - Logic cắt giấy cho Sunmi được xử lý riêng trong HybridBillPrintService
+     *   thông qua blank bitmap + lineWrap + cutPaperWithFallback()
      */
     fun cut(partial: Boolean = true): SingleCanvasBillBuilder {
         postCommands.write(EscPosCommands.LINE_SPACING_DEFAULT)
-        // Feed 16 dòng (~40mm) để đảm bảo footer không bị cắt
-        // Sunmi T1 có khoảng cách đầu in - dao cắt khoảng 20-25mm
-        postCommands.write(EscPosCommands.feedLines(16))
-        // FIX: Sử dụng cutWithFeed(4) - lệnh atomic GS V 66 n
-        // Feed thêm 4 dòng rồi cut - đảm bảo footer không bị cắt
-        postCommands.write(EscPosCommands.cutWithFeed(4))
+        // Feed 3 dòng (~8mm) - đủ cho TCP/IP printers
+        postCommands.write(EscPosCommands.feedLines(3))
+        // Sử dụng cutWithFeed(1) - cắt với feed tối thiểu
+        postCommands.write(EscPosCommands.cutWithFeed(1))
         return this
     }
 

@@ -1284,23 +1284,25 @@ class HybridBillBuilder(
     }
 
     /**
-     * Cắt giấy
-     * QUAN TRỌNG: Phải feed giấy trước khi cắt để footer không bị dao cắt luôn
+     * Cắt giấy (cho TCP/IP printers)
      *
-     * FIX cho Sunmi T1: Sử dụng lệnh cutWithFeed() (GS V 66 n) - lệnh atomic
-     * Lệnh này yêu cầu máy in feed n dòng RỒI MỚI cắt trong 1 operation
-     * Giống cách TCP/IP hoạt động - đảm bảo không có timing issue
+     * LƯU Ý: Method này dành cho máy in TCP/IP (WiFi/LAN)
+     * - Máy in TCP/IP có dao cắt ngay tại đầu in, không cần feed nhiều
+     * - Chỉ cần feed tối thiểu để đảm bảo footer không bị cắt
+     *
+     * Đối với Sunmi T1:
+     * - Sunmi T1 có khoảng cách lớn giữa đầu in và dao cắt (~20-25mm)
+     * - Logic cắt giấy cho Sunmi được xử lý riêng trong HybridBillPrintService
      */
     fun cut(partial: Boolean = true): HybridBillBuilder {
         // Reset line spacing về default trước khi cắt
         if (useBitmapMode) {
             buffer.write(EscPosCommands.LINE_SPACING_DEFAULT)
         }
-        // FIX: Feed 16 dòng (~40mm) trước khi cắt
-        buffer.write(EscPosCommands.feedLines(16))
-        // FIX: Sử dụng cutWithFeed(4) - lệnh atomic GS V 66 n
-        // Feed thêm 4 dòng rồi cut - đảm bảo footer không bị cắt
-        buffer.write(EscPosCommands.cutWithFeed(4))
+        // Feed 3 dòng (~8mm) - đủ cho TCP/IP printers
+        buffer.write(EscPosCommands.feedLines(3))
+        // Sử dụng cutWithFeed(1) - cắt với feed tối thiểu
+        buffer.write(EscPosCommands.cutWithFeed(1))
         return this
     }
 
