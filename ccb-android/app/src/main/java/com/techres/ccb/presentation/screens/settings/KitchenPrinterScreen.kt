@@ -289,6 +289,7 @@ fun KitchenPrinterScreen(
     if (showPrinterDialog && selectedKitchen != null) {
         PrinterConfigDialog(
             kitchen = selectedKitchen!!,
+            isSunmiDevice = uiState.isSunmiDevice,
             onDismiss = { showPrinterDialog = false },
             onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
                        ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
@@ -602,6 +603,7 @@ private fun PrinterInfoRow(label: String, value: String) {
 @Composable
 private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
+    isSunmiDevice: Boolean, // True nếu thiết bị là Sunmi
     onDismiss: () -> Unit,
     onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
              ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String, ticketLineSpacing: Float,
@@ -755,7 +757,13 @@ private fun PrinterConfigDialog(
                         expanded = printerTypeExpanded,
                         onDismissRequest = { printerTypeExpanded = false }
                     ) {
-                        KitchenPrinterType.entries.forEach { type ->
+                        // Chỉ hiển thị SUNMI nếu thiết bị là Sunmi
+                        val availableTypes = if (isSunmiDevice) {
+                            KitchenPrinterType.entries
+                        } else {
+                            KitchenPrinterType.entries.filter { it != KitchenPrinterType.SUNMI }
+                        }
+                        availableTypes.forEach { type ->
                             DropdownMenuItem(
                                 text = {
                                     Column {

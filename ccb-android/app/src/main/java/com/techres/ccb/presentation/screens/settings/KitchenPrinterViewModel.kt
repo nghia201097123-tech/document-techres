@@ -25,6 +25,7 @@ import javax.inject.Inject
 data class KitchenPrinterUiState(
     val kitchens: List<KitchenEntity> = emptyList(),
     val isLoading: Boolean = true,
+    val isSunmiDevice: Boolean = false, // True nếu thiết bị là Sunmi (có máy in tích hợp)
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val isDebugDataInserted: Boolean = false
@@ -133,7 +134,9 @@ class KitchenPrinterViewModel @Inject constructor(
 
     private fun loadKitchens() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            // Kiểm tra xem thiết bị có phải Sunmi không để hiển thị tùy chọn kết nối phù hợp
+            val isSunmi = sunmiPrinterAdapter.isSunmiDevice()
+            _uiState.update { it.copy(isLoading = true, isSunmiDevice = isSunmi) }
 
             try {
                 val branchId = authRepository.getBranchId()

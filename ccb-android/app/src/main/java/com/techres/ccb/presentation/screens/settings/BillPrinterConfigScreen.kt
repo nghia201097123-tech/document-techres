@@ -137,6 +137,7 @@ fun BillPrinterConfigScreen(
     if (uiState.showAllSettingsDialog && uiState.selectedConfig != null) {
         BillPrinterAllSettingsDialog(
             config = uiState.selectedConfig!!,
+            isSunmiDevice = uiState.isSunmiDevice,
             onDismiss = { viewModel.hideAllSettingsDialog() },
             onSave = { connectionType, printerIp, printerPort, paperWidth, fontSize, lineSpacing, numberOfCopies, printPreview, cutPaper, openCashDrawer, beepAfterPrint ->
                 viewModel.updateAllSettings(
@@ -1160,6 +1161,7 @@ private fun PrintSettingsDialog(
 @Composable
 private fun BillPrinterAllSettingsDialog(
     config: BillPrinterConfigEntity,
+    isSunmiDevice: Boolean, // True nếu thiết bị là Sunmi
     onDismiss: () -> Unit,
     onSave: (connectionType: String, printerIp: String?, printerPort: Int, paperWidth: Int, fontSize: String, lineSpacing: Float, numberOfCopies: Int, printPreview: Boolean, cutPaper: Boolean, openCashDrawer: Boolean, beepAfterPrint: Boolean) -> Unit
 ) {
@@ -1184,13 +1186,18 @@ private fun BillPrinterAllSettingsDialog(
     var fontSizeExpanded by remember { mutableStateOf(false) }
     var copiesExpanded by remember { mutableStateOf(false) }
 
-    // Options
-    val connectionTypeOptions = listOf(
+    // Options - chỉ hiển thị "Sunmi (Tích hợp)" nếu thiết bị là Sunmi
+    val allConnectionTypeOptions = listOf(
         "network" to "Mạng LAN (Network)",
         "bluetooth" to "Bluetooth",
         "usb" to "USB",
         "sunmi" to "Sunmi (Tích hợp)"
     )
+    val connectionTypeOptions = if (isSunmiDevice) {
+        allConnectionTypeOptions
+    } else {
+        allConnectionTypeOptions.filter { it.first != "sunmi" }
+    }
     val paperWidthOptions = listOf(58, 76, 80, 110, 112)
     val fontSizeOptions = listOf(
         "extra_small" to "Rất nhỏ (0.7x)",

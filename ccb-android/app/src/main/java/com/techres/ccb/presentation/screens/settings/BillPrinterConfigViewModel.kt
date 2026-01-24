@@ -28,6 +28,7 @@ data class BillPrinterConfigUiState(
     val printerConfigs: List<BillPrinterConfigEntity> = emptyList(),
     val templates: List<BillTemplateEntity> = emptyList(),
     val isLoading: Boolean = false,
+    val isSunmiDevice: Boolean = false, // True nếu thiết bị là Sunmi (có máy in tích hợp)
     val selectedConfig: BillPrinterConfigEntity? = null,
     val showEditDialog: Boolean = false,
     val showTemplateSelector: Boolean = false,
@@ -161,7 +162,9 @@ class BillPrinterConfigViewModel @Inject constructor(
             return
         }
 
-        _uiState.update { it.copy(isLoading = true) }
+        // Kiểm tra xem thiết bị có phải Sunmi không để hiển thị tùy chọn kết nối phù hợp
+        val isSunmi = sunmiPrinterAdapter.isSunmiDevice()
+        _uiState.update { it.copy(isLoading = true, isSunmiDevice = isSunmi) }
 
         // Load printer configs (Flow will keep collecting and updating UI)
         // Printer configs are at branch level
