@@ -489,8 +489,10 @@ class SingleCanvasBillBuilder(
      */
     fun cut(partial: Boolean = true): SingleCanvasBillBuilder {
         postCommands.write(EscPosCommands.LINE_SPACING_DEFAULT)
-        // Feed 7 dòng để đảm bảo footer không bị cắt (tăng từ 5 lên 7)
-        postCommands.write(EscPosCommands.feedLines(7))
+        // Feed 10 dòng (~25mm) để đảm bảo footer không bị cắt
+        // Footer có 2 dòng (~6mm) + khoảng cách đầu in - dao cắt (~15mm) = 21mm
+        // Thêm margin an toàn -> 25mm = 10 dòng
+        postCommands.write(EscPosCommands.feedLines(10))
         postCommands.write(if (partial) EscPosCommands.CUT_PARTIAL else EscPosCommands.CUT_FULL)
         return this
     }

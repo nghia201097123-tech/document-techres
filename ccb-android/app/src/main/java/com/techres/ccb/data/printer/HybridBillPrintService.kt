@@ -248,15 +248,17 @@ object HybridBillPrintService {
                 }
 
                 // Feed paper và cắt giấy nếu config cho phép
-                // LƯU Ý: Không cần đợi waitForPrinterIdle ở đây vì:
-                // 1. printBitmap đã có commitBuffer() bên trong
-                // 2. Sunmi printer tự queue các lệnh theo thứ tự
-                // 3. Việc đợi idle gây chậm 5-7 giây không cần thiết
+                // QUAN TRỌNG: Cần delay và feed đủ dòng để tránh:
+                // 1. Footer bị cắt mất chữ
+                // 2. Footer xuất hiện ở bill kế tiếp (do buffer chưa flush xong)
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper as per config...")
-                    // Đẩy giấy 6 dòng (~15mm) - vừa đủ để dao cắt đúng vị trí
-                    // Sunmi T1/V2 có khoảng cách đầu in - dao cắt khoảng 12-15mm
-                    adapter.feedLines(6)
+                    // Delay 300ms để đảm bảo buffer đã flush hoàn toàn
+                    delay(300)
+                    // Đẩy giấy 10 dòng (~25mm) để đảm bảo footer không bị cắt
+                    // Footer có 2 dòng (~6mm) + khoảng cách đầu in - dao cắt (~15mm) = 21mm
+                    // Thêm margin an toàn -> 25mm = 10 dòng
+                    adapter.feedLines(10)
                     adapter.cutPaper()
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
