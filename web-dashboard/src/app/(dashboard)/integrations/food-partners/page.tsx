@@ -166,6 +166,11 @@ export default function FoodPartnersPage() {
   // Store mappings from DB (for branch-link tab)
   const [storeMappings, setStoreMappings] = React.useState<Record<string, StoreMapping[]>>({});
 
+  // Change branch dialog states
+  const [changeBranchDialogOpen, setChangeBranchDialogOpen] = React.useState(false);
+  const [selectedMappingForChange, setSelectedMappingForChange] = React.useState<StoreMapping | null>(null);
+  const [deletingMapping, setDeletingMapping] = React.useState<string | null>(null);
+
   // Menu link tab states
   const [menuLoading, setMenuLoading] = React.useState(false);
   const [selectedAccountForMenu, setSelectedAccountForMenu] = React.useState<FoodPlatformAccount | null>(null);
@@ -773,6 +778,67 @@ export default function FoodPartnersPage() {
     }
   }, [activeTab, allAccounts]);
 
+  // Open change branch dialog
+  const openChangeBranchDialog = (mapping: StoreMapping) => {
+    setSelectedMappingForChange(mapping);
+    setChangeBranchDialogOpen(true);
+  };
+
+  // Handle change branch for store mapping
+  const handleChangeBranch = async (branchId: number, branchName: string) => {
+    if (!selectedMappingForChange) return;
+
+    setSavingMapping(true);
+    try {
+      await foodPartnerService.updateStoreMapping(selectedMappingForChange.id, {
+        branchId,
+        branchName,
+      });
+
+      toast({
+        title: "Thành công",
+        description: `Đã đổi chi nhánh sang "${branchName}"`,
+      });
+
+      // Close dialog and reload data
+      setChangeBranchDialogOpen(false);
+      setSelectedMappingForChange(null);
+      loadStoreMappings();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể đổi chi nhánh",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingMapping(false);
+    }
+  };
+
+  // Handle delete store mapping
+  const handleDeleteStoreMapping = async (mappingId: string) => {
+    setDeletingMapping(mappingId);
+    try {
+      await foodPartnerService.deleteStoreMapping(mappingId);
+
+      toast({
+        title: "Thành công",
+        description: "Đã hủy liên kết chi nhánh",
+      });
+
+      // Reload data
+      loadStoreMappings();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể hủy liên kết",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingMapping(null);
+    }
+  };
+
   // Open link dialog
   const handleOpenLinkDialog = (port: PartnerConnectionPort) => {
     setSelectedPort(port);
@@ -1228,6 +1294,27 @@ export default function FoodPartnersPage() {
                                   <span className="ml-1 hidden sm:inline">Đồng bộ chi nhánh</span>
                                 </Button>
                               )}
+                              {connection.status === ConnectionStatus.CONNECTED && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
+                                  onClick={() => {
+                                    const account = allAccounts.find(a => a.id === connection.id);
+                                    if (account) {
+                                      handleSyncMenu(account);
+                                    }
+                                  }}
+                                  disabled={syncingMenu}
+                                >
+                                  {syncingMenu ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <UtensilsCrossed className="h-4 w-4" />
+                                  )}
+                                  <span className="ml-1 hidden sm:inline">Đồng bộ món ăn</span>
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1422,10 +1509,33 @@ export default function FoodPartnersPage() {
                               </div>
                               <div className="flex items-center gap-2">
                                 {mapping.lastSyncedAt && (
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs text-muted-foreground mr-2">
                                     Đồng bộ: {new Date(mapping.lastSyncedAt).toLocaleDateString("vi-VN")}
                                   </span>
                                 )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                                  onClick={() => openChangeBranchDialog(mapping)}
+                                >
+                                  <ArrowRightLeft className="h-3 w-3 mr-1" />
+                                  Đổi chi nhánh
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                  onClick={() => handleDeleteStoreMapping(mapping.id)}
+                                  disabled={deletingMapping === mapping.id}
+                                >
+                                  {deletingMapping === mapping.id ? (
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <X className="h-3 w-3 mr-1" />
+                                  )}
+                                  Hủy liên kết
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -2209,6 +2319,86 @@ export default function FoodPartnersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Branch Dialog - Change branch for existing store mapping */}
+      <Dialog open={changeBranchDialogOpen} onOpenChange={setChangeBranchDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+              Đổi chi nhánh liên kết
+            </DialogTitle>
+            <DialogDescription>
+              {selectedMappingForChange && (
+                <>
+                  Chọn chi nhánh TechRes mới để liên kết với cửa hàng <strong>{selectedMappingForChange.externalStoreName}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedMappingForChange && (
+              <div className="space-y-4">
+                {/* Current mapping info */}
+                <div className="p-4 bg-gray-50 rounded-lg border">
+                  <p className="text-sm text-muted-foreground mb-2">Cửa hàng đối tác:</p>
+                  <p className="font-medium">{selectedMappingForChange.externalStoreName}</p>
+                  <code className="text-xs bg-gray-200 px-1.5 py-0.5 rounded mt-1 inline-block">
+                    {selectedMappingForChange.externalStoreId}
+                  </code>
+
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-sm text-muted-foreground mb-1">Chi nhánh hiện tại:</p>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-700">
+                        {selectedMappingForChange.branchName || `#${selectedMappingForChange.branchId}`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Branch selection */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Chọn chi nhánh mới:</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {branches.map((branch) => {
+                      const isCurrentBranch = String(selectedMappingForChange.branchId) === branch.id;
+                      return (
+                        <Button
+                          key={branch.id}
+                          variant={isCurrentBranch ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleChangeBranch(parseInt(branch.id), branch.name)}
+                          disabled={savingMapping || isCurrentBranch}
+                          className={cn(
+                            "justify-start",
+                            isCurrentBranch && "bg-green-600 hover:bg-green-600"
+                          )}
+                        >
+                          {savingMapping ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : isCurrentBranch ? (
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Building2 className="h-4 w-4 mr-2" />
+                          )}
+                          {branch.name}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeBranchDialogOpen(false)}>
               Đóng
             </Button>
           </DialogFooter>
