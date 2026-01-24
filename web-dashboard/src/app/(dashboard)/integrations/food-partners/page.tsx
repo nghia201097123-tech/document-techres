@@ -839,17 +839,15 @@ export default function FoodPartnersPage() {
                             </CardDescription>
                           </div>
                         </div>
-                        {hasUnlinkedAccounts && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                            onClick={() => openAddNewLinkDialog(partnerType)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Thêm liên kết
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                          onClick={() => openAddNewLinkDialog(partnerType)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Thêm liên kết
+                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -1231,7 +1229,18 @@ export default function FoodPartnersPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Store className="h-10 w-10 mx-auto mb-3 opacity-50" />
                   <p className="text-sm">Không có tài khoản nào có thể liên kết</p>
-                  <p className="text-xs mt-1">Vui lòng kết nối tài khoản mới từ tab "Kết nối tài khoản"</p>
+                  <p className="text-xs mt-1 mb-4">Tất cả tài khoản đã được liên kết hoặc chưa có tài khoản nào được kết nối</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAddNewLinkDialogOpen(false);
+                      setActiveTab("accounts");
+                    }}
+                  >
+                    <Link2 className="h-4 w-4 mr-1" />
+                    Đi đến kết nối tài khoản
+                  </Button>
                 </div>
               )}
             </div>
