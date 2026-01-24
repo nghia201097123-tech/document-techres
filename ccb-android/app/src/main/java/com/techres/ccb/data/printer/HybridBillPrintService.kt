@@ -250,13 +250,14 @@ object HybridBillPrintService {
                 // Feed paper và cắt giấy nếu config cho phép
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper as per config...")
-                    // Đẩy giấy nhiều hơn (6 dòng ~15mm) để footer không bị cắt
-                    adapter.feedLines(6)
+                    // Đẩy giấy nhiều hơn (8 dòng ~20mm) để footer không bị cắt bởi dao
+                    // Tăng từ 6 lên 8 để đảm bảo các dòng footer cuối cùng được in rõ
+                    adapter.feedLines(8)
                     adapter.cutPaper()
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
                     Log.d(TAG, "No auto-cut, feeding paper...")
-                    adapter.feedLines(5)
+                    adapter.feedLines(6)
                 }
 
                 // Recycle bitmaps
@@ -788,7 +789,8 @@ object HybridBillPrintService {
             }
 
             // Feed giấy để nội dung bill không bị cắt
-            feed(3)
+            // Tăng từ 3 lên 5 dòng để đảm bảo footer không bị dao cắt
+            feed(5)
         }
 
         return builder
