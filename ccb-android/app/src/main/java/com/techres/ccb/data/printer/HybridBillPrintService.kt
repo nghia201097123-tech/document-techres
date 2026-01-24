@@ -248,34 +248,17 @@ object HybridBillPrintService {
                 }
 
                 // Feed paper và cắt giấy nếu config cho phép
-                // FIX: Bitmap đã có blank space ở cuối (~200 pixels = ~50mm)
-                // Chỉ cần đợi in xong rồi gọi native cutPaper()
+                // Bitmap đã có blank space ở cuối (~160 pixels = ~40mm)
                 if (config.cutPaper) {
-                    Log.d(TAG, "Cutting paper as per config...")
+                    Log.d(TAG, "Cutting paper...")
 
-                    // Bước 1: Đợi printer xử lý xong buffer in (bitmap đã có blank space ở cuối)
-                    Log.d(TAG, "Step 1: Waiting for printer to finish printing...")
-                    adapter.waitForPrinterIdle(timeoutMs = 10000)
-
-                    // Bước 2: Delay cố định để đảm bảo in xong VẬT LÝ
-                    // waitForPrinterIdle() báo printer đã nhận data, không phải đã in xong giấy
-                    // Bitmap cuối có ~200 pixels blank = ~50mm giấy trắng
-                    // Cần đợi đủ lâu để giấy trắng này được đẩy ra hoàn toàn
-                    Log.d(TAG, "Step 2: Fixed delay (2000ms) for physical printing to complete...")
-                    delay(2000)
-
-                    // Bước 3: Feed thêm một chút qua native AIDL để chắc chắn
-                    Log.d(TAG, "Step 3: Extra feed via native AIDL (5 lines)...")
-                    adapter.feedLines(5)
-                    adapter.commitBuffer()
+                    // Đợi printer xử lý xong + delay ngắn cho in vật lý
+                    adapter.waitForPrinterIdle(timeoutMs = 5000)
                     delay(500)
 
-                    // Bước 4: Cắt giấy qua native AIDL
-                    Log.d(TAG, "Step 4: Cutting paper via native AIDL...")
+                    // Cắt giấy qua native AIDL
                     adapter.cutPaper()
-
-                    // Bước 5: Đợi cắt xong
-                    adapter.waitForPrinterIdle(timeoutMs = 2000)
+                    adapter.waitForPrinterIdle(timeoutMs = 1000)
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
                     Log.d(TAG, "No auto-cut, feeding paper...")

@@ -576,11 +576,10 @@ class SingleCanvasBillBuilder(
             }
         }
 
-        // FIX: Thêm blank bitmap ở cuối để footer không bị cắt
-        // Khoảng cách đầu in - dao cắt trên Sunmi T1 khoảng 20-25mm
-        // 1 line ~= 8 pixels, cần ít nhất 25mm = ~100 pixels = 12-15 lines
-        // Tổng: pendingFeedLines + extra margin (20 lines) = đủ an toàn
-        val extraMarginLines = 20 // ~50mm margin để chắc chắn
+        // Thêm blank bitmap ở cuối để footer không bị cắt
+        // Khoảng cách đầu in - dao cắt trên Sunmi T1 khoảng 20-25mm (~100 pixels)
+        // pendingFeedLines (từ feed() trong bill) + extra margin = đủ an toàn
+        val extraMarginLines = 12 // ~30mm extra margin
         val totalFeedLines = pendingFeedLines + extraMarginLines
         val feedHeightPixels = totalFeedLines * 8 // ~8 pixels per line
 
