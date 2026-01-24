@@ -1438,34 +1438,67 @@ class SunmiPrinterAdapter @Inject constructor(
 
     /**
      * Cut paper via AIDL transact for BinderProxy
+     * Tries multiple transaction codes to find the correct one for the device
      */
     private fun cutPaperViaTransact(binder: IBinder): PrinterResult {
         val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
 
-        try {
-            val dataParcel = Parcel.obtain()
-            val replyParcel = Parcel.obtain()
+        // Try multiple possible transaction codes for cutPaper
+        // Different Sunmi firmware versions may have different method ordering
+        val possibleCodes = listOf(
+            TransactionCodes.TRANSACTION_cutPaper,     // Position 24
+            IBinder.FIRST_CALL_TRANSACTION + 25,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 23,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 26,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 20,       // Alternative position
+            IBinder.FIRST_CALL_TRANSACTION + 21        // Alternative position
+        )
 
+        var lastError: Exception? = null
+
+        for (code in possibleCodes) {
             try {
-                dataParcel.writeInterfaceToken(descriptor)
-                dataParcel.writeStrongBinder(null) // callback
+                val dataParcel = Parcel.obtain()
+                val replyParcel = Parcel.obtain()
 
-                val success = binder.transact(TransactionCodes.TRANSACTION_cutPaper, dataParcel, replyParcel, 0)
+                try {
+                    dataParcel.writeInterfaceToken(descriptor)
+                    dataParcel.writeStrongBinder(null) // callback
 
-                if (success) {
-                    replyParcel.readException()
-                    Timber.d("$TAG: cutPaper transact succeeded")
-                    return PrinterResult.Success
+                    val success = binder.transact(code, dataParcel, replyParcel, 0)
+
+                    if (success) {
+                        replyParcel.readException()
+                        Timber.d("$TAG: cutPaper transact($code) succeeded")
+                        return PrinterResult.Success
+                    } else {
+                        Timber.d("$TAG: cutPaper transact($code) returned false")
+                    }
+                } finally {
+                    dataParcel.recycle()
+                    replyParcel.recycle()
                 }
-            } finally {
-                dataParcel.recycle()
-                replyParcel.recycle()
+            } catch (e: Exception) {
+                Timber.d("$TAG: cutPaper transact($code) failed: ${e.message}")
+                lastError = e
             }
-        } catch (e: Exception) {
-            Timber.e(e, "$TAG: cutPaperViaTransact failed")
         }
 
-        return PrinterResult.Error("cutPaper transact failed")
+        // If all AIDL transact attempts fail, try ESC/POS cut command via sendRAWData
+        Timber.d("$TAG: All cutPaper transact codes failed, trying ESC/POS cut command")
+        try {
+            // GS V 66 n - Cut with feed (n = 0 for minimal feed before cut)
+            val cutCommand = byteArrayOf(0x1D, 0x56, 0x42, 0x00)
+            val result = sendRawDataViaTransact(binder, cutCommand)
+            if (result is PrinterResult.Success) {
+                Timber.d("$TAG: ESC/POS cut command succeeded")
+                return result
+            }
+        } catch (e: Exception) {
+            Timber.d("$TAG: ESC/POS cut command failed: ${e.message}")
+        }
+
+        return PrinterResult.Error("cutPaper transact failed: ${lastError?.message ?: "unknown error"}")
     }
 
     /**

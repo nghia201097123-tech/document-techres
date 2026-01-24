@@ -248,23 +248,26 @@ object HybridBillPrintService {
                 }
 
                 // Feed paper và cắt giấy nếu config cho phép
-                // Bitmap đã có blank space ở cuối (~160 pixels = ~40mm)
+                // Bitmap đã có blank space ở cuối (~96 pixels = ~24mm)
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper...")
 
-                    // Đợi printer xử lý xong + delay ngắn cho in vật lý
-                    adapter.waitForPrinterIdle(timeoutMs = 5000)
-                    delay(500)
+                    // Đợi ngắn cho printer xử lý xong buffer (tối ưu từ 5000ms xuống 1500ms)
+                    adapter.waitForPrinterIdle(timeoutMs = 1500)
+                    delay(100)  // Giảm từ 500ms xuống 100ms
 
                     // Cắt giấy qua native AIDL
-                    adapter.cutPaper()
-                    adapter.waitForPrinterIdle(timeoutMs = 1000)
+                    val cutResult = adapter.cutPaper()
+                    Log.d(TAG, "Cut paper result: $cutResult")
+
+                    // Chỉ đợi ngắn sau khi cắt (giảm từ 1000ms xuống 300ms)
+                    adapter.waitForPrinterIdle(timeoutMs = 300)
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
                     Log.d(TAG, "No auto-cut, feeding paper...")
                     adapter.feedLines(5)
                     adapter.commitBuffer()
-                    adapter.waitForPrinterIdle(timeoutMs = 3000)
+                    adapter.waitForPrinterIdle(timeoutMs = 1000)  // Giảm từ 3000ms
                 }
 
                 // Recycle bitmaps
