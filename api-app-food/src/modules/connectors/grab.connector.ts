@@ -242,6 +242,57 @@ export class GrabConnector extends BasePlatformConnector {
   }
 
   /**
+   * Get menu from GrabFood
+   * Endpoint: GET /food/merchant/v2/menu
+   */
+  async getMenu(account: FoodPlatformAccount): Promise<any> {
+    try {
+      this.logger.debug('[GrabConnector] Fetching menu...');
+
+      const response = await this.httpClient.get(
+        '/food/merchant/v2/menu',
+        {
+          headers: {
+            'Authorization': account.accessToken,
+            'x-user-type': 'user-profile',
+          },
+        },
+      );
+
+      const menuData = response.data;
+      this.logger.debug(`[GrabConnector] Got menu with ${menuData?.categories?.length || 0} categories`);
+
+      return {
+        categories: menuData.categories || [],
+        modifierGroups: menuData.modifierGroups || [],
+        sellingTimes: menuData.sellingTimes || [],
+      };
+    } catch (error: any) {
+      this.logger.error('GrabFood get menu failed');
+      this.logger.error(`Error message: ${error?.message}`);
+      this.logger.error(`Error response status: ${error?.response?.status}`);
+
+      // Check for 401 errors
+      const is401 = error?.response?.status === 401 ||
+        error?.message?.includes('UNAUTHORIZED') ||
+        error?.message?.includes('401') ||
+        error?.message?.includes('Token expired');
+
+      if (is401) {
+        this.logger.log('Throwing UnauthorizedException for getMenu...');
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
+      // For other errors, return empty menu
+      return {
+        categories: [],
+        modifierGroups: [],
+        sellingTimes: [],
+      };
+    }
+  }
+
+  /**
    * Poll orders from a specific store
    */
   async pollOrders(

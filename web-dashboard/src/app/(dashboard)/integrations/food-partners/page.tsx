@@ -18,6 +18,10 @@ import {
   ArrowRightLeft,
   Store,
   Plus,
+  UtensilsCrossed,
+  ChevronDown,
+  ChevronRight,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +62,9 @@ import {
   type ExternalStore,
   type StoreMapping,
   type CreateStoreMappingDto,
+  type ExternalMenu,
+  type ExternalMenuCategory,
+  type ExternalMenuItem,
   foodPartnerService,
 } from "@/services/food-partner-service";
 import { Branch, branchService } from "@/services/branch-service";
@@ -152,6 +159,12 @@ export default function FoodPartnersPage() {
   // Store mappings from DB (for branch-link tab)
   const [storeMappings, setStoreMappings] = React.useState<Record<string, StoreMapping[]>>({});
 
+  // Menu link tab states
+  const [menuLoading, setMenuLoading] = React.useState(false);
+  const [selectedAccountForMenu, setSelectedAccountForMenu] = React.useState<FoodPlatformAccount | null>(null);
+  const [externalMenu, setExternalMenu] = React.useState<ExternalMenu | null>(null);
+  const [expandedCategories, setExpandedCategories] = React.useState<Record<string, boolean>>({});
+
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -223,6 +236,49 @@ export default function FoodPartnersPage() {
     } finally {
       setBranchLinkLoading(false);
     }
+  };
+
+  // Load menu from platform
+  const loadMenu = async (account: FoodPlatformAccount) => {
+    setMenuLoading(true);
+    setSelectedAccountForMenu(account);
+    setExternalMenu(null);
+    setExpandedCategories({});
+
+    try {
+      const menu = await foodPartnerService.getMenu(account.id);
+      setExternalMenu(menu);
+
+      // Expand all categories by default
+      const expanded: Record<string, boolean> = {};
+      menu.categories.forEach((cat: ExternalMenuCategory) => {
+        expanded[cat.categoryID] = true;
+      });
+      setExpandedCategories(expanded);
+
+      if (menu.categories.length === 0) {
+        toast({
+          title: "Thông báo",
+          description: "Không tìm thấy món ăn nào từ tài khoản này",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải menu",
+        variant: "destructive",
+      });
+    } finally {
+      setMenuLoading(false);
+    }
+  };
+
+  // Toggle category expansion
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
   };
 
   // Update account branch
@@ -738,7 +794,7 @@ export default function FoodPartnersPage() {
             showAllBranchOption={false}
           />
         )}
-        {activeTab === "branch-link" && (
+        {(activeTab === "branch-link" || activeTab === "menu-link") && (
           <BrandBranchFilter
             selectedBrandId={filterBrandId}
             selectedBranchId={filterBranchId}
@@ -752,7 +808,7 @@ export default function FoodPartnersPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="accounts" className="gap-2">
             <Link2 className="h-4 w-4" />
             Kết nối tài khoản
@@ -760,6 +816,10 @@ export default function FoodPartnersPage() {
           <TabsTrigger value="branch-link" className="gap-2">
             <Building2 className="h-4 w-4" />
             Liên kết chi nhánh
+          </TabsTrigger>
+          <TabsTrigger value="menu-link" className="gap-2">
+            <UtensilsCrossed className="h-4 w-4" />
+            Liên kết món ăn
           </TabsTrigger>
         </TabsList>
 
@@ -1137,6 +1197,213 @@ export default function FoodPartnersPage() {
                   </Card>
                 );
               })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Tab: Menu Link */}
+        <TabsContent value="menu-link" className="mt-6">
+          {branchLinkLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : allAccounts.filter(a => a.status === ConnectionStatus.CONNECTED).length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-20">
+                <UtensilsCrossed className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Chưa có tài khoản nào</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  Chưa có tài khoản app food nào đã kết nối. Vui lòng kết nối tài khoản trước để xem menu.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Account selector */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Chọn tài khoản để xem menu</CardTitle>
+                  <CardDescription>
+                    Chọn một tài khoản đã kết nối để tải và xem danh sách món ăn
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3">
+                    {allAccounts
+                      .filter(a => a.status === ConnectionStatus.CONNECTED)
+                      .map((account) => {
+                        const partner = FoodPartnerInfo[account.platform];
+                        const isSelected = selectedAccountForMenu?.id === account.id;
+
+                        return (
+                          <Button
+                            key={account.id}
+                            variant={isSelected ? "default" : "outline"}
+                            className={cn("gap-2", isSelected && "bg-green-600 hover:bg-green-700")}
+                            onClick={() => loadMenu(account)}
+                            disabled={menuLoading}
+                          >
+                            {menuLoading && selectedAccountForMenu?.id === account.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <PartnerLogo type={account.platform} size="sm" />
+                            )}
+                            <span>{account.username || account.externalMerchantName || partner.name}</span>
+                          </Button>
+                        );
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Menu content */}
+              {menuLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Đang tải menu...</span>
+                </div>
+              ) : externalMenu && selectedAccountForMenu ? (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <PartnerLogo type={selectedAccountForMenu.platform} />
+                        <div>
+                          <CardTitle>
+                            Menu từ {FoodPartnerInfo[selectedAccountForMenu.platform].name}
+                          </CardTitle>
+                          <CardDescription>
+                            {externalMenu.categories.length} danh mục, {" "}
+                            {externalMenu.categories.reduce((sum, cat) => sum + cat.items.length, 0)} món ăn
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadMenu(selectedAccountForMenu)}
+                        disabled={menuLoading}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Tải lại
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {externalMenu.categories.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <UtensilsCrossed className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                        <p className="text-sm">Không có món ăn nào trong menu</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {externalMenu.categories.map((category) => (
+                          <div key={category.categoryID} className="border rounded-lg overflow-hidden">
+                            {/* Category header */}
+                            <button
+                              className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                              onClick={() => toggleCategory(category.categoryID)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
+                                  <UtensilsCrossed className="h-4 w-4" />
+                                </div>
+                                <div className="text-left">
+                                  <h4 className="font-medium">{category.categoryName}</h4>
+                                  <p className="text-xs text-muted-foreground">
+                                    {category.items.length} món ăn
+                                    {category.availableStatus !== 1 && (
+                                      <Badge variant="secondary" className="ml-2">Tạm ẩn</Badge>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              {expandedCategories[category.categoryID] ? (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              )}
+                            </button>
+
+                            {/* Category items */}
+                            {expandedCategories[category.categoryID] && (
+                              <div className="divide-y">
+                                {category.items.map((item) => (
+                                  <div
+                                    key={item.itemID}
+                                    className={cn(
+                                      "flex items-start gap-4 p-4",
+                                      item.availableStatus !== 1 && "opacity-50 bg-gray-50"
+                                    )}
+                                  >
+                                    {/* Item image */}
+                                    <div className="flex-shrink-0">
+                                      {item.imageURL || item.webPURL ? (
+                                        <img
+                                          src={item.webPURL || item.imageURL}
+                                          alt={item.itemName}
+                                          className="w-20 h-20 rounded-lg object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center">
+                                          <ImageIcon className="h-8 w-8 text-gray-400" />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Item info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div>
+                                          <h5 className="font-medium text-sm line-clamp-2">
+                                            {item.itemName}
+                                          </h5>
+                                          {item.description && (
+                                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                              {item.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                          <p className="font-semibold text-green-600">
+                                            {item.priceDisplay}
+                                          </p>
+                                          {item.availableStatus !== 1 && (
+                                            <Badge variant="secondary" className="text-xs mt-1">
+                                              Hết hàng
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Item ID */}
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                          {item.itemID}
+                                        </code>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-20">
+                    <UtensilsCrossed className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Chọn tài khoản để xem menu</h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      Nhấn vào một trong các tài khoản phía trên để tải và xem danh sách món ăn từ nền tảng.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </TabsContent>

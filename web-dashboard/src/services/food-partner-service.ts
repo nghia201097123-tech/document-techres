@@ -180,6 +180,65 @@ export interface CreateStoreMappingDto {
   branchName?: string;
 }
 
+// Menu item from GrabFood
+export interface ExternalMenuItem {
+  itemID: string;
+  itemName: string;
+  description?: string;
+  priceInMin: number;
+  priceDisplay: string;
+  imageURL?: string;
+  webPURL?: string;
+  availableStatus: number; // 1=available, 3=unavailable
+  sortOrder: number;
+  categoryID: string;
+  categoryName?: string;
+  linkedModifierGroupIDs?: string[];
+  nameTranslation?: {
+    translation: Record<string, string>;
+  };
+}
+
+// Menu category from GrabFood
+export interface ExternalMenuCategory {
+  categoryID: string;
+  categoryName: string;
+  availableStatus: number;
+  sortOrder: number;
+  items: ExternalMenuItem[];
+  sellingTimeID?: string;
+  nameTranslation?: {
+    translation: Record<string, string>;
+  };
+}
+
+// Modifier from GrabFood
+export interface ExternalModifier {
+  modifierID: string;
+  modifierName: string;
+  priceInMin: number;
+  priceDisplay: string;
+  availableStatus: number;
+  sortOrder: number;
+}
+
+// Modifier group from GrabFood
+export interface ExternalModifierGroup {
+  modifierGroupID: string;
+  modifierGroupName: string;
+  selectionRangeMin: number;
+  selectionRangeMax: number;
+  modifiers: ExternalModifier[];
+  availableStatus: number;
+}
+
+// Menu response from GrabFood
+export interface ExternalMenu {
+  categories: ExternalMenuCategory[];
+  modifierGroups: ExternalModifierGroup[];
+  sellingTimes: any[];
+}
+
 /**
  * Transform backend FoodPlatformAccount to frontend PartnerConnectionView
  */
@@ -308,6 +367,14 @@ export const foodPartnerService = {
    */
   async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string; success?: boolean }> {
     const response = await foodApi.post<ApiResponse<{ success: boolean; status: ConnectionStatus; message: string }>>(`/accounts/${connectionId}/test`);
+    return response.data.data;
+  },
+
+  /**
+   * Get menu from platform (GrabFood, etc.)
+   */
+  async getMenu(accountId: string): Promise<ExternalMenu> {
+    const response = await foodApi.get<ApiResponse<ExternalMenu>>(`/accounts/${accountId}/menu`);
     return response.data.data;
   },
 

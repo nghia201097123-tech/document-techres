@@ -159,6 +159,18 @@ export class AccountsController {
   }
 
   /**
+   * Get menu from platform
+   */
+  @Get(':id/menu')
+  @ApiOperation({ summary: 'Lấy danh sách menu từ platform' })
+  @ApiParam({ name: 'id', description: 'Account ID' })
+  @ApiResponse({ status: 200, description: 'Thành công' })
+  async getMenu(@Param('id') id: string) {
+    const menu = await this.accountsService.getMenu(id);
+    return ApiResponseDto.success(menu);
+  }
+
+  /**
    * Update account settings
    */
   @Put(':id/settings')

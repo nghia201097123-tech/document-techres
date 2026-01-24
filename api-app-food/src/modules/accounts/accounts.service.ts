@@ -528,6 +528,71 @@ export class AccountsService {
   }
 
   /**
+   * Get menu from platform
+   * Auto-reconnect if token expired (401)
+   */
+  async getMenu(accountId: string): Promise<any> {
+    let account = await this.getAccountById(accountId);
+
+    if (account.status !== AccountStatus.CONNECTED) {
+      throw new BadRequestException('Tài khoản chưa kết nối');
+    }
+
+    await this.refreshTokenIfNeeded(account);
+
+    const connector = this.connectorFactory.getConnector(account.platform) as any;
+
+    // Check if connector supports getMenu
+    if (typeof connector.getMenu !== 'function') {
+      throw new BadRequestException(`Platform ${account.platform} không hỗ trợ lấy menu`);
+    }
+
+    try {
+      this.logger.log(`[getMenu] Fetching menu for account ${accountId}...`);
+      const menu = await connector.getMenu(account);
+      this.logger.log(`[getMenu] Got ${menu?.categories?.length || 0} categories`);
+      return menu;
+    } catch (error: any) {
+      this.logger.error(`[getMenu] Error caught: ${error?.message}`);
+
+      // Check if it's a 401 Unauthorized error
+      const isUnauthorized = error instanceof UnauthorizedException ||
+        error?.name === 'UnauthorizedException' ||
+        error?.status === 401 ||
+        error?.message?.includes('UNAUTHORIZED') ||
+        error?.message?.includes('401');
+
+      if (isUnauthorized) {
+        this.logger.log(`[getMenu] Token expired, attempting to reconnect...`);
+
+        try {
+          account = await this.reconnect(accountId);
+          this.logger.log(`[getMenu] Reconnect success, retrying getMenu...`);
+
+          const menu = await connector.getMenu(account);
+          this.logger.log(`[getMenu] Retry success! Got ${menu?.categories?.length || 0} categories`);
+          return menu;
+        } catch (reconnectError: any) {
+          this.logger.error(`[getMenu] Failed to reconnect: ${reconnectError?.message}`);
+
+          // Mark account as disconnected
+          account.status = AccountStatus.DISCONNECTED;
+          account.isActive = false;
+          account.lastError = 'Token hết hạn và không thể kết nối lại tự động.';
+          account.errorCount += 1;
+          await this.accountRepo.save(account);
+
+          throw new BadRequestException(
+            'Token hết hạn và không thể kết nối lại. Vui lòng đăng nhập lại.',
+          );
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Update account branch assignment
    */
   async updateBranch(
