@@ -65,6 +65,10 @@ import {
   type ExternalMenu,
   type ExternalMenuCategory,
   type ExternalMenuItem,
+  type SyncedExternalItem,
+  type SyncedItemsByCategory,
+  type ItemMapping,
+  type MenuSyncStatus,
   foodPartnerService,
 } from "@/services/food-partner-service";
 import { Branch, branchService } from "@/services/branch-service";
@@ -164,6 +168,13 @@ export default function FoodPartnersPage() {
   const [selectedAccountForMenu, setSelectedAccountForMenu] = React.useState<FoodPlatformAccount | null>(null);
   const [externalMenu, setExternalMenu] = React.useState<ExternalMenu | null>(null);
   const [expandedCategories, setExpandedCategories] = React.useState<Record<string, boolean>>({});
+
+  // Menu sync states
+  const [syncingMenu, setSyncingMenu] = React.useState(false);
+  const [syncedItems, setSyncedItems] = React.useState<SyncedItemsByCategory[]>([]);
+  const [itemMappings, setItemMappings] = React.useState<ItemMapping[]>([]);
+  const [menuSyncStatus, setMenuSyncStatus] = React.useState<MenuSyncStatus | null>(null);
+  const [loadingSyncedItems, setLoadingSyncedItems] = React.useState(false);
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -279,6 +290,73 @@ export default function FoodPartnersPage() {
       ...prev,
       [categoryId]: !prev[categoryId],
     }));
+  };
+
+  // Sync menu from platform to database
+  const handleSyncMenu = async (account: FoodPlatformAccount) => {
+    setSyncingMenu(true);
+    try {
+      const result = await foodPartnerService.syncMenuItems(account.id);
+      toast({
+        title: "Đồng bộ thành công",
+        description: result.message,
+      });
+
+      // Reload synced items after sync
+      await loadSyncedItems(account);
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể đồng bộ menu",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingMenu(false);
+    }
+  };
+
+  // Load synced items from database
+  const loadSyncedItems = async (account: FoodPlatformAccount) => {
+    setLoadingSyncedItems(true);
+    try {
+      const [items, status, mappings] = await Promise.all([
+        foodPartnerService.getSyncedItemsByCategory(account.id),
+        foodPartnerService.getMenuSyncStatus(account.id),
+        foodPartnerService.getItemMappings(account.id),
+      ]);
+      setSyncedItems(items);
+      setMenuSyncStatus(status);
+      setItemMappings(mappings);
+
+      // Expand all categories by default
+      const expanded: Record<string, boolean> = {};
+      items.forEach((cat) => {
+        expanded[cat.categoryId] = true;
+      });
+      setExpandedCategories(expanded);
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách món ăn",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSyncedItems(false);
+    }
+  };
+
+  // Select account for menu tab
+  const selectAccountForMenu = async (account: FoodPlatformAccount) => {
+    setSelectedAccountForMenu(account);
+    setSyncedItems([]);
+    setItemMappings([]);
+    setMenuSyncStatus(null);
+    await loadSyncedItems(account);
+  };
+
+  // Check if an item is mapped
+  const getItemMapping = (itemId: string): ItemMapping | undefined => {
+    return itemMappings.find(m => m.externalItemId === itemId);
   };
 
   // Update account branch
@@ -1222,9 +1300,9 @@ export default function FoodPartnersPage() {
               {/* Account selector */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Chọn tài khoản để xem menu</CardTitle>
+                  <CardTitle className="text-lg">Chọn tài khoản để đồng bộ menu</CardTitle>
                   <CardDescription>
-                    Chọn một tài khoản đã kết nối để tải và xem danh sách món ăn
+                    Chọn một tài khoản đã kết nối để đồng bộ và liên kết món ăn với thương hiệu TechRes
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1240,10 +1318,10 @@ export default function FoodPartnersPage() {
                             key={account.id}
                             variant={isSelected ? "default" : "outline"}
                             className={cn("gap-2", isSelected && "bg-green-600 hover:bg-green-700")}
-                            onClick={() => loadMenu(account)}
-                            disabled={menuLoading}
+                            onClick={() => selectAccountForMenu(account)}
+                            disabled={loadingSyncedItems}
                           >
-                            {menuLoading && selectedAccountForMenu?.id === account.id ? (
+                            {loadingSyncedItems && selectedAccountForMenu?.id === account.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <PartnerLogo type={account.platform} size="sm" />
@@ -1256,13 +1334,8 @@ export default function FoodPartnersPage() {
                 </CardContent>
               </Card>
 
-              {/* Menu content */}
-              {menuLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Đang tải menu...</span>
-                </div>
-              ) : externalMenu && selectedAccountForMenu ? (
+              {/* Menu sync status & actions */}
+              {selectedAccountForMenu && (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -1273,75 +1346,132 @@ export default function FoodPartnersPage() {
                             Menu từ {FoodPartnerInfo[selectedAccountForMenu.platform].name}
                           </CardTitle>
                           <CardDescription>
-                            {externalMenu.categories.length} danh mục, {" "}
-                            {externalMenu.categories.reduce((sum, cat) => sum + cat.items.length, 0)} món ăn
+                            {menuSyncStatus ? (
+                              <>
+                                {menuSyncStatus.totalItems} món ăn đã đồng bộ
+                                {menuSyncStatus.lastSyncedAt && (
+                                  <> • Lần cuối: {new Date(menuSyncStatus.lastSyncedAt).toLocaleString("vi-VN")}</>
+                                )}
+                              </>
+                            ) : (
+                              "Chưa đồng bộ menu"
+                            )}
                           </CardDescription>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => loadMenu(selectedAccountForMenu)}
-                        disabled={menuLoading}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Tải lại
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadSyncedItems(selectedAccountForMenu)}
+                          disabled={loadingSyncedItems}
+                        >
+                          <RefreshCw className={cn("h-4 w-4 mr-1", loadingSyncedItems && "animate-spin")} />
+                          Tải lại
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSyncMenu(selectedAccountForMenu)}
+                          disabled={syncingMenu}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {syncingMenu ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <ArrowRightLeft className="h-4 w-4 mr-1" />
+                          )}
+                          Đồng bộ menu
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    {externalMenu.categories.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <UtensilsCrossed className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                        <p className="text-sm">Không có món ăn nào trong menu</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {externalMenu.categories.map((category) => (
-                          <div key={category.categoryID} className="border rounded-lg overflow-hidden">
-                            {/* Category header */}
-                            <button
-                              className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
-                              onClick={() => toggleCategory(category.categoryID)}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
-                                  <UtensilsCrossed className="h-4 w-4" />
-                                </div>
-                                <div className="text-left">
-                                  <h4 className="font-medium">{category.categoryName}</h4>
-                                  <p className="text-xs text-muted-foreground">
-                                    {category.items.length} món ăn
-                                    {category.availableStatus !== 1 && (
-                                      <Badge variant="secondary" className="ml-2">Tạm ẩn</Badge>
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-                              {expandedCategories[category.categoryID] ? (
-                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                              )}
-                            </button>
 
-                            {/* Category items */}
-                            {expandedCategories[category.categoryID] && (
-                              <div className="divide-y">
-                                {category.items.map((item) => (
+                  {/* Sync stats */}
+                  {menuSyncStatus && menuSyncStatus.totalItems > 0 && (
+                    <CardContent className="pt-0 pb-4">
+                      <div className="flex gap-4">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+                          <UtensilsCrossed className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-700">{menuSyncStatus.totalItems} tổng món</span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-700">{menuSyncStatus.mappedItems} đã liên kết</span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 rounded-lg">
+                          <AlertCircle className="h-4 w-4 text-yellow-600" />
+                          <span className="text-sm font-medium text-yellow-700">{menuSyncStatus.unmappedItems} chưa liên kết</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              )}
+
+              {/* Menu content from DB */}
+              {loadingSyncedItems ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Đang tải danh sách món ăn...</span>
+                </div>
+              ) : selectedAccountForMenu && syncedItems.length > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Danh sách món ăn đã đồng bộ</CardTitle>
+                    <CardDescription>
+                      Các món ăn từ {FoodPartnerInfo[selectedAccountForMenu.platform].name} đã được lưu vào hệ thống. Bạn có thể liên kết với món ăn TechRes.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {syncedItems.map((category) => (
+                        <div key={category.categoryId} className="border rounded-lg overflow-hidden">
+                          {/* Category header */}
+                          <button
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                            onClick={() => toggleCategory(category.categoryId)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
+                                <UtensilsCrossed className="h-4 w-4" />
+                              </div>
+                              <div className="text-left">
+                                <h4 className="font-medium">{category.categoryName}</h4>
+                                <p className="text-xs text-muted-foreground">
+                                  {category.items.length} món ăn
+                                  {" • "}
+                                  {category.items.filter(i => i.isMapped).length} đã liên kết
+                                </p>
+                              </div>
+                            </div>
+                            {expandedCategories[category.categoryId] ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </button>
+
+                          {/* Category items */}
+                          {expandedCategories[category.categoryId] && (
+                            <div className="divide-y">
+                              {category.items.map((item) => {
+                                const mapping = getItemMapping(item.id);
+
+                                return (
                                   <div
-                                    key={item.itemID}
+                                    key={item.id}
                                     className={cn(
                                       "flex items-start gap-4 p-4",
-                                      item.availableStatus !== 1 && "opacity-50 bg-gray-50"
+                                      !item.isActive && "opacity-50 bg-gray-50",
+                                      item.isMapped && "bg-green-50 border-l-4 border-l-green-500"
                                     )}
                                   >
                                     {/* Item image */}
                                     <div className="flex-shrink-0">
-                                      {item.imageURL || item.webPURL ? (
+                                      {item.imageUrl ? (
                                         <img
-                                          src={item.webPURL || item.imageURL}
-                                          alt={item.itemName}
+                                          src={item.imageUrl}
+                                          alt={item.externalItemName}
                                           className="w-20 h-20 rounded-lg object-cover"
                                         />
                                       ) : (
@@ -1356,7 +1486,7 @@ export default function FoodPartnersPage() {
                                       <div className="flex items-start justify-between gap-2">
                                         <div>
                                           <h5 className="font-medium text-sm line-clamp-2">
-                                            {item.itemName}
+                                            {item.externalItemName}
                                           </h5>
                                           {item.description && (
                                             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -1366,9 +1496,9 @@ export default function FoodPartnersPage() {
                                         </div>
                                         <div className="text-right flex-shrink-0">
                                           <p className="font-semibold text-green-600">
-                                            {item.priceDisplay}
+                                            {item.priceDisplay || `${item.priceInMin.toLocaleString()}đ`}
                                           </p>
-                                          {item.availableStatus !== 1 && (
+                                          {!item.isActive && (
                                             <Badge variant="secondary" className="text-xs mt-1">
                                               Hết hàng
                                             </Badge>
@@ -1376,30 +1506,63 @@ export default function FoodPartnersPage() {
                                         </div>
                                       </div>
 
-                                      {/* Item ID */}
-                                      <div className="mt-2 flex items-center gap-2">
+                                      {/* Item ID & mapping status */}
+                                      <div className="mt-2 flex items-center gap-2 flex-wrap">
                                         <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
-                                          {item.itemID}
+                                          {item.externalItemId}
                                         </code>
+                                        {item.isMapped && mapping ? (
+                                          <Badge variant="default" className="bg-green-600 text-xs">
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            Đã liên kết: {mapping.techresItemName || `#${mapping.techresItemId}`}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-xs">
+                                            <AlertCircle className="h-3 w-3 mr-1" />
+                                            Chưa liên kết
+                                          </Badge>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : selectedAccountForMenu && syncedItems.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-20">
+                    <UtensilsCrossed className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Chưa có món ăn nào</h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+                      Chưa đồng bộ menu từ {FoodPartnerInfo[selectedAccountForMenu.platform].name}. Nhấn nút "Đồng bộ menu" để tải và lưu danh sách món ăn.
+                    </p>
+                    <Button
+                      onClick={() => handleSyncMenu(selectedAccountForMenu)}
+                      disabled={syncingMenu}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {syncingMenu ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <ArrowRightLeft className="h-4 w-4 mr-2" />
+                      )}
+                      Đồng bộ menu ngay
+                    </Button>
                   </CardContent>
                 </Card>
               ) : (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-20">
                     <UtensilsCrossed className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Chọn tài khoản để xem menu</h3>
+                    <h3 className="text-lg font-medium mb-2">Chọn tài khoản để đồng bộ menu</h3>
                     <p className="text-sm text-muted-foreground text-center max-w-md">
-                      Nhấn vào một trong các tài khoản phía trên để tải và xem danh sách món ăn từ nền tảng.
+                      Nhấn vào một trong các tài khoản phía trên để đồng bộ và xem danh sách món ăn.
                     </p>
                   </CardContent>
                 </Card>

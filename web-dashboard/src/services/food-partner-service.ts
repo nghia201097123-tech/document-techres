@@ -239,6 +239,90 @@ export interface ExternalMenu {
   sellingTimes: any[];
 }
 
+// Synced external item (stored in DB after sync)
+export interface SyncedExternalItem {
+  id: string;
+  tenantId: string;
+  accountId: string;
+  externalItemId: string;
+  externalItemName: string;
+  description?: string;
+  priceInMin: number;
+  priceDisplay?: string;
+  imageUrl?: string;
+  externalCategoryId: string;
+  externalCategoryName: string;
+  availableStatus: number;
+  isActive: boolean;
+  isMapped: boolean;
+  rawData?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+}
+
+// Synced items grouped by category
+export interface SyncedItemsByCategory {
+  categoryId: string;
+  categoryName: string;
+  items: SyncedExternalItem[];
+}
+
+// Item mapping types
+export enum ItemMappingType {
+  DIRECT = 'direct',
+  COMBO = 'combo',
+  VARIANT = 'variant',
+}
+
+// Item mapping (links external item to TechRes item)
+export interface ItemMapping {
+  id: string;
+  tenantId: string;
+  accountId: string;
+  externalItemId: string;
+  externalPlatformItemId: string;
+  externalItemName: string;
+  techresBrandId: number;
+  techresBrandName?: string;
+  techresItemId: number;
+  techresItemName?: string;
+  mappingType: ItemMappingType;
+  comboItems?: { itemId: number; quantity: number; itemName?: string }[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  externalItem?: SyncedExternalItem;
+}
+
+// DTO for creating item mapping
+export interface CreateItemMappingDto {
+  externalItemId: string; // UUID of SyncedExternalItem
+  techresBrandId: number;
+  techresBrandName?: string;
+  techresItemId: number;
+  techresItemName?: string;
+  mappingType?: ItemMappingType;
+  comboItems?: { itemId: number; quantity: number; itemName?: string }[];
+}
+
+// Menu sync result
+export interface MenuSyncResult {
+  success: boolean;
+  syncedCount: number;
+  updatedCount: number;
+  categories: number;
+  message: string;
+}
+
+// Menu sync status
+export interface MenuSyncStatus {
+  totalItems: number;
+  mappedItems: number;
+  unmappedItems: number;
+  lastSyncedAt?: string;
+}
+
 /**
  * Transform backend FoodPlatformAccount to frontend PartnerConnectionView
  */
@@ -454,5 +538,93 @@ export const foodPartnerService = {
   async syncStoreMapping(mappingId: string): Promise<StoreMapping> {
     const response = await foodApi.post<ApiResponse<StoreMapping>>(`/food-platforms/store-mappings/${mappingId}/sync`);
     return response.data.data;
+  },
+
+  // ==================== Menu Sync & Item Mapping ====================
+
+  /**
+   * Sync menu items from platform to database
+   * Calls GrabFood API and saves items to DB
+   */
+  async syncMenuItems(accountId: string): Promise<MenuSyncResult> {
+    const response = await foodApi.post<ApiResponse<MenuSyncResult>>(`/menu/${accountId}/sync`);
+    return response.data.data;
+  },
+
+  /**
+   * Get menu sync status for an account
+   */
+  async getMenuSyncStatus(accountId: string): Promise<MenuSyncStatus> {
+    const response = await foodApi.get<ApiResponse<MenuSyncStatus>>(`/menu/${accountId}/sync-status`);
+    return response.data.data;
+  },
+
+  /**
+   * Get synced external items for an account
+   */
+  async getSyncedItems(accountId: string, categoryId?: string): Promise<SyncedExternalItem[]> {
+    const params: Record<string, string> = {};
+    if (categoryId) {
+      params.categoryId = categoryId;
+    }
+    const response = await foodApi.get<ApiResponse<SyncedExternalItem[]>>(`/menu/${accountId}/items`, { params });
+    return response.data.data || [];
+  },
+
+  /**
+   * Get synced external items grouped by category
+   */
+  async getSyncedItemsByCategory(accountId: string): Promise<SyncedItemsByCategory[]> {
+    const response = await foodApi.get<ApiResponse<SyncedItemsByCategory[]>>(`/menu/${accountId}/items/by-category`);
+    return response.data.data || [];
+  },
+
+  /**
+   * Get item mappings for an account
+   */
+  async getItemMappings(accountId: string): Promise<ItemMapping[]> {
+    const response = await foodApi.get<ApiResponse<ItemMapping[]>>(`/menu/${accountId}/mappings`);
+    return response.data.data || [];
+  },
+
+  /**
+   * Create item mapping
+   */
+  async createItemMapping(accountId: string, dto: CreateItemMappingDto): Promise<ItemMapping> {
+    const response = await foodApi.post<ApiResponse<ItemMapping>>(`/menu/${accountId}/mappings`, dto);
+    return response.data.data;
+  },
+
+  /**
+   * Batch create/update item mappings
+   */
+  async batchItemMappings(accountId: string, mappings: CreateItemMappingDto[]): Promise<{
+    success: boolean;
+    createdCount: number;
+    updatedCount: number;
+    message: string;
+  }> {
+    const response = await foodApi.post<ApiResponse<{
+      success: boolean;
+      createdCount: number;
+      updatedCount: number;
+      message: string;
+    }>>(`/menu/${accountId}/mappings/batch`, { mappings });
+    return response.data.data;
+  },
+
+  /**
+   * Update item mapping
+   */
+  async updateItemMapping(mappingId: string, dto: Partial<CreateItemMappingDto>): Promise<ItemMapping> {
+    const response = await foodApi.put<ApiResponse<ItemMapping>>(`/menu/mappings/${mappingId}`, dto);
+    return response.data.data;
+  },
+
+  /**
+   * Delete item mapping
+   */
+  async deleteItemMapping(mappingId: string): Promise<void> {
+    await foodApi.delete(`/menu/mappings/${mappingId}`);
   },
 };

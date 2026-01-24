@@ -18,6 +18,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { PublicModule } from './modules/public/public.module';
+import { MenuModule } from './modules/menu/menu.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { PublicModule } from './modules/public/public.module';
     OrdersModule,
     SyncModule,
     PublicModule,
+    MenuModule,
   ],
 })
 export class AppModule {}
