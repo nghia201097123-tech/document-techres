@@ -135,6 +135,7 @@ export default function BillTemplatePage() {
       setEditingPrinterConfig(printerConfig);
 
       setTemplateForm({
+        brandId: template.brandId,
         name: template.name,
         templateType: template.templateType,
         description: template.description,
@@ -227,6 +228,7 @@ export default function BillTemplatePage() {
       setEditingTemplate(null);
       setEditingPrinterConfig(null);
       setTemplateForm({
+        brandId: "",
         name: "",
         storeName: "",
         templateType: BillTemplateType.CLASSIC,
