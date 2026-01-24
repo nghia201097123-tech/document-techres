@@ -1437,6 +1437,70 @@ class SunmiPrinterAdapter @Inject constructor(
     }
 
     /**
+     * Cắt giấy với nhiều phương pháp fallback
+     * Được thiết kế đặc biệt cho Sunmi T1 với BinderProxy
+     */
+    suspend fun cutPaperWithFallback(): PrinterResult = withContext(Dispatchers.IO) {
+        if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
+
+        try {
+            val service = printerService ?: return@withContext PrinterResult.Error("Service not available")
+
+            if (service is BinderProxyWrapper) {
+                val binder = service.binder
+                Timber.d("$TAG: cutPaperWithFallback - trying multiple methods")
+
+                // Method 1: Try native AIDL cutPaper transact
+                val aidlResult = cutPaperViaTransact(binder)
+                if (aidlResult is PrinterResult.Success) {
+                    Timber.d("$TAG: cutPaperWithFallback - AIDL transact succeeded")
+                    return@withContext aidlResult
+                }
+
+                // Method 2: Send ESC/POS partial cut command (GS V 66 n) via sendRawDataOnly
+                // Không init printer để không reset buffer
+                Timber.d("$TAG: cutPaperWithFallback - trying ESC/POS partial cut via sendRawDataOnly")
+                val partialCutCmd = byteArrayOf(0x1D, 0x56, 0x42, 0x00) // GS V 66 0 - Partial cut
+                val partialResult = sendRawDataOnlyViaTransact(binder, partialCutCmd)
+                if (partialResult is PrinterResult.Success) {
+                    commitPrinterBufferViaTransact(binder)
+                    Timber.d("$TAG: cutPaperWithFallback - ESC/POS partial cut succeeded")
+                    return@withContext partialResult
+                }
+
+                // Method 3: Send ESC/POS full cut command (GS V 0)
+                Timber.d("$TAG: cutPaperWithFallback - trying ESC/POS full cut via sendRawDataOnly")
+                val fullCutCmd = byteArrayOf(0x1D, 0x56, 0x00) // GS V 0 - Full cut
+                val fullResult = sendRawDataOnlyViaTransact(binder, fullCutCmd)
+                if (fullResult is PrinterResult.Success) {
+                    commitPrinterBufferViaTransact(binder)
+                    Timber.d("$TAG: cutPaperWithFallback - ESC/POS full cut succeeded")
+                    return@withContext fullResult
+                }
+
+                // Method 4: Try ESC i (partial cut) - older printers
+                Timber.d("$TAG: cutPaperWithFallback - trying ESC i via sendRawDataOnly")
+                val escICutCmd = byteArrayOf(0x1B, 0x69) // ESC i - Partial cut
+                val escIResult = sendRawDataOnlyViaTransact(binder, escICutCmd)
+                if (escIResult is PrinterResult.Success) {
+                    commitPrinterBufferViaTransact(binder)
+                    Timber.d("$TAG: cutPaperWithFallback - ESC i cut succeeded")
+                    return@withContext escIResult
+                }
+
+                Timber.w("$TAG: cutPaperWithFallback - all methods failed")
+                return@withContext PrinterResult.Error("All cut paper methods failed")
+            }
+
+            // Non-BinderProxy: use regular cutPaper
+            return@withContext cutPaper()
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: cutPaperWithFallback failed")
+            return@withContext PrinterResult.Error(e.message ?: "Cut paper failed")
+        }
+    }
+
+    /**
      * Cut paper via AIDL transact for BinderProxy
      * Tries multiple transaction codes to find the correct one for the device
      */

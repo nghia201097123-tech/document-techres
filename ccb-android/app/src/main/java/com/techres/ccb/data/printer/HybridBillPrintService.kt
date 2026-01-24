@@ -252,22 +252,22 @@ object HybridBillPrintService {
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper...")
 
-                    // Đợi ngắn cho printer xử lý xong buffer (tối ưu từ 5000ms xuống 1500ms)
+                    // QUAN TRỌNG: Commit buffer để đảm bảo tất cả data đã được gửi đến printer
+                    adapter.commitBuffer()
+
+                    // Đợi ngắn cho printer xử lý xong buffer
                     adapter.waitForPrinterIdle(timeoutMs = 1500)
-                    delay(100)  // Giảm từ 500ms xuống 100ms
+                    delay(200)
 
-                    // Cắt giấy qua native AIDL
-                    val cutResult = adapter.cutPaper()
+                    // Cắt giấy - thử native AIDL trước, fallback sang ESC/POS
+                    val cutResult = adapter.cutPaperWithFallback()
                     Log.d(TAG, "Cut paper result: $cutResult")
-
-                    // Chỉ đợi ngắn sau khi cắt (giảm từ 1000ms xuống 300ms)
-                    adapter.waitForPrinterIdle(timeoutMs = 300)
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
                     Log.d(TAG, "No auto-cut, feeding paper...")
                     adapter.feedLines(5)
                     adapter.commitBuffer()
-                    adapter.waitForPrinterIdle(timeoutMs = 1000)  // Giảm từ 3000ms
+                    adapter.waitForPrinterIdle(timeoutMs = 1000)
                 }
 
                 // Recycle bitmaps
