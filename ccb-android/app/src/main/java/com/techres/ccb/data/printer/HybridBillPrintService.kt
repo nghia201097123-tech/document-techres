@@ -7,6 +7,9 @@ import com.techres.ccb.data.local.entity.BillPrinterConfigEntity
 import com.techres.ccb.data.local.entity.BillTemplateEntity
 import com.techres.ccb.data.local.entity.BillTemplateType
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
+import com.techres.ccb.printer.adapter.UsbPrinterAdapter
+import com.techres.ccb.printer.core.PrinterDevice
+import com.techres.ccb.printer.core.ConnectionType
 import com.techres.ccb.printer.core.EscPosCommands
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -55,11 +58,21 @@ object HybridBillPrintService {
     // Sunmi printer adapter instance (lazy init)
     private var sunmiAdapter: SunmiPrinterAdapter? = null
 
+    // USB printer adapter instance (lazy init)
+    private var usbAdapter: UsbPrinterAdapter? = null
+
     /**
      * Initialize Sunmi adapter (call from Application or PrinterModule)
      */
     fun initSunmiAdapter(adapter: SunmiPrinterAdapter) {
         sunmiAdapter = adapter
+    }
+
+    /**
+     * Initialize USB adapter (call from Application or PrinterModule)
+     */
+    fun initUsbAdapter(adapter: UsbPrinterAdapter) {
+        usbAdapter = adapter
     }
 
     /**
@@ -126,6 +139,7 @@ object HybridBillPrintService {
                 Log.d(TAG, "Attempt ${attempt + 1}/$effectiveRetryCount...")
                 val result = when (printerConfig.connectionType) {
                     "network" -> printViaNetwork(printerConfig, template, billContent)
+                    "usb" -> printViaUsb(printerConfig, template, billContent)
                     else -> PrinterResult.Error("Loại kết nối không được hỗ trợ: ${printerConfig.connectionType}")
                 }
 
@@ -983,6 +997,92 @@ object HybridBillPrintService {
 
         Log.d(TAG, "=== PRINT VIA NETWORK COMPLETED: $numberOfCopies copies ===")
         return PrinterResult.Success("In bill thành công!")
+    }
+
+    /**
+     * In bill qua USB Printer
+     *
+     * Hỗ trợ các máy in USB ESC/POS:
+     * - Epson TM-T88, TM-T82
+     * - Star TSP143, TSP654
+     * - Bixolon SRP-350, SRP-380
+     * - Xprinter XP-N160II
+     * - Và các máy in USB khác hỗ trợ ESC/POS
+     *
+     * Flow: get adapter → connect → write bill → disconnect
+     */
+    private suspend fun printViaUsb(
+        config: BillPrinterConfigEntity,
+        template: BillTemplateEntity,
+        billContent: ByteArray
+    ): PrinterResult {
+        val adapter = usbAdapter ?: return PrinterResult.Error("USB adapter chưa được khởi tạo")
+
+        val usbPath = config.printerUsbPath
+        if (usbPath.isNullOrBlank()) {
+            return PrinterResult.Error("Chưa cấu hình đường dẫn USB máy in")
+        }
+
+        // Sử dụng numberOfCopies từ config
+        val numberOfCopies = maxOf(config.numberOfCopies, 1)
+        Log.d(TAG, "=== PRINT VIA USB ===")
+        Log.d(TAG, "USB Path: $usbPath")
+        Log.d(TAG, "Effective copies: $numberOfCopies")
+        Log.d(TAG, "Bill content size: ${billContent.size} bytes")
+
+        try {
+            // Tìm và kết nối USB printer
+            val connectedPrinters = adapter.getConnectedPrinters()
+            Log.d(TAG, "Found ${connectedPrinters.size} USB printers")
+
+            val targetPrinter = connectedPrinters.find { it.address == usbPath || it.id == usbPath }
+                ?: connectedPrinters.firstOrNull()
+                ?: return PrinterResult.Error("Không tìm thấy máy in USB. Hãy kiểm tra kết nối.")
+
+            Log.d(TAG, "Using USB printer: ${targetPrinter.name} (${targetPrinter.address})")
+
+            // Đăng ký receiver để xử lý permission
+            adapter.registerReceiver()
+
+            // Kết nối
+            val connectResult = adapter.connect(targetPrinter)
+            if (connectResult is PrinterResult.Error) {
+                Log.e(TAG, "USB connect failed: ${connectResult.message}")
+                return connectResult
+            }
+
+            // In từng bản
+            repeat(numberOfCopies) { copyIndex ->
+                Log.d(TAG, "Printing USB copy ${copyIndex + 1}/$numberOfCopies...")
+
+                val writeResult = adapter.write(billContent)
+                if (writeResult is PrinterResult.Error) {
+                    Log.e(TAG, "USB write failed: ${writeResult.message}")
+                    adapter.disconnect()
+                    return writeResult
+                }
+
+                Log.d(TAG, "USB copy ${copyIndex + 1} completed")
+
+                // Delay giữa các bản
+                if (copyIndex < numberOfCopies - 1) {
+                    delay(500)
+                }
+            }
+
+            // Ngắt kết nối
+            adapter.disconnect()
+
+            Log.d(TAG, "=== PRINT VIA USB COMPLETED: $numberOfCopies copies ===")
+            return PrinterResult.Success("In bill USB thành công!")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "USB print error: ${e.message}", e)
+            try {
+                adapter.disconnect()
+            } catch (ignored: Exception) {}
+            return PrinterResult.Error("Lỗi in USB: ${e.message}")
+        }
     }
 
     /**

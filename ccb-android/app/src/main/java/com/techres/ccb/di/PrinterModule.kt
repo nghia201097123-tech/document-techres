@@ -40,7 +40,10 @@ object PrinterModule {
     fun provideUsbPrinterAdapter(
         @ApplicationContext context: Context
     ): UsbPrinterAdapter {
-        return UsbPrinterAdapter(context)
+        val adapter = UsbPrinterAdapter(context)
+        // Initialize USB adapter for HybridBillPrintService
+        HybridBillPrintService.initUsbAdapter(adapter)
+        return adapter
     }
 
     @Provides

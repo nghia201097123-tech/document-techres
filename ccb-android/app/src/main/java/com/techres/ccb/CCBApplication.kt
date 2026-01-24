@@ -8,6 +8,7 @@ import coil.ImageLoaderFactory
 import com.techres.ccb.data.printer.HybridBillPrintService
 import com.techres.ccb.data.printer.KitchenTicketPrintService
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
+import com.techres.ccb.printer.adapter.UsbPrinterAdapter
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -38,6 +39,7 @@ class CCBApplication : Application(), ImageLoaderFactory {
     @InstallIn(SingletonComponent::class)
     interface PrinterEntryPoint {
         fun sunmiPrinterAdapter(): SunmiPrinterAdapter
+        fun usbPrinterAdapter(): UsbPrinterAdapter
     }
 
     override fun onCreate() {
@@ -59,8 +61,8 @@ class CCBApplication : Application(), ImageLoaderFactory {
     }
 
     /**
-     * Khởi tạo Sunmi printer adapter ngay khi app khởi động
-     * Đảm bảo HybridBillPrintService.sunmiAdapter luôn sẵn sàng
+     * Khởi tạo Sunmi và USB printer adapter ngay khi app khởi động
+     * Đảm bảo HybridBillPrintService adapters luôn sẵn sàng
      */
     private fun initializeSunmiAdapter() {
         try {
@@ -68,16 +70,22 @@ class CCBApplication : Application(), ImageLoaderFactory {
                 this,
                 PrinterEntryPoint::class.java
             )
-            val sunmiAdapter = entryPoint.sunmiPrinterAdapter()
 
+            // Initialize Sunmi adapter
+            val sunmiAdapter = entryPoint.sunmiPrinterAdapter()
             // initSunmiAdapter đã được gọi trong PrinterModule.provideSunmiPrinterAdapter()
             // nhưng gọi lại ở đây để chắc chắn (idempotent operation)
             HybridBillPrintService.initSunmiAdapter(sunmiAdapter)
             KitchenTicketPrintService.initSunmiAdapter(sunmiAdapter)
-
             Timber.d("Sunmi adapter initialized on app startup (Bill + Kitchen)")
+
+            // Initialize USB adapter
+            val usbAdapter = entryPoint.usbPrinterAdapter()
+            HybridBillPrintService.initUsbAdapter(usbAdapter)
+            Timber.d("USB adapter initialized on app startup")
+
         } catch (e: Exception) {
-            Timber.e(e, "Failed to initialize Sunmi adapter on startup")
+            Timber.e(e, "Failed to initialize printer adapters on startup")
         }
     }
 
