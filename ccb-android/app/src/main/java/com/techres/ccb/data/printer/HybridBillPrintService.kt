@@ -1069,13 +1069,23 @@ object HybridBillPrintService {
             val connectedPrinters = adapter.getConnectedPrinters()
             Log.d(TAG, "Found ${connectedPrinters.size} USB printers")
 
+            if (connectedPrinters.isEmpty()) {
+                Log.e(TAG, "No USB printers detected!")
+                Log.e(TAG, "Possible causes:")
+                Log.e(TAG, "  1. Sunmi T1 may not support USB Host Mode on this port")
+                Log.e(TAG, "  2. USB cable not properly connected")
+                Log.e(TAG, "  3. Printer not powered on")
+                Log.e(TAG, "  4. May need OTG adapter")
+                return PrinterResult.Error("Không tìm thấy máy in USB. Kiểm tra: (1) Cáp USB đã cắm chặt, (2) Máy in đã bật nguồn, (3) Có thể cần cáp OTG")
+            }
+
             // Nếu có cấu hình usbPath thì tìm theo path, nếu không thì dùng máy in USB đầu tiên
             val targetPrinter = if (!usbPath.isNullOrBlank()) {
                 connectedPrinters.find { it.address == usbPath || it.id == usbPath }
                     ?: connectedPrinters.firstOrNull()
             } else {
                 connectedPrinters.firstOrNull()
-            } ?: return PrinterResult.Error("Không tìm thấy máy in USB. Hãy kiểm tra kết nối cáp USB.")
+            } ?: return PrinterResult.Error("Không tìm thấy máy in USB phù hợp.")
 
             Log.d(TAG, "Using USB printer: ${targetPrinter.name} (${targetPrinter.address})")
 

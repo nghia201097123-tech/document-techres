@@ -70,7 +70,21 @@ class UsbPrinterAdapter @Inject constructor(
             0x0456 to "HPRT",
             0x0DD4 to "Custom",
             0x154F to "Seiko",
-            0x0B00 to "Goojprt"
+            0x0B00 to "Goojprt",
+            // Thêm vendor IDs cho máy in Trung Quốc phổ biến
+            0x1FC9 to "NXP", // Nhiều máy in dùng chip NXP
+            0x0525 to "PLX/Netchip", // USB-Serial bridges
+            0x067B to "Prolific", // PL2303 USB-Serial
+            0x10C4 to "Silicon Labs", // CP210x
+            0x1A86 to "QinHeng", // CH340/CH341
+            0x2341 to "Arduino",
+            0x1D50 to "OpenMoko",
+            0x28E9 to "GD32", // GigaDevice
+            0x0FE6 to "ICS", // Kontron
+            0x20D1 to "Simcom",
+            0x4348 to "WCH", // CH9326
+            0x1234 to "Generic Printer",
+            0x0FFF to "Generic"
         )
     }
 
@@ -177,9 +191,13 @@ class UsbPrinterAdapter @Inject constructor(
 
     /**
      * Lấy danh sách máy in USB đang kết nối
+     * Nếu không tìm thấy máy in theo tiêu chí chuẩn, sẽ fallback lấy tất cả USB devices có bulk endpoint
      */
     fun getConnectedPrinters(): List<PrinterDevice> {
-        return usbManager.deviceList.values
+        // Log tất cả USB devices để debug
+        logAllUsbDevices()
+
+        val printers = usbManager.deviceList.values
             .filter { isPrinter(it) }
             .map { device ->
                 PrinterDevice(
@@ -195,6 +213,101 @@ class UsbPrinterAdapter @Inject constructor(
                     )
                 )
             }
+
+        // Nếu không tìm thấy máy in, thử lấy tất cả USB devices có bulk OUT endpoint
+        if (printers.isEmpty()) {
+            Timber.d("$TAG: No printers found by standard detection, trying fallback...")
+            return getAllPrintableDevices()
+        }
+
+        return printers
+    }
+
+    /**
+     * Fallback: Lấy tất cả USB devices có bulk OUT endpoint (có thể in được)
+     */
+    private fun getAllPrintableDevices(): List<PrinterDevice> {
+        return usbManager.deviceList.values
+            .filter { hasBulkOutEndpoint(it) }
+            .map { device ->
+                PrinterDevice(
+                    id = device.deviceId.toString(),
+                    name = getDeviceName(device),
+                    connectionType = ConnectionType.USB,
+                    address = device.deviceName,
+                    manufacturer = KNOWN_PRINTER_VENDORS[device.vendorId],
+                    model = device.productName,
+                    extra = mapOf(
+                        "vendorId" to device.vendorId.toString(),
+                        "productId" to device.productId.toString()
+                    )
+                )
+            }
+    }
+
+    /**
+     * Log tất cả USB devices để debug
+     */
+    private fun logAllUsbDevices() {
+        val devices = usbManager.deviceList
+        Timber.d("$TAG: ===== ALL USB DEVICES =====")
+        Timber.d("$TAG: Total devices: ${devices.size}")
+
+        if (devices.isEmpty()) {
+            Timber.d("$TAG: No USB devices connected!")
+            Timber.d("$TAG: Please check:")
+            Timber.d("$TAG:   1. USB cable is properly connected")
+            Timber.d("$TAG:   2. Device supports USB Host Mode (OTG)")
+            Timber.d("$TAG:   3. Printer is powered on")
+        }
+
+        devices.values.forEachIndexed { index, device ->
+            Timber.d("$TAG: --- Device $index ---")
+            Timber.d("$TAG:   Name: ${device.deviceName}")
+            Timber.d("$TAG:   Product: ${device.productName}")
+            Timber.d("$TAG:   Manufacturer: ${device.manufacturerName}")
+            Timber.d("$TAG:   Vendor ID: ${String.format("0x%04X", device.vendorId)}")
+            Timber.d("$TAG:   Product ID: ${String.format("0x%04X", device.productId)}")
+            Timber.d("$TAG:   Device Class: ${device.deviceClass}")
+            Timber.d("$TAG:   Interface Count: ${device.interfaceCount}")
+
+            for (i in 0 until device.interfaceCount) {
+                val intf = device.getInterface(i)
+                Timber.d("$TAG:     Interface $i: class=${intf.interfaceClass}, subclass=${intf.interfaceSubclass}")
+                for (j in 0 until intf.endpointCount) {
+                    val ep = intf.getEndpoint(j)
+                    val direction = if (ep.direction == UsbConstants.USB_DIR_OUT) "OUT" else "IN"
+                    val type = when (ep.type) {
+                        UsbConstants.USB_ENDPOINT_XFER_BULK -> "BULK"
+                        UsbConstants.USB_ENDPOINT_XFER_INT -> "INT"
+                        UsbConstants.USB_ENDPOINT_XFER_ISOC -> "ISOC"
+                        else -> "CTRL"
+                    }
+                    Timber.d("$TAG:       Endpoint $j: $direction $type")
+                }
+            }
+
+            val isPrinterDevice = isPrinter(device)
+            Timber.d("$TAG:   Is Printer: $isPrinterDevice")
+        }
+        Timber.d("$TAG: ===========================")
+    }
+
+    /**
+     * Kiểm tra device có bulk OUT endpoint không
+     */
+    private fun hasBulkOutEndpoint(device: UsbDevice): Boolean {
+        for (i in 0 until device.interfaceCount) {
+            val intf = device.getInterface(i)
+            for (j in 0 until intf.endpointCount) {
+                val ep = intf.getEndpoint(j)
+                if (ep.direction == UsbConstants.USB_DIR_OUT &&
+                    ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     override suspend fun connect(device: PrinterDevice): PrinterResult = withContext(Dispatchers.IO) {
