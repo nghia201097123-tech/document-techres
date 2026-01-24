@@ -76,6 +76,14 @@ object HybridBillPrintService {
     }
 
     /**
+     * Lấy thông tin debug USB để hiển thị cho user
+     * Giúp debug khi không tìm thấy máy in USB
+     */
+    fun getUsbDebugInfo(): String {
+        return usbAdapter?.getUsbDebugInfo() ?: "USB adapter chưa được khởi tạo"
+    }
+
+    /**
      * In bill với template và config
      *
      * Hỗ trợ 2 loại máy in:
@@ -1070,13 +1078,10 @@ object HybridBillPrintService {
             Log.d(TAG, "Found ${connectedPrinters.size} USB printers")
 
             if (connectedPrinters.isEmpty()) {
+                val debugInfo = adapter.getUsbDebugInfo()
                 Log.e(TAG, "No USB printers detected!")
-                Log.e(TAG, "Possible causes:")
-                Log.e(TAG, "  1. Sunmi T1 may not support USB Host Mode on this port")
-                Log.e(TAG, "  2. USB cable not properly connected")
-                Log.e(TAG, "  3. Printer not powered on")
-                Log.e(TAG, "  4. May need OTG adapter")
-                return PrinterResult.Error("Không tìm thấy máy in USB. Kiểm tra: (1) Cáp USB đã cắm chặt, (2) Máy in đã bật nguồn, (3) Có thể cần cáp OTG")
+                Log.e(TAG, debugInfo)
+                return PrinterResult.Error("Không tìm thấy máy in USB.\n\n$debugInfo")
             }
 
             // Nếu có cấu hình usbPath thì tìm theo path, nếu không thì dùng máy in USB đầu tiên

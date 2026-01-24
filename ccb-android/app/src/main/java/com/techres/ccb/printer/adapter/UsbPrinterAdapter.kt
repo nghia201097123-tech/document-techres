@@ -310,6 +310,63 @@ class UsbPrinterAdapter @Inject constructor(
         return false
     }
 
+    /**
+     * Lấy thông tin debug USB để hiển thị cho user
+     * Giúp debug khi không tìm thấy máy in USB
+     */
+    fun getUsbDebugInfo(): String {
+        val sb = StringBuilder()
+        val devices = usbManager.deviceList
+
+        sb.appendLine("=== THÔNG TIN USB ===")
+        sb.appendLine("Tổng số thiết bị USB: ${devices.size}")
+        sb.appendLine()
+
+        if (devices.isEmpty()) {
+            sb.appendLine("❌ Không phát hiện thiết bị USB nào!")
+            sb.appendLine()
+            sb.appendLine("Nguyên nhân có thể:")
+            sb.appendLine("1. Cổng USB không hỗ trợ chế độ Host (OTG)")
+            sb.appendLine("2. Cáp USB chưa cắm chặt")
+            sb.appendLine("3. Máy in chưa bật nguồn")
+            sb.appendLine("4. Cần dùng cáp/đầu chuyển OTG")
+            sb.appendLine()
+            sb.appendLine("Thử:")
+            sb.appendLine("• Dùng cổng USB khác trên Sunmi")
+            sb.appendLine("• Kiểm tra cáp USB còn tốt không")
+            sb.appendLine("• Dùng cáp OTG nếu có")
+        } else {
+            devices.values.forEachIndexed { index, device ->
+                sb.appendLine("--- Thiết bị ${index + 1} ---")
+                sb.appendLine("Tên: ${device.productName ?: device.deviceName}")
+                sb.appendLine("Hãng: ${device.manufacturerName ?: KNOWN_PRINTER_VENDORS[device.vendorId] ?: "Không rõ"}")
+                sb.appendLine("Vendor ID: ${String.format("0x%04X", device.vendorId)}")
+                sb.appendLine("Product ID: ${String.format("0x%04X", device.productId)}")
+
+                val isPrinterDevice = isPrinter(device)
+                val hasBulk = hasBulkOutEndpoint(device)
+
+                if (isPrinterDevice) {
+                    sb.appendLine("✅ Được nhận diện là MÁY IN")
+                } else if (hasBulk) {
+                    sb.appendLine("⚠️ Có thể in được (có Bulk OUT)")
+                } else {
+                    sb.appendLine("❌ Không phải máy in")
+                }
+                sb.appendLine()
+            }
+
+            val printers = getConnectedPrinters()
+            sb.appendLine("=== KẾT QUẢ ===")
+            sb.appendLine("Máy in tìm thấy: ${printers.size}")
+            printers.forEach { printer ->
+                sb.appendLine("• ${printer.name} (${printer.address})")
+            }
+        }
+
+        return sb.toString()
+    }
+
     override suspend fun connect(device: PrinterDevice): PrinterResult = withContext(Dispatchers.IO) {
         if (device.connectionType != ConnectionType.USB) {
             return@withContext PrinterResult.Error("Invalid connection type for USB adapter")
