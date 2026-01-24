@@ -174,12 +174,12 @@ export default function FoodPartnersPage() {
     }
   }, [filterBranchId]);
 
-  // Load data when tab changes to branch-link
+  // Load accounts and branches data when tenantId is available (needed for both tabs)
   React.useEffect(() => {
-    if (activeTab === "branch-link" && tenantId) {
+    if (tenantId) {
       loadBranchLinkData();
     }
-  }, [activeTab, tenantId, filterBrandId]);
+  }, [tenantId, filterBrandId]);
 
   const loadData = async () => {
     if (!filterBranchId || filterBranchId === "all") return;
