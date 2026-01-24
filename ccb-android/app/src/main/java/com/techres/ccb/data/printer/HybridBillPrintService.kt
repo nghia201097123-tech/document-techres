@@ -120,6 +120,47 @@ object HybridBillPrintService {
                 return@withContext printViaSunmi(printerConfig, template, billData, paymentBankAccount, payosQrCode)
             }
 
+            // ========== MÁY IN USB ==========
+            if (printerConfig.connectionType == "usb") {
+                Log.d(TAG, "Using USB printer: ${printerConfig.printerUsbPath}")
+
+                // USB printers use ESC/POS standard capability
+                val capability = PrinterCapability(
+                    printerIp = "usb://${printerConfig.printerUsbPath ?: "default"}",
+                    printerPort = 0,
+                    supportVietnameseUtf8 = false,
+                    supportBitmap = true
+                )
+
+                // Generate bill content cho USB printer
+                val billContent = generateHybridBill(printerConfig, template, billData, capability, paymentBankAccount, payosQrCode)
+
+                // Retry logic
+                val effectiveRetryCount = maxOf(printerConfig.retryCount, 1)
+                Log.d(TAG, "USB Retry count: $effectiveRetryCount, Bill content: ${billContent.size} bytes")
+
+                repeat(effectiveRetryCount) { attempt ->
+                    Log.d(TAG, "USB Attempt ${attempt + 1}/$effectiveRetryCount...")
+                    val result = printViaUsb(printerConfig, template, billContent)
+
+                    when (result) {
+                        is PrinterResult.Success -> {
+                            Log.d(TAG, "USB Attempt ${attempt + 1} succeeded!")
+                            return@withContext result
+                        }
+                        is PrinterResult.Error -> {
+                            lastError = result.message
+                            Log.w(TAG, "USB Attempt ${attempt + 1} failed: ${result.message}")
+                            if (attempt < effectiveRetryCount - 1) {
+                                delay(printerConfig.retryDelayMs.toLong())
+                            }
+                        }
+                    }
+                }
+
+                return@withContext PrinterResult.Error(lastError ?: "In bill USB thất bại sau $effectiveRetryCount lần thử")
+            }
+
             // ========== MÁY IN RỜI (NETWORK) ==========
             Log.d(TAG, "Using NETWORK printer: ${printerConfig.printerIp}:${printerConfig.printerPort}")
 
@@ -137,11 +178,7 @@ object HybridBillPrintService {
 
             repeat(effectiveRetryCount) { attempt ->
                 Log.d(TAG, "Attempt ${attempt + 1}/$effectiveRetryCount...")
-                val result = when (printerConfig.connectionType) {
-                    "network" -> printViaNetwork(printerConfig, template, billContent)
-                    "usb" -> printViaUsb(printerConfig, template, billContent)
-                    else -> PrinterResult.Error("Loại kết nối không được hỗ trợ: ${printerConfig.connectionType}")
-                }
+                val result = printViaNetwork(printerConfig, template, billContent)
 
                 when (result) {
                     is PrinterResult.Success -> {
