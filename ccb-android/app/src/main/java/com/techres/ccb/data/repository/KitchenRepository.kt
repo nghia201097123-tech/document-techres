@@ -48,6 +48,7 @@ class KitchenRepository @Inject constructor(
      */
     suspend fun updateFullPrinterConfig(
         kitchenId: String,
+        connectionType: String = "network", // "network", "usb", "sunmi"
         ip: String?,
         port: Int,
         name: String?,
@@ -85,7 +86,7 @@ class KitchenRepository @Inject constructor(
         labelLineSpacing: Float = 1.0f
     ) {
         kitchenDao.updateFullPrinterConfig(
-            kitchenId, ip, port, name, isConnected,
+            kitchenId, connectionType, ip, port, name, isConnected,
             protocol, labelWidthMm, labelHeightMm, labelGapMm, printDensity,
             paperWidth, printMode,
             ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
@@ -113,6 +114,7 @@ class KitchenRepository @Inject constructor(
      */
     suspend fun updateLabelSettings(
         kitchenId: String,
+        connectionType: String = "network", // "network", "usb", "sunmi"
         printerIp: String?,
         printerPort: Int,
         printerProtocol: String,
@@ -131,7 +133,7 @@ class KitchenRepository @Inject constructor(
         labelLineSpacing: Float
     ) {
         kitchenDao.updateLabelSettings(
-            kitchenId, printerIp, printerPort, printerProtocol,
+            kitchenId, connectionType, printerIp, printerPort, printerProtocol,
             labelPrintPrice, labelPrintStoreName, labelPrintOrderNumber,
             labelPrintTableName, labelPrintTime, labelStoreName, labelReverse,
             labelWidthMm, labelHeightMm, labelGapMm, labelFontScale,

@@ -45,9 +45,19 @@ import java.util.Date
  */
 private enum class KitchenPrinterType(val displayName: String) {
     TCP_IP("Máy in TCP/IP (Mạng)"),
+    USB("Máy in USB"),
     SUNMI("Máy in Sunmi tích hợp");
 
     companion object {
+        fun fromConnectionType(connectionType: String?): KitchenPrinterType {
+            return when (connectionType) {
+                "sunmi" -> SUNMI
+                "usb" -> USB
+                else -> TCP_IP
+            }
+        }
+
+        // Legacy support
         fun fromPrinterIp(printerIp: String?): KitchenPrinterType {
             return if (printerIp == SUNMI_PRINTER_IP) SUNMI else TCP_IP
         }
@@ -291,7 +301,7 @@ fun KitchenPrinterScreen(
             kitchen = selectedKitchen!!,
             isSunmiDevice = uiState.isSunmiDevice,
             onDismiss = { showPrinterDialog = false },
-            onSave = { ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
+            onSave = { connectionType, ip, port, name, protocol, labelSize, printDensity, paperWidth, printMode,
                        ticketCutAfterPrint, ticketPrintItemsSeparately, ticketCopies, ticketFontSize, ticketLineSpacing,
                        ticketPrintOrderNumber, ticketPrintTableName, ticketPrintTime, ticketPrintNotes,
                        ticketPrintPrice, ticketPrintStoreName, ticketStoreName,
@@ -300,10 +310,11 @@ fun KitchenPrinterScreen(
                        labelFontScale, labelMaxToppings, labelLineSpacing ->
                 viewModel.updateFullPrinterConfig(
                     kitchenId = selectedKitchen!!.id,
+                    connectionType = connectionType,
                     ip = ip.ifBlank { null },
                     port = port,
                     name = name.ifBlank { null },
-                    isConnected = ip.isNotBlank(),
+                    isConnected = connectionType != "network" || ip.isNotBlank(), // USB and Sunmi are always "connected"
                     protocol = protocol.name,
                     labelWidthMm = labelSize.widthMm,
                     labelHeightMm = labelSize.heightMm,
@@ -487,18 +498,27 @@ private fun KitchenPrinterCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (kitchen.printerIp != null) {
-                        val isSunmiPrinter = kitchen.printerIp == SUNMI_PRINTER_IP
+                    if (kitchen.printerIp != null || kitchen.connectionType == "usb") {
+                        val isSunmiPrinter = kitchen.connectionType == "sunmi" || kitchen.printerIp == SUNMI_PRINTER_IP
+                        val isUsbPrinter = kitchen.connectionType == "usb"
 
                         PrinterInfoRow("Tên máy in", kitchen.printerName ?: "Chưa đặt tên")
 
-                        if (isSunmiPrinter) {
-                            // Display Sunmi printer info
-                            PrinterInfoRow("Loại kết nối", "Máy in Sunmi tích hợp")
-                        } else {
-                            // Display TCP/IP printer info
-                            PrinterInfoRow("Địa chỉ IP", kitchen.printerIp!!)
-                            PrinterInfoRow("Cổng", kitchen.printerPort.toString())
+                        when {
+                            isSunmiPrinter -> {
+                                // Display Sunmi printer info
+                                PrinterInfoRow("Loại kết nối", "Máy in Sunmi tích hợp")
+                            }
+                            isUsbPrinter -> {
+                                // Display USB printer info
+                                PrinterInfoRow("Loại kết nối", "Máy in USB")
+                            }
+                            else -> {
+                                // Display TCP/IP printer info
+                                PrinterInfoRow("Loại kết nối", "TCP/IP (Mạng)")
+                                PrinterInfoRow("Địa chỉ IP", kitchen.printerIp ?: "Chưa cấu hình")
+                                PrinterInfoRow("Cổng", kitchen.printerPort.toString())
+                            }
                         }
 
                         PrinterInfoRow("Protocol", kitchen.getPrinterProtocolEnum().displayName)
@@ -546,11 +566,14 @@ private fun KitchenPrinterCard(
                     Text("Cấu hình")
                 }
 
-                // Test print button - enabled when IP is configured and not printing
+                // Test print button - enabled when printer is configured and not printing
+                val isPrinterConfigured = kitchen.connectionType == "usb" ||
+                    kitchen.connectionType == "sunmi" ||
+                    !kitchen.printerIp.isNullOrBlank()
                 Button(
                     onClick = onTestPrint,
                     modifier = Modifier.weight(1f),
-                    enabled = !kitchen.printerIp.isNullOrBlank() && !isPrinting,
+                    enabled = isPrinterConfigured && !isPrinting,
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = color
@@ -605,7 +628,7 @@ private fun PrinterConfigDialog(
     kitchen: KitchenEntity,
     isSunmiDevice: Boolean, // True nếu thiết bị là Sunmi
     onDismiss: () -> Unit,
-    onSave: (ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
+    onSave: (connectionType: String, ip: String, port: Int, name: String, protocol: PrinterProtocol, labelSize: LabelSize, printDensity: Int, paperWidth: Int, printMode: KitchenPrintMode,
              ticketCutAfterPrint: Boolean, ticketPrintItemsSeparately: Boolean, ticketCopies: Int, ticketFontSize: String, ticketLineSpacing: Float,
              ticketPrintOrderNumber: Boolean, ticketPrintTableName: Boolean, ticketPrintTime: Boolean, ticketPrintNotes: Boolean,
              ticketPrintPrice: Boolean, ticketPrintStoreName: Boolean, ticketStoreName: String,
@@ -616,8 +639,8 @@ private fun PrinterConfigDialog(
     val color = getKitchenColor(kitchen.kitchenType)
 
     var printerName by remember { mutableStateOf(kitchen.printerName ?: "") }
-    var selectedPrinterType by remember { mutableStateOf(KitchenPrinterType.fromPrinterIp(kitchen.printerIp)) }
-    var printerIp by remember { mutableStateOf(if (kitchen.printerIp == SUNMI_PRINTER_IP) "" else (kitchen.printerIp ?: "")) }
+    var selectedPrinterType by remember { mutableStateOf(KitchenPrinterType.fromConnectionType(kitchen.connectionType)) }
+    var printerIp by remember { mutableStateOf(if (kitchen.connectionType == "sunmi") "" else (kitchen.printerIp ?: "")) }
     var printerPort by remember { mutableStateOf(kitchen.printerPort.toString()) }
     var printerTypeExpanded by remember { mutableStateOf(false) }
     var selectedProtocol by remember { mutableStateOf(kitchen.getPrinterProtocolEnum()) }
@@ -774,6 +797,7 @@ private fun PrinterConfigDialog(
                                         Text(
                                             text = when (type) {
                                                 KitchenPrinterType.TCP_IP -> "Kết nối qua địa chỉ IP (mạng LAN/WiFi)"
+                                                KitchenPrinterType.USB -> "Kết nối qua cáp USB"
                                                 KitchenPrinterType.SUNMI -> "Máy in tích hợp sẵn trên thiết bị Sunmi"
                                             },
                                             fontSize = 12.sp,
@@ -789,6 +813,7 @@ private fun PrinterConfigDialog(
                                     Icon(
                                         imageVector = when (type) {
                                             KitchenPrinterType.TCP_IP -> Icons.Default.Wifi
+                                            KitchenPrinterType.USB -> Icons.Default.Usb
                                             KitchenPrinterType.SUNMI -> Icons.Default.PhoneAndroid
                                         },
                                         contentDescription = null,
@@ -833,6 +858,45 @@ private fun PrinterConfigDialog(
                                     text = "Sử dụng máy in có sẵn trên thiết bị Sunmi T1/T2/V2",
                                     fontSize = 12.sp,
                                     color = Color(0xFF388E3C)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Show USB printer info when selected
+                if (selectedPrinterType == KitchenPrinterType.USB) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE3F2FD)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Usb,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color(0xFF1976D2)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Máy in USB",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF1565C0)
+                                )
+                                Text(
+                                    text = "Tự động phát hiện máy in USB được kết nối",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF1976D2)
                                 )
                             }
                         }
@@ -1636,12 +1700,19 @@ private fun PrinterConfigDialog(
 
                     Button(
                         onClick = {
-                            // Use "sunmi" as IP when Sunmi printer is selected
+                            // Use "sunmi" as IP when Sunmi printer is selected, empty for USB
                             val effectivePrinterIp = when (selectedPrinterType) {
                                 KitchenPrinterType.SUNMI -> SUNMI_PRINTER_IP
+                                KitchenPrinterType.USB -> "" // USB doesn't need IP
                                 KitchenPrinterType.TCP_IP -> printerIp
                             }
+                            val connectionType = when (selectedPrinterType) {
+                                KitchenPrinterType.SUNMI -> "sunmi"
+                                KitchenPrinterType.USB -> "usb"
+                                KitchenPrinterType.TCP_IP -> "network"
+                            }
                             onSave(
+                                connectionType,
                                 effectivePrinterIp,
                                 printerPort.toIntOrNull() ?: 9100,
                                 printerName,

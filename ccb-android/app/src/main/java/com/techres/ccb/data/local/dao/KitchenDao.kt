@@ -45,6 +45,7 @@ interface KitchenDao {
 
     @Query("""
         UPDATE kitchens SET
+            connection_type = :connectionType,
             printer_ip = :printerIp,
             printer_port = :printerPort,
             printer_protocol = :printerProtocol,
@@ -65,6 +66,7 @@ interface KitchenDao {
     """)
     suspend fun updateLabelSettings(
         kitchenId: String,
+        connectionType: String, // "network", "usb", "sunmi"
         printerIp: String?,
         printerPort: Int,
         printerProtocol: String,
@@ -85,6 +87,7 @@ interface KitchenDao {
 
     @Query("""
         UPDATE kitchens SET
+            connection_type = :connectionType,
             printer_ip = :ip,
             printer_port = :port,
             printer_name = :name,
@@ -122,6 +125,7 @@ interface KitchenDao {
     """)
     suspend fun updateFullPrinterConfig(
         kitchenId: String,
+        connectionType: String, // "network", "usb", "sunmi"
         ip: String?,
         port: Int,
         name: String?,

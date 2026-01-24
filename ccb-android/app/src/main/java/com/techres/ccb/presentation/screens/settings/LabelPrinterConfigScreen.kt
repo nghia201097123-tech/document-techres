@@ -28,9 +28,29 @@ import com.techres.ccb.data.local.entity.LabelSize
 import com.techres.ccb.data.local.entity.PrinterProtocol
 import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.data.printer.PrinterResult
+import com.techres.ccb.data.printer.KitchenTicketPrintService.SUNMI_PRINTER_IP
 import com.techres.ccb.presentation.components.PosTopAppBar
 import kotlinx.coroutines.launch
 import java.util.Date
+
+/**
+ * Label printer connection type
+ */
+private enum class LabelPrinterType(val displayName: String) {
+    TCP_IP("Máy in TCP/IP (Mạng)"),
+    USB("Máy in USB"),
+    SUNMI("Máy in Sunmi tích hợp");
+
+    companion object {
+        fun fromConnectionType(connectionType: String?): LabelPrinterType {
+            return when (connectionType) {
+                "sunmi" -> SUNMI
+                "usb" -> USB
+                else -> TCP_IP
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,6 +242,7 @@ fun LabelPrinterConfigScreen(
     if (showSettingsDialog && selectedPrinter != null) {
         LabelPrinterSettingsDialog(
             printer = selectedPrinter!!,
+            isSunmiDevice = uiState.isSunmiDevice,
             onDismiss = { showSettingsDialog = false },
             onSave = { updatedPrinter ->
                 viewModel.updateLabelPrinterSettings(updatedPrinter)
@@ -343,10 +364,26 @@ private fun LabelPrinterCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (printer.printerIp != null) {
+                    if (printer.printerIp != null || printer.connectionType == "usb") {
+                        val isSunmiPrinter = printer.connectionType == "sunmi" || printer.printerIp == SUNMI_PRINTER_IP
+                        val isUsbPrinter = printer.connectionType == "usb"
+
                         LabelPrinterInfoRow("Tên máy in", printer.printerName ?: "Chưa đặt tên")
-                        LabelPrinterInfoRow("Địa chỉ IP", printer.printerIp!!)
-                        LabelPrinterInfoRow("Cổng", printer.printerPort.toString())
+
+                        when {
+                            isSunmiPrinter -> {
+                                LabelPrinterInfoRow("Loại kết nối", "Máy in Sunmi tích hợp")
+                            }
+                            isUsbPrinter -> {
+                                LabelPrinterInfoRow("Loại kết nối", "Máy in USB")
+                            }
+                            else -> {
+                                LabelPrinterInfoRow("Loại kết nối", "TCP/IP (Mạng)")
+                                LabelPrinterInfoRow("Địa chỉ IP", printer.printerIp ?: "Chưa cấu hình")
+                                LabelPrinterInfoRow("Cổng", printer.printerPort.toString())
+                            }
+                        }
+
                         LabelPrinterInfoRow("Protocol", printer.getPrinterProtocolEnum().displayName)
                         LabelPrinterInfoRow("Kích thước tem", printer.getLabelSize().displayName)
                         LabelPrinterInfoRow("Chế độ in", when (printer.getPrintModeEnum()) {
@@ -387,11 +424,14 @@ private fun LabelPrinterCard(
                     Text("Cấu hình")
                 }
 
-                // Test print button - enabled when IP is configured and not printing
+                // Test print button - enabled when printer is configured and not printing
+                val isPrinterConfigured = printer.connectionType == "usb" ||
+                    printer.connectionType == "sunmi" ||
+                    !printer.printerIp.isNullOrBlank()
                 Button(
                     onClick = onTestPrint,
                     modifier = Modifier.weight(1f),
-                    enabled = !printer.printerIp.isNullOrBlank() && !isPrinting,
+                    enabled = isPrinterConfigured && !isPrinting,
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = color
@@ -444,15 +484,18 @@ private fun LabelPrinterInfoRow(label: String, value: String) {
 @Composable
 private fun LabelPrinterSettingsDialog(
     printer: KitchenEntity,
+    isSunmiDevice: Boolean = false, // True nếu thiết bị là Sunmi
     onDismiss: () -> Unit,
     onSave: (KitchenEntity) -> Unit
 ) {
     val color = Color(0xFF4CAF50)
 
     // Printer connection state
+    var selectedPrinterType by remember { mutableStateOf(LabelPrinterType.fromConnectionType(printer.connectionType)) }
     var selectedProtocol by remember { mutableStateOf(printer.getPrinterProtocolEnum()) }
-    var printerIp by remember { mutableStateOf(printer.printerIp ?: "") }
+    var printerIp by remember { mutableStateOf(if (printer.connectionType == "sunmi") "" else (printer.printerIp ?: "")) }
     var printerPort by remember { mutableStateOf(printer.printerPort.toString()) }
+    var printerTypeExpanded by remember { mutableStateOf(false) }
 
     // Label size
     var selectedLabelSize by remember { mutableStateOf(printer.getLabelSize()) }
@@ -526,7 +569,163 @@ private fun LabelPrinterSettingsDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // ========== PRINTER CONNECTION SECTION ==========
+                // ========== PRINTER CONNECTION TYPE SECTION ==========
+                Text(
+                    text = "Loại kết nối máy in",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = printerTypeExpanded,
+                    onExpandedChange = { printerTypeExpanded = !printerTypeExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedPrinterType.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = printerTypeExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = color,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = printerTypeExpanded,
+                        onDismissRequest = { printerTypeExpanded = false }
+                    ) {
+                        // Chỉ hiển thị SUNMI nếu thiết bị là Sunmi
+                        val availableTypes = if (isSunmiDevice) {
+                            LabelPrinterType.entries
+                        } else {
+                            LabelPrinterType.entries.filter { it != LabelPrinterType.SUNMI }
+                        }
+                        availableTypes.forEach { type ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = type.displayName,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = when (type) {
+                                                LabelPrinterType.TCP_IP -> "Kết nối qua địa chỉ IP (mạng LAN/WiFi)"
+                                                LabelPrinterType.USB -> "Kết nối qua cáp USB"
+                                                LabelPrinterType.SUNMI -> "Máy in tích hợp sẵn trên thiết bị Sunmi"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedPrinterType = type
+                                    printerTypeExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (type) {
+                                            LabelPrinterType.TCP_IP -> Icons.Default.Wifi
+                                            LabelPrinterType.USB -> Icons.Default.Usb
+                                            LabelPrinterType.SUNMI -> Icons.Default.PhoneAndroid
+                                        },
+                                        contentDescription = null,
+                                        tint = if (selectedPrinterType == type) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Show Sunmi printer info when selected
+                if (selectedPrinterType == LabelPrinterType.SUNMI) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE8F5E9)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Máy in Sunmi tích hợp",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF2E7D32)
+                                )
+                                Text(
+                                    text = "Sử dụng máy in có sẵn trên thiết bị Sunmi T1/T2/V2",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF388E3C)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Show USB printer info when selected
+                if (selectedPrinterType == LabelPrinterType.USB) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE3F2FD)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Usb,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color(0xFF1976D2)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Máy in USB",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF1565C0)
+                                )
+                                Text(
+                                    text = "Tự động phát hiện máy in USB được kết nối",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF1976D2)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ========== PRINTER PROTOCOL SECTION ==========
                 Text(
                     text = "Loại máy in (Protocol)",
                     fontSize = 14.sp,
@@ -594,31 +793,33 @@ private fun LabelPrinterSettingsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // IP Address and Port - only show for TCP/IP
+                if (selectedPrinterType == LabelPrinterType.TCP_IP) {
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                // IP Address and Port
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = printerIp,
-                        onValueChange = { printerIp = it },
-                        label = { Text("IP máy in") },
-                        placeholder = { Text("192.168.1.100") },
-                        modifier = Modifier.weight(2f),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    OutlinedTextField(
-                        value = printerPort,
-                        onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
-                        label = { Text("Cổng") },
-                        placeholder = { Text("9100") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = printerIp,
+                            onValueChange = { printerIp = it },
+                            label = { Text("IP máy in") },
+                            placeholder = { Text("192.168.1.100") },
+                            modifier = Modifier.weight(2f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = printerPort,
+                            onValueChange = { printerPort = it.filter { c -> c.isDigit() } },
+                            label = { Text("Cổng") },
+                            placeholder = { Text("9100") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -940,10 +1141,23 @@ private fun LabelPrinterSettingsDialog(
 
                     Button(
                         onClick = {
+                            // Determine connection type and IP
+                            val connectionType = when (selectedPrinterType) {
+                                LabelPrinterType.SUNMI -> "sunmi"
+                                LabelPrinterType.USB -> "usb"
+                                LabelPrinterType.TCP_IP -> "network"
+                            }
+                            val effectivePrinterIp = when (selectedPrinterType) {
+                                LabelPrinterType.SUNMI -> SUNMI_PRINTER_IP
+                                LabelPrinterType.USB -> "" // USB doesn't need IP
+                                LabelPrinterType.TCP_IP -> printerIp
+                            }
                             val updatedPrinter = printer.copy(
+                                connectionType = connectionType,
                                 printerProtocol = selectedProtocol.name,
-                                printerIp = printerIp.ifBlank { null },
+                                printerIp = effectivePrinterIp.ifBlank { null },
                                 printerPort = printerPort.toIntOrNull() ?: 9100,
+                                isPrinterConnected = connectionType != "network" || printerIp.isNotBlank(),
                                 labelWidthMm = selectedLabelSize.widthMm,
                                 labelHeightMm = selectedLabelSize.heightMm,
                                 labelGapMm = labelGapMm.toIntOrNull() ?: 3,

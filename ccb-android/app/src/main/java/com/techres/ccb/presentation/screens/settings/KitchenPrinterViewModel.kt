@@ -241,6 +241,7 @@ class KitchenPrinterViewModel @Inject constructor(
      */
     fun updateFullPrinterConfig(
         kitchenId: String,
+        connectionType: String = "network", // "network", "usb", "sunmi"
         ip: String?,
         port: Int,
         name: String?,
@@ -281,6 +282,7 @@ class KitchenPrinterViewModel @Inject constructor(
             try {
                 kitchenRepository.updateFullPrinterConfig(
                     kitchenId = kitchenId,
+                    connectionType = connectionType,
                     ip = ip,
                     port = port,
                     name = name,

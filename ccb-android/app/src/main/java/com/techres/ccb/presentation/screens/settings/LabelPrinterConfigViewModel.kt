@@ -6,6 +6,7 @@ import com.techres.ccb.data.local.entity.KitchenEntity
 import com.techres.ccb.data.local.entity.KitchenPrintMode
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.KitchenRepository
+import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,13 +18,15 @@ import javax.inject.Inject
 data class LabelPrinterUiState(
     val labelPrinters: List<KitchenEntity> = emptyList(),
     val isLoading: Boolean = true,
+    val isSunmiDevice: Boolean = false, // True nếu thiết bị là Sunmi (có máy in tích hợp)
     val errorMessage: String? = null
 )
 
 @HiltViewModel
 class LabelPrinterConfigViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val kitchenRepository: KitchenRepository
+    private val kitchenRepository: KitchenRepository,
+    private val sunmiPrinterAdapter: SunmiPrinterAdapter
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LabelPrinterUiState())
@@ -35,7 +38,9 @@ class LabelPrinterConfigViewModel @Inject constructor(
 
     private fun loadLabelPrinters() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            // Kiểm tra xem thiết bị có phải Sunmi không để hiển thị tùy chọn kết nối phù hợp
+            val isSunmi = sunmiPrinterAdapter.isSunmiDevice()
+            _uiState.update { it.copy(isLoading = true, isSunmiDevice = isSunmi) }
 
             try {
                 val branchId = authRepository.getBranchId()
@@ -176,6 +181,7 @@ class LabelPrinterConfigViewModel @Inject constructor(
             try {
                 kitchenRepository.updateLabelSettings(
                     kitchenId = printer.id,
+                    connectionType = printer.connectionType,
                     printerIp = printer.printerIp,
                     printerPort = printer.printerPort,
                     printerProtocol = printer.printerProtocol,
