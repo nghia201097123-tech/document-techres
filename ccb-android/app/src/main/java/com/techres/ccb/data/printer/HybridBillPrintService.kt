@@ -1056,14 +1056,11 @@ object HybridBillPrintService {
         val adapter = usbAdapter ?: return PrinterResult.Error("USB adapter chưa được khởi tạo")
 
         val usbPath = config.printerUsbPath
-        if (usbPath.isNullOrBlank()) {
-            return PrinterResult.Error("Chưa cấu hình đường dẫn USB máy in")
-        }
 
         // Sử dụng numberOfCopies từ config
         val numberOfCopies = maxOf(config.numberOfCopies, 1)
         Log.d(TAG, "=== PRINT VIA USB ===")
-        Log.d(TAG, "USB Path: $usbPath")
+        Log.d(TAG, "USB Path: ${usbPath ?: "auto-detect"}")
         Log.d(TAG, "Effective copies: $numberOfCopies")
         Log.d(TAG, "Bill content size: ${billContent.size} bytes")
 
@@ -1072,9 +1069,13 @@ object HybridBillPrintService {
             val connectedPrinters = adapter.getConnectedPrinters()
             Log.d(TAG, "Found ${connectedPrinters.size} USB printers")
 
-            val targetPrinter = connectedPrinters.find { it.address == usbPath || it.id == usbPath }
-                ?: connectedPrinters.firstOrNull()
-                ?: return PrinterResult.Error("Không tìm thấy máy in USB. Hãy kiểm tra kết nối.")
+            // Nếu có cấu hình usbPath thì tìm theo path, nếu không thì dùng máy in USB đầu tiên
+            val targetPrinter = if (!usbPath.isNullOrBlank()) {
+                connectedPrinters.find { it.address == usbPath || it.id == usbPath }
+                    ?: connectedPrinters.firstOrNull()
+            } else {
+                connectedPrinters.firstOrNull()
+            } ?: return PrinterResult.Error("Không tìm thấy máy in USB. Hãy kiểm tra kết nối cáp USB.")
 
             Log.d(TAG, "Using USB printer: ${targetPrinter.name} (${targetPrinter.address})")
 
