@@ -216,6 +216,7 @@ object KitchenTicketPrintService {
 
     /**
      * In 1 phiếu qua Sunmi (nội bộ)
+     * Sử dụng native printBitmap API cho Sunmi T1 (BinderProxy mode)
      */
     private suspend fun printSingleTicketSunmi(
         adapter: SunmiPrinterAdapter,
@@ -223,21 +224,43 @@ object KitchenTicketPrintService {
         ticketData: KitchenTicketData
     ): PrinterResult {
         return try {
-            // Generate ESC/POS content
-            val content = generateTicketContent(kitchen, ticketData)
+            // Kiểm tra xem có phải BinderProxy (Sunmi T1) không
+            val isBinderProxy = adapter.isUsingBinderProxy()
+            Log.d(TAG, "Sunmi BinderProxy mode: $isBinderProxy")
 
-            // Gửi qua Sunmi
-            val writeResult = adapter.write(content)
-            if (writeResult is PrinterResult.Error) {
-                return writeResult
-            }
+            if (isBinderProxy) {
+                // SUNMI T1 (BinderProxy): Sử dụng native bitmap printing
+                val bitmaps = generateTicketBitmaps(kitchen, ticketData)
+                Log.d(TAG, "Generated ${bitmaps.size} bitmaps for Sunmi T1")
 
-            // Commit buffer
-            adapter.commitBuffer()
+                // In từng bitmap qua native API
+                bitmaps.forEachIndexed { index, bitmap ->
+                    Log.d(TAG, "Printing bitmap ${index + 1}/${bitmaps.size}: ${bitmap.width}x${bitmap.height}")
+                    val result = adapter.printBitmap(bitmap)
+                    bitmap.recycle() // Recycle ngay sau khi in
+                    if (result is PrinterResult.Error) {
+                        // Recycle các bitmap còn lại
+                        bitmaps.drop(index + 1).forEach { it.recycle() }
+                        return result
+                    }
+                }
 
-            // Cắt giấy nếu cần
-            if (kitchen.ticketCutAfterPrint) {
-                adapter.cutPaperWithFallback()
+                // Commit và cắt giấy
+                adapter.commitBuffer()
+                if (kitchen.ticketCutAfterPrint) {
+                    adapter.cutPaperWithFallback()
+                }
+            } else {
+                // NON-BINDERPROXY: Có thể dùng ESC/POS
+                val content = generateTicketContent(kitchen, ticketData)
+                val writeResult = adapter.write(content)
+                if (writeResult is PrinterResult.Error) {
+                    return writeResult
+                }
+                adapter.commitBuffer()
+                if (kitchen.ticketCutAfterPrint) {
+                    adapter.cutPaperWithFallback()
+                }
             }
 
             // Delay nhỏ giữa các bản
@@ -458,50 +481,54 @@ object KitchenTicketPrintService {
      * │ TỔNG: 3 MÓN                     │
      * └─────────────────────────────────┘
      */
+    /**
+     * Generate ticket bitmaps cho Sunmi T1 native printing
+     * Sử dụng HybridBillBuilder với enableBitmapCollection() mode
+     */
+    private fun generateTicketBitmaps(
+        kitchen: KitchenEntity,
+        ticket: KitchenTicketData
+    ): List<android.graphics.Bitmap> {
+        Log.d(TAG, "=== Generate ticket BITMAPS for Sunmi T1 ===")
+
+        val builder = createTicketBuilder(kitchen)
+            .enableBitmapCollection() // QUAN TRỌNG: Bật chế độ thu thập bitmap
+
+        // Build content (không bao gồm feed/beep/cut - sẽ xử lý riêng cho Sunmi)
+        buildTicketContentToBuilder(builder, kitchen, ticket, includeCutCommands = false)
+
+        return builder.buildBitmaps()
+    }
+
+    /**
+     * Generate ticket ESC/POS content cho TCP/IP printing
+     */
     private fun generateTicketContent(
         kitchen: KitchenEntity,
         ticket: KitchenTicketData
     ): ByteArray {
+        Log.d(TAG, "=== Generate ticket ESC/POS for TCP/IP ===")
+
+        val builder = createTicketBuilder(kitchen)
+
+        // Build content (bao gồm feed/beep/cut)
+        buildTicketContentToBuilder(builder, kitchen, ticket, includeCutCommands = true)
+
+        val content = builder.build()
+        Log.d(TAG, "Ticket content generated: ${content.size} bytes")
+        return content
+    }
+
+    /**
+     * Tạo HybridBillBuilder với config từ kitchen
+     */
+    private fun createTicketBuilder(kitchen: KitchenEntity): HybridBillBuilder {
         val paperWidth = kitchen.paperWidth
         val useBitmapMode = true
-        // Sử dụng GS v 0 (raster bitmap) thay vì ESC * để tránh khoảng trắng thừa
-        // GS v 0 gửi toàn bộ bitmap trong 1 lệnh, không có LF giữa các strip
-        // Điều này giúp loại bỏ hoàn toàn vấn đề line spacing giữa các bitmap
         val useRasterBitmap = true
 
-        // ========== TICKET CONFIG FROM WEB-DASHBOARD ==========
-        val showOrderNumber = kitchen.ticketPrintOrderNumber
-        val showTableName = kitchen.ticketPrintTableName
-        val showTime = kitchen.ticketPrintTime
-        val showStoreName = kitchen.ticketPrintStoreName
-        val storeName = kitchen.ticketStoreName
-        val showNotes = kitchen.ticketPrintNotes
-        val showPrice = kitchen.ticketPrintPrice // In giá món
-        val fontSize = kitchen.ticketFontSize // "small", "medium", "large"
-
-        Log.d(TAG, "=== Generating ticket content ===")
-        Log.d(TAG, "  - Paper width: ${paperWidth}mm")
-        Log.d(TAG, "  - Kitchen: ${ticket.kitchenName}")
-        Log.d(TAG, "  - Items count: ${ticket.items.size}")
-        Log.d(TAG, "  === Ticket Config ===")
-        Log.d(TAG, "  - showOrderNumber: $showOrderNumber")
-        Log.d(TAG, "  - showTableName: $showTableName")
-        Log.d(TAG, "  - showTime: $showTime")
-        Log.d(TAG, "  - showStoreName: $showStoreName")
-        Log.d(TAG, "  - storeName: $storeName")
-        Log.d(TAG, "  - showNotes: $showNotes")
-        Log.d(TAG, "  - showPrice: $showPrice")
-        Log.d(TAG, "  - fontSize: $fontSize")
-        ticket.items.forEachIndexed { index, item ->
-            Log.d(TAG, "  Item $index: ${item.name}")
-            Log.d(TAG, "    - quantity: ${item.quantity}")
-            Log.d(TAG, "    - options: ${item.options}")
-            Log.d(TAG, "    - toppings (${item.toppings.size}): ${item.toppings}")
-            Log.d(TAG, "    - note: ${item.note}")
-        }
-
-        // Font scale based on fontSize config - nhiều lựa chọn hơn
-        val fontScale = when (fontSize) {
+        // Font scale based on fontSize config
+        val fontScale = when (kitchen.ticketFontSize) {
             "extra_small" -> 0.7f
             "small" -> 0.85f
             "large" -> 1.2f
@@ -509,10 +536,33 @@ object KitchenTicketPrintService {
             else -> 1.0f // medium (default)
         }
 
-        // Line spacing từ config (0.3 - 1.0, default 0.4)
         val ticketLineSpacing = kitchen.ticketLineSpacing.coerceIn(0.3f, 1.0f)
 
-        val builder = HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap, fontScale, ticketLineSpacing)
+        return HybridBillBuilder(paperWidth, useBitmapMode, useRasterBitmap, fontScale, ticketLineSpacing)
+    }
+
+    /**
+     * Build ticket content vào builder
+     * Shared giữa generateTicketContent và generateTicketBitmaps
+     */
+    private fun buildTicketContentToBuilder(
+        builder: HybridBillBuilder,
+        kitchen: KitchenEntity,
+        ticket: KitchenTicketData,
+        includeCutCommands: Boolean = true
+    ) {
+        // ========== TICKET CONFIG FROM WEB-DASHBOARD ==========
+        val showOrderNumber = kitchen.ticketPrintOrderNumber
+        val showTableName = kitchen.ticketPrintTableName
+        val showTime = kitchen.ticketPrintTime
+        val showStoreName = kitchen.ticketPrintStoreName
+        val storeName = kitchen.ticketStoreName
+        val showNotes = kitchen.ticketPrintNotes
+        val showPrice = kitchen.ticketPrintPrice
+
+        Log.d(TAG, "  - Paper width: ${kitchen.paperWidth}mm")
+        Log.d(TAG, "  - Kitchen: ${ticket.kitchenName}")
+        Log.d(TAG, "  - Items count: ${ticket.items.size}")
 
         builder.apply {
             init()
@@ -724,21 +774,18 @@ object KitchenTicketPrintService {
             lineBold("TỔNG: $totalItems MÓN", BitmapTextStyle(centerAlign = true))
 
             // ═══════════════════════════════════════════
-            // FEED, BEEP & CUT
-            // Feed 6 dòng để đảm bảo dòng TỔNG MÓN không bị cắt mất
-            // (khoảng cách từ đầu in đến dao cắt thường 20-25mm ~ 6-8 dòng)
+            // FEED, BEEP & CUT (chỉ cho TCP/IP, không dùng cho Sunmi bitmap mode)
             // ═══════════════════════════════════════════
-            feed(6)
-            beep()
-            // Cắt giấy dựa trên config
-            if (kitchen.ticketCutAfterPrint) {
-                cut()
+            if (includeCutCommands) {
+                // Feed 6 dòng để đảm bảo dòng TỔNG MÓN không bị cắt mất
+                feed(6)
+                beep()
+                // Cắt giấy dựa trên config
+                if (kitchen.ticketCutAfterPrint) {
+                    cut()
+                }
             }
         }
-
-        val content = builder.build()
-        Log.d(TAG, "Ticket content generated: ${content.size} bytes")
-        return content
     }
 
 }

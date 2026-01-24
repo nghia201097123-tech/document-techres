@@ -692,6 +692,20 @@ class HybridBillBuilder(
     private val ESC = 0x1B.toByte()
     private val GS = 0x1D.toByte()
 
+    // Bitmap collection cho Sunmi T1 native printing
+    // Khi useBitmapMode = true, các bitmap được lưu ở đây thay vì chuyển sang ESC/POS ngay
+    private val collectedBitmaps = mutableListOf<Bitmap>()
+    private var collectBitmapsMode = false // true = thu thập bitmap, false = chuyển ESC/POS ngay
+
+    /**
+     * Bật chế độ thu thập bitmap (cho Sunmi T1)
+     * Khi bật, các bitmap sẽ được lưu lại thay vì chuyển sang ESC/POS
+     */
+    fun enableBitmapCollection(): HybridBillBuilder {
+        collectBitmapsMode = true
+        return this
+    }
+
     // Pre-rendered separators (lazy init để tránh render khi không cần)
     // Sử dụng separatorChar và doubleSeparatorChar từ constructor (từ template config)
     private val cachedSingleSeparator: ByteArray by lazy {
@@ -773,16 +787,21 @@ class HybridBillBuilder(
                 return this
             }
 
-            // Chọn chế độ in bitmap phù hợp với máy in
-            val imageData = if (useRasterBitmap) {
-                // GS v 0 - Raster bitmap (EPSON, BIXOLON, máy in cao cấp)
-                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            if (collectBitmapsMode) {
+                // SUNMI MODE: Thu thập bitmap để dùng với native printBitmap
+                collectedBitmaps.add(bitmap) // Không recycle - caller sẽ recycle sau
             } else {
-                // ESC * - Bit image (XPRINTER, máy in giá rẻ Trung Quốc)
-                EscPosCommands.printBitmap(bitmap, 0) // 0 = left align
+                // ESC/POS MODE: Chuyển bitmap sang ESC/POS ngay
+                val imageData = if (useRasterBitmap) {
+                    // GS v 0 - Raster bitmap (EPSON, BIXOLON, máy in cao cấp)
+                    EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+                } else {
+                    // ESC * - Bit image (XPRINTER, máy in giá rẻ Trung Quốc)
+                    EscPosCommands.printBitmap(bitmap, 0) // 0 = left align
+                }
+                buffer.write(imageData)
+                bitmap.recycle()
             }
-            buffer.write(imageData)
-            bitmap.recycle()
         } else {
             // TEXT MODE - Chỉ dùng khi máy in hỗ trợ UTF-8 Vietnamese
             applyTextStyle(actualStyle)
@@ -864,13 +883,19 @@ class HybridBillBuilder(
                 return this
             }
 
-            val imageData = if (useRasterBitmap) {
-                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            if (collectBitmapsMode) {
+                // SUNMI MODE: Thu thập bitmap
+                collectedBitmaps.add(bitmap)
             } else {
-                EscPosCommands.printBitmap(bitmap, 0)
+                // ESC/POS MODE: Chuyển sang ESC/POS
+                val imageData = if (useRasterBitmap) {
+                    EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+                } else {
+                    EscPosCommands.printBitmap(bitmap, 0)
+                }
+                buffer.write(imageData)
+                bitmap.recycle()
             }
-            buffer.write(imageData)
-            bitmap.recycle()
         } else {
             val fillCount = lineWidth - key.length - value.length
             val line = if (fillCount > 0) {
@@ -918,13 +943,19 @@ class HybridBillBuilder(
                 return this
             }
 
-            val imageData = if (useRasterBitmap) {
-                EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+            if (collectBitmapsMode) {
+                // SUNMI MODE: Thu thập bitmap
+                collectedBitmaps.add(bitmap)
             } else {
-                EscPosCommands.printBitmap(bitmap, 0)
+                // ESC/POS MODE: Chuyển sang ESC/POS
+                val imageData = if (useRasterBitmap) {
+                    EscPosCommands.printRasterBitmap(bitmap, pixelWidth)
+                } else {
+                    EscPosCommands.printBitmap(bitmap, 0)
+                }
+                buffer.write(imageData)
+                bitmap.recycle()
             }
-            buffer.write(imageData)
-            bitmap.recycle()
         } else {
             // Fallback: text mode - use character-based approximation
             val totalPercent = columns.sumOf { it.widthPercent.toDouble() }.toFloat()
@@ -1009,7 +1040,15 @@ class HybridBillBuilder(
      * - In mượt hơn vì data đã sẵn sàng
      */
     fun separator(char: Char = separatorChar): HybridBillBuilder {
-        // Sử dụng cached data nếu char trùng với separatorChar hoặc doubleSeparatorChar
+        if (collectBitmapsMode) {
+            // SUNMI MODE: Luôn render mới để thu thập bitmap
+            val separatorFontSize = (baseFontSize * 0.7f).coerceAtLeast(12f)
+            val bitmap = BitmapTextRenderer.renderSeparator(char, pixelWidth, separatorFontSize, lineSpacing)
+            collectedBitmaps.add(bitmap)
+            return this
+        }
+
+        // ESC/POS MODE: Sử dụng cached data nếu có
         val cachedData = when (char) {
             separatorChar -> cachedSingleSeparator
             doubleSeparatorChar -> cachedDoubleSeparator
@@ -1323,9 +1362,42 @@ class HybridBillBuilder(
     }
 
     /**
-     * Build thành byte array
+     * Build thành byte array (cho TCP/IP printing)
      */
     fun build(): ByteArray = buffer.toByteArray()
+
+    /**
+     * Build thành list bitmap (cho Sunmi native printing)
+     *
+     * QUAN TRỌNG:
+     * - Phải gọi enableBitmapCollection() TRƯỚC khi build content
+     * - Caller PHẢI recycle các bitmap sau khi dùng xong
+     * - Thêm blank bitmap ở cuối để footer không bị cắt (khoảng cách đầu in - dao cắt)
+     *
+     * @return List<Bitmap> - Danh sách các bitmap cần in
+     */
+    fun buildBitmaps(): List<Bitmap> {
+        if (!collectBitmapsMode) {
+            Log.w(TAG, "buildBitmaps() called but collectBitmapsMode is false. Call enableBitmapCollection() first!")
+            return emptyList()
+        }
+
+        Log.d(TAG, "buildBitmaps(): Collected ${collectedBitmaps.size} bitmaps")
+
+        // Thêm blank bitmap ở cuối để footer không bị cắt
+        // Khoảng cách đầu in - dao cắt trên Sunmi T1 khoảng 20-25mm (~100 pixels)
+        val feedHeightPixels = 100 // ~25mm extra margin
+        if (feedHeightPixels > 0 && collectedBitmaps.isNotEmpty()) {
+            val feedBitmap = Bitmap.createBitmap(pixelWidth, feedHeightPixels, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(feedBitmap)
+            canvas.drawColor(Color.WHITE) // Blank white space
+            collectedBitmaps.add(feedBitmap)
+            Log.d(TAG, "Added feed bitmap: ${pixelWidth}x${feedHeightPixels} pixels")
+        }
+
+        Log.d(TAG, "buildBitmaps(): Total ${collectedBitmaps.size} bitmaps (including feed)")
+        return collectedBitmaps.toList()
+    }
 
     // ==================== PRIVATE HELPERS ====================
 
