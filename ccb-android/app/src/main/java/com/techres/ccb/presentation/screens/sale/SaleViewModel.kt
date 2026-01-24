@@ -3100,8 +3100,7 @@ class SaleViewModel @Inject constructor(
                     val brandId = authRepository.getBrandId() ?: ""
                     var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
-                        val activePrinters = billPrinterConfigDao.getActiveByBranchSync(branchId)
-                        printerConfig = activePrinters.firstOrNull()
+                        printerConfig = billPrinterConfigDao.getFirstActiveByBranch(branchId)
                     }
 
                     if (printerConfig != null && printerConfig.isActive) {
@@ -3233,8 +3232,7 @@ class SaleViewModel @Inject constructor(
                     // Get printer config (only active ones)
                     var printerConfig = billPrinterConfigDao.getDefaultByBranch(branchId)
                     if (printerConfig == null) {
-                        val activePrinters = billPrinterConfigDao.getActiveByBranchSync(branchId)
-                        printerConfig = activePrinters.firstOrNull()
+                        printerConfig = billPrinterConfigDao.getFirstActiveByBranch(branchId)
                     }
 
                     if (printerConfig != null && printerConfig.isActive) {

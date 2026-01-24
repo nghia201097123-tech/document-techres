@@ -27,11 +27,16 @@ interface BillPrinterConfigDao {
     @Query("SELECT * FROM bill_printer_configs WHERE id = :id")
     fun getByIdFlow(id: String): Flow<BillPrinterConfigEntity?>
 
-    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_default = 1 LIMIT 1")
+    // Get ACTIVE default printer (cho việc in thực tế)
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_default = 1 AND is_active = 1 LIMIT 1")
     suspend fun getDefaultByBranch(branchId: String): BillPrinterConfigEntity?
 
-    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_default = 1 LIMIT 1")
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_default = 1 AND is_active = 1 LIMIT 1")
     fun getDefaultByBranchFlow(branchId: String): Flow<BillPrinterConfigEntity?>
+
+    // Fallback: Get first ACTIVE printer if no active default (sorted by sort_order)
+    @Query("SELECT * FROM bill_printer_configs WHERE branch_id = :branchId AND is_active = 1 ORDER BY sort_order ASC LIMIT 1")
+    suspend fun getFirstActiveByBranch(branchId: String): BillPrinterConfigEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(config: BillPrinterConfigEntity)

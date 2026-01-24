@@ -367,12 +367,16 @@ class PaymentViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Lấy printer config
-                val printerConfig = billPrinterConfigDao.getDefaultByBranch(currentBranchId)
+                // Lấy printer config - try default first, then any active printer
+                var printerConfig = billPrinterConfigDao.getDefaultByBranch(currentBranchId)
+                if (printerConfig == null) {
+                    // Fallback to first active printer
+                    printerConfig = billPrinterConfigDao.getFirstActiveByBranch(currentBranchId)
+                }
                 if (printerConfig == null) {
                     _uiState.value = _uiState.value.copy(
                         isPrintingQr = false,
-                        printQrMessage = "Chưa cấu hình máy in bill"
+                        printQrMessage = "Không tìm thấy máy in đang hoạt động"
                     )
                     return@launch
                 }
