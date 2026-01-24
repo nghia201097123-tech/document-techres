@@ -98,6 +98,9 @@ object KitchenTicketPrintService {
      * - ticketPrintItemsSeparately: In từng món riêng biệt
      * - ticketCutAfterPrint: Cắt giấy sau khi in
      * - ticketCopies: Số bản in
+     *
+     * TỐI ƯU: Gộp tất cả nội dung (items × copies) vào 1 byte array
+     * và gửi trong 1 connection duy nhất để tránh giật khi in
      */
     suspend fun printTicket(
         kitchen: KitchenEntity,
@@ -115,68 +118,59 @@ object KitchenTicketPrintService {
             Log.d(TAG, "  cutAfterPrint: ${kitchen.ticketCutAfterPrint}")
             Log.d(TAG, "  copies: $copies")
 
-            var totalPrinted = 0
-            var lastError: String? = null
+            // ========== BATCHED CONTENT GENERATION ==========
+            // Gộp tất cả nội dung vào 1 byte array để gửi trong 1 connection
+            // Tránh jerky behavior do mở/đóng nhiều connection
+            val batchedContent = java.io.ByteArrayOutputStream()
+            var totalTickets = 0
 
             if (printSeparately && ticketData.items.size > 1) {
-                // In từng món riêng biệt
-                Log.d(TAG, "Printing ${ticketData.items.size} items separately")
-                ticketData.items.forEachIndexed { index, item ->
-                    // Tạo ticket cho từng món
+                // In từng món riêng biệt - gộp tất cả items × copies
+                Log.d(TAG, "Batching ${ticketData.items.size} items × $copies copies")
+                ticketData.items.forEach { item ->
                     val singleItemTicket = ticketData.copy(items = listOf(item))
                     val ticketContent = generateTicketContent(kitchen, singleItemTicket)
 
-                    // In số bản (copies)
-                    for (copy in 1..copies) {
-                        val result = printWithRetry(ip, kitchen.printerPort, ticketContent)
-                        when (result) {
-                            is PrinterResult.Success -> {
-                                totalPrinted++
-                                Log.d(TAG, "Item ${index + 1}/${ticketData.items.size} copy $copy/$copies: Success")
-                            }
-                            is PrinterResult.Error -> {
-                                lastError = result.message
-                                Log.w(TAG, "Item ${index + 1} copy $copy failed: ${result.message}")
-                            }
-                        }
-                        // Delay giữa các bản in
-                        if (copy < copies) delay(300)
+                    // Ghi copies lần cho mỗi item
+                    repeat(copies) {
+                        batchedContent.write(ticketContent)
+                        totalTickets++
                     }
-                    // Delay giữa các món
-                    if (index < ticketData.items.size - 1) delay(500)
                 }
             } else {
-                // In tất cả món trên 1 phiếu
+                // In tất cả món trên 1 phiếu - gộp copies lần
                 val ticketContent = generateTicketContent(kitchen, ticketData)
+                Log.d(TAG, "Batching 1 ticket × $copies copies")
 
-                // In số bản (copies)
-                for (copy in 1..copies) {
-                    val result = printWithRetry(ip, kitchen.printerPort, ticketContent)
-                    when (result) {
-                        is PrinterResult.Success -> {
-                            totalPrinted++
-                            Log.d(TAG, "Ticket copy $copy/$copies: Success")
-                        }
-                        is PrinterResult.Error -> {
-                            lastError = result.message
-                            Log.w(TAG, "Ticket copy $copy failed: ${result.message}")
-                        }
-                    }
-                    // Delay giữa các bản in
-                    if (copy < copies) delay(300)
+                repeat(copies) {
+                    batchedContent.write(ticketContent)
+                    totalTickets++
                 }
             }
 
-            if (totalPrinted > 0) {
-                PrinterResult.Success("Đã in $totalPrinted phiếu bếp")
-            } else {
-                PrinterResult.Error(lastError ?: "In phiếu bếp thất bại")
+            val allContent = batchedContent.toByteArray()
+            Log.d(TAG, "Total batched content: ${allContent.size} bytes ($totalTickets tickets)")
+
+            // ========== SINGLE CONNECTION PRINT ==========
+            // Gửi tất cả trong 1 connection duy nhất
+            val result = printWithRetry(ip, kitchen.printerPort, allContent)
+
+            when (result) {
+                is PrinterResult.Success -> {
+                    Log.d(TAG, "=== PRINT SUCCESS: $totalTickets tickets ===")
+                    PrinterResult.Success("Đã in $totalTickets phiếu bếp")
+                }
+                is PrinterResult.Error -> {
+                    Log.e(TAG, "=== PRINT FAILED: ${result.message} ===")
+                    result
+                }
             }
         }
     }
 
     /**
      * In với retry logic
+     * Sử dụng exponential backoff để tránh flood máy in
      */
     private suspend fun printWithRetry(
         ip: String,
@@ -186,17 +180,26 @@ object KitchenTicketPrintService {
     ): PrinterResult {
         var lastError: String? = null
         repeat(maxRetries) { attempt ->
+            Log.d(TAG, "Print attempt ${attempt + 1}/$maxRetries...")
             val result = printViaNetwork(ip, port, content)
             when (result) {
-                is PrinterResult.Success -> return result
+                is PrinterResult.Success -> {
+                    Log.d(TAG, "Attempt ${attempt + 1} succeeded!")
+                    return result
+                }
                 is PrinterResult.Error -> {
                     lastError = result.message
                     Log.w(TAG, "Attempt ${attempt + 1} failed: ${result.message}")
-                    if (attempt < maxRetries - 1) delay(1000)
+                    if (attempt < maxRetries - 1) {
+                        // Exponential backoff: 500ms, 1000ms, 2000ms
+                        val delayMs = 500L * (1 shl attempt)
+                        Log.d(TAG, "Waiting ${delayMs}ms before retry...")
+                        delay(delayMs)
+                    }
                 }
             }
         }
-        return PrinterResult.Error(lastError ?: "In thất bại")
+        return PrinterResult.Error(lastError ?: "In thất bại sau $maxRetries lần thử")
     }
 
     /**
@@ -551,16 +554,21 @@ object KitchenTicketPrintService {
             outputStream = socket.getOutputStream()
             Log.d(TAG, "Got output stream, writing ${content.size} bytes...")
 
+            // SINGLE WRITE: Gửi toàn bộ batched content trong 1 lần
             outputStream.write(content)
             Log.d(TAG, "Write completed, flushing...")
             outputStream.flush()
             Log.d(TAG, "Flush completed!")
 
-            // Đợi máy in xử lý xong bitmap data
-            Log.d(TAG, "Waiting 500ms for printer to process...")
-            delay(500)
+            // Đợi máy in xử lý - thời gian tỷ lệ với kích thước content
+            // Base: 500ms, thêm 100ms cho mỗi 10KB content
+            val baseDelay = 500L
+            val sizeDelay = (content.size / 10240) * 100L
+            val totalDelay = (baseDelay + sizeDelay).coerceIn(500L, 2000L)
+            Log.d(TAG, "Waiting ${totalDelay}ms for printer to process ${content.size} bytes...")
+            delay(totalDelay)
 
-            Log.d(TAG, "=== PRINT TICKET SUCCESS ===")
+            Log.d(TAG, "=== PRINT TICKET SUCCESS (SINGLE WRITE, BATCHED) ===")
             PrinterResult.Success("In phiếu bếp thành công!")
         } catch (e: Exception) {
             Log.e(TAG, "=== PRINT TICKET FAILED ===")
