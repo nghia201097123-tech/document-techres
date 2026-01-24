@@ -247,17 +247,38 @@ object HybridBillPrintService {
                     }
                 }
 
+                // QUAN TRỌNG: Đợi máy in xử lý xong tất cả data trước khi feed/cut
+                // Nếu không đợi, lệnh cut có thể đến trước khi footer được in xong
+                // dẫn đến footer bị cắt và in qua bill sau
+                Log.d(TAG, "Waiting for printer to finish processing all data before feed/cut...")
+
+                // Bước 1: Commit buffer để đảm bảo tất cả data đã gửi
+                adapter.commitBuffer()
+
+                // Bước 2: Đợi đủ thời gian để máy in xử lý xong data
+                // Thời gian này phụ thuộc vào tốc độ in và kích thước bill
+                delay(800) // Tăng từ 500ms lên 800ms để đảm bảo an toàn hơn
+
                 // Feed paper và cắt giấy nếu config cho phép
                 if (config.cutPaper) {
                     Log.d(TAG, "Cutting paper as per config...")
-                    // Đẩy giấy nhiều hơn (8 dòng ~20mm) để footer không bị cắt bởi dao
-                    // Tăng từ 6 lên 8 để đảm bảo các dòng footer cuối cùng được in rõ
-                    adapter.feedLines(8)
+                    // Đẩy giấy nhiều hơn (12 dòng ~30mm) để footer không bị cắt bởi dao
+                    // Tăng từ 8 lên 12 để đảm bảo các dòng footer cuối cùng được in rõ
+                    // và có khoảng cách an toàn trước lưỡi dao
+                    adapter.feedLines(12)
+
+                    // Đợi thêm để feed hoàn tất trước khi cắt
+                    delay(300)
+
+                    // Commit một lần nữa để đảm bảo feed đã được thực thi
+                    adapter.commitBuffer()
+                    delay(200)
+
                     adapter.cutPaper()
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé
                     Log.d(TAG, "No auto-cut, feeding paper...")
-                    adapter.feedLines(6)
+                    adapter.feedLines(10)
                 }
 
                 // Recycle bitmaps
@@ -314,6 +335,10 @@ object HybridBillPrintService {
 
     /**
      * Kết nối đến máy in Sunmi với retry logic
+     *
+     * QUAN TRỌNG: Sau khi kết nối thành công, gọi warmUpPrinter() để:
+     * 1. Xóa buffer cũ (tránh in bill test từ session trước)
+     * 2. Đảm bảo máy in sẵn sàng nhận lệnh mới
      */
     private suspend fun connectToSunmiWithRetry(
         adapter: SunmiPrinterAdapter,
@@ -329,10 +354,14 @@ object HybridBillPrintService {
             when (connectResult) {
                 is com.techres.ccb.printer.core.PrinterResult.Success -> {
                     Log.d(TAG, "Sunmi connected successfully")
+                    // Warm-up printer: clear old buffer và đảm bảo sẵn sàng
+                    warmUpPrinter(adapter)
                     return PrinterResult.Success("Connected")
                 }
                 is com.techres.ccb.printer.core.PrinterResult.PartialSuccess -> {
                     Log.d(TAG, "Sunmi connected with partial success")
+                    // Warm-up printer: clear old buffer và đảm bảo sẵn sàng
+                    warmUpPrinter(adapter)
                     return PrinterResult.Success("Connected")
                 }
                 is com.techres.ccb.printer.core.PrinterResult.Error -> {
@@ -348,6 +377,35 @@ object HybridBillPrintService {
         }
 
         return PrinterResult.Error("Không thể kết nối máy in Sunmi sau $retryCount lần thử: $lastError")
+    }
+
+    /**
+     * Warm-up printer sau khi kết nối
+     *
+     * Mục đích:
+     * 1. Xóa bất kỳ data cũ trong buffer (tránh in bill test từ session trước)
+     * 2. Đảm bảo máy in sẵn sàng nhận lệnh mới
+     * 3. "Đánh thức" máy in nếu nó đang ở chế độ sleep
+     */
+    private suspend fun warmUpPrinter(adapter: SunmiPrinterAdapter) {
+        try {
+            Log.d(TAG, "Warming up Sunmi printer...")
+
+            // Bước 1: Init printer để reset trạng thái
+            adapter.initPrinter()
+
+            // Bước 2: Commit buffer để xóa bất kỳ data cũ nào
+            // Điều này sẽ flush buffer mà không in gì (vì không có data mới)
+            adapter.commitBuffer()
+
+            // Bước 3: Đợi một chút để máy in xử lý
+            delay(100)
+
+            Log.d(TAG, "Sunmi printer warmed up successfully")
+        } catch (e: Exception) {
+            // Không fail nếu warm-up thất bại, chỉ log warning
+            Log.w(TAG, "Warm-up failed (non-fatal): ${e.message}")
+        }
     }
 
     /**

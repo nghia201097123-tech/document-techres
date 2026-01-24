@@ -205,10 +205,22 @@ class SunmiPrinterAdapter @Inject constructor(
     }
 
     override suspend fun connect(device: PrinterDevice): PrinterResult = withContext(Dispatchers.Main) {
+        // Kiểm tra nếu đã kết nối rồi thì không cần kết nối lại
+        if (isConnected()) {
+            Timber.d("$TAG: Already connected, skipping reconnection")
+            return@withContext PrinterResult.Success
+        }
+
         if (!isSunmiDevice() && !isSunmiServiceAvailable()) {
             _connectionState.value = ConnectionState.Error("Not a Sunmi device")
             return@withContext PrinterResult.Error("This is not a Sunmi device")
         }
+
+        // Reset trạng thái trước khi kết nối mới (quan trọng khi app restart)
+        printerService = null
+        rawBinder = null
+        serviceDescriptor = null
+        isBound = false
 
         _connectionState.value = ConnectionState.Connecting
 
@@ -221,6 +233,10 @@ class SunmiPrinterAdapter @Inject constructor(
                 )
                 _connectionState.value = ConnectionState.Connected
                 Timber.d("$TAG: Connected to Sunmi inner printer")
+
+                // Đợi một chút để service ổn định sau khi bind
+                kotlinx.coroutines.delay(100)
+
                 return@withContext PrinterResult.Success
             } else {
                 _connectionState.value = ConnectionState.Error("Cannot bind to Sunmi service")
@@ -240,63 +256,73 @@ class SunmiPrinterAdapter @Inject constructor(
         return connect(PrinterDevice.sunmiInner())
     }
 
-    private suspend fun bindService(): Boolean = suspendCancellableCoroutine { cont ->
-        serviceConnection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                Timber.d("$TAG: Service connected, converting IBinder to interface...")
+    private suspend fun bindService(): Boolean {
+        // Sử dụng withTimeout để tránh treo vô thời hạn
+        return try {
+            kotlinx.coroutines.withTimeout(5000L) { // 5 giây timeout
+                suspendCancellableCoroutine { cont ->
+                    serviceConnection = object : ServiceConnection {
+                        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                            Timber.d("$TAG: Service connected, converting IBinder to interface...")
 
-                // Store raw binder for AIDL transact() calls
-                rawBinder = service
+                            // Store raw binder for AIDL transact() calls
+                            rawBinder = service
 
-                // Try to get interface descriptor for proper AIDL communication
-                try {
-                    serviceDescriptor = service?.interfaceDescriptor
-                    Timber.d("$TAG: Service descriptor: $serviceDescriptor")
-                } catch (e: Exception) {
-                    Timber.w(e, "$TAG: Failed to get interface descriptor")
-                }
+                            // Try to get interface descriptor for proper AIDL communication
+                            try {
+                                serviceDescriptor = service?.interfaceDescriptor
+                                Timber.d("$TAG: Service descriptor: $serviceDescriptor")
+                            } catch (e: Exception) {
+                                Timber.w(e, "$TAG: Failed to get interface descriptor")
+                            }
 
-                // Convert IBinder to IWoyouService interface using reflection
-                val serviceInterface = convertBinderToInterface(service)
-                if (serviceInterface != null) {
-                    printerService = serviceInterface
-                    isBound = true
-                    Timber.d("$TAG: Service interface obtained successfully, class: ${serviceInterface.javaClass.name}")
-                    if (cont.isActive) {
-                        cont.resume(true)
+                            // Convert IBinder to IWoyouService interface using reflection
+                            val serviceInterface = convertBinderToInterface(service)
+                            if (serviceInterface != null) {
+                                printerService = serviceInterface
+                                isBound = true
+                                Timber.d("$TAG: Service interface obtained successfully, class: ${serviceInterface.javaClass.name}")
+                                if (cont.isActive) {
+                                    cont.resume(true)
+                                }
+                            } else {
+                                Timber.e("$TAG: Failed to convert IBinder to service interface")
+                                if (cont.isActive) {
+                                    cont.resume(false)
+                                }
+                            }
+                        }
+
+                        override fun onServiceDisconnected(name: ComponentName?) {
+                            Timber.d("$TAG: Service disconnected")
+                            printerService = null
+                            rawBinder = null
+                            serviceDescriptor = null
+                            isBound = false
+                            _connectionState.value = ConnectionState.Disconnected
+                        }
                     }
-                } else {
-                    Timber.e("$TAG: Failed to convert IBinder to service interface")
-                    if (cont.isActive) {
+
+                    val intent = Intent().apply {
+                        setPackage(SUNMI_PACKAGE)
+                        action = SUNMI_SERVICE_ACTION
+                    }
+
+                    val bound = try {
+                        context.bindService(intent, serviceConnection!!, Context.BIND_AUTO_CREATE)
+                    } catch (e: Exception) {
+                        Timber.e(e, "$TAG: Failed to bind service")
+                        false
+                    }
+
+                    if (!bound && cont.isActive) {
                         cont.resume(false)
                     }
                 }
             }
-
-            override fun onServiceDisconnected(name: ComponentName?) {
-                Timber.d("$TAG: Service disconnected")
-                printerService = null
-                rawBinder = null
-                serviceDescriptor = null
-                isBound = false
-                _connectionState.value = ConnectionState.Disconnected
-            }
-        }
-
-        val intent = Intent().apply {
-            setPackage(SUNMI_PACKAGE)
-            action = SUNMI_SERVICE_ACTION
-        }
-
-        val bound = try {
-            context.bindService(intent, serviceConnection!!, Context.BIND_AUTO_CREATE)
-        } catch (e: Exception) {
-            Timber.e(e, "$TAG: Failed to bind service")
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Timber.e("$TAG: Service bind timeout after 5 seconds")
             false
-        }
-
-        if (!bound && cont.isActive) {
-            cont.resume(false)
         }
     }
 
