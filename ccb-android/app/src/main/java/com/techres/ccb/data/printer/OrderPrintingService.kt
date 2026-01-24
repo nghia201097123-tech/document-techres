@@ -50,8 +50,9 @@ object OrderPrintingService {
         Log.d(TAG, "printOrderToKitchens - Order #${order.orderNumber}, items: ${orderItems.size}, kitchens: ${kitchens.size}")
 
         // Filter chỉ những kitchen có printer đã cấu hình
+        // USB và Sunmi không cần printerIp, chỉ cần connectionType phù hợp
         val activeKitchens = kitchens.filter { kitchen ->
-            kitchen.isActive && !kitchen.printerIp.isNullOrBlank()
+            kitchen.isActive && kitchen.hasPrinterConfigured()
         }
 
         if (activeKitchens.isEmpty()) {
@@ -71,7 +72,7 @@ object OrderPrintingService {
         // Log active kitchens and their printMode
         Log.d(TAG, "=== Active Kitchens ===")
         activeKitchens.forEach { k ->
-            Log.d(TAG, "  ${k.name}: printMode='${k.printMode}', ip=${k.printerIp}:${k.printerPort}")
+            Log.d(TAG, "  ${k.name}: printMode='${k.printMode}', connectionType='${k.connectionType}', ip=${k.printerIp}:${k.printerPort}")
         }
 
         // Convert order items sang PrintRoutingService.OrderItem
@@ -141,9 +142,10 @@ object OrderPrintingService {
     ): PrintRoutingService.RoutingResult = withContext(Dispatchers.IO) {
         Log.d(TAG, "reprintOrderToKitchens - Order #${order.orderNumber}")
 
-        // Chỉ lọc bếp có thể in phiếu (TICKET hoặc BOTH), active và có IP
+        // Chỉ lọc bếp có thể in phiếu (TICKET hoặc BOTH), active và có printer configured
+        // USB và Sunmi không cần printerIp
         val activeKitchens = kitchens.filter { kitchen ->
-            kitchen.isActive && !kitchen.printerIp.isNullOrBlank() && kitchen.shouldPrintTicket()
+            kitchen.isActive && kitchen.hasPrinterConfigured() && kitchen.shouldPrintTicket()
         }
 
         if (activeKitchens.isEmpty()) {

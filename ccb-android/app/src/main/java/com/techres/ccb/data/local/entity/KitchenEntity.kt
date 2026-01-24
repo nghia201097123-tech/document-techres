@@ -337,6 +337,20 @@ data class KitchenEntity(
     }
 
     /**
+     * Kiểm tra máy in đã được cấu hình chưa
+     * - USB: connectionType = "usb"
+     * - Sunmi: connectionType = "sunmi"
+     * - Network: printerIp không rỗng
+     */
+    fun hasPrinterConfigured(): Boolean {
+        return when (connectionType) {
+            "usb" -> true // USB luôn sẵn sàng (tự động phát hiện khi in)
+            "sunmi" -> true // Sunmi tích hợp sẵn
+            else -> !printerIp.isNullOrBlank() // Network cần có IP
+        }
+    }
+
+    /**
      * Lấy PrinterProtocol enum
      */
     fun getPrinterProtocolEnum(): PrinterProtocol {
