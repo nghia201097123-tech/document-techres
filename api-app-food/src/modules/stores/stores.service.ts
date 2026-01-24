@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   FoodPlatformStoreMapping,
   FoodPlatformAccount,
@@ -92,25 +92,8 @@ export class StoresService {
       throw new NotFoundException(`Không tìm thấy tài khoản với ID: ${accountId}`);
     }
 
-    // Validate: check for duplicate branch mappings within same platform
-    const branchIds = dto.mappings.map((m) => m.branchId);
-    const existingMappings = await this.storeMappingRepo.find({
-      where: {
-        branchId: In(branchIds),
-      },
-      relations: ['account'],
-    });
-
-    const conflictingMappings = existingMappings.filter(
-      (m) => m.account.platform === account.platform && m.accountId !== accountId,
-    );
-
-    if (conflictingMappings.length > 0) {
-      const conflictBranches = conflictingMappings.map((m) => m.branchId);
-      throw new BadRequestException(
-        `Các chi nhánh ${conflictBranches.join(', ')} đã được mapping với platform ${account.platform}`,
-      );
-    }
+    // Note: One branch can be linked to multiple stores on the same platform
+    // No validation needed for duplicate branch mappings
 
     // Create mappings
     const mappings = dto.mappings.map((item) =>
@@ -142,20 +125,7 @@ export class StoresService {
     const mapping = await this.getMappingById(id);
 
     if (dto.branchId !== undefined) {
-      // Check for conflicts
-      const existingMapping = await this.storeMappingRepo.findOne({
-        where: {
-          branchId: dto.branchId,
-          accountId: mapping.accountId,
-        },
-      });
-
-      if (existingMapping && existingMapping.id !== id) {
-        throw new BadRequestException(
-          `Chi nhánh ${dto.branchId} đã được mapping với account này`,
-        );
-      }
-
+      // Note: One branch can be linked to multiple stores, no conflict check needed
       mapping.branchId = dto.branchId;
     }
 
