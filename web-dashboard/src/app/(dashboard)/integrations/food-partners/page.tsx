@@ -834,29 +834,6 @@ export default function FoodPartnersPage() {
                                     {expandedAccount === account.id ? "Ẩn cửa hàng" : "Xem cửa hàng"}
                                   </Button>
                                 )}
-                                <Select
-                                  value={account.branchId || ""}
-                                  onValueChange={(value) => handleUpdateAccountBranch(account.id, value)}
-                                  disabled={updatingAccount === account.id}
-                                >
-                                  <SelectTrigger className="w-[200px]">
-                                    {updatingAccount === account.id ? (
-                                      <div className="flex items-center gap-2">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        <span>Đang cập nhật...</span>
-                                      </div>
-                                    ) : (
-                                      <SelectValue placeholder="Chọn chi nhánh" />
-                                    )}
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {branches.map((branch) => (
-                                      <SelectItem key={branch.id} value={branch.id}>
-                                        {branch.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
                               </div>
                             </div>
 
