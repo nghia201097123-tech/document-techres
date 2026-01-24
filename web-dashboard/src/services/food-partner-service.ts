@@ -139,6 +139,16 @@ export interface PartnerConnectionView {
   connection?: PartnerAccountConnection;
 }
 
+// External store from food platform (GrabFood, Shopee, etc.)
+export interface ExternalStore {
+  externalStoreId: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
+}
+
 /**
  * Transform backend FoodPlatformAccount to frontend PartnerConnectionView
  */
@@ -294,5 +304,14 @@ export const foodPartnerService = {
       branchId,
     });
     return response.data.data;
+  },
+
+  /**
+   * Get stores from a connected food platform account
+   * Fetches stores from GrabFood unified-profile API
+   */
+  async getStores(accountId: string): Promise<ExternalStore[]> {
+    const response = await foodApi.get<ApiResponse<ExternalStore[]>>(`/accounts/${accountId}/stores`);
+    return response.data.data || response.data || [];
   },
 };

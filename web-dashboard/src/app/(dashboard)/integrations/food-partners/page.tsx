@@ -54,6 +54,7 @@ import {
   type PartnerConnectionPort,
   type PartnerAccountConnection,
   type FoodPlatformAccount,
+  type ExternalStore,
   foodPartnerService,
 } from "@/services/food-partner-service";
 import { Branch, branchService } from "@/services/branch-service";
@@ -122,6 +123,11 @@ export default function FoodPartnersPage() {
   const [allAccounts, setAllAccounts] = React.useState<FoodPlatformAccount[]>([]);
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [updatingAccount, setUpdatingAccount] = React.useState<string | null>(null);
+
+  // External stores states (fetched from food platforms)
+  const [externalStores, setExternalStores] = React.useState<Record<string, ExternalStore[]>>({});
+  const [loadingStores, setLoadingStores] = React.useState<string | null>(null);
+  const [expandedAccount, setExpandedAccount] = React.useState<string | null>(null);
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -214,6 +220,48 @@ export default function FoodPartnersPage() {
       });
     } finally {
       setUpdatingAccount(null);
+    }
+  };
+
+  // Fetch stores from connected account
+  const handleFetchStores = async (accountId: string) => {
+    setLoadingStores(accountId);
+    try {
+      const stores = await foodPartnerService.getStores(accountId);
+      setExternalStores(prev => ({ ...prev, [accountId]: stores }));
+      setExpandedAccount(accountId);
+      if (stores.length === 0) {
+        toast({
+          title: "Thông báo",
+          description: "Không tìm thấy cửa hàng nào từ tài khoản này",
+        });
+      } else {
+        toast({
+          title: "Thành công",
+          description: `Đã tải ${stores.length} cửa hàng từ tài khoản`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách cửa hàng",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStores(null);
+    }
+  };
+
+  // Toggle expanded account
+  const toggleExpandAccount = (accountId: string) => {
+    if (expandedAccount === accountId) {
+      setExpandedAccount(null);
+    } else {
+      setExpandedAccount(accountId);
+      // Auto fetch stores if not loaded
+      if (!externalStores[accountId]) {
+        handleFetchStores(accountId);
+      }
     }
   };
 
@@ -720,56 +768,165 @@ export default function FoodPartnersPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {accounts.map((account) => (
-                          <div
-                            key={account.id}
-                            className={cn(
-                              "flex items-center justify-between p-4 rounded-lg border",
-                              !account.branchId && "border-dashed border-yellow-300 bg-yellow-50"
-                            )}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="min-w-[200px]">
-                                <p className="font-medium">{account.username || account.displayName}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <StatusBadge status={account.status} />
+                          <div key={account.id} className="space-y-3">
+                            {/* Account Header */}
+                            <div
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-lg border",
+                                !account.branchId && "border-dashed border-yellow-300 bg-yellow-50",
+                                account.status === ConnectionStatus.CONNECTED && "border-green-200 bg-green-50"
+                              )}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="min-w-[200px]">
+                                  <p className="font-medium">{account.username || account.displayName}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StatusBadge status={account.status} />
+                                  </div>
+                                </div>
+                                <div className="h-10 w-px bg-border" />
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">Chi nhánh:</span>
+                                  <span className={cn("font-medium", !account.branchId && "text-yellow-600")}>
+                                    {getBranchName(account.branchId)}
+                                  </span>
                                 </div>
                               </div>
-                              <div className="h-10 w-px bg-border" />
-                              <div className="flex items-center gap-2 text-sm">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">Chi nhánh:</span>
-                                <span className={cn("font-medium", !account.branchId && "text-yellow-600")}>
-                                  {getBranchName(account.branchId)}
-                                </span>
+                              <div className="flex items-center gap-2">
+                                {account.status === ConnectionStatus.CONNECTED && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => toggleExpandAccount(account.id)}
+                                    disabled={loadingStores === account.id}
+                                  >
+                                    {loadingStores === account.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                    ) : (
+                                      <Store className="h-4 w-4 mr-1" />
+                                    )}
+                                    {expandedAccount === account.id ? "Ẩn cửa hàng" : "Xem cửa hàng"}
+                                  </Button>
+                                )}
+                                <Select
+                                  value={account.branchId || ""}
+                                  onValueChange={(value) => handleUpdateAccountBranch(account.id, value)}
+                                  disabled={updatingAccount === account.id}
+                                >
+                                  <SelectTrigger className="w-[200px]">
+                                    {updatingAccount === account.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>Đang cập nhật...</span>
+                                      </div>
+                                    ) : (
+                                      <SelectValue placeholder="Chọn chi nhánh" />
+                                    )}
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {branches.map((branch) => (
+                                      <SelectItem key={branch.id} value={branch.id}>
+                                        {branch.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Select
-                                value={account.branchId || ""}
-                                onValueChange={(value) => handleUpdateAccountBranch(account.id, value)}
-                                disabled={updatingAccount === account.id}
-                              >
-                                <SelectTrigger className="w-[200px]">
-                                  {updatingAccount === account.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                      <span>Đang cập nhật...</span>
+
+                            {/* External Stores List */}
+                            {expandedAccount === account.id && externalStores[account.id] && (
+                              <div className="ml-4 pl-4 border-l-2 border-green-200 space-y-3">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Store className="h-4 w-4" />
+                                  <span>Danh sách cửa hàng từ {partner.name} ({externalStores[account.id].length} cửa hàng)</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleFetchStores(account.id)}
+                                    disabled={loadingStores === account.id}
+                                  >
+                                    <RefreshCw className={cn("h-3 w-3", loadingStores === account.id && "animate-spin")} />
+                                  </Button>
+                                </div>
+                                {externalStores[account.id].length === 0 ? (
+                                  <div className="text-sm text-muted-foreground p-4 bg-gray-50 rounded-lg text-center">
+                                    Không có cửa hàng nào
+                                  </div>
+                                ) : (
+                                  externalStores[account.id].map((store, storeIndex) => (
+                                    <div
+                                      key={store.externalStoreId}
+                                      className="p-4 bg-white border rounded-lg shadow-sm"
+                                    >
+                                      <div className="flex items-start justify-between">
+                                        <div className="space-y-2 flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                                              #{storeIndex + 1}
+                                            </span>
+                                            <h4 className="font-semibold text-base">{store.name}</h4>
+                                            <Badge variant={store.isActive ? "default" : "secondary"} className="text-xs">
+                                              {store.isActive ? "Đang hoạt động" : "Tạm ngưng"}
+                                            </Badge>
+                                          </div>
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                              <span className="font-medium min-w-[60px]">ID:</span>
+                                              <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                                {store.externalStoreId}
+                                              </code>
+                                            </div>
+                                            {store.phone && (
+                                              <div className="flex items-center gap-2 text-muted-foreground">
+                                                <span className="font-medium min-w-[60px]">SĐT:</span>
+                                                <span>{store.phone}</span>
+                                              </div>
+                                            )}
+                                            {store.email && (
+                                              <div className="flex items-center gap-2 text-muted-foreground">
+                                                <span className="font-medium min-w-[60px]">Email:</span>
+                                                <span>{store.email}</span>
+                                              </div>
+                                            )}
+                                            {store.address && (
+                                              <div className="flex items-start gap-2 text-muted-foreground md:col-span-2">
+                                                <span className="font-medium min-w-[60px]">Địa chỉ:</span>
+                                                <span>{store.address}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="ml-4">
+                                          <Select
+                                            onValueChange={(value) => {
+                                              // For now, just update the account's branch
+                                              // In future, this could create a store mapping
+                                              handleUpdateAccountBranch(account.id, value);
+                                            }}
+                                          >
+                                            <SelectTrigger className="w-[180px]">
+                                              <ArrowRightLeft className="h-4 w-4 mr-1" />
+                                              <SelectValue placeholder="Liên kết chi nhánh" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {branches.map((branch) => (
+                                                <SelectItem key={branch.id} value={branch.id}>
+                                                  {branch.name}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      </div>
                                     </div>
-                                  ) : (
-                                    <SelectValue placeholder="Chọn chi nhánh" />
-                                  )}
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {branches.map((branch) => (
-                                    <SelectItem key={branch.id} value={branch.id}>
-                                      {branch.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
