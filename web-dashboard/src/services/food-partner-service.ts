@@ -149,6 +149,37 @@ export interface ExternalStore {
   isActive: boolean;
 }
 
+// Store mapping saved in DB (links external store to TechRes branch)
+export interface StoreMapping {
+  id: string;
+  accountId: string;
+  tenantId: string;
+  externalStoreId: string;
+  externalStoreName: string;
+  externalStoreAddress?: string;
+  externalStorePhone?: string;
+  externalStoreEmail?: string;
+  branchId?: number;
+  branchName?: string;
+  isActive: boolean;
+  isStoreActive: boolean;
+  lastSyncedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  account?: FoodPlatformAccount;
+}
+
+// DTO for creating store mapping
+export interface CreateStoreMappingDto {
+  externalStoreId: string;
+  externalStoreName: string;
+  externalStoreAddress?: string;
+  externalStorePhone?: string;
+  externalStoreEmail?: string;
+  branchId: number;
+  branchName?: string;
+}
+
 /**
  * Transform backend FoodPlatformAccount to frontend PartnerConnectionView
  */
@@ -313,5 +344,46 @@ export const foodPartnerService = {
   async getStores(accountId: string): Promise<ExternalStore[]> {
     const response = await foodApi.get<ApiResponse<ExternalStore[]>>(`/accounts/${accountId}/stores`);
     return response.data.data || response.data || [];
+  },
+
+  /**
+   * Get store mappings for an account (from DB)
+   */
+  async getStoreMappings(accountId: string): Promise<StoreMapping[]> {
+    const response = await foodApi.get<ApiResponse<StoreMapping[]>>(`/food-platforms/accounts/${accountId}/store-mappings`);
+    return response.data.data || [];
+  },
+
+  /**
+   * Create store mappings for an account
+   */
+  async createStoreMappings(accountId: string, mappings: CreateStoreMappingDto[]): Promise<StoreMapping[]> {
+    const response = await foodApi.post<ApiResponse<StoreMapping[]>>(`/food-platforms/accounts/${accountId}/store-mappings`, {
+      mappings,
+    });
+    return response.data.data || [];
+  },
+
+  /**
+   * Update a store mapping (e.g., change branch assignment)
+   */
+  async updateStoreMapping(mappingId: string, data: { branchId?: number; branchName?: string; isActive?: boolean }): Promise<StoreMapping> {
+    const response = await foodApi.put<ApiResponse<StoreMapping>>(`/food-platforms/store-mappings/${mappingId}`, data);
+    return response.data.data;
+  },
+
+  /**
+   * Delete a store mapping
+   */
+  async deleteStoreMapping(mappingId: string): Promise<void> {
+    await foodApi.delete(`/food-platforms/store-mappings/${mappingId}`);
+  },
+
+  /**
+   * Sync store info from platform (update store details)
+   */
+  async syncStoreMapping(mappingId: string): Promise<StoreMapping> {
+    const response = await foodApi.post<ApiResponse<StoreMapping>>(`/food-platforms/store-mappings/${mappingId}/sync`);
+    return response.data.data;
   },
 };

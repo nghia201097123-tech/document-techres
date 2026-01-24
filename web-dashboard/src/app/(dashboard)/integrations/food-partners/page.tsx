@@ -56,6 +56,8 @@ import {
   type PartnerAccountConnection,
   type FoodPlatformAccount,
   type ExternalStore,
+  type StoreMapping,
+  type CreateStoreMappingDto,
   foodPartnerService,
 } from "@/services/food-partner-service";
 import { Branch, branchService } from "@/services/branch-service";
@@ -138,6 +140,16 @@ export default function FoodPartnersPage() {
   // Add new link dialog states
   const [addNewLinkDialogOpen, setAddNewLinkDialogOpen] = React.useState(false);
   const [selectedPlatformForAdd, setSelectedPlatformForAdd] = React.useState<FoodPartnerType | null>(null);
+
+  // Sync stores dialog states
+  const [syncDialogOpen, setSyncDialogOpen] = React.useState(false);
+  const [syncingAccount, setSyncingAccount] = React.useState<FoodPlatformAccount | null>(null);
+  const [syncingStores, setSyncingStores] = React.useState<ExternalStore[]>([]);
+  const [syncLoading, setSyncLoading] = React.useState(false);
+  const [savingMapping, setSavingMapping] = React.useState(false);
+
+  // Store mappings from DB (for branch-link tab)
+  const [storeMappings, setStoreMappings] = React.useState<Record<string, StoreMapping[]>>({});
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -306,6 +318,106 @@ export default function FoodPartnersPage() {
     // Set this account for linking
     setSelectedAccountForLink(accountId);
   };
+
+  // Open sync dialog for an account
+  const openSyncDialog = async (account: FoodPlatformAccount) => {
+    setSyncingAccount(account);
+    setSyncDialogOpen(true);
+    setSyncLoading(true);
+    setSyncingStores([]);
+
+    try {
+      // Fetch stores from platform
+      const stores = await foodPartnerService.getStores(account.id);
+      setSyncingStores(stores);
+      if (stores.length === 0) {
+        toast({
+          title: "Thông báo",
+          description: "Không tìm thấy cửa hàng nào từ tài khoản này",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể tải danh sách cửa hàng",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  // Save store mapping (link external store to branch)
+  const handleSaveStoreMapping = async (store: ExternalStore, branchId: number, branchName: string) => {
+    if (!syncingAccount) return;
+
+    setSavingMapping(true);
+    try {
+      const mapping: CreateStoreMappingDto = {
+        externalStoreId: store.externalStoreId,
+        externalStoreName: store.name,
+        externalStoreAddress: store.address,
+        externalStorePhone: store.phone,
+        externalStoreEmail: store.email,
+        branchId,
+        branchName,
+      };
+
+      await foodPartnerService.createStoreMappings(syncingAccount.id, [mapping]);
+
+      toast({
+        title: "Thành công",
+        description: `Đã liên kết "${store.name}" với "${branchName}"`,
+      });
+
+      // Close dialog and reload data
+      setSyncDialogOpen(false);
+      setSyncingAccount(null);
+      setSyncingStores([]);
+      loadBranchLinkData();
+
+      // Also load store mappings
+      loadStoreMappings();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể lưu liên kết",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingMapping(false);
+    }
+  };
+
+  // Load store mappings from DB for all accounts
+  const loadStoreMappings = async () => {
+    if (!tenantId || allAccounts.length === 0) return;
+
+    try {
+      const mappingsPromises = allAccounts
+        .filter(a => a.status === ConnectionStatus.CONNECTED)
+        .map(async (account) => {
+          const mappings = await foodPartnerService.getStoreMappings(account.id);
+          return { accountId: account.id, mappings };
+        });
+
+      const results = await Promise.all(mappingsPromises);
+      const mappingsMap: Record<string, StoreMapping[]> = {};
+      results.forEach(({ accountId, mappings }) => {
+        mappingsMap[accountId] = mappings;
+      });
+      setStoreMappings(mappingsMap);
+    } catch (error) {
+      console.error("Error loading store mappings:", error);
+    }
+  };
+
+  // Load store mappings when accounts change
+  React.useEffect(() => {
+    if (activeTab === "branch-link" && allAccounts.length > 0) {
+      loadStoreMappings();
+    }
+  }, [activeTab, allAccounts]);
 
   // Open link dialog
   const handleOpenLinkDialog = (port: PartnerConnectionPort) => {
@@ -516,6 +628,32 @@ export default function FoodPartnersPage() {
     return allAccounts.filter(a => a.branchId).length;
   }, [allAccounts]);
 
+  // Group store mappings by platform for branch link tab
+  const storeMappingsByPlatform = React.useMemo(() => {
+    const groups: Record<FoodPartnerType, StoreMapping[]> = {
+      [FoodPartnerType.SHOPEE]: [],
+      [FoodPartnerType.GRAB]: [],
+      [FoodPartnerType.BEFOOD]: [],
+    };
+
+    // Get all store mappings from all accounts
+    Object.entries(storeMappings).forEach(([accountId, mappings]) => {
+      const account = allAccounts.find(a => a.id === accountId);
+      if (account) {
+        mappings.forEach(mapping => {
+          groups[account.platform].push({ ...mapping, account });
+        });
+      }
+    });
+
+    return groups;
+  }, [storeMappings, allAccounts]);
+
+  // Total store mappings count
+  const totalStoreMappings = React.useMemo(() => {
+    return Object.values(storeMappings).flat().length;
+  }, [storeMappings]);
+
   // Get branch name by id
   const getBranchName = (branchId: string) => {
     const branch = branches.find(b => b.id === branchId);
@@ -717,6 +855,20 @@ export default function FoodPartnersPage() {
                                 )}
                                 <span className="ml-1 hidden sm:inline">Kiểm tra</span>
                               </Button>
+                              {connection.status === ConnectionStatus.CONNECTED && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                                  onClick={() => {
+                                    const account = allAccounts.find(a => a.id === connection.id);
+                                    if (account) openSyncDialog(account);
+                                  }}
+                                >
+                                  <ArrowRightLeft className="h-4 w-4" />
+                                  <span className="ml-1 hidden sm:inline">Đồng bộ chi nhánh</span>
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -783,8 +935,8 @@ export default function FoodPartnersPage() {
                         <Building2 className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{totalLinkedStores}</p>
-                        <p className="text-xs text-muted-foreground">Cửa hàng đã liên kết</p>
+                        <p className="text-2xl font-bold">{totalStoreMappings}</p>
+                        <p className="text-xs text-muted-foreground">Liên kết đã lưu</p>
                       </div>
                     </div>
                   </CardContent>
@@ -796,8 +948,8 @@ export default function FoodPartnersPage() {
                         <Store className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{allAccounts.filter(a => a.status === ConnectionStatus.CONNECTED && !a.branchId).length}</p>
-                        <p className="text-xs text-muted-foreground">Tài khoản có thể liên kết</p>
+                        <p className="text-2xl font-bold">{allAccounts.filter(a => a.status === ConnectionStatus.CONNECTED).length}</p>
+                        <p className="text-xs text-muted-foreground">Tài khoản đã kết nối</p>
                       </div>
                     </div>
                   </CardContent>
@@ -817,12 +969,12 @@ export default function FoodPartnersPage() {
                 </Card>
               </div>
 
-              {/* Partner Sections for branch link - show all platforms */}
+              {/* Partner Sections for branch link - show store mappings from DB */}
               {Object.values(FoodPartnerType).map((partnerType) => {
                 const partner = FoodPartnerInfo[partnerType];
-                const linkedAccounts = linkedAccountsByPlatform[partnerType] || [];
-                const unlinkedAccounts = unlinkedAccountsByPlatform[partnerType] || [];
-                const hasUnlinkedAccounts = unlinkedAccounts.length > 0;
+                const platformMappings = storeMappingsByPlatform[partnerType] || [];
+                const connectedAccounts = allAccounts.filter(a => a.platform === partnerType && a.status === ConnectionStatus.CONNECTED);
+                const hasConnectedAccounts = connectedAccounts.length > 0;
 
                 return (
                   <Card key={partnerType}>
@@ -833,34 +985,38 @@ export default function FoodPartnersPage() {
                           <div>
                             <CardTitle>{partner.name}</CardTitle>
                             <CardDescription>
-                              {linkedAccounts.length > 0
-                                ? `${linkedAccounts.length} cửa hàng đã liên kết`
+                              {platformMappings.length > 0
+                                ? `${platformMappings.length} liên kết đã lưu`
                                 : "Chưa có liên kết nào"}
                             </CardDescription>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                          onClick={() => openAddNewLinkDialog(partnerType)}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Thêm liên kết
-                        </Button>
+                        {hasConnectedAccounts && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                            onClick={() => {
+                              const account = connectedAccounts[0];
+                              if (account) openSyncDialog(account);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Thêm liên kết
+                          </Button>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {linkedAccounts.length === 0 ? (
+                      {platformMappings.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                           <Store className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                          <p className="text-sm">Chưa có cửa hàng nào được liên kết với chi nhánh</p>
-                          {hasUnlinkedAccounts && (
+                          <p className="text-sm">Chưa có liên kết nào được lưu</p>
+                          {hasConnectedAccounts ? (
                             <p className="text-xs mt-1">
-                              Bấm <strong>"Thêm liên kết"</strong> để bắt đầu liên kết cửa hàng
+                              Bấm <strong>"Thêm liên kết"</strong> để đồng bộ và liên kết cửa hàng
                             </p>
-                          )}
-                          {!hasUnlinkedAccounts && (
+                          ) : (
                             <p className="text-xs mt-1 text-yellow-600">
                               Chưa có tài khoản {partner.name} nào đã kết nối. Vui lòng kết nối tài khoản trước.
                             </p>
@@ -868,115 +1024,50 @@ export default function FoodPartnersPage() {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {linkedAccounts.map((account) => (
-                            <div key={account.id} className="space-y-3">
-                              {/* Account Header - shows linked store */}
-                              <div
-                                className={cn(
-                                  "flex items-center justify-between p-4 rounded-lg border",
-                                  account.status === ConnectionStatus.CONNECTED && "border-green-200 bg-green-50",
-                                  account.status === ConnectionStatus.ERROR && "border-red-200 bg-red-50"
-                                )}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className="min-w-[200px]">
-                                    <p className="font-medium">{account.externalMerchantName || account.username || account.displayName}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <StatusBadge status={account.status} />
-                                    </div>
+                          {platformMappings.map((mapping) => (
+                            <div
+                              key={mapping.id}
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-lg border",
+                                mapping.isActive && "border-green-200 bg-green-50",
+                                !mapping.isActive && "border-gray-200 bg-gray-50"
+                              )}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="min-w-[200px]">
+                                  <p className="font-medium">{mapping.externalStoreName}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant={mapping.isStoreActive ? "default" : "secondary"} className="text-xs">
+                                      {mapping.isStoreActive ? "Đang hoạt động" : "Tạm ngưng"}
+                                    </Badge>
+                                    <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                      {mapping.externalStoreId}
+                                    </code>
                                   </div>
-                                  <div className="h-10 w-px bg-border" />
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Building2 className="h-4 w-4 text-green-600" />
-                                    <span className="text-muted-foreground">Chi nhánh:</span>
-                                    <span className="font-medium text-green-700">
-                                      {getBranchName(account.branchId)}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {account.status === ConnectionStatus.CONNECTED && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => toggleExpandAccount(account.id)}
-                                      disabled={loadingStores === account.id}
-                                    >
-                                      {loadingStores === account.id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                      ) : (
-                                        <Store className="h-4 w-4 mr-1" />
-                                      )}
-                                      {expandedAccount === account.id ? "Ẩn chi tiết" : "Xem chi tiết"}
-                                    </Button>
+                                  {mapping.externalStoreAddress && (
+                                    <p className="text-xs text-muted-foreground mt-1">{mapping.externalStoreAddress}</p>
                                   )}
+                                </div>
+                                <div className="h-10 w-px bg-border" />
+                                <div className="flex items-center gap-2">
+                                  <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div className="h-10 w-px bg-border" />
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Building2 className="h-4 w-4 text-green-600" />
+                                  <span className="text-muted-foreground">Chi nhánh TechRes:</span>
+                                  <span className="font-medium text-green-700">
+                                    {mapping.branchName || `#${mapping.branchId}`}
+                                  </span>
                                 </div>
                               </div>
-
-                              {/* External Stores List */}
-                              {expandedAccount === account.id && externalStores[account.id] && (
-                                <div className="ml-4 pl-4 border-l-2 border-green-200 space-y-3">
-                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Store className="h-4 w-4" />
-                                    <span>Thông tin cửa hàng từ {partner.name}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleFetchStores(account.id)}
-                                      disabled={loadingStores === account.id}
-                                    >
-                                      <RefreshCw className={cn("h-3 w-3", loadingStores === account.id && "animate-spin")} />
-                                    </Button>
-                                  </div>
-                                  {externalStores[account.id].length === 0 ? (
-                                    <div className="text-sm text-muted-foreground p-4 bg-gray-50 rounded-lg text-center">
-                                      Không có thông tin cửa hàng
-                                    </div>
-                                  ) : (
-                                    externalStores[account.id].map((store, storeIndex) => (
-                                      <div
-                                        key={store.externalStoreId}
-                                        className="p-4 bg-white border rounded-lg shadow-sm"
-                                      >
-                                        <div className="space-y-2">
-                                          <div className="flex items-center gap-2">
-                                            <h4 className="font-semibold text-base">{store.name}</h4>
-                                            <Badge variant={store.isActive ? "default" : "secondary"} className="text-xs">
-                                              {store.isActive ? "Đang hoạt động" : "Tạm ngưng"}
-                                            </Badge>
-                                          </div>
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                              <span className="font-medium min-w-[60px]">ID:</span>
-                                              <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                                                {store.externalStoreId}
-                                              </code>
-                                            </div>
-                                            {store.phone && (
-                                              <div className="flex items-center gap-2 text-muted-foreground">
-                                                <span className="font-medium min-w-[60px]">SĐT:</span>
-                                                <span>{store.phone}</span>
-                                              </div>
-                                            )}
-                                            {store.email && (
-                                              <div className="flex items-center gap-2 text-muted-foreground">
-                                                <span className="font-medium min-w-[60px]">Email:</span>
-                                                <span>{store.email}</span>
-                                              </div>
-                                            )}
-                                            {store.address && (
-                                              <div className="flex items-start gap-2 text-muted-foreground md:col-span-2">
-                                                <span className="font-medium min-w-[60px]">Địa chỉ:</span>
-                                                <span>{store.address}</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {mapping.lastSyncedAt && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Đồng bộ: {new Date(mapping.lastSyncedAt).toLocaleDateString("vi-VN")}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1247,6 +1338,88 @@ export default function FoodPartnersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddNewLinkDialogOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sync Stores Dialog */}
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+              Đồng bộ chi nhánh
+            </DialogTitle>
+            <DialogDescription>
+              {syncingAccount && (
+                <>
+                  Chọn chi nhánh TechRes để liên kết với cửa hàng từ tài khoản <strong>{syncingAccount.username || syncingAccount.displayName}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {syncLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Đang tải danh sách cửa hàng...</span>
+              </div>
+            ) : syncingStores.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Store className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Không tìm thấy cửa hàng nào từ tài khoản này</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Label className="block text-sm font-medium">Cửa hàng từ {syncingAccount?.platform === FoodPartnerType.GRAB ? "GrabFood" : syncingAccount?.platform}</Label>
+                {syncingStores.map((store) => (
+                  <div key={store.externalStoreId} className="p-4 border rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold">{store.name}</h4>
+                          <Badge variant={store.isActive ? "default" : "secondary"} className="text-xs">
+                            {store.isActive ? "Đang hoạt động" : "Tạm ngưng"}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <div>ID: <code className="bg-gray-100 px-1 rounded">{store.externalStoreId}</code></div>
+                          {store.address && <div>Địa chỉ: {store.address}</div>}
+                          {store.phone && <div>SĐT: {store.phone}</div>}
+                          {store.email && <div>Email: {store.email}</div>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t">
+                      <Label className="text-xs text-muted-foreground mb-2 block">Chọn chi nhánh TechRes để liên kết:</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {branches.map((branch) => (
+                          <Button
+                            key={branch.id}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSaveStoreMapping(store, parseInt(branch.id), branch.name)}
+                            disabled={savingMapping}
+                          >
+                            {savingMapping ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Building2 className="h-3 w-3 mr-1" />
+                            )}
+                            {branch.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>
               Đóng
             </Button>
           </DialogFooter>
