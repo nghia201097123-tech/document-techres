@@ -147,6 +147,7 @@ export default function FoodPartnersPage() {
   const [syncingStores, setSyncingStores] = React.useState<ExternalStore[]>([]);
   const [syncLoading, setSyncLoading] = React.useState(false);
   const [savingMapping, setSavingMapping] = React.useState(false);
+  const [syncAccountMappings, setSyncAccountMappings] = React.useState<StoreMapping[]>([]);
 
   // Store mappings from DB (for branch-link tab)
   const [storeMappings, setStoreMappings] = React.useState<Record<string, StoreMapping[]>>({});
@@ -325,16 +326,27 @@ export default function FoodPartnersPage() {
     setSyncDialogOpen(true);
     setSyncLoading(true);
     setSyncingStores([]);
+    setSyncAccountMappings([]);
 
     // Helper function to fetch stores
     const fetchStores = async (): Promise<ExternalStore[]> => {
       return await foodPartnerService.getStores(account.id);
     };
 
+    // Helper function to fetch existing mappings
+    const fetchMappings = async (): Promise<StoreMapping[]> => {
+      try {
+        return await foodPartnerService.getStoreMappings(account.id);
+      } catch {
+        return [];
+      }
+    };
+
     try {
-      // Fetch stores from platform
-      const stores = await fetchStores();
+      // Fetch stores from platform and existing mappings in parallel
+      const [stores, mappings] = await Promise.all([fetchStores(), fetchMappings()]);
       setSyncingStores(stores);
+      setSyncAccountMappings(mappings);
       if (stores.length === 0) {
         toast({
           title: "Thông báo",
@@ -1422,47 +1434,80 @@ export default function FoodPartnersPage() {
             ) : (
               <div className="space-y-4">
                 <Label className="block text-sm font-medium">Cửa hàng từ {syncingAccount?.platform === FoodPartnerType.GRAB ? "GrabFood" : syncingAccount?.platform}</Label>
-                {syncingStores.map((store) => (
-                  <div key={store.externalStoreId} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold">{store.name}</h4>
-                          <Badge variant={store.isActive ? "default" : "secondary"} className="text-xs">
-                            {store.isActive ? "Đang hoạt động" : "Tạm ngưng"}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          <div>ID: <code className="bg-gray-100 px-1 rounded">{store.externalStoreId}</code></div>
-                          {store.address && <div>Địa chỉ: {store.address}</div>}
-                          {store.phone && <div>SĐT: {store.phone}</div>}
-                          {store.email && <div>Email: {store.email}</div>}
+                {syncingStores.map((store) => {
+                  // Find existing mapping for this store
+                  const existingMapping = syncAccountMappings.find(m => m.externalStoreId === store.externalStoreId);
+                  const linkedBranch = existingMapping ? branches.find(b => b.id === String(existingMapping.branchId)) : null;
+
+                  return (
+                    <div key={store.externalStoreId} className={cn(
+                      "p-4 border rounded-lg",
+                      existingMapping && "border-green-200 bg-green-50"
+                    )}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold">{store.name}</h4>
+                            <Badge variant={store.isActive ? "default" : "secondary"} className="text-xs">
+                              {store.isActive ? "Đang hoạt động" : "Tạm ngưng"}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            <div>ID: <code className="bg-gray-100 px-1 rounded">{store.externalStoreId}</code></div>
+                            {store.address && <div>Địa chỉ: {store.address}</div>}
+                            {store.phone && <div>SĐT: {store.phone}</div>}
+                            {store.email && <div>Email: {store.email}</div>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t">
-                      <Label className="text-xs text-muted-foreground mb-2 block">Chọn chi nhánh TechRes để liên kết:</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {branches.map((branch) => (
-                          <Button
-                            key={branch.id}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSaveStoreMapping(store, parseInt(branch.id), branch.name)}
-                            disabled={savingMapping}
-                          >
-                            {savingMapping ? (
-                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                            ) : (
+
+                      {/* Show linked branch if exists */}
+                      {existingMapping && (
+                        <div className="mt-3 pt-3 border-t border-green-200">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <span className="text-green-700 font-medium">Đã liên kết với chi nhánh:</span>
+                            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
                               <Building2 className="h-3 w-3 mr-1" />
-                            )}
-                            {branch.name}
-                          </Button>
-                        ))}
+                              {linkedBranch?.name || existingMapping.branchName || `#${existingMapping.branchId}`}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">Chọn chi nhánh khác để thay đổi liên kết:</p>
+                        </div>
+                      )}
+
+                      <div className={cn("mt-3 pt-3", !existingMapping && "border-t")}>
+                        <Label className="text-xs text-muted-foreground mb-2 block">
+                          {existingMapping ? "Đổi chi nhánh liên kết:" : "Chọn chi nhánh TechRes để liên kết:"}
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          {branches.map((branch) => {
+                            const isCurrentLinked = existingMapping && String(existingMapping.branchId) === branch.id;
+                            return (
+                              <Button
+                                key={branch.id}
+                                variant={isCurrentLinked ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleSaveStoreMapping(store, parseInt(branch.id), branch.name)}
+                                disabled={savingMapping || isCurrentLinked}
+                                className={cn(isCurrentLinked && "bg-green-600 hover:bg-green-600")}
+                              >
+                                {savingMapping ? (
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                ) : isCurrentLinked ? (
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                ) : (
+                                  <Building2 className="h-3 w-3 mr-1" />
+                                )}
+                                {branch.name}
+                              </Button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
