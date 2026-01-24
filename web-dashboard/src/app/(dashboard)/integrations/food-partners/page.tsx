@@ -74,7 +74,7 @@ import {
   foodPartnerService,
 } from "@/services/food-partner-service";
 import { Branch, branchService } from "@/services/branch-service";
-import { Product, productService } from "@/services/product-service";
+import { Product, ProductType, productService } from "@/services/product-service";
 
 // Status badge component
 const StatusBadge = ({ status }: { status: ConnectionStatus }) => {
@@ -186,6 +186,11 @@ export default function FoodPartnersPage() {
   const [loadingProducts, setLoadingProducts] = React.useState(false);
   const [productSearchQuery, setProductSearchQuery] = React.useState("");
   const [savingItemMapping, setSavingItemMapping] = React.useState(false);
+
+  // GrabFood items filter states
+  const [grabItemSearchQuery, setGrabItemSearchQuery] = React.useState("");
+  const [grabItemCategoryFilter, setGrabItemCategoryFilter] = React.useState<string>("all");
+  const [grabItemMappingFilter, setGrabItemMappingFilter] = React.useState<string>("all"); // all, mapped, unmapped
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -453,17 +458,66 @@ export default function FoodPartnersPage() {
     }
   };
 
-  // Filtered products by search query
+  // Filtered products by search query (exclude toppings)
   const filteredProducts = React.useMemo(() => {
-    if (!productSearchQuery.trim()) return techresProducts;
+    // First filter out toppings
+    let filtered = techresProducts.filter(p => p.type !== ProductType.TOPPING);
 
-    const query = productSearchQuery.toLowerCase();
-    return techresProducts.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.code?.toLowerCase().includes(query) ||
-      p.categoryName?.toLowerCase().includes(query)
-    );
+    // Then apply search query
+    if (productSearchQuery.trim()) {
+      const query = productSearchQuery.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.code?.toLowerCase().includes(query) ||
+        p.categoryName?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
   }, [techresProducts, productSearchQuery]);
+
+  // Get list of unique categories from synced items
+  const syncedCategories = React.useMemo(() => {
+    return syncedItems.map(cat => ({
+      id: cat.categoryId,
+      name: cat.categoryName,
+    }));
+  }, [syncedItems]);
+
+  // Filtered synced items by search, category, and mapping status
+  const filteredSyncedItems = React.useMemo(() => {
+    let filtered = [...syncedItems];
+
+    // Filter by category
+    if (grabItemCategoryFilter !== "all") {
+      filtered = filtered.filter(cat => cat.categoryId === grabItemCategoryFilter);
+    }
+
+    // Filter items within categories
+    filtered = filtered.map(category => {
+      let items = [...category.items];
+
+      // Filter by mapping status
+      if (grabItemMappingFilter === "mapped") {
+        items = items.filter(item => item.isMapped);
+      } else if (grabItemMappingFilter === "unmapped") {
+        items = items.filter(item => !item.isMapped);
+      }
+
+      // Filter by search query
+      if (grabItemSearchQuery.trim()) {
+        const query = grabItemSearchQuery.toLowerCase();
+        items = items.filter(item =>
+          item.externalItemName.toLowerCase().includes(query) ||
+          item.externalItemId.toLowerCase().includes(query)
+        );
+      }
+
+      return { ...category, items };
+    }).filter(cat => cat.items.length > 0); // Remove empty categories
+
+    return filtered;
+  }, [syncedItems, grabItemCategoryFilter, grabItemMappingFilter, grabItemSearchQuery]);
 
   // Update account branch
   const handleUpdateAccountBranch = async (accountId: string, branchId: string) => {
@@ -1529,8 +1583,78 @@ export default function FoodPartnersPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
+                    {/* Search and filter controls */}
+                    <div className="mb-4 flex flex-col sm:flex-row gap-3">
+                      {/* Search input */}
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Tìm kiếm món ăn..."
+                          value={grabItemSearchQuery}
+                          onChange={(e) => setGrabItemSearchQuery(e.target.value)}
+                          className="pl-9"
+                        />
+                        {grabItemSearchQuery && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                            onClick={() => setGrabItemSearchQuery("")}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Category filter */}
+                      <Select
+                        value={grabItemCategoryFilter}
+                        onValueChange={setGrabItemCategoryFilter}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                          <SelectValue placeholder="Danh mục" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả danh mục</SelectItem>
+                          {syncedCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Mapping status filter */}
+                      <Select
+                        value={grabItemMappingFilter}
+                        onValueChange={setGrabItemMappingFilter}
+                      >
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="Trạng thái" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                          <SelectItem value="mapped">Đã liên kết</SelectItem>
+                          <SelectItem value="unmapped">Chưa liên kết</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Filtered results count */}
+                    {(grabItemSearchQuery || grabItemCategoryFilter !== "all" || grabItemMappingFilter !== "all") && (
+                      <div className="mb-3 text-sm text-muted-foreground">
+                        Hiển thị {filteredSyncedItems.reduce((sum, cat) => sum + cat.items.length, 0)} món ăn
+                        {grabItemSearchQuery && <> khớp với "{grabItemSearchQuery}"</>}
+                      </div>
+                    )}
+
                     <div className="space-y-4">
-                      {syncedItems.map((category) => (
+                      {filteredSyncedItems.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <UtensilsCrossed className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm">Không tìm thấy món ăn nào phù hợp với bộ lọc</p>
+                        </div>
+                      ) : filteredSyncedItems.map((category) => (
                         <div key={category.categoryId} className="border rounded-lg overflow-hidden">
                           {/* Category header */}
                           <button
@@ -2133,6 +2257,26 @@ export default function FoodPartnersPage() {
                         {selectedItemForMapping.externalItemId}
                       </code>
                     </div>
+                    {/* Show current mapping if exists */}
+                    {(() => {
+                      const currentMapping = getItemMapping(selectedItemForMapping.id);
+                      if (currentMapping) {
+                        return (
+                          <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                            <p className="text-xs text-green-700 font-medium mb-1">
+                              Đang liên kết với món TechRes:
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-semibold text-green-800">
+                                {currentMapping.techresItemName || `#${currentMapping.techresItemId}`}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>
