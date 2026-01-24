@@ -326,9 +326,14 @@ export default function FoodPartnersPage() {
     setSyncLoading(true);
     setSyncingStores([]);
 
+    // Helper function to fetch stores
+    const fetchStores = async (): Promise<ExternalStore[]> => {
+      return await foodPartnerService.getStores(account.id);
+    };
+
     try {
       // Fetch stores from platform
-      const stores = await foodPartnerService.getStores(account.id);
+      const stores = await fetchStores();
       setSyncingStores(stores);
       if (stores.length === 0) {
         toast({
@@ -337,11 +342,54 @@ export default function FoodPartnersPage() {
         });
       }
     } catch (error: any) {
-      toast({
-        title: "Lỗi",
-        description: error.response?.data?.message || "Không thể tải danh sách cửa hàng",
-        variant: "destructive",
-      });
+      // Check if it's a 401 Unauthorized error
+      if (error.response?.status === 401) {
+        toast({
+          title: "Token hết hạn",
+          description: "Đang kết nối lại...",
+        });
+
+        try {
+          // Try to reconnect using stored credentials
+          await foodPartnerService.reconnectAccount(account.id);
+
+          toast({
+            title: "Kết nối lại thành công",
+            description: "Đang tải danh sách cửa hàng...",
+          });
+
+          // Retry fetching stores after reconnect
+          const stores = await fetchStores();
+          setSyncingStores(stores);
+
+          if (stores.length === 0) {
+            toast({
+              title: "Thông báo",
+              description: "Không tìm thấy cửa hàng nào từ tài khoản này",
+            });
+          }
+
+          // Reload accounts data to update status
+          loadBranchLinkData();
+        } catch (reconnectError: any) {
+          // Reconnect failed - show disconnected message
+          toast({
+            title: "Mất kết nối",
+            description: reconnectError.response?.data?.message || "Tài khoản đã mất kết nối. Vui lòng đăng nhập lại.",
+            variant: "destructive",
+          });
+
+          // Close dialog and reload data to show updated status
+          setSyncDialogOpen(false);
+          loadBranchLinkData();
+        }
+      } else {
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || "Không thể tải danh sách cửa hàng",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSyncLoading(false);
     }

@@ -295,6 +295,15 @@ export const foodPartnerService = {
   },
 
   /**
+   * Reconnect account using stored credentials
+   * Used when token expires and needs to re-authenticate
+   */
+  async reconnectAccount(accountId: string): Promise<FoodPlatformAccount> {
+    const response = await foodApi.post<ApiResponse<FoodPlatformAccount>>(`/accounts/${accountId}/reconnect`);
+    return response.data.data;
+  },
+
+  /**
    * Test connection status
    */
   async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string }> {

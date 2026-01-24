@@ -262,6 +262,64 @@ export class AccountsService {
   }
 
   /**
+   * Reconnect account using stored credentials
+   * Used when token expires and refresh fails
+   */
+  async reconnect(accountId: string): Promise<FoodPlatformAccount> {
+    const account = await this.getAccountById(accountId);
+
+    // Check if we have stored credentials
+    if (!account.username || !account.password) {
+      throw new BadRequestException(
+        'Không có thông tin đăng nhập. Vui lòng đăng nhập lại với tài khoản và mật khẩu.',
+      );
+    }
+
+    // Decrypt stored password
+    const password = this.encryptionService.decrypt(account.password);
+
+    // Update status to connecting
+    account.status = AccountStatus.CONNECTING;
+    await this.accountRepo.save(account);
+
+    // Get connector and login
+    const connector = this.connectorFactory.getConnector(account.platform);
+    const result = await connector.login({
+      username: account.username,
+      password: password,
+    });
+
+    if (!result.success) {
+      account.status = AccountStatus.DISCONNECTED;
+      account.lastError = result.error ?? 'Không thể kết nối lại. Vui lòng đăng nhập lại.';
+      account.errorCount += 1;
+      account.isActive = false;
+      await this.accountRepo.save(account);
+
+      throw new BadRequestException(
+        result.error || 'Kết nối lại thất bại. Tài khoản có thể đã bị thay đổi mật khẩu.',
+      );
+    }
+
+    // Update account with new tokens
+    account.accessToken = result.accessToken ?? null;
+    account.refreshToken = result.refreshToken ?? null;
+    account.tokenExpiresAt = result.expiresIn
+      ? new Date(Date.now() + result.expiresIn * 1000)
+      : null;
+    account.externalMerchantId = result.merchantId ?? account.externalMerchantId;
+    account.externalMerchantName = result.merchantName ?? account.externalMerchantName;
+    account.status = AccountStatus.CONNECTED;
+    account.isActive = true;
+    account.errorCount = 0;
+    account.lastError = null;
+
+    this.logger.log(`Account ${accountId} reconnected successfully`);
+
+    return this.accountRepo.save(account);
+  }
+
+  /**
    * Update account settings
    */
   async updateSettings(

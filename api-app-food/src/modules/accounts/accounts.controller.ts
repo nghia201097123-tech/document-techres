@@ -190,6 +190,20 @@ export class AccountsController {
   }
 
   /**
+   * Reconnect account using stored credentials
+   */
+  @Post(':id/reconnect')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kết nối lại tài khoản bằng thông tin đã lưu' })
+  @ApiParam({ name: 'id', description: 'Account ID' })
+  @ApiResponse({ status: 200, description: 'Kết nối lại thành công' })
+  @ApiResponse({ status: 400, description: 'Kết nối lại thất bại' })
+  async reconnect(@Param('id') id: string) {
+    const account = await this.accountsService.reconnect(id);
+    return ApiResponseDto.success(account, 'Kết nối lại thành công');
+  }
+
+  /**
    * Update account branch assignment
    */
   @Patch(':id/branch')
