@@ -220,10 +220,19 @@ export class GrabConnector extends BasePlatformConnector {
       return stores;
     } catch (error: any) {
       this.logger.error('GrabFood get stores failed');
-      this.logger.error(error);
+      this.logger.error(`Error message: ${error?.message}`);
+      this.logger.error(`Error response status: ${error?.response?.status}`);
 
-      // Throw UnauthorizedException for 401 errors so frontend can catch and retry
-      if (error?.response?.status === 401) {
+      // Check for 401 errors (both direct axios error and transformed error)
+      const is401 = error?.response?.status === 401 ||
+        error?.message?.includes('UNAUTHORIZED') ||
+        error?.message?.includes('401') ||
+        error?.message?.includes('Token expired');
+
+      this.logger.log(`Is 401 error: ${is401}`);
+
+      if (is401) {
+        this.logger.log('Throwing UnauthorizedException...');
         throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
       }
 
