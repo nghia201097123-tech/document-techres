@@ -676,11 +676,23 @@ class EscPosBuilder {
         return this
     }
 
+    /**
+     * Cắt giấy với feed trước để đảm bảo footer không bị cắt
+     * FIX cho Sunmi T1: Feed 16 dòng + cutWithFeed(4) = tổng ~20 dòng (~50mm)
+     */
     fun cut(partial: Boolean = false): EscPosBuilder {
-        buffer.write(if (partial) EscPosCommands.CUT_PARTIAL else EscPosCommands.CUT_FULL)
+        // Reset line spacing về default
+        buffer.write(EscPosCommands.LINE_SPACING_DEFAULT)
+        // Feed 16 dòng trước
+        buffer.write(EscPosCommands.feedLines(16))
+        // Sử dụng cutWithFeed - lệnh atomic GS V 66 n
+        buffer.write(EscPosCommands.cutWithFeed(4))
         return this
     }
 
+    /**
+     * Cắt giấy với số dòng feed tùy chỉnh
+     */
     fun cutWithFeed(lines: Int = 3): EscPosBuilder {
         buffer.write(EscPosCommands.cutWithFeed(lines))
         return this

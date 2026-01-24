@@ -1469,6 +1469,50 @@ class SunmiPrinterAdapter @Inject constructor(
     }
 
     /**
+     * Feed giấy và cắt trong MỘT lệnh ESC/POS duy nhất
+     *
+     * QUAN TRỌNG: Method này giải quyết vấn đề footer bị cắt trên Sunmi T1
+     * Thay vì gọi riêng feedLines() rồi cutPaper() (2 AIDL calls riêng biệt có timing issue),
+     * method này gửi tất cả commands trong 1 buffer duy nhất qua sendRAWData()
+     *
+     * Flow giống TCP/IP printer: Build buffer → Single write → Printer executes in sequence
+     *
+     * @param feedLines Số dòng feed trước khi cắt (default 20 dòng = ~50mm cho Sunmi T1)
+     * @param partial true = partial cut, false = full cut
+     */
+    suspend fun feedAndCutPaper(feedLines: Int = 20, partial: Boolean = true): PrinterResult = withContext(Dispatchers.IO) {
+        if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
+
+        try {
+            Timber.d("$TAG: feedAndCutPaper - feedLines=$feedLines, partial=$partial")
+
+            // Build ESC/POS commands buffer
+            val buffer = java.io.ByteArrayOutputStream()
+
+            // 1. Reset line spacing về default để đảm bảo feed đúng khoảng cách
+            buffer.write(byteArrayOf(0x1B, 0x32)) // ESC 2 - Default line spacing
+
+            // 2. Feed giấy n dòng
+            // ESC d n - Feed n lines
+            buffer.write(byteArrayOf(0x1B, 0x64, feedLines.toByte()))
+
+            // 3. Cut giấy
+            // GS V 66 n - Feed n lines then cut (atomic command)
+            // Thêm 3 dòng extra trong lệnh cut để đảm bảo
+            buffer.write(byteArrayOf(0x1D, 0x56, 0x42, 0x03))
+
+            val commands = buffer.toByteArray()
+            Timber.d("$TAG: Sending ${commands.size} bytes ESC/POS feed+cut commands")
+
+            // Gửi qua sendRAWData - single atomic operation
+            return@withContext write(commands)
+        } catch (e: Exception) {
+            Timber.e(e, "$TAG: feedAndCutPaper failed")
+            return@withContext PrinterResult.Error(e.message ?: "Feed and cut failed")
+        }
+    }
+
+    /**
      * Mở ngăn kéo tiền
      */
     suspend fun openCashDrawer(): PrinterResult = withContext(Dispatchers.IO) {

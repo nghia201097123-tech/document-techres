@@ -487,16 +487,17 @@ class SingleCanvasBillBuilder(
      * QUAN TRỌNG: Phải feed giấy trước khi cắt để footer không bị dao cắt luôn
      * Khi dùng bitmap mode, khoảng trống trong bitmap không đủ - cần lệnh feed thật
      *
-     * FIX cho Sunmi T1: Tăng feed lines từ 12 lên 16 để đảm bảo footer không bị cắt
+     * FIX cho Sunmi T1: Sử dụng lệnh cutWithFeed() (GS V 66 n) - lệnh atomic
+     * Feed n dòng RỒI MỚI cắt trong 1 operation - không có timing issue
      */
     fun cut(partial: Boolean = true): SingleCanvasBillBuilder {
         postCommands.write(EscPosCommands.LINE_SPACING_DEFAULT)
         // Feed 16 dòng (~40mm) để đảm bảo footer không bị cắt
         // Sunmi T1 có khoảng cách đầu in - dao cắt khoảng 20-25mm
-        // Footer có 2 dòng (~6mm) + khoảng cách đầu in - dao cắt (~25mm) + margin (~9mm) = 40mm
-        // FIX: Tăng từ 12 lên 16 dòng cho Sunmi T1
         postCommands.write(EscPosCommands.feedLines(16))
-        postCommands.write(if (partial) EscPosCommands.CUT_PARTIAL else EscPosCommands.CUT_FULL)
+        // FIX: Sử dụng cutWithFeed(4) - lệnh atomic GS V 66 n
+        // Feed thêm 4 dòng rồi cut - đảm bảo footer không bị cắt
+        postCommands.write(EscPosCommands.cutWithFeed(4))
         return this
     }
 
