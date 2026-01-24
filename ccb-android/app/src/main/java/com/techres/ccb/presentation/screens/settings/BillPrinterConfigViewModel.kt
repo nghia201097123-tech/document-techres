@@ -62,8 +62,8 @@ class BillPrinterConfigViewModel @Inject constructor(
 
     init {
         loadData()
-        // Tự động phát hiện máy in Sunmi tích hợp
-        autoDetectSunmiPrinter()
+        // Không tự động tạo máy in Sunmi nữa - người dùng sẽ chọn Sunmi khi cấu hình
+        // autoDetectSunmiPrinter()
     }
 
     /**
@@ -168,13 +168,14 @@ class BillPrinterConfigViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 billPrinterConfigDao.getAllByBranch(branchId).collect { configs ->
-                    // Sắp xếp: Sunmi printer (tự động phát hiện) luôn ở trên đầu
-                    val sortedConfigs = configs.sortedWith(
+                    // Lọc bỏ máy in Sunmi tự động tạo - chỉ hiển thị máy in do user tạo/cấu hình
+                    // Máy in auto-detect có id chứa "sunmi_builtin_printer"
+                    val filteredConfigs = configs.filter { !it.id.contains(SUNMI_PRINTER_ID) }
+
+                    // Sắp xếp theo sortOrder
+                    val sortedConfigs = filteredConfigs.sortedWith(
                         compareBy<BillPrinterConfigEntity> {
-                            // Sunmi printer lên đầu (connectionType = "sunmi")
-                            if (it.connectionType == "sunmi") 0 else 1
-                        }.thenBy {
-                            // Sau đó theo sortOrder
+                            // Sắp xếp theo sortOrder
                             it.sortOrder
                         }.thenBy {
                             // Cuối cùng theo tên

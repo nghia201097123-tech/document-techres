@@ -48,8 +48,8 @@ class KitchenPrinterViewModel @Inject constructor(
 
     init {
         loadKitchens()
-        // Tự động phát hiện máy in Sunmi tích hợp
-        autoDetectSunmiPrinter()
+        // Không tự động tạo bếp Sunmi nữa - người dùng sẽ chọn Sunmi khi cấu hình
+        // autoDetectSunmiPrinter()
     }
 
     /**
@@ -158,16 +158,19 @@ class KitchenPrinterViewModel @Inject constructor(
                         kitchen.printMode == KitchenPrintMode.BOTH.name
                     }
 
-                    // Sắp xếp: Sunmi printer (tự động phát hiện) luôn ở trên đầu
-                    val sortedKitchens = ticketKitchens.sortedWith(
+                    // Lọc bỏ bếp Sunmi tự động tạo - chỉ hiển thị bếp do user tạo
+                    // Bếp auto-detect có id chứa "sunmi_builtin_kitchen"
+                    val filteredKitchens = ticketKitchens.filter { kitchen ->
+                        !kitchen.id.contains(SUNMI_KITCHEN_ID)
+                    }
+
+                    // Sắp xếp theo sortOrder và tên
+                    val sortedKitchens = filteredKitchens.sortedWith(
                         compareBy<KitchenEntity> {
-                            // Sunmi printer lên đầu (printerIp = "sunmi")
-                            if (it.printerIp == SUNMI_PRINTER_IP) 0 else 1
-                        }.thenBy {
-                            // Sau đó theo sortOrder
+                            // Sắp xếp theo sortOrder
                             it.sortOrder
                         }.thenBy {
-                            // Cuối cùng theo tên
+                            // Sau đó theo tên
                             it.name
                         }
                     )
