@@ -257,11 +257,12 @@ object HybridBillPrintService {
                     Log.d(TAG, "Step 1: Waiting for printer to finish printing...")
                     adapter.waitForPrinterIdle(timeoutMs = 8000)
 
-                    // Bước 2: Feed giấy 12 dòng (~30mm) để đẩy footer ra khỏi đầu in
-                    // Khoảng cách đầu in - dao cắt trên Sunmi thường là 15-20mm
-                    // Footer 2 dòng (~6mm) + khoảng cách đầu in - dao (~20mm) + margin (~4mm) = 30mm
-                    Log.d(TAG, "Step 2: Feeding paper (12 lines = ~30mm)...")
-                    adapter.feedLines(12)
+                    // Bước 2: Feed giấy 16 dòng (~40mm) để đẩy footer ra khỏi đầu in
+                    // Sunmi T1 có khoảng cách đầu in - dao cắt khoảng 20-25mm
+                    // Footer 2 dòng (~6mm) + khoảng cách đầu in - dao (~25mm) + margin (~9mm) = 40mm
+                    // FIX: Tăng từ 12 lên 16 dòng để đảm bảo footer không bị cắt trên Sunmi T1
+                    Log.d(TAG, "Step 2: Feeding paper (16 lines = ~40mm)...")
+                    adapter.feedLines(16)
 
                     // Bước 3: Commit buffer để đảm bảo lệnh feed được thực thi
                     adapter.commitBuffer()
@@ -271,14 +272,21 @@ object HybridBillPrintService {
                     val feedComplete = adapter.waitForPrinterIdle(timeoutMs = 5000)
                     Log.d(TAG, "Paper feed complete: $feedComplete")
 
-                    // Bước 5: Delay thêm để đảm bảo motor dừng hẳn
-                    delay(200)
+                    // Bước 5: Feed thêm 2 dòng nữa để đảm bảo buffer được flush hoàn toàn
+                    // FIX: Thêm bước này để fix lỗi footer bị cắt trên Sunmi T1
+                    Log.d(TAG, "Step 3b: Extra feed for buffer flush...")
+                    adapter.feedLines(2)
+                    adapter.commitBuffer()
 
-                    // Bước 6: Cắt giấy
+                    // Bước 6: Delay thêm để đảm bảo motor dừng hẳn
+                    // FIX: Tăng từ 200ms lên 350ms cho Sunmi T1
+                    delay(350)
+
+                    // Bước 7: Cắt giấy
                     Log.d(TAG, "Step 4: Cutting paper...")
                     adapter.cutPaper()
 
-                    // Bước 7: Đợi cắt xong để tránh ảnh hưởng bill kế tiếp
+                    // Bước 8: Đợi cắt xong để tránh ảnh hưởng bill kế tiếp
                     adapter.waitForPrinterIdle(timeoutMs = 2000)
                 } else {
                     // Chỉ đẩy giấy ra để dễ xé

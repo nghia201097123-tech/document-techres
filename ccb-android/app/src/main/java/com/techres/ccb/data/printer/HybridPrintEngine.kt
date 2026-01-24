@@ -1285,6 +1285,9 @@ class HybridBillBuilder(
 
     /**
      * Cắt giấy
+     * QUAN TRỌNG: Phải feed giấy trước khi cắt để footer không bị dao cắt luôn
+     *
+     * FIX cho Sunmi T1: Thêm feed lines trước khi cut để đảm bảo footer không bị cắt
      */
     fun cut(partial: Boolean = true): HybridBillBuilder {
         // Ensure line spacing is reset to default before cutting
@@ -1292,6 +1295,9 @@ class HybridBillBuilder(
         if (useBitmapMode) {
             buffer.write(EscPosCommands.LINE_SPACING_DEFAULT)
         }
+        // FIX: Feed 16 dòng (~40mm) trước khi cắt để đảm bảo footer không bị cắt
+        // Sunmi T1 có khoảng cách đầu in - dao cắt khoảng 20-25mm
+        buffer.write(EscPosCommands.feedLines(16))
         buffer.write(if (partial) EscPosCommands.CUT_PARTIAL else EscPosCommands.CUT_FULL)
         return this
     }
