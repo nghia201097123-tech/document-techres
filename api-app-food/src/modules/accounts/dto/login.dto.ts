@@ -49,6 +49,11 @@ export class LoginDto {
   @MinLength(6)
   @MaxLength(255)
   password: string;
+
+  @ApiPropertyOptional({ example: 'branch-001', description: 'Branch ID to assign account to' })
+  @IsString()
+  @IsOptional()
+  branchId?: string;
 }
 
 /**

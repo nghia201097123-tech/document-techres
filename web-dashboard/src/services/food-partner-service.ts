@@ -124,6 +124,7 @@ export interface LinkPartnerAccountDto {
   portId: string;
   username: string;
   password: string;
+  branchId?: string; // Branch to assign account to when linking
 }
 
 // DTO for updating connection
@@ -229,6 +230,7 @@ export const foodPartnerService = {
     const response = await foodApi.post<ApiResponse<any>>(`/accounts/${dto.portId}/login`, {
       username: dto.username,
       password: dto.password,
+      branchId: dto.branchId,
     });
     return response.data.data;
   },

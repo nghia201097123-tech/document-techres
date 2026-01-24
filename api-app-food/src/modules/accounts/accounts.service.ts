@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull, Or } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   FoodPlatformAccount,
@@ -73,10 +73,15 @@ export class AccountsService {
 
   /**
    * Get accounts by branch
+   * Returns accounts that match the branchId OR have no branch assigned (null)
+   * This allows unassigned accounts to be shown and linked to a branch
    */
   async getAccountsByBranch(branchId: string): Promise<FoodPlatformAccount[]> {
     return this.accountRepo.find({
-      where: { branchId },
+      where: [
+        { branchId },
+        { branchId: IsNull() },
+      ],
       order: { createdAt: 'DESC' },
     });
   }
@@ -121,6 +126,11 @@ export class AccountsService {
     account.isActive = true;
     account.errorCount = 0;
     account.lastError = null;
+
+    // Set branchId if provided (when linking from a branch context)
+    if (dto.branchId) {
+      account.branchId = dto.branchId;
+    }
 
     return this.accountRepo.save(account);
   }

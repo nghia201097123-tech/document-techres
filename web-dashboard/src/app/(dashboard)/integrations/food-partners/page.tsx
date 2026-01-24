@@ -248,7 +248,12 @@ export default function FoodPartnersPage() {
 
     setSaving(true);
     try {
-      await foodPartnerService.linkAccount({ portId: selectedPort.id, username, password });
+      await foodPartnerService.linkAccount({
+        portId: selectedPort.id,
+        username,
+        password,
+        branchId: filterBranchId && filterBranchId !== "all" ? filterBranchId : undefined,
+      });
 
       toast({
         title: "Thành công",
