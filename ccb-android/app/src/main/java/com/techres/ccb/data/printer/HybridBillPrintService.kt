@@ -118,26 +118,33 @@ object HybridBillPrintService {
             // Sử dụng paperWidth, fontSize, lineSpacing từ printerConfig (user cài đặt trong app)
             val billContent = generateHybridBill(printerConfig, template, billData, capability, paymentBankAccount, payosQrCode)
 
-            // Retry logic
-            repeat(printerConfig.retryCount) { attempt ->
+            // Retry logic - đảm bảo ít nhất 1 lần thử
+            val effectiveRetryCount = maxOf(printerConfig.retryCount, 1)
+            Log.d(TAG, "Retry count: $effectiveRetryCount, Bill content: ${billContent.size} bytes")
+
+            repeat(effectiveRetryCount) { attempt ->
+                Log.d(TAG, "Attempt ${attempt + 1}/$effectiveRetryCount...")
                 val result = when (printerConfig.connectionType) {
                     "network" -> printViaNetwork(printerConfig, template, billContent)
                     else -> PrinterResult.Error("Loại kết nối không được hỗ trợ: ${printerConfig.connectionType}")
                 }
 
                 when (result) {
-                    is PrinterResult.Success -> return@withContext result
+                    is PrinterResult.Success -> {
+                        Log.d(TAG, "Attempt ${attempt + 1} succeeded!")
+                        return@withContext result
+                    }
                     is PrinterResult.Error -> {
                         lastError = result.message
                         Log.w(TAG, "Attempt ${attempt + 1} failed: ${result.message}")
-                        if (attempt < printerConfig.retryCount - 1) {
+                        if (attempt < effectiveRetryCount - 1) {
                             delay(printerConfig.retryDelayMs.toLong())
                         }
                     }
                 }
             }
 
-            PrinterResult.Error(lastError ?: "In bill thất bại sau ${printerConfig.retryCount} lần thử")
+            PrinterResult.Error(lastError ?: "In bill thất bại sau $effectiveRetryCount lần thử")
         }
     }
 
@@ -950,18 +957,31 @@ object HybridBillPrintService {
     ): PrinterResult {
         val ip = config.printerIp ?: return PrinterResult.Error("Chưa cấu hình IP máy in")
 
-        // In từng bản trong kết nối riêng - sử dụng numberOfCopies từ template (web-dashboard)
-        repeat(template.numberOfCopies) { copyIndex ->
+        // Sử dụng numberOfCopies từ config (user settings trong app) thay vì template (web-dashboard)
+        // Đảm bảo ít nhất 1 bản được in
+        val numberOfCopies = maxOf(config.numberOfCopies, 1)
+        Log.d(TAG, "=== PRINT VIA NETWORK ===")
+        Log.d(TAG, "IP: $ip:${config.printerPort}")
+        Log.d(TAG, "Config numberOfCopies: ${config.numberOfCopies}, Template numberOfCopies: ${template.numberOfCopies}")
+        Log.d(TAG, "Effective copies: $numberOfCopies")
+        Log.d(TAG, "Bill content size: ${billContent.size} bytes")
+
+        // In từng bản trong kết nối riêng
+        repeat(numberOfCopies) { copyIndex ->
+            Log.d(TAG, "Printing copy ${copyIndex + 1}/$numberOfCopies...")
             val result = printSingleCopy(ip, config.printerPort, config.connectionTimeoutMs, billContent)
             if (result is PrinterResult.Error) {
+                Log.e(TAG, "Copy ${copyIndex + 1} failed: ${result.message}")
                 return result
             }
+            Log.d(TAG, "Copy ${copyIndex + 1} completed successfully")
             // Delay giữa các bản
-            if (copyIndex < template.numberOfCopies - 1) {
+            if (copyIndex < numberOfCopies - 1) {
                 delay(300)
             }
         }
 
+        Log.d(TAG, "=== PRINT VIA NETWORK COMPLETED: $numberOfCopies copies ===")
         return PrinterResult.Success("In bill thành công!")
     }
 
