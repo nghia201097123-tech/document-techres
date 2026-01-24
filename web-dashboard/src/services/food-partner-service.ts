@@ -273,4 +273,24 @@ export const foodPartnerService = {
     // Placeholder - will be implemented when backend supports it
     return { success: true, message: "Sync completed" };
   },
+
+  /**
+   * Get all accounts by tenant
+   */
+  async getAccountsByTenant(tenantId: string): Promise<FoodPlatformAccount[]> {
+    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts`, {
+      params: { tenantId }
+    });
+    return response.data.data || [];
+  },
+
+  /**
+   * Update account branch assignment
+   */
+  async updateAccountBranch(accountId: string, branchId: string): Promise<FoodPlatformAccount> {
+    const response = await foodApi.patch<ApiResponse<FoodPlatformAccount>>(`/accounts/${accountId}/branch`, {
+      branchId,
+    });
+    return response.data.data;
+  },
 };

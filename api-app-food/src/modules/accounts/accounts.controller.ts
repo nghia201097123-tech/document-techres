@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -186,6 +187,21 @@ export class AccountsController {
       { accountId: account.id, status: account.status },
       'Ngắt kết nối thành công',
     );
+  }
+
+  /**
+   * Update account branch assignment
+   */
+  @Patch(':id/branch')
+  @ApiOperation({ summary: 'Cập nhật chi nhánh cho tài khoản' })
+  @ApiParam({ name: 'id', description: 'Account ID' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
+  async updateBranch(
+    @Param('id') id: string,
+    @Body() dto: { branchId: string },
+  ) {
+    const account = await this.accountsService.updateBranch(id, dto.branchId);
+    return ApiResponseDto.success(account, 'Cập nhật chi nhánh thành công');
   }
 
   /**

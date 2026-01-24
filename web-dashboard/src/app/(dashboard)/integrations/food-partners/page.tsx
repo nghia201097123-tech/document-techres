@@ -14,11 +14,16 @@ import {
   EyeOff,
   Settings2,
   Unplug,
+  Building2,
+  ArrowRightLeft,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -48,8 +53,10 @@ import {
   type PartnerConnectionView,
   type PartnerConnectionPort,
   type PartnerAccountConnection,
+  type FoodPlatformAccount,
   foodPartnerService,
 } from "@/services/food-partner-service";
+import { Branch, branchService } from "@/services/branch-service";
 
 // Status badge component
 const StatusBadge = ({ status }: { status: ConnectionStatus }) => {
@@ -102,10 +109,19 @@ const PartnerLogo = ({ type, size = "md" }: { type: FoodPartnerType; size?: "sm"
 
 export default function FoodPartnersPage() {
   const { toast } = useToast();
-  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId } = useGlobalFilters();
+  const { brandId: filterBrandId, branchId: filterBranchId, setBrandId: setFilterBrandId, setBranchId: setFilterBranchId, tenantId } = useGlobalFilters();
+
+  // Tab state
+  const [activeTab, setActiveTab] = React.useState("accounts");
 
   const [loading, setLoading] = React.useState(false);
   const [connectionViews, setConnectionViews] = React.useState<PartnerConnectionView[]>([]);
+
+  // Branch link tab states
+  const [branchLinkLoading, setBranchLinkLoading] = React.useState(false);
+  const [allAccounts, setAllAccounts] = React.useState<FoodPlatformAccount[]>([]);
+  const [branches, setBranches] = React.useState<Branch[]>([]);
+  const [updatingAccount, setUpdatingAccount] = React.useState<string | null>(null);
 
   // Dialog states
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -121,7 +137,7 @@ export default function FoodPartnersPage() {
   const [saving, setSaving] = React.useState(false);
   const [testingConnection, setTestingConnection] = React.useState<string | null>(null);
 
-  // Load data when branch changes
+  // Load data when branch changes (accounts tab)
   React.useEffect(() => {
     if (filterBranchId && filterBranchId !== "all") {
       loadData();
@@ -129,6 +145,13 @@ export default function FoodPartnersPage() {
       setConnectionViews([]);
     }
   }, [filterBranchId]);
+
+  // Load data when tab changes to branch-link
+  React.useEffect(() => {
+    if (activeTab === "branch-link" && tenantId) {
+      loadBranchLinkData();
+    }
+  }, [activeTab, tenantId, filterBrandId]);
 
   const loadData = async () => {
     if (!filterBranchId || filterBranchId === "all") return;
@@ -146,6 +169,51 @@ export default function FoodPartnersPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load branch link data
+  const loadBranchLinkData = async () => {
+    if (!tenantId) return;
+
+    setBranchLinkLoading(true);
+    try {
+      const [accountsData, branchesData] = await Promise.all([
+        foodPartnerService.getAccountsByTenant(tenantId),
+        branchService.getAll(filterBrandId !== "all" ? filterBrandId : undefined),
+      ]);
+      setAllAccounts(accountsData);
+      setBranches(branchesData);
+    } catch (error) {
+      console.error("Error loading branch link data:", error);
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải dữ liệu",
+        variant: "destructive",
+      });
+    } finally {
+      setBranchLinkLoading(false);
+    }
+  };
+
+  // Update account branch
+  const handleUpdateAccountBranch = async (accountId: string, branchId: string) => {
+    setUpdatingAccount(accountId);
+    try {
+      await foodPartnerService.updateAccountBranch(accountId, branchId);
+      toast({
+        title: "Thành công",
+        description: "Đã cập nhật chi nhánh cho tài khoản",
+      });
+      loadBranchLinkData();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể cập nhật chi nhánh",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingAccount(null);
     }
   };
 
@@ -312,6 +380,29 @@ export default function FoodPartnersPage() {
     return { total, connected, errors, notLinked };
   }, [connectionViews]);
 
+  // Group accounts by platform for branch link tab
+  const groupedAccountsByPlatform = React.useMemo(() => {
+    const groups: Record<FoodPartnerType, FoodPlatformAccount[]> = {
+      [FoodPartnerType.SHOPEE]: [],
+      [FoodPartnerType.GRAB]: [],
+      [FoodPartnerType.BEFOOD]: [],
+    };
+
+    allAccounts.forEach(account => {
+      if (groups[account.platform]) {
+        groups[account.platform].push(account);
+      }
+    });
+
+    return groups;
+  }, [allAccounts]);
+
+  // Get branch name by id
+  const getBranchName = (branchId: string) => {
+    const branch = branches.find(b => b.id === branchId);
+    return branch?.name || "Chưa gán";
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -320,21 +411,48 @@ export default function FoodPartnersPage() {
           <h1 className="text-2xl font-bold">Kết nối đối tác App Food</h1>
           <p className="text-muted-foreground">Liên kết tài khoản Shopee Food, GrabFood, BeFood với chi nhánh</p>
         </div>
-        <BrandBranchFilter
-          selectedBrandId={filterBrandId}
-          selectedBranchId={filterBranchId}
-          onBrandChange={setFilterBrandId}
-          onBranchChange={setFilterBranchId}
-          showAllBranchOption={false}
-        />
+        {activeTab === "accounts" && (
+          <BrandBranchFilter
+            selectedBrandId={filterBrandId}
+            selectedBranchId={filterBranchId}
+            onBrandChange={setFilterBrandId}
+            onBranchChange={setFilterBranchId}
+            showAllBranchOption={false}
+          />
+        )}
+        {activeTab === "branch-link" && (
+          <BrandBranchFilter
+            selectedBrandId={filterBrandId}
+            selectedBranchId={filterBranchId}
+            onBrandChange={setFilterBrandId}
+            onBranchChange={setFilterBranchId}
+            showAllBranchOption={true}
+            showBranchFilter={false}
+          />
+        )}
       </div>
 
-      {!filterBranchId || filterBranchId === "all" ? (
-        <FilterRequiredPlaceholder
-          title="Vui lòng chọn chi nhánh"
-          description="Chọn một chi nhánh cụ thể từ bộ lọc phía trên để quản lý kết nối đối tác"
-        />
-      ) : loading ? (
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="accounts" className="gap-2">
+            <Link2 className="h-4 w-4" />
+            Kết nối tài khoản
+          </TabsTrigger>
+          <TabsTrigger value="branch-link" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            Liên kết chi nhánh
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tab: Account Connections */}
+        <TabsContent value="accounts" className="mt-6">
+          {!filterBranchId || filterBranchId === "all" ? (
+            <FilterRequiredPlaceholder
+              title="Vui lòng chọn chi nhánh"
+              description="Chọn một chi nhánh cụ thể từ bộ lọc phía trên để quản lý kết nối đối tác"
+            />
+          ) : loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -517,6 +635,147 @@ export default function FoodPartnersPage() {
           })}
         </>
       )}
+        </TabsContent>
+
+        {/* Tab: Branch Link */}
+        <TabsContent value="branch-link" className="mt-6">
+          {branchLinkLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : allAccounts.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-20">
+                <Store className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Chưa có tài khoản nào</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  Chưa có tài khoản app food nào trong hệ thống. Vui lòng tạo cổng kết nối từ trang Admin.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Stats for branch link */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
+                        <Store className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allAccounts.length}</p>
+                        <p className="text-xs text-muted-foreground">Tổng số tài khoản</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-100 text-green-800">
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allAccounts.filter(a => a.branchId).length}</p>
+                        <p className="text-xs text-muted-foreground">Đã gán chi nhánh</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-yellow-100 text-yellow-800">
+                        <AlertCircle className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allAccounts.filter(a => !a.branchId).length}</p>
+                        <p className="text-xs text-muted-foreground">Chưa gán chi nhánh</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Partner Sections for branch link */}
+              {Object.entries(groupedAccountsByPlatform).map(([partnerType, accounts]) => {
+                if (accounts.length === 0) return null;
+                const partner = FoodPartnerInfo[partnerType as FoodPartnerType];
+
+                return (
+                  <Card key={partnerType}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <PartnerLogo type={partnerType as FoodPartnerType} />
+                        <div>
+                          <CardTitle>{partner.name}</CardTitle>
+                          <CardDescription>{accounts.length} tài khoản</CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {accounts.map((account) => (
+                          <div
+                            key={account.id}
+                            className={cn(
+                              "flex items-center justify-between p-4 rounded-lg border",
+                              !account.branchId && "border-dashed border-yellow-300 bg-yellow-50"
+                            )}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="min-w-[200px]">
+                                <p className="font-medium">{account.username || account.displayName}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <StatusBadge status={account.status} />
+                                </div>
+                              </div>
+                              <div className="h-10 w-px bg-border" />
+                              <div className="flex items-center gap-2 text-sm">
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground">Chi nhánh:</span>
+                                <span className={cn("font-medium", !account.branchId && "text-yellow-600")}>
+                                  {getBranchName(account.branchId)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={account.branchId || ""}
+                                onValueChange={(value) => handleUpdateAccountBranch(account.id, value)}
+                                disabled={updatingAccount === account.id}
+                              >
+                                <SelectTrigger className="w-[200px]">
+                                  {updatingAccount === account.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span>Đang cập nhật...</span>
+                                    </div>
+                                  ) : (
+                                    <SelectValue placeholder="Chọn chi nhánh" />
+                                  )}
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {branches.map((branch) => (
+                                    <SelectItem key={branch.id} value={branch.id}>
+                                      {branch.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Link Account Dialog */}
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>

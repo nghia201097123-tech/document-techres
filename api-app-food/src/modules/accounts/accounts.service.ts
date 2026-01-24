@@ -337,6 +337,18 @@ export class AccountsService {
   }
 
   /**
+   * Update account branch assignment
+   */
+  async updateBranch(
+    accountId: string,
+    branchId: string,
+  ): Promise<FoodPlatformAccount> {
+    const account = await this.getAccountById(accountId);
+    account.branchId = branchId;
+    return this.accountRepo.save(account);
+  }
+
+  /**
    * Delete account
    */
   async deleteAccount(accountId: string): Promise<void> {

@@ -14,11 +14,13 @@ import { fetchBrands } from "@/store/slices/brandsSlice";
 import { fetchBranchesByBrand } from "@/store/slices/branchesSlice";
 import { setBrandId, setBranchId, loadFiltersFromStorage } from "@/store/slices/filtersSlice";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuthStore } from "@/stores/auth-store";
 
 // Hook to use global filters - returns filter values and setters from Redux store
 export function useGlobalFilters() {
   const dispatch = useAppDispatch();
   const { brandId, branchId } = useAppSelector((state) => state.filters);
+  const tenantId = useAuthStore((state) => state.tenantId);
 
   // Load filters from localStorage on mount
   React.useEffect(() => {
@@ -36,6 +38,7 @@ export function useGlobalFilters() {
   return {
     brandId,
     branchId,
+    tenantId,
     setBrandId: setGlobalBrandId,
     setBranchId: setGlobalBranchId,
   };
@@ -118,6 +121,7 @@ interface BrandBranchFilterProps {
   showAllOption?: boolean;
   showAllBrandOption?: boolean; // Override for brand "all" option
   showAllBranchOption?: boolean; // Override for branch "all" option
+  showBranchFilter?: boolean; // Whether to show branch filter (default: true)
   allBrandLabel?: string;
   allBranchLabel?: string;
   brandClassName?: string;
@@ -134,6 +138,7 @@ export function BrandBranchFilter({
   showAllOption = true,
   showAllBrandOption,
   showAllBranchOption,
+  showBranchFilter = true,
   allBrandLabel = "Tất cả thương hiệu",
   allBranchLabel = "Tất cả chi nhánh",
   brandClassName,
@@ -189,28 +194,30 @@ export function BrandBranchFilter({
         </SelectContent>
       </Select>
 
-      <Select
-        value={selectedBranchId}
-        onValueChange={onBranchChange}
-        disabled={!selectedBrandId || selectedBrandId === "all" || selectedBrandId === ""}
-      >
-        <SelectTrigger className={branchClassName || "w-[180px]"}>
-          {loadingBranches ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Store className="mr-2 h-4 w-4" />
-          )}
-          <SelectValue placeholder={branchPlaceholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {showBranchAll && <SelectItem value="all">{allBranchLabel}</SelectItem>}
-          {branches.filter(b => b.isActive).map((branch) => (
-            <SelectItem key={branch.id} value={branch.id}>
-              {branch.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {showBranchFilter && (
+        <Select
+          value={selectedBranchId}
+          onValueChange={onBranchChange}
+          disabled={!selectedBrandId || selectedBrandId === "all" || selectedBrandId === ""}
+        >
+          <SelectTrigger className={branchClassName || "w-[180px]"}>
+            {loadingBranches ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Store className="mr-2 h-4 w-4" />
+            )}
+            <SelectValue placeholder={branchPlaceholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {showBranchAll && <SelectItem value="all">{allBranchLabel}</SelectItem>}
+            {branches.filter(b => b.isActive).map((branch) => (
+              <SelectItem key={branch.id} value={branch.id}>
+                {branch.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 }
