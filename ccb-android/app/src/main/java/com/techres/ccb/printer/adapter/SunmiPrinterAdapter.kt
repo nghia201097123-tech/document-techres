@@ -1439,6 +1439,9 @@ class SunmiPrinterAdapter @Inject constructor(
     /**
      * Cắt giấy với nhiều phương pháp fallback
      * Được thiết kế đặc biệt cho Sunmi T1 với BinderProxy
+     *
+     * QUAN TRỌNG: Sunmi T1 có thể không hỗ trợ AIDL cutPaper transact,
+     * nên sử dụng ESC/POS command qua sendRawDataViaTransact (có init/commit đầy đủ)
      */
     suspend fun cutPaperWithFallback(): PrinterResult = withContext(Dispatchers.IO) {
         if (!isConnected()) return@withContext PrinterResult.Error("Not connected")
@@ -1448,48 +1451,59 @@ class SunmiPrinterAdapter @Inject constructor(
 
             if (service is BinderProxyWrapper) {
                 val binder = service.binder
-                Timber.d("$TAG: cutPaperWithFallback - trying multiple methods")
+                Timber.d("$TAG: cutPaperWithFallback - using ESC/POS commands via sendRawData")
 
-                // Method 1: Try native AIDL cutPaper transact
+                // Feed thêm giấy trước khi cắt (5 dòng = ~10mm)
+                // Để đảm bảo giấy đã qua vị trí dao cắt
+                lineWrapViaTransact(binder, 5)
+
+                // Tạo lệnh cắt ESC/POS với nhiều variant
+                // GS V 66 n - Cut with feed (phổ biến nhất cho thermal printer)
+                val cutWithFeedCmd = byteArrayOf(
+                    0x1D, 0x56, 0x42, 0x03  // GS V 66 3 - Partial cut với feed 3 lines
+                )
+
+                // Gửi lệnh cắt qua sendRawDataViaTransact (có init/commit đầy đủ)
+                Timber.d("$TAG: cutPaperWithFallback - sending GS V 66 3 via sendRawDataViaTransact")
+                val result1 = sendRawDataViaTransact(binder, cutWithFeedCmd)
+                if (result1 is PrinterResult.Success) {
+                    Timber.d("$TAG: cutPaperWithFallback - GS V 66 succeeded")
+                    return@withContext result1
+                }
+
+                // Thử GS V 0 - Full cut
+                Timber.d("$TAG: cutPaperWithFallback - trying GS V 0 via sendRawDataViaTransact")
+                val fullCutCmd = byteArrayOf(0x1D, 0x56, 0x00)
+                val result2 = sendRawDataViaTransact(binder, fullCutCmd)
+                if (result2 is PrinterResult.Success) {
+                    Timber.d("$TAG: cutPaperWithFallback - GS V 0 succeeded")
+                    return@withContext result2
+                }
+
+                // Thử GS V 1 - Partial cut
+                Timber.d("$TAG: cutPaperWithFallback - trying GS V 1 via sendRawDataViaTransact")
+                val partialCutCmd = byteArrayOf(0x1D, 0x56, 0x01)
+                val result3 = sendRawDataViaTransact(binder, partialCutCmd)
+                if (result3 is PrinterResult.Success) {
+                    Timber.d("$TAG: cutPaperWithFallback - GS V 1 succeeded")
+                    return@withContext result3
+                }
+
+                // Thử ESC m - Cut paper (một số máy cũ)
+                Timber.d("$TAG: cutPaperWithFallback - trying ESC m via sendRawDataViaTransact")
+                val escMCutCmd = byteArrayOf(0x1B, 0x6D)
+                val result4 = sendRawDataViaTransact(binder, escMCutCmd)
+                if (result4 is PrinterResult.Success) {
+                    Timber.d("$TAG: cutPaperWithFallback - ESC m succeeded")
+                    return@withContext result4
+                }
+
+                // Cuối cùng thử AIDL transact (có thể không hoạt động nhưng thử)
+                Timber.d("$TAG: cutPaperWithFallback - trying AIDL cutPaper transact")
                 val aidlResult = cutPaperViaTransact(binder)
-                if (aidlResult is PrinterResult.Success) {
-                    Timber.d("$TAG: cutPaperWithFallback - AIDL transact succeeded")
-                    return@withContext aidlResult
-                }
 
-                // Method 2: Send ESC/POS partial cut command (GS V 66 n) via sendRawDataOnly
-                // Không init printer để không reset buffer
-                Timber.d("$TAG: cutPaperWithFallback - trying ESC/POS partial cut via sendRawDataOnly")
-                val partialCutCmd = byteArrayOf(0x1D, 0x56, 0x42, 0x00) // GS V 66 0 - Partial cut
-                val partialResult = sendRawDataOnlyViaTransact(binder, partialCutCmd)
-                if (partialResult is PrinterResult.Success) {
-                    commitPrinterBufferViaTransact(binder)
-                    Timber.d("$TAG: cutPaperWithFallback - ESC/POS partial cut succeeded")
-                    return@withContext partialResult
-                }
-
-                // Method 3: Send ESC/POS full cut command (GS V 0)
-                Timber.d("$TAG: cutPaperWithFallback - trying ESC/POS full cut via sendRawDataOnly")
-                val fullCutCmd = byteArrayOf(0x1D, 0x56, 0x00) // GS V 0 - Full cut
-                val fullResult = sendRawDataOnlyViaTransact(binder, fullCutCmd)
-                if (fullResult is PrinterResult.Success) {
-                    commitPrinterBufferViaTransact(binder)
-                    Timber.d("$TAG: cutPaperWithFallback - ESC/POS full cut succeeded")
-                    return@withContext fullResult
-                }
-
-                // Method 4: Try ESC i (partial cut) - older printers
-                Timber.d("$TAG: cutPaperWithFallback - trying ESC i via sendRawDataOnly")
-                val escICutCmd = byteArrayOf(0x1B, 0x69) // ESC i - Partial cut
-                val escIResult = sendRawDataOnlyViaTransact(binder, escICutCmd)
-                if (escIResult is PrinterResult.Success) {
-                    commitPrinterBufferViaTransact(binder)
-                    Timber.d("$TAG: cutPaperWithFallback - ESC i cut succeeded")
-                    return@withContext escIResult
-                }
-
-                Timber.w("$TAG: cutPaperWithFallback - all methods failed")
-                return@withContext PrinterResult.Error("All cut paper methods failed")
+                Timber.d("$TAG: cutPaperWithFallback - completed, last result: $aidlResult")
+                return@withContext aidlResult
             }
 
             // Non-BinderProxy: use regular cutPaper
