@@ -265,10 +265,14 @@ export class AccountsService {
    * Used when token expires and refresh fails
    */
   async reconnect(accountId: string): Promise<FoodPlatformAccount> {
+    this.logger.log(`[reconnect] Starting reconnect for account ${accountId}`);
     const account = await this.getAccountById(accountId);
+
+    this.logger.log(`[reconnect] Account found: username=${account.username}, hasPassword=${!!account.password}`);
 
     // Check if we have stored credentials
     if (!account.username || !account.password) {
+      this.logger.error(`[reconnect] No credentials stored!`);
       throw new BadRequestException(
         'Không có thông tin đăng nhập. Vui lòng đăng nhập lại với tài khoản và mật khẩu.',
       );
@@ -276,19 +280,24 @@ export class AccountsService {
 
     // Use stored password directly (plain text)
     const password = account.password;
+    this.logger.log(`[reconnect] Using credentials: ${account.username} / ${password.substring(0, 3)}***`);
 
     // Update status to connecting
     account.status = AccountStatus.CONNECTING;
     await this.accountRepo.save(account);
 
     // Get connector and login
+    this.logger.log(`[reconnect] Calling connector.login...`);
     const connector = this.connectorFactory.getConnector(account.platform);
     const result = await connector.login({
       username: account.username,
       password: password,
     });
 
+    this.logger.log(`[reconnect] Login result: success=${result.success}, hasToken=${!!result.accessToken}`);
+
     if (!result.success) {
+      this.logger.error(`[reconnect] Login failed: ${result.error}`);
       account.status = AccountStatus.DISCONNECTED;
       account.lastError = result.error ?? 'Không thể kết nối lại. Vui lòng đăng nhập lại.';
       account.errorCount += 1;
@@ -313,7 +322,7 @@ export class AccountsService {
     account.errorCount = 0;
     account.lastError = null;
 
-    this.logger.log(`Account ${accountId} reconnected successfully`);
+    this.logger.log(`[reconnect] Account ${accountId} reconnected successfully! New token: ${account.accessToken?.substring(0, 20)}...`);
 
     return this.accountRepo.save(account);
   }
@@ -395,24 +404,40 @@ export class AccountsService {
     const connector = this.connectorFactory.getConnector(account.platform);
 
     try {
+      this.logger.log(`[getStores] Fetching stores for account ${accountId}...`);
       const stores = await connector.getStores(account);
+      this.logger.log(`[getStores] Got ${stores.length} stores`);
       return this.mapStores(stores);
-    } catch (error) {
-      // Check if it's a 401 Unauthorized error
-      if (error instanceof UnauthorizedException) {
-        this.logger.log(`Token expired for account ${accountId}, attempting to reconnect...`);
+    } catch (error: any) {
+      this.logger.error(`[getStores] Error caught:`, error?.message || error);
+      this.logger.error(`[getStores] Error type: ${error?.constructor?.name}`);
+      this.logger.error(`[getStores] Is UnauthorizedException: ${error instanceof UnauthorizedException}`);
+
+      // Check if it's a 401 Unauthorized error (check both instance and error name)
+      const isUnauthorized = error instanceof UnauthorizedException ||
+        error?.name === 'UnauthorizedException' ||
+        error?.status === 401 ||
+        error?.message?.includes('UNAUTHORIZED') ||
+        error?.message?.includes('401');
+
+      this.logger.log(`[getStores] isUnauthorized: ${isUnauthorized}`);
+
+      if (isUnauthorized) {
+        this.logger.log(`[getStores] Token expired for account ${accountId}, attempting to reconnect...`);
 
         try {
           // Auto-reconnect using stored credentials
+          this.logger.log(`[getStores] Calling reconnect...`);
           account = await this.reconnect(accountId);
-
-          this.logger.log(`Reconnected successfully, retrying getStores...`);
+          this.logger.log(`[getStores] Reconnect success! New token: ${account.accessToken?.substring(0, 20)}...`);
 
           // Retry getting stores with new token
+          this.logger.log(`[getStores] Retrying getStores with new token...`);
           const stores = await connector.getStores(account);
+          this.logger.log(`[getStores] Retry success! Got ${stores.length} stores`);
           return this.mapStores(stores);
-        } catch (reconnectError) {
-          this.logger.error(`Failed to reconnect account ${accountId}`, reconnectError);
+        } catch (reconnectError: any) {
+          this.logger.error(`[getStores] Failed to reconnect: ${reconnectError?.message}`);
           throw new BadRequestException(
             'Token hết hạn và không thể kết nối lại. Vui lòng đăng nhập lại.',
           );
