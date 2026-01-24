@@ -423,7 +423,7 @@ export class AccountsService {
       this.logger.log(`[getStores] isUnauthorized: ${isUnauthorized}`);
 
       if (isUnauthorized) {
-        this.logger.log(`[getStores] Token expired for account ${accountId}, attempting to reconnect...`);
+        this.logger.log(`[getStores] Token expired for account ${accountId}, attempting to reconnect (1 retry only)...`);
 
         try {
           // Auto-reconnect using stored credentials
@@ -431,15 +431,25 @@ export class AccountsService {
           account = await this.reconnect(accountId);
           this.logger.log(`[getStores] Reconnect success! New token: ${account.accessToken?.substring(0, 20)}...`);
 
-          // Retry getting stores with new token
+          // Retry getting stores with new token (only 1 retry)
           this.logger.log(`[getStores] Retrying getStores with new token...`);
           const stores = await connector.getStores(account);
           this.logger.log(`[getStores] Retry success! Got ${stores.length} stores`);
           return this.mapStores(stores);
         } catch (reconnectError: any) {
-          this.logger.error(`[getStores] Failed to reconnect: ${reconnectError?.message}`);
+          this.logger.error(`[getStores] Failed to reconnect or retry: ${reconnectError?.message}`);
+
+          // Mark account as disconnected
+          account.status = AccountStatus.DISCONNECTED;
+          account.isActive = false;
+          account.lastError = 'Token hết hạn và không thể kết nối lại tự động.';
+          account.errorCount += 1;
+          await this.accountRepo.save(account);
+
+          this.logger.log(`[getStores] Account ${accountId} marked as DISCONNECTED`);
+
           throw new BadRequestException(
-            'Token hết hạn và không thể kết nối lại. Vui lòng đăng nhập lại.',
+            'Token hết hạn và không thể kết nối lại. Tài khoản đã bị đánh dấu mất kết nối. Vui lòng đăng nhập lại.',
           );
         }
       }
