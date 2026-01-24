@@ -415,16 +415,33 @@ private fun PrinterConfigCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.Wifi,
+                            when (config.connectionType) {
+                                "sunmi" -> Icons.Default.PhoneAndroid
+                                "bluetooth" -> Icons.Default.Bluetooth
+                                "usb" -> Icons.Default.Usb
+                                else -> Icons.Default.Wifi
+                            },
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            tint = if (config.connectionType == "sunmi")
+                                Color(0xFF4CAF50)
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Kết nối: ${config.connectionType.uppercase()}",
+                            when (config.connectionType) {
+                                "sunmi" -> "Máy in Sunmi tích hợp"
+                                "bluetooth" -> "Kết nối: Bluetooth"
+                                "usb" -> "Kết nối: USB"
+                                else -> "Kết nối: Mạng LAN"
+                            },
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = if (config.connectionType == "sunmi")
+                                Color(0xFF2E7D32)
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontWeight = if (config.connectionType == "sunmi") FontWeight.Medium else FontWeight.Normal
                         )
                     }
 
@@ -1262,6 +1279,45 @@ private fun BillPrinterAllSettingsDialog(
                                     }
                                 }
                             )
+                        }
+                    }
+                }
+
+                // Show Sunmi printer info when selected
+                if (connectionType == "sunmi") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE8F5E9)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Máy in Sunmi tích hợp",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF2E7D32)
+                                )
+                                Text(
+                                    text = "Sử dụng máy in có sẵn trên thiết bị Sunmi T1/T2/V2",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF388E3C)
+                                )
+                            }
                         }
                     }
                 }
