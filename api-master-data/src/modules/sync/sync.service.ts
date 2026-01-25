@@ -1116,18 +1116,29 @@ export class SyncService {
    * Returns accounts, store mappings, and item mappings for a specific branch
    */
   private async fetchFoodPlatformData(branchId: string): Promise<FoodPlatformSyncDto | null> {
-    try {
-      console.log(`[SyncService.fetchFoodPlatformData] Fetching from ${this.foodApiUrl}/api/public/sync/food-platform/${branchId}`);
+    const url = `${this.foodApiUrl}/api/public/sync/food-platform/${branchId}`;
+    console.log(`\n========== FOOD PLATFORM SYNC DEBUG ==========`);
+    console.log(`[fetchFoodPlatformData] branchId: ${branchId}`);
+    console.log(`[fetchFoodPlatformData] foodApiUrl: ${this.foodApiUrl}`);
+    console.log(`[fetchFoodPlatformData] Full URL: ${url}`);
+    console.log(`[fetchFoodPlatformData] Calling api-app-food...`);
 
+    try {
       const response = await firstValueFrom(
-        this.httpService.get(`${this.foodApiUrl}/api/public/sync/food-platform/${branchId}`, {
+        this.httpService.get(url, {
           timeout: 10000, // 10 second timeout
         })
       );
 
+      console.log(`[fetchFoodPlatformData] Response status: ${response.status}`);
+      console.log(`[fetchFoodPlatformData] Response data.status: ${response.data?.status}`);
+      console.log(`[fetchFoodPlatformData] Response data.message: ${response.data?.message}`);
+      console.log(`[fetchFoodPlatformData] Response data.data: ${JSON.stringify(response.data?.data, null, 2)}`);
+
       if (response.data?.status === 200 && response.data?.data) {
         const data = response.data.data;
-        console.log(`[SyncService.fetchFoodPlatformData] Found ${data.accounts?.length || 0} accounts, ${data.itemMappings?.length || 0} item mappings`);
+        console.log(`[fetchFoodPlatformData] SUCCESS! Found ${data.accounts?.length || 0} accounts, ${data.itemMappings?.length || 0} item mappings`);
+        console.log(`==============================================\n`);
 
         return {
           accounts: data.accounts || [],
@@ -1136,11 +1147,15 @@ export class SyncService {
         };
       }
 
-      console.log(`[SyncService.fetchFoodPlatformData] No food platform data found for branch ${branchId}`);
+      console.log(`[fetchFoodPlatformData] No food platform data found (status != 200 or no data)`);
+      console.log(`==============================================\n`);
       return null;
     } catch (error) {
       // Don't fail the sync if food platform API is unavailable
-      console.error(`[SyncService.fetchFoodPlatformData] Error fetching food platform data:`, error.message);
+      console.error(`[fetchFoodPlatformData] ERROR: ${error.message}`);
+      console.error(`[fetchFoodPlatformData] Error code: ${error.code}`);
+      console.error(`[fetchFoodPlatformData] Full error:`, error);
+      console.log(`==============================================\n`);
       return null;
     }
   }
