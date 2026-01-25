@@ -582,7 +582,7 @@ export class AccountsService {
               this.logger.log(`[getMenu] Found merchantId from getStores: ${merchantId}`);
 
               // Update the store mapping with merchantId for future calls
-              storeMapping.externalMerchantId = merchantId;
+              storeMapping.externalMerchantId = merchantId || null;
               await this.storeMappingRepo.save(storeMapping);
               this.logger.log(`[getMenu] Updated store mapping with merchantId`);
             }
