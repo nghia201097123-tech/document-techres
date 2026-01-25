@@ -36,9 +36,18 @@ import com.techres.ccb.presentation.components.PosTopAppBar
 fun AddFoodPlatformAccountScreen(
     onNavigateBack: () -> Unit,
     onSuccess: () -> Unit,
+    existingAccountId: String? = null,
+    existingPlatform: String? = null,
     viewModel: AddFoodPlatformAccountViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // If we have existing account info (relogin flow), initialize with that
+    LaunchedEffect(existingAccountId, existingPlatform) {
+        if (existingAccountId != null && existingPlatform != null) {
+            viewModel.initForRelogin(existingAccountId, existingPlatform)
+        }
+    }
 
     // Handle back press
     BackHandler {

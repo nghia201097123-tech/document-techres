@@ -69,6 +69,27 @@ class AddFoodPlatformAccountViewModel @Inject constructor(
         _uiState.update { it.copy(selectedPlatform = platform) }
     }
 
+    /**
+     * Initialize for relogin flow - skip platform selection and go directly to credentials
+     * Used when user wants to re-enter credentials for an existing disconnected account
+     */
+    fun initForRelogin(accountId: String, platformValue: String) {
+        val platform = FoodPlatform.values().find { it.apiValue == platformValue }
+        if (platform != null) {
+            Log.d(TAG, "Initializing relogin for account: $accountId, platform: ${platform.displayName}")
+            _uiState.update {
+                it.copy(
+                    accountId = accountId,
+                    selectedPlatform = platform,
+                    currentStep = LoginStep.ENTER_CREDENTIALS
+                )
+            }
+        } else {
+            Log.e(TAG, "Unknown platform: $platformValue")
+            _uiState.update { it.copy(error = "Nền tảng không hợp lệ") }
+        }
+    }
+
     fun proceedFromPlatformSelection() {
         val platform = _uiState.value.selectedPlatform ?: return
         createAccountAndProceed(platform)

@@ -25,12 +25,21 @@ import com.techres.ccb.presentation.components.PosTopAppBar
 fun FoodPartnerConnectionScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAddAccount: () -> Unit = {},
+    onNavigateToRelogin: (accountId: String, platform: String) -> Unit = { _, _ -> },
     viewModel: FoodPartnerConnectionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadAccounts()
+    // Show snackbar for action result
+    LaunchedEffect(uiState.actionResult) {
+        uiState.actionResult?.let { result ->
+            snackbarHostState.showSnackbar(
+                message = result.message,
+                duration = SnackbarDuration.Short
+            )
+            viewModel.clearActionResult()
+        }
     }
 
     Scaffold(
@@ -52,6 +61,16 @@ fun FoodPartnerConnectionScreen(
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Thêm tài khoản")
+            }
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                val isSuccess = uiState.actionResult?.success ?: true
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = if (isSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                    contentColor = Color.White
+                )
             }
         }
     ) { paddingValues ->
@@ -141,10 +160,9 @@ fun FoodPartnerConnectionScreen(
                         items(uiState.accounts) { account ->
                             FoodPartnerAccountCard(
                                 account = account,
-                                isReconnecting = uiState.reconnectingAccountId == account.id,
                                 isTesting = uiState.testingAccountId == account.id,
                                 isDisconnecting = uiState.disconnectingAccountId == account.id,
-                                onReconnect = { viewModel.reconnectAccount(account.id) },
+                                onRelogin = { onNavigateToRelogin(account.id, account.platform) },
                                 onTest = { viewModel.testConnection(account.id) },
                                 onDisconnect = { viewModel.disconnectAccount(account.id) }
                             )
@@ -163,27 +181,6 @@ fun FoodPartnerConnectionScreen(
                     }
                 }
             }
-        }
-    }
-
-    // Show snackbar for action result
-    uiState.actionResult?.let { result ->
-        LaunchedEffect(result) {
-            kotlinx.coroutines.delay(3000)
-            viewModel.clearActionResult()
-        }
-
-        Snackbar(
-            modifier = Modifier
-                .padding(16.dp),
-            containerColor = if (result.success) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
-            action = {
-                TextButton(onClick = { viewModel.clearActionResult() }) {
-                    Text("Đóng", color = Color.White)
-                }
-            }
-        ) {
-            Text(result.message, color = Color.White)
         }
     }
 }
@@ -249,10 +246,9 @@ private fun StatItem(
 @Composable
 private fun FoodPartnerAccountCard(
     account: FoodPartnerAccount,
-    isReconnecting: Boolean,
     isTesting: Boolean,
     isDisconnecting: Boolean,
-    onReconnect: () -> Unit,
+    onRelogin: () -> Unit,
     onTest: () -> Unit,
     onDisconnect: () -> Unit
 ) {
@@ -271,7 +267,7 @@ private fun FoodPartnerAccountCard(
     }
 
     val isConnected = account.status == "connected"
-    val isAnyActionInProgress = isReconnecting || isTesting || isDisconnecting
+    val isAnyActionInProgress = isTesting || isDisconnecting
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -405,10 +401,10 @@ private fun FoodPartnerAccountCard(
                     )
                 }
 
-                // Reconnect button (for disconnected) / Login button
+                // Relogin button (for disconnected accounts - navigate to login screen)
                 if (!isConnected) {
                     OutlinedButton(
-                        onClick = onReconnect,
+                        onClick = onRelogin,
                         enabled = !isAnyActionInProgress,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
@@ -416,22 +412,14 @@ private fun FoodPartnerAccountCard(
                             contentColor = Color(0xFF4CAF50)
                         )
                     ) {
-                        if (isReconnecting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                                color = Color(0xFF4CAF50)
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.Login,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Login,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isReconnecting) "Đang kết nối" else "Đăng nhập",
+                            text = "Đăng nhập",
                             fontSize = 11.sp
                         )
                     }

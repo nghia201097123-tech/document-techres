@@ -78,7 +78,15 @@ sealed class Screen(val route: String) {
     object BillPrinter : Screen("bill_printer")
     object LabelPrinter : Screen("label_printer")
     object FoodPartner : Screen("food_partner")
-    object AddFoodPlatformAccount : Screen("add_food_platform_account")
+    object AddFoodPlatformAccount : Screen("add_food_platform_account?accountId={accountId}&platform={platform}") {
+        fun createRoute(accountId: String? = null, platform: String? = null): String {
+            return if (accountId != null && platform != null) {
+                "add_food_platform_account?accountId=$accountId&platform=$platform"
+            } else {
+                "add_food_platform_account"
+            }
+        }
+    }
     object DatabaseDebug : Screen("database_debug")
     object OrderHistory : Screen("order_history")
     object Table : Screen("table")  // Table List Screen
@@ -436,17 +444,30 @@ fun CCBNavHost() {
         composable(Screen.FoodPartner.route) {
             FoodPartnerConnectionScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToAddAccount = { navController.navigate(Screen.AddFoodPlatformAccount.route) }
+                onNavigateToAddAccount = { navController.navigate(Screen.AddFoodPlatformAccount.createRoute()) },
+                onNavigateToRelogin = { accountId, platform ->
+                    navController.navigate(Screen.AddFoodPlatformAccount.createRoute(accountId, platform))
+                }
             )
         }
 
-        composable(Screen.AddFoodPlatformAccount.route) {
+        composable(
+            route = Screen.AddFoodPlatformAccount.route,
+            arguments = listOf(
+                navArgument("accountId") { nullable = true; defaultValue = null },
+                navArgument("platform") { nullable = true; defaultValue = null }
+            )
+        ) { backStackEntry ->
+            val accountId = backStackEntry.arguments?.getString("accountId")
+            val platform = backStackEntry.arguments?.getString("platform")
             AddFoodPlatformAccountScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onSuccess = {
                     // Navigate back to FoodPartner and refresh
                     navController.popBackStack()
-                }
+                },
+                existingAccountId = accountId,
+                existingPlatform = platform
             )
         }
 
