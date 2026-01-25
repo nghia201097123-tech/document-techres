@@ -127,46 +127,42 @@ class FoodPartnerConnectionViewModel @Inject constructor(
             try {
                 val response = foodPlatformRepository.reconnectAccount(accountId)
 
-                val result = if (response.status == 200 && response.data?.reconnected == true) {
-                    ReconnectResult(
-                        accountId = accountId,
-                        success = true,
-                        message = "Kết nối lại thành công"
-                    )
+                val success = response.status == 200 && response.data?.reconnected == true
+                val message = if (success) "Kết nối lại thành công" else (response.message ?: "Không thể kết nối lại")
+
+                // Update local account status if reconnect was successful
+                val updatedAccounts = if (success) {
+                    _uiState.value.accounts.map { account ->
+                        if (account.id == accountId) {
+                            account.copy(status = "connected", lastError = null, errorCount = 0)
+                        } else {
+                            account
+                        }
+                    }
                 } else {
-                    ReconnectResult(
-                        accountId = accountId,
-                        success = false,
-                        message = response.message ?: "Không thể kết nối lại"
-                    )
+                    _uiState.value.accounts
                 }
 
                 _uiState.update {
                     it.copy(
                         reconnectingAccountId = null,
-                        reconnectResult = result
+                        accounts = updatedAccounts,
+                        actionResult = ActionResult(
+                            accountId = accountId,
+                            action = "reconnect",
+                            success = success,
+                            message = message
+                        )
                     )
-                }
-
-                // Update local account status if reconnect was successful
-                if (result.success) {
-                    // Update the account status in the UI
-                    val updatedAccounts = _uiState.value.accounts.map { account ->
-                        if (account.id == accountId) {
-                            account.copy(status = "CONNECTED", lastError = null, errorCount = 0)
-                        } else {
-                            account
-                        }
-                    }
-                    _uiState.update { it.copy(accounts = updatedAccounts) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "reconnectAccount - Error: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         reconnectingAccountId = null,
-                        reconnectResult = ReconnectResult(
+                        actionResult = ActionResult(
                             accountId = accountId,
+                            action = "reconnect",
                             success = false,
                             message = e.message ?: "Có lỗi xảy ra"
                         )
