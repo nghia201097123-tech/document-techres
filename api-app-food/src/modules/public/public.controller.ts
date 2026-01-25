@@ -6,7 +6,7 @@ import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem
 import { AccountsService } from '../accounts/accounts.service';
 
 @ApiTags('public')
-@Controller('api/public')
+@Controller('public')
 export class PublicController {
   private readonly logger = new Logger(PublicController.name);
 
