@@ -125,9 +125,9 @@ export class StoresController {
    */
   @Get('branches/:branchId/store-mappings')
   @ApiOperation({ summary: 'Lấy danh sách store mappings theo chi nhánh' })
-  @ApiParam({ name: 'branchId', description: 'Branch ID' })
+  @ApiParam({ name: 'branchId', description: 'Branch ID (UUID)' })
   @ApiResponse({ status: 200, description: 'Thành công' })
-  async getMappingsByBranch(@Param('branchId') branchId: number) {
+  async getMappingsByBranch(@Param('branchId') branchId: string) {
     const mappings = await this.storesService.getMappingsByBranch(branchId);
     return ApiResponseDto.success(mappings);
   }
@@ -137,9 +137,9 @@ export class StoresController {
    */
   @Get('branches/:branchId/platform-status')
   @ApiOperation({ summary: 'Lấy trạng thái food platform của chi nhánh' })
-  @ApiParam({ name: 'branchId', description: 'Branch ID' })
+  @ApiParam({ name: 'branchId', description: 'Branch ID (UUID)' })
   @ApiResponse({ status: 200, description: 'Thành công' })
-  async getBranchPlatformStatus(@Param('branchId') branchId: number) {
+  async getBranchPlatformStatus(@Param('branchId') branchId: string) {
     const status = await this.storesService.getBranchPlatformStatus(branchId);
     return ApiResponseDto.success(status);
   }

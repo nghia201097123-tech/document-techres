@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -44,9 +43,10 @@ export class StoreMappingItemDto {
   @IsOptional()
   externalStoreEmail?: string;
 
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  branchId: number;
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-...' })
+  @IsString()
+  @IsNotEmpty()
+  branchId: string;
 
   @ApiPropertyOptional({ example: 'Chi nhánh Quận 1' })
   @IsString()
@@ -69,10 +69,10 @@ export class CreateStoreMappingsDto {
  * Update Store Mapping DTO
  */
 export class UpdateStoreMappingDto {
-  @ApiPropertyOptional({ example: 2 })
-  @IsInt()
+  @ApiPropertyOptional({ example: 'a1b2c3d4-e5f6-...' })
+  @IsString()
   @IsOptional()
-  branchId?: number;
+  branchId?: string;
 
   @ApiPropertyOptional({ example: 'Chi nhánh Quận 2' })
   @IsString()

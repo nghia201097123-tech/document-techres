@@ -61,8 +61,8 @@ export class FoodPlatformStoreMapping {
   isStoreActive: boolean; // Trạng thái trên platform
 
   // TechRes branch mapping
-  @Column({ type: 'int', name: 'branch_id' })
-  branchId: number; // FK to branches (TechRes)
+  @Column({ type: 'varchar', length: 50, name: 'branch_id' })
+  branchId: string; // FK to branches (TechRes) - can be UUID or legacy int as string
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'branch_name' })
   branchName: string; // Cache tên chi nhánh

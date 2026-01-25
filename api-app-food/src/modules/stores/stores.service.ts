@@ -43,7 +43,7 @@ export class StoresService {
   /**
    * Get all store mappings for a branch
    */
-  async getMappingsByBranch(branchId: number): Promise<FoodPlatformStoreMapping[]> {
+  async getMappingsByBranch(branchId: string): Promise<FoodPlatformStoreMapping[]> {
     return this.storeMappingRepo.find({
       where: { branchId, isActive: true },
       relations: ['account'],
@@ -54,7 +54,7 @@ export class StoresService {
    * Get active mappings for a branch (for polling)
    */
   async getActiveMappingsForBranch(
-    branchId: number,
+    branchId: string,
   ): Promise<FoodPlatformStoreMapping[]> {
     return this.storeMappingRepo.find({
       where: {
@@ -223,7 +223,7 @@ export class StoresService {
   /**
    * Get food platform status for a branch
    */
-  async getBranchPlatformStatus(branchId: number): Promise<any> {
+  async getBranchPlatformStatus(branchId: string): Promise<any> {
     const mappings = await this.storeMappingRepo.find({
       where: { branchId },
       relations: ['account'],

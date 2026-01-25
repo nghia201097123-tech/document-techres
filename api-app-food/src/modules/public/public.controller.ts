@@ -57,8 +57,9 @@ export class PublicController {
 
     try {
       // Get accounts linked to this branch via store mappings
+      // branchId can be UUID string or legacy integer as string
       const storeMappings = await this.storeMappingRepo.find({
-        where: { branchId: parseInt(branchId), isActive: true },
+        where: { branchId: branchId, isActive: true },
         relations: ['account'],
       });
 
@@ -306,8 +307,9 @@ export class PublicController {
 
     try {
       // Get all store mappings for this branch
+      // branchId can be UUID string or legacy integer as string
       const storeMappings = await this.storeMappingRepo.find({
-        where: { branchId: parseInt(branchId), isActive: true },
+        where: { branchId: branchId, isActive: true },
         relations: ['account'],
       });
 
