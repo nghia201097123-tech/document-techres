@@ -576,15 +576,29 @@ export class AccountsService {
           this.logger.log(`[getMenu] merchantId is missing, fetching from getStores...`);
           try {
             const stores = await connector.getStores(account);
-            const matchingStore = stores.find((s: any) => String(s.externalStoreId) === String(storeId));
+            this.logger.log(`[getMenu] Got ${stores.length} stores from API`);
+            stores.forEach((s: any, i: number) => {
+              this.logger.log(`[getMenu] Store[${i}]: externalStoreId=${s.externalStoreId}, merchantId=${s.merchantId}`);
+            });
+
+            let matchingStore = stores.find((s: any) => String(s.externalStoreId) === String(storeId));
+
+            // Fallback: If only 1 store and no match, use that store (storeId in mapping might be outdated)
+            if (!matchingStore && stores.length === 1) {
+              this.logger.log(`[getMenu] No match found, using the only available store`);
+              matchingStore = stores[0];
+              storeId = matchingStore.externalStoreId;
+            }
+
             if (matchingStore?.merchantId) {
               merchantId = matchingStore.merchantId;
-              this.logger.log(`[getMenu] Found merchantId from getStores: ${merchantId}`);
+              this.logger.log(`[getMenu] Found merchantId from getStores: ${merchantId}, storeId: ${storeId}`);
 
-              // Update the store mapping with merchantId for future calls
+              // Update the store mapping with merchantId and correct storeId
               storeMapping.externalMerchantId = merchantId || null;
+              storeMapping.externalStoreId = storeId!;
               await this.storeMappingRepo.save(storeMapping);
-              this.logger.log(`[getMenu] Updated store mapping with merchantId`);
+              this.logger.log(`[getMenu] Updated store mapping with merchantId and storeId`);
             }
           } catch (err: any) {
             this.logger.warn(`[getMenu] Failed to fetch merchantId from getStores: ${err?.message}`);
@@ -620,23 +634,38 @@ export class AccountsService {
           this.logger.log(`[getMenu] Reconnect success, retrying getMenu...`);
 
           // For BeFood: Re-fetch merchantId after reconnect (now token is valid)
-          if (account.platform === FoodPlatformType.BEFOOD && !merchantId && storeId) {
+          if (account.platform === FoodPlatformType.BEFOOD && !merchantId) {
             this.logger.log(`[getMenu] Re-fetching merchantId after reconnect...`);
             try {
               const stores = await connector.getStores(account);
-              const matchingStore = stores.find((s: any) => String(s.externalStoreId) === String(storeId));
+              this.logger.log(`[getMenu] Got ${stores.length} stores from API`);
+              stores.forEach((s: any, i: number) => {
+                this.logger.log(`[getMenu] Store[${i}]: externalStoreId=${s.externalStoreId}, merchantId=${s.merchantId}`);
+              });
+
+              let matchingStore = stores.find((s: any) => String(s.externalStoreId) === String(storeId));
+
+              // Fallback: If only 1 store and no match, use that store (storeId in mapping might be outdated)
+              if (!matchingStore && stores.length === 1) {
+                this.logger.log(`[getMenu] No match found, using the only available store`);
+                matchingStore = stores[0];
+                // Also update storeId to the correct value
+                storeId = matchingStore.externalStoreId;
+              }
+
               if (matchingStore?.merchantId) {
                 merchantId = matchingStore.merchantId;
-                this.logger.log(`[getMenu] Found merchantId after reconnect: ${merchantId}`);
+                this.logger.log(`[getMenu] Found merchantId after reconnect: ${merchantId}, storeId: ${storeId}`);
 
-                // Update store mapping
+                // Update store mapping with correct merchantId and storeId
                 const storeMapping = await this.storeMappingRepo.findOne({
-                  where: { accountId: account.id, externalStoreId: storeId },
+                  where: { accountId: account.id, isActive: true },
                 });
                 if (storeMapping) {
                   storeMapping.externalMerchantId = merchantId || null;
+                  storeMapping.externalStoreId = storeId!;
                   await this.storeMappingRepo.save(storeMapping);
-                  this.logger.log(`[getMenu] Updated store mapping with merchantId`);
+                  this.logger.log(`[getMenu] Updated store mapping with merchantId and storeId`);
                 }
               }
             } catch (fetchErr: any) {
