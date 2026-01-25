@@ -269,23 +269,103 @@ export class BeFoodConnector extends BasePlatformConnector {
 
   /**
    * Get menu from BeFood
-   * TODO: Need actual menu API endpoint
+   * Endpoint: POST /v2/merchant/get_restaurant_items
+   * @param account - The BeFood account
+   * @param storeId - The store ID (vendor_id = restaurant_id = store_id)
+   * @param merchantId - The merchant ID (optional, from store profiles)
    */
-  async getMenu(account: FoodPlatformAccount, storeId?: string): Promise<any> {
+  async getMenu(account: FoodPlatformAccount, storeId?: string, merchantId?: string): Promise<any> {
     try {
-      this.logger.debug('[BeFoodConnector] Getting menu...');
+      this.logger.debug(`[BeFoodConnector] Getting menu for store ${storeId}...`);
 
-      // TODO: Implement when menu API is available
-      // For now, return empty menu structure
+      if (!storeId) {
+        this.logger.warn('[BeFoodConnector] No storeId provided for getMenu');
+        return {
+          categories: [],
+          modifierGroups: [],
+          sellingTimes: [],
+        };
+      }
+
+      const storeIdNum = parseInt(storeId);
+      const merchantIdNum = merchantId ? parseInt(merchantId) : undefined;
+
+      const response = await axios.post(
+        `${this.beFoodBaseUrl}/v2/merchant/get_restaurant_items`,
+        {
+          access_token: account.accessToken,
+          vendor_id: storeIdNum,
+          restaurant_id: storeIdNum,
+          ...(merchantIdNum && { merchant_id: merchantIdNum }),
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        },
+      );
+
+      const responseData = response.data;
+      this.logger.debug('[BeFoodConnector] Get menu response flag:', responseData?.flag);
+
+      if (responseData?.flag !== 143) {
+        this.logger.error('[BeFoodConnector] Get menu failed:', responseData?.message);
+        return {
+          categories: [],
+          modifierGroups: [],
+          sellingTimes: [],
+        };
+      }
+
+      const restaurantItems = responseData.restaurant_items || [];
+
+      // Transform BeFood menu format to standard format (similar to GrabFood)
+      const categories = restaurantItems.map((cat: any) => ({
+        categoryID: String(cat.category?.category_id),
+        categoryName: cat.category?.name || 'Unknown',
+        availableStatus: 1,
+        sortOrder: cat.category?.display_order || 0,
+        items: (cat.items || []).map((item: any) => ({
+          itemID: String(item.restaurant_item_id),
+          itemName: item.item_name,
+          description: item.item_details || '',
+          priceInMin: item.price || 0,
+          priceDisplay: `${(item.price || 0).toLocaleString('vi-VN')}đ`,
+          imageURL: item.item_image || item.item_image_compressed_web,
+          webPURL: item.item_image_compressed_web,
+          availableStatus: item.is_active === 1 ? 1 : 3,
+          sortOrder: item.display_order || 0,
+          categoryID: String(cat.category?.category_id),
+          categoryName: cat.category?.name,
+          // BeFood specific fields
+          oldPrice: item.old_price,
+          customizeCount: item.customize_count,
+          customizeIds: item.customize_ids,
+          restaurantCategoryId: item.restaurant_category_id,
+          referenceId: item.reference_id,
+        })),
+      }));
+
+      this.logger.debug(`[BeFoodConnector] Got menu with ${categories.length} categories`);
+
       return {
-        categories: [],
-        items: [],
+        categories,
+        modifierGroups: [], // BeFood modifiers need separate API call if needed
+        sellingTimes: [],
       };
     } catch (error: any) {
       this.logger.error('[BeFoodConnector] Get menu failed:', error?.message);
+
+      // Check for auth errors
+      if (error?.response?.status === 401 || error?.message?.includes('UNAUTHORIZED')) {
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
       return {
         categories: [],
-        items: [],
+        modifierGroups: [],
+        sellingTimes: [],
       };
     }
   }

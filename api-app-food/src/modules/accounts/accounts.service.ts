@@ -10,6 +10,7 @@ import { Repository, IsNull, Or } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   FoodPlatformAccount,
+  FoodPlatformStoreMapping,
   AccountStatus,
   FoodPlatformType,
 } from '../../database/entities';
@@ -30,6 +31,8 @@ export class AccountsService {
   constructor(
     @InjectRepository(FoodPlatformAccount)
     private readonly accountRepo: Repository<FoodPlatformAccount>,
+    @InjectRepository(FoodPlatformStoreMapping)
+    private readonly storeMappingRepo: Repository<FoodPlatformStoreMapping>,
     private readonly connectorFactory: ConnectorFactory,
   ) {}
 
@@ -547,9 +550,29 @@ export class AccountsService {
       throw new BadRequestException(`Platform ${account.platform} không hỗ trợ lấy menu`);
     }
 
+    // For BeFood, we need to get storeId from store mappings
+    let storeId: string | undefined;
+    let merchantId: string | undefined;
+
+    if (account.platform === FoodPlatformType.BEFOOD) {
+      // Get the first store mapping to use its storeId
+      const storeMapping = await this.storeMappingRepo.findOne({
+        where: { accountId: account.id, isActive: true },
+      });
+
+      if (storeMapping) {
+        storeId = storeMapping.externalStoreId;
+        // merchantId can be stored in rawData or we use account's externalMerchantId
+        merchantId = account.externalMerchantId || undefined;
+        this.logger.log(`[getMenu] Using storeId: ${storeId}, merchantId: ${merchantId}`);
+      } else {
+        this.logger.warn(`[getMenu] No store mapping found for BeFood account ${accountId}`);
+      }
+    }
+
     try {
       this.logger.log(`[getMenu] Fetching menu for account ${accountId}...`);
-      const menu = await connector.getMenu(account);
+      const menu = await connector.getMenu(account, storeId, merchantId);
       this.logger.log(`[getMenu] Got ${menu?.categories?.length || 0} categories`);
       return menu;
     } catch (error: any) {
@@ -569,7 +592,7 @@ export class AccountsService {
           account = await this.reconnect(accountId);
           this.logger.log(`[getMenu] Reconnect success, retrying getMenu...`);
 
-          const menu = await connector.getMenu(account);
+          const menu = await connector.getMenu(account, storeId, merchantId);
           this.logger.log(`[getMenu] Retry success! Got ${menu?.categories?.length || 0} categories`);
           return menu;
         } catch (reconnectError: any) {
