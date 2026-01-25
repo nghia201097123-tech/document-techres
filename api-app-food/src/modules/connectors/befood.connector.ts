@@ -294,7 +294,6 @@ export class BeFoodConnector extends BasePlatformConnector {
         `${this.beFoodBaseUrl}/v2/merchant/get_restaurant_items`,
         {
           access_token: account.accessToken,
-          vendor_id: storeIdNum,
           restaurant_id: storeIdNum,
           ...(merchantIdNum && { merchant_id: merchantIdNum }),
         },
@@ -309,8 +308,22 @@ export class BeFoodConnector extends BasePlatformConnector {
       const responseData = response.data;
       this.logger.debug('[BeFoodConnector] Get menu response flag:', responseData?.flag);
 
+      // Check for auth errors - flag != 143 might indicate token expired
       if (responseData?.flag !== 143) {
         this.logger.error('[BeFoodConnector] Get menu failed:', responseData?.message);
+
+        // Check if it's an auth error (token expired)
+        const isAuthError = responseData?.flag === 401 ||
+          responseData?.code === 401 ||
+          responseData?.message?.toLowerCase()?.includes('unauthorized') ||
+          responseData?.message?.toLowerCase()?.includes('token') ||
+          responseData?.message?.toLowerCase()?.includes('hết hạn') ||
+          responseData?.message?.toLowerCase()?.includes('expired');
+
+        if (isAuthError) {
+          throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+        }
+
         return {
           categories: [],
           modifierGroups: [],
