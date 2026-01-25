@@ -79,4 +79,20 @@ interface FoodPlatformApi {
         @Path("accountId") accountId: String,
         @Body request: SelectStoreRequest
     ): Response<SelectStoreResponse>
+
+    /**
+     * Test connection - verify account can connect to platform
+     */
+    @POST("api/accounts/{accountId}/test")
+    suspend fun testConnection(
+        @Path("accountId") accountId: String
+    ): Response<TestConnectionResponse>
+
+    /**
+     * Disconnect account from platform
+     */
+    @POST("api/accounts/{accountId}/disconnect")
+    suspend fun disconnectAccount(
+        @Path("accountId") accountId: String
+    ): Response<DisconnectResponse>
 }

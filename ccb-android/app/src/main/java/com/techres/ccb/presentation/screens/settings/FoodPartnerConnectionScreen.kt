@@ -142,7 +142,11 @@ fun FoodPartnerConnectionScreen(
                             FoodPartnerAccountCard(
                                 account = account,
                                 isReconnecting = uiState.reconnectingAccountId == account.id,
-                                onReconnect = { viewModel.reconnectAccount(account.id) }
+                                isTesting = uiState.testingAccountId == account.id,
+                                isDisconnecting = uiState.disconnectingAccountId == account.id,
+                                onReconnect = { viewModel.reconnectAccount(account.id) },
+                                onTest = { viewModel.testConnection(account.id) },
+                                onDisconnect = { viewModel.disconnectAccount(account.id) }
                             )
                         }
 
@@ -162,11 +166,24 @@ fun FoodPartnerConnectionScreen(
         }
     }
 
-    // Show snackbar for reconnect result
-    uiState.reconnectResult?.let { result ->
+    // Show snackbar for action result
+    uiState.actionResult?.let { result ->
         LaunchedEffect(result) {
-            // Auto clear after showing
-            viewModel.clearReconnectResult()
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearActionResult()
+        }
+
+        Snackbar(
+            modifier = Modifier
+                .padding(16.dp),
+            containerColor = if (result.success) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+            action = {
+                TextButton(onClick = { viewModel.clearActionResult() }) {
+                    Text("Đóng", color = Color.White)
+                }
+            }
+        ) {
+            Text(result.message, color = Color.White)
         }
     }
 }
@@ -233,7 +250,11 @@ private fun StatItem(
 private fun FoodPartnerAccountCard(
     account: FoodPartnerAccount,
     isReconnecting: Boolean,
-    onReconnect: () -> Unit
+    isTesting: Boolean,
+    isDisconnecting: Boolean,
+    onReconnect: () -> Unit,
+    onTest: () -> Unit,
+    onDisconnect: () -> Unit
 ) {
     val platformColor = when (account.platform.lowercase()) {
         "grab" -> Color(0xFF00B14F)
@@ -250,6 +271,7 @@ private fun FoodPartnerAccountCard(
     }
 
     val isConnected = account.status == "connected"
+    val isAnyActionInProgress = isReconnecting || isTesting || isDisconnecting
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -260,114 +282,190 @@ private fun FoodPartnerAccountCard(
                 Color(0xFFFFF3E0)
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            // Platform icon/badge
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(platformColor.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = platformName.first().toString(),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = platformColor
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Account info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = platformName,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = account.displayName ?: account.username ?: "Không có tên",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Status badge
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isConnected) Color(0xFF4CAF50)
-                                else Color(0xFFE91E63)
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isConnected) "Đã kết nối" else "Mất kết nối",
-                        fontSize = 12.sp,
-                        color = if (isConnected) Color(0xFF4CAF50) else Color(0xFFE91E63)
-                    )
-                }
-
-                // Show error if disconnected
-                if (!isConnected && account.lastError != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = account.lastError,
-                        fontSize = 11.sp,
-                        color = Color(0xFFE91E63).copy(alpha = 0.8f),
-                        maxLines = 2
-                    )
-                }
-            }
-
-            // Reconnect button (only for disconnected accounts)
-            if (!isConnected) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = onReconnect,
-                    enabled = !isReconnecting,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF2196F3)
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                // Platform icon/badge
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(platformColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (isReconnecting) {
+                    Text(
+                        text = platformName.first().toString(),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = platformColor
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Account info
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = platformName,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = account.displayName ?: account.username ?: "Không có tên",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Status badge
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isConnected) Color(0xFF4CAF50)
+                                    else Color(0xFFE91E63)
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isConnected) "Đã kết nối" else "Mất kết nối",
+                            fontSize = 12.sp,
+                            color = if (isConnected) Color(0xFF4CAF50) else Color(0xFFE91E63)
+                        )
+                    }
+
+                    // Show error if disconnected
+                    if (!isConnected && account.lastError != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = account.lastError,
+                            fontSize = 11.sp,
+                            color = Color(0xFFE91E63).copy(alpha = 0.8f),
+                            maxLines = 2
+                        )
+                    }
+                }
+
+                // Connected indicator
+                if (isConnected) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // Action buttons row
+            Spacer(modifier = Modifier.height(12.dp))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Test button
+                OutlinedButton(
+                    onClick = onTest,
+                    enabled = !isAnyActionInProgress,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF2196F3)
+                    )
+                ) {
+                    if (isTesting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(14.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White
+                            color = Color(0xFF2196F3)
                         )
                     } else {
                         Icon(
-                            Icons.Default.Refresh,
+                            Icons.Default.Sync,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isReconnecting) "Đang kết nối..." else "Kết nối lại",
-                        fontSize = 12.sp
+                        text = if (isTesting) "Đang kiểm tra" else "Kiểm tra",
+                        fontSize = 11.sp
                     )
                 }
-            } else {
-                // Connected indicator
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(24.dp)
-                )
+
+                // Reconnect button (for disconnected) / Login button
+                if (!isConnected) {
+                    OutlinedButton(
+                        onClick = onReconnect,
+                        enabled = !isAnyActionInProgress,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF4CAF50)
+                        )
+                    ) {
+                        if (isReconnecting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF4CAF50)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Login,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isReconnecting) "Đang kết nối" else "Đăng nhập",
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                // Disconnect button
+                OutlinedButton(
+                    onClick = onDisconnect,
+                    enabled = !isAnyActionInProgress && isConnected,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFE91E63)
+                    )
+                ) {
+                    if (isDisconnecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFE91E63)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.LinkOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isDisconnecting) "Đang ngắt" else "Ngắt kết nối",
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }

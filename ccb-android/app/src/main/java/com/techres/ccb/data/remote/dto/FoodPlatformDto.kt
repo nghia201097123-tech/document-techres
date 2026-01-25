@@ -193,3 +193,32 @@ data class SelectStoreResponse(
     val message: String?,
     val data: LoginResultDto?
 )
+
+// ==================== Test Connection ====================
+
+data class TestConnectionResponse(
+    val status: Int,
+    val message: String?,
+    val data: TestConnectionResultDto?
+)
+
+data class TestConnectionResultDto(
+    val success: Boolean?,
+    val message: String?,
+    val platform: String?,
+    val merchantId: String?,
+    val merchantName: String?
+)
+
+// ==================== Disconnect ====================
+
+data class DisconnectResponse(
+    val status: Int,
+    val message: String?,
+    val data: DisconnectResultDto?
+)
+
+data class DisconnectResultDto(
+    val accountId: String?,
+    val status: String?
+)

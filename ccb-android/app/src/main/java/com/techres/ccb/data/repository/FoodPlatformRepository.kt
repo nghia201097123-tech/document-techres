@@ -203,6 +203,50 @@ class FoodPlatformRepository @Inject constructor(
     }
 
     /**
+     * Test connection - verify account can connect to platform
+     */
+    suspend fun testConnection(accountId: String): Result<TestConnectionResultDto> {
+        return try {
+            Log.d(TAG, "Testing connection for account $accountId")
+            val response = foodPlatformApi.testConnection(accountId)
+
+            if (response.isSuccessful && response.body()?.status == 200) {
+                Log.d(TAG, "Test connection successful: ${response.body()?.data}")
+                Result.success(response.body()!!.data!!)
+            } else {
+                val errorMsg = response.body()?.message ?: "Kiểm tra kết nối thất bại"
+                Log.e(TAG, "Test connection failed: $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Test connection error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Disconnect account from platform
+     */
+    suspend fun disconnectAccount(accountId: String): Result<DisconnectResultDto> {
+        return try {
+            Log.d(TAG, "Disconnecting account $accountId")
+            val response = foodPlatformApi.disconnectAccount(accountId)
+
+            if (response.isSuccessful && response.body()?.status == 200) {
+                Log.d(TAG, "Disconnect successful: ${response.body()?.data}")
+                Result.success(response.body()!!.data!!)
+            } else {
+                val errorMsg = response.body()?.message ?: "Ngắt kết nối thất bại"
+                Log.e(TAG, "Disconnect failed: $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Disconnect error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Get disconnected accounts for a branch
      */
     suspend fun getDisconnectedAccounts(branchId: String): List<DisconnectedAccount> {

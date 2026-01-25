@@ -21,9 +21,19 @@ data class FoodPartnerConnectionUiState(
     val error: String? = null,
     val lastSyncTime: String? = null,
     val reconnectingAccountId: String? = null,
-    val reconnectResult: ReconnectResult? = null
+    val testingAccountId: String? = null,
+    val disconnectingAccountId: String? = null,
+    val actionResult: ActionResult? = null
 )
 
+data class ActionResult(
+    val accountId: String,
+    val action: String, // "test", "reconnect", "disconnect"
+    val success: Boolean,
+    val message: String
+)
+
+// Keep for backward compatibility
 data class ReconnectResult(
     val accountId: String,
     val success: Boolean,
@@ -167,6 +177,130 @@ class FoodPartnerConnectionViewModel @Inject constructor(
     }
 
     fun clearReconnectResult() {
-        _uiState.update { it.copy(reconnectResult = null) }
+        _uiState.update { it.copy(actionResult = null) }
+    }
+
+    /**
+     * Test connection for a food platform account
+     */
+    fun testConnection(accountId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(testingAccountId = accountId) }
+
+            try {
+                val result = foodPlatformRepository.testConnection(accountId)
+
+                result.fold(
+                    onSuccess = { testResult ->
+                        _uiState.update {
+                            it.copy(
+                                testingAccountId = null,
+                                actionResult = ActionResult(
+                                    accountId = accountId,
+                                    action = "test",
+                                    success = testResult.success == true,
+                                    message = testResult.message ?: "Kết nối thành công"
+                                )
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        _uiState.update {
+                            it.copy(
+                                testingAccountId = null,
+                                actionResult = ActionResult(
+                                    accountId = accountId,
+                                    action = "test",
+                                    success = false,
+                                    message = e.message ?: "Kiểm tra kết nối thất bại"
+                                )
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "testConnection - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        testingAccountId = null,
+                        actionResult = ActionResult(
+                            accountId = accountId,
+                            action = "test",
+                            success = false,
+                            message = e.message ?: "Có lỗi xảy ra"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Disconnect a food platform account
+     */
+    fun disconnectAccount(accountId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(disconnectingAccountId = accountId) }
+
+            try {
+                val result = foodPlatformRepository.disconnectAccount(accountId)
+
+                result.fold(
+                    onSuccess = { disconnectResult ->
+                        // Update the account status in the UI
+                        val updatedAccounts = _uiState.value.accounts.map { account ->
+                            if (account.id == accountId) {
+                                account.copy(status = "disconnected")
+                            } else {
+                                account
+                            }
+                        }
+
+                        _uiState.update {
+                            it.copy(
+                                disconnectingAccountId = null,
+                                accounts = updatedAccounts,
+                                actionResult = ActionResult(
+                                    accountId = accountId,
+                                    action = "disconnect",
+                                    success = true,
+                                    message = "Đã ngắt kết nối thành công"
+                                )
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        _uiState.update {
+                            it.copy(
+                                disconnectingAccountId = null,
+                                actionResult = ActionResult(
+                                    accountId = accountId,
+                                    action = "disconnect",
+                                    success = false,
+                                    message = e.message ?: "Ngắt kết nối thất bại"
+                                )
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "disconnectAccount - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        disconnectingAccountId = null,
+                        actionResult = ActionResult(
+                            accountId = accountId,
+                            action = "disconnect",
+                            success = false,
+                            message = e.message ?: "Có lỗi xảy ra"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearActionResult() {
+        _uiState.update { it.copy(actionResult = null) }
     }
 }
