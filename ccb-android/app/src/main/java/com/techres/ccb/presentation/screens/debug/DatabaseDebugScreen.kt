@@ -48,8 +48,10 @@ import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.ComboItemDao
 import com.techres.ccb.data.local.dao.BankAccountDao
+import com.techres.ccb.data.local.dao.FoodPlatformAccountDao
 import com.techres.ccb.data.local.entity.ProductNoteEntity
 import com.techres.ccb.data.local.entity.BankAccountEntity
+import com.techres.ccb.data.local.entity.FoodPlatformAccountEntity
 import com.techres.ccb.data.repository.*
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -76,7 +78,8 @@ enum class DebugTab(val title: String) {
     COUPONS("Coupon"),
     BILL_TEMPLATES("Mẫu in bill"),
     BILL_PRINTER_CONFIGS("Cấu hình máy in"),
-    BANK_ACCOUNTS("Tài khoản NH")
+    BANK_ACCOUNTS("Tài khoản NH"),
+    FOOD_PLATFORM_ACCOUNTS("Cổng liên kết")
 }
 
 data class DebugUiState(
@@ -102,6 +105,7 @@ data class DebugUiState(
     val billTemplates: List<BillTemplateEntity> = emptyList(),
     val billPrinterConfigs: List<BillPrinterConfigEntity> = emptyList(),
     val bankAccounts: List<BankAccountEntity> = emptyList(),
+    val foodPlatformAccounts: List<FoodPlatformAccountEntity> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -125,7 +129,8 @@ class DatabaseDebugViewModel @Inject constructor(
     private val kitchenDao: KitchenDao,
     private val billTemplateDao: BillTemplateDao,
     private val billPrinterConfigDao: BillPrinterConfigDao,
-    private val bankAccountDao: BankAccountDao
+    private val bankAccountDao: BankAccountDao,
+    private val foodPlatformAccountDao: FoodPlatformAccountDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebugUiState())
@@ -392,6 +397,17 @@ class DatabaseDebugViewModel @Inject constructor(
                 Log.e(TAG, "Exception loading bank accounts", e)
             }
         }
+
+        // Food platform accounts (not branch-specific)
+        viewModelScope.launch {
+            try {
+                val foodPlatformAccounts = foodPlatformAccountDao.getAllForDebug()
+                Log.d(TAG, "Found ${foodPlatformAccounts.size} food platform accounts")
+                _uiState.update { it.copy(foodPlatformAccounts = foodPlatformAccounts) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception loading food platform accounts", e)
+            }
+        }
     }
 
     companion object {
@@ -476,6 +492,7 @@ fun DatabaseDebugScreen(
                         DebugTab.BILL_TEMPLATES -> uiState.billTemplates.size
                         DebugTab.BILL_PRINTER_CONFIGS -> uiState.billPrinterConfigs.size
                         DebugTab.BANK_ACCOUNTS -> uiState.bankAccounts.size
+                        DebugTab.FOOD_PLATFORM_ACCOUNTS -> uiState.foodPlatformAccounts.size
                     }
                     Tab(
                         selected = uiState.selectedTab == tab,
@@ -514,6 +531,7 @@ fun DatabaseDebugScreen(
                     DebugTab.BILL_TEMPLATES -> BillTemplatesTable(uiState.billTemplates)
                     DebugTab.BILL_PRINTER_CONFIGS -> BillPrinterConfigsTable(uiState.billPrinterConfigs)
                     DebugTab.BANK_ACCOUNTS -> BankAccountsTable(uiState.bankAccounts)
+                    DebugTab.FOOD_PLATFORM_ACCOUNTS -> FoodPlatformAccountsTable(uiState.foodPlatformAccounts)
                 }
             }
         }
@@ -946,6 +964,32 @@ fun BankAccountsTable(accounts: List<BankAccountEntity>) {
                 account.accountName.take(20),
                 account.bankBin ?: "-",
                 if (account.isPrimary) "✓" else "✗",
+                if (account.isActive) "✓" else "✗"
+            )
+        }
+    )
+}
+
+@Composable
+fun FoodPlatformAccountsTable(accounts: List<FoodPlatformAccountEntity>) {
+    DataTable(
+        headers = listOf("ID", "Nền tảng", "Tên hiển thị", "Username", "Trạng thái", "Merchant ID", "Lỗi cuối", "Số lỗi", "Active"),
+        data = accounts,
+        rowContent = { account ->
+            val statusText = when (account.status) {
+                "CONNECTED" -> "✅ Đã kết nối"
+                "DISCONNECTED" -> "❌ Mất kết nối"
+                else -> account.status
+            }
+            listOf(
+                account.id.take(8) + "...",
+                account.getPlatformDisplayName(),
+                account.displayName ?: "-",
+                account.username ?: "-",
+                statusText,
+                account.externalMerchantId?.take(12) ?: "-",
+                account.lastError?.take(20) ?: "-",
+                account.errorCount.toString(),
                 if (account.isActive) "✓" else "✗"
             )
         }
