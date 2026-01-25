@@ -45,127 +45,53 @@ export class PublicController {
   }
 
   /**
-   * Get food platform config for sync to CCB offline
-   * Returns: accounts for a specific branch from TWO sources:
-   * 1. Accounts with branchId directly on the account (food_platform_accounts.branchId)
-   * 2. Accounts linked via store mappings (food_platform_store_mappings.branchId)
+   * Get food platform accounts for sync to CCB offline
+   * Returns: accounts linked to this branch (via food_platform_accounts.branchId)
    */
   @Get('sync/food-platform/:branchId')
-  @ApiOperation({ summary: 'Get food platform config for sync to CCB offline' })
+  @ApiOperation({ summary: 'Get food platform accounts for sync to CCB offline' })
   @ApiParam({ name: 'branchId', description: 'Branch ID' })
   @ApiResponse({ status: 200, description: 'Food platform sync data' })
   async getFoodPlatformSync(@Param('branchId') branchId: string) {
     this.logger.log(`[getFoodPlatformSync] branchId=${branchId}`);
 
     try {
-      // Source 1: Get accounts with branchId directly on the account
-      const directAccounts = await this.accountRepo.find({
+      // Get accounts with this branchId
+      const accounts = await this.accountRepo.find({
         where: {
           branchId: branchId,
           isActive: true,
         },
       });
 
-      this.logger.log(`[getFoodPlatformSync] Found ${directAccounts.length} accounts directly linked to branch ${branchId}`);
+      // Filter to only CONNECTED and DISCONNECTED accounts
+      const validAccounts = accounts.filter(
+        account => account.status === AccountStatus.CONNECTED || account.status === AccountStatus.DISCONNECTED
+      );
 
-      // Source 2: Get accounts linked via store mappings
-      const storeMappings = await this.storeMappingRepo.find({
-        where: { branchId: branchId, isActive: true },
-        relations: ['account'],
-      });
+      this.logger.log(`[getFoodPlatformSync] Found ${validAccounts.length} accounts for branch ${branchId}`);
 
-      this.logger.log(`[getFoodPlatformSync] Found ${storeMappings.length} store mappings for branch ${branchId}`);
-
-      // Group by account (combine both sources)
-      const accountsMap = new Map<string, {
-        account: any;
-        storeMappings: any[];
-      }>();
-
-      // Add direct accounts first
-      for (const account of directAccounts) {
-        // Include both CONNECTED and DISCONNECTED accounts
-        if (account.status !== AccountStatus.CONNECTED && account.status !== AccountStatus.DISCONNECTED) continue;
-
-        if (!accountsMap.has(account.id)) {
-          accountsMap.set(account.id, {
-            account: {
-              id: account.id,
-              tenantId: account.tenantId,
-              platform: account.platform,
-              displayName: account.displayName,
-              status: account.status,
-              externalMerchantId: account.externalMerchantId,
-              externalMerchantName: account.externalMerchantName,
-              isActive: account.isActive,
-            },
-            storeMappings: [],
-          });
-        }
-      }
-
-      // Add accounts from store mappings (and their store mappings)
-      for (const mapping of storeMappings) {
-        if (!mapping.account) continue;
-        if (mapping.account.status !== AccountStatus.CONNECTED && mapping.account.status !== AccountStatus.DISCONNECTED) continue;
-
-        if (!accountsMap.has(mapping.accountId)) {
-          accountsMap.set(mapping.accountId, {
-            account: {
-              id: mapping.account.id,
-              tenantId: mapping.account.tenantId,
-              platform: mapping.account.platform,
-              displayName: mapping.account.displayName,
-              status: mapping.account.status,
-              externalMerchantId: mapping.account.externalMerchantId,
-              externalMerchantName: mapping.account.externalMerchantName,
-              isActive: mapping.account.isActive,
-            },
-            storeMappings: [],
-          });
-        }
-
-        accountsMap.get(mapping.accountId)!.storeMappings.push({
-          id: mapping.id,
-          externalStoreId: mapping.externalStoreId,
-          externalStoreName: mapping.externalStoreName,
-          externalStoreAddress: mapping.externalStoreAddress,
-          branchId: mapping.branchId,
-          branchName: mapping.branchName,
-          isActive: mapping.isActive,
-        });
-      }
-
-      const accountsWithMappings = Array.from(accountsMap.values());
-
-      // Get item mappings for these accounts
-      const accountIds = accountsWithMappings.map(a => a.account.id);
-      const itemMappings = accountIds.length > 0
-        ? await this.itemMappingRepo
-            .createQueryBuilder('m')
-            .where('m.accountId IN (:...accountIds)', { accountIds })
-            .andWhere('m.isActive = :isActive', { isActive: true })
-            .getMany()
-        : [];
-
-      this.logger.log(`[getFoodPlatformSync] Found ${accountsWithMappings.length} accounts, ${itemMappings.length} item mappings for branch ${branchId}`);
+      // Format response
+      const formattedAccounts = validAccounts.map(account => ({
+        account: {
+          id: account.id,
+          tenantId: account.tenantId,
+          platform: account.platform,
+          displayName: account.displayName,
+          status: account.status,
+          externalMerchantId: account.externalMerchantId,
+          externalMerchantName: account.externalMerchantName,
+          isActive: account.isActive,
+        },
+        storeMappings: [],
+      }));
 
       return {
         status: 200,
         message: 'Ok',
         data: {
-          accounts: accountsWithMappings,
-          itemMappings: itemMappings.map(m => ({
-            id: m.id,
-            accountId: m.accountId,
-            externalItemId: m.externalItemId,
-            externalPlatformItemId: m.externalPlatformItemId,
-            externalItemName: m.externalItemName,
-            techresBrandId: m.techresBrandId,
-            techresItemId: m.techresItemId,
-            techresItemName: m.techresItemName,
-            mappingType: m.mappingType,
-          })),
+          accounts: formattedAccounts,
+          itemMappings: [],
           syncedAt: new Date().toISOString(),
         },
       };
