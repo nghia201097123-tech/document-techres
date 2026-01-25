@@ -20,7 +20,7 @@ import { FoodPlatformAccount } from './food-platform-account.entity';
 @Index(['branchId'])
 @Index(['externalStoreId'])
 @Unique(['accountId', 'externalStoreId']) // 1 store chỉ map 1 lần với 1 account
-@Unique(['branchId', 'accountId']) // 1 branch chỉ map với 1 store/platform
+// Note: Removed @Unique(['branchId', 'accountId']) - 1 branch can be linked to multiple stores
 export class FoodPlatformStoreMapping {
   @PrimaryGeneratedColumn('uuid')
   id: string;
