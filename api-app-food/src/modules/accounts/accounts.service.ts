@@ -619,6 +619,31 @@ export class AccountsService {
           account = await this.reconnect(accountId);
           this.logger.log(`[getMenu] Reconnect success, retrying getMenu...`);
 
+          // For BeFood: Re-fetch merchantId after reconnect (now token is valid)
+          if (account.platform === FoodPlatformType.BEFOOD && !merchantId && storeId) {
+            this.logger.log(`[getMenu] Re-fetching merchantId after reconnect...`);
+            try {
+              const stores = await connector.getStores(account);
+              const matchingStore = stores.find((s: any) => String(s.externalStoreId) === String(storeId));
+              if (matchingStore?.merchantId) {
+                merchantId = matchingStore.merchantId;
+                this.logger.log(`[getMenu] Found merchantId after reconnect: ${merchantId}`);
+
+                // Update store mapping
+                const storeMapping = await this.storeMappingRepo.findOne({
+                  where: { accountId: account.id, externalStoreId: storeId },
+                });
+                if (storeMapping) {
+                  storeMapping.externalMerchantId = merchantId || null;
+                  await this.storeMappingRepo.save(storeMapping);
+                  this.logger.log(`[getMenu] Updated store mapping with merchantId`);
+                }
+              }
+            } catch (fetchErr: any) {
+              this.logger.warn(`[getMenu] Failed to fetch merchantId after reconnect: ${fetchErr?.message}`);
+            }
+          }
+
           const menu = await connector.getMenu(account, storeId, merchantId);
           this.logger.log(`[getMenu] Retry success! Got ${menu?.categories?.length || 0} categories`);
           return menu;
