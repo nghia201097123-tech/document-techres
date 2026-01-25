@@ -121,13 +121,13 @@ data class CreatedAccountDto(
 
 // ==================== Login ====================
 
-data class LoginRequest(
+data class FoodPlatformLoginRequest(
     val username: String,
     val password: String,
     val branchId: String? = null
 )
 
-data class LoginResponse(
+data class FoodPlatformLoginResponse(
     val status: Int,
     val message: String?,
     val data: LoginResultDto?

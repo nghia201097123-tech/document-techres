@@ -83,7 +83,7 @@ class FoodPlatformRepository @Inject constructor(
     ): Result<LoginResultDto> {
         return try {
             Log.d(TAG, "Logging in account $accountId")
-            val request = LoginRequest(username, password, branchId)
+            val request = FoodPlatformLoginRequest(username, password, branchId)
             val response = foodPlatformApi.login(accountId, request)
 
             if (response.isSuccessful && response.body()?.status == 200) {

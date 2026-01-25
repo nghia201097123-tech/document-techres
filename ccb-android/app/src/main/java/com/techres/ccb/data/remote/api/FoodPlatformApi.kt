@@ -50,8 +50,8 @@ interface FoodPlatformApi {
     @POST("api/accounts/{accountId}/login")
     suspend fun login(
         @Path("accountId") accountId: String,
-        @Body request: LoginRequest
-    ): Response<LoginResponse>
+        @Body request: FoodPlatformLoginRequest
+    ): Response<FoodPlatformLoginResponse>
 
     /**
      * Request OTP for phone authentication
