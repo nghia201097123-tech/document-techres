@@ -190,8 +190,16 @@ object NetworkModule {
     @Singleton
     @FoodRetrofit
     fun provideFoodRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        // api-app-food service URL
-        val foodApiUrl = BuildConfig.API_FOOD_BASE_URL.ifEmpty { BuildConfig.API_POS_BASE_URL }
+        // api-app-food service URL - use reflection to safely access the field
+        // This handles the case where BuildConfig hasn't been regenerated yet
+        val foodApiUrl = try {
+            val field = BuildConfig::class.java.getField("API_FOOD_BASE_URL")
+            val url = field.get(null) as? String
+            if (url.isNullOrEmpty()) BuildConfig.API_POS_BASE_URL else url
+        } catch (e: Exception) {
+            Log.w(TAG, "API_FOOD_BASE_URL not found, using POS URL as fallback")
+            BuildConfig.API_POS_BASE_URL
+        }
         Log.d(TAG, "API Food Base URL: $foodApiUrl")
         return Retrofit.Builder()
             .baseUrl(foodApiUrl)
