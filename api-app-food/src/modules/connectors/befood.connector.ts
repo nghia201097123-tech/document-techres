@@ -28,19 +28,48 @@ export class BeFoodConnector extends BasePlatformConnector {
   }
 
   /**
-   * Login with email/password via BeFood Merchant Gateway
+   * Login with email or phone/password via BeFood Merchant Gateway
    * Endpoint: POST /v2/merchant/login
+   * Supports both:
+   *   - Email login: { email, password }
+   *   - Phone login: { phone_no: "+84xxxxxxxxx", password }
    */
   async login(credentials: LoginCredentials): Promise<LoginResult> {
     try {
       this.logger.debug('[BeFoodConnector] Attempting login...');
 
+      // Determine if username is phone number or email
+      const username = credentials.username || '';
+      const isPhoneNumber = username.startsWith('+84') ||
+                            username.startsWith('84') ||
+                            username.startsWith('0') && /^\d+$/.test(username.replace(/^0/, ''));
+
+      // Format phone number with +84 prefix if needed
+      let phoneNumber = username;
+      if (isPhoneNumber) {
+        if (username.startsWith('0')) {
+          phoneNumber = '+84' + username.substring(1);
+        } else if (username.startsWith('84') && !username.startsWith('+84')) {
+          phoneNumber = '+' + username;
+        }
+      }
+
+      // Build request body based on login type
+      const requestBody: Record<string, string> = {
+        password: credentials.password || '',
+      };
+
+      if (isPhoneNumber) {
+        requestBody.phone_no = phoneNumber;
+        this.logger.debug(`[BeFoodConnector] Using phone login: ${phoneNumber}`);
+      } else {
+        requestBody.email = username;
+        this.logger.debug(`[BeFoodConnector] Using email login: ${username}`);
+      }
+
       const response = await axios.post(
         `${this.beFoodBaseUrl}/v2/merchant/login`,
-        {
-          email: credentials.username,
-          password: credentials.password,
-        },
+        requestBody,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -62,7 +91,7 @@ export class BeFoodConnector extends BasePlatformConnector {
           refreshToken: responseData.resfresh_token || responseData.refresh_token, // Note: typo in API "resfresh"
           expiresIn: 23328000, // ~270 days based on JWT exp
           merchantId: String(user.user_id),
-          merchantName: user.email,
+          merchantName: user.email || user.phone_no,
           // Additional user info
           email: user.email,
           phoneNumber: user.phone_no,
