@@ -80,7 +80,7 @@ export class StoresService {
   }
 
   /**
-   * Create store mappings for an account
+   * Create or update store mappings for an account (upsert)
    */
   async createMappings(
     accountId: string,
@@ -95,24 +95,54 @@ export class StoresService {
     // Note: One branch can be linked to multiple stores on the same platform
     // No validation needed for duplicate branch mappings
 
-    // Create mappings
-    const mappings = dto.mappings.map((item) =>
-      this.storeMappingRepo.create({
-        accountId,
-        tenantId: account.tenantId,
-        externalStoreId: item.externalStoreId,
-        externalStoreName: item.externalStoreName,
-        externalStoreAddress: item.externalStoreAddress,
-        externalStorePhone: item.externalStorePhone,
-        externalStoreEmail: item.externalStoreEmail,
-        branchId: item.branchId,
-        branchName: item.branchName,
-        isActive: true,
-        isStoreActive: true,
-      }),
-    );
+    const results: FoodPlatformStoreMapping[] = [];
 
-    return this.storeMappingRepo.save(mappings);
+    for (const item of dto.mappings) {
+      // Check if mapping already exists for this account + externalStoreId
+      let existing = await this.storeMappingRepo.findOne({
+        where: {
+          accountId,
+          externalStoreId: item.externalStoreId,
+        },
+      });
+
+      if (existing) {
+        // Update existing mapping
+        existing.externalStoreName = item.externalStoreName;
+        existing.externalStoreAddress = item.externalStoreAddress || existing.externalStoreAddress;
+        existing.externalStorePhone = item.externalStorePhone || existing.externalStorePhone;
+        existing.externalStoreEmail = item.externalStoreEmail || existing.externalStoreEmail;
+        existing.branchId = item.branchId;
+        existing.branchName = item.branchName || existing.branchName;
+        existing.isActive = true;
+        existing.isStoreActive = true;
+
+        const updated = await this.storeMappingRepo.save(existing);
+        results.push(updated);
+        this.logger.log(`[createMappings] Updated existing mapping for store ${item.externalStoreId}`);
+      } else {
+        // Create new mapping
+        const mapping = this.storeMappingRepo.create({
+          accountId,
+          tenantId: account.tenantId,
+          externalStoreId: item.externalStoreId,
+          externalStoreName: item.externalStoreName,
+          externalStoreAddress: item.externalStoreAddress,
+          externalStorePhone: item.externalStorePhone,
+          externalStoreEmail: item.externalStoreEmail,
+          branchId: item.branchId,
+          branchName: item.branchName,
+          isActive: true,
+          isStoreActive: true,
+        });
+
+        const created = await this.storeMappingRepo.save(mapping);
+        results.push(created);
+        this.logger.log(`[createMappings] Created new mapping for store ${item.externalStoreId}`);
+      }
+    }
+
+    return results;
   }
 
   /**
