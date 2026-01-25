@@ -133,7 +133,7 @@ export class OrdersService {
    */
   private async syncOrdersToDb(
     rawOrders: RawFoodOrder[],
-    branchId: number,
+    branchId: string,
     mappings: FoodPlatformStoreMapping[],
   ): Promise<{ newOrders: FoodOrder[]; updatedOrders: FoodOrder[] }> {
     const newOrders: FoodOrder[] = [];

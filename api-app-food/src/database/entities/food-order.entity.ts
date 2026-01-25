@@ -56,8 +56,8 @@ export class FoodOrder {
   @Column({ type: 'varchar', length: 50, name: 'tenant_id' })
   tenantId: string;
 
-  @Column({ type: 'int', name: 'branch_id' })
-  branchId: number;
+  @Column({ type: 'varchar', length: 50, name: 'branch_id' })
+  branchId: string; // Can be UUID or legacy int as string
 
   // External order info
   @Column({ type: 'varchar', length: 100, name: 'external_order_id' })

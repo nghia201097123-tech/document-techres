@@ -13,10 +13,10 @@ import { FoodOrderStatus, FoodPlatformType } from '../../../database/entities';
  * Poll Orders Query DTO
  */
 export class PollOrdersQueryDto {
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  @Min(1)
-  branchId: number;
+  @ApiProperty({ example: '168ae283-3efb-46cc-8657-3df86def1aed' })
+  @IsString()
+  @IsNotEmpty()
+  branchId: string;
 
   @ApiPropertyOptional({ example: 1706003400000 })
   @IsOptional()
@@ -28,10 +28,10 @@ export class PollOrdersQueryDto {
  * Get Orders Query DTO
  */
 export class GetOrdersQueryDto {
-  @ApiPropertyOptional({ example: 1 })
+  @ApiPropertyOptional({ example: '168ae283-3efb-46cc-8657-3df86def1aed' })
   @IsOptional()
-  @IsInt()
-  branchId?: number;
+  @IsString()
+  branchId?: string;
 
   @ApiPropertyOptional({ example: 'tenant-001' })
   @IsOptional()
