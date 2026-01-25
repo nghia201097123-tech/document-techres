@@ -81,7 +81,17 @@ class FoodPlatformRepository @Inject constructor(
         return try {
             val response = foodPlatformApi.getDisconnectedAccounts(branchId)
             if (response.isSuccessful && response.body() != null) {
-                response.body()?.data?.disconnectedAccounts ?: emptyList()
+                response.body()?.data?.disconnectedAccounts?.map { dto ->
+                    DisconnectedAccount(
+                        accountId = dto.accountId,
+                        platform = dto.platform,
+                        displayName = dto.displayName,
+                        username = dto.username,
+                        status = dto.status,
+                        lastError = dto.lastError,
+                        errorCount = dto.errorCount ?: 0
+                    )
+                } ?: emptyList()
             } else {
                 emptyList()
             }

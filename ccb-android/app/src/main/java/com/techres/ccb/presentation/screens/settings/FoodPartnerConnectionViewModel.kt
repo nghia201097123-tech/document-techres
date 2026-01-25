@@ -45,7 +45,8 @@ class FoodPartnerConnectionViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                val branchId = authRepository.getSelectedBranchId()
+                val branchIdStr = authRepository.getBranchId()
+                val branchId = branchIdStr?.toIntOrNull()
                 if (branchId == null) {
                     _uiState.update {
                         it.copy(
