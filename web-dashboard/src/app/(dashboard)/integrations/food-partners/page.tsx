@@ -178,7 +178,7 @@ export default function FoodPartnersPage() {
   const [expandedCategories, setExpandedCategories] = React.useState<Record<string, boolean>>({});
 
   // Menu sync states
-  const [syncingMenu, setSyncingMenu] = React.useState(false);
+  const [syncingMenu, setSyncingMenu] = React.useState<string | null>(null); // Account ID being synced
   const [syncedItems, setSyncedItems] = React.useState<SyncedItemsByCategory[]>([]);
   const [itemMappings, setItemMappings] = React.useState<ItemMapping[]>([]);
   const [menuSyncStatus, setMenuSyncStatus] = React.useState<MenuSyncStatus | null>(null);
@@ -315,7 +315,7 @@ export default function FoodPartnersPage() {
 
   // Sync menu from platform to database
   const handleSyncMenu = async (account: FoodPlatformAccount) => {
-    setSyncingMenu(true);
+    setSyncingMenu(account.id);
     try {
       const result = await foodPartnerService.syncMenuItems(account.id);
       toast({
@@ -332,7 +332,7 @@ export default function FoodPartnersPage() {
         variant: "destructive",
       });
     } finally {
-      setSyncingMenu(false);
+      setSyncingMenu(null);
     }
   };
 
@@ -1305,9 +1305,9 @@ export default function FoodPartnersPage() {
                                       handleSyncMenu(account);
                                     }
                                   }}
-                                  disabled={syncingMenu}
+                                  disabled={syncingMenu === connection.id}
                                 >
-                                  {syncingMenu ? (
+                                  {syncingMenu === connection.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <UtensilsCrossed className="h-4 w-4" />
@@ -1642,10 +1642,10 @@ export default function FoodPartnersPage() {
                         <Button
                           size="sm"
                           onClick={() => handleSyncMenu(selectedAccountForMenu)}
-                          disabled={syncingMenu}
+                          disabled={syncingMenu === selectedAccountForMenu?.id}
                           className="bg-blue-600 hover:bg-blue-700"
                         >
-                          {syncingMenu ? (
+                          {syncingMenu === selectedAccountForMenu?.id ? (
                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           ) : (
                             <ArrowRightLeft className="h-4 w-4 mr-1" />
@@ -1919,10 +1919,10 @@ export default function FoodPartnersPage() {
                     </p>
                     <Button
                       onClick={() => handleSyncMenu(selectedAccountForMenu)}
-                      disabled={syncingMenu}
+                      disabled={syncingMenu === selectedAccountForMenu?.id}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
-                      {syncingMenu ? (
+                      {syncingMenu === selectedAccountForMenu?.id ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
                         <ArrowRightLeft className="h-4 w-4 mr-2" />
