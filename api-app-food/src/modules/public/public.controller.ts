@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, AccountStatus } from '../../database/entities';
+import { AccountsService } from '../accounts/accounts.service';
 
 @ApiTags('public')
 @Controller('api/public')
@@ -18,6 +19,7 @@ export class PublicController {
     private readonly externalItemRepo: Repository<FoodPlatformExternalItem>,
     @InjectRepository(FoodPlatformItemMapping)
     private readonly itemMappingRepo: Repository<FoodPlatformItemMapping>,
+    private readonly accountsService: AccountsService,
   ) {}
 
   @Get('health-check')
@@ -67,7 +69,9 @@ export class PublicController {
       }>();
 
       for (const mapping of storeMappings) {
-        if (!mapping.account || mapping.account.status !== AccountStatus.CONNECTED) continue;
+        // Include both CONNECTED and DISCONNECTED accounts (CCB will reconnect disconnected ones)
+        if (!mapping.account) continue;
+        if (mapping.account.status !== AccountStatus.CONNECTED && mapping.account.status !== AccountStatus.DISCONNECTED) continue;
 
         if (!accountsMap.has(mapping.accountId)) {
           accountsMap.set(mapping.accountId, {
@@ -219,6 +223,124 @@ export class PublicController {
       };
     } catch (error: any) {
       this.logger.error(`[getFoodPlatformSyncByTenant] Error: ${error.message}`);
+      return {
+        status: 500,
+        message: error.message,
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Reconnect a disconnected food platform account
+   * Called by CCB offline app when it detects a disconnected account
+   */
+  @Post('reconnect/:accountId')
+  @ApiOperation({ summary: 'Reconnect a disconnected food platform account' })
+  @ApiParam({ name: 'accountId', description: 'Account ID to reconnect' })
+  @ApiResponse({ status: 200, description: 'Reconnect result' })
+  async reconnectAccount(@Param('accountId') accountId: string) {
+    this.logger.log(`[reconnectAccount] Attempting to reconnect account ${accountId}`);
+
+    try {
+      // Check if account exists and is disconnected
+      const account = await this.accountRepo.findOne({ where: { id: accountId } });
+      if (!account) {
+        return {
+          status: 404,
+          message: 'Không tìm thấy tài khoản',
+          data: null,
+        };
+      }
+
+      if (account.status === AccountStatus.CONNECTED) {
+        this.logger.log(`[reconnectAccount] Account ${accountId} is already connected`);
+        return {
+          status: 200,
+          message: 'Tài khoản đã được kết nối',
+          data: {
+            accountId: account.id,
+            status: account.status,
+            reconnected: false,
+          },
+        };
+      }
+
+      // Attempt to reconnect using stored credentials
+      const reconnectedAccount = await this.accountsService.reconnect(accountId);
+
+      this.logger.log(`[reconnectAccount] Successfully reconnected account ${accountId}`);
+      return {
+        status: 200,
+        message: 'Kết nối lại thành công',
+        data: {
+          accountId: reconnectedAccount.id,
+          status: reconnectedAccount.status,
+          reconnected: true,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[reconnectAccount] Failed to reconnect account ${accountId}: ${error.message}`);
+      return {
+        status: 400,
+        message: error.message || 'Không thể kết nối lại',
+        data: {
+          accountId,
+          reconnected: false,
+          error: error.message,
+        },
+      };
+    }
+  }
+
+  /**
+   * Get all disconnected accounts for a branch
+   * CCB can use this to check which accounts need reconnection
+   */
+  @Get('disconnected-accounts/:branchId')
+  @ApiOperation({ summary: 'Get disconnected accounts for a branch' })
+  @ApiParam({ name: 'branchId', description: 'Branch ID' })
+  @ApiResponse({ status: 200, description: 'List of disconnected accounts' })
+  async getDisconnectedAccounts(@Param('branchId') branchId: string) {
+    this.logger.log(`[getDisconnectedAccounts] branchId=${branchId}`);
+
+    try {
+      // Get all store mappings for this branch
+      const storeMappings = await this.storeMappingRepo.find({
+        where: { branchId: parseInt(branchId), isActive: true },
+        relations: ['account'],
+      });
+
+      // Filter to disconnected accounts only
+      const disconnectedAccounts = storeMappings
+        .filter(m => m.account && m.account.status === AccountStatus.DISCONNECTED)
+        .map(m => ({
+          accountId: m.account.id,
+          platform: m.account.platform,
+          displayName: m.account.displayName,
+          username: m.account.username,
+          status: m.account.status,
+          lastError: m.account.lastError,
+          errorCount: m.account.errorCount,
+        }));
+
+      // Remove duplicates
+      const uniqueAccounts = Array.from(
+        new Map(disconnectedAccounts.map(a => [a.accountId, a])).values()
+      );
+
+      this.logger.log(`[getDisconnectedAccounts] Found ${uniqueAccounts.length} disconnected accounts for branch ${branchId}`);
+
+      return {
+        status: 200,
+        message: 'Ok',
+        data: {
+          disconnectedAccounts: uniqueAccounts,
+          count: uniqueAccounts.length,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[getDisconnectedAccounts] Error: ${error.message}`);
       return {
         status: 500,
         message: error.message,
