@@ -569,8 +569,28 @@ export class AccountsService {
       if (storeMapping) {
         this.logger.log(`[getMenu] Store mapping: externalStoreId=${storeMapping.externalStoreId}, externalMerchantId=${storeMapping.externalMerchantId}, branchId=${storeMapping.branchId}`);
         storeId = storeMapping.externalStoreId;
-        // Use merchantId from store mapping (saved from get_user_profiles response)
         merchantId = storeMapping.externalMerchantId || undefined;
+
+        // Fallback: If merchantId is missing, fetch from getStores and update mapping
+        if (!merchantId) {
+          this.logger.log(`[getMenu] merchantId is missing, fetching from getStores...`);
+          try {
+            const stores = await connector.getStores(account);
+            const matchingStore = stores.find((s: any) => String(s.externalStoreId) === String(storeId));
+            if (matchingStore?.merchantId) {
+              merchantId = matchingStore.merchantId;
+              this.logger.log(`[getMenu] Found merchantId from getStores: ${merchantId}`);
+
+              // Update the store mapping with merchantId for future calls
+              storeMapping.externalMerchantId = merchantId;
+              await this.storeMappingRepo.save(storeMapping);
+              this.logger.log(`[getMenu] Updated store mapping with merchantId`);
+            }
+          } catch (err: any) {
+            this.logger.warn(`[getMenu] Failed to fetch merchantId from getStores: ${err?.message}`);
+          }
+        }
+
         this.logger.log(`[getMenu] Using storeId: ${storeId}, merchantId: ${merchantId}`);
       } else {
         this.logger.warn(`[getMenu] No store mapping found for BeFood account ${accountId}`);
