@@ -192,4 +192,11 @@ object DatabaseModule {
     fun provideBankAccountDao(database: CCBDatabase): BankAccountDao {
         return database.bankAccountDao()
     }
+
+    // Food platform account DAO
+    @Provides
+    @Singleton
+    fun provideFoodPlatformAccountDao(database: CCBDatabase): FoodPlatformAccountDao {
+        return database.foodPlatformAccountDao()
+    }
 }

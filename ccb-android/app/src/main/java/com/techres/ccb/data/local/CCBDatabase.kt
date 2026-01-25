@@ -43,9 +43,11 @@ import com.techres.ccb.data.local.entity.*
         // Surcharges (phụ thu)
         SurchargeEntity::class,
         // Bank accounts (tài khoản ngân hàng)
-        BankAccountEntity::class
+        BankAccountEntity::class,
+        // Food platform accounts (cổng liên kết app food)
+        FoodPlatformAccountEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = true
 )
 abstract class CCBDatabase : RoomDatabase() {
@@ -91,6 +93,9 @@ abstract class CCBDatabase : RoomDatabase() {
 
     // Bank account DAOs
     abstract fun bankAccountDao(): BankAccountDao
+
+    // Food platform DAOs
+    abstract fun foodPlatformAccountDao(): FoodPlatformAccountDao
 
     /**
      * Clear only master data tables, preserving transaction data (orders, shifts, payments)
@@ -162,6 +167,10 @@ abstract class CCBDatabase : RoomDatabase() {
             // Clear bank accounts
             Log.d(TAG, "clearMasterData - Clearing bank_accounts...")
             db.execSQL("DELETE FROM bank_accounts")
+
+            // Clear food platform accounts
+            Log.d(TAG, "clearMasterData - Clearing food_platform_accounts...")
+            db.execSQL("DELETE FROM food_platform_accounts")
 
             db.setTransactionSuccessful()
             Log.d(TAG, "clearMasterData - Transaction successful, committing...")

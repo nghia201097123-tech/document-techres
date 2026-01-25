@@ -1134,6 +1134,45 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 27 to 28
+     * Creates food_platform_accounts table for storing food delivery platform connections
+     * (GrabFood, ShopeeFood, BeFood, etc.)
+     */
+    val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            Log.d(TAG, "Running migration from 27 to 28...")
+            Log.d(TAG, "Creating food_platform_accounts table")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS food_platform_accounts (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    branch_id TEXT NOT NULL,
+                    tenant_id TEXT,
+                    platform TEXT NOT NULL,
+                    display_name TEXT,
+                    username TEXT,
+                    status TEXT NOT NULL,
+                    external_merchant_id TEXT,
+                    external_merchant_name TEXT,
+                    last_error TEXT,
+                    error_count INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    sync_status TEXT NOT NULL DEFAULT 'synced',
+                    synced_at TEXT
+                )
+            """.trimIndent())
+
+            // Create indices
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_food_platform_accounts_branch_id ON food_platform_accounts(branch_id)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_food_platform_accounts_platform ON food_platform_accounts(platform)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_food_platform_accounts_status ON food_platform_accounts(status)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_food_platform_accounts_is_active ON food_platform_accounts(is_active)")
+
+            Log.d(TAG, "Migration 27 to 28 complete - Created food_platform_accounts table")
+        }
+    }
+
+    /**
      * All migrations in order
      */
     val ALL_MIGRATIONS = arrayOf(
@@ -1154,6 +1193,7 @@ object DatabaseMigrations {
         MIGRATION_23_24,
         MIGRATION_24_25,
         MIGRATION_25_26,
-        MIGRATION_26_27
+        MIGRATION_26_27,
+        MIGRATION_27_28
     )
 }

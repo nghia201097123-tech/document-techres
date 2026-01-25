@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
 import com.techres.ccb.data.local.dao.BankAccountDao
+import com.techres.ccb.data.local.dao.FoodPlatformAccountDao
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
 import com.techres.ccb.data.local.dao.ComboItemDao
@@ -77,6 +78,7 @@ class SyncRepository @Inject constructor(
     private val billPrinterConfigDao: BillPrinterConfigDao,
     private val surchargeDao: SurchargeDao,
     private val bankAccountDao: BankAccountDao,
+    private val foodPlatformAccountDao: FoodPlatformAccountDao,
     private val sharedPreferences: SharedPreferences
 ) {
     companion object {
@@ -802,13 +804,35 @@ class SyncRepository @Inject constructor(
         }
         onProgress?.invoke(SyncStepProgress(SyncStep.BANK_ACCOUNTS, SyncStepStatus.COMPLETED, bankAccountsList.size))
 
-        // Save food platform data to SharedPreferences (for display in Food Partner Connection screen)
+        // Save food platform data to Room database and SharedPreferences
         syncData.foodPlatform?.let { foodPlatformData ->
             try {
+                // Save to SharedPreferences (for backward compatibility)
                 val json = gson.toJson(foodPlatformData)
                 sharedPreferences.edit().putString(KEY_FOOD_PLATFORM_DATA, json).apply()
-                val accountCount = foodPlatformData.accounts?.size ?: 0
-                Log.d("SyncRepository", "Saved food platform data: $accountCount accounts")
+
+                // Save to Room database (for database debug view)
+                val foodPlatformAccountsList = foodPlatformData.accounts?.map { accountData ->
+                    FoodPlatformAccountEntity(
+                        id = accountData.account.id,
+                        branchId = branchId,
+                        tenantId = accountData.account.tenantId,
+                        platform = accountData.account.platform,
+                        displayName = accountData.account.displayName,
+                        username = accountData.account.username,
+                        status = accountData.account.status,
+                        externalMerchantId = accountData.account.externalMerchantId,
+                        externalMerchantName = accountData.account.externalMerchantName,
+                        lastError = accountData.account.lastError,
+                        errorCount = accountData.account.errorCount ?: 0,
+                        isActive = accountData.account.isActive ?: true,
+                        syncStatus = "synced",
+                        syncedAt = syncTime
+                    )
+                } ?: emptyList()
+
+                foodPlatformAccountDao.syncFoodPlatformAccounts(branchId, foodPlatformAccountsList)
+                Log.d("SyncRepository", "Saved ${foodPlatformAccountsList.size} food platform accounts to database")
             } catch (e: Exception) {
                 Log.e("SyncRepository", "Error saving food platform data: ${e.message}")
             }
