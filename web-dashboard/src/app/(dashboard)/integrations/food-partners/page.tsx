@@ -714,6 +714,7 @@ export default function FoodPartnersPage() {
     try {
       const mapping: CreateStoreMappingDto = {
         externalStoreId: store.externalStoreId,
+        externalMerchantId: store.externalMerchantId, // Merchant ID for BeFood
         externalStoreName: store.name,
         externalStoreAddress: store.address,
         externalStorePhone: store.phone,

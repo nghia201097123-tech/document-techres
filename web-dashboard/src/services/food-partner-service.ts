@@ -142,6 +142,7 @@ export interface PartnerConnectionView {
 // External store from food platform (GrabFood, Shopee, etc.)
 export interface ExternalStore {
   externalStoreId: string;
+  externalMerchantId?: string; // Merchant ID (for BeFood)
   name: string;
   address?: string;
   phone?: string;
@@ -172,6 +173,7 @@ export interface StoreMapping {
 // DTO for creating store mapping
 export interface CreateStoreMappingDto {
   externalStoreId: string;
+  externalMerchantId?: string; // Merchant ID (for BeFood)
   externalStoreName: string;
   externalStoreAddress?: string;
   externalStorePhone?: string;

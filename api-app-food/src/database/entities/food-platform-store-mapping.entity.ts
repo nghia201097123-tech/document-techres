@@ -42,6 +42,9 @@ export class FoodPlatformStoreMapping {
   @Column({ type: 'varchar', length: 100, name: 'external_store_id' })
   externalStoreId: string; // Store ID trên platform (GR-001)
 
+  @Column({ type: 'varchar', length: 100, nullable: true, name: 'external_merchant_id' })
+  externalMerchantId: string | null; // Merchant ID trên platform (for BeFood)
+
   @Column({ type: 'varchar', length: 255, name: 'external_store_name' })
   externalStoreName: string; // Tên cửa hàng trên platform
 

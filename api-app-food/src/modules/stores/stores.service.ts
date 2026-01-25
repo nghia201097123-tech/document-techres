@@ -112,6 +112,7 @@ export class StoresService {
         existing.externalStoreAddress = item.externalStoreAddress || existing.externalStoreAddress;
         existing.externalStorePhone = item.externalStorePhone || existing.externalStorePhone;
         existing.externalStoreEmail = item.externalStoreEmail || existing.externalStoreEmail;
+        existing.externalMerchantId = item.externalMerchantId || existing.externalMerchantId;
         existing.branchId = item.branchId;
         existing.branchName = item.branchName || existing.branchName;
         existing.isActive = true;
@@ -119,13 +120,14 @@ export class StoresService {
 
         const updated = await this.storeMappingRepo.save(existing);
         results.push(updated);
-        this.logger.log(`[createMappings] Updated existing mapping for store ${item.externalStoreId}`);
+        this.logger.log(`[createMappings] Updated existing mapping for store ${item.externalStoreId}, merchantId: ${item.externalMerchantId}`);
       } else {
         // Create new mapping
         const mapping = this.storeMappingRepo.create({
           accountId,
           tenantId: account.tenantId,
           externalStoreId: item.externalStoreId,
+          externalMerchantId: item.externalMerchantId,
           externalStoreName: item.externalStoreName,
           externalStoreAddress: item.externalStoreAddress,
           externalStorePhone: item.externalStorePhone,
@@ -138,7 +140,7 @@ export class StoresService {
 
         const created = await this.storeMappingRepo.save(mapping);
         results.push(created);
-        this.logger.log(`[createMappings] Created new mapping for store ${item.externalStoreId}`);
+        this.logger.log(`[createMappings] Created new mapping for store ${item.externalStoreId}, merchantId: ${item.externalMerchantId}`);
       }
     }
 

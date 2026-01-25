@@ -19,6 +19,11 @@ export class StoreMappingItemDto {
   @IsNotEmpty()
   externalStoreId: string;
 
+  @ApiPropertyOptional({ example: '104746', description: 'Merchant ID on platform (for BeFood)' })
+  @IsString()
+  @IsOptional()
+  externalMerchantId?: string;
+
   @ApiProperty({ example: 'Cà phê TechRes Quận 1' })
   @IsString()
   @IsNotEmpty()
