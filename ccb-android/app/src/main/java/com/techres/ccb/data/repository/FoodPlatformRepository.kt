@@ -152,11 +152,12 @@ class FoodPlatformRepository @Inject constructor(
     suspend fun selectStore(
         accountId: String,
         merchantId: String,
-        storeName: String
+        storeName: String,
+        branchId: String? = null
     ): Result<LoginResultDto> {
         return try {
-            Log.d(TAG, "Selecting store for account $accountId")
-            val request = SelectStoreRequest(merchantId, storeName)
+            Log.d(TAG, "Selecting store for account $accountId, branchId=$branchId")
+            val request = SelectStoreRequest(merchantId, storeName, branchId)
             val response = foodPlatformApi.selectStore(accountId, request)
 
             if (response.isSuccessful && response.body()?.status == 200) {
