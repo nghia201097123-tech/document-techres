@@ -1,6 +1,8 @@
 package com.techres.ccb.data.repository
 
+import android.content.SharedPreferences
 import android.util.Log
+import com.google.gson.Gson
 import com.techres.ccb.data.local.dao.BankAccountDao
 import com.techres.ccb.data.local.dao.BillPrinterConfigDao
 import com.techres.ccb.data.local.dao.BillTemplateDao
@@ -74,8 +76,14 @@ class SyncRepository @Inject constructor(
     private val billTemplateDao: BillTemplateDao,
     private val billPrinterConfigDao: BillPrinterConfigDao,
     private val surchargeDao: SurchargeDao,
-    private val bankAccountDao: BankAccountDao
+    private val bankAccountDao: BankAccountDao,
+    private val sharedPreferences: SharedPreferences
 ) {
+    companion object {
+        private const val KEY_FOOD_PLATFORM_DATA = "food_platform_data"
+    }
+
+    private val gson = Gson()
     suspend fun performFullSync(): Result<Unit> {
         return performFullSyncWithProgress(null)
     }
@@ -793,6 +801,36 @@ class SyncRepository @Inject constructor(
             Log.d("SyncRepository", "Saved ${bankAccountsList.size} bank accounts to database")
         }
         onProgress?.invoke(SyncStepProgress(SyncStep.BANK_ACCOUNTS, SyncStepStatus.COMPLETED, bankAccountsList.size))
+
+        // Save food platform data to SharedPreferences (for display in Food Partner Connection screen)
+        syncData.foodPlatform?.let { foodPlatformData ->
+            try {
+                val json = gson.toJson(foodPlatformData)
+                sharedPreferences.edit().putString(KEY_FOOD_PLATFORM_DATA, json).apply()
+                val accountCount = foodPlatformData.accounts?.size ?: 0
+                Log.d("SyncRepository", "Saved food platform data: $accountCount accounts")
+            } catch (e: Exception) {
+                Log.e("SyncRepository", "Error saving food platform data: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Get food platform data from SharedPreferences
+     * Returns null if no data is stored
+     */
+    fun getFoodPlatformData(): com.techres.ccb.data.remote.dto.FoodPlatformSyncDto? {
+        return try {
+            val json = sharedPreferences.getString(KEY_FOOD_PLATFORM_DATA, null)
+            if (json != null) {
+                gson.fromJson(json, com.techres.ccb.data.remote.dto.FoodPlatformSyncDto::class.java)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("SyncRepository", "Error reading food platform data: ${e.message}")
+            null
+        }
     }
 
     /**

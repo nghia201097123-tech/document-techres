@@ -3,8 +3,8 @@ package com.techres.ccb.presentation.screens.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techres.ccb.data.repository.BranchRepository
 import com.techres.ccb.data.repository.FoodPlatformRepository
+import com.techres.ccb.data.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,8 +32,8 @@ data class ReconnectResult(
 
 @HiltViewModel
 class FoodPartnerConnectionViewModel @Inject constructor(
-    private val foodPlatformRepository: FoodPlatformRepository,
-    private val branchRepository: BranchRepository
+    private val syncRepository: SyncRepository,
+    private val foodPlatformRepository: FoodPlatformRepository
 ) : ViewModel() {
 
     companion object {
@@ -45,62 +45,57 @@ class FoodPartnerConnectionViewModel @Inject constructor(
 
     private val dateFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
 
+    /**
+     * Load food platform accounts from local sync data
+     * Data is synced via sync/full endpoint and stored in SharedPreferences
+     */
     fun loadAccounts() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                // Get selected branch ID from BranchRepository
-                val branchIdStr = branchRepository.getSelectedBranchId()
-                Log.d(TAG, "loadAccounts - branchIdStr: $branchIdStr")
+                // Read food platform data from local storage (synced via sync/full)
+                val foodPlatformData = syncRepository.getFoodPlatformData()
+                Log.d(TAG, "loadAccounts - foodPlatformData: ${foodPlatformData != null}")
 
-                val branchId = branchIdStr?.toIntOrNull()
-                Log.d(TAG, "loadAccounts - branchId (Int): $branchId")
-
-                if (branchId == null) {
-                    Log.e(TAG, "loadAccounts - Branch ID is null or not a valid integer")
+                if (foodPlatformData == null) {
+                    Log.d(TAG, "loadAccounts - No food platform data found in local storage")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = "Chưa chọn chi nhánh (branchId: $branchIdStr)"
+                            accounts = emptyList(),
+                            lastSyncTime = null,
+                            error = "Chưa có dữ liệu cổng liên kết. Vui lòng đồng bộ dữ liệu."
                         )
                     }
                     return@launch
                 }
 
-                // Fetch accounts from API
-                val response = foodPlatformRepository.syncFoodPlatformConfig(branchId)
+                // Map accounts from sync data
+                val accounts = foodPlatformData.accounts?.map { accountData ->
+                    FoodPartnerAccount(
+                        id = accountData.account.id,
+                        platform = accountData.account.platform,
+                        displayName = accountData.account.displayName,
+                        username = accountData.account.username,
+                        status = accountData.account.status,
+                        lastError = accountData.account.lastError,
+                        errorCount = accountData.account.errorCount ?: 0
+                    )
+                } ?: emptyList()
 
-                if (response.status == 200 && response.data != null) {
-                    val accounts = response.data.accounts.map { accountData ->
-                        FoodPartnerAccount(
-                            id = accountData.account.id,
-                            platform = accountData.account.platform,
-                            displayName = accountData.account.displayName,
-                            username = accountData.account.username,
-                            status = accountData.account.status,
-                            lastError = accountData.account.lastError,
-                            errorCount = accountData.account.errorCount ?: 0
-                        )
-                    }
+                Log.d(TAG, "loadAccounts - Found ${accounts.size} accounts")
 
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            accounts = accounts,
-                            lastSyncTime = dateFormat.format(Date()),
-                            error = null
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = response.message ?: "Không thể tải danh sách tài khoản"
-                        )
-                    }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        accounts = accounts,
+                        lastSyncTime = foodPlatformData.syncedAt,
+                        error = null
+                    )
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadAccounts - Error: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -111,6 +106,10 @@ class FoodPartnerConnectionViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Reconnect a disconnected food platform account
+     * Calls the reconnect API on api-app-food
+     */
     fun reconnectAccount(accountId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(reconnectingAccountId = accountId) }
@@ -139,11 +138,20 @@ class FoodPartnerConnectionViewModel @Inject constructor(
                     )
                 }
 
-                // Reload accounts to reflect new status
+                // Update local account status if reconnect was successful
                 if (result.success) {
-                    loadAccounts()
+                    // Update the account status in the UI
+                    val updatedAccounts = _uiState.value.accounts.map { account ->
+                        if (account.id == accountId) {
+                            account.copy(status = "CONNECTED", lastError = null, errorCount = 0)
+                        } else {
+                            account
+                        }
+                    }
+                    _uiState.update { it.copy(accounts = updatedAccounts) }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "reconnectAccount - Error: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         reconnectingAccountId = null,
