@@ -276,7 +276,9 @@ export class BeFoodConnector extends BasePlatformConnector {
    */
   async getMenu(account: FoodPlatformAccount, storeId?: string, merchantId?: string): Promise<any> {
     try {
-      this.logger.debug(`[BeFoodConnector] Getting menu for store ${storeId}...`);
+      this.logger.log(`[BeFoodConnector] ===== GET MENU START =====`);
+      this.logger.log(`[BeFoodConnector] storeId: ${storeId}, merchantId: ${merchantId}`);
+      this.logger.log(`[BeFoodConnector] account.accessToken: ${account.accessToken?.substring(0, 50)}...`);
 
       if (!storeId) {
         this.logger.warn('[BeFoodConnector] No storeId provided for getMenu');
@@ -290,13 +292,18 @@ export class BeFoodConnector extends BasePlatformConnector {
       const storeIdNum = parseInt(storeId);
       const merchantIdNum = merchantId ? parseInt(merchantId) : undefined;
 
+      const requestBody = {
+        access_token: account.accessToken,
+        restaurant_id: storeIdNum,
+        ...(merchantIdNum && { merchant_id: merchantIdNum }),
+      };
+
+      this.logger.log(`[BeFoodConnector] Request URL: ${this.beFoodBaseUrl}/v2/merchant/get_restaurant_items`);
+      this.logger.log(`[BeFoodConnector] Request body: ${JSON.stringify({ ...requestBody, access_token: requestBody.access_token?.substring(0, 30) + '...' })}`);
+
       const response = await axios.post(
         `${this.beFoodBaseUrl}/v2/merchant/get_restaurant_items`,
-        {
-          access_token: account.accessToken,
-          restaurant_id: storeIdNum,
-          ...(merchantIdNum && { merchant_id: merchantIdNum }),
-        },
+        requestBody,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -306,11 +313,12 @@ export class BeFoodConnector extends BasePlatformConnector {
       );
 
       const responseData = response.data;
-      this.logger.debug('[BeFoodConnector] Get menu response flag:', responseData?.flag);
+      this.logger.log(`[BeFoodConnector] Response: flag=${responseData?.flag}, code=${responseData?.code}, message=${responseData?.message}`);
+      this.logger.log(`[BeFoodConnector] Full response keys: ${Object.keys(responseData || {}).join(', ')}`);
 
       // Check for auth errors - flag != 143 might indicate token expired
       if (responseData?.flag !== 143) {
-        this.logger.error('[BeFoodConnector] Get menu failed:', responseData?.message);
+        this.logger.error(`[BeFoodConnector] Get menu failed! flag=${responseData?.flag}, message=${responseData?.message}`);
 
         // Check if it's an auth error (token expired)
         const isAuthError = responseData?.flag === 401 ||
@@ -319,6 +327,8 @@ export class BeFoodConnector extends BasePlatformConnector {
           responseData?.message?.toLowerCase()?.includes('token') ||
           responseData?.message?.toLowerCase()?.includes('hết hạn') ||
           responseData?.message?.toLowerCase()?.includes('expired');
+
+        this.logger.log(`[BeFoodConnector] isAuthError: ${isAuthError}`);
 
         if (isAuthError) {
           throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');

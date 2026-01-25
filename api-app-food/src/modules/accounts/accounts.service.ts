@@ -555,12 +555,19 @@ export class AccountsService {
     let merchantId: string | undefined;
 
     if (account.platform === FoodPlatformType.BEFOOD) {
+      this.logger.log(`[getMenu] ===== BEFOOD MENU FLOW =====`);
+      this.logger.log(`[getMenu] Account ID: ${account.id}`);
+      this.logger.log(`[getMenu] Account username: ${account.username}`);
+      this.logger.log(`[getMenu] Account externalMerchantId: ${account.externalMerchantId}`);
+
       // Get the first store mapping to use its storeId
       const storeMapping = await this.storeMappingRepo.findOne({
         where: { accountId: account.id, isActive: true },
       });
 
+      this.logger.log(`[getMenu] Store mapping found: ${!!storeMapping}`);
       if (storeMapping) {
+        this.logger.log(`[getMenu] Store mapping: externalStoreId=${storeMapping.externalStoreId}, branchId=${storeMapping.branchId}`);
         storeId = storeMapping.externalStoreId;
         // merchantId can be stored in rawData or we use account's externalMerchantId
         merchantId = account.externalMerchantId || undefined;
