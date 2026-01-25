@@ -56,19 +56,57 @@ export class PublicController {
     this.logger.log(`[getFoodPlatformSync] branchId=${branchId}`);
 
     try {
-      // Get accounts linked to this branch via store mappings
-      // branchId can be UUID string or legacy integer as string
+      // Strategy: Get accounts from TWO sources:
+      // 1. Accounts with branchId directly on the account (food_platform_accounts.branchId)
+      // 2. Accounts linked via store mappings (food_platform_store_mappings.branchId)
+
+      // 1. Get accounts directly linked to this branch
+      const directAccounts = await this.accountRepo.find({
+        where: {
+          branchId: branchId,
+          isActive: true,
+        },
+      });
+
+      this.logger.log(`[getFoodPlatformSync] Found ${directAccounts.length} accounts directly linked to branch ${branchId}`);
+
+      // 2. Get accounts linked via store mappings
       const storeMappings = await this.storeMappingRepo.find({
         where: { branchId: branchId, isActive: true },
         relations: ['account'],
       });
 
-      // Group by account
+      this.logger.log(`[getFoodPlatformSync] Found ${storeMappings.length} store mappings for branch ${branchId}`);
+
+      // Group by account (combine both sources)
       const accountsMap = new Map<string, {
         account: any;
         storeMappings: any[];
       }>();
 
+      // Add direct accounts first
+      for (const account of directAccounts) {
+        // Include both CONNECTED and DISCONNECTED accounts
+        if (account.status !== AccountStatus.CONNECTED && account.status !== AccountStatus.DISCONNECTED) continue;
+
+        if (!accountsMap.has(account.id)) {
+          accountsMap.set(account.id, {
+            account: {
+              id: account.id,
+              tenantId: account.tenantId,
+              platform: account.platform,
+              displayName: account.displayName,
+              status: account.status,
+              externalMerchantId: account.externalMerchantId,
+              externalMerchantName: account.externalMerchantName,
+              isActive: account.isActive,
+            },
+            storeMappings: [],
+          });
+        }
+      }
+
+      // Add accounts from store mappings
       for (const mapping of storeMappings) {
         // Include both CONNECTED and DISCONNECTED accounts (CCB will reconnect disconnected ones)
         if (!mapping.account) continue;
