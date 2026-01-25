@@ -912,6 +912,8 @@ data class BankAccountDto(
 /**
  * Food Platform sync data (GrabFood, ShopeeFood, BeFood...)
  * Được sync từ api-app-food qua api-master-data
+ * Note: Uses FoodPlatformAccountDto, FoodPlatformStoreMappingDto, FoodPlatformItemMappingDto
+ * from FoodPlatformDto.kt to avoid duplication
  */
 data class FoodPlatformSyncDto(
     @SerializedName("accounts") val accounts: List<FoodPlatformAccountWithMappingsDto>?,
@@ -925,49 +927,4 @@ data class FoodPlatformSyncDto(
 data class FoodPlatformAccountWithMappingsDto(
     @SerializedName("account") val account: FoodPlatformAccountDto,
     @SerializedName("storeMappings") val storeMappings: List<FoodPlatformStoreMappingDto>?
-)
-
-/**
- * Food platform account (GrabFood, ShopeeFood, BeFood...)
- */
-data class FoodPlatformAccountDto(
-    @SerializedName("id") val id: String,
-    @SerializedName("tenantId") val tenantId: String?,
-    @SerializedName("platform") val platform: String,             // grabfood, shopeefood, befood
-    @SerializedName("displayName") val displayName: String?,
-    @SerializedName("username") val username: String?,
-    @SerializedName("status") val status: String,                 // CONNECTED, DISCONNECTED
-    @SerializedName("externalMerchantId") val externalMerchantId: String?,
-    @SerializedName("externalMerchantName") val externalMerchantName: String?,
-    @SerializedName("lastError") val lastError: String?,
-    @SerializedName("errorCount") val errorCount: Int?,
-    @SerializedName("isActive") val isActive: Boolean = true
-)
-
-/**
- * Store mapping - liên kết store bên app food với branch TechRes
- */
-data class FoodPlatformStoreMappingDto(
-    @SerializedName("id") val id: String,
-    @SerializedName("externalStoreId") val externalStoreId: String?,
-    @SerializedName("externalStoreName") val externalStoreName: String?,
-    @SerializedName("externalStoreAddress") val externalStoreAddress: String?,
-    @SerializedName("branchId") val branchId: Int?,
-    @SerializedName("branchName") val branchName: String?,
-    @SerializedName("isActive") val isActive: Boolean = true
-)
-
-/**
- * Item mapping - liên kết món bên app food với sản phẩm TechRes
- */
-data class FoodPlatformItemMappingDto(
-    @SerializedName("id") val id: String,
-    @SerializedName("accountId") val accountId: String,
-    @SerializedName("externalItemId") val externalItemId: String?,
-    @SerializedName("externalPlatformItemId") val externalPlatformItemId: String?,
-    @SerializedName("externalItemName") val externalItemName: String?,
-    @SerializedName("techresBrandId") val techresBrandId: String?,
-    @SerializedName("techresItemId") val techresItemId: String?,
-    @SerializedName("techresItemName") val techresItemName: String?,
-    @SerializedName("mappingType") val mappingType: String?
 )
