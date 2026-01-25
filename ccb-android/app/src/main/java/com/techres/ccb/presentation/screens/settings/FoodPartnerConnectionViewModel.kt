@@ -1,8 +1,9 @@
 package com.techres.ccb.presentation.screens.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.BranchRepository
 import com.techres.ccb.data.repository.FoodPlatformRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,8 +33,12 @@ data class ReconnectResult(
 @HiltViewModel
 class FoodPartnerConnectionViewModel @Inject constructor(
     private val foodPlatformRepository: FoodPlatformRepository,
-    private val authRepository: AuthRepository
+    private val branchRepository: BranchRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "FoodPartnerVM"
+    }
 
     private val _uiState = MutableStateFlow(FoodPartnerConnectionUiState())
     val uiState: StateFlow<FoodPartnerConnectionUiState> = _uiState.asStateFlow()
@@ -45,13 +50,19 @@ class FoodPartnerConnectionViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                val branchIdStr = authRepository.getBranchId()
+                // Get selected branch ID from BranchRepository
+                val branchIdStr = branchRepository.getSelectedBranchId()
+                Log.d(TAG, "loadAccounts - branchIdStr: $branchIdStr")
+
                 val branchId = branchIdStr?.toIntOrNull()
+                Log.d(TAG, "loadAccounts - branchId (Int): $branchId")
+
                 if (branchId == null) {
+                    Log.e(TAG, "loadAccounts - Branch ID is null or not a valid integer")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = "Chưa chọn chi nhánh"
+                            error = "Chưa chọn chi nhánh (branchId: $branchIdStr)"
                         )
                     }
                     return@launch
