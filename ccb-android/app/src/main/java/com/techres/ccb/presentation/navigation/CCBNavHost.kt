@@ -25,6 +25,7 @@ import com.techres.ccb.presentation.screens.settings.SettingsScreen
 import com.techres.ccb.presentation.screens.settings.KitchenPrinterScreen
 import com.techres.ccb.presentation.screens.settings.BillPrinterConfigScreen
 import com.techres.ccb.presentation.screens.settings.LabelPrinterConfigScreen
+import com.techres.ccb.presentation.screens.settings.FoodPartnerConnectionScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
@@ -75,6 +76,7 @@ sealed class Screen(val route: String) {
     object KitchenPrinter : Screen("kitchen_printer")
     object BillPrinter : Screen("bill_printer")
     object LabelPrinter : Screen("label_printer")
+    object FoodPartner : Screen("food_partner")
     object DatabaseDebug : Screen("database_debug")
     object OrderHistory : Screen("order_history")
     object Table : Screen("table")  // Table List Screen
@@ -406,7 +408,8 @@ fun CCBNavHost() {
                 onNavigateToDebug = { navController.navigate(Screen.DatabaseDebug.route) },
                 onNavigateToKitchenPrinter = { navController.navigate(Screen.KitchenPrinter.route) },
                 onNavigateToBillPrinter = { navController.navigate(Screen.BillPrinter.route) },
-                onNavigateToLabelPrinter = { navController.navigate(Screen.LabelPrinter.route) }
+                onNavigateToLabelPrinter = { navController.navigate(Screen.LabelPrinter.route) },
+                onNavigateToFoodPartner = { navController.navigate(Screen.FoodPartner.route) }
             )
         }
 
@@ -424,6 +427,12 @@ fun CCBNavHost() {
 
         composable(Screen.LabelPrinter.route) {
             LabelPrinterConfigScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.FoodPartner.route) {
+            FoodPartnerConnectionScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

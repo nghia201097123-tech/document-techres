@@ -34,6 +34,7 @@ fun SettingsScreen(
     onNavigateToKitchenPrinter: () -> Unit = {},
     onNavigateToBillPrinter: () -> Unit = {},
     onNavigateToLabelPrinter: () -> Unit = {},
+    onNavigateToFoodPartner: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -132,6 +133,26 @@ fun SettingsScreen(
                     title = "Máy in Món",
                     subtitle = "Cấu hình máy in order cho bếp/bar",
                     onClick = onNavigateToKitchenPrinter
+                )
+            }
+
+            // Food Partner section
+            item {
+                Text(
+                    text = "Đối tác giao hàng",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+            }
+
+            item {
+                SettingsCard(
+                    icon = Icons.Default.DeliveryDining,
+                    title = "Cổng liên kết",
+                    subtitle = "Quản lý kết nối GrabFood, BeFood, ShopeeFood",
+                    onClick = onNavigateToFoodPartner
                 )
             }
 

@@ -4,6 +4,7 @@ import android.os.Build
 import android.util.Log
 import com.techres.ccb.BuildConfig
 import com.techres.ccb.data.remote.api.AuthApi
+import com.techres.ccb.data.remote.api.FoodPlatformApi
 import com.techres.ccb.data.remote.api.MasterDataApi
 import com.techres.ccb.data.remote.api.PayOSApi
 import com.techres.ccb.data.remote.api.PosApi
@@ -43,6 +44,10 @@ annotation class PosRetrofit
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class GatewayRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class FoodRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -179,6 +184,26 @@ object NetworkModule {
     fun providePayOSApi(@PosRetrofit retrofit: Retrofit): PayOSApi {
         // PayOS is now in api-dashboard (same as POS API)
         return retrofit.create(PayOSApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @FoodRetrofit
+    fun provideFoodRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        // api-app-food service URL
+        val foodApiUrl = BuildConfig.API_FOOD_BASE_URL.ifEmpty { BuildConfig.API_POS_BASE_URL }
+        Log.d(TAG, "API Food Base URL: $foodApiUrl")
+        return Retrofit.Builder()
+            .baseUrl(foodApiUrl)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFoodPlatformApi(@FoodRetrofit retrofit: Retrofit): FoodPlatformApi {
+        return retrofit.create(FoodPlatformApi::class.java)
     }
 }
 
