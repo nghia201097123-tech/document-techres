@@ -358,7 +358,23 @@ function transformToConnectionView(account: FoodPlatformAccount, index: number):
   return { port, connection };
 }
 
+// DTO for creating account
+export interface CreateAccountDto {
+  tenantId: string;
+  platform: FoodPartnerType;
+  authType: AuthType;
+  displayName?: string;
+}
+
 export const foodPartnerService = {
+  /**
+   * Create a new food platform account
+   */
+  async createAccount(dto: CreateAccountDto): Promise<FoodPlatformAccount> {
+    const response = await foodApi.post<ApiResponse<FoodPlatformAccount>>('/accounts', dto);
+    return response.data.data;
+  },
+
   /**
    * Get all available connection ports for a branch
    */

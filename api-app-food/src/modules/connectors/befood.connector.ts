@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
 import { BasePlatformConnector } from './base.connector';
 import {
@@ -13,53 +14,83 @@ import {
 
 /**
  * BeFood Platform Connector
+ * Uses BeFood Merchant Gateway API
+ * Base URL: https://gw.be.com.vn/api/v1/be-merchant-gateway
  */
 @Injectable()
 export class BeFoodConnector extends BasePlatformConnector {
   readonly platform = FoodPlatformType.BEFOOD;
+  private readonly beFoodBaseUrl = 'https://gw.be.com.vn/api/v1/be-merchant-gateway';
 
   constructor(configService: ConfigService) {
-    const baseUrl = configService.get<string>('platform.befood.baseUrl') || 'https://api.befood.vn/merchant';
+    const baseUrl = configService.get<string>('platform.befood.baseUrl') || 'https://gw.be.com.vn/api/v1/be-merchant-gateway';
     super(configService, baseUrl);
   }
 
   /**
-   * Login with username/password
+   * Login with email/password via BeFood Merchant Gateway
+   * Endpoint: POST /v2/merchant/login
    */
   async login(credentials: LoginCredentials): Promise<LoginResult> {
     try {
-      const clientId = this.configService.get<string>('platform.befood.clientId');
-      const clientSecret = this.configService.get<string>('platform.befood.clientSecret');
+      this.logger.debug('[BeFoodConnector] Attempting login...');
 
-      const response = await this.httpClient.post('/auth/login', {
-        username: credentials.username,
-        password: credentials.password,
-        client_id: clientId,
-        client_secret: clientSecret,
-      });
+      const response = await axios.post(
+        `${this.beFoodBaseUrl}/v2/merchant/login`,
+        {
+          email: credentials.username,
+          password: credentials.password,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        },
+      );
 
-      const data = response.data?.data || response.data;
+      const responseData = response.data;
+      this.logger.debug('[BeFoodConnector] Login response code:', responseData?.code);
 
-      return {
-        success: true,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresIn: data.expires_in,
-        merchantId: data.merchant_id,
-        merchantName: data.merchant_name,
-      };
-    } catch (error) {
-      this.logger.error('BeFood login failed', error);
+      // BeFood success code is 143
+      if (responseData?.code === 143 && responseData?.token) {
+        const user = responseData.user || {};
+
+        return {
+          success: true,
+          accessToken: responseData.token,
+          refreshToken: responseData.resfresh_token || responseData.refresh_token, // Note: typo in API "resfresh"
+          expiresIn: 23328000, // ~270 days based on JWT exp
+          merchantId: String(user.user_id),
+          merchantName: user.email,
+          // Additional user info
+          email: user.email,
+          phoneNumber: user.phone_no,
+          userType: responseData.user_type,
+        };
+      }
+
       return {
         success: false,
-        error: 'Đăng nhập thất bại',
+        error: responseData?.message || 'Đăng nhập thất bại',
         errorCode: 'INVALID_CREDENTIALS',
+      };
+    } catch (error: any) {
+      this.logger.error('[BeFoodConnector] Login failed:', error?.response?.data || error?.message);
+
+      const errData = error?.response?.data;
+      const errorMessage = errData?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.';
+
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errData?.code || 'INVALID_CREDENTIALS',
       };
     }
   }
 
   /**
-   * Request OTP (BeFood uses username/password, not OTP)
+   * Request OTP (BeFood uses email/password, not OTP)
    */
   async requestOtp(_phoneNumber: string): Promise<OtpRequestResult> {
     return {
@@ -80,59 +111,159 @@ export class BeFoodConnector extends BasePlatformConnector {
 
   /**
    * Refresh access token
+   * Note: BeFood may not have a separate refresh endpoint, token has long expiry
    */
   async refreshToken(refreshToken: string): Promise<LoginResult> {
-    try {
-      const response = await this.httpClient.post('/auth/refresh', {
-        refresh_token: refreshToken,
-      });
-
-      const data = response.data?.data || response.data;
-
-      return {
-        success: true,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token || refreshToken,
-        expiresIn: data.expires_in,
-      };
-    } catch (error) {
-      this.logger.error('BeFood refresh token failed', error);
-      return {
-        success: false,
-        error: 'Refresh token thất bại',
-        errorCode: 'TOKEN_REFRESH_FAILED',
-      };
-    }
+    // BeFood tokens have long expiry (~270 days), refresh may not be needed
+    // If needed, implement the refresh endpoint here
+    return {
+      success: false,
+      error: 'BeFood refresh token không được hỗ trợ. Vui lòng đăng nhập lại.',
+      errorCode: 'TOKEN_REFRESH_NOT_SUPPORTED',
+    };
   }
 
   /**
-   * Get list of merchant stores
+   * Get list of merchant stores using get_user_profiles API
+   * Endpoint: POST /v2/merchant/get_user_profiles
    */
   async getStores(account: FoodPlatformAccount): Promise<MerchantStore[]> {
     try {
-      const response = await this.authenticatedRequest<{ data: any[] }>(
-        account,
-        'get',
-        '/stores',
+      this.logger.debug('[BeFoodConnector] Getting user profiles/stores...');
+
+      const response = await axios.post(
+        `${this.beFoodBaseUrl}/v2/merchant/get_user_profiles`,
+        {
+          access_token: account.accessToken,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        },
       );
 
-      const stores = response.data || response;
+      const responseData = response.data;
+      this.logger.debug('[BeFoodConnector] Get profiles response code:', responseData?.code);
 
-      return (Array.isArray(stores) ? stores : []).map((store) => ({
-        externalStoreId: store.store_id || store.id,
-        name: store.store_name || store.name,
-        address: store.address,
-        phone: store.phone,
-        isActive: store.status === 'ACTIVE' || store.is_active,
-      }));
-    } catch (error) {
-      this.logger.error('BeFood get stores failed', error);
+      if (responseData?.code !== 143) {
+        this.logger.error('[BeFoodConnector] Get profiles failed:', responseData?.message);
+
+        // Check for auth errors
+        if (responseData?.code === 401 || responseData?.message?.includes('unauthorized')) {
+          throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+        }
+
+        return [];
+      }
+
+      const stores: MerchantStore[] = [];
+      const merchants = responseData.data || [];
+
+      for (const merchant of merchants) {
+        const storeProfiles = merchant.store_profiles || [];
+
+        for (const store of storeProfiles) {
+          stores.push({
+            externalStoreId: String(store.store_id),
+            name: store.store_name,
+            address: store.address,
+            phone: undefined, // Not in this response
+            email: undefined,
+            isActive: store.order_mode === 1,
+            // Additional BeFood specific data
+            merchantId: String(merchant.merchant_id),
+            merchantName: merchant.merchant_name,
+            rating: store.rating,
+            reviewCount: store.review_count,
+            storeImage: store.store_image,
+            payMode: store.pay_mode,
+            autoAccept: store.auto_accept === 1,
+          });
+        }
+      }
+
+      this.logger.debug(`[BeFoodConnector] Found ${stores.length} stores`);
+      return stores;
+    } catch (error: any) {
+      this.logger.error('[BeFoodConnector] Get stores failed:', error?.message);
+
+      const is401 = error?.response?.status === 401 ||
+        error?.message?.includes('UNAUTHORIZED') ||
+        error?.message?.includes('Token expired') ||
+        error instanceof UnauthorizedException;
+
+      if (is401) {
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
       return [];
     }
   }
 
   /**
+   * Get store details
+   * Endpoint: POST /v2/merchant/store/get
+   */
+  async getStoreDetails(account: FoodPlatformAccount, storeId: string, merchantId: string): Promise<any> {
+    try {
+      this.logger.debug(`[BeFoodConnector] Getting store details for store ${storeId}...`);
+
+      const response = await axios.post(
+        `${this.beFoodBaseUrl}/v2/merchant/store/get`,
+        {
+          access_token: account.accessToken,
+          store_id: parseInt(storeId),
+          merchant_id: parseInt(merchantId),
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        },
+      );
+
+      const responseData = response.data;
+
+      if (responseData?.flag === 143 || responseData?.code === 143) {
+        return responseData.store;
+      }
+
+      return null;
+    } catch (error: any) {
+      this.logger.error('[BeFoodConnector] Get store details failed:', error?.message);
+      return null;
+    }
+  }
+
+  /**
+   * Get menu from BeFood
+   * TODO: Need actual menu API endpoint
+   */
+  async getMenu(account: FoodPlatformAccount, storeId?: string): Promise<any> {
+    try {
+      this.logger.debug('[BeFoodConnector] Getting menu...');
+
+      // TODO: Implement when menu API is available
+      // For now, return empty menu structure
+      return {
+        categories: [],
+        items: [],
+      };
+    } catch (error: any) {
+      this.logger.error('[BeFoodConnector] Get menu failed:', error?.message);
+      return {
+        categories: [],
+        items: [],
+      };
+    }
+  }
+
+  /**
    * Poll orders from a specific store
+   * TODO: Need actual orders API endpoint
    */
   async pollOrders(
     account: FoodPlatformAccount,
@@ -140,32 +271,12 @@ export class BeFoodConnector extends BasePlatformConnector {
     since?: Date,
   ): Promise<RawFoodOrder[]> {
     try {
-      const params: Record<string, unknown> = {
-        store_id: storeId,
-        status: 'PENDING,CONFIRMED,PREPARING,READY,DELIVERING',
-      };
+      this.logger.debug(`[BeFoodConnector] Polling orders for store ${storeId}...`);
 
-      if (since) {
-        params.from_time = since.toISOString();
-      }
-
-      this.httpClient.defaults.headers.common['X-Store-ID'] = storeId;
-
-      const response = await this.authenticatedRequest<{ data: any[] }>(
-        account,
-        'get',
-        '/orders',
-        undefined,
-        params,
-      );
-
-      const orders = response.data || response;
-
-      return (Array.isArray(orders) ? orders : []).map((order) =>
-        this.transformOrder(order),
-      );
+      // TODO: Implement when orders API is available
+      return [];
     } catch (error) {
-      this.logger.error('BeFood poll orders failed', error);
+      this.logger.error('[BeFoodConnector] Poll orders failed:', error);
       return [];
     }
   }
@@ -245,19 +356,14 @@ export class BeFoodConnector extends BasePlatformConnector {
     orderId: string,
   ): Promise<OrderActionResult> {
     try {
-      await this.authenticatedRequest(
-        account,
-        'post',
-        `/orders/${orderId}/confirm`,
-      );
-
+      // TODO: Implement when order action API is available
       return {
-        success: true,
+        success: false,
         orderId,
-        newStatus: FoodOrderStatus.ACCEPTED,
+        error: 'Chức năng chưa được hỗ trợ',
       };
     } catch (error) {
-      this.logger.error(`BeFood accept order ${orderId} failed`, error);
+      this.logger.error(`[BeFoodConnector] Accept order ${orderId} failed`, error);
       return {
         success: false,
         orderId,
@@ -274,19 +380,14 @@ export class BeFoodConnector extends BasePlatformConnector {
     orderId: string,
   ): Promise<OrderActionResult> {
     try {
-      await this.authenticatedRequest(
-        account,
-        'post',
-        `/orders/${orderId}/ready`,
-      );
-
+      // TODO: Implement when order action API is available
       return {
-        success: true,
+        success: false,
         orderId,
-        newStatus: FoodOrderStatus.READY,
+        error: 'Chức năng chưa được hỗ trợ',
       };
     } catch (error) {
-      this.logger.error(`BeFood mark ready ${orderId} failed`, error);
+      this.logger.error(`[BeFoodConnector] Mark ready ${orderId} failed`, error);
       return {
         success: false,
         orderId,
@@ -303,19 +404,14 @@ export class BeFoodConnector extends BasePlatformConnector {
     orderId: string,
   ): Promise<OrderActionResult> {
     try {
-      await this.authenticatedRequest(
-        account,
-        'post',
-        `/orders/${orderId}/complete`,
-      );
-
+      // TODO: Implement when order action API is available
       return {
-        success: true,
+        success: false,
         orderId,
-        newStatus: FoodOrderStatus.COMPLETED,
+        error: 'Chức năng chưa được hỗ trợ',
       };
     } catch (error) {
-      this.logger.error(`BeFood complete order ${orderId} failed`, error);
+      this.logger.error(`[BeFoodConnector] Complete order ${orderId} failed`, error);
       return {
         success: false,
         orderId,
@@ -333,17 +429,14 @@ export class BeFoodConnector extends BasePlatformConnector {
     reason: string,
   ): Promise<OrderActionResult> {
     try {
-      await this.authenticatedRequest(account, 'post', `/orders/${orderId}/cancel`, {
-        reason,
-      });
-
+      // TODO: Implement when order action API is available
       return {
-        success: true,
+        success: false,
         orderId,
-        newStatus: FoodOrderStatus.CANCELLED,
+        error: 'Chức năng chưa được hỗ trợ',
       };
     } catch (error) {
-      this.logger.error(`BeFood cancel order ${orderId} failed`, error);
+      this.logger.error(`[BeFoodConnector] Cancel order ${orderId} failed`, error);
       return {
         success: false,
         orderId,

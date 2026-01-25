@@ -28,6 +28,10 @@ export interface LoginResult {
   merchantGrabId?: string;
   country?: string;
   cityId?: number;
+  // BeFood specific fields
+  email?: string;
+  phoneNumber?: string;
+  userType?: number;
 }
 
 /**
@@ -50,6 +54,14 @@ export interface MerchantStore {
   phone?: string;
   email?: string;
   isActive: boolean;
+  // BeFood specific fields
+  merchantId?: string;
+  merchantName?: string;
+  rating?: number;
+  reviewCount?: number;
+  storeImage?: string;
+  payMode?: number;
+  autoAccept?: boolean;
 }
 
 /**
