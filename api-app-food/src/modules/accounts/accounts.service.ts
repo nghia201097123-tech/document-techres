@@ -134,33 +134,7 @@ export class AccountsService {
       account.branchId = dto.branchId;
     }
 
-    const savedAccount = await this.accountRepo.save(account);
-
-    // Create store mapping if branchId is provided (ensures sync to CCB works)
-    if (dto.branchId && result.merchantId) {
-      const existingMapping = await this.storeMappingRepo.findOne({
-        where: {
-          accountId: savedAccount.id,
-          branchId: dto.branchId,
-        },
-      });
-
-      if (!existingMapping) {
-        const storeMapping = this.storeMappingRepo.create({
-          tenantId: savedAccount.tenantId,
-          accountId: savedAccount.id,
-          branchId: dto.branchId,
-          externalStoreId: result.merchantId,
-          externalMerchantId: result.merchantId,
-          externalStoreName: result.merchantName || savedAccount.displayName || 'Store',
-          isActive: true,
-        });
-        await this.storeMappingRepo.save(storeMapping);
-        this.logger.log(`[login] Created store mapping for account ${savedAccount.id} with branchId ${dto.branchId}`);
-      }
-    }
-
-    return savedAccount;
+    return this.accountRepo.save(account);
   }
 
   /**
@@ -271,38 +245,7 @@ export class AccountsService {
     account.errorCount = 0;
     account.lastError = null;
 
-    // Set branchId if provided (when linking from a branch context)
-    if (dto.branchId) {
-      account.branchId = dto.branchId;
-    }
-
-    const savedAccount = await this.accountRepo.save(account);
-
-    // Create store mapping if branchId is provided (ensures sync to CCB works)
-    if (dto.branchId) {
-      const existingMapping = await this.storeMappingRepo.findOne({
-        where: {
-          accountId: savedAccount.id,
-          branchId: dto.branchId,
-        },
-      });
-
-      if (!existingMapping) {
-        const storeMapping = this.storeMappingRepo.create({
-          tenantId: savedAccount.tenantId,
-          accountId: savedAccount.id,
-          branchId: dto.branchId,
-          externalStoreId: dto.merchantId,
-          externalMerchantId: dto.merchantId,
-          externalStoreName: dto.storeName,
-          isActive: true,
-        });
-        await this.storeMappingRepo.save(storeMapping);
-        this.logger.log(`[selectStore] Created store mapping for account ${savedAccount.id} with branchId ${dto.branchId}`);
-      }
-    }
-
-    return savedAccount;
+    return this.accountRepo.save(account);
   }
 
   /**

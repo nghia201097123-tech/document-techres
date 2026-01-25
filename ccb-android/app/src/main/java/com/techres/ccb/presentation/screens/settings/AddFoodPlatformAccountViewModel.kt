@@ -307,13 +307,10 @@ class AddFoodPlatformAccountViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            val branchId = authRepository.getBranchId()
-
             val result = foodPlatformRepository.selectStore(
                 accountId = accountId,
                 merchantId = store.merchantId ?: "",
-                storeName = store.storeName ?: "",
-                branchId = branchId
+                storeName = store.storeName ?: ""
             )
 
             result.fold(

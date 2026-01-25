@@ -185,8 +185,7 @@ data class StoreDto(
 
 data class SelectStoreRequest(
     val merchantId: String,
-    val storeName: String,
-    val branchId: String? = null
+    val storeName: String
 )
 
 data class SelectStoreResponse(

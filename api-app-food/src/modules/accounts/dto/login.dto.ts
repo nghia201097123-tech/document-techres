@@ -93,11 +93,6 @@ export class SelectStoreDto {
   @IsString()
   @IsNotEmpty()
   storeName: string;
-
-  @ApiPropertyOptional({ example: 'branch-001', description: 'Branch ID to assign account to' })
-  @IsString()
-  @IsOptional()
-  branchId?: string;
 }
 
 /**
