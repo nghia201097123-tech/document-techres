@@ -24,6 +24,7 @@ import com.techres.ccb.presentation.components.PosTopAppBar
 @Composable
 fun FoodPartnerConnectionScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToAddAccount: () -> Unit = {},
     viewModel: FoodPartnerConnectionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -44,6 +45,14 @@ fun FoodPartnerConnectionScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onNavigateToAddAccount,
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Thêm tài khoản")
+            }
         }
     ) { paddingValues ->
         Box(
@@ -101,10 +110,16 @@ fun FoodPartnerConnectionScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Vui lòng liên kết tài khoản trên Web Dashboard",
+                            text = "Nhấn nút + để thêm tài khoản mới",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = onNavigateToAddAccount) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Thêm tài khoản")
+                        }
                     }
                 }
                 else -> {

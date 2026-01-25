@@ -94,3 +94,102 @@ data class DisconnectedAccountDto(
     val lastError: String?,
     val errorCount: Int?
 )
+
+// ==================== Create Account ====================
+
+data class CreateAccountRequest(
+    val tenantId: String,
+    val platform: String,
+    val authType: String,
+    val displayName: String? = null
+)
+
+data class CreateAccountResponse(
+    val status: Int,
+    val message: String?,
+    val data: CreatedAccountDto?
+)
+
+data class CreatedAccountDto(
+    val id: String,
+    val tenantId: String?,
+    val platform: String?,
+    val authType: String?,
+    val displayName: String?,
+    val status: String?
+)
+
+// ==================== Login ====================
+
+data class LoginRequest(
+    val username: String,
+    val password: String,
+    val branchId: String? = null
+)
+
+data class LoginResponse(
+    val status: Int,
+    val message: String?,
+    val data: LoginResultDto?
+)
+
+data class LoginResultDto(
+    val accountId: String?,
+    val status: String?,
+    val merchantId: String?,
+    val merchantName: String?
+)
+
+// ==================== Request OTP ====================
+
+data class RequestOtpRequest(
+    val phoneNumber: String
+)
+
+data class RequestOtpResponse(
+    val status: Int,
+    val message: String?,
+    val data: RequestOtpResultDto?
+)
+
+data class RequestOtpResultDto(
+    val success: Boolean?,
+    val message: String?,
+    val expiresIn: Int?
+)
+
+// ==================== Verify OTP ====================
+
+data class VerifyOtpRequest(
+    val otp: String
+)
+
+data class VerifyOtpResponse(
+    val status: Int,
+    val message: String?,
+    val data: VerifyOtpResultDto?
+)
+
+data class VerifyOtpResultDto(
+    val success: Boolean?,
+    val stores: List<StoreDto>?
+)
+
+data class StoreDto(
+    val merchantId: String?,
+    val storeName: String?,
+    val storeAddress: String?
+)
+
+// ==================== Select Store ====================
+
+data class SelectStoreRequest(
+    val merchantId: String,
+    val storeName: String
+)
+
+data class SelectStoreResponse(
+    val status: Int,
+    val message: String?,
+    val data: LoginResultDto?
+)

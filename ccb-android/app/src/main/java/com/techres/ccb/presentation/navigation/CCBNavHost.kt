@@ -26,6 +26,7 @@ import com.techres.ccb.presentation.screens.settings.KitchenPrinterScreen
 import com.techres.ccb.presentation.screens.settings.BillPrinterConfigScreen
 import com.techres.ccb.presentation.screens.settings.LabelPrinterConfigScreen
 import com.techres.ccb.presentation.screens.settings.FoodPartnerConnectionScreen
+import com.techres.ccb.presentation.screens.settings.AddFoodPlatformAccountScreen
 import com.techres.ccb.presentation.screens.shift.ShiftScreen
 import com.techres.ccb.presentation.screens.splash.SplashScreen
 import com.techres.ccb.presentation.screens.sync.SyncDataScreen
@@ -77,6 +78,7 @@ sealed class Screen(val route: String) {
     object BillPrinter : Screen("bill_printer")
     object LabelPrinter : Screen("label_printer")
     object FoodPartner : Screen("food_partner")
+    object AddFoodPlatformAccount : Screen("add_food_platform_account")
     object DatabaseDebug : Screen("database_debug")
     object OrderHistory : Screen("order_history")
     object Table : Screen("table")  // Table List Screen
@@ -433,7 +435,18 @@ fun CCBNavHost() {
 
         composable(Screen.FoodPartner.route) {
             FoodPartnerConnectionScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddAccount = { navController.navigate(Screen.AddFoodPlatformAccount.route) }
+            )
+        }
+
+        composable(Screen.AddFoodPlatformAccount.route) {
+            AddFoodPlatformAccountScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSuccess = {
+                    // Navigate back to FoodPartner and refresh
+                    navController.popBackStack()
+                }
             )
         }
 
