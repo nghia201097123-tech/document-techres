@@ -1,9 +1,11 @@
 package com.techres.ccb.presentation.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,10 +47,9 @@ fun FoodPartnerConnectionScreen(
     Scaffold(
         topBar = {
             PosTopAppBar(
-                title = { Text("Cổng liên kết") },
+                title = { Text("Cổng kết nối") },
                 onBack = onNavigateBack,
                 actions = {
-                    // Refresh button
                     IconButton(onClick = { viewModel.loadAccounts() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Tải lại")
                     }
@@ -60,7 +61,7 @@ fun FoodPartnerConnectionScreen(
                 onClick = onNavigateToAddAccount,
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Thêm tài khoản")
+                Icon(Icons.Default.Add, contentDescription = "Thêm liên kết")
             }
         },
         snackbarHost = {
@@ -124,48 +125,50 @@ fun FoodPartnerConnectionScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Chưa có cổng liên kết nào",
+                            text = "Chưa có cổng kết nối nào",
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Nhấn nút + để thêm tài khoản mới",
+                            text = "Vui lòng đồng bộ dữ liệu hoặc thêm liên kết mới",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = onNavigateToAddAccount) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Thêm tài khoản")
-                        }
                     }
                 }
                 else -> {
+                    // Group accounts by platform
+                    val groupedAccounts = uiState.accounts.groupBy { it.platform.lowercase() }
+
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Summary card
-                        item {
-                            SummaryCard(
-                                totalAccounts = uiState.accounts.size,
-                                connectedCount = uiState.accounts.count { it.status == "connected" },
-                                disconnectedCount = uiState.accounts.count { it.status == "disconnected" }
-                            )
-                        }
+                        groupedAccounts.forEach { (platform, accounts) ->
+                            // Platform header
+                            item(key = "header_$platform") {
+                                PlatformHeader(
+                                    platform = platform,
+                                    accountCount = accounts.size
+                                )
+                            }
 
-                        // Account list
-                        items(uiState.accounts) { account ->
-                            FoodPartnerAccountCard(
-                                account = account,
-                                isTesting = uiState.testingAccountId == account.id,
-                                isDisconnecting = uiState.disconnectingAccountId == account.id,
-                                onRelogin = { onNavigateToRelogin(account.id, account.platform) },
-                                onTest = { viewModel.testConnection(account.id) },
-                                onDisconnect = { viewModel.disconnectAccount(account.id) }
-                            )
+                            // Accounts in this platform
+                            itemsIndexed(
+                                items = accounts,
+                                key = { _, account -> account.id }
+                            ) { index, account ->
+                                AccountCard(
+                                    account = account,
+                                    index = index + 1,
+                                    isTesting = uiState.testingAccountId == account.id,
+                                    isDisconnecting = uiState.disconnectingAccountId == account.id,
+                                    onRelogin = { onNavigateToRelogin(account.id, account.platform) },
+                                    onTest = { viewModel.testConnection(account.id) },
+                                    onDisconnect = { viewModel.disconnectAccount(account.id) }
+                                )
+                            }
                         }
 
                         // Last sync info
@@ -186,97 +189,82 @@ fun FoodPartnerConnectionScreen(
 }
 
 @Composable
-private fun SummaryCard(
-    totalAccounts: Int,
-    connectedCount: Int,
-    disconnectedCount: Int
+private fun PlatformHeader(
+    platform: String,
+    accountCount: Int
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatItem(
-                value = totalAccounts.toString(),
-                label = "Tổng cộng",
-                color = MaterialTheme.colorScheme.primary
-            )
-            StatItem(
-                value = connectedCount.toString(),
-                label = "Đã kết nối",
-                color = Color(0xFF4CAF50)
-            )
-            StatItem(
-                value = disconnectedCount.toString(),
-                label = "Mất kết nối",
-                color = if (disconnectedCount > 0) Color(0xFFE91E63) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatItem(
-    value: String,
-    label: String,
-    color: Color
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
-    }
-}
-
-@Composable
-private fun FoodPartnerAccountCard(
-    account: FoodPartnerAccount,
-    isTesting: Boolean,
-    isDisconnecting: Boolean,
-    onRelogin: () -> Unit,
-    onTest: () -> Unit,
-    onDisconnect: () -> Unit
-) {
-    val platformColor = when (account.platform.lowercase()) {
+    val platformColor = when (platform) {
         "grab" -> Color(0xFF00B14F)
         "befood" -> Color(0xFFFFB300)
         "shopee_food" -> Color(0xFFEE4D2D)
         else -> MaterialTheme.colorScheme.primary
     }
 
-    val platformName = when (account.platform.lowercase()) {
+    val platformName = when (platform) {
         "grab" -> "GrabFood"
         "befood" -> "BeFood"
         "shopee_food" -> "ShopeeFood"
-        else -> account.platform
+        else -> platform
     }
 
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Platform icon
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(platformColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = platformName.first().toString(),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column {
+            Text(
+                text = platformName,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "$accountCount cổng kết nối",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountCard(
+    account: FoodPartnerAccount,
+    index: Int,
+    isTesting: Boolean,
+    isDisconnecting: Boolean,
+    onRelogin: () -> Unit,
+    onTest: () -> Unit,
+    onDisconnect: () -> Unit
+) {
     val isConnected = account.status == "connected"
     val isAnyActionInProgress = isTesting || isDisconnecting
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isConnected)
-                MaterialTheme.colorScheme.surface
-            else
-                Color(0xFFFFF3E0)
-        )
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -287,56 +275,60 @@ private fun FoodPartnerAccountCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Platform icon/badge
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(platformColor.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
+                // Index number
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(50.dp)
                 ) {
                     Text(
-                        text = platformName.first().toString(),
-                        fontSize = 20.sp,
+                        text = "#$index",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = platformColor
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Shop",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 // Account info
                 Column(modifier = Modifier.weight(1f)) {
+                    // Username/Display name
                     Text(
-                        text = platformName,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = account.displayName ?: account.username ?: "Không có tên",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        text = account.username ?: account.displayName ?: "Không có tên",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Status badge
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isConnected) Color(0xFF4CAF50)
-                                    else Color(0xFFE91E63)
-                                )
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isConnected) "Đã kết nối" else "Mất kết nối",
-                            fontSize = 12.sp,
-                            color = if (isConnected) Color(0xFF4CAF50) else Color(0xFFE91E63)
-                        )
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (isConnected) Color(0xFFE8F5E9) else Color(0xFFFCE4EC)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (isConnected) Icons.Default.CheckCircle else Icons.Default.Error,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (isConnected) Color(0xFF4CAF50) else Color(0xFFE91E63)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isConnected) "Đã kết nối" else "Mất kết nối",
+                                fontSize = 12.sp,
+                                color = if (isConnected) Color(0xFF4CAF50) else Color(0xFFE91E63)
+                            )
+                        }
                     }
 
                     // Show error if disconnected
@@ -350,112 +342,100 @@ private fun FoodPartnerAccountCard(
                         )
                     }
                 }
-
-                // Connected indicator
-                if (isConnected) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF4CAF50),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
             }
 
             // Action buttons row
             Spacer(modifier = Modifier.height(12.dp))
-            Divider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(12.dp))
 
+            // Buttons - similar to web dashboard
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Test button
-                OutlinedButton(
-                    onClick = onTest,
+                ActionButton(
+                    text = if (isTesting) "Đang kiểm tra..." else "Kiểm tra",
+                    icon = Icons.Default.Sync,
+                    color = Color(0xFF2196F3),
                     enabled = !isAnyActionInProgress,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFF2196F3)
-                    )
-                ) {
-                    if (isTesting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFF2196F3)
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Sync,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isTesting) "Đang kiểm tra" else "Kiểm tra",
-                        fontSize = 11.sp
-                    )
-                }
+                    isLoading = isTesting,
+                    onClick = onTest,
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Relogin button (for disconnected accounts - navigate to login screen)
+                // Relogin button (for disconnected accounts)
                 if (!isConnected) {
-                    OutlinedButton(
-                        onClick = onRelogin,
+                    ActionButton(
+                        text = "Đăng nhập",
+                        icon = Icons.Default.Login,
+                        color = Color(0xFF4CAF50),
                         enabled = !isAnyActionInProgress,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF4CAF50)
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Login,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Đăng nhập",
-                            fontSize = 11.sp
-                        )
-                    }
+                        onClick = onRelogin,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 // Disconnect button
-                OutlinedButton(
-                    onClick = onDisconnect,
+                ActionButton(
+                    text = if (isDisconnecting) "Đang ngắt..." else "Ngắt kết nối",
+                    icon = Icons.Default.LinkOff,
+                    color = Color(0xFFE91E63),
                     enabled = !isAnyActionInProgress && isConnected,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFFE91E63)
-                    )
-                ) {
-                    if (isDisconnecting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFFE91E63)
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.LinkOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isDisconnecting) "Đang ngắt" else "Ngắt kết nối",
-                        fontSize = 11.sp
-                    )
-                }
+                    isLoading = isDisconnecting,
+                    onClick = onDisconnect,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun ActionButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = color,
+            disabledContentColor = color.copy(alpha = 0.4f)
+        ),
+        border = ButtonDefaults.outlinedButtonBorder.copy(
+            brush = androidx.compose.ui.graphics.SolidColor(
+                if (enabled) color.copy(alpha = 0.5f) else color.copy(alpha = 0.2f)
+            )
+        )
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = color
+            )
+        } else {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            maxLines = 1
+        )
     }
 }
 
