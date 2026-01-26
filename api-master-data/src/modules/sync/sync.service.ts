@@ -87,7 +87,7 @@ export class SyncService {
     private bankAccountRepository: Repository<BankAccount>,
   ) {
     // Get food API URL from config or use default
-    this.foodApiUrl = this.configService.get<string>('FOOD_API_URL') || 'http://localhost:3003';
+    this.foodApiUrl = this.configService.get<string>('CONFIG_API_NODEJS_APP_FOOD_URL') || 'http://localhost:3010';
   }
 
   /**
