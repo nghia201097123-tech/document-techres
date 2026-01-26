@@ -56,14 +56,6 @@ fun FoodPartnerConnectionScreen(
                 }
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddAccount,
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Thêm liên kết")
-            }
-        },
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
                 val isSuccess = uiState.actionResult?.success ?: true

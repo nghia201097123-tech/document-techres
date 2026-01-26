@@ -72,22 +72,25 @@ class FoodPartnerConnectionViewModel @Inject constructor(
                 val branchId = authRepository.getBranchId()
                 Log.d(TAG, "loadAccounts - branchId: $branchId")
 
-                if (branchId == null) {
-                    Log.d(TAG, "loadAccounts - No branch ID found")
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            accounts = emptyList(),
-                            lastSyncTime = null,
-                            error = "Chưa đăng nhập chi nhánh. Vui lòng đăng nhập lại."
-                        )
-                    }
-                    return@launch
+                // First try to get accounts by branchId
+                var accountEntities = if (branchId != null) {
+                    foodPlatformAccountDao.getActiveAccountsList(branchId)
+                } else {
+                    emptyList()
                 }
+                Log.d(TAG, "loadAccounts - Found ${accountEntities.size} accounts for branch $branchId")
 
-                // Read food platform accounts from Room database
-                val accountEntities = foodPlatformAccountDao.getActiveAccountsList(branchId)
-                Log.d(TAG, "loadAccounts - Found ${accountEntities.size} accounts in Room DB for branch $branchId")
+                // If no accounts found by branchId, try to get all accounts (fallback for debug)
+                if (accountEntities.isEmpty()) {
+                    Log.d(TAG, "loadAccounts - No accounts for branchId, trying getAllForDebug...")
+                    accountEntities = foodPlatformAccountDao.getAllForDebug()
+                    Log.d(TAG, "loadAccounts - getAllForDebug returned ${accountEntities.size} accounts")
+
+                    // Log each account's branchId for debugging
+                    accountEntities.forEach { account ->
+                        Log.d(TAG, "loadAccounts - Account: ${account.id}, branchId: ${account.branchId}, platform: ${account.platform}")
+                    }
+                }
 
                 if (accountEntities.isEmpty()) {
                     Log.d(TAG, "loadAccounts - No food platform accounts found in Room DB")
@@ -96,7 +99,7 @@ class FoodPartnerConnectionViewModel @Inject constructor(
                             isLoading = false,
                             accounts = emptyList(),
                             lastSyncTime = null,
-                            error = "Chưa có cổng liên kết nào. Vui lòng đồng bộ dữ liệu hoặc thêm liên kết mới."
+                            error = null // No error, just empty - will show empty state
                         )
                     }
                     return@launch
