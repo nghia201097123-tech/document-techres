@@ -431,11 +431,22 @@ fun FoodOrderCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        // Driver phone number
+                        order.driverPhone?.let { phone ->
+                            Text(
+                                phone,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontSize = 10.sp
+                            )
+                        }
                         order.orderContentMessage?.let { message ->
                             Text(
                                 message,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF4CAF50),
+                                color = Color(0xFF388E3C),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 fontSize = 10.sp
