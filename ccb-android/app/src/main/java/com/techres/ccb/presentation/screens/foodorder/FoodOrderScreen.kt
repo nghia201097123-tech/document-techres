@@ -361,9 +361,10 @@ fun FoodOrderCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Customer name (show only if not ultra compact)
+            // Customer info (show only if not ultra compact)
             if (!isUltraCompact) {
                 Spacer(modifier = Modifier.height(4.dp))
+                // Customer name
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.Person,
@@ -379,6 +380,58 @@ fun FoodOrderCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                // Customer phone
+                if (order.customerPhone.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Phone,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            order.customerPhone,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                // Customer note (ghi chú đơn hàng)
+                order.customerNote?.let { note ->
+                    if (note.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Color(0xFFFFF8E1),
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFFF8F00)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                note,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFE65100),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
                 }
             }
 
@@ -715,13 +768,43 @@ fun OrderDetailDialog(
                                     value = it
                                 )
                             }
-                            order.customerNote?.let {
-                                DetailRow(
-                                    icon = Icons.Default.Note,
-                                    label = "Ghi chú",
-                                    value = it,
-                                    valueColor = MaterialTheme.colorScheme.error
-                                )
+                            order.customerNote?.let { note ->
+                                if (note.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                Color(0xFFFFF3E0),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Warning,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = Color(0xFFFF6F00)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                "GHI CHÚ ĐƠN HÀNG",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFE65100)
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                note,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = Color(0xFFBF360C),
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
