@@ -316,8 +316,8 @@ export class OrdersService {
       existing.driverPhone !== raw.driverPhone ||
       existing.driverAvatar !== raw.driverAvatar ||
       // Update if we now have customer info that was missing before
-      (!existing.customerPhone && raw.customerPhone) ||
-      (!existing.customerNote && raw.customerNote)
+      (!existing.customerPhone && !!raw.customerPhone) ||
+      (!existing.customerNote && !!raw.customerNote)
     );
   }
 
