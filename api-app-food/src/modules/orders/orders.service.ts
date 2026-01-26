@@ -132,27 +132,33 @@ export class OrdersService {
     const connector = this.connectorFactory.getConnector(account.platform);
     const orders = await connector.pollOrders(account, mapping.externalStoreId, since);
 
-    // Enrich orders with detail (to get driver phone, full customer info, etc.)
+    // Enrich ALL orders with detail API to get full customer info, driver phone, etc.
+    // Pagination API doesn't return these fields
     const enrichedOrders = await Promise.all(
       orders.map(async (order) => {
-        // If order has driver but no phone, fetch detail
-        if (order.driverName && !order.driverPhone) {
+        // Always fetch detail to get customer_phone, customer_note, driver_phone, driver_avatar
+        // Only skip if we already have full data (customer_phone is the indicator)
+        const needsEnrichment = !order.customerPhone || !order.driverPhone;
+
+        if (needsEnrichment && connector.fetchOrderDetail) {
           try {
-            const detailOrder = await connector.fetchOrderDetail?.(
+            const detailOrder = await connector.fetchOrderDetail(
               account,
               order.externalOrderId,
               order.orderCode,
             );
             if (detailOrder) {
+              this.logger.log(`Enriched order ${order.orderCode} with detail data`);
               // Merge detail data into order
               return {
                 ...order,
-                driverPhone: detailOrder.driverPhone || order.driverPhone,
-                driverLicensePlate: detailOrder.driverLicensePlate || order.driverLicensePlate,
                 customerPhone: detailOrder.customerPhone || order.customerPhone,
                 customerAddress: detailOrder.customerAddress || order.customerAddress,
                 customerNote: detailOrder.customerNote || order.customerNote,
-                items: detailOrder.items.length > 0 ? detailOrder.items : order.items,
+                driverPhone: detailOrder.driverPhone || order.driverPhone,
+                driverAvatar: detailOrder.driverAvatar || order.driverAvatar,
+                driverLicensePlate: detailOrder.driverLicensePlate || order.driverLicensePlate,
+                items: detailOrder.items?.length > 0 ? detailOrder.items : order.items,
               };
             }
           } catch (error) {
@@ -200,10 +206,16 @@ export class OrdersService {
         if (hasChanges) {
           existingOrder.previousStatus = existingOrder.status;
           existingOrder.status = rawOrder.status as FoodOrderStatus;
-          existingOrder.driverName = rawOrder.driverName ?? null;
-          existingOrder.driverPhone = rawOrder.driverPhone ?? null;
-          existingOrder.driverLicensePlate = rawOrder.driverLicensePlate ?? null;
-          existingOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime ?? null;
+          // Update customer info if available
+          existingOrder.customerPhone = rawOrder.customerPhone || existingOrder.customerPhone;
+          existingOrder.customerAddress = rawOrder.customerAddress || existingOrder.customerAddress;
+          existingOrder.customerNote = rawOrder.customerNote || existingOrder.customerNote;
+          // Update driver info
+          existingOrder.driverName = rawOrder.driverName ?? existingOrder.driverName;
+          existingOrder.driverPhone = rawOrder.driverPhone ?? existingOrder.driverPhone;
+          existingOrder.driverAvatar = rawOrder.driverAvatar ?? existingOrder.driverAvatar;
+          existingOrder.driverLicensePlate = rawOrder.driverLicensePlate ?? existingOrder.driverLicensePlate;
+          existingOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime ?? existingOrder.estimatedDeliveryTime;
           existingOrder.platformUpdatedAt = rawOrder.updatedAt;
           existingOrder.lastSyncAt = new Date();
           existingOrder.rawData = rawOrder.rawData ?? null;
@@ -239,6 +251,7 @@ export class OrdersService {
 
           driverName: rawOrder.driverName,
           driverPhone: rawOrder.driverPhone,
+          driverAvatar: rawOrder.driverAvatar,
           driverLicensePlate: rawOrder.driverLicensePlate,
           estimatedDeliveryTime: rawOrder.estimatedDeliveryTime,
 
@@ -300,7 +313,11 @@ export class OrdersService {
     return (
       existing.status !== raw.status ||
       existing.driverName !== raw.driverName ||
-      existing.driverPhone !== raw.driverPhone
+      existing.driverPhone !== raw.driverPhone ||
+      existing.driverAvatar !== raw.driverAvatar ||
+      // Update if we now have customer info that was missing before
+      (!existing.customerPhone && raw.customerPhone) ||
+      (!existing.customerNote && raw.customerNote)
     );
   }
 

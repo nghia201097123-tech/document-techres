@@ -135,6 +135,9 @@ export class FoodOrder {
   @Column({ type: 'varchar', length: 20, nullable: true, name: 'driver_phone' })
   driverPhone: string | null;
 
+  @Column({ type: 'text', nullable: true, name: 'driver_avatar' })
+  driverAvatar: string | null;
+
   @Column({ type: 'varchar', length: 100, nullable: true, name: 'driver_license_plate' })
   driverLicensePlate: string | null;
 
