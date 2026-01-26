@@ -4,11 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -178,7 +178,7 @@ fun FoodOrderScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(uiState.orders, key = { it.id }) { order ->
+                    gridItems(uiState.orders, key = { it.id }) { order ->
                         FoodOrderCard(
                             order = order,
                             onClick = { viewModel.selectOrder(order) },
@@ -189,10 +189,6 @@ fun FoodOrderScreen(
                             onCancel = { viewModel.cancelOrder(order.id) },
                             gridColumns = uiState.gridColumns
                         )
-                    }
-                    // Bottom spacing
-                    item(span = { GridItemSpan(uiState.gridColumns) }) {
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             }
