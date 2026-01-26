@@ -10,6 +10,7 @@ import com.techres.ccb.data.printer.KitchenTicketPrintService
 import com.techres.ccb.data.printer.LabelPrintService
 import com.techres.ccb.printer.adapter.SunmiPrinterAdapter
 import com.techres.ccb.printer.adapter.UsbPrinterAdapter
+import com.techres.ccb.util.FoodOrderPollingService
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -43,6 +44,16 @@ class CCBApplication : Application(), ImageLoaderFactory {
         fun usbPrinterAdapter(): UsbPrinterAdapter
     }
 
+    /**
+     * EntryPoint for Food Order Polling Service
+     * Allows polling to start when app launches
+     */
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface FoodOrderEntryPoint {
+        fun foodOrderPollingService(): FoodOrderPollingService
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -59,6 +70,27 @@ class CCBApplication : Application(), ImageLoaderFactory {
         // Khởi tạo Sunmi adapter ngay khi app start để tránh lỗi "adapter chưa được khởi tạo"
         // khi user in bill trước khi vào Settings
         initializeSunmiAdapter()
+
+        // Start food order polling service for TTS announcements
+        initializeFoodOrderPolling()
+    }
+
+    /**
+     * Initialize food order polling service
+     * This allows TTS announcements for new orders regardless of which screen is active
+     */
+    private fun initializeFoodOrderPolling() {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                this,
+                FoodOrderEntryPoint::class.java
+            )
+            val pollingService = entryPoint.foodOrderPollingService()
+            pollingService.startPolling()
+            Timber.d("Food order polling service started on app startup")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to start food order polling service")
+        }
     }
 
     /**
