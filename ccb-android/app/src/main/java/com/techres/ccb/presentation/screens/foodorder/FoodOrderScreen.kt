@@ -361,47 +361,49 @@ fun FoodOrderCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Customer info (show only if not ultra compact)
-            if (!isUltraCompact) {
-                Spacer(modifier = Modifier.height(4.dp))
-                // Customer name
+            // Customer info - ALWAYS show (priority: name + phone)
+            Spacer(modifier = Modifier.height(4.dp))
+            // Customer name
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (isUltraCompact) 12.dp else 14.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    order.customerName,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = if (isUltraCompact) 11.sp else 12.sp
+                )
+            }
+            // Customer phone - ALWAYS show
+            if (order.customerPhone.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Default.Person,
+                        Icons.Default.Phone,
                         contentDescription = null,
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(if (isUltraCompact) 10.dp else 12.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        order.customerName,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
+                        order.customerPhone,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = if (isUltraCompact) 10.sp else 11.sp
                     )
                 }
-                // Customer phone
-                if (order.customerPhone.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Phone,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            order.customerPhone,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                // Customer note (ghi chú đơn hàng)
+            }
+            // Customer note - hide in ultra compact mode
+            if (!isUltraCompact) {
                 order.customerNote?.let { note ->
                     if (note.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -435,26 +437,27 @@ fun FoodOrderCard(
                 }
             }
 
-            // Driver info (compact version - only show if driver assigned and not ultra compact)
-            if (order.driverName != null && !isUltraCompact) {
-                Spacer(modifier = Modifier.height(6.dp))
+            // Driver info - ALWAYS show if driver assigned (priority display)
+            if (order.driverName != null) {
+                Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 6.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
                             Color(0xFF4CAF50).copy(alpha = 0.1f),
-                            RoundedCornerShape(6.dp)
+                            RoundedCornerShape(if (isUltraCompact) 4.dp else 6.dp)
                         )
-                        .padding(6.dp),
+                        .padding(if (isUltraCompact) 4.dp else 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Driver avatar
+                    // Driver avatar - show smaller in ultraCompact
+                    val avatarSize = if (isUltraCompact) 20.dp else 24.dp
                     if (order.driverAvatar != null) {
                         AsyncImage(
                             model = order.driverAvatar,
                             contentDescription = "Driver avatar",
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(avatarSize)
                                 .clip(CircleShape)
                                 .border(1.dp, Color(0xFF4CAF50), CircleShape),
                             contentScale = ContentScale.Crop
@@ -462,19 +465,19 @@ fun FoodOrderCard(
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(avatarSize)
                                 .background(Color(0xFF4CAF50).copy(alpha = 0.2f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.DeliveryDining,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(if (isUltraCompact) 12.dp else 16.dp),
                                 tint = Color(0xFF4CAF50)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(if (isUltraCompact) 4.dp else 6.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             order.driverName ?: "",
@@ -482,9 +485,10 @@ fun FoodOrderCard(
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF2E7D32),
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = if (isUltraCompact) 10.sp else 11.sp
                         )
-                        // Driver phone number
+                        // Driver phone number - ALWAYS show
                         order.driverPhone?.let { phone ->
                             Text(
                                 phone,
@@ -492,18 +496,21 @@ fun FoodOrderCard(
                                 color = Color(0xFF4CAF50),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                fontSize = 10.sp
+                                fontSize = if (isUltraCompact) 9.sp else 10.sp
                             )
                         }
-                        order.orderContentMessage?.let { message ->
-                            Text(
-                                message,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF388E3C),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontSize = 10.sp
-                            )
+                        // Order content message - hide in ultraCompact
+                        if (!isUltraCompact) {
+                            order.orderContentMessage?.let { message ->
+                                Text(
+                                    message,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF388E3C),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
                     }
                 }
