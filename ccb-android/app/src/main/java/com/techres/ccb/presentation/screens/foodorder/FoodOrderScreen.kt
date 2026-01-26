@@ -105,8 +105,11 @@ fun FoodOrderScreen(
             // Filter Tabs
             FilterTabRow(
                 selectedFilter = uiState.selectedFilter,
+                allCount = uiState.allOrdersCount,
                 newCount = uiState.newOrdersCount,
                 processingCount = uiState.processingOrdersCount,
+                completedCount = uiState.completedOrdersCount,
+                cancelledCount = uiState.cancelledOrdersCount,
                 onFilterSelected = { viewModel.setFilter(it) }
             )
 
@@ -208,8 +211,11 @@ fun FoodOrderScreen(
 @Composable
 fun FilterTabRow(
     selectedFilter: FoodOrderFilter,
+    allCount: Int,
     newCount: Int,
     processingCount: Int,
+    completedCount: Int,
+    cancelledCount: Int,
     onFilterSelected: (FoodOrderFilter) -> Unit
 ) {
     ScrollableTabRow(
@@ -219,9 +225,11 @@ fun FilterTabRow(
     ) {
         FoodOrderFilter.entries.forEach { filter ->
             val count = when (filter) {
+                FoodOrderFilter.ALL -> allCount
                 FoodOrderFilter.NEW -> newCount
                 FoodOrderFilter.PROCESSING -> processingCount
-                else -> null
+                FoodOrderFilter.COMPLETED -> completedCount
+                FoodOrderFilter.CANCELLED -> cancelledCount
             }
 
             Tab(
@@ -233,12 +241,14 @@ fun FilterTabRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(filter.displayName)
-                        if (count != null && count > 0) {
+                        if (count > 0) {
                             Badge(
                                 containerColor = when (filter) {
+                                    FoodOrderFilter.ALL -> Color(0xFF757575)
                                     FoodOrderFilter.NEW -> Color(0xFFFF5722)
                                     FoodOrderFilter.PROCESSING -> Color(0xFF2196F3)
-                                    else -> MaterialTheme.colorScheme.primary
+                                    FoodOrderFilter.COMPLETED -> Color(0xFF4CAF50)
+                                    FoodOrderFilter.CANCELLED -> Color(0xFFF44336)
                                 }
                             ) {
                                 Text(count.toString())
@@ -298,6 +308,9 @@ fun FoodOrderCard(
     val cardPadding = if (isCompact) 10.dp else 16.dp
     val statusColor = Color(order.status.color)
 
+    // Check if order has note
+    val hasNote = !order.customerNote.isNullOrEmpty()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -309,32 +322,57 @@ fun FoodOrderCard(
         )
     ) {
         Column(modifier = Modifier.padding(cardPadding)) {
-            // Header: Platform badge + Order code + Status
+            // Header: Platform badge + Note indicator + Status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Platform badge
-                Box(
-                    modifier = Modifier
-                        .background(
-                            Color(order.platform.color).copy(alpha = 0.15f),
-                            RoundedCornerShape(6.dp)
-                        )
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                // Platform badge + Note indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // Platform badge
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                Color(order.platform.color).copy(alpha = 0.15f),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
-                        Text(order.platform.icon, fontSize = if (isCompact) 10.sp else 12.sp)
-                        if (!isUltraCompact) {
-                            Text(
-                                order.platform.shortName,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(order.platform.color)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(order.platform.icon, fontSize = if (isCompact) 10.sp else 12.sp)
+                            if (!isUltraCompact) {
+                                Text(
+                                    order.platform.shortName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(order.platform.color)
+                                )
+                            }
+                        }
+                    }
+
+                    // Note indicator - always visible if has note
+                    if (hasNote) {
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    Color(0xFFFF8F00).copy(alpha = 0.15f),
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Có ghi chú",
+                                modifier = Modifier.size(if (isUltraCompact) 12.dp else 14.dp),
+                                tint = Color(0xFFFF8F00)
                             )
                         }
                     }

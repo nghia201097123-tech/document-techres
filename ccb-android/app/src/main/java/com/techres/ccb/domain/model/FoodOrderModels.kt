@@ -84,24 +84,6 @@ enum class FoodPlatform(
         shortName = "Be",
         color = 0xFFFFD500,  // Yellow
         icon = "🟡"
-    ),
-    GO_FOOD(
-        displayName = "GoFood",
-        shortName = "GoJek",
-        color = 0xFF00AA13,  // Green
-        icon = "🟢"
-    ),
-    WEB_ORDER(
-        displayName = "Web Order",
-        shortName = "Web",
-        color = 0xFF2196F3,  // Blue
-        icon = "🔵"
-    ),
-    PHONE_ORDER(
-        displayName = "Đặt qua điện thoại",
-        shortName = "Phone",
-        color = 0xFF9C27B0,  // Purple
-        icon = "🟣"
     )
 }
 

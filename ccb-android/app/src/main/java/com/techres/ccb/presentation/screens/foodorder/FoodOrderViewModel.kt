@@ -30,9 +30,12 @@ data class FoodOrderUiState(
     val selectedFilter: FoodOrderFilter = FoodOrderFilter.ALL,
     val selectedPlatform: FoodPlatform? = null,
 
-    // Counts
+    // Counts for all tabs
+    val allOrdersCount: Int = 0,
     val newOrdersCount: Int = 0,
     val processingOrdersCount: Int = 0,
+    val completedOrdersCount: Int = 0,
+    val cancelledOrdersCount: Int = 0,
 
     // UI State
     val isLoading: Boolean = false,
@@ -179,10 +182,13 @@ class FoodOrderViewModel @Inject constructor(
                 _uiState.update { state ->
                     state.copy(
                         orders = getFilteredOrders(),
+                        allOrdersCount = _ordersList.size,
                         newOrdersCount = _ordersList.count { it.status == FoodOrderStatus.NEW },
                         processingOrdersCount = _ordersList.count {
                             it.status == FoodOrderStatus.PREPARING
                         },
+                        completedOrdersCount = _ordersList.count { it.status == FoodOrderStatus.COMPLETED },
+                        cancelledOrdersCount = _ordersList.count { it.status == FoodOrderStatus.CANCELLED },
                         isLoading = false,
                         errorMessage = null
                     )
@@ -263,9 +269,6 @@ class FoodOrderViewModel @Inject constructor(
             "GRAB", "GRABFOOD", "GRAB_FOOD" -> FoodPlatform.GRAB_FOOD
             "SHOPEE", "SHOPEEFOOD", "SHOPEE_FOOD" -> FoodPlatform.SHOPEE_FOOD
             "BE", "BEFOOD", "BE_FOOD" -> FoodPlatform.BE_FOOD
-            "GO", "GOFOOD", "GO_FOOD" -> FoodPlatform.GO_FOOD
-            "WEB", "WEB_ORDER" -> FoodPlatform.WEB_ORDER
-            "PHONE", "PHONE_ORDER" -> FoodPlatform.PHONE_ORDER
             else -> FoodPlatform.GRAB_FOOD
         }
     }
