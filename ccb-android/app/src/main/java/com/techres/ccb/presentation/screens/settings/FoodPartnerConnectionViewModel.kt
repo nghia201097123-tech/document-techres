@@ -25,6 +25,7 @@ data class FoodPartnerConnectionUiState(
     val reconnectingAccountId: String? = null,
     val testingAccountId: String? = null,
     val disconnectingAccountId: String? = null,
+    val updatingAccountId: String? = null,
     val actionResult: ActionResult? = null
 )
 
@@ -323,5 +324,81 @@ class FoodPartnerConnectionViewModel @Inject constructor(
 
     fun clearActionResult() {
         _uiState.update { it.copy(actionResult = null) }
+    }
+
+    /**
+     * Update account credentials (username/password)
+     * Calls the login API to update credentials
+     */
+    fun updateAccount(accountId: String, username: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(updatingAccountId = accountId) }
+
+            try {
+                val branchId = authRepository.getBranchId()
+                val result = foodPlatformRepository.login(accountId, username, password, branchId)
+
+                result.fold(
+                    onSuccess = { loginResult ->
+                        // Update in Room DB
+                        foodPlatformAccountDao.updateStatus(accountId, "CONNECTED", null, 0)
+                        foodPlatformAccountDao.updateUsername(accountId, username)
+
+                        // Update the account in the UI
+                        val updatedAccounts = _uiState.value.accounts.map { account ->
+                            if (account.id == accountId) {
+                                account.copy(
+                                    status = "CONNECTED",
+                                    username = username,
+                                    lastError = null,
+                                    errorCount = 0
+                                )
+                            } else {
+                                account
+                            }
+                        }
+
+                        _uiState.update {
+                            it.copy(
+                                updatingAccountId = null,
+                                accounts = updatedAccounts,
+                                actionResult = ActionResult(
+                                    accountId = accountId,
+                                    action = "update",
+                                    success = true,
+                                    message = "Cập nhật thông tin thành công"
+                                )
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        _uiState.update {
+                            it.copy(
+                                updatingAccountId = null,
+                                actionResult = ActionResult(
+                                    accountId = accountId,
+                                    action = "update",
+                                    success = false,
+                                    message = e.message ?: "Cập nhật thất bại"
+                                )
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "updateAccount - Error: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        updatingAccountId = null,
+                        actionResult = ActionResult(
+                            accountId = accountId,
+                            action = "update",
+                            success = false,
+                            message = e.message ?: "Có lỗi xảy ra"
+                        )
+                    )
+                }
+            }
+        }
     }
 }

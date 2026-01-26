@@ -33,6 +33,12 @@ fun FoodPartnerConnectionScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // State for update credentials dialog
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateDialogAccountId by remember { mutableStateOf("") }
+    var updateDialogUsername by remember { mutableStateOf("") }
+    var updateDialogPlatform by remember { mutableStateOf("") }
+
     // Load accounts when screen first appears
     LaunchedEffect(Unit) {
         viewModel.loadAccounts()
@@ -46,6 +52,29 @@ fun FoodPartnerConnectionScreen(
                 duration = SnackbarDuration.Short
             )
             viewModel.clearActionResult()
+        }
+    }
+
+    // Update credentials dialog
+    if (showUpdateDialog) {
+        UpdateCredentialsDialog(
+            platform = updateDialogPlatform,
+            initialUsername = updateDialogUsername,
+            isLoading = uiState.updatingAccountId == updateDialogAccountId,
+            onDismiss = { showUpdateDialog = false },
+            onConfirm = { username, password ->
+                viewModel.updateAccount(updateDialogAccountId, username, password)
+            }
+        )
+    }
+
+    // Close dialog when update is complete
+    LaunchedEffect(uiState.updatingAccountId) {
+        if (uiState.updatingAccountId == null && showUpdateDialog) {
+            // Check if action result is for update
+            if (uiState.actionResult?.action == "update") {
+                showUpdateDialog = false
+            }
         }
     }
 
@@ -161,9 +190,16 @@ fun FoodPartnerConnectionScreen(
                                     index = index + 1,
                                     isTesting = uiState.testingAccountId == account.id,
                                     isDisconnecting = uiState.disconnectingAccountId == account.id,
+                                    isUpdating = uiState.updatingAccountId == account.id,
                                     onRelogin = { onNavigateToRelogin(account.id, account.platform) },
                                     onTest = { viewModel.testConnection(account.id) },
-                                    onDisconnect = { viewModel.disconnectAccount(account.id) }
+                                    onDisconnect = { viewModel.disconnectAccount(account.id) },
+                                    onUpdate = {
+                                        updateDialogAccountId = account.id
+                                        updateDialogUsername = account.username ?: ""
+                                        updateDialogPlatform = account.platform
+                                        showUpdateDialog = true
+                                    }
                                 )
                             }
                         }
@@ -248,12 +284,14 @@ private fun AccountCard(
     index: Int,
     isTesting: Boolean,
     isDisconnecting: Boolean,
+    isUpdating: Boolean,
     onRelogin: () -> Unit,
     onTest: () -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    onUpdate: () -> Unit
 ) {
     val isConnected = account.status.equals("connected", ignoreCase = true)
-    val isAnyActionInProgress = isTesting || isDisconnecting
+    val isAnyActionInProgress = isTesting || isDisconnecting || isUpdating
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -351,6 +389,16 @@ private fun AccountCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Update button
+                ActionButton(
+                    text = "Cập nhật",
+                    icon = Icons.Default.Edit,
+                    color = Color(0xFFFF9800),
+                    enabled = !isAnyActionInProgress,
+                    onClick = onUpdate,
+                    modifier = Modifier.weight(1f)
+                )
+
                 // Test button
                 ActionButton(
                     text = if (isTesting) "Đang kiểm tra..." else "Kiểm tra",
@@ -362,18 +410,6 @@ private fun AccountCard(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Relogin button (for disconnected accounts)
-                if (!isConnected) {
-                    ActionButton(
-                        text = "Đăng nhập",
-                        icon = Icons.Default.Login,
-                        color = Color(0xFF4CAF50),
-                        enabled = !isAnyActionInProgress,
-                        onClick = onRelogin,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
                 // Disconnect button
                 ActionButton(
                     text = if (isDisconnecting) "Đang ngắt..." else "Ngắt kết nối",
@@ -383,6 +419,19 @@ private fun AccountCard(
                     isLoading = isDisconnecting,
                     onClick = onDisconnect,
                     modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Show login button for disconnected accounts
+            if (!isConnected) {
+                Spacer(modifier = Modifier.height(8.dp))
+                ActionButton(
+                    text = "Đăng nhập lại",
+                    icon = Icons.Default.Login,
+                    color = Color(0xFF4CAF50),
+                    enabled = !isAnyActionInProgress,
+                    onClick = onRelogin,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -434,6 +483,108 @@ private fun ActionButton(
             maxLines = 1
         )
     }
+}
+
+@Composable
+private fun UpdateCredentialsDialog(
+    platform: String,
+    initialUsername: String,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (username: String, password: String) -> Unit
+) {
+    var username by remember { mutableStateOf(initialUsername) }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    val platformName = when (platform.lowercase()) {
+        "grab" -> "GrabFood"
+        "befood" -> "BeFood"
+        "shopee_food" -> "ShopeeFood"
+        else -> platform
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = {
+            Text(
+                text = "Cập nhật thông tin $platformName",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Nhập thông tin đăng nhập mới",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Tên đăng nhập") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Person, contentDescription = null)
+                    }
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Mật khẩu") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (passwordVisible)
+                        androidx.compose.ui.text.input.VisualTransformation.None
+                    else
+                        androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Lock, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                            )
+                        }
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(username, password) },
+                enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(if (isLoading) "Đang cập nhật..." else "Cập nhật")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("Hủy")
+            }
+        }
+    )
 }
 
 // Data class for UI

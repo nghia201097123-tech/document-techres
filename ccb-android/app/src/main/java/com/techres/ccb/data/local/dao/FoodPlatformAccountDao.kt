@@ -87,6 +87,12 @@ interface FoodPlatformAccountDao {
     @Query("UPDATE food_platform_accounts SET status = :status, last_error = :lastError, error_count = :errorCount WHERE id = :accountId")
     suspend fun updateStatus(accountId: String, status: String, lastError: String?, errorCount: Int)
 
+    /**
+     * Update account username after credentials update
+     */
+    @Query("UPDATE food_platform_accounts SET username = :username WHERE id = :accountId")
+    suspend fun updateUsername(accountId: String, username: String)
+
     @Transaction
     suspend fun syncFoodPlatformAccounts(branchId: String, accounts: List<FoodPlatformAccountEntity>) {
         // Delete existing accounts for this branch and insert fresh data
