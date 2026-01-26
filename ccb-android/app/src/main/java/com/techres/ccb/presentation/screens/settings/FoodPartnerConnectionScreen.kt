@@ -33,6 +33,11 @@ fun FoodPartnerConnectionScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Load accounts when screen first appears
+    LaunchedEffect(Unit) {
+        viewModel.loadAccounts()
+    }
+
     // Show snackbar for action result
     LaunchedEffect(uiState.actionResult) {
         uiState.actionResult?.let { result ->
@@ -247,7 +252,7 @@ private fun AccountCard(
     onTest: () -> Unit,
     onDisconnect: () -> Unit
 ) {
-    val isConnected = account.status == "connected"
+    val isConnected = account.status.equals("connected", ignoreCase = true)
     val isAnyActionInProgress = isTesting || isDisconnecting
 
     Card(

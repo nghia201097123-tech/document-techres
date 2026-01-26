@@ -68,28 +68,18 @@ class FoodPartnerConnectionViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                // Get current branch ID
+                // Get current branch ID for logging
                 val branchId = authRepository.getBranchId()
-                Log.d(TAG, "loadAccounts - branchId: $branchId")
+                Log.d(TAG, "loadAccounts - Current branchId: $branchId")
 
-                // First try to get accounts by branchId
-                var accountEntities = if (branchId != null) {
-                    foodPlatformAccountDao.getActiveAccountsList(branchId)
-                } else {
-                    emptyList()
-                }
-                Log.d(TAG, "loadAccounts - Found ${accountEntities.size} accounts for branch $branchId")
+                // Get ALL accounts from database (no filter)
+                // This ensures we display all available accounts regardless of branchId
+                val accountEntities = foodPlatformAccountDao.getAllForDebug()
+                Log.d(TAG, "loadAccounts - getAllForDebug returned ${accountEntities.size} accounts")
 
-                // If no accounts found by branchId, try to get all accounts (fallback for debug)
-                if (accountEntities.isEmpty()) {
-                    Log.d(TAG, "loadAccounts - No accounts for branchId, trying getAllForDebug...")
-                    accountEntities = foodPlatformAccountDao.getAllForDebug()
-                    Log.d(TAG, "loadAccounts - getAllForDebug returned ${accountEntities.size} accounts")
-
-                    // Log each account's branchId for debugging
-                    accountEntities.forEach { account ->
-                        Log.d(TAG, "loadAccounts - Account: ${account.id}, branchId: ${account.branchId}, platform: ${account.platform}")
-                    }
+                // Log each account for debugging
+                accountEntities.forEach { account ->
+                    Log.d(TAG, "loadAccounts - Account: id=${account.id}, branchId=${account.branchId}, platform=${account.platform}, status=${account.status}, isActive=${account.isActive}")
                 }
 
                 if (accountEntities.isEmpty()) {
@@ -99,7 +89,7 @@ class FoodPartnerConnectionViewModel @Inject constructor(
                             isLoading = false,
                             accounts = emptyList(),
                             lastSyncTime = null,
-                            error = null // No error, just empty - will show empty state
+                            error = null
                         )
                     }
                     return@launch
