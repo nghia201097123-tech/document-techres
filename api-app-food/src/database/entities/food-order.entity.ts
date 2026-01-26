@@ -5,12 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   Index,
   Unique,
 } from 'typeorm';
 import { FoodPlatformAccount, FoodPlatformType } from './food-platform-account.entity';
 import { FoodPlatformStoreMapping } from './food-platform-store-mapping.entity';
+import { FoodOrderItemEntity } from './food-order-item.entity';
 
 /**
  * Food Order Status
@@ -96,9 +98,13 @@ export class FoodOrder {
   @Column({ type: 'text', nullable: true, name: 'customer_note' })
   customerNote: string;
 
-  // Items
+  // Items (JSONB - deprecated, use orderItems relation instead)
   @Column({ type: 'jsonb', default: '[]' })
   items: FoodOrderItem[];
+
+  // Order Items relation (normalized table)
+  @OneToMany(() => FoodOrderItemEntity, (item) => item.order, { cascade: true, eager: false })
+  orderItems: FoodOrderItemEntity[];
 
   // Payment
   @Column({ type: 'bigint', default: 0 })

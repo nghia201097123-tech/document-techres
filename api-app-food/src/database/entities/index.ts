@@ -6,3 +6,4 @@ export * from './food-platform-product-mapping.entity';
 export * from './food-platform-external-item.entity';
 export * from './food-platform-item-mapping.entity';
 export * from './food-order.entity';
+export * from './food-order-item.entity';

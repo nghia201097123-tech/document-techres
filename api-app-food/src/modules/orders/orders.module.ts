@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FoodOrder, FoodPlatformAccount } from '../../database/entities';
+import { FoodOrder, FoodPlatformAccount, FoodOrderItemEntity } from '../../database/entities';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { StoresModule } from '../stores/stores.module';
 import { AccountsModule } from '../accounts/accounts.module';
@@ -9,7 +9,7 @@ import { OrdersService } from './orders.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FoodOrder, FoodPlatformAccount]),
+    TypeOrmModule.forFeature([FoodOrder, FoodOrderItemEntity, FoodPlatformAccount]),
     ConnectorsModule,
     StoresModule,
     AccountsModule,

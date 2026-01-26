@@ -9,11 +9,14 @@ import { Repository, In } from 'typeorm';
 import {
   FoodOrder,
   FoodOrderStatus,
+  FoodOrderItem,
   FoodPlatformAccount,
   FoodPlatformStoreMapping,
   FoodPlatformType,
+  FoodOrderItemEntity,
+  FoodOrderItemStatus,
 } from '../../database/entities';
-import { ConnectorFactory, RawFoodOrder } from '../connectors';
+import { ConnectorFactory, RawFoodOrder, RawFoodOrderItem } from '../connectors';
 import { StoresService } from '../stores/stores.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { PollOrdersQueryDto, GetOrdersQueryDto, PollResponseDto } from './dto/order.dto';
@@ -25,6 +28,8 @@ export class OrdersService {
   constructor(
     @InjectRepository(FoodOrder)
     private readonly orderRepo: Repository<FoodOrder>,
+    @InjectRepository(FoodOrderItemEntity)
+    private readonly orderItemRepo: Repository<FoodOrderItemEntity>,
     @InjectRepository(FoodPlatformAccount)
     private readonly accountRepo: Repository<FoodPlatformAccount>,
     private readonly storesService: StoresService,
@@ -188,7 +193,7 @@ export class OrdersService {
           customerAddress: rawOrder.customerAddress,
           customerNote: rawOrder.customerNote,
 
-          items: rawOrder.items,
+          items: rawOrder.items, // Keep JSONB for backward compatibility
 
           subtotal: rawOrder.subtotal,
           deliveryFee: rawOrder.deliveryFee,
@@ -214,11 +219,45 @@ export class OrdersService {
         });
 
         await this.orderRepo.save(newOrder);
+
+        // Save items to separate table
+        await this.saveOrderItems(newOrder.id, rawOrder.items);
+
         newOrders.push(newOrder);
       }
     }
 
     return { newOrders, updatedOrders };
+  }
+
+  /**
+   * Save order items to the food_order_items table
+   */
+  private async saveOrderItems(
+    orderId: string,
+    items: RawFoodOrderItem[],
+  ): Promise<void> {
+    if (!items || items.length === 0) return;
+
+    const orderItems = items.map((item, index) =>
+      this.orderItemRepo.create({
+        orderId,
+        productName: item.productName,
+        externalProductId: item.externalProductId || null,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        discountAmount: item.discountAmount || 0,
+        note: item.note || null,
+        options: item.options || null,
+        modifiers: item.modifiers || null,
+        techresProductId: item.techresProductId || null,
+        status: FoodOrderItemStatus.PENDING,
+        sortOrder: index,
+      }),
+    );
+
+    await this.orderItemRepo.save(orderItems);
   }
 
   /**
@@ -266,10 +305,15 @@ export class OrdersService {
   /**
    * Get order by ID
    */
-  async getOrderById(id: string): Promise<FoodOrder> {
+  async getOrderById(id: string, includeItems = true): Promise<FoodOrder> {
+    const relations = ['account', 'storeMapping'];
+    if (includeItems) {
+      relations.push('orderItems');
+    }
+
     const order = await this.orderRepo.findOne({
       where: { id },
-      relations: ['account', 'storeMapping'],
+      relations,
     });
 
     if (!order) {

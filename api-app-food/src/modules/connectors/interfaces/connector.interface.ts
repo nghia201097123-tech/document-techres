@@ -142,9 +142,25 @@ export interface RawFoodOrderItem {
 
   // Discount info for item
   discounts?: RawItemDiscount[];
+  discountAmount?: number; // Calculated total discount for this item
 
   // Modifiers/Options detailed
   modifierGroups?: RawModifierGroup[];
+  modifiers?: SimplifiedModifier[]; // Simplified modifiers for storage
+
+  // Techres mapping (for future integration)
+  techresProductId?: number;
+  techresBrandId?: number;
+}
+
+/**
+ * Simplified Modifier for storage
+ */
+export interface SimplifiedModifier {
+  groupName: string;
+  modifierName: string;
+  price: number;
+  quantity?: number;
 }
 
 /**
