@@ -6,6 +6,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface FoodPlatformApi {
 
@@ -33,6 +34,16 @@ interface FoodPlatformApi {
     suspend fun getDisconnectedAccounts(
         @Path("branchId") branchId: String
     ): Response<DisconnectedAccountsResponse>
+
+    /**
+     * Poll orders from food platforms for a branch
+     * Called every 5 seconds to fetch new orders from GrabFood, etc.
+     */
+    @GET("api/public/poll-orders/{branchId}")
+    suspend fun pollOrders(
+        @Path("branchId") branchId: String,
+        @Query("pageType") pageType: String = "Preparing"
+    ): Response<PollOrdersResponse>
 
     // ==================== Account Management ====================
 

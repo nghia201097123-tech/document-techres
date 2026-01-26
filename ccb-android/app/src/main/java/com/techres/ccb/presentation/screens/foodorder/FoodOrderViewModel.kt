@@ -1,13 +1,21 @@
 package com.techres.ccb.presentation.screens.foodorder
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.remote.dto.PollOrderDto
+import com.techres.ccb.data.remote.dto.PollOrderItemDto
+import com.techres.ccb.data.repository.AuthRepository
+import com.techres.ccb.data.repository.FoodPlatformRepository
 import com.techres.ccb.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,6 +35,7 @@ data class FoodOrderUiState(
     // UI State
     val isLoading: Boolean = false,
     val showOrderDetail: Boolean = false,
+    val isPolling: Boolean = false,
 
     // Messages
     val successMessage: String? = null,
@@ -34,35 +43,202 @@ data class FoodOrderUiState(
 )
 
 @HiltViewModel
-class FoodOrderViewModel @Inject constructor() : ViewModel() {
+class FoodOrderViewModel @Inject constructor(
+    private val foodPlatformRepository: FoodPlatformRepository,
+    private val authRepository: AuthRepository
+) : ViewModel() {
+
+    companion object {
+        private const val TAG = "FoodOrderViewModel"
+        private const val POLL_INTERVAL_MS = 5000L // 5 seconds
+    }
 
     private val _uiState = MutableStateFlow(FoodOrderUiState())
     val uiState: StateFlow<FoodOrderUiState> = _uiState.asStateFlow()
 
-    // Empty list - Food app orders will come from API integration
+    // All orders from API
     private val _ordersList = mutableListOf<FoodAppOrder>()
 
+    // Polling job
+    private var pollingJob: Job? = null
+
     init {
-        loadOrders()
+        // Start polling when ViewModel is created
+        startPolling()
     }
 
-    private fun loadOrders() {
-        viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(
-                    orders = getFilteredOrders(),
-                    newOrdersCount = _ordersList.count { it.status == FoodOrderStatus.NEW },
-                    processingOrdersCount = _ordersList.count {
-                        it.status in listOf(
-                            FoodOrderStatus.ACCEPTED,
-                            FoodOrderStatus.PREPARING,
-                            FoodOrderStatus.READY,
-                            FoodOrderStatus.DELIVERING
-                        )
-                    },
-                    isLoading = false
-                )
+    override fun onCleared() {
+        super.onCleared()
+        stopPolling()
+    }
+
+    /**
+     * Start auto-polling orders every 5 seconds
+     */
+    fun startPolling() {
+        if (pollingJob?.isActive == true) {
+            Log.d(TAG, "Polling already active")
+            return
+        }
+
+        Log.d(TAG, "Starting order polling...")
+        _uiState.update { it.copy(isPolling = true) }
+
+        pollingJob = viewModelScope.launch {
+            while (isActive) {
+                pollOrders()
+                delay(POLL_INTERVAL_MS)
             }
+        }
+    }
+
+    /**
+     * Stop auto-polling
+     */
+    fun stopPolling() {
+        Log.d(TAG, "Stopping order polling...")
+        pollingJob?.cancel()
+        pollingJob = null
+        _uiState.update { it.copy(isPolling = false) }
+    }
+
+    /**
+     * Poll orders from API
+     */
+    private suspend fun pollOrders() {
+        val branchId = authRepository.getBranchId()
+        if (branchId == null) {
+            Log.w(TAG, "No branchId available, skipping poll")
+            return
+        }
+
+        Log.d(TAG, "Polling orders for branchId: $branchId")
+
+        try {
+            val response = foodPlatformRepository.pollOrders(branchId.toString())
+
+            if (response.status == 200 && response.data != null) {
+                val newOrders = response.data.orders.mapNotNull { dto ->
+                    mapDtoToFoodAppOrder(dto)
+                }
+
+                // Update orders list
+                _ordersList.clear()
+                _ordersList.addAll(newOrders)
+
+                Log.d(TAG, "Received ${newOrders.size} orders, ${response.data.newOrders} new")
+
+                // Update UI state
+                _uiState.update { state ->
+                    state.copy(
+                        orders = getFilteredOrders(),
+                        newOrdersCount = _ordersList.count { it.status == FoodOrderStatus.NEW },
+                        processingOrdersCount = _ordersList.count {
+                            it.status in listOf(
+                                FoodOrderStatus.ACCEPTED,
+                                FoodOrderStatus.PREPARING,
+                                FoodOrderStatus.READY,
+                                FoodOrderStatus.DELIVERING
+                            )
+                        },
+                        isLoading = false,
+                        errorMessage = null
+                    )
+                }
+
+                // Show notification for new orders
+                if (response.data.newOrders > 0) {
+                    showSuccess("Có ${response.data.newOrders} đơn hàng mới!")
+                }
+            } else {
+                Log.e(TAG, "Poll orders failed: ${response.message}")
+                // Don't update error message on every failed poll, just log it
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Poll orders error: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Map DTO to domain model
+     */
+    private fun mapDtoToFoodAppOrder(dto: PollOrderDto): FoodAppOrder? {
+        return try {
+            FoodAppOrder(
+                id = dto.id ?: dto.externalOrderId,
+                orderCode = dto.orderCode,
+                platform = mapPlatformString(dto.platform),
+                status = mapStatusString(dto.status),
+                customerName = dto.customerName ?: "Khách hàng",
+                customerPhone = dto.customerPhone ?: "",
+                customerAddress = dto.customerAddress,
+                customerNote = dto.customerNote,
+                items = dto.items?.map { mapItemDto(it) } ?: emptyList(),
+                subtotal = (dto.subtotal ?: 0.0).toLong(),
+                deliveryFee = (dto.deliveryFee ?: 0.0).toLong(),
+                platformFee = (dto.platformFee ?: 0.0).toLong(),
+                discount = (dto.discount ?: 0.0).toLong(),
+                totalAmount = dto.totalAmount.toLong(),
+                driverName = dto.driverName,
+                driverPhone = dto.driverPhone,
+                estimatedDeliveryTime = dto.estimatedDeliveryTime,
+                createdAt = parseTimestamp(dto.platformCreatedAt ?: dto.createdAt) ?: System.currentTimeMillis(),
+                acceptedAt = parseTimestamp(dto.acceptedAt),
+                preparedAt = parseTimestamp(dto.preparedAt),
+                completedAt = parseTimestamp(dto.completedAt),
+                isPaid = dto.isPaid ?: true,
+                paymentMethod = dto.paymentMethod
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mapping order ${dto.orderCode}: ${e.message}")
+            null
+        }
+    }
+
+    private fun mapItemDto(dto: PollOrderItemDto): FoodOrderItem {
+        return FoodOrderItem(
+            productName = dto.productName,
+            quantity = dto.quantity,
+            unitPrice = (dto.unitPrice ?: 0.0).toLong(),
+            totalPrice = (dto.totalPrice ?: 0.0).toLong(),
+            note = dto.note,
+            options = dto.options
+        )
+    }
+
+    private fun mapPlatformString(platform: String): FoodPlatform {
+        return when (platform.uppercase()) {
+            "GRAB", "GRABFOOD", "GRAB_FOOD" -> FoodPlatform.GRAB_FOOD
+            "SHOPEE", "SHOPEEFOOD", "SHOPEE_FOOD" -> FoodPlatform.SHOPEE_FOOD
+            "BE", "BEFOOD", "BE_FOOD" -> FoodPlatform.BE_FOOD
+            "GO", "GOFOOD", "GO_FOOD" -> FoodPlatform.GO_FOOD
+            "WEB", "WEB_ORDER" -> FoodPlatform.WEB_ORDER
+            "PHONE", "PHONE_ORDER" -> FoodPlatform.PHONE_ORDER
+            else -> FoodPlatform.GRAB_FOOD
+        }
+    }
+
+    private fun mapStatusString(status: String): FoodOrderStatus {
+        return when (status.uppercase()) {
+            "NEW" -> FoodOrderStatus.NEW
+            "ACCEPTED" -> FoodOrderStatus.ACCEPTED
+            "PREPARING" -> FoodOrderStatus.PREPARING
+            "READY" -> FoodOrderStatus.READY
+            "DELIVERING" -> FoodOrderStatus.DELIVERING
+            "COMPLETED" -> FoodOrderStatus.COMPLETED
+            "CANCELLED" -> FoodOrderStatus.CANCELLED
+            else -> FoodOrderStatus.NEW
+        }
+    }
+
+    private fun parseTimestamp(dateString: String?): Long? {
+        if (dateString == null) return null
+        return try {
+            // ISO 8601 format: 2024-01-26T10:30:00.000Z
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+                .parse(dateString.replace("Z", "").substringBefore("."))?.time
+        } catch (e: Exception) {
+            System.currentTimeMillis()
         }
     }
 
@@ -97,14 +273,20 @@ class FoodOrderViewModel @Inject constructor() : ViewModel() {
         _uiState.update { state ->
             state.copy(selectedFilter = filter)
         }
-        loadOrders()
+        updateFilteredOrders()
     }
 
     fun setPlatformFilter(platform: FoodPlatform?) {
         _uiState.update { state ->
             state.copy(selectedPlatform = platform)
         }
-        loadOrders()
+        updateFilteredOrders()
+    }
+
+    private fun updateFilteredOrders() {
+        _uiState.update { state ->
+            state.copy(orders = getFilteredOrders())
+        }
     }
 
     // ===== ORDER DETAIL =====
@@ -173,7 +355,7 @@ class FoodOrderViewModel @Inject constructor() : ViewModel() {
                 }
             }
         }
-        loadOrders()
+        updateFilteredOrders()
     }
 
     // ===== MESSAGES =====
@@ -202,7 +384,8 @@ class FoodOrderViewModel @Inject constructor() : ViewModel() {
         _uiState.update { state ->
             state.copy(isLoading = true)
         }
-        // TODO: Implement API call to fetch food app orders
-        loadOrders()
+        viewModelScope.launch {
+            pollOrders()
+        }
     }
 }

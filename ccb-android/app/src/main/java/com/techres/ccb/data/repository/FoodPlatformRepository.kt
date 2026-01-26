@@ -247,6 +247,37 @@ class FoodPlatformRepository @Inject constructor(
     }
 
     /**
+     * Poll orders from food platforms for a branch
+     * Called every 5 seconds to fetch new orders from GrabFood, etc.
+     */
+    suspend fun pollOrders(branchId: String, pageType: String = "Preparing"): PollOrdersResponse {
+        return try {
+            Log.d(TAG, "Polling orders for branch $branchId with pageType=$pageType")
+            val response = foodPlatformApi.pollOrders(branchId, pageType)
+
+            if (response.isSuccessful && response.body() != null) {
+                val data = response.body()!!
+                Log.d(TAG, "Poll orders successful: ${data.data?.totalOrders ?: 0} orders, ${data.data?.newOrders ?: 0} new")
+                data
+            } else {
+                Log.e(TAG, "Poll orders failed: ${response.errorBody()?.string()}")
+                PollOrdersResponse(
+                    status = response.code(),
+                    message = "Không thể lấy đơn hàng",
+                    data = null
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Poll orders error: ${e.message}", e)
+            PollOrdersResponse(
+                status = 500,
+                message = e.message ?: "Có lỗi xảy ra",
+                data = null
+            )
+        }
+    }
+
+    /**
      * Get disconnected accounts for a branch
      */
     suspend fun getDisconnectedAccounts(branchId: String): List<DisconnectedAccount> {

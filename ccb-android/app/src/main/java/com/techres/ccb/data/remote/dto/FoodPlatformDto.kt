@@ -222,3 +222,83 @@ data class DisconnectResultDto(
     val accountId: String?,
     val status: String?
 )
+
+// ==================== Poll Orders ====================
+
+data class PollOrdersResponse(
+    val status: Int,
+    val message: String?,
+    val data: PollOrdersData?
+)
+
+data class PollOrdersData(
+    val branchId: String,
+    val totalOrders: Int,
+    val newOrders: Int,
+    val newOrderIds: List<String>?,
+    val accounts: List<PollOrdersAccountResult>,
+    val orders: List<PollOrderDto>,
+    val polledAt: String?
+)
+
+data class PollOrdersAccountResult(
+    val platform: String,
+    val accountId: String,
+    val displayName: String?,
+    val success: Boolean,
+    val ordersCount: Int,
+    val newOrdersCount: Int,
+    val error: String?,
+    val orderStats: OrderStatsDto?
+)
+
+data class OrderStatsDto(
+    val unreadNumberInNew: Int?,
+    val unreadAANumberInPrepare: Int?,
+    val unreadViaCallNumberInPrepare: Int?,
+    val numberInNew: Int?,
+    val numberInPrepare: Int?,
+    val numberInReady: Int?,
+    val numberInDelivering: Int?
+)
+
+data class PollOrderDto(
+    val id: String?,
+    val externalOrderId: String,
+    val orderCode: String,
+    val platform: String,
+    val status: String,
+    val customerName: String?,
+    val customerPhone: String?,
+    val customerAddress: String?,
+    val customerNote: String?,
+    val items: List<PollOrderItemDto>?,
+    val itemsCount: Int?,
+    val subtotal: Double?,
+    val deliveryFee: Double?,
+    val platformFee: Double?,
+    val discount: Double?,
+    val totalAmount: Double,
+    val isPaid: Boolean?,
+    val paymentMethod: String?,
+    val driverName: String?,
+    val driverPhone: String?,
+    val driverLicensePlate: String?,
+    val estimatedDeliveryTime: String?,
+    val createdAt: String?,
+    val platformCreatedAt: String?,
+    val acceptedAt: String?,
+    val preparedAt: String?,
+    val completedAt: String?,
+    val cancelledAt: String?
+)
+
+data class PollOrderItemDto(
+    val productName: String,
+    val quantity: Int,
+    val unitPrice: Double?,
+    val totalPrice: Double?,
+    val note: String?,
+    val options: String?,
+    val externalProductId: String?
+)
