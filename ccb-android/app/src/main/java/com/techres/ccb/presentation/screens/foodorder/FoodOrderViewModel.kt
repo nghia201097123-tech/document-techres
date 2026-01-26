@@ -8,6 +8,7 @@ import com.techres.ccb.data.remote.dto.PollOrderItemDto
 import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.FoodPlatformRepository
 import com.techres.ccb.domain.model.*
+import com.techres.ccb.util.OrderAnnouncementManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -45,7 +46,8 @@ data class FoodOrderUiState(
 @HiltViewModel
 class FoodOrderViewModel @Inject constructor(
     private val foodPlatformRepository: FoodPlatformRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val orderAnnouncementManager: OrderAnnouncementManager
 ) : ViewModel() {
 
     companion object {
@@ -59,6 +61,9 @@ class FoodOrderViewModel @Inject constructor(
     // All orders from API
     private val _ordersList = mutableListOf<FoodAppOrder>()
 
+    // Track known order IDs to detect truly new orders
+    private val knownOrderIds = mutableSetOf<String>()
+
     // Polling job
     private var pollingJob: Job? = null
 
@@ -70,6 +75,7 @@ class FoodOrderViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopPolling()
+        orderAnnouncementManager.stop()
     }
 
     /**
@@ -118,15 +124,32 @@ class FoodOrderViewModel @Inject constructor(
             val response = foodPlatformRepository.pollOrders(branchId.toString())
 
             if (response.status == 200 && response.data != null) {
-                val newOrders = response.data.orders.mapNotNull { dto ->
+                val fetchedOrders = response.data.orders.mapNotNull { dto ->
                     mapDtoToFoodAppOrder(dto)
+                }
+
+                // Detect truly new orders (not seen before)
+                val newlyArrivedOrders = fetchedOrders.filter { order ->
+                    order.id !in knownOrderIds
+                }
+
+                // Update known order IDs
+                knownOrderIds.addAll(fetchedOrders.map { it.id })
+
+                // Announce new orders via TTS
+                if (newlyArrivedOrders.isNotEmpty()) {
+                    Log.d(TAG, "Announcing ${newlyArrivedOrders.size} new orders")
+                    val ordersToAnnounce = newlyArrivedOrders.map { order ->
+                        Pair(order.platform.name, order.orderCode)
+                    }
+                    orderAnnouncementManager.announceNewOrders(ordersToAnnounce)
                 }
 
                 // Update orders list
                 _ordersList.clear()
-                _ordersList.addAll(newOrders)
+                _ordersList.addAll(fetchedOrders)
 
-                Log.d(TAG, "Received ${newOrders.size} orders, ${response.data.newOrders} new")
+                Log.d(TAG, "Received ${fetchedOrders.size} orders, ${newlyArrivedOrders.size} newly arrived")
 
                 // Update UI state
                 _uiState.update { state ->
@@ -146,9 +169,9 @@ class FoodOrderViewModel @Inject constructor(
                     )
                 }
 
-                // Show notification for new orders
-                if (response.data.newOrders > 0) {
-                    showSuccess("Có ${response.data.newOrders} đơn hàng mới!")
+                // Show snackbar notification for new orders
+                if (newlyArrivedOrders.isNotEmpty()) {
+                    showSuccess("Có ${newlyArrivedOrders.size} đơn hàng mới!")
                 }
             } else {
                 Log.e(TAG, "Poll orders failed: ${response.message}")
