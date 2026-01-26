@@ -130,7 +130,40 @@ export class OrdersService {
 
     // Get connector and poll
     const connector = this.connectorFactory.getConnector(account.platform);
-    return connector.pollOrders(account, mapping.externalStoreId, since);
+    const orders = await connector.pollOrders(account, mapping.externalStoreId, since);
+
+    // Enrich orders with detail (to get driver phone, full customer info, etc.)
+    const enrichedOrders = await Promise.all(
+      orders.map(async (order) => {
+        // If order has driver but no phone, fetch detail
+        if (order.driverName && !order.driverPhone) {
+          try {
+            const detailOrder = await connector.fetchOrderDetail?.(
+              account,
+              order.externalOrderId,
+              order.orderCode,
+            );
+            if (detailOrder) {
+              // Merge detail data into order
+              return {
+                ...order,
+                driverPhone: detailOrder.driverPhone || order.driverPhone,
+                driverLicensePlate: detailOrder.driverLicensePlate || order.driverLicensePlate,
+                customerPhone: detailOrder.customerPhone || order.customerPhone,
+                customerAddress: detailOrder.customerAddress || order.customerAddress,
+                customerNote: detailOrder.customerNote || order.customerNote,
+                items: detailOrder.items.length > 0 ? detailOrder.items : order.items,
+              };
+            }
+          } catch (error) {
+            this.logger.warn(`Failed to fetch order detail for ${order.orderCode}: ${error.message}`);
+          }
+        }
+        return order;
+      }),
+    );
+
+    return enrichedOrders;
   }
 
   /**

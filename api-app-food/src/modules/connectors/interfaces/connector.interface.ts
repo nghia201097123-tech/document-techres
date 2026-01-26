@@ -349,6 +349,16 @@ export interface IPlatformConnector {
   ): Promise<RawFoodOrder[]>;
 
   /**
+   * Fetch order detail from platform API
+   * Used to get additional info like driver phone, full customer details
+   */
+  fetchOrderDetail?(
+    account: FoodPlatformAccount,
+    orderId: string,
+    displayId?: string,
+  ): Promise<RawFoodOrder | null>;
+
+  /**
    * Accept/Confirm an order
    */
   acceptOrder(account: FoodPlatformAccount, orderId: string): Promise<OrderActionResult>;
