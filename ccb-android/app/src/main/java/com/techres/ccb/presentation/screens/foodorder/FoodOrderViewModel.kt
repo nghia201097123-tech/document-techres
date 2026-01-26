@@ -50,7 +50,7 @@ class FoodOrderViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "FoodOrderViewModel"
-        private const val POLL_INTERVAL_MS = 5000L // 5 seconds
+        private const val POLL_INTERVAL_MS = 15000L // 15 seconds
     }
 
     private val _uiState = MutableStateFlow(FoodOrderUiState())
