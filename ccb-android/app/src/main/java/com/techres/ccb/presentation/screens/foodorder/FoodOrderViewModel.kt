@@ -1,5 +1,6 @@
 package com.techres.ccb.presentation.screens.foodorder
 
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -38,6 +39,9 @@ data class FoodOrderUiState(
     val showOrderDetail: Boolean = false,
     val isPolling: Boolean = false,
 
+    // Grid settings
+    val gridColumns: Int = 3,
+
     // Messages
     val successMessage: String? = null,
     val errorMessage: String? = null
@@ -47,12 +51,15 @@ data class FoodOrderUiState(
 class FoodOrderViewModel @Inject constructor(
     private val foodPlatformRepository: FoodPlatformRepository,
     private val authRepository: AuthRepository,
-    private val orderAnnouncementManager: OrderAnnouncementManager
+    private val orderAnnouncementManager: OrderAnnouncementManager,
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "FoodOrderViewModel"
         private const val POLL_INTERVAL_MS = 15000L // 15 seconds
+        private const val KEY_FOOD_ORDER_GRID_COLUMNS = "food_order_grid_columns"
+        private const val DEFAULT_GRID_COLUMNS = 3
     }
 
     private val _uiState = MutableStateFlow(FoodOrderUiState())
@@ -68,8 +75,24 @@ class FoodOrderViewModel @Inject constructor(
     private var pollingJob: Job? = null
 
     init {
+        // Load grid columns preference
+        loadGridColumnsPreference()
         // Start polling when ViewModel is created
         startPolling()
+    }
+
+    private fun loadGridColumnsPreference() {
+        val savedColumns = sharedPreferences.getInt(KEY_FOOD_ORDER_GRID_COLUMNS, DEFAULT_GRID_COLUMNS)
+        Log.d(TAG, "loadGridColumnsPreference - Loaded columns: $savedColumns")
+        _uiState.update { it.copy(gridColumns = savedColumns) }
+    }
+
+    fun setGridColumns(columns: Int) {
+        if (columns in 1..6) {
+            Log.d(TAG, "setGridColumns - Setting columns to: $columns")
+            _uiState.update { it.copy(gridColumns = columns) }
+            sharedPreferences.edit().putInt(KEY_FOOD_ORDER_GRID_COLUMNS, columns).commit()
+        }
     }
 
     override fun onCleared() {

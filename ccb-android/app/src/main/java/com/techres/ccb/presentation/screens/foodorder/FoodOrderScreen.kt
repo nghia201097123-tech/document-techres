@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,13 +110,57 @@ fun FoodOrderScreen(
                 onFilterSelected = { viewModel.setFilter(it) }
             )
 
-            // Platform Filter
-            PlatformFilterRow(
-                selectedPlatform = uiState.selectedPlatform,
-                onPlatformSelected = { viewModel.setPlatformFilter(it) }
-            )
+            // Platform Filter + Grid Column Selector
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Platform Filter (scrollable)
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // All platforms option
+                    item {
+                        FilterChip(
+                            selected = uiState.selectedPlatform == null,
+                            onClick = { viewModel.setPlatformFilter(null) },
+                            label = { Text("Tất cả") },
+                            leadingIcon = if (uiState.selectedPlatform == null) {
+                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp)) }
+                            } else null
+                        )
+                    }
+                    // Platform options
+                    items(FoodPlatform.entries.toTypedArray()) { platform ->
+                        FilterChip(
+                            selected = uiState.selectedPlatform == platform,
+                            onClick = { viewModel.setPlatformFilter(platform) },
+                            label = { Text(platform.shortName) },
+                            leadingIcon = {
+                                Text(platform.icon, fontSize = 14.sp)
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(platform.color).copy(alpha = 0.2f),
+                                selectedLabelColor = Color(platform.color)
+                            )
+                        )
+                    }
+                }
 
-            // Orders List
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Grid Column Selector
+                GridColumnSelector(
+                    gridColumns = uiState.gridColumns,
+                    onGridColumnsChanged = { viewModel.setGridColumns(it) }
+                )
+            }
+
+            // Orders Grid
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -124,9 +171,11 @@ fun FoodOrderScreen(
             } else if (uiState.orders.isEmpty()) {
                 EmptyOrdersView()
             } else {
-                LazyColumn(
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(uiState.gridColumns),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(uiState.orders, key = { it.id }) { order ->
@@ -137,8 +186,13 @@ fun FoodOrderScreen(
                             onStartPreparing = { viewModel.startPreparing(order.id) },
                             onMarkReady = { viewModel.markAsReady(order.id) },
                             onComplete = { viewModel.completeOrder(order.id) },
-                            onCancel = { viewModel.cancelOrder(order.id) }
+                            onCancel = { viewModel.cancelOrder(order.id) },
+                            gridColumns = uiState.gridColumns
                         )
+                    }
+                    // Bottom spacing
+                    item(span = { GridItemSpan(uiState.gridColumns) }) {
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             }
@@ -206,41 +260,31 @@ fun FilterTabRow(
 }
 
 @Composable
-fun PlatformFilterRow(
-    selectedPlatform: FoodPlatform?,
-    onPlatformSelected: (FoodPlatform?) -> Unit
+fun GridColumnSelector(
+    gridColumns: Int,
+    onGridColumnsChanged: (Int) -> Unit
 ) {
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // All platforms option
-        item {
-            FilterChip(
-                selected = selectedPlatform == null,
-                onClick = { onPlatformSelected(null) },
-                label = { Text("Tất cả") },
-                leadingIcon = if (selectedPlatform == null) {
-                    { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp)) }
-                } else null
-            )
-        }
+    val columnOptions = listOf(2, 3, 4, 5)
 
-        // Platform options
-        items(FoodPlatform.entries.toTypedArray()) { platform ->
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            Icons.Default.GridView,
+            contentDescription = "Grid",
+            modifier = Modifier.size(16.dp),
+            tint = Color.Gray
+        )
+        columnOptions.forEach { cols ->
             FilterChip(
-                selected = selectedPlatform == platform,
-                onClick = { onPlatformSelected(platform) },
-                label = { Text(platform.shortName) },
-                leadingIcon = {
-                    Text(platform.icon, fontSize = 14.sp)
-                },
+                selected = gridColumns == cols,
+                onClick = { onGridColumnsChanged(cols) },
+                label = { Text("$cols", fontSize = 11.sp) },
+                modifier = Modifier.height(28.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(platform.color).copy(alpha = 0.2f),
-                    selectedLabelColor = Color(platform.color)
+                    selectedContainerColor = Color(0xFF1976D2),
+                    selectedLabelColor = Color.White
                 )
             )
         }
@@ -255,108 +299,104 @@ fun FoodOrderCard(
     onStartPreparing: () -> Unit,
     onMarkReady: () -> Unit,
     onComplete: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    gridColumns: Int = 3
 ) {
+    // Compact mode for more columns
+    val isCompact = gridColumns >= 4
+    val isUltraCompact = gridColumns >= 5
+    val cardPadding = if (isCompact) 10.dp else 16.dp
+    val statusColor = Color(order.status.color)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Platform badge + Order code + Time
+        Column(modifier = Modifier.padding(cardPadding)) {
+            // Header: Platform badge + Order code + Status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Platform badge
+                Box(
+                    modifier = Modifier
+                        .background(
+                            Color(order.platform.color).copy(alpha = 0.15f),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
                 ) {
-                    // Platform badge
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                Color(order.platform.color).copy(alpha = 0.15f),
-                                RoundedCornerShape(6.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(order.platform.icon, fontSize = 12.sp)
+                        Text(order.platform.icon, fontSize = if (isCompact) 10.sp else 12.sp)
+                        if (!isUltraCompact) {
                             Text(
                                 order.platform.shortName,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(order.platform.color)
                             )
                         }
                     }
-
-                    // Order code
-                    Text(
-                        order.orderCode,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
 
                 // Status badge
-                StatusBadge(status = order.status)
+                StatusBadge(status = order.status, isCompact = isCompact)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 6.dp else 8.dp))
 
-            // Customer info
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.outline
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    order.customerName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                if (order.customerPhone.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(12.dp))
+            // Order code
+            Text(
+                order.orderCode,
+                style = if (isCompact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Customer name (show only if not ultra compact)
+            if (!isUltraCompact) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Default.Phone,
+                        Icons.Default.Person,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        order.customerPhone,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        order.customerName,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            // Driver info (if assigned)
-            if (order.driverName != null) {
-                Spacer(modifier = Modifier.height(8.dp))
+            // Driver info (compact version - only show if driver assigned and not ultra compact)
+            if (order.driverName != null && !isUltraCompact) {
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
                             Color(0xFF4CAF50).copy(alpha = 0.1f),
-                            RoundedCornerShape(8.dp)
+                            RoundedCornerShape(6.dp)
                         )
-                        .padding(8.dp),
+                        .padding(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Driver avatar
@@ -365,7 +405,7 @@ fun FoodOrderCard(
                             model = order.driverAvatar,
                             contentDescription = "Driver avatar",
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(24.dp)
                                 .clip(CircleShape)
                                 .border(1.dp, Color(0xFF4CAF50), CircleShape),
                             contentScale = ContentScale.Crop
@@ -373,177 +413,180 @@ fun FoodOrderCard(
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(24.dp)
                                 .background(Color(0xFF4CAF50).copy(alpha = 0.2f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.DeliveryDining,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(16.dp),
                                 tint = Color(0xFF4CAF50)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Tài xế: ${order.driverName}",
-                            style = MaterialTheme.typography.bodyMedium,
+                            order.driverName ?: "",
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF2E7D32)
+                            color = Color(0xFF2E7D32),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        // Order content message (e.g., "Driver is nearby")
                         order.orderContentMessage?.let { message ->
                             Text(
                                 message,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF4CAF50)
-                            )
-                        }
-                    }
-                    order.driverPhone?.let { phone ->
-                        IconButton(
-                            onClick = { /* TODO: Call driver */ },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Phone,
-                                contentDescription = "Gọi tài xế",
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(20.dp)
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontSize = 10.sp
                             )
                         }
                     }
                 }
             }
 
-            // Items summary
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "${order.items.size} món: ${order.items.joinToString(", ") { "${it.quantity}x ${it.productName}" }}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            // Items summary (only if not ultra compact)
+            if (!isUltraCompact) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "${order.items.size} món",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
 
-            // Footer: Total + Time + Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        formatCurrency(order.totalAmount),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+            // Footer: Total + Time
+            Column {
+                Text(
+                    formatCurrency(order.totalAmount),
+                    style = if (isCompact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = MaterialTheme.colorScheme.outline
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Schedule,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        formatTimeAgo(order.createdAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontSize = 10.sp
+                    )
+                    if (!order.isPaid) {
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            formatTimeAgo(order.createdAt),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        if (!order.isPaid) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Badge(containerColor = Color(0xFFFFF3E0)) {
-                                Text("COD", color = Color(0xFFE65100), fontSize = 10.sp)
-                            }
+                        Badge(
+                            containerColor = Color(0xFFFFF3E0),
+                            modifier = Modifier.height(16.dp)
+                        ) {
+                            Text("COD", color = Color(0xFFE65100), fontSize = 8.sp)
                         }
                     }
                 }
+            }
 
-                // Quick action buttons based on status
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    when (order.status) {
-                        FoodOrderStatus.NEW -> {
+            // Action buttons (compact layout)
+            Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
+            when (order.status) {
+                FoodOrderStatus.NEW -> {
+                    if (isCompact) {
+                        // Vertical buttons for compact mode
+                        Button(
+                            onClick = onAccept,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Text("Nhận", fontSize = 11.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             OutlinedButton(
                                 onClick = onCancel,
+                                modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.error
                                 ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
-                                Text("Hủy", fontSize = 12.sp)
+                                Text("Hủy", fontSize = 11.sp)
                             }
                             Button(
                                 onClick = onAccept,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF4CAF50)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
-                                Text("Nhận đơn", fontSize = 12.sp)
+                                Text("Nhận đơn", fontSize = 11.sp)
                             }
                         }
-                        FoodOrderStatus.ACCEPTED -> {
-                            Button(
-                                onClick = onStartPreparing,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF9C27B0)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text("Bắt đầu làm", fontSize = 12.sp)
-                            }
-                        }
-                        FoodOrderStatus.PREPARING -> {
-                            Button(
-                                onClick = onMarkReady,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2196F3)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text("Sẵn sàng", fontSize = 12.sp)
-                            }
-                        }
-                        FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> {
-                            Button(
-                                onClick = onComplete,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF4CAF50)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text("Hoàn thành", fontSize = 12.sp)
-                            }
-                        }
-                        else -> {}
                     }
                 }
+                FoodOrderStatus.ACCEPTED -> {
+                    Button(
+                        onClick = onStartPreparing,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9C27B0)),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Text(if (isCompact) "Làm" else "Bắt đầu làm", fontSize = 11.sp)
+                    }
+                }
+                FoodOrderStatus.PREPARING -> {
+                    Button(
+                        onClick = onMarkReady,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Text(if (isCompact) "Xong" else "Sẵn sàng", fontSize = 11.sp)
+                    }
+                }
+                FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> {
+                    Button(
+                        onClick = onComplete,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Text(if (isCompact) "Xong" else "Hoàn thành", fontSize = 11.sp)
+                    }
+                }
+                else -> {}
             }
         }
     }
 }
 
 @Composable
-fun StatusBadge(status: FoodOrderStatus) {
+fun StatusBadge(status: FoodOrderStatus, isCompact: Boolean = false) {
     Box(
         modifier = Modifier
             .background(
                 Color(status.color).copy(alpha = 0.15f),
                 RoundedCornerShape(4.dp)
             )
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = if (isCompact) 6.dp else 8.dp, vertical = if (isCompact) 2.dp else 4.dp)
     ) {
         Text(
             status.displayName,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = Color(status.color)
+            color = Color(status.color),
+            fontSize = if (isCompact) 10.sp else 12.sp
         )
     }
 }
