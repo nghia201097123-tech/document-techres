@@ -550,41 +550,61 @@ export class GrabConnector extends BasePlatformConnector {
 
   /**
    * Fetch order detail from GrabFood API
-   * Endpoint: GET https://api.grab.com/food/merchant/v3/order/{orderID}
+   * Endpoint: GET https://api.grab.com/food/merchant/v3/orders/{orderID}
+   * Includes retry logic for temporary server errors (502, 503)
    */
   async fetchOrderDetail(
     account: FoodPlatformAccount,
     orderId: string,
     displayId?: string,
   ): Promise<RawFoodOrder | null> {
-    const url = `${GrabConnector.GRAB_FOOD_API_URL}/order/${orderId}`;
+    const url = `${GrabConnector.GRAB_FOOD_API_URL}/orders/${orderId}`;
+    const maxRetries = 2;
+    let lastError: any = null;
 
-    this.logger.log(`[GrabFood OrderDetail] Fetching order ${orderId} from ${url}`);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Wait before retry (exponential backoff: 500ms, 1000ms)
+          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+          this.logger.log(`[GrabFood OrderDetail] Retry attempt ${attempt} for order ${orderId}`);
+        }
 
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': account.accessToken,
-          'Accept': '*/*',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-        },
-        timeout: 30000,
-      });
+        const response = await axios.get(url, {
+          headers: {
+            'Authorization': account.accessToken,
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+          },
+          timeout: 30000,
+        });
 
-      const orderData = response.data?.order || response.data;
-      this.logger.log(`[GrabFood OrderDetail] Got order ${orderData?.orderID}`);
+        const orderData = response.data?.order || response.data;
+        this.logger.log(`[GrabFood OrderDetail] Got order ${orderData?.orderID}`);
 
-      return this.transformOrderDetail(orderData, displayId);
-    } catch (error: any) {
-      this.logger.error(`[GrabFood OrderDetail] EXCEPTION: ${error?.message}`);
+        return this.transformOrderDetail(orderData, displayId);
+      } catch (error: any) {
+        lastError = error;
+        const status = error?.response?.status;
 
-      if (error?.response?.status === 401) {
-        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+        // Don't retry for auth errors
+        if (status === 401) {
+          throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+        }
+
+        // Retry for temporary server errors (502, 503, 504)
+        if ([502, 503, 504].includes(status) && attempt < maxRetries) {
+          this.logger.warn(`[GrabFood OrderDetail] Server error ${status} for order ${orderId}, will retry...`);
+          continue;
+        }
+
+        this.logger.error(`[GrabFood OrderDetail] EXCEPTION: ${error?.message} (status: ${status})`);
+        break;
       }
-
-      return null;
     }
+
+    return null;
   }
 
   /**
