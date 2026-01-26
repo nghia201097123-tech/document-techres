@@ -20,10 +20,11 @@ import {
 export class GrabConnector extends BasePlatformConnector {
   readonly platform = FoodPlatformType.GRAB;
 
+  // Hardcoded MEX API base URL
+  private static readonly GRAB_MEX_API_URL = 'https://api.grab.com/mex-app';
+
   constructor(configService: ConfigService) {
-    // Use MEX API base URL
-    const baseUrl = configService.get<string>('platform.grab.baseUrl') || 'https://api.grab.com/mex-app';
-    super(configService, baseUrl);
+    super(configService, GrabConnector.GRAB_MEX_API_URL);
   }
 
   /**
@@ -46,7 +47,8 @@ export class GrabConnector extends BasePlatformConnector {
       username: credentials.username,
     };
 
-    const fullUrl = `${this.httpClient.defaults.baseURL}${requestUrl}`;
+    // Use hardcoded URL directly to avoid any config issues
+    const fullUrl = `${GrabConnector.GRAB_MEX_API_URL}${requestUrl}`;
     this.logger.log(`[GrabFood Login] Attempting login for user: ${credentials.username}`);
     this.logger.log(`[GrabFood Login] URL: ${fullUrl}`);
     this.logger.log(`[GrabFood Login] Request body: ${JSON.stringify(requestBody)}`);
