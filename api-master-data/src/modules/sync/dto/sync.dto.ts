@@ -1026,6 +1026,9 @@ export class FoodPlatformAccountInfoDto {
   @ApiProperty({ description: 'Display name' })
   displayName: string;
 
+  @ApiProperty({ description: 'Username for login', nullable: true })
+  username: string | null;
+
   @ApiProperty({ description: 'Account status: pending, otp_required, connected, disconnected' })
   status: string;
 
@@ -1037,6 +1040,12 @@ export class FoodPlatformAccountInfoDto {
 
   @ApiProperty()
   isActive: boolean;
+
+  @ApiProperty({ description: 'Last error message', nullable: true })
+  lastError: string | null;
+
+  @ApiProperty({ description: 'Error count' })
+  errorCount: number;
 }
 
 export class FoodPlatformAccountDto {
