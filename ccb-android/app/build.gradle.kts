@@ -29,7 +29,7 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.49:4000/api/tenant/\"")
             buildConfigField("String", "API_POS_BASE_URL", "\"http://192.168.1.49:4000/api/pos/\"")
             buildConfigField("String", "API_GATEWAY_URL", "\"http://192.168.1.49:4000/\"")
-            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://192.168.1.49:3006/\"")
+            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://192.168.1.49:3010/\"")
             // Socket-service runs on port 3007
             buildConfigField("String", "SOCKET_URL", "\"http://192.168.1.49:3007\"")
         }
