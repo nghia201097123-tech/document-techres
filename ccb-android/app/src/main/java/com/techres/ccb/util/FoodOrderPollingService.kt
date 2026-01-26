@@ -8,6 +8,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,8 +39,12 @@ class FoodOrderPollingService @Inject constructor(
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollingJob: Job? = null
 
+    // Mutex to prevent concurrent polling
+    private val pollMutex = Mutex()
+
     // Track known order IDs to detect truly new orders (persisted in SharedPreferences)
-    private val knownOrderIds = mutableSetOf<String>()
+    // Use thread-safe set
+    private val knownOrderIds: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
     init {
         // Load previously announced order IDs from SharedPreferences
@@ -49,26 +56,34 @@ class FoodOrderPollingService @Inject constructor(
      */
     private fun loadAnnouncedOrderIds() {
         val savedIds = sharedPreferences.getStringSet(KEY_ANNOUNCED_ORDER_IDS, emptySet()) ?: emptySet()
-        knownOrderIds.addAll(savedIds)
+        synchronized(knownOrderIds) {
+            knownOrderIds.addAll(savedIds)
+        }
         Log.d(TAG, "Loaded ${knownOrderIds.size} announced order IDs from storage")
     }
 
     /**
      * Save announced order IDs to SharedPreferences
+     * Uses commit() for immediate persistence to prevent data loss
      */
     private fun saveAnnouncedOrderIds() {
-        // Keep only the most recent order IDs to prevent unbounded growth
-        val idsToSave = if (knownOrderIds.size > MAX_STORED_ORDER_IDS) {
-            knownOrderIds.toList().takeLast(MAX_STORED_ORDER_IDS).toSet()
-        } else {
-            knownOrderIds.toSet()
+        // Take a snapshot of the set to avoid concurrent modification
+        val currentIds: Set<String>
+        synchronized(knownOrderIds) {
+            currentIds = knownOrderIds.toSet()
         }
 
-        sharedPreferences.edit()
-            .putStringSet(KEY_ANNOUNCED_ORDER_IDS, idsToSave)
-            .apply()
+        // Keep only the most recent order IDs to prevent unbounded growth
+        val idsToSave = if (currentIds.size > MAX_STORED_ORDER_IDS) {
+            currentIds.toList().takeLast(MAX_STORED_ORDER_IDS).toSet()
+        } else {
+            currentIds
+        }
 
-        Log.d(TAG, "Saved ${idsToSave.size} announced order IDs to storage")
+        // Use commit() for immediate persistence (blocking but ensures data is saved)
+        sharedPreferences.edit()
+            .putStringSet(KEY_ANNOUNCED_ORDER_IDS, HashSet(idsToSave)) // Create new HashSet to avoid SharedPreferences quirk
+            .commit()
     }
 
     // Polling state
@@ -126,50 +141,52 @@ class FoodOrderPollingService @Inject constructor(
      * Poll orders from API and announce new ones
      */
     private suspend fun pollOrders() {
-        val branchId = authRepository.getBranchId()
-        if (branchId == null) {
-            Log.d(TAG, "No branchId available, skipping poll")
+        // Use mutex to prevent concurrent polling
+        if (!pollMutex.tryLock()) {
+            Log.d(TAG, "Poll already in progress, skipping")
             return
         }
 
-        Log.d(TAG, "Polling orders for branchId: $branchId")
-
         try {
+            val branchId = authRepository.getBranchId()
+            if (branchId == null) {
+                Log.d(TAG, "No branchId available, skipping poll")
+                return
+            }
+
+            Log.d(TAG, "Polling orders for branchId: $branchId")
+
             val response = foodPlatformRepository.pollOrders(branchId.toString())
 
             if (response.status == 200 && response.data != null) {
                 val orders = response.data.orders
 
-                // Detect truly new orders (not seen before and not already announced)
-                val newlyArrivedOrders = orders.filter { order ->
-                    val orderId = order.id ?: order.externalOrderId
-                    orderId !in knownOrderIds
-                }
+                // Collect orders to announce while adding to known set atomically
+                val ordersToAnnounce = mutableListOf<Pair<String, String>>()
 
-                // Update known order IDs and persist
-                var hasNewIds = false
                 orders.forEach { order ->
                     val orderId = order.id ?: order.externalOrderId
+                    // add() returns true if the element was NOT already present
+                    // This is atomic - first thread to add wins
                     if (knownOrderIds.add(orderId)) {
-                        hasNewIds = true
+                        // This is a new order - add to announce list
+                        ordersToAnnounce.add(Pair(order.platform, order.orderCode))
+                        Log.d(TAG, "New order detected: $orderId (${order.platform} - ${order.orderCode})")
                     }
                 }
 
-                // Save to SharedPreferences if we added new IDs
-                if (hasNewIds) {
+                // Save to SharedPreferences immediately if we have new orders
+                if (ordersToAnnounce.isNotEmpty()) {
                     saveAnnouncedOrderIds()
+                    Log.d(TAG, "Saved ${knownOrderIds.size} order IDs to storage")
                 }
 
                 // Update new orders count
                 _newOrdersCount.value = orders.count { it.status.uppercase() == "NEW" }
 
-                // Announce new orders via TTS (only orders we haven't announced before)
-                if (newlyArrivedOrders.isNotEmpty()) {
-                    Log.d(TAG, "Found ${newlyArrivedOrders.size} new orders to announce...")
-
-                    val ordersToAnnounce = newlyArrivedOrders.map { order ->
-                        Pair(order.platform, order.orderCode)
-                    }
+                // Announce new orders via TTS
+                if (ordersToAnnounce.isNotEmpty()) {
+                    Log.d(TAG, "Announcing ${ordersToAnnounce.size} new orders...")
 
                     // Use Main dispatcher for TTS (UI thread)
                     withContext(Dispatchers.Main) {
@@ -177,12 +194,14 @@ class FoodOrderPollingService @Inject constructor(
                     }
                 }
 
-                Log.d(TAG, "Poll complete: ${orders.size} orders, ${newlyArrivedOrders.size} newly announced")
+                Log.d(TAG, "Poll complete: ${orders.size} orders, ${ordersToAnnounce.size} newly announced")
             } else {
                 Log.w(TAG, "Poll orders failed: ${response.message}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Poll orders error: ${e.message}", e)
+        } finally {
+            pollMutex.unlock()
         }
     }
 
@@ -191,11 +210,13 @@ class FoodOrderPollingService @Inject constructor(
      * Also clears the persisted data in SharedPreferences
      */
     fun clearKnownOrders() {
-        knownOrderIds.clear()
+        synchronized(knownOrderIds) {
+            knownOrderIds.clear()
+        }
         _newOrdersCount.value = 0
         sharedPreferences.edit()
             .remove(KEY_ANNOUNCED_ORDER_IDS)
-            .apply()
+            .commit()
         Log.d(TAG, "Cleared all announced order IDs")
     }
 
