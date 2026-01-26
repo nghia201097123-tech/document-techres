@@ -422,8 +422,9 @@ export class GrabConnector extends BasePlatformConnector {
    * Transform Grab pagination order to RawFoodOrder format
    */
   transformPaginationOrder(grabOrder: GrabPaginationOrder): RawFoodOrder {
-    // Parse order value (e.g., "97.000" -> 97000)
-    const orderValue = parseFloat((grabOrder.orderValue || '0').replace(/\./g, '').replace(',', '.')) * 1000;
+    // Parse order value (e.g., "246.500" -> 246500)
+    // Vietnamese format uses dots as thousand separators, so just remove them
+    const orderValue = parseInt((grabOrder.orderValue || '0').replace(/\./g, ''), 10);
 
     return {
       externalOrderId: grabOrder.orderID,
