@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('platform', () => ({
   grab: {
-    baseUrl: process.env.GRAB_API_BASE_URL || 'https://api.grab.com/merchant/v2',
+    baseUrl: process.env.GRAB_API_BASE_URL || 'https://api.grab.com/mex-app',
     clientId: process.env.GRAB_CLIENT_ID || '',
     clientSecret: process.env.GRAB_CLIENT_SECRET || '',
   },
