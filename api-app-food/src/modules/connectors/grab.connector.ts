@@ -455,10 +455,10 @@ export class GrabConnector extends BasePlatformConnector {
       isPaid: true, // Assuming online payment
       paymentMethod: 'GrabPay',
 
-      driverName: grabOrder.driver?.name || null,
-      driverPhone: null,
-      driverLicensePlate: null,
-      estimatedDeliveryTime: grabOrder.times?.deliveredAt || null,
+      driverName: grabOrder.driver?.name || undefined,
+      driverPhone: undefined,
+      driverLicensePlate: undefined,
+      estimatedDeliveryTime: grabOrder.times?.deliveredAt || undefined,
 
       createdAt: grabOrder.times?.createdAt ? new Date(grabOrder.times.createdAt) : new Date(),
       updatedAt: new Date(),
@@ -469,7 +469,7 @@ export class GrabConnector extends BasePlatformConnector {
       completedAt: grabOrder.times?.completedAt ? new Date(grabOrder.times.completedAt) : undefined,
       cancelledAt: grabOrder.times?.cancelledAt ? new Date(grabOrder.times.cancelledAt) : undefined,
 
-      rawData: grabOrder,
+      rawData: grabOrder as unknown as Record<string, unknown>,
     };
   }
 

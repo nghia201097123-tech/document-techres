@@ -459,7 +459,7 @@ export class PublicController {
               existingOrder.previousStatus = statusChanged ? existingOrder.status : existingOrder.previousStatus;
               existingOrder.driverName = rawOrder.driverName || existingOrder.driverName;
               existingOrder.lastSyncAt = new Date();
-              existingOrder.rawData = rawOrder.rawData;
+              existingOrder.rawData = rawOrder.rawData || null;
 
               if (rawOrder.acceptedAt && !existingOrder.acceptedAt) {
                 existingOrder.acceptedAt = rawOrder.acceptedAt;
@@ -478,37 +478,36 @@ export class PublicController {
               savedOrders.push(existingOrder);
             } else {
               // Create new order
-              const newOrder = this.orderRepo.create({
-                tenantId: account.tenantId,
-                branchId: account.branchId,
-                externalOrderId: rawOrder.externalOrderId,
-                orderCode: rawOrder.orderCode,
-                platform: FoodPlatformType.GRAB,
-                status: this.mapGrabStatusToFoodOrderStatus(rawOrder.status),
-                customerName: rawOrder.customerName,
-                customerPhone: rawOrder.customerPhone || '',
-                customerAddress: rawOrder.customerAddress || null,
-                customerNote: rawOrder.customerNote || null,
-                items: rawOrder.items,
-                subtotal: rawOrder.subtotal,
-                deliveryFee: rawOrder.deliveryFee,
-                platformFee: rawOrder.platformFee,
-                discount: rawOrder.discount,
-                totalAmount: rawOrder.totalAmount,
-                isPaid: rawOrder.isPaid,
-                paymentMethod: rawOrder.paymentMethod || null,
-                driverName: rawOrder.driverName || null,
-                driverPhone: rawOrder.driverPhone || null,
-                driverLicensePlate: rawOrder.driverLicensePlate || null,
-                estimatedDeliveryTime: rawOrder.estimatedDeliveryTime || null,
-                platformCreatedAt: rawOrder.createdAt,
-                acceptedAt: rawOrder.acceptedAt || null,
-                preparedAt: rawOrder.readyAt || null,
-                completedAt: rawOrder.completedAt || null,
-                cancelledAt: rawOrder.cancelledAt || null,
-                accountId: account.id,
-                rawData: rawOrder.rawData,
-              });
+              const newOrder = new FoodOrder();
+              newOrder.tenantId = account.tenantId;
+              newOrder.branchId = account.branchId;
+              newOrder.externalOrderId = rawOrder.externalOrderId;
+              newOrder.orderCode = rawOrder.orderCode;
+              newOrder.platform = FoodPlatformType.GRAB;
+              newOrder.status = this.mapGrabStatusToFoodOrderStatus(rawOrder.status);
+              newOrder.customerName = rawOrder.customerName;
+              newOrder.customerPhone = rawOrder.customerPhone || '';
+              newOrder.customerAddress = rawOrder.customerAddress || null;
+              newOrder.customerNote = rawOrder.customerNote || null;
+              newOrder.items = rawOrder.items;
+              newOrder.subtotal = rawOrder.subtotal;
+              newOrder.deliveryFee = rawOrder.deliveryFee;
+              newOrder.platformFee = rawOrder.platformFee;
+              newOrder.discount = rawOrder.discount;
+              newOrder.totalAmount = rawOrder.totalAmount;
+              newOrder.isPaid = rawOrder.isPaid;
+              newOrder.paymentMethod = rawOrder.paymentMethod || null;
+              newOrder.driverName = rawOrder.driverName || null;
+              newOrder.driverPhone = rawOrder.driverPhone || null;
+              newOrder.driverLicensePlate = rawOrder.driverLicensePlate || null;
+              newOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime || null;
+              newOrder.platformCreatedAt = rawOrder.createdAt;
+              newOrder.acceptedAt = rawOrder.acceptedAt || null;
+              newOrder.preparedAt = rawOrder.readyAt || null;
+              newOrder.completedAt = rawOrder.completedAt || null;
+              newOrder.cancelledAt = rawOrder.cancelledAt || null;
+              newOrder.accountId = account.id;
+              newOrder.rawData = rawOrder.rawData || null;
 
               const saved = await this.orderRepo.save(newOrder);
               savedOrders.push(saved);
