@@ -31,22 +31,28 @@ export class GrabConnector extends BasePlatformConnector {
    * Endpoint: POST /troy/user-profile/v1/login
    */
   async login(credentials: LoginCredentials): Promise<LoginResult> {
+    const requestUrl = '/troy/user-profile/v1/login';
+    const requestBody = {
+      login_source: 'TROY_APP_MAIN_USERNAME_PASSWORD',
+      session_data: {
+        mobile_session_data: {
+          device_model: 'iPhone 13',
+          device_id: '',
+          device_brand: '',
+        },
+      },
+      without_force_logout: false,
+      password: credentials.password,
+      username: credentials.username,
+    };
+
+    this.logger.log(`[GrabFood Login] Attempting login for user: ${credentials.username}`);
+    this.logger.log(`[GrabFood Login] URL: ${this.httpClient.defaults.baseURL}${requestUrl}`);
+
     try {
       const response = await this.httpClient.post(
-        '/troy/user-profile/v1/login',
-        {
-          login_source: 'TROY_APP_MAIN_USERNAME_PASSWORD',
-          session_data: {
-            mobile_session_data: {
-              device_model: 'iPhone 13',
-              device_id: '',
-              device_brand: '',
-            },
-          },
-          without_force_logout: false,
-          password: credentials.password,
-          username: credentials.username,
-        },
+        requestUrl,
+        requestBody,
         {
           headers: {
             'user-agent': 'Grab Merchant/4.126.0 (ios 16.7.10; Build 102734851)',
@@ -59,7 +65,8 @@ export class GrabConnector extends BasePlatformConnector {
 
       const responseData = response.data;
 
-      this.logger.debug('GrabFood login response:', JSON.stringify(responseData));
+      this.logger.log(`[GrabFood Login] Response status: ${response.status}`);
+      this.logger.debug('[GrabFood Login] Response data:', JSON.stringify(responseData, null, 2));
 
       // Check if login was successful - handle both direct response and wrapped response
       // Direct response format: { success: true, data: { jwt: '...' } }
@@ -68,8 +75,12 @@ export class GrabConnector extends BasePlatformConnector {
       const successCheck = isDirectResponse ? responseData?.success : responseData?.data?.success;
       const loginData = isDirectResponse ? responseData?.data : responseData?.data?.data;
 
+      this.logger.log(`[GrabFood Login] isDirectResponse: ${isDirectResponse}, successCheck: ${successCheck}, hasJwt: ${!!loginData?.jwt}`);
+
       if (successCheck && loginData?.jwt) {
         const userProfile = loginData.user_profile;
+
+        this.logger.log(`[GrabFood Login] SUCCESS - merchantId: ${userProfile?.grab_food_entity_id}`);
 
         return {
           success: true,
@@ -94,13 +105,17 @@ export class GrabConnector extends BasePlatformConnector {
         ? (responseData?.message || responseData?.error?.message)
         : (responseData?.data?.message || responseData?.data?.error?.message);
 
+      this.logger.warn(`[GrabFood Login] FAILED - ${errorMsg || 'Unknown error'}`);
+
       return {
         success: false,
         error: errorMsg || 'Đăng nhập thất bại',
         errorCode: 'INVALID_CREDENTIALS',
       };
     } catch (error: any) {
-      this.logger.error('GrabFood login failed', error?.response?.data || error?.message);
+      this.logger.error(`[GrabFood Login] EXCEPTION: ${error?.message}`);
+      this.logger.error(`[GrabFood Login] Error response status: ${error?.response?.status}`);
+      this.logger.error(`[GrabFood Login] Error response data: ${JSON.stringify(error?.response?.data)}`);
 
       // Extract error message from response if available - handle multiple formats
       const errData = error?.response?.data;
