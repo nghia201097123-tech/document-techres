@@ -77,29 +77,55 @@ class OrderAnnouncementManager @Inject constructor(
             val (platform, orderCode) = orders.first()
             announceNewOrder(platform, orderCode)
         } else {
-            // Multiple orders - announce count first, then each order
-            val countMessage = "Bạn có ${orders.size} đơn hàng mới"
+            // Multiple orders - announce count then short platform + code for each
+            val countMessage = "${orders.size} đơn mới"
             speak(countMessage)
 
             orders.forEach { (platform, orderCode) ->
-                val message = buildAnnouncementMessage(platform, orderCode)
+                val message = buildShortMessage(platform, orderCode)
                 speak(message, addToQueue = true)
             }
         }
     }
 
-    private fun buildAnnouncementMessage(platform: String, orderCode: String): String {
-        val platformName = when (platform.uppercase()) {
-            "GRAB", "GRABFOOD", "GRAB_FOOD" -> "Grab Food"
-            "SHOPEE", "SHOPEEFOOD", "SHOPEE_FOOD" -> "Shopee Food"
-            "BE", "BEFOOD", "BE_FOOD" -> "Be Food"
-            "GO", "GOFOOD", "GO_FOOD" -> "Go Food"
+    /**
+     * Get short platform name for TTS
+     */
+    private fun getShortPlatformName(platform: String): String {
+        return when (platform.uppercase()) {
+            "GRAB", "GRABFOOD", "GRAB_FOOD" -> "Grab"
+            "SHOPEE", "SHOPEEFOOD", "SHOPEE_FOOD" -> "Shopee"
+            "BE", "BEFOOD", "BE_FOOD" -> "Be"
+            "GO", "GOFOOD", "GO_FOOD" -> "Go"
             "WEB", "WEB_ORDER" -> "Web"
-            "PHONE", "PHONE_ORDER" -> "điện thoại"
+            "PHONE", "PHONE_ORDER" -> "Điện thoại"
             else -> platform
         }
+    }
 
-        return "Bạn có đơn $platformName mới, mã đơn $orderCode"
+    /**
+     * Extract just the numeric part from order code (e.g., "GF-714" -> "714")
+     */
+    private fun extractOrderNumber(orderCode: String): String {
+        // Remove common prefixes like "GF-", "SF-", "BE-", etc.
+        val cleaned = orderCode.replace(Regex("^[A-Za-z]+-?"), "")
+        return if (cleaned.isNotEmpty()) cleaned else orderCode
+    }
+
+    /**
+     * Build short announcement message: "Grab, mã 714"
+     */
+    private fun buildShortMessage(platform: String, orderCode: String): String {
+        val platformName = getShortPlatformName(platform)
+        val orderNumber = extractOrderNumber(orderCode)
+        return "$platformName, mã $orderNumber"
+    }
+
+    private fun buildAnnouncementMessage(platform: String, orderCode: String): String {
+        val platformName = getShortPlatformName(platform)
+        val orderNumber = extractOrderNumber(orderCode)
+        // Short format: "Đơn Grab, mã 714"
+        return "Đơn $platformName, mã $orderNumber"
     }
 
     private fun speak(message: String, addToQueue: Boolean = false) {
