@@ -2,28 +2,31 @@
 
 ## 📋 Tổng quan
 
-Hệ thống được tách thành 2 microservices riêng biệt để tối ưu hiệu năng và khả năng mở rộng.
+Hệ thống gồm 2 microservices để tối ưu hiệu năng và khả năng mở rộng:
+- **api-app-food** (đã có): Quản lý tài khoản, liên kết platforms, menu
+- **api-order-worker** (mới): Poll đơn hàng với Piscina workers, realtime WebSocket
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              CCB ANDROID APP                                    │
 │                         Poll mỗi 15s + WebSocket realtime                       │
 └─────────────────────────────────────────────────────────────────────────────────┘
-                     │                                    │
-              GET /orders/:branchId              WebSocket /orders
-              POST /trigger-poll/:branchId              │
-                     │                                    │
-                     ▼                                    ▼
+                    │                                    │
+             GET /orders/:branchId              WebSocket /orders
+             POST /trigger-poll/:branchId              │
+             POST /accounts/link                       │
+                    │                                    │
+                    ▼                                    ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │                            API GATEWAY (Nginx/Kong)                              │
 └──────────────────────────────────────────────────────────────────────────────────┘
-                     │                                    │
-         ┌───────────┴──────────┐              ┌─────────┴─────────┐
-         ▼                      ▼              ▼                   ▼
+                    │                                    │
+        ┌───────────┴──────────┐              ┌─────────┴─────────┐
+        ▼                      ▼              ▼                   ▼
 ┌─────────────────────┐  ┌─────────────────────────────────────────────────────────┐
-│  MICROSERVICE 1     │  │                MICROSERVICE 2                           │
-│  (Account Service)  │  │            (Order Worker Service)                       │
-│  Port: 3001         │  │            Port: 3002                                   │
+│  api-app-food       │  │              api-order-worker                           │
+│  (Đã có - Giữ nguyên)│  │              (Mới - Thêm mới)                          │
+│  Port: 3001         │  │              Port: 3002                                 │
 │                     │  │                                                         │
 │  Chức năng:         │  │  Chức năng:                                            │
 │  • Link account     │  │  • Poll orders từ platforms (Piscina Workers)          │
@@ -33,12 +36,12 @@ Hệ thống được tách thành 2 microservices riêng biệt để tối ưu
 │  • Disconnect       │  │                                                         │
 │  • Token management │  │  Workers:                                               │
 │                     │  │  • GrabWorker (pool: 2-10 threads)                     │
-└─────────────────────┘  │  • ShopeeWorker (pool: 2-10 threads)                   │
-         │               │  • BeFoodWorker (pool: 2-10 threads)                   │
-         │               └─────────────────────────────────────────────────────────┘
-         │                              │                    │
-         │                              │                    │
-         ▼                              ▼                    ▼
+│  ❌ BỎ: Gọi lấy đơn │  │  • ShopeeWorker (pool: 2-10 threads)                   │
+│     từ merchant     │  │  • BeFoodWorker (pool: 2-10 threads)                   │
+└─────────────────────┘  └─────────────────────────────────────────────────────────┘
+        │                              │                    │
+        │                              │                    │
+        ▼                              ▼                    ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │                                    REDIS                                         │
 │   • Cache: orders:branch:{id} (TTL 10s)                                         │
@@ -46,13 +49,13 @@ Hệ thống được tách thành 2 microservices riêng biệt để tối ưu
 │   • Lock: poll-lock:branch:{id}                                                 │
 │   • Queue: Bull jobs                                                            │
 └──────────────────────────────────────────────────────────────────────────────────┘
-         │                              │                    │
-         └──────────────────────────────┼────────────────────┘
-                                        ▼
+        │                              │                    │
+        └──────────────────────────────┼────────────────────┘
+                                       ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │                           POSTGRESQL DATABASE                                    │
-│   • food_platform_accounts (MS1 write, MS2 read)                                │
-│   • food_orders (MS2 write)                                                     │
+│   • food_platform_accounts (api-app-food write, api-order-worker read)          │
+│   • food_orders (api-order-worker write)                                        │
 │   • food_order_items                                                            │
 │   • food_platform_store_mappings                                                │
 └──────────────────────────────────────────────────────────────────────────────────┘
@@ -60,9 +63,9 @@ Hệ thống được tách thành 2 microservices riêng biệt để tối ưu
 
 ---
 
-## 🏗️ Microservice 1: Account Service (Port 3001)
+## 🏗️ api-app-food (Đã có - Port 3001)
 
-### Chức năng
+### Chức năng giữ nguyên
 | Endpoint | Method | Mô tả |
 |----------|--------|-------|
 | `/accounts/link` | POST | Liên kết tài khoản Grab/Shopee/BeFood |
@@ -73,17 +76,24 @@ Hệ thống được tách thành 2 microservices riêng biệt để tối ưu
 | `/stores/:accountId` | GET | Lấy danh sách cửa hàng |
 | `/menu/:accountId` | GET | Lấy menu từ platform |
 
-### Cấu trúc thư mục
+### ❌ Cần bỏ
+- Tất cả logic gọi đến merchant API để lấy đơn hàng
+- Endpoints liên quan đến polling orders trực tiếp
+
+### Cấu trúc (giữ nguyên)
 ```
-api-account-service/
+api-app-food/
 ├── src/
 │   ├── main.ts
 │   ├── app.module.ts
 │   ├── modules/
-│   │   ├── accounts/           # Account management
-│   │   ├── stores/             # Store/branch management
-│   │   ├── menu/               # Menu synchronization
-│   │   └── connectors/         # Platform connectors (login, OTP)
+│   │   ├── accounts/           # Account management ✅
+│   │   ├── stores/             # Store/branch management ✅
+│   │   ├── menu/               # Menu synchronization ✅
+│   │   └── connectors/         # Platform connectors (login, OTP) ✅
+│   │       ├── grab/
+│   │       ├── shopee/
+│   │       └── befood/
 │   └── database/
 │       └── entities/
 └── package.json
@@ -91,7 +101,7 @@ api-account-service/
 
 ---
 
-## 🚀 Microservice 2: Order Worker Service (Port 3002)
+## 🚀 api-order-worker (Mới - Port 3002)
 
 ### Chức năng
 | Endpoint | Method | Mô tả |
@@ -111,7 +121,10 @@ api-order-worker/
 │   │   ├── orders/             # Order API + WebSocket Gateway
 │   │   ├── workers/            # Piscina Worker Manager
 │   │   ├── queue/              # Bull Queue for background jobs
-│   │   └── connectors/         # (Reserved)
+│   │   └── connectors/         # Platform order fetching
+│   │       ├── grab/
+│   │       ├── shopee/
+│   │       └── befood/
 │   ├── workers/                # Piscina worker files
 │   │   ├── grab-poll.worker.ts
 │   │   ├── shopee-poll.worker.ts
@@ -149,7 +162,7 @@ const results = await Promise.all([
 
 ### 1. CCB App gọi GET /orders/:branchId (mỗi 15s)
 ```
-CCB App → API Gateway → Order Worker
+CCB App → API Gateway → api-order-worker
                               │
                               ├─ Check Redis cache
                               │   └─ Cache hit → Return immediately (<50ms)
@@ -159,11 +172,11 @@ CCB App → API Gateway → Order Worker
 
 ### 2. CCB App gọi POST /trigger-poll/:branchId (khi cần refresh)
 ```
-CCB App → API Gateway → Order Worker
+CCB App → API Gateway → api-order-worker
                               │
                               ├─ Acquire lock (Redis)
                               │
-                              ├─ Get all accounts of branch
+                              ├─ Get all accounts of branch (từ DB)
                               │
                               ├─ Poll parallel via Piscina:
                               │   ├─ GrabWorker.run(account1)
@@ -181,7 +194,7 @@ CCB App → API Gateway → Order Worker
 
 ### 3. Realtime push khi có đơn mới
 ```
-Order Worker (sau khi save)
+api-order-worker (sau khi save)
        │
        ├─ redis.publish('branch:123:new-orders', orders)
        │
@@ -208,40 +221,21 @@ Order Worker (sau khi save)
 
 ## 🔧 Cài đặt & Chạy
 
-### 1. Account Service
+### 1. api-app-food (đã có)
 ```bash
-cd api-account-service
+cd api-app-food
 npm install
 npm run start:dev
 # Runs on port 3001
 ```
 
-### 2. Order Worker Service
+### 2. api-order-worker (mới)
 ```bash
 cd api-order-worker
 npm install
 npm run build         # Build NestJS + Workers
 npm run start:dev
 # Runs on port 3002
-```
-
-### Environment Variables
-```env
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=postgres
-DB_DATABASE=food_platform
-
-# Redis
-REDIS_URL=redis://localhost:6379
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# Ports
-PORT=3001  # Account Service
-PORT=3002  # Order Worker
 ```
 
 ---
@@ -296,3 +290,4 @@ getAllConnectedBranches(): Record<string, number>
 2. **Piscina Workers**: Compile riêng với `tsconfig.workers.json`
 3. **Redis**: Required cho cache, pub/sub, và Bull queue
 4. **WebSocket**: Namespace `/orders`, clients join room `branch:{id}`
+5. **api-app-food**: Giữ nguyên code hiện tại, chỉ bỏ phần gọi lấy đơn hàng từ merchant
