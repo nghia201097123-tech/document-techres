@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Query, Logger, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
 import { AccountsService } from '../accounts/accounts.service';
 import { GrabConnector } from '../connectors/grab.connector';
@@ -605,6 +605,67 @@ export class PublicController {
               const saved = await this.orderRepo.save(newOrder);
               savedOrders.push(saved);
               newOrderIds.push(saved.externalOrderId);
+            }
+          }
+
+          // Sync status for active orders in DB that are not in pagination response
+          // These orders may have been COMPLETED or CANCELLED
+          const activeStatuses = [
+            FoodOrderStatus.ACCEPTED,
+            FoodOrderStatus.PREPARING,
+            FoodOrderStatus.READY,
+            FoodOrderStatus.DELIVERING,
+          ];
+
+          const activeOrdersInDb = await this.orderRepo.find({
+            where: {
+              accountId: currentAccount.id,
+              status: In(activeStatuses),
+            },
+          });
+
+          // Get order IDs from pagination response
+          const paginationOrderIds = new Set(result.orders.map((o: any) => o.orderID));
+
+          // Find orders that are active in DB but not in pagination (may have completed/cancelled)
+          const ordersToSync = activeOrdersInDb.filter(
+            (o) => !paginationOrderIds.has(o.externalOrderId),
+          );
+
+          if (ordersToSync.length > 0) {
+            this.logger.log(`[pollOrders] [StatusSync] Found ${ordersToSync.length} active orders not in pagination, checking status...`);
+
+            for (const order of ordersToSync) {
+              try {
+                const detailOrder = await this.grabConnector.fetchOrderDetail(
+                  currentAccount,
+                  order.externalOrderId,
+                  order.orderCode,
+                );
+
+                if (detailOrder) {
+                  const newStatus = this.mapGrabStatusToFoodOrderStatus(detailOrder.status);
+                  if (newStatus !== order.status) {
+                    this.logger.log(`[pollOrders] [StatusSync] Order ${order.orderCode}: ${order.status} -> ${newStatus}`);
+
+                    order.previousStatus = order.status;
+                    order.status = newStatus;
+                    order.lastSyncAt = new Date();
+
+                    // Update timestamps based on new status
+                    if (newStatus === FoodOrderStatus.COMPLETED && !order.completedAt) {
+                      order.completedAt = new Date();
+                    }
+                    if (newStatus === FoodOrderStatus.CANCELLED && !order.cancelledAt) {
+                      order.cancelledAt = new Date();
+                    }
+
+                    await this.orderRepo.save(order);
+                  }
+                }
+              } catch (syncError: any) {
+                this.logger.warn(`[pollOrders] [StatusSync] Failed for order ${order.orderCode}: ${syncError.message}`);
+              }
             }
           }
 
