@@ -598,75 +598,52 @@ fun FoodOrderCard(
             Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
             when (order.status) {
                 FoodOrderStatus.NEW -> {
-                    if (isCompact) {
-                        // Vertical buttons for compact mode
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            contentPadding = PaddingValues(vertical = if (isCompact) 4.dp else 6.dp)
+                        ) {
+                            Text("Huỷ", fontSize = if (isCompact) 10.sp else 11.sp)
+                        }
                         Button(
                             onClick = onAccept,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                            contentPadding = PaddingValues(vertical = 6.dp)
+                            contentPadding = PaddingValues(vertical = if (isCompact) 4.dp else 6.dp)
                         ) {
-                            Text("Xác nhận", fontSize = 11.sp)
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = onCancel,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                ),
-                                contentPadding = PaddingValues(vertical = 6.dp)
-                            ) {
-                                Text("Huỷ", fontSize = 11.sp)
-                            }
-                            Button(
-                                onClick = onAccept,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                contentPadding = PaddingValues(vertical = 6.dp)
-                            ) {
-                                Text("Xác nhận", fontSize = 11.sp)
-                            }
+                            Text("Xác nhận", fontSize = if (isCompact) 10.sp else 11.sp)
                         }
                     }
                 }
                 FoodOrderStatus.PREPARING -> {
-                    if (isCompact) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            contentPadding = PaddingValues(vertical = if (isCompact) 4.dp else 6.dp)
+                        ) {
+                            Text("Huỷ", fontSize = if (isCompact) 10.sp else 11.sp)
+                        }
                         Button(
                             onClick = onComplete,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                            contentPadding = PaddingValues(vertical = 6.dp)
+                            contentPadding = PaddingValues(vertical = if (isCompact) 4.dp else 6.dp)
                         ) {
-                            Text("Hoàn tất", fontSize = 11.sp)
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = onCancel,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                ),
-                                contentPadding = PaddingValues(vertical = 6.dp)
-                            ) {
-                                Text("Huỷ", fontSize = 11.sp)
-                            }
-                            Button(
-                                onClick = onComplete,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                contentPadding = PaddingValues(vertical = 6.dp)
-                            ) {
-                                Text("Hoàn tất", fontSize = 11.sp)
-                            }
+                            Text("Hoàn tất", fontSize = if (isCompact) 10.sp else 11.sp)
                         }
                     }
                 }
