@@ -169,23 +169,33 @@ class FoodOrderViewModel @Inject constructor(
                 orderCode = dto.orderCode,
                 platform = mapPlatformString(dto.platform),
                 status = mapStatusString(dto.status),
+                // Customer info
+                customerId = dto.customerId,
                 customerName = dto.customerName ?: "Khách hàng",
                 customerPhone = dto.customerPhone ?: "",
                 customerAddress = dto.customerAddress,
                 customerNote = dto.customerNote,
+                // Items
                 items = dto.items?.map { mapItemDto(it) } ?: emptyList(),
                 subtotal = (dto.subtotal ?: 0.0).toLong(),
                 deliveryFee = (dto.deliveryFee ?: 0.0).toLong(),
                 platformFee = (dto.platformFee ?: 0.0).toLong(),
                 discount = (dto.discount ?: 0.0).toLong(),
                 totalAmount = dto.totalAmount.toLong(),
+                // Driver info
+                driverId = dto.driverId,
                 driverName = dto.driverName,
                 driverPhone = dto.driverPhone,
+                driverAvatar = dto.driverAvatar,
                 estimatedDeliveryTime = dto.estimatedDeliveryTime,
+                // Order status message
+                orderContentMessage = dto.orderContentMessage,
+                // Timestamps
                 createdAt = parseTimestamp(dto.platformCreatedAt ?: dto.createdAt) ?: System.currentTimeMillis(),
                 acceptedAt = parseTimestamp(dto.acceptedAt),
                 preparedAt = parseTimestamp(dto.preparedAt),
                 completedAt = parseTimestamp(dto.completedAt),
+                // Extra
                 isPaid = dto.isPaid ?: true,
                 paymentMethod = dto.paymentMethod
             )

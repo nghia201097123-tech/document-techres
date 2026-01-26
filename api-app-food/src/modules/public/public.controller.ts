@@ -611,19 +611,50 @@ export class PublicController {
           newOrders: allNewOrderIds.length,
           newOrderIds: allNewOrderIds,
           accounts: platformResults,
-          orders: allSavedOrders.map(o => ({
-            id: o.id,
-            externalOrderId: o.externalOrderId,
-            orderCode: o.orderCode,
-            platform: o.platform,
-            status: o.status,
-            customerName: o.customerName,
-            itemsCount: o.items?.length || 0,
-            totalAmount: o.totalAmount,
-            driverName: o.driverName,
-            createdAt: o.createdAt,
-            platformCreatedAt: o.platformCreatedAt,
-          })),
+          orders: allSavedOrders.map(o => {
+            // Extract customer/driver info from rawData (original Grab response)
+            const raw = o.rawData as any;
+            return {
+              id: o.id,
+              externalOrderId: o.externalOrderId,
+              orderCode: o.orderCode,
+              platform: o.platform,
+              status: o.status,
+              // Customer info
+              customerId: raw?.eater?.ID?.toString() || null,
+              customerName: o.customerName,
+              customerPhone: o.customerPhone || null,
+              customerAddress: o.customerAddress || null,
+              customerNote: o.customerNote || null,
+              // Items
+              items: o.items,
+              itemsCount: o.items?.length || 0,
+              // Payment
+              subtotal: o.subtotal,
+              deliveryFee: o.deliveryFee,
+              platformFee: o.platformFee,
+              discount: o.discount,
+              totalAmount: o.totalAmount,
+              isPaid: o.isPaid,
+              paymentMethod: o.paymentMethod,
+              // Driver info
+              driverId: raw?.driver?.ID?.toString() || null,
+              driverName: o.driverName || raw?.driver?.name || null,
+              driverPhone: o.driverPhone || null,
+              driverAvatar: raw?.driver?.avatar || null,
+              driverLicensePlate: o.driverLicensePlate || null,
+              estimatedDeliveryTime: o.estimatedDeliveryTime || raw?.times?.deliveredAt || null,
+              // Order status message
+              orderContentMessage: raw?.orderContentMessage || null,
+              // Timestamps
+              createdAt: o.createdAt,
+              platformCreatedAt: o.platformCreatedAt,
+              acceptedAt: o.acceptedAt,
+              preparedAt: o.preparedAt,
+              completedAt: o.completedAt,
+              cancelledAt: o.cancelledAt,
+            };
+          }),
           polledAt: new Date().toISOString(),
         },
       };

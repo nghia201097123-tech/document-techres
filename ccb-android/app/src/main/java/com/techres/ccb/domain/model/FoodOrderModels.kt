@@ -13,6 +13,7 @@ data class FoodAppOrder(
     val status: FoodOrderStatus,
 
     // Customer info
+    val customerId: String? = null,           // ID khách hàng từ platform
     val customerName: String,
     val customerPhone: String,
     val customerAddress: String?,             // Địa chỉ giao hàng
@@ -26,10 +27,15 @@ data class FoodAppOrder(
     val discount: Long = 0,
     val totalAmount: Long,
 
-    // Delivery info
+    // Driver info
+    val driverId: String? = null,             // ID tài xế từ platform
     val driverName: String? = null,
     val driverPhone: String? = null,
+    val driverAvatar: String? = null,         // URL avatar tài xế
     val estimatedDeliveryTime: String? = null, // "15-20 phút"
+
+    // Order status message
+    val orderContentMessage: String? = null,  // "Driver is nearby", etc.
 
     // Timestamps
     val createdAt: Long = System.currentTimeMillis(),

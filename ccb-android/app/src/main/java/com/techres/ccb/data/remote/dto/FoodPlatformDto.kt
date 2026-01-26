@@ -268,12 +268,16 @@ data class PollOrderDto(
     val orderCode: String,
     val platform: String,
     val status: String,
+    // Customer info
+    val customerId: String?,
     val customerName: String?,
     val customerPhone: String?,
     val customerAddress: String?,
     val customerNote: String?,
+    // Items
     val items: List<PollOrderItemDto>?,
     val itemsCount: Int?,
+    // Payment
     val subtotal: Double?,
     val deliveryFee: Double?,
     val platformFee: Double?,
@@ -281,10 +285,16 @@ data class PollOrderDto(
     val totalAmount: Double,
     val isPaid: Boolean?,
     val paymentMethod: String?,
+    // Driver info
+    val driverId: String?,
     val driverName: String?,
     val driverPhone: String?,
+    val driverAvatar: String?,
     val driverLicensePlate: String?,
     val estimatedDeliveryTime: String?,
+    // Order status message
+    val orderContentMessage: String?,
+    // Timestamps
     val createdAt: String?,
     val platformCreatedAt: String?,
     val acceptedAt: String?,

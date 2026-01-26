@@ -73,6 +73,8 @@ export interface RawFoodOrder {
   platform: FoodPlatformType;
   status: string;
 
+  // Customer info
+  customerId?: string;
   customerName: string;
   customerPhone: string;
   customerAddress?: string;
@@ -97,8 +99,11 @@ export interface RawFoodOrder {
   isPaid: boolean;
   paymentMethod?: string;
 
+  // Driver info
+  driverId?: string;
   driverName?: string;
   driverPhone?: string;
+  driverAvatar?: string;
   driverLicensePlate?: string;
   estimatedDeliveryTime?: string;
 
@@ -110,6 +115,9 @@ export interface RawFoodOrder {
   readyAt?: Date;
   completedAt?: Date;
   cancelledAt?: Date;
+
+  // Order status message
+  orderContentMessage?: string;
 
   rawData?: Record<string, unknown>;
 }

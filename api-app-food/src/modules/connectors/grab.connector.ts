@@ -431,6 +431,8 @@ export class GrabConnector extends BasePlatformConnector {
       platform: FoodPlatformType.GRAB,
       status: this.mapPaginationStatus(grabOrder.state, grabOrder.preparationTaskpoolStatus),
 
+      // Customer info
+      customerId: grabOrder.eater?.ID?.toString() || undefined,
       customerName: grabOrder.eater?.name || 'Khách hàng',
       customerPhone: '', // Not available in pagination response
       customerAddress: '', // Not available in pagination response
@@ -455,7 +457,10 @@ export class GrabConnector extends BasePlatformConnector {
       isPaid: true, // Assuming online payment
       paymentMethod: 'GrabPay',
 
+      // Driver info
+      driverId: grabOrder.driver?.ID?.toString() || undefined,
       driverName: grabOrder.driver?.name || undefined,
+      driverAvatar: grabOrder.driver?.avatar || undefined,
       driverPhone: undefined,
       driverLicensePlate: undefined,
       estimatedDeliveryTime: grabOrder.times?.deliveredAt || undefined,
@@ -468,6 +473,9 @@ export class GrabConnector extends BasePlatformConnector {
       readyAt: grabOrder.times?.readyAt ? new Date(grabOrder.times.readyAt) : undefined,
       completedAt: grabOrder.times?.completedAt ? new Date(grabOrder.times.completedAt) : undefined,
       cancelledAt: grabOrder.times?.cancelledAt ? new Date(grabOrder.times.cancelledAt) : undefined,
+
+      // Order status message
+      orderContentMessage: grabOrder.orderContentMessage || undefined,
 
       rawData: grabOrder as unknown as Record<string, unknown>,
     };
