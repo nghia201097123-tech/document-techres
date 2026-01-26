@@ -105,6 +105,12 @@ export interface RawFoodOrder {
   createdAt: Date;
   updatedAt: Date;
 
+  // Additional timestamp fields
+  acceptedAt?: Date;
+  readyAt?: Date;
+  completedAt?: Date;
+  cancelledAt?: Date;
+
   rawData?: Record<string, unknown>;
 }
 
@@ -115,6 +121,102 @@ export interface OrderActionResult {
   success: boolean;
   orderId: string;
   newStatus?: string;
+  error?: string;
+}
+
+/**
+ * GrabFood Pagination Order Item
+ */
+export interface GrabPaginationOrderItem {
+  itemID: string;
+  name: string;
+  quantity: number;
+  weight?: number | null;
+}
+
+/**
+ * GrabFood Pagination Order
+ */
+export interface GrabPaginationOrder {
+  orderID: string;
+  displayID: string;
+  driver: {
+    ID: number;
+    name: string;
+    avatar: string;
+  };
+  eater: {
+    ID: number;
+    name: string;
+  };
+  itemInfo: {
+    count: number;
+    items: GrabPaginationOrderItem[];
+  };
+  times: {
+    createdAt: string;
+    deliveredAt: string | null;
+    completedAt: string | null;
+    expiredAt: string;
+    acceptedAt: string | null;
+    cancelledAt: string | null;
+    readyAt: string | null;
+    displayedAt: string;
+    driverArriveRestoAt: string | null;
+    preparationCompletedAt: string | null;
+  };
+  state: string;
+  deliveryTaskpoolStatus: string;
+  preparationTaskpoolStatus: string;
+  scheduleOrderInfo: {
+    isScheduledOrder: boolean;
+    expectedDeliveryTime: string | null;
+    pickupTime: string | null;
+  };
+  orderValue: string;
+  preparationTaskID: string;
+  labels: {
+    acceptedViaCall: boolean;
+    isRead: boolean;
+    isOrderEdited: boolean;
+    acceptedViaAA: boolean;
+    hasPromo: boolean;
+    isTakeawayOrder: boolean;
+    isDeliverByMex: boolean;
+    isBusyModeOrder: boolean;
+    printCount: number;
+    isGiftOrder: boolean;
+  };
+  mcorInfo: {
+    supportMcor: boolean;
+    isEditable: boolean;
+    correctedOrderReadyAt: string | null;
+    estimatedOrderReadyAt: string;
+    driverCloseToPickingUp: boolean;
+    maxOrderReadyAt: string;
+  };
+  orderContentMessage: string;
+}
+
+/**
+ * GrabFood Orders Pagination Response
+ */
+export interface GrabOrdersPaginationResponse {
+  success: boolean;
+  orderStats?: {
+    unreadNumberInNew: number;
+    unreadAANumberInPrepare: number;
+    unreadViaCallNumberInPrepare: number;
+    numberInNew: number;
+    numberInPrepare: number;
+    numberInReady: number;
+    numberInDelivering: number;
+  };
+  orders: GrabPaginationOrder[];
+  pollInterval: number;
+  nextRequestTimestamp?: string;
+  hasMore: boolean;
+  serverTime?: string;
   error?: string;
 }
 

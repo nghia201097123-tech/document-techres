@@ -10,6 +10,8 @@ import {
   MerchantStore,
   RawFoodOrder,
   OrderActionResult,
+  GrabPaginationOrder,
+  GrabOrdersPaginationResponse,
 } from './interfaces/connector.interface';
 
 /**
@@ -321,7 +323,7 @@ export class GrabConnector extends BasePlatformConnector {
   }
 
   /**
-   * Poll orders from a specific store
+   * Poll orders from a specific store (old API)
    */
   async pollOrders(
     account: FoodPlatformAccount,
@@ -352,6 +354,149 @@ export class GrabConnector extends BasePlatformConnector {
       this.logger.error('GrabFood poll orders failed', error);
       return [];
     }
+  }
+
+  // Hardcoded Grab Food API URL for orders
+  private static readonly GRAB_FOOD_API_URL = 'https://api.grab.com/food/merchant/v3';
+
+  /**
+   * Poll orders using pagination API (new API - called by CCB every 5s)
+   * Endpoint: GET https://api.grab.com/food/merchant/v3/orders-pagination
+   */
+  async fetchOrdersPagination(
+    account: FoodPlatformAccount,
+    pageType: 'New' | 'Preparing' | 'Ready' | 'Delivering' = 'Preparing',
+    autoAcceptGroup: number = 3,
+  ): Promise<GrabOrdersPaginationResponse> {
+    const url = `${GrabConnector.GRAB_FOOD_API_URL}/orders-pagination`;
+
+    this.logger.log(`[GrabFood Orders] Fetching orders from ${url} with pageType=${pageType}`);
+
+    try {
+      const response = await axios.get(url, {
+        params: {
+          autoAcceptGroup,
+          pageType,
+        },
+        headers: {
+          'Authorization': account.accessToken,
+          'Accept': '*/*',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+        },
+        timeout: 30000,
+      });
+
+      const data = response.data;
+      this.logger.log(`[GrabFood Orders] Got ${data.orders?.length || 0} orders, pollInterval=${data.pollInterval}s`);
+
+      return {
+        success: true,
+        orderStats: data.orderStats,
+        orders: data.orders || [],
+        pollInterval: data.pollInterval || 60,
+        nextRequestTimestamp: data.nextRequestTimestamp,
+        hasMore: data.hasMore || false,
+        serverTime: data.serverTime,
+      };
+    } catch (error: any) {
+      this.logger.error(`[GrabFood Orders] EXCEPTION: ${error?.message}`);
+      this.logger.error(`[GrabFood Orders] Error status: ${error?.response?.status}`);
+
+      // Check for 401 errors
+      if (error?.response?.status === 401) {
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
+      return {
+        success: false,
+        orders: [],
+        pollInterval: 60,
+        hasMore: false,
+        error: error?.message || 'Lấy đơn hàng thất bại',
+      };
+    }
+  }
+
+  /**
+   * Transform Grab pagination order to RawFoodOrder format
+   */
+  transformPaginationOrder(grabOrder: GrabPaginationOrder): RawFoodOrder {
+    // Parse order value (e.g., "97.000" -> 97000)
+    const orderValue = parseFloat((grabOrder.orderValue || '0').replace(/\./g, '').replace(',', '.')) * 1000;
+
+    return {
+      externalOrderId: grabOrder.orderID,
+      orderCode: grabOrder.displayID || `#GR${grabOrder.orderID.slice(-6)}`,
+      platform: FoodPlatformType.GRAB,
+      status: this.mapPaginationStatus(grabOrder.state, grabOrder.preparationTaskpoolStatus),
+
+      customerName: grabOrder.eater?.name || 'Khách hàng',
+      customerPhone: '', // Not available in pagination response
+      customerAddress: '', // Not available in pagination response
+      customerNote: '',
+
+      items: (grabOrder.itemInfo?.items || []).map((item) => ({
+        productName: item.name,
+        quantity: item.quantity,
+        unitPrice: 0, // Not available in pagination response
+        totalPrice: 0,
+        note: '',
+        options: '',
+        externalProductId: item.itemID,
+      })),
+
+      subtotal: orderValue,
+      deliveryFee: 0,
+      platformFee: 0,
+      discount: 0,
+      totalAmount: orderValue,
+
+      isPaid: true, // Assuming online payment
+      paymentMethod: 'GrabPay',
+
+      driverName: grabOrder.driver?.name || null,
+      driverPhone: null,
+      driverLicensePlate: null,
+      estimatedDeliveryTime: grabOrder.times?.deliveredAt || null,
+
+      createdAt: grabOrder.times?.createdAt ? new Date(grabOrder.times.createdAt) : new Date(),
+      updatedAt: new Date(),
+
+      // Additional fields from pagination response
+      acceptedAt: grabOrder.times?.acceptedAt ? new Date(grabOrder.times.acceptedAt) : undefined,
+      readyAt: grabOrder.times?.readyAt ? new Date(grabOrder.times.readyAt) : undefined,
+      completedAt: grabOrder.times?.completedAt ? new Date(grabOrder.times.completedAt) : undefined,
+      cancelledAt: grabOrder.times?.cancelledAt ? new Date(grabOrder.times.cancelledAt) : undefined,
+
+      rawData: grabOrder,
+    };
+  }
+
+  /**
+   * Map pagination order state to standard status
+   */
+  private mapPaginationStatus(state: string, preparationStatus?: string): string {
+    // First check the main state
+    const stateMap: Record<string, string> = {
+      'ORDER_NEW': FoodOrderStatus.NEW,
+      'ORDER_IN_PREPARE': FoodOrderStatus.PREPARING,
+      'ORDER_READY': FoodOrderStatus.READY,
+      'ORDER_IN_DELIVERY': FoodOrderStatus.DELIVERING,
+      'ORDER_DELIVERED': FoodOrderStatus.COMPLETED,
+      'ORDER_CANCELLED': FoodOrderStatus.CANCELLED,
+    };
+
+    if (stateMap[state]) {
+      return stateMap[state];
+    }
+
+    // Fallback to preparation status
+    if (preparationStatus === 'ACCEPTED') {
+      return FoodOrderStatus.ACCEPTED;
+    }
+
+    return FoodOrderStatus.NEW;
   }
 
   /**

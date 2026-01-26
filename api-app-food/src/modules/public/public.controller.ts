@@ -2,8 +2,9 @@ import { Controller, Get, Post, Param, Query, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, AccountStatus } from '../../database/entities';
+import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
 import { AccountsService } from '../accounts/accounts.service';
+import { GrabConnector } from '../connectors/grab.connector';
 
 @ApiTags('public')
 @Controller('public')
@@ -19,7 +20,10 @@ export class PublicController {
     private readonly externalItemRepo: Repository<FoodPlatformExternalItem>,
     @InjectRepository(FoodPlatformItemMapping)
     private readonly itemMappingRepo: Repository<FoodPlatformItemMapping>,
+    @InjectRepository(FoodOrder)
+    private readonly orderRepo: Repository<FoodOrder>,
     private readonly accountsService: AccountsService,
+    private readonly grabConnector: GrabConnector,
   ) {}
 
   @Get('health-check')
@@ -313,5 +317,234 @@ export class PublicController {
         data: null,
       };
     }
+  }
+
+  /**
+   * Poll orders from food platform (called by CCB every 5 seconds)
+   * Fetches orders from the platform API and saves to database
+   */
+  @Get('poll-orders/:accountId')
+  @ApiOperation({ summary: 'Poll orders from food platform' })
+  @ApiParam({ name: 'accountId', description: 'Account ID to poll orders for' })
+  @ApiQuery({ name: 'pageType', required: false, description: 'Page type: New, Preparing, Ready, Delivering' })
+  @ApiResponse({ status: 200, description: 'Orders polled and saved' })
+  async pollOrders(
+    @Param('accountId') accountId: string,
+    @Query('pageType') pageType: string = 'Preparing',
+  ) {
+    this.logger.log(`[pollOrders] accountId=${accountId}, pageType=${pageType}`);
+
+    try {
+      // Get account
+      const account = await this.accountRepo.findOne({ where: { id: accountId } });
+      if (!account) {
+        return {
+          status: 404,
+          message: 'Không tìm thấy tài khoản',
+          data: null,
+        };
+      }
+
+      // Check account status
+      if (account.status !== AccountStatus.CONNECTED) {
+        return {
+          status: 400,
+          message: 'Tài khoản chưa được kết nối',
+          data: null,
+        };
+      }
+
+      // Check access token
+      if (!account.accessToken) {
+        return {
+          status: 400,
+          message: 'Tài khoản chưa có token',
+          data: null,
+        };
+      }
+
+      // Only GrabFood is supported for now
+      if (account.platform !== FoodPlatformType.GRAB) {
+        return {
+          status: 400,
+          message: 'Chỉ hỗ trợ GrabFood hiện tại',
+          data: null,
+        };
+      }
+
+      // Fetch orders from GrabFood
+      const validPageType = ['New', 'Preparing', 'Ready', 'Delivering'].includes(pageType)
+        ? pageType as 'New' | 'Preparing' | 'Ready' | 'Delivering'
+        : 'Preparing';
+
+      const result = await this.grabConnector.fetchOrdersPagination(account, validPageType);
+
+      if (!result.success) {
+        // Update account error status
+        await this.accountRepo.update(account.id, {
+          errorCount: account.errorCount + 1,
+          lastError: result.error || 'Lấy đơn hàng thất bại',
+        });
+
+        return {
+          status: 500,
+          message: result.error || 'Lấy đơn hàng thất bại',
+          data: null,
+        };
+      }
+
+      // Save orders to database
+      const savedOrders: FoodOrder[] = [];
+      const newOrderIds: string[] = [];
+
+      for (const grabOrder of result.orders) {
+        const rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
+
+        // Check if order already exists
+        let existingOrder = await this.orderRepo.findOne({
+          where: {
+            externalOrderId: rawOrder.externalOrderId,
+            platform: FoodPlatformType.GRAB,
+          },
+        });
+
+        if (existingOrder) {
+          // Update existing order
+          const newStatus = this.mapGrabStatusToFoodOrderStatus(rawOrder.status);
+          const statusChanged = existingOrder.status !== newStatus;
+
+          existingOrder.status = newStatus;
+          existingOrder.previousStatus = statusChanged ? existingOrder.status : existingOrder.previousStatus;
+          existingOrder.driverName = rawOrder.driverName || existingOrder.driverName;
+          existingOrder.lastSyncAt = new Date();
+          existingOrder.rawData = rawOrder.rawData;
+
+          if (rawOrder.acceptedAt && !existingOrder.acceptedAt) {
+            existingOrder.acceptedAt = rawOrder.acceptedAt;
+          }
+          if (rawOrder.readyAt && !existingOrder.preparedAt) {
+            existingOrder.preparedAt = rawOrder.readyAt;
+          }
+          if (rawOrder.completedAt && !existingOrder.completedAt) {
+            existingOrder.completedAt = rawOrder.completedAt;
+          }
+          if (rawOrder.cancelledAt && !existingOrder.cancelledAt) {
+            existingOrder.cancelledAt = rawOrder.cancelledAt;
+          }
+
+          await this.orderRepo.save(existingOrder);
+          savedOrders.push(existingOrder);
+        } else {
+          // Create new order
+          const newOrder = this.orderRepo.create({
+            tenantId: account.tenantId,
+            branchId: account.branchId,
+            externalOrderId: rawOrder.externalOrderId,
+            orderCode: rawOrder.orderCode,
+            platform: FoodPlatformType.GRAB,
+            status: this.mapGrabStatusToFoodOrderStatus(rawOrder.status),
+            customerName: rawOrder.customerName,
+            customerPhone: rawOrder.customerPhone || '',
+            customerAddress: rawOrder.customerAddress || null,
+            customerNote: rawOrder.customerNote || null,
+            items: rawOrder.items,
+            subtotal: rawOrder.subtotal,
+            deliveryFee: rawOrder.deliveryFee,
+            platformFee: rawOrder.platformFee,
+            discount: rawOrder.discount,
+            totalAmount: rawOrder.totalAmount,
+            isPaid: rawOrder.isPaid,
+            paymentMethod: rawOrder.paymentMethod || null,
+            driverName: rawOrder.driverName || null,
+            driverPhone: rawOrder.driverPhone || null,
+            driverLicensePlate: rawOrder.driverLicensePlate || null,
+            estimatedDeliveryTime: rawOrder.estimatedDeliveryTime || null,
+            platformCreatedAt: rawOrder.createdAt,
+            acceptedAt: rawOrder.acceptedAt || null,
+            preparedAt: rawOrder.readyAt || null,
+            completedAt: rawOrder.completedAt || null,
+            cancelledAt: rawOrder.cancelledAt || null,
+            accountId: account.id,
+            rawData: rawOrder.rawData,
+          });
+
+          const saved = await this.orderRepo.save(newOrder);
+          savedOrders.push(saved);
+          newOrderIds.push(saved.externalOrderId);
+        }
+      }
+
+      // Update account last poll time
+      await this.accountRepo.update(account.id, {
+        lastPollAt: new Date(),
+        errorCount: 0,
+        lastError: null,
+      });
+
+      this.logger.log(`[pollOrders] Saved ${savedOrders.length} orders (${newOrderIds.length} new) for account ${accountId}`);
+
+      return {
+        status: 200,
+        message: 'Ok',
+        data: {
+          orderStats: result.orderStats,
+          ordersCount: savedOrders.length,
+          newOrdersCount: newOrderIds.length,
+          newOrderIds,
+          orders: savedOrders.map(o => ({
+            id: o.id,
+            externalOrderId: o.externalOrderId,
+            orderCode: o.orderCode,
+            status: o.status,
+            customerName: o.customerName,
+            itemsCount: o.items?.length || 0,
+            totalAmount: o.totalAmount,
+            driverName: o.driverName,
+            createdAt: o.createdAt,
+            platformCreatedAt: o.platformCreatedAt,
+          })),
+          pollInterval: result.pollInterval,
+          nextRequestTimestamp: result.nextRequestTimestamp,
+          serverTime: result.serverTime,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[pollOrders] Error: ${error.message}`);
+
+      // Update account error status
+      try {
+        const account = await this.accountRepo.findOne({ where: { id: accountId } });
+        if (account) {
+          await this.accountRepo.update(account.id, {
+            errorCount: account.errorCount + 1,
+            lastError: error.message,
+          });
+        }
+      } catch (e) {
+        // Ignore error updating account
+      }
+
+      return {
+        status: 500,
+        message: error.message,
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Map Grab status to FoodOrderStatus
+   */
+  private mapGrabStatusToFoodOrderStatus(status: string): FoodOrderStatus {
+    const statusMap: Record<string, FoodOrderStatus> = {
+      'new': FoodOrderStatus.NEW,
+      'accepted': FoodOrderStatus.ACCEPTED,
+      'preparing': FoodOrderStatus.PREPARING,
+      'ready': FoodOrderStatus.READY,
+      'delivering': FoodOrderStatus.DELIVERING,
+      'completed': FoodOrderStatus.COMPLETED,
+      'cancelled': FoodOrderStatus.CANCELLED,
+    };
+    return statusMap[status] || FoodOrderStatus.NEW;
   }
 }
